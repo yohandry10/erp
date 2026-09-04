@@ -246,6 +246,64 @@ test.describe('Argentina · aislamiento jurisdiccional y factura ARCA', () => {
     expect(writes.filter((url) => /\/api\/documentos\//.test(url))).toEqual([])
   })
 
+  test('Compras guarda desde el modal con moneda y clave estable; conserva errores y no duplica líneas al reabrir', async ({ page }) => {
+    const submissions: Record<string, any>[] = []
+    let accept = false
+    const supplier = { id: '11111111-1111-4111-8111-111111111111', nombre: 'Proveedor Argentina', razon_social: 'Proveedor Argentina', ruc: '30999888778' }
+    const product = { id: '22222222-2222-4222-8222-222222222222', nombre: 'Café QA', precio: 100, afectacion_igv: '10' }
+    await page.route(/\/api\/compras\/proveedores\/?(?:\?|$)/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: [supplier] }) }))
+    await page.route(/\/api\/compras\/productos\/?(?:\?|$)/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: [product] }) }))
+    await page.route(/\/api\/compras\/next-number\/?(?:\?|$)/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: { numero: 'OC-2026-001' } }) }))
+    await page.route(/\/api\/compras\/ordenes\/?(?:\?|$)/, route => {
+      if (route.request().method() !== 'POST') return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: [] }) })
+      submissions.push(route.request().postDataJSON())
+      return route.fulfill({ status: accept ? 201 : 400, contentType: 'application/json', body: JSON.stringify(accept
+        ? { success: true, data: { id: '33333333-3333-4333-8333-333333333333' } }
+        : { message: 'Compra rechazada en QA: revise los datos y reintente.' }) })
+    })
+    await page.goto('/dashboard/compras/')
+    await page.getByRole('button', { name: 'Nueva orden', exact: true }).first().click()
+    await page.locator('#orden-compra-modal-proveedor-id').selectOption(supplier.id)
+    await page.getByRole('combobox', { name: 'Producto', exact: true }).selectOption(product.id)
+    // Seleccionar producto debe recalcular incluso sin editar precio/cantidad.
+    await expect(page.getByText('Total: $ 121.00', { exact: true })).toBeVisible()
+    await page.getByRole('spinbutton', { name: 'Cantidad', exact: true }).fill('10')
+    await page.locator('#orden-compra-modal-fecha-entrega').fill('2026-09-07')
+    await page.locator('#orden-compra-modal-observaciones').fill('QA compra con recepción parcial')
+    await page.locator('#orden-compra-modal-moneda').selectOption('USD')
+    await page.getByRole('button', { name: 'Crear Orden', exact: true }).click()
+    await expect(page.getByRole('alert')).toContainText('Compra rechazada en QA')
+    await expect(page.getByRole('spinbutton', { name: 'Cantidad', exact: true })).toHaveValue('10')
+    await expect(page.locator('#orden-compra-modal-observaciones')).toHaveValue('QA compra con recepción parcial')
+    expect(submissions).toHaveLength(1)
+    expect(submissions[0]).toMatchObject({ moneda: 'USD', idempotency_key: expect.stringMatching(/^[a-f0-9-]{36}$/), detalles: [{ producto_id: product.id, cantidad: 10, precio_unitario: 100 }] })
+    expect(submissions[0]).not.toHaveProperty('items')
+    expect(submissions[0]).not.toHaveProperty('total')
+    accept = true
+    await page.getByRole('button', { name: 'Crear Orden', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Nueva Orden de Compra', exact: true })).toHaveCount(0)
+    expect(submissions).toHaveLength(2)
+    expect(submissions[1]).toEqual(submissions[0])
+    await page.getByRole('button', { name: 'Nueva orden', exact: true }).first().click()
+    await expect(page.getByRole('combobox', { name: 'Producto', exact: true })).toHaveCount(1)
+    await expect(page.locator('#orden-compra-modal-moneda')).toHaveValue('ARS')
+    await expect(page.locator('#orden-compra-modal-observaciones')).toHaveValue('')
+    await page.getByRole('button', { name: 'Cancelar', exact: true }).click()
+    await page.getByRole('button', { name: 'Nueva orden', exact: true }).first().click()
+    await expect(page.getByRole('combobox', { name: 'Producto', exact: true })).toHaveCount(1)
+    await page.locator('#orden-compra-modal-proveedor-id').selectOption(supplier.id)
+    await page.locator('#orden-compra-modal-fecha-entrega').fill('2026-09-07')
+    await page.getByRole('combobox', { name: 'Producto', exact: true }).selectOption(product.id)
+    await page.getByRole('spinbutton', { name: 'Cantidad', exact: true }).fill('0')
+    await page.getByRole('button', { name: 'Crear Orden', exact: true }).click()
+    expect(submissions).toHaveLength(2)
+    await page.getByRole('spinbutton', { name: 'Cantidad', exact: true }).fill('0.5')
+    await page.getByRole('button', { name: 'Crear Orden', exact: true }).click()
+    await expect.poll(() => submissions.length).toBe(3)
+    expect(submissions[2].idempotency_key).not.toBe(submissions[0].idempotency_key)
+    expect(submissions[2]).toMatchObject({ moneda: 'ARS', detalles: [{ cantidad: 0.5 }] })
+  })
+
   test('el asiento conserva el borrador y explica el período faltante para corregir y reintentar', async ({ page }) => {
     const periodError = 'El período contable 2026-09 no existe. Debe crearse explícitamente antes de registrar movimientos.'
     const submissions: Record<string, unknown>[] = []

@@ -1,4 +1,4 @@
-import { IsString, IsUUID, IsDate, IsOptional, IsArray, ValidateNested, Min, IsInt, ArrayMinSize } from 'class-validator';
+import { IsString, IsUUID, IsDate, IsOptional, IsArray, ValidateNested, Min, IsInt, ArrayMinSize, IsIn } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { OrdenCompraDetalleDto } from './create-orden-compra.dto';
@@ -13,6 +13,11 @@ export class UpdateOrdenCompraDto {
   @IsOptional()
   @IsUUID('4', { message: 'El proveedor_id debe ser un UUID válido' })
   proveedor_id?: string;
+
+  @ApiPropertyOptional({ description: 'Moneda de la orden', enum: ['PEN', 'COP', 'ARS', 'USD'] })
+  @IsOptional()
+  @IsIn(['PEN', 'COP', 'ARS', 'USD'])
+  moneda?: string;
 
   @ApiPropertyOptional({ description: 'Fecha de la orden', example: '2024-10-24' })
   @IsOptional()
