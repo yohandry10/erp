@@ -17,7 +17,7 @@ import {
   DIAN_PAYMENT_SNAPSHOT_KEY,
 } from './pedido-payment.util';
 import {
-  isColombiaDemoRepresentation,
+  isFiscalDemoRepresentation,
   resolveHistoricalCpeCountry,
 } from '../../cpe/historical-cpe-country.util';
 
@@ -454,6 +454,7 @@ export class CPEIntegrationService {
     total: number;
     documento_id?: string | null;
     cpe_id?: string;
+    fiscal_authority?: 'SUNAT' | 'ARCA' | 'DIAN';
   }> {
     this.logger.log(`Generando factura desde pedido ${pedido.id}`);
 
@@ -462,16 +463,17 @@ export class CPEIntegrationService {
     let dianSnapshotPrepared = false;
 
     try {
-      // 1. Determinar primero país y modalidad. Una demo CO produce sólo una
-      // representación local marcada sin validez DIAN; no debe fingir una
+      // 1. Determinar primero país y modalidad. Una demo CO/AR produce sólo una
+      // representación local marcada sin validez fiscal; no debe fingir una
       // firma usando el certificado sintético peruano ni exigir un PFX real.
       let empresaConfig = await this.obtenerEmpresaConfig(tenantId);
-      const esDemoColombia = empresaConfig.is_demo === true
-        && String(empresaConfig.pais ?? '').trim().toUpperCase() === 'CO';
+      const paisConfigurado = String(empresaConfig.pais ?? '').trim().toUpperCase();
+      const esDemoLocalSinFirma = empresaConfig.is_demo === true
+        && ['CO', 'AR'].includes(paisConfigurado);
 
-      // 2. Toda cuenta real (incluida CO) y las demos no colombianas conservan
-      // el guard de certificado vigente. El bypass es exacto para CO demo.
-      if (!esDemoColombia) {
+      // 2. Toda cuenta real y las demos fuera de CO/AR conservan el guard de
+      // certificado vigente. El bypass es exacto para representaciones locales.
+      if (!esDemoLocalSinFirma) {
         const certificateValidation = await this.validationService.validateCertificate(tenantId);
         if (!certificateValidation.isValid) {
           this.logger.error(`Certificado inválido para tenant ${tenantId}: ${certificateValidation.errors.join(', ')}`);
@@ -587,7 +589,12 @@ export class CPEIntegrationService {
       // inferir desde empresa_config porque el tenant puede convertirse de demo
       // a real entre el freeze y esta respuesta (o antes de un reintento).
       const paisFiscalPersistido = resolveHistoricalCpeCountry(facturaPersistida);
-      const esRepresentacionDemoColombia = isColombiaDemoRepresentation(
+      const autoridadFiscalPersistida = paisFiscalPersistido === 'AR'
+        ? 'ARCA'
+        : paisFiscalPersistido === 'CO'
+          ? 'DIAN'
+          : 'SUNAT';
+      const esRepresentacionDemoLocal = isFiscalDemoRepresentation(
         facturaPersistida,
       );
 
@@ -595,7 +602,7 @@ export class CPEIntegrationService {
       const resultado = this.procesarRespuestaFiscal(
         facturaPersistida,
         paisFiscalPersistido,
-        esRepresentacionDemoColombia,
+        esRepresentacionDemoLocal,
       );
 
       const durationMs = Date.now() - startedAt;
@@ -609,7 +616,7 @@ export class CPEIntegrationService {
           serie: facturaPersistida.serie ?? factura.serie ?? facturaData.serie,
           numero: facturaPersistida.numero ?? factura.numero ?? facturaData.numero,
           estado: resultado.estado,
-          is_demo_representation: esRepresentacionDemoColombia,
+          is_demo_representation: esRepresentacionDemoLocal,
         },
       });
 
@@ -618,7 +625,8 @@ export class CPEIntegrationService {
         cpe_id: facturaPersistida.id,
         estado: resultado.estado,
         warnings: resultado.warnings,
-        is_demo_representation: esRepresentacionDemoColombia,
+        is_demo_representation: esRepresentacionDemoLocal,
+        fiscal_authority: autoridadFiscalPersistida,
         serie: facturaPersistida.serie ?? factura.serie ?? facturaData.serie,
         numero: facturaPersistida.numero ?? factura.numero ?? facturaData.numero,
         moneda: facturaPersistida.moneda ?? factura.moneda ?? facturaData.moneda ?? 'PEN',
@@ -999,9 +1007,9 @@ export class CPEIntegrationService {
     const warnings: string[] = [];
     const authority = countryCode === 'CO' ? 'DIAN' : countryCode === 'AR' ? 'ARCA' : 'SUNAT';
 
-    if (countryCode === 'CO' && isDemo) {
-      warnings.push('Comprobante demo generado localmente: muestra sin transmisión ni validez DIAN');
-      this.logger.log(`Factura demo ${factura.id} generada sin transmisión DIAN`);
+    if (isDemo) {
+      warnings.push(`Comprobante demo generado localmente: muestra sin transmisión ni validez ${authority}`);
+      this.logger.log(`Factura demo ${factura.id} generada sin transmisión ${authority}`);
       return { estado: factura.estado, warnings };
     }
 

@@ -1632,11 +1632,20 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       const dianCreationContext = paisCodigo === 'CO'
         ? await this.loadDianCreationContext(createFacturaDto, tenantId)
         : null;
+      // La modalidad demo se vuelve a leer en el núcleo de creación. No basta
+      // con que la UI o el flujo de pedidos la hayan observado antes: una
+      // llamada interna/directa debe conservar el mismo límite de no emisión.
+      const argentinaCreationIssuer = paisCodigo === 'AR'
+        ? await this.getEmpresaEmisorInfoStrict(tenantId)
+        : null;
       const isRealDianCreation = paisCodigo === 'CO'
         && dianCreationContext !== null
         && !dianCreationContext.emisor.isDemo;
       const isColombiaDemoCreation = paisCodigo === 'CO'
         && dianCreationContext?.emisor.isDemo === true;
+      const isArgentinaDemoCreation = paisCodigo === 'AR'
+        && argentinaCreationIssuer?.isDemo === true;
+      const isLocalDemoCreation = isColombiaDemoCreation || isArgentinaDemoCreation;
       if (isColombiaDemoCreation) {
         // La resolución demo puede no declarar prefijo, igual que una
         // autorización DIAN válida. El escritor atómico heredado exige una
@@ -1731,6 +1740,12 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       );
       this.assertFechaEmisionNoFutura(emissionDate, paisCodigo);
       if (paisCodigo === 'AR') {
+        if (isArgentinaDemoCreation
+            && String(createFacturaDto.moneda ?? '').trim().toUpperCase() !== 'ARS') {
+          throw new BadRequestException(
+            'ARCA: la demo sólo admite ARS y no consulta servicios oficiales de cotización',
+          );
+        }
         await this.prepareArgentinaCurrency(createFacturaDto, tenantId, emissionDate);
       }
       this.assertReceptorValido(createFacturaDto, paisCodigo);
@@ -1775,10 +1790,10 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       // ===== PRE-EMISSION VALIDATIONS =====
       this.logger.log(`Starting pre-emission validations for tenant: ${tenantId}`);
 
-      // 1. Validate certificate. Una demo CO nunca firma ni transmite: sólo
+      // 1. Validate certificate. Una demo CO/AR nunca firma ni transmite: sólo
       // persiste un artefacto interno explícitamente no fiscal para alimentar
       // la representación A4. Todas las cuentas reales siguen fallando cerrado.
-      if (!isColombiaDemoCreation) {
+      if (!isLocalDemoCreation) {
         const certificateValidation = await this.validationService.validateCertificate(tenantId);
         if (!certificateValidation.isValid) {
           this.logger.error(`Certificate validation failed: ${certificateValidation.errors.join(', ')}`);
@@ -1928,11 +1943,14 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
         );
         signedXml = signedDian.xml;
         hash = signedDian.hash;
-      } else if (isColombiaDemoCreation) {
-        // No se crea un UBL DIAN ni una firma sintética. Este XML de dominio
+      } else if (isLocalDemoCreation) {
+        // No se crea un UBL/WSFE ni una firma sintética. Este XML de dominio
         // interno sólo permite cerrar el workflow demo y generar su A4 con
         // marca de agua; getSignedXml y el transporte rechazan este formato.
-        const demoArtifact = this.generateColombiaDemoArtifact(createFacturaDto);
+        const demoArtifact = this.generateLocalDemoArtifact(
+          createFacturaDto,
+          paisCodigo === 'AR' ? 'AR' : 'CO',
+        );
         signedXml = demoArtifact.xml;
         hash = demoArtifact.hash;
       } else {
@@ -1975,6 +1993,7 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
         total_igv: createFacturaDto.total_igv,
         total_venta: createFacturaDto.total_venta,
         metadata: paisCodigo === 'AR' ? {
+          pais: 'AR',
           arca_punto_venta: Number(createFacturaDto.serie),
           arca_condicion_iva_emisor: (createFacturaDto as any).arca_condicion_iva_emisor ?? null,
           arca_condicion_iva_receptor: (createFacturaDto as any).arca_condicion_iva_receptor,
@@ -1986,6 +2005,15 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
           arca_tributos_total: totalIsc,
           arca_can_mis_mon_ext: (createFacturaDto as any).arca_pago_misma_moneda ?? null,
           arca_cotizacion: Number((createFacturaDto as any).tipo_cambio ?? 1),
+          arca_is_demo: isArgentinaDemoCreation,
+          ...(isArgentinaDemoCreation ? {
+            arca_simulado: true,
+            arca_fixture_source: 'ERP_DEMO_LOCAL_REPRESENTATION_V1',
+            demo_artifact_format: 'ERP_DEMO_CPE_V1',
+            demo_artifact_signed: false,
+            demo_artifact_integrity: 'SHA-256',
+            fiscal_delivery_eligible: false,
+          } : {}),
         } : paisCodigo === 'CO' ? {
           ...(
             (createFacturaDto as any).metadata
@@ -3037,19 +3065,21 @@ async retrySendToOse(
     return this.xmlBuilder.generateXmlContent(factura);
   }
 
-  private generateColombiaDemoArtifact(
+  private generateLocalDemoArtifact(
     factura: CreateFacturaDto,
+    country: 'CO' | 'AR',
   ): { xml: string; hash: string } {
+    const authority = country === 'AR' ? 'ARCA' : 'DIAN';
     const canonicalPayload = {
       version: 1,
-      country: 'CO',
-      authority: 'DIAN',
+      country,
+      authority,
       fiscalValidity: 'NONE',
       documentType: String(factura.tipo_documento ?? ''),
       series: String(factura.serie ?? ''),
       number: Number(factura.numero ?? 0),
       issueDate: String((factura as any).fecha_emision ?? ''),
-      currency: String(factura.moneda ?? 'COP').trim().toUpperCase(),
+      currency: String(factura.moneda ?? (country === 'AR' ? 'ARS' : 'COP')).trim().toUpperCase(),
       issuerTaxId: String(factura.ruc_emisor ?? ''),
       receiverDocument: String(factura.documento_receptor ?? ''),
       taxable: Number(factura.total_gravadas ?? 0),
@@ -3070,8 +3100,8 @@ async retrySendToOse(
     const payload = Buffer.from(JSON.stringify(canonicalPayload), 'utf8').toString('base64');
     const xml = [
       '<?xml version="1.0" encoding="UTF-8"?>',
-      '<DemoCpe xmlns="urn:erp-suite:demo:cpe:1" country="CO" authority="DIAN" fiscalValidity="NONE">',
-      '<Notice>MUESTRA DEMO SIN TRANSMISION NI VALIDEZ DIAN</Notice>',
+      `<DemoCpe xmlns="urn:erp-suite:demo:cpe:1" country="${country}" authority="${authority}" fiscalValidity="NONE">`,
+      `<Notice>MUESTRA DEMO SIN TRANSMISION NI VALIDEZ ${authority}</Notice>`,
       `<CanonicalPayload encoding="base64-json">${payload}</CanonicalPayload>`,
       '</DemoCpe>',
     ].join('');

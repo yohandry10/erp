@@ -108,7 +108,11 @@ BEGIN
   UPDATE public.empresa_config
   SET pais = 'AR', ruc = '30710158229', razon_social = 'Empresa AR 524',
       moneda_defecto = 'ARS', arca_punto_venta = 12,
-      arca_condicion_iva = 'RESPONSABLE_INSCRIPTO'
+      arca_condicion_iva = 'RESPONSABLE_INSCRIPTO',
+      -- Este verificador ejercita aceptación CAE real. Desde 536 las demos AR
+      -- fallan cerrado antes de reservar SEND, por lo que el fixture debe
+      -- declarar explícitamente la conversión que su escenario siempre asumió.
+      is_demo = false, demo_extended = false, demo_expires_at = NULL
   WHERE tenant_id = v_tenant;
 
   v_failed := false;
@@ -454,7 +458,18 @@ BEGIN
   -- que todo transporte de un CPE demo CO se rechaza. Aquí sólo conservamos
   -- el contraste no-ARCA de Perú que corresponde al alcance original de 524.
   FOREACH v_country IN ARRAY ARRAY['PE'] LOOP
-    UPDATE public.empresa_config SET pais = v_country WHERE tenant_id = v_tenant;
+    -- 525 vuelve inmutable el país de un tenant que ya tiene CPE reales. El
+    -- contraste debe usar su propio contribuyente, no mutar el emisor ARCA que
+    -- acaba de recibir CAE en este mismo verificador.
+    v_demo := public.create_demo_tenant('VERIFY SUNAT 524', 1, v_country);
+    v_tenant := (v_demo->>'tenant_id')::uuid;
+    v_actor := (v_demo->>'user_id')::uuid;
+    PERFORM set_config('app.current_tenant_id', v_tenant::text, true);
+    UPDATE public.empresa_config
+    SET pais = v_country, ruc = '20600000524', razon_social = 'Empresa ' || v_country,
+        moneda_defecto = 'PEN', is_demo = false,
+        demo_extended = false, demo_expires_at = NULL
+    WHERE tenant_id = v_tenant;
     v_country_document := gen_random_uuid();
     v_country_cpe := gen_random_uuid();
     v_num := v_num + 1;

@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { CpeService } from './cpe.service';
 
 const TENANT_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -58,20 +59,28 @@ function buildHarness(receiver = ARGENTINA_RECEIVER) {
       cotizacion: 1325.75,
       fecha: '20260904',
     }),
+    generarYFirmarDocumentoSinTransmitir: jest.fn(),
   };
+  const validation = {
+    validateCertificate: jest.fn().mockResolvedValue({ isValid: true, warnings: [], errors: [] }),
+    validateRucConfiguration: jest.fn().mockResolvedValue({ isValid: true, missingFields: [], errors: [] }),
+    validateDocumentBeforeEmission: jest.fn().mockResolvedValue({ isValid: true, warnings: [], errors: [] }),
+  };
+  const audit = { registrarCambio: jest.fn().mockResolvedValue(undefined) };
+  const cache = { onCpeCreated: jest.fn().mockResolvedValue(undefined) };
   const service = new CpeService(
     { getClient: jest.fn(() => client), update: jest.fn() } as any,
     { get: jest.fn() } as any,
     { emit: jest.fn() } as any,
-    {} as any,
-    {} as any,
-    {} as any,
+    validation as any,
+    audit as any,
+    cache as any,
     {} as any,
     fiscalAdapter as any,
     {} as any,
   );
   jest.spyOn(service as any, 'getEmpresaEmisorInfoStrict').mockResolvedValue(ARGENTINA_ISSUER);
-  return { service, receiverQuery, client, fiscalAdapter };
+  return { service, receiverQuery, client, fiscalAdapter, validation };
 }
 
 function uiPayload(overrides: Record<string, unknown> = {}) {
@@ -262,5 +271,128 @@ describe('CpeService · creación Argentina desde UI', () => {
     );
     expect(dto.tipo_cambio).toBe(1325.75);
     expect(dto.arca_pago_misma_moneda).toBe('S');
+  });
+
+  it('persiste una muestra Argentina local sin certificado, firma, CAE ni contacto ARCA', async () => {
+    const { service, client, fiscalAdapter, validation } = buildHarness();
+    jest.spyOn(service as any, 'getEmpresaEmisorInfoStrict').mockResolvedValue({
+      ...ARGENTINA_ISSUER,
+      isDemo: true,
+    });
+    validation.validateCertificate.mockResolvedValue({
+      isValid: false,
+      warnings: [],
+      errors: ['No hay certificado'],
+    });
+    const signerSpy = jest.spyOn(service as any, 'getXmlSigner');
+    let persistedPayload: any;
+    client.rpc.mockImplementation(async (name: string, args: any) => {
+      if (name !== 'emitir_factura_cliente_tx') {
+        throw new Error(`RPC no esperada: ${name}`);
+      }
+      persistedPayload = args.p_cpe;
+      return {
+        data: {
+          cpe: {
+            id: 'cpe-demo-ar-local',
+            ...args.p_cpe,
+            simulated_origin: true,
+            issuer_snapshot: { country_code: 'AR' },
+            fiscal_authority_evidence: {
+              contract_version: 525,
+              status: 'SIMULATED',
+              authority: 'ARCA',
+              country_code: 'AR',
+            },
+          },
+          documento_id: 'documento-demo-ar-local',
+          cxc_id: null,
+        },
+        error: null,
+      };
+    });
+
+    const result = await service.create({
+      tipo_documento: '01',
+      serie: '00012',
+      numero: 7,
+      fecha_emision: '2026-09-04',
+      moneda: 'ARS',
+      items: [{
+        codigo: 'SERV-AR-1',
+        descripcion: 'Producto demostración Argentina',
+        cantidad: 1,
+        precio_unitario: 1000,
+        valor_venta: 1000,
+        igv: 210,
+        afectacion_igv: '10',
+      }],
+      ruc_emisor: ARGENTINA_ISSUER.ruc,
+      razon_social_emisor: ARGENTINA_ISSUER.razonSocial,
+      cliente_id: CLIENTE_ID,
+      tipo_documento_receptor: '80',
+      documento_receptor: ARGENTINA_RECEIVER.ruc,
+      razon_social_receptor: ARGENTINA_RECEIVER.razon_social,
+      direccion_receptor: ARGENTINA_RECEIVER.direccion,
+      total_gravadas: 1000,
+      total_igv: 210,
+      total_venta: 1210,
+      arca_concepto: 1,
+      arca_condicion_iva_emisor: 'RESPONSABLE_INSCRIPTO',
+      arca_condicion_iva_receptor: 'MONOTRIBUTO',
+      idempotency_key: 'cpe.ar.demo:local-artifact',
+    } as any, TENANT_ID, ACTOR_ID);
+
+    expect(result.id).toBe('cpe-demo-ar-local');
+    expect(validation.validateCertificate).not.toHaveBeenCalled();
+    expect(signerSpy).not.toHaveBeenCalled();
+    expect(fiscalAdapter.generarYFirmarDocumentoSinTransmitir).not.toHaveBeenCalled();
+    expect(fiscalAdapter.obtenerCotizacionOficialArca).not.toHaveBeenCalled();
+    expect(persistedPayload.metadata).toEqual(expect.objectContaining({
+      pais: 'AR',
+      arca_is_demo: true,
+      arca_simulado: true,
+      arca_fixture_source: 'ERP_DEMO_LOCAL_REPRESENTATION_V1',
+      demo_artifact_format: 'ERP_DEMO_CPE_V1',
+      demo_artifact_signed: false,
+      demo_artifact_integrity: 'SHA-256',
+      fiscal_delivery_eligible: false,
+    }));
+    expect(persistedPayload.xml_firmado).toContain(
+      'country="AR" authority="ARCA" fiscalValidity="NONE"',
+    );
+    expect(persistedPayload.xml_firmado).toContain(
+      '<Notice>MUESTRA DEMO SIN TRANSMISION NI VALIDEZ ARCA</Notice>',
+    );
+    expect(persistedPayload.xml_firmado).not.toContain('Signature');
+    expect(persistedPayload.metadata).not.toHaveProperty('arca_cae');
+    expect(persistedPayload.hash_firma).toBe(
+      createHash('sha256').update(persistedPayload.xml_firmado, 'utf8').digest('hex'),
+    );
+  });
+
+  it('rechaza USD en una demo Argentina sin consultar la cotización oficial', async () => {
+    const { service, fiscalAdapter } = buildHarness();
+    jest.spyOn(service as any, 'getEmpresaEmisorInfoStrict').mockResolvedValue({
+      ...ARGENTINA_ISSUER,
+      isDemo: true,
+    });
+
+    await expect(service.create({
+      tipo_documento: '01', serie: '00012', numero: 8,
+      fecha_emision: '2026-09-04', moneda: 'USD',
+      items: [{ cantidad: 1, precio_unitario: 100, valor_venta: 100, igv: 21 }],
+      ruc_emisor: ARGENTINA_ISSUER.ruc,
+      razon_social_emisor: ARGENTINA_ISSUER.razonSocial,
+      tipo_documento_receptor: '80', documento_receptor: ARGENTINA_RECEIVER.ruc,
+      razon_social_receptor: ARGENTINA_RECEIVER.razon_social,
+      total_gravadas: 100, total_igv: 21, total_venta: 121,
+      arca_concepto: 1,
+      arca_pago_misma_moneda: 'S',
+      arca_condicion_iva_emisor: 'RESPONSABLE_INSCRIPTO',
+      arca_condicion_iva_receptor: 'MONOTRIBUTO',
+    } as any, TENANT_ID, ACTOR_ID)).rejects.toThrow(/demo sólo admite ARS/i);
+
+    expect(fiscalAdapter.obtenerCotizacionOficialArca).not.toHaveBeenCalled();
   });
 });
