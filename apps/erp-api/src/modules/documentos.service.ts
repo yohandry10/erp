@@ -10,6 +10,7 @@ import { CacheInvalidationService } from '../shared/cache/cache-invalidation.ser
 import { CpeService } from './cpe/cpe.service';
 import { validateArgentinaTaxId } from './fiscal/arca-fiscal.service';
 import { getActiveCountryById, validateColombiaNit } from './paises/initial-country';
+import { resolveArgentinaExplicitFiscalCode, resolveArgentinaFiscalDocument } from '../shared/utils/argentina-fiscal-document.util';
 import {
   ActualizarDocumentoManualDto,
   CrearDocumentoManualDto,
@@ -155,7 +156,46 @@ export class DocumentosService {
     if (filters.serie) query = query.eq('serie', filters.serie);
     const { data, error } = await query;
     if (error) throw new BadRequestException(`No se pudieron obtener los documentos: ${error.message}`);
-    return { success: true, data: data ?? [] };
+    const documentos = data ?? [];
+    const argentinaIds = documentos.filter((doc) => doc.metadata?.pais === 'AR').map((doc) => doc.id);
+    if (argentinaIds.length === 0) return { success: true, data: documentos };
+    const { data: comprobantes, error: fiscalError } = await this.supabaseService.getClient()
+      .from('cpe')
+      .select('id, documento_id, tipo_documento, estado, metadata')
+      .eq('tenant_id', tenant)
+      .in('documento_id', argentinaIds);
+    if (fiscalError) throw new BadRequestException('No se pudo consultar el historial ARCA de los documentos');
+    return {
+      success: true,
+      data: documentos.map((doc) => {
+        if (doc.metadata?.pais !== 'AR') return doc;
+        const matches = (comprobantes ?? []).filter((cpe) => cpe.documento_id === doc.id);
+        if (matches.length !== 1) return doc;
+        const cpe = matches[0];
+        const metadata = cpe.metadata ?? {};
+        if (metadata.pais !== 'AR' || (metadata.fiscal_country && metadata.fiscal_country !== 'AR')) return doc;
+        let codigo: number | null = null;
+        try {
+          const autorizado = metadata.arca_cbte_tipo || metadata.arcaCbteTipo || metadata.tipoComprobante;
+          codigo = autorizado
+            ? resolveArgentinaExplicitFiscalCode(String(autorizado).padStart(3, '0'))
+            : resolveArgentinaFiscalDocument({
+              documentType: cpe.tipo_documento,
+              issuerVatCondition: metadata.arca_condicion_iva_emisor,
+              receiverVatCondition: metadata.arca_condicion_iva_receptor,
+            }).wsfeCode;
+        } catch {
+          // Un historial incompleto conserva su tipo genérico; nunca se infiere A de FACTURA.
+        }
+        return { ...doc, arca: {
+          cpe_id: cpe.id,
+          codigo,
+          estado: cpe.estado,
+          is_demo: metadata.arca_is_demo === true || metadata.arca_simulado === true
+            || metadata.demo_artifact_format === 'ERP_DEMO_CPE_V1',
+        } };
+      }),
+    };
   }
 
   async getDocumento(id: string, tenantId?: string) {
@@ -547,9 +587,9 @@ export class DocumentosService {
 
   private async assertLegacyFiscalEndpointAllowed(tenantId: string): Promise<void> {
     const { pais } = await this.obtenerContextoPaisTenant(tenantId, true);
-    if (pais === 'CO') {
+    if (pais === 'CO' || pais === 'AR') {
       throw new ConflictException(
-        'En Colombia la emisión y transmisión DIAN se realizan exclusivamente desde el Centro CPE; '
+        `En ${pais === 'AR' ? 'Argentina la emisión y transmisión ARCA' : 'Colombia la emisión y transmisión DIAN'} se realizan exclusivamente desde el Centro CPE; `
         + 'el endpoint fiscal legado de Documentos está deshabilitado',
       );
     }

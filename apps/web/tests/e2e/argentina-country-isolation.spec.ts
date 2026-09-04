@@ -214,6 +214,37 @@ test.describe('Argentina · aislamiento jurisdiccional y factura ARCA', () => {
     })
   }
 
+  test('Documentos conserva clase y procedencia ARCA sin acciones fiscales heredadas', async ({ page }) => {
+    const writes: string[] = []
+    page.on('request', (request) => {
+      if (request.method() === 'POST') writes.push(request.url())
+    })
+    await page.route(/\/api\/documentos\/lista\/?(?:\?|$)/, (route) => route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true, data: [
+        { id: 'demo', tipo_documento: 'FACTURA', serie: '00001', numero: '2', fecha_emision: '2026-09-04', receptor_razon_social: 'Muestra argentina', receptor_numero_doc: '30123456', total: 1210, moneda: 'ARS', estado: 'EMITIDO', arca: { cpe_id: 'cpe-demo', codigo: 6, estado: 'FIRMADO', is_demo: true } },
+        { id: 'real', tipo_documento: 'FACTURA', serie: '00001', numero: '3', fecha_emision: '2026-09-04', receptor_razon_social: 'Factura autorizada', total: 1000, moneda: 'ARS', estado: 'EMITIDO', arca: { cpe_id: 'cpe-real', codigo: 11, estado: 'ACEPTADO', is_demo: false } },
+        { id: 'legacy', tipo_documento: 'FACTURA', serie: '00001', numero: '4', fecha_emision: '2026-09-04', receptor_razon_social: 'Registro incompleto', total: 1000, moneda: 'ARS', estado: 'BORRADOR' },
+      ] }),
+    }))
+    await page.goto('/dashboard/documentos/')
+    const demo = page.getByRole('row').filter({ hasText: 'Muestra argentina' })
+    await expect(demo).toContainText('Factura B')
+    await expect(demo).toContainText('MUESTRA LOCAL · SIN VALIDEZ ARCA')
+    const real = page.getByRole('row').filter({ hasText: 'Factura autorizada' })
+    await expect(real).toContainText('Factura C')
+    await expect(real).toContainText('Aceptado')
+    const legacy = page.getByRole('row').filter({ hasText: 'Registro incompleto' })
+    await expect(legacy).not.toContainText('Factura A')
+    await expect(legacy).toContainText('Consultar en Centro ARCA')
+    await expect(page.getByRole('button', { name: /^(Enviar|XML|Editar|Anular)$/ })).toHaveCount(0)
+    await expect(page.getByRole('option', { name: 'Facturas B', exact: true })).toHaveCount(0)
+    await expect(page.locator('body')).not.toContainText('Por enviar a ARCA')
+    await demo.getByRole('button', { name: 'Ver en Centro ARCA' }).click()
+    await expect(page).toHaveURL(/\/dashboard\/cpe\//)
+    expect(writes.filter((url) => /\/api\/documentos\//.test(url))).toEqual([])
+  })
+
   test('el centro de ayuda sólo ofrece fichas y contenido argentinos', async ({ page }) => {
     await page.goto('/dashboard/ayuda/', { waitUntil: 'domcontentloaded' })
     const body = page.locator('body')
