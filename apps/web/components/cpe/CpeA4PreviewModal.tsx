@@ -84,6 +84,7 @@ interface CpePreviewMetadata {
     authorizationCode?: string
     authorizationLabel?: string
     authorizationExpiry?: string
+    isDemo?: boolean
     pointOfSale?: number
     documentNumber?: number
     specialLegend?: string | null
@@ -477,7 +478,9 @@ function CpeA4Sheet({
 
       {profile.countryCode === 'AR' && fiscalPrintInfo && (
         <div className="relative z-10 mt-3 border border-[#64748b] bg-[#f8fafc] p-3 text-center" data-testid="cpe-arca-authorization">
-          <p className="font-black uppercase">Comprobante autorizado</p>
+          <p className="font-black uppercase">
+            {fiscalPrintInfo.isDemo ? 'Muestra demo · sin validez ARCA' : 'Comprobante autorizado'}
+          </p>
           <p className="mt-1"><strong>{fiscalPrintInfo.authorizationLabel || 'CAE'}:</strong> {fiscalPrintInfo.authorizationCode}</p>
           <p><strong>Vencimiento:</strong> {fiscalPrintInfo.authorizationExpiry} · <strong>Punto de venta:</strong> {String(fiscalPrintInfo.pointOfSale || '').padStart(5, '0')}</p>
           {fiscalPrintInfo.specialLegend && <p className="mt-1 font-black uppercase">{fiscalPrintInfo.specialLegend}</p>}
@@ -685,7 +688,9 @@ export default function CpeA4PreviewModal({
               {label} {numberLabel}
             </h2>
             <p className="mt-1 text-sm font-medium text-foreground" data-testid="cpe-a4-preview-authority-note">
-              El PDF descargable es la representación completa y autoritativa. Esta hoja es un resumen visual de su primera página.
+              {metadata && lacksFiscalAcceptance
+                ? 'El PDF descargable es la representación completa de la muestra y no tiene validez fiscal. Esta hoja resume su primera página.'
+                : 'El PDF descargable es la representación completa y autoritativa. Esta hoja es un resumen visual de su primera página.'}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               Salida PDF A4 del ERP. Para conservar 210 × 297 mm, imprime en A4 con escala 100% y sin “ajustar a página”.

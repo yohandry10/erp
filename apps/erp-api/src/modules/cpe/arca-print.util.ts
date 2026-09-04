@@ -5,6 +5,7 @@ import {
 
 export interface ArcaPrintedFiscalInfo {
   documentType: string;
+  isDemo: boolean;
   authorizationCode: string;
   authorizationLabel: 'CAE';
   authorizationExpiry: string;
@@ -58,12 +59,13 @@ export function resolveArcaPrintedFiscalInfo(
           || metadata.arca_condicion_iva_receptor_id,
       }).wsfeCode;
 
-  const authorizationCode = clean(
-    allowDemo ? metadata.arca_cae || metadata.cae || cpe.cae || cpe.hash : metadata.arca_cae,
-  );
-  const authorizationExpiry = clean(
-    metadata.arca_cae_vencimiento || metadata.caeVencimiento || cpe.cae_vencimiento,
-  ).replace(/-/g, '').slice(0, 8);
+  // Una muestra nunca hereda CAE ni vencimiento de aliases o del hash técnico
+  // del artefacto. Mostrar ese digest como autorización sería fiscalmente
+  // engañoso aunque la hoja también lleve marca de agua.
+  const authorizationCode = allowDemo ? '' : clean(metadata.arca_cae);
+  const authorizationExpiry = allowDemo
+    ? ''
+    : clean(metadata.arca_cae_vencimiento).replace(/-/g, '').slice(0, 8);
   const authorizationType = clean(metadata.tipoCodAut || metadata.tipo_cod_aut || 'E').toUpperCase();
   if (!allowDemo && (!/^\d{14}$/.test(authorizationCode) || !validCompactDate(authorizationExpiry))) {
     throw new Error('Representación ARCA incompleta: falta CAE o vencimiento válido');
@@ -99,6 +101,7 @@ export function resolveArcaPrintedFiscalInfo(
 
   return {
     documentType: String(resolvedType).padStart(3, '0'),
+    isDemo: allowDemo,
     authorizationCode: authorizationCode || 'MUESTRA-SIN-CAE',
     authorizationLabel: 'CAE',
     authorizationExpiry: authorizationExpiry || 'No aplica en muestra',

@@ -211,7 +211,7 @@ describe('representación impresa CPE', () => {
     };
     const service = new PdfGeneratorService({} as any, pdfFormatHelper) as any;
     service.addArcaAuthorizationInfo(doc, {
-      documentType: '051', authorizationCode: '70417054367476', authorizationLabel: 'CAE',
+      documentType: '051', isDemo: false, authorizationCode: '70417054367476', authorizationLabel: 'CAE',
       authorizationExpiry: '20260910', pointOfSale: 12, documentNumber: 9,
       specialLegend: 'OPERACIÓN SUJETA A RETENCIÓN',
     });
@@ -262,8 +262,50 @@ describe('representación impresa CPE', () => {
       ...arcaInvoice, hash: null, metadata: { ...arcaInvoice.metadata, arca_cae: null },
     }, 'AR', false))
       .rejects.toThrow('falta CAE válido de 14 dígitos');
-    await expect(service.generateQRCode({ ...arcaInvoice, hash: null, metadata: {} }, 'AR', true))
+    await expect(service.generateQRCode({
+      ...arcaInvoice,
+      hash: 'a'.repeat(64),
+      metadata: { ...arcaInvoice.metadata, arca_cae: '70417054367476' },
+    }, 'AR', true))
       .resolves.toBeNull();
+  });
+
+  it('genera el A4 demo Argentina con hash técnico, sin CAE ni QR', async () => {
+    const service = new PdfGeneratorService({} as any, pdfFormatHelper) as any;
+    jest.spyOn(service, 'getCpeData').mockResolvedValue({
+      tipo_documento: '01', serie: '00001', numero: 2,
+      fecha_emision: '2026-09-04', ruc_emisor: '30710158229',
+      razon_social_emisor: 'Demo Argentina', tipo_documento_receptor: 'DNI',
+      documento_receptor: '30123456', moneda: 'ARS', total_venta: 1210,
+      simulated_origin: true, hash: 'a'.repeat(64),
+      issuer_snapshot: { country_code: 'AR', tax_id: '30710158229', legal_name: 'Demo Argentina' },
+      fiscal_authority_evidence: { status: 'SIMULATED', authority: 'ARCA', country_code: 'AR' },
+      metadata: {
+        arca_condicion_iva_emisor: 'RESPONSABLE_INSCRIPTO',
+        arca_condicion_iva_receptor: 'CONSUMIDOR_FINAL',
+        arca_punto_venta: 1,
+      },
+    });
+    jest.spyOn(service, 'getCountryCode').mockResolvedValue('AR');
+    jest.spyOn(service, 'getEmpresaConfig').mockResolvedValue({
+      ruc: '30710158229', razon_social: 'Demo Argentina', direccion_fiscal: 'Buenos Aires',
+    });
+    const buildSpy = jest.spyOn(service, 'buildPdfDocument').mockResolvedValue(Buffer.from('%PDF-demo'));
+
+    await expect(service.generateSunatCompliantPdf('cpe-ar-demo', 'tenant-ar-demo'))
+      .resolves.toEqual(Buffer.from('%PDF-demo'));
+    expect(buildSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        arca_print_info: expect.objectContaining({
+          isDemo: true,
+          authorizationCode: 'MUESTRA-SIN-CAE',
+          authorizationExpiry: 'No aplica en muestra',
+        }),
+      }),
+      expect.any(Object),
+      null,
+      'AR',
+    );
   });
 
   it('conserva el día fiscal de una fecha ISO sin desplazarlo por zona horaria', () => {
