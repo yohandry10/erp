@@ -12,7 +12,10 @@ import { calcularDesgloseIgv } from '../../../shared/utils/igv-afectacion.util';
 import { canUseRuntimeDemoCertificate } from '../../../shared/utils/demo-certificate.utils';
 import { TenantContextService } from '../../../shared/tenant/tenant-context.service';
 import { tieneEntradaPagoPedido } from './pedido-payment.util';
-import { isColombiaDemoRepresentation } from '../../cpe/historical-cpe-country.util';
+import {
+  isFiscalDemoRepresentation,
+  resolveHistoricalCpeCountry,
+} from '../../cpe/historical-cpe-country.util';
 
 interface ConfiguracionEmpresa {
   usar_flujo_logistica: boolean;
@@ -1343,7 +1346,7 @@ export class PedidosService {
 
     if (pedido.factura_id) {
       console.log(`ℹ️ [PedidosService] Pedido ${id} ya tiene factura ${pedido.factura_id}, retornando datos actuales`);
-      const representacionDemoExistente = await this.esRepresentacionDemoCpePersistida(
+      const demoExistente = await this.obtenerRepresentacionDemoCpePersistida(
         client,
         pedido.factura_id,
         tenantId,
@@ -1354,11 +1357,11 @@ export class PedidosService {
         success: true,
         factura_id: pedido.factura_id,
         sugerir_gre: sugerenciaExistente.sugerir,
-        is_demo_representation: representacionDemoExistente,
-        ...(representacionDemoExistente
+        is_demo_representation: demoExistente.isDemo,
+        ...(demoExistente.isDemo
           ? {
-              warnings: ['Comprobante demo generado localmente: muestra sin transmisión ni validez DIAN'],
-              message: 'Muestra demo generada localmente, sin transmisión ni validez DIAN',
+              warnings: [`Comprobante demo generado localmente: muestra sin transmisión ni validez ${demoExistente.authority}`],
+              message: `Muestra demo generada localmente, sin transmisión ni validez ${demoExistente.authority}`,
             }
           : {}),
       };
@@ -1428,8 +1431,11 @@ export class PedidosService {
 
     // 9. Notificar
     const esRepresentacionDemo = facturaResultado.is_demo_representation === true;
+    const autoridadFiscal = facturaResultado.fiscal_authority
+      ?? facturaResultado.warnings?.[0]?.match(/validez (SUNAT|ARCA|DIAN)$/)?.[1]
+      ?? 'fiscal';
     const mensajeResultado = esRepresentacionDemo
-      ? 'Muestra demo generada localmente, sin transmisión ni validez DIAN'
+      ? `Muestra demo generada localmente, sin transmisión ni validez ${autoridadFiscal}`
       : `La factura para el pedido ${pedido.numero} ha sido emitida exitosamente`;
 
     await this.enviarNotificacion(tenantId, {
@@ -1458,11 +1464,11 @@ export class PedidosService {
     };
   }
 
-  private async esRepresentacionDemoCpePersistida(
+  private async obtenerRepresentacionDemoCpePersistida(
     client: any,
     facturaId: string,
     tenantId: string,
-  ): Promise<boolean> {
+  ): Promise<{ isDemo: boolean; authority: 'SUNAT' | 'ARCA' | 'DIAN' }> {
     const { data: cpe, error } = await client
       .from('cpe')
       .select('id,pais,simulated_origin,issuer_snapshot')
@@ -1483,7 +1489,11 @@ export class PedidosService {
       });
     }
 
-    return isColombiaDemoRepresentation(cpe as Record<string, any>);
+    const country = resolveHistoricalCpeCountry(cpe as Record<string, any>);
+    return {
+      isDemo: isFiscalDemoRepresentation(cpe as Record<string, any>),
+      authority: country === 'AR' ? 'ARCA' : country === 'CO' ? 'DIAN' : 'SUNAT',
+    };
   }
 
   private async repararDetalleFacturadoSiEsNecesario(

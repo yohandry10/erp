@@ -1,4 +1,5 @@
 import {
+  isFiscalDemoRepresentation,
   isColombiaDemoRepresentation,
   resolveHistoricalCpeCountry,
 } from './historical-cpe-country.util';
@@ -53,5 +54,16 @@ describe('resolveHistoricalCpeCountry', () => {
   it('usa el país actual sólo para clasificar una fila legacy sin procedencia persistida', () => {
     expect(isColombiaDemoRepresentation({ simulated_origin: null }, 'CO')).toBe(true);
     expect(isColombiaDemoRepresentation({ simulated_origin: null }, 'PE')).toBe(false);
+  });
+
+  it('reconoce como muestra local una procedencia simulada Argentina', () => {
+    expect(isFiscalDemoRepresentation({
+      simulated_origin: true,
+      issuer_snapshot: { country_code: 'AR' },
+    })).toBe(true);
+    expect(isFiscalDemoRepresentation({
+      simulated_origin: false,
+      issuer_snapshot: { country_code: 'AR' },
+    })).toBe(false);
   });
 });
