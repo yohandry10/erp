@@ -141,10 +141,10 @@ export function BalanceComprobacion({ anio, mes, showComparison = false }: Balan
           columns: [
             { header: 'Cuenta', key: 'Cuenta', width: 12 },
             { header: 'Nombre', key: 'Nombre', width: 35 },
-            { header: 'Saldo Inicial', key: 'Saldo Inicial', width: 18 },
-            { header: 'Debe', key: 'Debe', width: 18 },
-            { header: 'Haber', key: 'Haber', width: 18 },
-            { header: 'Saldo Final', key: 'Saldo Final', width: 18 },
+            { header: `Saldo Inicial (${country.moneda})`, key: 'Saldo Inicial', width: 22 },
+            { header: `Debe (${country.moneda})`, key: 'Debe', width: 18 },
+            { header: `Haber (${country.moneda})`, key: 'Haber', width: 18 },
+            { header: `Saldo Final (${country.moneda})`, key: 'Saldo Final', width: 22 },
           ],
         },
       ],
@@ -157,7 +157,7 @@ export function BalanceComprobacion({ anio, mes, showComparison = false }: Balan
       alert('No hay datos para exportar')
       return
     }
-    exportBalanceComprobacionToPDF(data, anio, mes, totales, country.moneda)
+    exportBalanceComprobacionToPDF(data, anio, mes, totales, country.moneda, country.locale)
   }
 
   if (loading) {

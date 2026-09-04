@@ -29,9 +29,11 @@ export interface PDFSection {
  * más escribe mientras tanto.
  */
 let monedaDelDocumento = ''
+let localeDelDocumento = 'es-PE'
 
-function usarMoneda(moneda?: string | null) {
+function usarMoneda(moneda?: string | null, locale?: string) {
   monedaDelDocumento = String(moneda ?? '').trim().toUpperCase()
+  localeDelDocumento = locale || 'es-PE'
 }
 
 /**
@@ -40,14 +42,15 @@ function usarMoneda(moneda?: string | null) {
  */
 export function formatCurrency(amount: number): string {
   if (!monedaDelDocumento) {
-    return new Intl.NumberFormat('es-PE', {
+    return new Intl.NumberFormat(localeDelDocumento, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(amount)
   }
-  return new Intl.NumberFormat('es-PE', {
+  return new Intl.NumberFormat(localeDelDocumento, {
     style: 'currency',
     currency: monedaDelDocumento,
+    currencyDisplay: 'code',
     minimumFractionDigits: 2,
   }).format(amount)
 }
@@ -61,8 +64,9 @@ export function exportBalanceComprobacionToPDF(
   mes: number,
   totales: any,
   moneda?: string,
+  locale?: string,
 ) {
-  usarMoneda(moneda)
+  usarMoneda(moneda, locale)
   const doc = new jsPDF('landscape')
   
   // Title
@@ -148,8 +152,9 @@ export function exportEstadoResultadosToPDF(
   anio: number,
   mes: number,
   moneda?: string,
+  locale?: string,
 ) {
-  usarMoneda(moneda)
+  usarMoneda(moneda, locale)
   const doc = new jsPDF()
   
   // Title
@@ -160,31 +165,28 @@ export function exportEstadoResultadosToPDF(
   doc.setFontSize(12)
   doc.text(`Período: ${anio} - ${String(mes).padStart(2, '0')}`, 14, 28)
   
-  const margenBruto = data.ingresos.total_ingresos > 0 
-    ? (data.costos.utilidad_bruta / data.ingresos.total_ingresos) * 100 
-    : 0
-  const margenNeto = data.ingresos.total_ingresos > 0 
-    ? (data.utilidad_neta / data.ingresos.total_ingresos) * 100 
-    : 0
-  
+  const porcentajeIngresos = (importe: number) => data.ingresos.total_ingresos !== 0
+    ? `${((importe / data.ingresos.total_ingresos) * 100).toFixed(2)}%`
+    : 'No aplica'
+
   // Prepare table data
   const tableData = [
     ['INGRESOS', '', ''],
     ['Ventas', formatCurrency(data.ingresos.ventas), ''],
     ['Otros Ingresos', formatCurrency(data.ingresos.otros_ingresos), ''],
-    ['Total Ingresos', formatCurrency(data.ingresos.total_ingresos), '100.00%'],
+    ['Total Ingresos', formatCurrency(data.ingresos.total_ingresos), porcentajeIngresos(data.ingresos.total_ingresos)],
     ['', '', ''],
     ['COSTOS', '', ''],
-    ['Costo de Ventas', `(${formatCurrency(data.costos.costo_ventas)})`, `${((data.costos.costo_ventas / data.ingresos.total_ingresos) * 100).toFixed(2)}%`],
-    ['Utilidad Bruta', formatCurrency(data.costos.utilidad_bruta), `${margenBruto.toFixed(2)}%`],
+    ['Costo de Ventas', `(${formatCurrency(data.costos.costo_ventas)})`, porcentajeIngresos(data.costos.costo_ventas)],
+    ['Utilidad Bruta', formatCurrency(data.costos.utilidad_bruta), porcentajeIngresos(data.costos.utilidad_bruta)],
     ['', '', ''],
     ['GASTOS OPERATIVOS', '', ''],
-    ['Gastos Administrativos', `(${formatCurrency(data.gastos.gastos_administrativos)})`, `${((data.gastos.gastos_administrativos / data.ingresos.total_ingresos) * 100).toFixed(2)}%`],
-    ['Gastos de Ventas', `(${formatCurrency(data.gastos.gastos_ventas)})`, `${((data.gastos.gastos_ventas / data.ingresos.total_ingresos) * 100).toFixed(2)}%`],
-    ['Gastos Financieros', `(${formatCurrency(data.gastos.gastos_financieros)})`, `${((data.gastos.gastos_financieros / data.ingresos.total_ingresos) * 100).toFixed(2)}%`],
-    ['Total Gastos', `(${formatCurrency(data.gastos.total_gastos)})`, `${((data.gastos.total_gastos / data.ingresos.total_ingresos) * 100).toFixed(2)}%`],
+    ['Gastos Administrativos', `(${formatCurrency(data.gastos.gastos_administrativos)})`, porcentajeIngresos(data.gastos.gastos_administrativos)],
+    ['Gastos de Ventas', `(${formatCurrency(data.gastos.gastos_ventas)})`, porcentajeIngresos(data.gastos.gastos_ventas)],
+    ['Gastos Financieros', `(${formatCurrency(data.gastos.gastos_financieros)})`, porcentajeIngresos(data.gastos.gastos_financieros)],
+    ['Total Gastos', `(${formatCurrency(data.gastos.total_gastos)})`, porcentajeIngresos(data.gastos.total_gastos)],
     ['', '', ''],
-    ['UTILIDAD NETA', formatCurrency(data.utilidad_neta), `${margenNeto.toFixed(2)}%`]
+    ['UTILIDAD NETA', formatCurrency(data.utilidad_neta), porcentajeIngresos(data.utilidad_neta)]
   ]
   
   autoTable(doc, {
@@ -208,6 +210,7 @@ export function exportEstadoResultadosToPDF(
       cellPadding: 4
     },
     didParseCell: function(data) {
+      if (data.section !== 'body') return
       // Bold for section headers and totals
       if (data.row.index === 0 || data.row.index === 3 || data.row.index === 5 || 
           data.row.index === 7 || data.row.index === 9 || data.row.index === 13 || 
@@ -243,8 +246,9 @@ export function exportBalanceGeneralToPDF(
   anio: number,
   mes: number,
   moneda?: string,
+  locale?: string,
 ) {
-  usarMoneda(moneda)
+  usarMoneda(moneda, locale)
   const doc = new jsPDF()
   
   // Title
@@ -322,6 +326,7 @@ export function exportBalanceGeneralToPDF(
       cellPadding: 3
     },
     didParseCell: function(data) {
+      if (data.section !== 'body') return
       // Bold for main sections and totals
       if (data.row.index === 0 || data.row.index === 7 || data.row.index === 13 || 
           data.row.index === 15 || data.row.index === 18 || data.row.index === 25 || 
