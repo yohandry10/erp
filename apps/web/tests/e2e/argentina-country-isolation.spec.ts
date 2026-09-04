@@ -246,6 +246,116 @@ test.describe('Argentina · aislamiento jurisdiccional y factura ARCA', () => {
     expect(writes.filter((url) => /\/api\/documentos\//.test(url))).toEqual([])
   })
 
+  test('Compras guarda desde el modal con moneda y clave estable; conserva errores y no duplica líneas al reabrir', async ({ page }) => {
+    const submissions: Record<string, any>[] = []
+    let accept = false
+    const supplier = { id: '11111111-1111-4111-8111-111111111111', nombre: 'Proveedor Argentina', razon_social: 'Proveedor Argentina', ruc: '30999888778' }
+    const product = { id: '22222222-2222-4222-8222-222222222222', nombre: 'Café QA', precio: 100, afectacion_igv: '10' }
+    await page.route(/\/api\/compras\/proveedores\/?(?:\?|$)/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: [supplier] }) }))
+    await page.route(/\/api\/compras\/productos\/?(?:\?|$)/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: [product] }) }))
+    await page.route(/\/api\/compras\/next-number\/?(?:\?|$)/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: { numero: 'OC-2026-001' } }) }))
+    await page.route(/\/api\/compras\/ordenes\/?(?:\?|$)/, route => {
+      if (route.request().method() !== 'POST') return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: [] }) })
+      submissions.push(route.request().postDataJSON())
+      return route.fulfill({ status: accept ? 201 : 400, contentType: 'application/json', body: JSON.stringify(accept
+        ? { success: true, data: { id: '33333333-3333-4333-8333-333333333333' } }
+        : { message: 'Compra rechazada en QA: revise los datos y reintente.' }) })
+    })
+    await page.goto('/dashboard/compras/')
+    await page.getByRole('button', { name: 'Nueva orden', exact: true }).first().click()
+    await page.locator('#orden-compra-modal-proveedor-id').selectOption(supplier.id)
+    await page.getByRole('combobox', { name: 'Producto', exact: true }).selectOption(product.id)
+    // Seleccionar producto debe recalcular incluso sin editar precio/cantidad.
+    await expect(page.getByText('Total: $ 121.00', { exact: true })).toBeVisible()
+    await page.getByRole('spinbutton', { name: 'Cantidad', exact: true }).fill('10')
+    await page.locator('#orden-compra-modal-fecha-entrega').fill('2026-09-07')
+    await page.locator('#orden-compra-modal-observaciones').fill('QA compra con recepción parcial')
+    await page.locator('#orden-compra-modal-moneda').selectOption('USD')
+    await page.getByRole('button', { name: 'Crear Orden', exact: true }).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'Compra rechazada en QA' })).toBeInViewport()
+    await expect(page.getByRole('spinbutton', { name: 'Cantidad', exact: true })).toHaveValue('10')
+    await expect(page.locator('#orden-compra-modal-observaciones')).toHaveValue('QA compra con recepción parcial')
+    expect(submissions).toHaveLength(1)
+    expect(submissions[0]).toMatchObject({ moneda: 'USD', idempotency_key: expect.stringMatching(/^[a-f0-9-]{36}$/), detalles: [{ producto_id: product.id, cantidad: 10, precio_unitario: 100 }] })
+    expect(submissions[0]).not.toHaveProperty('items')
+    expect(submissions[0]).not.toHaveProperty('total')
+    accept = true
+    await page.getByRole('button', { name: 'Crear Orden', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Nueva Orden de Compra', exact: true })).toHaveCount(0)
+    expect(submissions).toHaveLength(2)
+    expect(submissions[1]).toEqual(submissions[0])
+    await page.getByRole('button', { name: 'Nueva orden', exact: true }).first().click()
+    await expect(page.getByRole('combobox', { name: 'Producto', exact: true })).toHaveCount(1)
+    await expect(page.locator('#orden-compra-modal-moneda')).toHaveValue('ARS')
+    await expect(page.locator('#orden-compra-modal-observaciones')).toHaveValue('')
+    await page.getByRole('button', { name: 'Cancelar', exact: true }).click()
+    await page.getByRole('button', { name: 'Nueva orden', exact: true }).first().click()
+    await expect(page.getByRole('combobox', { name: 'Producto', exact: true })).toHaveCount(1)
+    await page.locator('#orden-compra-modal-proveedor-id').selectOption(supplier.id)
+    await page.locator('#orden-compra-modal-fecha-entrega').fill('2026-09-07')
+    await page.getByRole('combobox', { name: 'Producto', exact: true }).selectOption(product.id)
+    await page.getByRole('spinbutton', { name: 'Cantidad', exact: true }).fill('0')
+    await page.getByRole('button', { name: 'Crear Orden', exact: true }).click()
+    expect(submissions).toHaveLength(2)
+    await page.getByRole('spinbutton', { name: 'Cantidad', exact: true }).fill('0.5')
+    await page.getByRole('button', { name: 'Crear Orden', exact: true }).click()
+    await expect.poll(() => submissions.length).toBe(3)
+    expect(submissions[2].idempotency_key).not.toBe(submissions[0].idempotency_key)
+    expect(submissions[2]).toMatchObject({ moneda: 'ARS', detalles: [{ cantidad: 0.5 }] })
+  })
+
+  test('el asistente de compra valida sin alertas nativas y conserva proveedor, crédito y detalle hasta guardar', async ({ page }) => {
+    const nativeDialogs: string[] = []
+    page.on('dialog', async dialog => { nativeDialogs.push(dialog.message()); await dialog.dismiss() })
+    const supplier = { id: '11111111-1111-4111-8111-111111111111', razon_social: 'Proveedor Argentina', ruc: '30999888778' }
+    const product = { id: '22222222-2222-4222-8222-222222222222', nombre: 'Café QA', afectacion_igv: '10' }
+    const warehouse = { id: '33333333-3333-4333-8333-333333333333', nombre: 'Almacén QA' }
+    const submissions: Record<string, any>[] = []
+    // El asistente usa permisos granulares; ADMIN no elude ese contrato.
+    await page.route(/\/api\/usuarios-sistema\/me\/permissions\/?$/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: [{ id: 'qa-create-order', modulo: 'compras', recurso: 'ordenes', accion: 'crear' }] }) }))
+    await page.route(/\/api\/compras\/proveedores\/?(?:\?|$)/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: [supplier] }) }))
+    await page.route(/\/api\/inventario\/productos\/?(?:\?|$)/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: [product] }) }))
+    await page.route(/\/api\/inventario\/almacenes\/?(?:\?|$)/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: [warehouse] }) }))
+    await page.route(/\/api\/compras\/ordenes\/?(?:\?|$)/, route => {
+      if (route.request().method() === 'POST') {
+        submissions.push(route.request().postDataJSON())
+        return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ success: true, data: { id: '44444444-4444-4444-8444-444444444444' } }) })
+      }
+      return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: [] }) })
+    })
+    await page.goto('/dashboard/compras/ordenes/nueva/')
+    await page.locator('#ocwizard-numero-de-orden').fill('OC-QA-AR-001')
+    await page.locator('#ocwizard-proveedor').selectOption(supplier.id)
+    await page.locator('#ocwizard-condiciones-de-pago').selectOption('CREDITO_15')
+    await page.locator('#ocwizard-dias-de-credito').fill('15')
+    await page.locator('#ocwizard-almacen-destino').selectOption(warehouse.id)
+    await page.getByRole('button', { name: 'Siguiente', exact: true }).click()
+    await page.getByRole('button', { name: 'Siguiente', exact: true }).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'Debe agregar al menos un producto' })).toBeVisible()
+    await page.getByRole('button', { name: 'Agregar producto', exact: true }).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'Seleccione un producto' })).toBeVisible()
+    await page.locator('#ocwizard-producto').selectOption(product.id)
+    await page.locator('#ocwizard-cantidad').fill('0')
+    await page.getByRole('button', { name: 'Agregar producto', exact: true }).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'La cantidad debe ser mayor a 0' })).toBeVisible()
+    await page.locator('#ocwizard-cantidad').fill('10')
+    await page.locator('#ocwizard-precio-unit').fill('-1')
+    await page.getByRole('button', { name: 'Agregar producto', exact: true }).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'El precio no puede ser negativo' })).toBeVisible()
+    await page.locator('#ocwizard-precio-unit').fill('100')
+    await page.getByRole('button', { name: 'Agregar producto', exact: true }).click()
+    await expect(page.getByRole('alert').filter({ hasText: /producto|cantidad|precio/i })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Siguiente', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Revisión Final', exact: true })).toBeVisible()
+    await expect(page.getByText('OC-QA-AR-001', { exact: true })).toBeVisible()
+    await expect(page.getByText('Crédito 15 días', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Crear Orden de Compra', exact: true }).click()
+    await expect.poll(() => submissions.length).toBe(1)
+    expect(submissions[0]).toMatchObject({ numero: 'OC-QA-AR-001', proveedor_id: supplier.id, almacen_destino_id: warehouse.id, condiciones_pago: 'CREDITO_15', dias_credito: 15, idempotency_key: expect.any(String), detalles: [{ producto_id: product.id, cantidad: 10, precio_unitario: 100 }] })
+    expect(nativeDialogs).toEqual([])
+    await expect(page).toHaveURL(/\/dashboard\/compras\/ordenes\/?$/, { timeout: 20000 })
+  })
+
   test('el asiento conserva el borrador y explica el período faltante para corregir y reintentar', async ({ page }) => {
     const periodError = 'El período contable 2026-09 no existe. Debe crearse explícitamente antes de registrar movimientos.'
     const submissions: Record<string, unknown>[] = []
