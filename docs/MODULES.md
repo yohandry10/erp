@@ -396,6 +396,11 @@ Cotización -> Aprobación -> Orden de compra -> Recepción -> CxP -> Pago
 ```
 
 - Órdenes y recepciones conservan cantidades pedidas, recibidas y pendientes.
+- El alta rápida de orden conserva una clave de intento entre reintentos,
+  envía la moneda seleccionada y muestra el rechazo sin vaciar el formulario.
+  Una nueva apertura inicia otra intención y una sola línea; cancelar no
+  arrastra productos a la siguiente compra. API valida moneda y cantidades,
+  mientras PostgreSQL calcula importes e impuesto sin aceptar totales del cliente.
 - La creación de recepción reserva en PostgreSQL un correlativo único por tenant
   y guarda cabecera e ítems en una RPC atómica con actor e idempotencia; un
   reintento reutiliza la misma recepción y nunca deja cabeceras huérfanas.
