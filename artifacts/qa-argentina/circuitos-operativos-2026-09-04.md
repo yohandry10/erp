@@ -59,6 +59,12 @@ del botón Actualizar durante la vigencia de la caché.
 - Primera regresión del modal detecta, a 1280×720, Guardar fuera del viewport
   sin scroll alcanzable. Se añade altura máxima con scroll interno; pendiente
   repetición de la misma prueba, sin forzar clicks fuera de pantalla.
+- Alta guiada, mismo COMPRAS: proveedor, crédito 15 días, almacén principal,
+  fechas y observación capturados. Siguiente sin productos usa `alert` nativo
+  (contrastado con OCWizard) y la sesión de control no consigue cerrarlo.
+  No se envió una orden por este camino. Se sustituye esa validación y las
+  de producto/cantidad/precio por mensajes inline; no se declara un fallo
+  del writer ni se cuenta el aviso como validado visualmente en la demo.
 - Regresión local anterior a este cambio: 95/96 pasan; monitoreo outbox falla
   antes de su pantalla en `Preparando configuración fiscal del tenant…`.
   CI del commit de #107 dio 24/24 checks verdes. Se conserva la discrepancia;

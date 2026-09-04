@@ -401,6 +401,8 @@ Cotización -> Aprobación -> Orden de compra -> Recepción -> CxP -> Pago
   Una nueva apertura inicia otra intención y una sola línea; cancelar no
   arrastra productos a la siguiente compra. API valida moneda y cantidades,
   mientras PostgreSQL calcula importes e impuesto sin aceptar totales del cliente.
+- El asistente de orden valida producto, cantidad y precio dentro de la página;
+  corregir esos datos no depende de cerrar alertas nativas del navegador.
 - La creación de recepción reserva en PostgreSQL un correlativo único por tenant
   y guarda cabecera e ítems en una RPC atómica con actor e idempotencia; un
   reintento reutiliza la misma recepción y nunca deja cabeceras huérfanas.
