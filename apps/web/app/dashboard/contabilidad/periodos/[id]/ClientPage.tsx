@@ -7,6 +7,8 @@ import { Calendar, Lock, Unlock, AlertCircle, ArrowLeft, CheckCircle } from 'luc
 import PeriodoCierreWizard from '@/components/contabilidad/PeriodoCierreWizard'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import { useApi } from '@/hooks/use-api'
+import { useAuth } from '@/contexts/AuthContext'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface Periodo {
   id: string
@@ -22,6 +24,9 @@ interface Periodo {
 
 export default function PeriodoDetailPage() {
   const router = useRouter()
+  const country = useCountryContext()
+  const { user, loading: authLoading } = useAuth()
+  const canReopen = !authLoading && user?.is_super_admin === true
   const params = useParams()
   const periodoId = params.id as string | undefined
 
@@ -30,7 +35,7 @@ export default function PeriodoDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [showWizard, setShowWizard] = useState(false)
   const [reopening, setReopening] = useState(false)
-  const { apiCall } = useApi<any>({ retries: 2, timeoutMs: 12000, showErrorToast: false })
+  const { apiCall } = useApi<any>({ retries: 2, timeoutMs: 12000, showErrorToast: false, throwOnError: true })
 
   // Estado para diálogo de confirmación
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -99,13 +104,14 @@ export default function PeriodoDetailPage() {
   }
 
   const handleReabrirPeriodo = async () => {
+    if (!canReopen) return
     setReopening(true)
     setError(null)
 
     try {
       const response = await apiCall(`/contabilidad/periodos/${periodoId}/reabrir`, { method: 'POST' })
-      if (response?.success === false) {
-        throw new Error(response.message || 'Error al reabrir el período')
+      if (!response?.success || !response.data) {
+        throw new Error(response?.message || 'Error al reabrir el período')
       }
       await fetchPeriodo()
     } catch (err: any) {
@@ -133,7 +139,7 @@ export default function PeriodoDetailPage() {
     )
   }
 
-  if (error || !periodo) {
+  if (!periodo) {
     return (
       <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
         <div className="p-8 bg-[#fee2e2] border rounded-xl text-destructive">
@@ -191,7 +197,7 @@ export default function PeriodoDetailPage() {
               Cerrar Período
             </button>
           )}
-          {periodo.estado === 'CERRADO' && (
+          {periodo.estado === 'CERRADO' && canReopen && (
             <button
               onClick={() => {
                 setConfirmDialog({
@@ -222,6 +228,7 @@ export default function PeriodoDetailPage() {
       </div>
 
       {/* Period Info Card */}
+      {error && <div role="alert" className="mb-4 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-foreground">{error}</div>}
       <div className="bg-card rounded-xl shadow overflow-hidden mb-8">
         <div className="p-8 border-b">
           <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-8">
@@ -263,7 +270,7 @@ export default function PeriodoDetailPage() {
                   Fecha de Cierre
                 </p>
                 <p className="m-0 text-base font-semibold text-foreground">
-                  {parseDateLocal(periodo.fecha_cierre).toLocaleDateString('es-PE', {
+                  {parseDateLocal(periodo.fecha_cierre).toLocaleDateString(country.locale, {
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric'
@@ -291,7 +298,7 @@ export default function PeriodoDetailPage() {
                 Fecha de Creación
               </p>
               <p className="m-0 text-[0.875rem] font-medium text-foreground">
-                {parseDateLocal(periodo.created_at).toLocaleDateString('es-PE', {
+                {parseDateLocal(periodo.created_at).toLocaleDateString(country.locale, {
                   year: 'numeric',
                   month: 'short',
                   day: 'numeric'

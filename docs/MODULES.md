@@ -545,6 +545,9 @@ Código principal: `apps/erp-api/src/modules/finanzas`,
   en otra pestaña. Los writers operativos que usan la barrera SQL 458 pueden
   crear el período abierto de forma idempotente; nunca eluden un cierre o
   bloqueo existente ni trabajan bajo un período abierto invisible.
+- Reabrir un período requiere superadministrador tanto en servidor como en
+  la acción disponible en pantalla. Un rechazo de reapertura conserva el
+  detalle y su estado cerrado, mostrando el motivo sin aparentar éxito.
 - Asientos se originan en eventos de ventas, compras, POS, caja, RRHH y activos.
 - Debe/haber debe cuadrar y el período debe permitir la operación.
 - Libros, estados financieros y materialized views son proyecciones.
