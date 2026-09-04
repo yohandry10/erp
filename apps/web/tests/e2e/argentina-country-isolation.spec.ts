@@ -61,21 +61,35 @@ const argentinaModuleRoutes = [
 ] as const
 
 const foreignJurisdictionTerms = [
-  'SUNAT', 'DIAN', 'PLAME', 'T-Registro', 'CTS', 'SIRE',
-  'Guía de Remisión', 'Boleta', 'IGV', 'RUC', 'Soles', 'PEN', 'Perú', 'Colombia',
+  /\bSUNAT\b/iu,
+  /\bDIAN\b/iu,
+  /\bPLAME\b/iu,
+  /\bT-Registro\b/iu,
+  /\bCTS\b/iu,
+  /\bSIRE\b/iu,
+  /Guía de Remisión/iu,
+  /\bBoleta\b/iu,
+  /\bIGV\b/iu,
+  /\bRUC\b/iu,
+  /\bSoles\b/iu,
+  /\bPEN\b/iu,
+  /Perú/iu,
+  /Colombia/iu,
 ] as const
 
 function readJwtSecret(): string {
   if (process.env.JWT_SECRET) return process.env.JWT_SECRET
-  for (const envPath of [
-    path.resolve(process.cwd(), '.env.local'),
-    path.resolve(process.cwd(), '../../.env'),
-    path.resolve(process.cwd(), '../erp-api/.env'),
-  ]) {
+  for (const envPath of [path.resolve(process.cwd(), '.env.local'), path.resolve(process.cwd(), '../../.env'), path.resolve(process.cwd(), '../erp-api/.env')]) {
     if (!fs.existsSync(envPath)) continue
-    const line = fs.readFileSync(envPath, 'utf8').split(/\r?\n/)
+    const line = fs
+      .readFileSync(envPath, 'utf8')
+      .split(/\r?\n/)
       .find((entry) => /^\s*JWT_SECRET=/.test(entry))
-    if (line) return line.replace(/^\s*JWT_SECRET=/, '').trim().replace(/^['"]|['"]$/g, '')
+    if (line)
+      return line
+        .replace(/^\s*JWT_SECRET=/, '')
+        .trim()
+        .replace(/^['"]|['"]$/g, '')
   }
   throw new Error('JWT_SECRET no está disponible para el E2E aislado de Argentina')
 }
@@ -92,13 +106,15 @@ async function authenticate(context: BrowserContext, page: Page) {
     .setExpirationTime('10m')
     .sign(new TextEncoder().encode(readJwtSecret()))
 
-  await context.addCookies([{
-    name: 'access_token',
-    value: token,
-    url: baseURL,
-    httpOnly: true,
-    sameSite: 'Lax',
-  }])
+  await context.addCookies([
+    {
+      name: 'access_token',
+      value: token,
+      url: baseURL,
+      httpOnly: true,
+      sameSite: 'Lax',
+    },
+  ])
   await page.addInitScript((sessionUser) => {
     const session = JSON.stringify({ user: sessionUser })
     window.localStorage.setItem('erp.auth.session.snapshot', session)
@@ -113,11 +129,12 @@ async function routeArgentinaApi(page: Page) {
   await page.route('**/api/**', async (route) => {
     const request = route.request()
     const pathname = new URL(request.url()).pathname
-    const json = (body: unknown, status = 200) => route.fulfill({
-      status,
-      contentType: 'application/json',
-      body: JSON.stringify(body),
-    })
+    const json = (body: unknown, status = 200) =>
+      route.fulfill({
+        status,
+        contentType: 'application/json',
+        body: JSON.stringify(body),
+      })
 
     if (/\/api\/auth\/profile\/?$/.test(pathname)) return json(user)
     if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
@@ -131,6 +148,20 @@ async function routeArgentinaApi(page: Page) {
           isDemo: true,
           arcaPuntoVenta: 12,
           arcaCondicionIva: 'RESPONSABLE_INSCRIPTO',
+        },
+      })
+    }
+    if (/\/api\/configuration\/context\/status\/?$/.test(pathname)) {
+      return json({
+        success: true,
+        data: {
+          isComplete: true,
+          isDemo: true,
+          completionPercentage: 100,
+          missingItems: [],
+          certificate: { exists: false, isValid: true },
+          ruc: { isConfigured: true, missingFields: [] },
+          fiscal: { isEnabled: false, isReady: true, missingItems: [] },
         },
       })
     }
@@ -149,7 +180,12 @@ async function routeArgentinaApi(page: Page) {
     if (/\/api\/cpe\/stats\/?$/.test(pathname)) {
       return json({
         success: true,
-        data: { cpeEmitidosHoy: 0, cpeDelMes: 0, montoFacturado: 0, rechazados: 0 },
+        data: {
+          cpeEmitidosHoy: 0,
+          cpeDelMes: 0,
+          montoFacturado: 0,
+          rechazados: 0,
+        },
       })
     }
     if (/\/api\/rrhh\/dashboard\/?$/.test(pathname)) {
@@ -168,12 +204,39 @@ test.describe('Argentina · aislamiento jurisdiccional y factura ARCA', () => {
   for (const [moduleName, route] of argentinaModuleRoutes) {
     test(`módulo ${moduleName} no expone otra jurisdicción`, async ({ page }) => {
       await page.goto(route, { waitUntil: 'domcontentloaded' })
-      await expect(page.locator('body')).not.toContainText('Application error')
+      const body = page.locator('body')
+      await expect(body).toContainText('Cerrar Sesión')
+      await expect(body).not.toContainText('Preparando configuración fiscal')
+      await expect(body).not.toContainText('Application error')
       for (const term of foreignJurisdictionTerms) {
-        await expect(page.locator('body')).not.toContainText(term)
+        await expect(body).not.toContainText(term)
       }
     })
   }
+
+  test('el centro de ayuda sólo ofrece fichas y contenido argentinos', async ({ page }) => {
+    await page.goto('/dashboard/ayuda/', { waitUntil: 'domcontentloaded' })
+    const body = page.locator('body')
+    await expect(body).toContainText('Cerrar Sesión')
+    await expect(body).toContainText('Comprobantes ARCA')
+    await expect(body).toContainText('Liquidaciones finales')
+
+    const fichas = page.getByTestId('module-guide-entry')
+    const total = await fichas.count()
+    expect(total).toBeGreaterThan(0)
+
+    await fichas.filter({ hasText: 'Comprobantes ARCA' }).click()
+    await expect(body).toContainText('Facturas A, B o C')
+    await fichas.filter({ hasText: 'Clientes' }).click()
+    await expect(body).toContainText('CUIT, CUIL, CDI o DNI')
+
+    for (let index = 0; index < total; index += 1) {
+      await fichas.nth(index).click()
+      for (const term of foreignJurisdictionTerms) {
+        await expect(body).not.toContainText(term)
+      }
+    }
+  })
 
   test('el menú y las rutas directas no pintan módulos de Perú o Colombia', async ({ page }) => {
     await page.goto('/dashboard/cpe/', { waitUntil: 'networkidle' })
@@ -192,15 +255,15 @@ test.describe('Argentina · aislamiento jurisdiccional y factura ARCA', () => {
 
     await page.getByRole('button', { name: 'Nueva NC / ND ARCA' }).click()
     await expect(page.getByRole('heading', { name: 'Nueva nota ARCA referenciada' })).toBeVisible()
-    await expect(page.getByTestId('referenced-note-empty-state')).toContainText(
-      'factura electrónica autorizada con CAE',
-    )
+    await expect(page.getByTestId('referenced-note-empty-state')).toContainText('factura electrónica autorizada con CAE')
     await expect(page.locator('body')).not.toContainText('SUNAT')
     await expect(page.locator('body')).not.toContainText('boleta')
     await expect(page.locator('body')).not.toContainText('IVAP')
     await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
 
-    await page.goto('/dashboard/rrhh/planilla-electronica/', { waitUntil: 'networkidle' })
+    await page.goto('/dashboard/rrhh/planilla-electronica/', {
+      waitUntil: 'networkidle',
+    })
     await expect(page).toHaveURL(/\/dashboard\/rrhh\/?$/)
     await expect(page.getByRole('heading', { name: 'Recursos Humanos' })).toBeVisible()
     await expect(page.locator('body')).not.toContainText('PLAME')
@@ -234,10 +297,7 @@ test.describe('Argentina · aislamiento jurisdiccional y factura ARCA', () => {
     await page.getByLabel('Descripción *').fill('Servicio profesional')
     await page.getByLabel('Valor Unitario *').fill('100')
 
-    const requestPromise = page.waitForRequest((request) =>
-      request.method() === 'POST'
-      && /\/api\/cpe\/comprobantes\/?$/.test(new URL(request.url()).pathname),
-    )
+    const requestPromise = page.waitForRequest((request) => request.method() === 'POST' && /\/api\/cpe\/comprobantes\/?$/.test(new URL(request.url()).pathname))
     await page.getByRole('button', { name: 'Crear Comprobante' }).click()
     const payload = (await requestPromise).postDataJSON()
 
@@ -247,13 +307,15 @@ test.describe('Argentina · aislamiento jurisdiccional y factura ARCA', () => {
       arca_fecha_servicio_desde: '2026-09-01',
       arca_fecha_servicio_hasta: '2026-09-30',
       arca_fecha_vencimiento_pago: '2026-10-10',
-      arca_tributos: [{
-        id: 1,
-        descripcion: 'Impuestos nacionales',
-        base_imponible: 100,
-        alicuota: 3,
-        importe: 3,
-      }],
+      arca_tributos: [
+        {
+          id: 1,
+          descripcion: 'Impuestos nacionales',
+          base_imponible: 100,
+          alicuota: 3,
+          importe: 3,
+        },
+      ],
       totalIgv: 21,
       total: 124,
     })
