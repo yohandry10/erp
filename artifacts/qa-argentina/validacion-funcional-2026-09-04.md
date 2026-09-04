@@ -78,3 +78,27 @@ y retest sobre el despliegue que lo corrige. No registrar contraseñas ni tokens
 Este circuito demuestra el ciclo manual básico, no aprueba todavía todo el
 módulo: quedan cierre/bloqueo/reapertura, plan, mayor/libros IVA, automatismos,
 compras/ventas/pagos, analítica y el resto de funciones de la matriz.
+
+### Cierre y permisos
+
+- La confirmación de cierre advierte que sólo un superadministrador puede
+  reabrir. Se canceló el cierre de septiembre para conservar el mes operativo.
+  Se creó y cerró agosto 2026, ID `a6d3ca11-7b1d-4933-b260-7c6d4f018bee`,
+  tras verificar asientos balanceados y ausencia de eventos pendientes.
+- El primer intento de fecha por automatización no propagó el cambio del
+  control nativo a React: `QA-AR-CIERRE-001` quedó en septiembre por 500 ARS,
+  asiento 3 `dd07947f-834c-42ef-9d02-cfb1dac10e10`. No se contó como prueba
+  de bloqueo; se reversó mediante el asiento 4
+  `bb77d6fa-c1cd-4bfe-b7bb-0ba54d9850e1`, con motivo explícito.
+- Para fecha por navegador integrado, usar el control de teclado y verificar
+  el valor después de editar otro campo; `fill` aislado del input date no
+  demostró actualizar el estado del formulario. No atribuir esto al backend.
+- `QA-AR-CIERRE-002`, fecha 31/08/2026 verificada antes de guardar, 500/500,
+  rechazado: «El período contable 2026-08 está CERRADO. No se pueden registrar
+  movimientos en períodos cerrados.» No se creó un asiento.
+- CONTADOR veía Reabrir Período (Superadmin). El intento dejó agosto CERRADO
+  pero ocultó el rechazo. Código contrastado: guardia SuperAdmin y permiso
+  granular en API; el cliente absorbía el error y recargaba. Corrección local:
+  acción sólo para superadministrador, propagación del error y detalle
+  conservado. Reapertura exitosa requiere un actor superadministrador; no se
+  elevó al contador ni al administrador de la demo.

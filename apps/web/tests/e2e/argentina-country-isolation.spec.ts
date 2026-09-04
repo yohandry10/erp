@@ -290,6 +290,39 @@ test.describe('Argentina · aislamiento jurisdiccional y factura ARCA', () => {
     expect(submissions[1]).toEqual(submissions[0])
   })
 
+  for (const superadmin of [false, true]) {
+    test(`reapertura de período: ${superadmin ? 'superadmin conserva el rechazo del servidor' : 'usuario de tenant no recibe una acción reservada'}`, async ({ page }) => {
+      if (superadmin) await page.route(/\/api\/auth\/profile\/?$/, (route) => route.fulfill({
+        contentType: 'application/json', body: JSON.stringify({ ...user, is_super_admin: true }),
+      }))
+      await page.route(/\/api\/contabilidad\/periodos\/44444444-4444-4444-8444-444444444444\/?$/, (route) => route.fulfill({
+        contentType: 'application/json', body: JSON.stringify({ success: true, data: {
+          id: '44444444-4444-4444-8444-444444444444', anio: 2026, mes: 8, estado: 'CERRADO',
+          fecha_cierre: '2026-09-04', created_at: '2026-09-04', updated_at: '2026-09-04',
+        } }),
+      }))
+      let writes = 0
+      await page.route(/\/api\/contabilidad\/periodos\/44444444-4444-4444-8444-444444444444\/reabrir\/?$/, (route) => {
+        writes++
+        return route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ message: 'Reapertura denegada por el servidor' }) })
+      })
+      await page.goto('/dashboard/contabilidad/periodos/44444444-4444-4444-8444-444444444444/')
+      await expect(page.getByRole('heading', { name: 'Período Cerrado', exact: true })).toBeVisible({ timeout: 20000 })
+      const reopen = page.getByRole('button', { name: 'Reabrir Período (Superadmin)', exact: true })
+      if (!superadmin) {
+        await expect(reopen).toHaveCount(0)
+        expect(writes).toBe(0)
+      } else {
+        await reopen.click()
+        await page.getByRole('button', { name: 'Confirmar', exact: true }).click()
+        await expect(page.getByRole('alert').filter({ hasText: 'Reapertura denegada por el servidor' })).toBeVisible()
+        await expect(page.getByRole('heading', { name: 'Período Cerrado', exact: true })).toBeVisible()
+        expect(writes).toBe(1)
+      }
+      await expect(page.locator('body')).not.toContainText('setiembre')
+    })
+  }
+
   test('la exportación conserva importes numéricos e identificadores de texto', () => {
     const xml = createSpreadsheetXml([{ name: 'Contabilidad AR', columns: [
       { header: 'Cuenta', key: 'cuenta' }, { header: 'Importe (ARS)', key: 'importe' },
