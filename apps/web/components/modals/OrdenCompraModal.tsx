@@ -42,6 +42,10 @@ export default function OrdenCompraModal({
   const createIdempotencyKeyRef = useRef<string | null>(null)
   const openedOrderRef = useRef<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const submitErrorRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (submitError) submitErrorRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [submitError])
 
   // DEBUG: Log de props recibidas
 
@@ -337,7 +341,7 @@ export default function OrdenCompraModal({
         </div>
 
         <form onSubmit={handleSubmit}>
-          {submitError && <div role="alert" className="mb-4 rounded-md border border-red-500/50 bg-red-500/10 p-3 text-sm">{submitError}</div>}
+          {submitError && <div ref={submitErrorRef} role="alert" className="mb-4 rounded-md border border-red-500/50 bg-red-500/10 p-3 text-sm">{submitError}</div>}
           {/* Información básica */}
           <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4 mb-6">
             <div>

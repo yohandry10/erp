@@ -76,6 +76,10 @@ ningún usuario de la demo. Septiembre permanece ABIERTO.
 ## Retesteo publicado #107
 
 - Login real CONTADOR: agosto sigue CERRADO y ya no se ofrece Reabrir.
+- Retesteo manual `QA-AR-CIERRE-RETEST-107`, fecha 31/08 verificada antes
+  de enviar, dos líneas balanceadas de 1 ARS: HTTP 400 con motivo de período
+  cerrado visible inline, sin alerta nativa; captura íntegra conservada.
+  Lista releída en una pestaña nueva: 4 asientos, sin quinta alta.
 - Balance de comprobación real: 2 cuentas, Caja y Capital con debe/haber
   1700 cada una; totales 3400/3400 y saldo final cero (incluye reversión del
   intento QA de fecha equivocada, además del aporte/reversión de 1200).

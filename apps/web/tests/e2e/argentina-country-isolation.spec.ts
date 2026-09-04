@@ -272,7 +272,7 @@ test.describe('Argentina · aislamiento jurisdiccional y factura ARCA', () => {
     await page.locator('#orden-compra-modal-observaciones').fill('QA compra con recepción parcial')
     await page.locator('#orden-compra-modal-moneda').selectOption('USD')
     await page.getByRole('button', { name: 'Crear Orden', exact: true }).click()
-    await expect(page.getByRole('alert')).toContainText('Compra rechazada en QA')
+    await expect(page.getByRole('alert').filter({ hasText: 'Compra rechazada en QA' })).toBeInViewport()
     await expect(page.getByRole('spinbutton', { name: 'Cantidad', exact: true })).toHaveValue('10')
     await expect(page.locator('#orden-compra-modal-observaciones')).toHaveValue('QA compra con recepción parcial')
     expect(submissions).toHaveLength(1)
