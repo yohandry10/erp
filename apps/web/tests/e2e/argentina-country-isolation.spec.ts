@@ -311,6 +311,8 @@ test.describe('Argentina · aislamiento jurisdiccional y factura ARCA', () => {
     const product = { id: '22222222-2222-4222-8222-222222222222', nombre: 'Café QA', afectacion_igv: '10' }
     const warehouse = { id: '33333333-3333-4333-8333-333333333333', nombre: 'Almacén QA' }
     const submissions: Record<string, any>[] = []
+    // El asistente usa permisos granulares; ADMIN no elude ese contrato.
+    await page.route(/\/api\/usuarios-sistema\/me\/permissions\/?$/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: [{ id: 'qa-create-order', modulo: 'compras', recurso: 'ordenes', accion: 'crear' }] }) }))
     await page.route(/\/api\/compras\/proveedores\/?(?:\?|$)/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: [supplier] }) }))
     await page.route(/\/api\/inventario\/productos\/?(?:\?|$)/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: [product] }) }))
     await page.route(/\/api\/inventario\/almacenes\/?(?:\?|$)/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: [warehouse] }) }))
