@@ -137,34 +137,21 @@ describe('QR fiscal ARCA', () => {
   });
 
   it.each([
-    ['01', 'RESPONSABLE_INSCRIPTO', 1],
-    ['03', 'CONSUMIDOR_FINAL', 6],
-    ['07', 'MONOTRIBUTO', 3],
-    ['08', 'EXENTO', 7],
-  ])('resuelve el legacy %s con receptor %s como WSFE %s', (
+    ['01', 'RESPONSABLE_INSCRIPTO'],
+    ['03', 'CONSUMIDOR_FINAL'],
+    ['07', 'MONOTRIBUTO'],
+    ['08', 'EXENTO'],
+  ])('una muestra legacy %s con receptor %s nunca genera QR ARCA', (
     legacyType,
     receiverVatCondition,
-    expectedWsfeType,
   ) => {
-    const content = resolveArcaQrContent({
+    expect(resolveArcaQrContent({
       ...authorizedInvoice,
       tipo_documento: legacyType,
       arca_condicion_iva_receptor: receiverVatCondition,
-      metadata: {},
-    }, { allowMissingAuthorization: true });
-    const payload = JSON.parse(
-      Buffer.from(content!.split('?p=')[1], 'base64').toString('utf8'),
-    );
-    expect(payload.tipoCmp).toBe(expectedWsfeType);
-  });
-
-  it('falla cerrado si un legacy AR no trae condiciones IVA', () => {
-    expect(() => resolveArcaQrContent({
-      ...authorizedInvoice,
-      tipo_documento: '01',
-      arca_condicion_iva_receptor: null,
-      metadata: {},
-    }, { allowMissingAuthorization: true })).toThrow('condición IVA válida del receptor');
+      hash: '70417054367476',
+      metadata: { ...authorizedInvoice.metadata },
+    }, { allowMissingAuthorization: true })).toBeNull();
   });
 
   it('no acepta un hash local numérico como CAE sin evidencia fiscal 524', () => {

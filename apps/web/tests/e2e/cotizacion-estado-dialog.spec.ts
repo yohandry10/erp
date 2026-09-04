@@ -240,7 +240,7 @@ test('el cliente encuentra y abre la representación A4 de una factura demo', as
   await expect(dialog.getByTestId('cpe-a4-qr')).toHaveCount(0)
   await expect(dialog.getByText('Código QR SUNAT', { exact: true })).toHaveCount(0)
   await expect(dialog.getByTestId('cpe-a4-additional-items')).toContainText('+ 2 líneas adicionales')
-  await expect(dialog.getByTestId('cpe-a4-preview-authority-note')).toContainText('PDF descargable es la representación completa y autoritativa')
+  await expect(dialog.getByTestId('cpe-a4-preview-authority-note')).toContainText('PDF descargable es la representación completa de la muestra y no tiene validez fiscal')
   await expect(dialog.getByText('Representación impresa de la Factura Electrónica.', { exact: false })).toBeVisible()
   await expect(dialog.getByText(/imprime en A4 con escala 100%/i)).toBeVisible()
   await expect(dialog.getByText('S/ 118.00', { exact: true }).last()).toBeVisible()
@@ -353,10 +353,10 @@ test('la representación A4 localiza etiquetas fiscales para Colombia y Argentin
           razon_social_receptor: 'Cliente Argentino S.A.', documento_receptor: '30712345678',
           direccion_receptor: 'Buenos Aires', total_gravadas: 100000, total_igv: 21000,
           tasa_igv: 21, total_venta: 121000,
-          fiscal_qr_data_url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+          fiscal_qr_data_url: null,
           fiscal_print_info: {
-            authorizationCode: '70417054367476', authorizationLabel: 'CAE',
-            authorizationExpiry: '20260910', pointOfSale: 12, documentNumber: 10,
+            isDemo: true, authorizationCode: 'MUESTRA-SIN-CAE', authorizationLabel: 'CAE',
+            authorizationExpiry: 'No aplica en muestra', pointOfSale: 12, documentNumber: 10,
             specialLegend: null,
           },
           emisor: { ruc: '30700000001', razon_social: 'Emisor Argentina S.A.', direccion_fiscal: 'Buenos Aires' },
@@ -403,10 +403,14 @@ test('la representación A4 localiza etiquetas fiscales para Colombia y Argentin
   await page.goto('/dashboard/cpe/?cpe_id=cpe-ar-demo', { waitUntil: 'domcontentloaded' })
   const arDialog = page.getByRole('dialog', { name: /Nota de crédito 00012-00000010/i })
   await expect(arDialog).toBeVisible({ timeout: 30_000 })
-  await expect(arDialog.getByText(/Muestra demo · sin validez ARCA/i)).toBeVisible()
+  await expect(
+    arDialog.locator('header').getByText('Muestra demo · sin validez ARCA', { exact: true }),
+  ).toBeVisible()
   await expect(arDialog.getByText('CUIT: 30700000001', { exact: true })).toBeVisible()
   await expect(arDialog.getByText('IVA (21%):', { exact: true })).toBeVisible()
-  await expect(arDialog.getByTestId('cpe-arca-authorization')).toContainText('70417054367476')
+  await expect(arDialog.getByTestId('cpe-arca-authorization')).toContainText('Muestra demo · sin validez ARCA')
+  await expect(arDialog.getByTestId('cpe-arca-authorization')).toContainText('MUESTRA-SIN-CAE')
+  await expect(arDialog.getByTestId('cpe-arca-authorization')).not.toContainText('Comprobante autorizado')
   await expect(arDialog.getByTestId('cpe-arca-authorization')).toContainText('00012')
   await expect(arDialog.getByText('Código QR ARCA', { exact: true })).toHaveCount(0)
   await expect(arDialog.getByText(/Representación gráfica de la Nota de Crédito Electrónica/i)).toBeVisible()
