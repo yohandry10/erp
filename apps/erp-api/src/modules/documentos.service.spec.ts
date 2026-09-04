@@ -219,10 +219,10 @@ describe('DocumentosService — contrato atómico 461/443/448', () => {
     expect(result.idempotent).toBe(true);
   });
 
-  it('falla cerrado en Colombia si se invocan los endpoints fiscales legacy de Documentos', async () => {
+  it.each([['CO', 2], ['AR', 5]])('falla cerrado en %s si se invocan los endpoints fiscales legacy de Documentos', async (_pais, paisId) => {
     tableResults.empresa_config = [
-      { data: { pais: null, pais_id: 2 }, error: null },
-      { data: { pais: '', pais_id: 2 }, error: null },
+      { data: { pais: null, pais_id: paisId }, error: null },
+      { data: { pais: '', pais_id: paisId }, error: null },
     ];
 
     await expect(
@@ -235,6 +235,44 @@ describe('DocumentosService — contrato atómico 461/443/448', () => {
     expect(client.from).not.toHaveBeenCalledWith('cpe');
     expect(cpe.create).not.toHaveBeenCalled();
     expect(cpe.resendToOse).not.toHaveBeenCalled();
+  });
+
+  it('proyecta Factura B y procedencia demo desde el CPE vinculado del mismo tenant', async () => {
+    tableResults.documentos = [{ data: [{ id: documentoId, tipo_documento: 'FACTURA', estado: 'EMITIDO', metadata: { pais: 'AR' } }], error: null }];
+    tableResults.cpe = [{ data: [{ id: 'cpe-ar', documento_id: documentoId, tipo_documento: '01', estado: 'FIRMADO', metadata: {
+      pais: 'AR', arca_condicion_iva_emisor: 'RESPONSABLE_INSCRIPTO', arca_condicion_iva_receptor: 'CONSUMIDOR_FINAL',
+      arca_is_demo: true, secreto_no_publicable: 'no-exponer',
+    } }], error: null }];
+
+    const result = await service.getDocumentos({}, tenantId);
+
+    expect(result.data[0].arca).toEqual({ cpe_id: 'cpe-ar', codigo: 6, estado: 'FIRMADO', is_demo: true });
+    const fiscalQuery = client.from.mock.results[1].value;
+    expect(fiscalQuery.eq).toHaveBeenCalledWith('tenant_id', tenantId);
+    expect(fiscalQuery.in).toHaveBeenCalledWith('documento_id', [documentoId]);
+    expect(JSON.stringify(result)).not.toContain('no-exponer');
+    expect(client.from).not.toHaveBeenCalledWith('empresa_config');
+  });
+
+  it('conserva el código ARCA autorizado aunque cambien las condiciones IVA', async () => {
+    tableResults.documentos = [{ data: [{ id: documentoId, metadata: { pais: 'AR' } }], error: null }];
+    tableResults.cpe = [{ data: [{ id: 'cpe-ar', documento_id: documentoId, tipo_documento: '01', estado: 'ACEPTADO', metadata: {
+      pais: 'AR', fiscal_country: 'AR', arca_cbte_tipo: 11,
+      arca_condicion_iva_emisor: 'RESPONSABLE_INSCRIPTO', arca_condicion_iva_receptor: 'CONSUMIDOR_FINAL',
+    } }], error: null }];
+    expect((await service.getDocumentos({}, tenantId)).data[0].arca).toMatchObject({ codigo: 11, is_demo: false });
+  });
+
+  it('no inventa una clase A para un CPE argentino sin condiciones IVA', async () => {
+    tableResults.documentos = [{ data: [{ id: documentoId, metadata: { pais: 'AR' } }], error: null }];
+    tableResults.cpe = [{ data: [{ id: 'cpe-ar', documento_id: documentoId, tipo_documento: '01', estado: 'FIRMADO', metadata: { pais: 'AR' } }], error: null }];
+    expect((await service.getDocumentos({}, tenantId)).data[0].arca.codigo).toBeNull();
+  });
+
+  it('no devuelve estados fiscales aparentes cuando falla la lectura del CPE', async () => {
+    tableResults.documentos = [{ data: [{ id: documentoId, metadata: { pais: 'AR' } }], error: null }];
+    tableResults.cpe = [{ data: null, error: { message: 'connection failed' } }];
+    await expect(service.getDocumentos({}, tenantId)).rejects.toThrow('historial ARCA');
   });
 
   it('falla cerrado si el tenant no tiene país fiscal resoluble', async () => {

@@ -561,7 +561,7 @@ test.describe('habilitación fiscal DIAN en CPE', () => {
 
     await expect(page.getByText('Muestra demo generada', { exact: true })).toBeVisible()
     await expect(
-      page.getByText(/muestra sin transmisión ni validez DIAN/i),
+      page.getByText('Comprobante demo generado localmente: muestra sin transmisión ni validez DIAN', { exact: true }),
     ).toBeVisible()
     await expect(page.getByText('Factura generada', { exact: true })).toHaveCount(0)
   })
