@@ -9,6 +9,7 @@ import { useOnboarding, getTourByRole } from '@/components/onboarding'
 import { getGuiaPorRuta } from '../module-guide'
 import { AyudaPanel } from './AyudaPanel'
 import { TemaAyuda } from './types'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 /**
  * Boton flotante + panel de ayuda. Opt-in: nada se muestra hasta que la persona
@@ -20,7 +21,8 @@ export function CentroAyuda() {
   const [temasCargando, setTemasCargando] = useState(false)
 
   const pathname = usePathname()
-  const guia = getGuiaPorRuta(pathname)
+  const country = useCountryContext()
+  const guia = getGuiaPorRuta(pathname, country.paisCodigo)
 
   const { user } = useTenant()
   const rol = (user?.roles?.[0] || (user?.is_super_admin ? 'superadmin' : '')) as string
@@ -28,6 +30,13 @@ export function CentroAyuda() {
   const { startTour } = useOnboarding()
 
   const cargarTemas = useCallback(async () => {
+    // La base histórica de temas frecuentes es peruana. Hasta disponer de un
+    // catálogo AR verificado, Argentina usa sólo las fichas locales específicas.
+    if (country.paisCodigo !== 'PE') {
+      setTemas([])
+      setTemasCargando(false)
+      return
+    }
     setTemasCargando(true)
     try {
       const params = new URLSearchParams()
@@ -50,7 +59,11 @@ export function CentroAyuda() {
     } finally {
       setTemasCargando(false)
     }
-  }, [rol])
+  }, [country.paisCodigo, rol])
+
+  useEffect(() => {
+    setTemas([])
+  }, [country.paisCodigo])
 
   useEffect(() => {
     if (abierto && temas.length === 0) cargarTemas()
@@ -58,23 +71,24 @@ export function CentroAyuda() {
 
   /** Trae la respuesta de un tema del catalogo. Como la pregunta viene del propio
    *  catalogo, siempre existe: el usuario nunca queda sin respuesta. */
-  const abrirTema = useCallback(async (tema: TemaAyuda): Promise<string | null> => {
-    try {
-      const params = new URLSearchParams({ q: tema.pregunta })
-      if (rol) params.append('rol', rol)
-      const res = await fetchApi(`/api/help/search?${params}`)
-      if (!res.ok) return null
-      const data = await res.json()
-      const r = data.resultado
-      if (!r) return null
-      const pasos = Array.isArray(r.pasos) && r.pasos.length > 0
-        ? '\n\n' + r.pasos.map((p: any) => `${p.paso}. ${p.texto}`).join('\n')
-        : ''
-      return `${r.respuesta}${pasos}`
-    } catch {
-      return null
-    }
-  }, [rol])
+  const abrirTema = useCallback(
+    async (tema: TemaAyuda): Promise<string | null> => {
+      try {
+        const params = new URLSearchParams({ q: tema.pregunta })
+        if (rol) params.append('rol', rol)
+        const res = await fetchApi(`/api/help/search?${params}`)
+        if (!res.ok) return null
+        const data = await res.json()
+        const r = data.resultado
+        if (!r) return null
+        const pasos = Array.isArray(r.pasos) && r.pasos.length > 0 ? '\n\n' + r.pasos.map((p: any) => `${p.paso}. ${p.texto}`).join('\n') : ''
+        return `${r.respuesta}${pasos}`
+      } catch {
+        return null
+      }
+    },
+    [rol],
+  )
 
   const iniciarTour = useCallback(() => {
     if (!tour) return

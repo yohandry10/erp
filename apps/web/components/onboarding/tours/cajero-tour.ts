@@ -42,7 +42,7 @@ export const cajeroTour: OnboardingTour = {
       id: 'metodo-pago',
       tipo: 'modal',
       titulo: 'Método de Pago',
-      descripcion: 'Al presionar Cobrar se abre el diálogo de pago, donde eliges cómo paga el cliente: efectivo, tarjeta, transferencia o Yape/Plin. Puedes combinar varios medios en una misma venta, y si cobras en efectivo el sistema calcula el vuelto.',
+      descripcion: 'Al presionar Cobrar se abre el diálogo de pago, donde eliges cómo paga el cliente: efectivo, tarjeta, transferencia u otro medio habilitado. Puedes combinar varios medios en una misma venta, y si cobras en efectivo el sistema calcula el vuelto.',
     },
     {
       id: 'procesar-venta',
