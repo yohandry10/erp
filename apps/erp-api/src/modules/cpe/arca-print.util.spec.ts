@@ -13,8 +13,24 @@ describe('resolveArcaPrintedFiscalInfo', () => {
 
   it('usa identidad y CAE autorizados, no aliases PE', () => {
     expect(resolveArcaPrintedFiscalInfo(accepted, {}, false)).toEqual({
-      documentType: '001', authorizationCode: '12345678901234', authorizationLabel: 'CAE',
+      documentType: '001', isDemo: false, authorizationCode: '12345678901234', authorizationLabel: 'CAE',
       authorizationExpiry: '20260910', pointOfSale: 12, documentNumber: 25, specialLegend: null,
+    });
+  });
+
+  it('una demo nunca presenta el hash técnico ni aliases como CAE', () => {
+    expect(resolveArcaPrintedFiscalInfo({
+      ...accepted,
+      hash: 'a'.repeat(64),
+      metadata: {
+        ...accepted.metadata,
+        arca_cae: '70417054367476',
+        arca_cae_vencimiento: '20260910',
+      },
+    }, {}, true)).toMatchObject({
+      isDemo: true,
+      authorizationCode: 'MUESTRA-SIN-CAE',
+      authorizationExpiry: 'No aplica en muestra',
     });
   });
 

@@ -828,7 +828,10 @@ export class PdfGeneratorService {
     this.ensureVerticalSpace(doc, 62 + extraHeight);
     const y = doc.y + 6;
     doc.fontSize(10).font('Helvetica-Bold')
-      .text('COMPROBANTE AUTORIZADO', 50, y, { width: 495, align: 'center' });
+      .text(
+        info.isDemo ? 'MUESTRA DEMO · SIN VALIDEZ ARCA' : 'COMPROBANTE AUTORIZADO',
+        50, y, { width: 495, align: 'center' },
+      );
     doc.fontSize(9).font('Helvetica')
       .text(`${info.authorizationLabel}: ${info.authorizationCode}`, 60, y + 17, { width: 225 })
       .text(`Vencimiento ${info.authorizationLabel}: ${this.formatCompactFiscalDate(info.authorizationExpiry)}`, 300, y + 17, { width: 235 })
@@ -1303,12 +1306,13 @@ export class PdfGeneratorService {
 
     const authority = getActiveCountryByCode(countryCode)?.autoridadFiscal ?? 'SUNAT';
     const locale = countryCode === 'AR' ? 'es-AR' : countryCode === 'CO' ? 'es-CO' : 'es-PE';
-    const status =
-      cpeData.dian_status ||
-      cpeData.arca_status ||
-      cpeData.sunat_status ||
-      cpeData.estado ||
-      'PENDIENTE';
+    const status = cpeData.simulated_origin !== false
+      ? 'MUESTRA LOCAL · NO TRANSMITIDO'
+      : cpeData.dian_status ||
+        cpeData.arca_status ||
+        cpeData.sunat_status ||
+        cpeData.estado ||
+        'PENDIENTE';
     doc.fontSize(7).font('Helvetica')
       .text(
         `Estado ${authority}: ${status} | ` +
