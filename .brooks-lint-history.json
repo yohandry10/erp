@@ -1,0 +1,13 @@
+[
+  {
+    "date": "2026-09-04T07:48:08Z",
+    "mode": "pr-review",
+    "score": 95,
+    "findings": {
+      "critical": 0,
+      "warning": 1,
+      "suggestion": 0
+    },
+    "scope": "git diff origin/main: Colombia DIAN 533-534"
+  }
+]

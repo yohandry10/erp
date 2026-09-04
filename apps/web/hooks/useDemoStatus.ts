@@ -21,9 +21,12 @@ export function useDemoStatus() {
   const { session } = useAuth()
 
   const fetchStatus = useCallback(async () => {
+    setLoading(true);
+    setStatus(null);
+    setError(null);
     try {
       if (!session?.user) {
-        setLoading(false);
+        setError('Sesión no disponible');
         return;
       }
 
@@ -54,7 +57,10 @@ export function useDemoStatus() {
     status,
     loading,
     error,
-    isDemoTenant: status?.is_demo || false,
+    // Fail closed: sólo una respuesta válida puede acreditar que la cuenta es
+    // real. Mientras el estado falta, se recarga o falla, los consumidores no
+    // deben habilitar credenciales ni acciones fiscales externas.
+    isDemoTenant: status?.is_demo ?? true,
     isExpired: status?.is_expired || false,
     diasRestantes: status?.dias_restantes || 0,
     canExtend: status?.can_extend || false,

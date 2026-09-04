@@ -37,15 +37,41 @@ Estado actual y pendientes: `docs/CURRENT_STATE.md`.
 8. Comparar conteos y revisar logs.
 9. Detener y revertir ante cualquier diferencia no explicada.
 
-El estado remoto comprobado el 2026-08-31 llega a `528`. El release candidate
-local añade `529..532`: sus verificadores pasan en una reconstrucción limpia
-de PostgreSQL 16 y el binario, `render.yaml` y CI exigen 532, pero sigue pre-PR y
-no está autorizado para PROD hasta que el CI remoto cierre. La promoción vuelve
-a comenzar por preflight, respaldo y ensayo transaccional; el API/worker no
-puede desplegarse hasta que DB registre 532.
-Después del deploy, `/health/ready` debe informar
-`schema_version = required_schema_version = 532`: que el esquema supere un gate
-viejo no basta.
+El release Colombia `529..532` se promovió el 2026-08-31 mediante el PR
+[#97](https://github.com/yohandry10/erp/pull/97), fusionado en
+`f6455355d12c8834a0c77a73b238647119dff04a`. Antes de la promoción pasaron la
+reconstrucción limpia de PostgreSQL 16, los verificadores vigentes e históricos,
+281 suites/2673 pruebas API, 46 pruebas Playwright, lint, type-check, builds,
+CodeQL, auditoría de dependencias y el contrato DIAN oficial. Las migraciones se
+aplicaron DB-first con preflight y respaldo verificable; Render y Vercel sirven
+el mismo SHA. `/health/ready` confirma
+`schema_version = required_schema_version = 532`, DB y Redis listos y outbox sin
+filas claimable, processing, failed ni stale. Los siete `dead_letter` restantes
+son históricos. Falta la revalidación visual autenticada del flujo Colombia en
+PROD y, por contribuyente, los gates externos descritos abajo.
+
+El candidato siguiente añade `533..534` y, al corte del 2026-09-04, está
+**verificado sólo localmente y pre-PR**. La 533 hace fail-closed la procedencia
+de CPE de demos Colombia: representación local no UBL/sin firma, sin
+`SEND`/`QUERY`, aceptación ni evidencia externa, incluso después de convertir
+el tenant a real. La 534 implementa el flujo atómico RMA→Nota Crédito DIAN `91`:
+la nota permanece neutral hasta aceptación; la aceptación aplica exactamente
+una vez los efectos enlazados y cierra la RMA, mientras el rechazo conserva cero
+efecto y permite corregir/reintentar. La respuesta comercial usa la procedencia
+persistida del CPE, reconsultada por `id + tenant_id`, y falla cerrado si no es
+inequívoca; no decide con `empresa_config` mutable.
+
+Su evidencia pre-PR es 283 suites/2693 pruebas API, type-check y builds API/Web,
+52 pruebas Playwright más 1 contrato visual móvil, nueve XML DIAN y una
+reconstrucción limpia PostgreSQL 16 con 531 migraciones, 44 verificadores
+vigentes y 67 históricos hasta la 534. Esto no autoriza producción: faltan PR,
+CI remoto, preflight y respaldo PROD, promoción DB-first `533..534`, despliegue
+Render/Vercel, postchecks y retest visual autenticado sobre el mismo SHA. PROD
+permanece en 532 mientras esa cadena no termine.
+
+La regla estable se mantiene: después de cada deploy, `/health/ready` debe
+informar `schema_version = required_schema_version`; que el esquema supere un
+gate viejo no basta.
 
 El rango `491..496` se promovió el 2026-08-17 en este orden:
 respaldo/preflight; inspección y aplicación DB; API/worker con
@@ -123,47 +149,46 @@ continúe el rechazo `2112`.
 
 ## Colombia DIAN
 
-El alcance funcional interno FEV queda cubierto por código, una reconstrucción
-PostgreSQL 16 desde cero, verificadores SQL y 281 suites/2673 pruebas API. El
-perfil aislado completo del release pasa 46 pruebas Playwright más el contrato
-visual móvil. Los nueve XML pasan XSD y los tipos cubiertos por el XSL oficial
-pasan además Schematron; `AttachedDocument` queda bajo XSD porque ese XSL no
-cubre su raíz. Esa evidencia no es
-homologación: para habilitar un contribuyente faltan sus credenciales reales,
+El alcance funcional interno FEV del candidato 533-534 queda cubierto por
+código, una reconstrucción PostgreSQL 16 desde cero con 531 migraciones, 44
+verificadores vigentes y 67 históricos, y 283 suites/2693 pruebas API. El perfil
+aislado completo pasa 52 pruebas Playwright más 1 contrato visual móvil;
+type-check y builds API/Web también están verdes. Los nueve XML pasan XSD y los
+tipos cubiertos por el XSL oficial pasan además Schematron;
+`AttachedDocument` queda bajo XSD porque ese XSL no cubre su raíz. Esa evidencia
+no es homologación: para habilitar un contribuyente faltan sus credenciales reales,
 resolución/rango, trust/pins, ejecutar `GetNumberingRange` y `SendTestSetAsync`,
 conservar el resultado terminal, acreditar `HABILITADO` en el portal y realizar
 el smoke oficial de factura, notas, adjunto y eventos.
 
-El release candidate implementa el núcleo FEV 1.9, la aceptación estricta 528,
-las notas desde UI 529, la numeración/idempotencia reforzada 530, el snapshot
-transaccional de pedidos 531 y el guard jurisdiccional RMA 532. La factura CO
+La base desplegada hasta 532 implementa el núcleo FEV 1.9, la aceptación
+estricta 528, las notas desde UI 529, la numeración/idempotencia reforzada 530,
+el snapshot transaccional de pedidos 531 y el guard jurisdiccional RMA 532. La factura CO
 real nace como UBL DIAN nativo firmado; la UI no puede escoger el consecutivo ni
 el prefijo que DIAN haya asignado —y admite una resolución sin prefijo—, y el
 retry no puede cambiar cliente, fechas, pago o perfil receptor.
-También implementa
-los eventos FEV 030-034 sobre anclas emitidas/recibidas, pero nada de ello
+El candidato 533 sella la procedencia demo CO y el 534 completa RMA→NC DIAN 91
+sin efecto financiero hasta aceptación; ambos siguen pre-PR. También se
+implementan los eventos FEV 030-034 sobre anclas emitidas/recibidas, pero nada de ello
 habilita por sí solo a ningún contribuyente ni constituye RADIAN integral. Antes
 de un go-live colombiano deben cumplirse, en este orden:
 
-1. Abrir el PR y exigir CI verde: gate oficial de nueve XML con `ProfileID`
-   normativos, suite API completa, type-check/build, Playwright Colombia,
-   verificación de offline sensible y reconstrucción PostgreSQL 16 hasta 532.
-   Las pruebas Chrome usan APIs interceptadas.
+1. Abrir el PR del candidato 533-534 y exigir CI verde: gate oficial de nueve
+   XML con `ProfileID` normativos, 283 suites/2693 pruebas API, type-check y
+   builds API/Web, 52 Playwright más 1 visual móvil, y reconstrucción PostgreSQL
+   16 con 531 migraciones, 44 verificadores vigentes y 67 históricos hasta 534.
+   Las pruebas Chrome usan APIs interceptadas y no sustituyen el backend
+   productivo.
 2. Configurar el bundle CA público y los pins SHA-256 de SPKI oficiales en el
    runtime. Una fuente ambigua, cadena no confiable o pin divergente debe fallar
    cerrado; nunca usar el PFX privado del tenant como trust store.
-3. Promover `529..532` DB-first y comprobar `schema_version =
-   required_schema_version = 532` antes de desplegar API/worker y Web. La 530
-   renombra y envuelve el writer 443; por eso sus verificadores deben incluir
-   compatibilidad 443/446/461, reintento semántico y concurrencia de numeración.
-   La 531 congela bajo lock la intención de pago y el snapshot comercial que
-   consumirá la emisión. Para permitir este orden DB-first sin abrir una ventana
-   de bypass, la firma de cuatro argumentos que usa el runtime 528 permanece
-   como adaptador temporal al guard 531; el writer anterior se renombra y queda
-   sin `EXECUTE` para `service_role`. El verificador debe demostrar una edición
-   previa al freeze y el rechazo de la misma firma después del freeze. La 532
-   bloquea la nota SUNAT `07` del RMA cuando el tenant es Colombia antes de
-   cualquier mutación.
+3. Tras preflight, respaldo y ensayo transaccional, promover `533..534`
+   DB-first y comprobar `schema_version = required_schema_version = 534` antes
+   de desplegar API/worker y Web. El preflight de 533 debe abortar ante cualquier
+   demo CO con estado/evidencia externa o una operación fiscal reclamada; no
+   corrige historia ambigua. El de 534 exige los contratos RMA 456/532 y notas
+   DIAN 529. Después de aplicar, ejecutar sus verificadores vigentes y los
+   históricos declarados antes de mover el runtime.
 4. Cargar por tenant el PFX, Software ID/PIN, TestSet,
    resolución/rango/fechas, prefijo sólo si DIAN lo asignó y clave técnica;
    confirmar que el PFX pertenece
@@ -179,8 +204,9 @@ de un go-live colombiano deben cumplirse, en este orden:
    técnica reciente. Un documento aceptado aislado no sustituye esta compuerta.
 7. Cambiar al endpoint oficial de producción y ejecutar un smoke autorizado:
    factura `01` → `GetStatus` → `ApplicationResponse` →
-   `AttachedDocument`; luego nota `91`, nota `92`, importación de FEV recibida
-   y eventos FEV 030-034. Verificar CUFE/CUDE, trust, numeración e identidad
+   `AttachedDocument`; luego RMA→nota `91` con aceptación/cierre y
+   rechazo/reintento sin efecto, nota `92`, importación de FEV recibida y eventos
+   FEV 030-034. Verificar CUFE/CUDE, trust, numeración e identidad
    visible exacta `prefijo + consecutivo` (o sólo consecutivo), A4/logo,
    reintento por `operationId` y auditoría.
 8. Si se ofrecerá operación directa RADIAN/factoring, completar además el
@@ -195,9 +221,11 @@ La fuente primaria para el requisito separado es el
 [Abecé RADIAN oficial vigente](https://micrositios.dian.gov.co/sistema-de-facturacion-electronica/abece-radian/),
 consultado el 2026-08-29. Sin PFX, Software ID/PIN, TestSet FEV,
 resolución/numeración, trust/pins y estado portal `HABILITADO` reales, el estado
-correcto es **técnicamente implementado en local, no homologado ni listo para
-emitir legalmente**. Para RADIAN directo faltan además su registro, requisitos y
-Set de 15 eventos. Las demos permanecen simuladas y no contactan DIAN.
+correcto es: **base 532 técnicamente implementada y desplegada; candidato
+533-534 técnicamente probado sólo en local; contribuyente no homologado ni listo
+para emitir legalmente**. Para RADIAN directo faltan además su registro,
+requisitos y Set de 15 eventos. Las demos permanecen simuladas y no contactan
+DIAN.
 
 ## Migración de clientes
 
@@ -238,8 +266,11 @@ correctivo probado. Nunca improvisarlo sobre PROD.
 ## Bloqueantes actuales
 
 - Certificado productivo compatible con el RUC.
-- Interno Colombia: PR/CI remoto, promoción DB-first 529-532, despliegue y retest
-  visual/API contra el mismo SHA; el cierre local no sustituye esos gates.
+- Interno Colombia: la base 532 está desplegada en
+  `f6455355d12c8834a0c77a73b238647119dff04a`, pero su revalidación visual/API
+  autenticada sigue pendiente. Para el candidato 533-534 faltan además PR/CI,
+  preflight y respaldo PROD, promoción DB-first, despliegues Render/Vercel y
+  retest visual sobre el mismo SHA.
 - Para Colombia: PFX compatible con el NIT, Software ID/PIN, TestSet,
   resolución/numeración, trust store/pins y constancia `HABILITADO` del portal;
   falta ejecutar y conservar el TestSet FEV y smoke DIAN reales. Para operación

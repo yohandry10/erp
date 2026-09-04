@@ -16,6 +16,10 @@ import {
   DIAN_PAYMENT_INTENT_KEY,
   DIAN_PAYMENT_SNAPSHOT_KEY,
 } from './pedido-payment.util';
+import {
+  isColombiaDemoRepresentation,
+  resolveHistoricalCpeCountry,
+} from '../../cpe/historical-cpe-country.util';
 
 interface DianPedidoPaymentSnapshot {
   condicionPago: CondicionPago;
@@ -442,6 +446,7 @@ export class CPEIntegrationService {
     factura_id: string;
     estado: string;
     warnings?: string[];
+    is_demo_representation?: boolean;
     serie?: string;
     numero?: number;
     moneda?: string;
@@ -457,26 +462,35 @@ export class CPEIntegrationService {
     let dianSnapshotPrepared = false;
 
     try {
-      // 1. Validar certificado digital vigente (Requirement 15.5, 19.6, 19.7)
-      const certificateValidation = await this.validationService.validateCertificate(tenantId);
-      if (!certificateValidation.isValid) {
-        this.logger.error(`Certificado inválido para tenant ${tenantId}: ${certificateValidation.errors.join(', ')}`);
-        throw new BadRequestException({
-          message: 'No se puede generar factura: Certificado digital inválido o vencido',
-          code: 'CERT_VALIDATION_FAILED',
-          errors: certificateValidation.errors,
-        });
+      // 1. Determinar primero país y modalidad. Una demo CO produce sólo una
+      // representación local marcada sin validez DIAN; no debe fingir una
+      // firma usando el certificado sintético peruano ni exigir un PFX real.
+      let empresaConfig = await this.obtenerEmpresaConfig(tenantId);
+      const esDemoColombia = empresaConfig.is_demo === true
+        && String(empresaConfig.pais ?? '').trim().toUpperCase() === 'CO';
+
+      // 2. Toda cuenta real (incluida CO) y las demos no colombianas conservan
+      // el guard de certificado vigente. El bypass es exacto para CO demo.
+      if (!esDemoColombia) {
+        const certificateValidation = await this.validationService.validateCertificate(tenantId);
+        if (!certificateValidation.isValid) {
+          this.logger.error(`Certificado inválido para tenant ${tenantId}: ${certificateValidation.errors.join(', ')}`);
+          throw new BadRequestException({
+            message: 'No se puede generar factura: Certificado digital inválido o vencido',
+            code: 'CERT_VALIDATION_FAILED',
+            errors: certificateValidation.errors,
+          });
+        }
+
+        // Log warnings del certificado (ej: próximo a vencer)
+        if (certificateValidation.warnings.length > 0) {
+          this.logger.warn(`Advertencias del certificado: ${certificateValidation.warnings.join(', ')}`);
+        }
       }
 
-      // Log warnings del certificado (ej: próximo a vencer)
-      if (certificateValidation.warnings.length > 0) {
-        this.logger.warn(`Advertencias del certificado: ${certificateValidation.warnings.join(', ')}`);
-      }
-
-      // 2. Determinar el adaptador fiscal. En Colombia el RPC retorna el corte
+      // 3. Determinar el adaptador fiscal. En Colombia el RPC retorna el corte
       // canónico completo tomado bajo locks; ningún dato precargado del pedido,
       // sus líneas o el cliente vuelve a participar en la emisión.
-      let empresaConfig = await this.obtenerEmpresaConfig(tenantId);
       let pedidoFacturable: PedidoDianFacturable = pedido;
       let cliente: Record<string, unknown>;
       if (String(empresaConfig.pais ?? '').trim().toUpperCase() === 'CO') {
@@ -544,49 +558,76 @@ export class CPEIntegrationService {
           ? { pedidoFiscalOwnerId: pedido.id }
           : undefined,
       );
-      const documentoId = (factura as any).documento_id ?? (factura as any).documentoId ?? null;
+      // `CpeService.create` devuelve el DTO público, que deliberadamente no
+      // expone `issuer_snapshot` ni `metadata`; además `cpe.pais` es nullable.
+      // Por eso la procedencia y el modo demo/real se vuelven a leer desde la
+      // fila ya persistida, siempre bajo el mismo tenant. Usar empresa_config
+      // aquí reetiquetaría comprobantes históricos después de una conversión.
+      const facturaPersistida = await this.obtenerCpePersistidoParaRespuesta(
+        factura?.id,
+        tenantId,
+      );
+      const documentoId = facturaPersistida.documento_id
+        ?? (factura as any).documento_id
+        ?? (factura as any).documentoId
+        ?? null;
 
       if (dianSnapshotPrepared && dianLifecycleKey) {
         await this.consumirSnapshotDianPedido(
           pedido.id,
           tenantId,
           dianLifecycleKey,
-          factura.id,
+          facturaPersistida.id,
         );
       }
 
-      this.logger.log(`✅ Factura generada exitosamente: ${factura.id}`);
+      this.logger.log(`✅ Factura generada exitosamente: ${facturaPersistida.id}`);
+
+      // El modo del comprobante es histórico e inmutable. No se vuelve a
+      // inferir desde empresa_config porque el tenant puede convertirse de demo
+      // a real entre el freeze y esta respuesta (o antes de un reintento).
+      const paisFiscalPersistido = resolveHistoricalCpeCountry(facturaPersistida);
+      const esRepresentacionDemoColombia = isColombiaDemoRepresentation(
+        facturaPersistida,
+      );
 
       // 7. Manejar respuestas de SUNAT (Requirement 10.7, 19.9, 19.10)
-      const resultado = this.procesarRespuestaSUNAT(factura);
+      const resultado = this.procesarRespuestaFiscal(
+        facturaPersistida,
+        paisFiscalPersistido,
+        esRepresentacionDemoColombia,
+      );
 
       const durationMs = Date.now() - startedAt;
 
       await this.registrarExitoIntegracion({
         pedidoId: pedido.id,
         tenantId,
-        facturaId: factura.id ?? null,
+        facturaId: facturaPersistida.id,
         durationMs,
         responseSummary: {
-          serie: factura.serie ?? facturaData.serie,
-          numero: factura.numero ?? facturaData.numero,
+          serie: facturaPersistida.serie ?? factura.serie ?? facturaData.serie,
+          numero: facturaPersistida.numero ?? factura.numero ?? facturaData.numero,
           estado: resultado.estado,
+          is_demo_representation: esRepresentacionDemoColombia,
         },
       });
 
       return {
-        factura_id: factura.id,
-        cpe_id: factura.id,
+        factura_id: facturaPersistida.id,
+        cpe_id: facturaPersistida.id,
         estado: resultado.estado,
         warnings: resultado.warnings,
-        serie: factura.serie ?? facturaData.serie,
-        numero: factura.numero ?? facturaData.numero,
-        moneda: factura.moneda ?? facturaData.moneda ?? 'PEN',
+        is_demo_representation: esRepresentacionDemoColombia,
+        serie: facturaPersistida.serie ?? factura.serie ?? facturaData.serie,
+        numero: facturaPersistida.numero ?? factura.numero ?? facturaData.numero,
+        moneda: facturaPersistida.moneda ?? factura.moneda ?? facturaData.moneda ?? 'PEN',
         // Fecha fiscal: si el writer no la devolvió, se toma la del contribuyente y
         // no la de UTC, que pasadas las 19:00 de Lima sería el día siguiente.
-        fecha_emision: (factura as any).fecha_emision
+        fecha_emision: facturaPersistida.fecha_emision
+          ?? (factura as any).fecha_emision
           ?? await fechaHoyDelTenant(this.supabase.getClient(), tenantId),
-        total: factura.total_venta ?? facturaData.total_venta,
+        total: facturaPersistida.total_venta ?? factura.total_venta ?? facturaData.total_venta,
         documento_id: documentoId,
       };
     } catch (error) {
@@ -950,33 +991,44 @@ export class CPEIntegrationService {
    * Procesa la respuesta de SUNAT
    * Requirements: 10.7, 19.9, 19.10
    */
-  private procesarRespuestaSUNAT(factura: any): { estado: string; warnings: string[] } {
+  private procesarRespuestaFiscal(
+    factura: any,
+    countryCode = 'PE',
+    isDemo = false,
+  ): { estado: string; warnings: string[] } {
     const warnings: string[] = [];
+    const authority = countryCode === 'CO' ? 'DIAN' : countryCode === 'AR' ? 'ARCA' : 'SUNAT';
+
+    if (countryCode === 'CO' && isDemo) {
+      warnings.push('Comprobante demo generado localmente: muestra sin transmisión ni validez DIAN');
+      this.logger.log(`Factura demo ${factura.id} generada sin transmisión DIAN`);
+      return { estado: factura.estado, warnings };
+    }
 
     // Estados posibles: FIRMADO, ENVIADO, ACEPTADO, RECHAZADO
     switch (factura.estado) {
       case 'ACEPTADO':
-        this.logger.log(`✅ Factura ${factura.id} aceptada por SUNAT`);
+        this.logger.log(`✅ Factura ${factura.id} aceptada por ${authority}`);
         return { estado: 'ACEPTADO', warnings };
 
       case 'FIRMADO':
-        // Factura firmada pero no enviada a SUNAT todavía
-        warnings.push('La factura fue firmada pero debe ser enviada manualmente a SUNAT desde el módulo CPE');
-        this.logger.warn(`⚠️ Factura ${factura.id} firmada, pendiente de envío a SUNAT`);
+        warnings.push(`La factura fue firmada pero debe ser enviada manualmente a ${authority} desde el módulo CPE`);
+        this.logger.warn(`⚠️ Factura ${factura.id} firmada, pendiente de envío a ${authority}`);
         return { estado: 'FIRMADO', warnings };
 
       case 'ENVIADO':
-        warnings.push('La factura fue enviada a SUNAT y está pendiente de respuesta');
-        this.logger.log(`📤 Factura ${factura.id} enviada a SUNAT, esperando respuesta`);
+        warnings.push(`La factura fue enviada a ${authority} y está pendiente de respuesta`);
+        this.logger.log(`📤 Factura ${factura.id} enviada a ${authority}, esperando respuesta`);
         return { estado: 'ENVIADO', warnings };
 
       case 'RECHAZADO':
-        this.logger.error(`❌ Factura ${factura.id} rechazada por SUNAT: ${factura.error_message}`);
+        this.logger.error(`❌ Factura ${factura.id} rechazada por ${authority}: ${factura.error_message}`);
         throw new BadRequestException({
-          message: 'La factura fue rechazada por SUNAT',
+          message: `La factura fue rechazada por ${authority}`,
           code: 'FACTURA_RECHAZADA',
           details: {
-            error_sunat: factura.error_message,
+            error_fiscal: factura.error_message,
+            ...(authority === 'SUNAT' ? { error_sunat: factura.error_message } : {}),
           },
         });
 
@@ -984,6 +1036,74 @@ export class CPEIntegrationService {
         warnings.push(`Estado desconocido: ${factura.estado}`);
         return { estado: factura.estado, warnings };
     }
+  }
+
+  /**
+   * Rehidrata la procedencia fiscal inmutable que el DTO público omite. La
+   * doble condición evita que un cliente service-role pueda resolver por error
+   * un CPE homónimo de otro tenant. Toda ausencia o contradicción falla cerrada
+   * antes de comunicar al flujo comercial que la factura quedó generada.
+   */
+  private async obtenerCpePersistidoParaRespuesta(
+    cpeIdInput: unknown,
+    tenantId: string,
+  ): Promise<Record<string, any>> {
+    const cpeId = String(cpeIdInput ?? '').trim();
+    if (!cpeId) {
+      throw new BadRequestException({
+        message: 'No se pudo confirmar el comprobante fiscal persistido',
+        code: 'CPE_PERSISTED_PROVENANCE_UNAVAILABLE',
+      });
+    }
+
+    const { data, error } = await this.supabase.getClient()
+      .from('cpe')
+      .select([
+        'id', 'tenant_id', 'documento_id', 'estado', 'estado_sunat',
+        'sunat_status', 'error_message', 'pais', 'simulated_origin',
+        'issuer_snapshot', 'metadata', 'serie', 'numero', 'moneda',
+        'fecha_emision', 'total_venta',
+      ].join(','))
+      .eq('id', cpeId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    if (error || !data
+        || String((data as any).id ?? '') !== cpeId
+        || String((data as any).tenant_id ?? '') !== tenantId) {
+      if (error) {
+        this.logger.error(
+          `No se pudo releer la procedencia del CPE ${cpeId} en tenant ${tenantId}: ${error.message}`,
+        );
+      }
+      throw new BadRequestException({
+        message: 'No se pudo confirmar la procedencia fiscal del comprobante persistido',
+        code: 'CPE_PERSISTED_PROVENANCE_UNAVAILABLE',
+      });
+    }
+
+    if (typeof (data as any).simulated_origin !== 'boolean') {
+      throw new BadRequestException({
+        message: 'El comprobante persistido no conserva una modalidad fiscal verificable',
+        code: 'CPE_PERSISTED_PROVENANCE_INVALID',
+      });
+    }
+
+    try {
+      // Valida país soportado y contradicciones snapshot/cpe.pais ahora, no
+      // después de devolver un éxito ambiguo al módulo de Pedidos.
+      resolveHistoricalCpeCountry(data as Record<string, any>);
+    } catch (cause) {
+      this.logger.error(
+        `Procedencia fiscal inválida en CPE ${cpeId}: ${(cause as Error)?.message ?? 'error desconocido'}`,
+      );
+      throw new BadRequestException({
+        message: 'El comprobante persistido no conserva una procedencia fiscal verificable',
+        code: 'CPE_PERSISTED_PROVENANCE_INVALID',
+      });
+    }
+
+    return data as Record<string, any>;
   }
 
   /**

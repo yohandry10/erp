@@ -449,7 +449,11 @@ BEGIN
     RAISE EXCEPTION 'VERIFY_524_ARCA_QUERY_DID_NOT_FINALIZE';
   END IF;
 
-  FOREACH v_country IN ARRAY ARRAY['PE', 'CO'] LOOP
+  -- Colombia ya no puede reutilizar este fixture demo para simular una
+  -- aceptación externa: 528 prueba la correlación DIAN real y 533 demuestra
+  -- que todo transporte de un CPE demo CO se rechaza. Aquí sólo conservamos
+  -- el contraste no-ARCA de Perú que corresponde al alcance original de 524.
+  FOREACH v_country IN ARRAY ARRAY['PE'] LOOP
     UPDATE public.empresa_config SET pais = v_country WHERE tenant_id = v_tenant;
     v_country_document := gen_random_uuid();
     v_country_cpe := gen_random_uuid();

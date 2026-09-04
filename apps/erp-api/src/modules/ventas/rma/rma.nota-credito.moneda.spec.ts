@@ -12,7 +12,7 @@ describe('RmaService - fronteras atómicas 456', () => {
       data: { success: true, rma_id: 'rma-1', idempotent: false },
       error: null,
     });
-    maybeSingle = jest.fn().mockResolvedValue({ data: { pais: 'PE' }, error: null });
+    maybeSingle = jest.fn().mockResolvedValue({ data: { pais: 'PE', is_demo: false }, error: null });
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RmaService,
@@ -83,8 +83,28 @@ describe('RmaService - fronteras atómicas 456', () => {
     });
   });
 
-  it('bloquea en Colombia la RPC SUNAT 07 y dirige al flujo DIAN 91', async () => {
-    maybeSingle.mockResolvedValueOnce({ data: { pais: 'CO' }, error: null });
+  it('en Colombia real deriva la RMA al writer atómico DIAN 91', async () => {
+    maybeSingle.mockResolvedValueOnce({ data: { pais: 'CO', is_demo: false }, error: null });
+
+    await service.generarNotaCredito(
+      'tenant-co',
+      'actor-2',
+      'rma-1',
+      { motivo: 'Devolución por ítems', tipo_nota_credito: '07' },
+      'rma:nc:co:001',
+    );
+
+    expect(rpc).toHaveBeenCalledWith('emitir_nota_credito_rma_tx', {
+      p_tenant_id: 'tenant-co',
+      p_actor_id: 'actor-2',
+      p_rma_id: 'rma-1',
+      p_payload: { motivo: 'Devolución por ítems' },
+      p_idempotency_key: 'rma:nc:co:001',
+    });
+  });
+
+  it('bloquea en demo Colombia cualquier apariencia de aceptación DIAN real', async () => {
+    maybeSingle.mockResolvedValueOnce({ data: { pais: 'CO', is_demo: true }, error: null });
 
     await expect(
       service.generarNotaCredito(
@@ -104,7 +124,7 @@ describe('RmaService - fronteras atómicas 456', () => {
   });
 
   it('bloquea en Argentina la RPC SUNAT 07 hasta usar la nota referenciada ARCA con CAE', async () => {
-    maybeSingle.mockResolvedValueOnce({ data: { pais: 'AR' }, error: null });
+    maybeSingle.mockResolvedValueOnce({ data: { pais: 'AR', is_demo: false }, error: null });
 
     await expect(
       service.generarNotaCredito(

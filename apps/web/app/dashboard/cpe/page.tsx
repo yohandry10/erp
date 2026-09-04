@@ -31,6 +31,7 @@ interface CpeDocument {
   moneda: string
   estado: 'BORRADOR' | 'FIRMADO' | 'ENVIADO' | 'ACEPTADO' | 'ERROR' | 'RECHAZADO' | 'ANULADO'
   estadoSunat?: string
+  isDemoRepresentation?: boolean
   observaciones?: string
   fechaCreacion: string
 }
