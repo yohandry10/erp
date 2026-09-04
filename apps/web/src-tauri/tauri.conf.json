@@ -49,8 +49,8 @@
     "publisher": "ERP Suite",
     "copyright": "Copyright © 2025 ERP Suite",
     "category": "Business",
-    "shortDescription": "Sistema ERP para gestión tributaria peruana",
-    "longDescription": "Sistema completo de gestión empresarial con soporte para CPE, GRE y SIRE según normativas SUNAT del Perú"
+    "shortDescription": "Sistema ERP multi-país para gestión empresarial y fiscal",
+    "longDescription": "Sistema completo de gestión empresarial y fiscal adaptado a la jurisdicción configurada para cada empresa"
   },
   "plugins": {
     "updater": {

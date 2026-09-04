@@ -583,6 +583,40 @@ describe('representación impresa CPE', () => {
     expect(textCalls).not.toContain('Op. Inafectas:');
   });
 
+  it('incluye el bloque obligatorio de transparencia fiscal argentino', () => {
+    const textCalls: string[] = [];
+    const doc: any = {
+      y: 100,
+      page: { height: 841.89, margins: { bottom: 50 } },
+      fontSize: jest.fn().mockReturnThis(),
+      font: jest.fn().mockReturnThis(),
+      text: jest.fn((value: unknown) => { textCalls.push(String(value)); return doc; }),
+      heightOfString: jest.fn(() => 10),
+      addPage: jest.fn().mockReturnThis(),
+    };
+    const service = new PdfGeneratorService({} as any, {} as any) as any;
+
+    service.addTotales(doc, {
+      moneda: 'ARS',
+      total_gravadas: 100,
+      total_igv: 21,
+      total_isc: 5,
+      total_venta: 126,
+      metadata: {
+        arca_tributos: [
+          { id: 1, importe: 3 },
+          { id: 2, importe: 2 },
+        ],
+      },
+    }, 'AR');
+
+    expect(textCalls).toContain('Otros tributos:');
+    expect(textCalls).not.toContain('ISC:');
+    expect(textCalls).toContain('Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)');
+    expect(textCalls).toContain('IVA Contenido: ARS 21.00');
+    expect(textCalls).toContain('Otros Impuestos Nacionales Indirectos: ARS 3.00');
+  });
+
   it('mueve el primer encabezado a otra hoja y representa una descripción vacía', () => {
     const textCalls: Array<{ value: string; y?: number }> = [];
     const doc: any = {

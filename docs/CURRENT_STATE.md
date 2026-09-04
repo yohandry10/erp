@@ -8,6 +8,26 @@ migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
 
+- **Release Argentina `535` preparado y verificado localmente.** El alta fiscal
+  AR ahora toma CUIT, condición IVA, punto de venta, correlativo y receptor desde
+  fuentes tenant-scoped del servidor; el browser no puede sustituir identidad,
+  numeración ni cotización. WSFEv1 cubre Facturas A/B/C ordinarias y sus notas en
+  ARS o USD, concepto `1/2/3`, fechas de servicios/vencimiento, tributos y
+  cotización oficial ARCA con `MonId`, `MonCotiz` y `CanMisMonExt`. El envío
+  revalida la cotización oficial y el QR usa el mismo valor persistido. El A4
+  incorpora el bloque de transparencia fiscal con IVA contenido y otros
+  impuestos nacionales indirectos. La migración 535 corrige los códigos 51-53
+  como comprobantes A sujetos a retención, no clase M.
+
+  El aislamiento de país redirige antes de pintar las rutas exclusivas de Perú y
+  oculta GRE, SIRE, PLAME/T-Registro y CTS en Argentina. Chromium recorrió 33
+  módulos visibles y el flujo de factura ARCA sin encontrar SUNAT, DIAN, IGV,
+  RUC, soles/PEN, Perú o Colombia. La evidencia local completa queda en 284
+  suites/2711 pruebas API, 89 recorridos Playwright más 1 contrato visual móvil,
+  lint y builds API/Web y una reconstrucción limpia de PostgreSQL 16 con 532
+  migraciones, 45 verificadores vigentes y 67 históricos hasta la 535. PR, CI,
+  promoción DB-first y retest visual productivo siguen pendientes en este corte.
+
 - **Release Colombia `533..534` fusionado y promovido en PROD.** La
   533 convierte cualquier CPE nacido en una demo CO en una representación local
   autocontenida, sin UBL ni firma DIAN, y falla cerrado ante intentos de
@@ -176,14 +196,14 @@ contribuyente real: PFX, Software ID/PIN, resolución/rango, trust/pins, TestSet
 estado portal `HABILITADO` y smoke oficial. Para RADIAN directo faltan además el
 registro y su Set independiente de 15 eventos.
 
-- **Alcance fiscal argentino de esta entrega:** sólo WSFEv1 en pesos y las
-  familias A/B/C ordinarias. Exportación E requiere WSFEXv1; moneda extranjera
-  requiere cotización oficial; CAEA tiene un régimen de contingencia propio; y
-  A-CBU/A sujeta a retención requieren una habilitación del emisor otorgada por
-  ARCA. Esos casos quedan bloqueados hasta implementar y verificar sus contratos
-  externos; no se degradan a A normal, CAE común ni cotización 1. Colombia ya
-  tiene transporte técnico, pero continúa sin homologación del contribuyente
-  ni transmisión real verificada.
+- **Alcance fiscal argentino de esta entrega:** WSFEv1 para familias A/B/C
+  ordinarias y sus notas en ARS o USD. La moneda extranjera usa la cotización
+  oficial de ARCA correspondiente a la fecha fiscal y declara si el pago se hace
+  en la misma moneda. Exportación E requiere WSFEXv1; CAEA tiene un régimen de
+  contingencia propio; y A-CBU/A sujeta a retención requieren una habilitación
+  específica del emisor otorgada por ARCA. Esos casos permanecen bloqueados; no
+  se degradan a A normal ni a CAE común. Colombia ya tiene transporte técnico,
+  pero continúa sin homologación del contribuyente ni transmisión real verificada.
 
 - **Un recorrido por pantalla, haciendo lo que hace un contador, encontró tres
   cosas que ninguna prueba veía** porque todas estaban del lado del uso, no del
@@ -1091,10 +1111,11 @@ niveles.
 - Catálogos, clientes, proveedores y configuración empresarial.
 - Ventas, cotizaciones, pedidos, POS, caja y pagos.
 - CPE `01/03/07/08`, RA y RC en beta.
-- Argentina: CUIT, ARS, IVA `0/10,5/21/27`, Facturas A/B/C ordinarias en pesos
-  y sus notas por WSFEv1, punto de venta, CAE/QR y autenticación WSAA. Factura E
-  requiere WSFEXv1; moneda extranjera, CAEA y clases especiales conservan sus
-  propias fronteras y no se presentan como soportadas.
+- Argentina: CUIT, ARS/USD, IVA `0/10,5/21/27`, Facturas A/B/C ordinarias y sus
+  notas por WSFEv1, concepto/fechas de servicio, tributos, cotización oficial,
+  punto de venta, CAE/QR y autenticación WSAA. Factura E requiere WSFEXv1; CAEA,
+  A-CBU y A sujeta a retención conservan sus propias fronteras y no se presentan
+  como soportadas.
 - Colombia: NIT con dígito de verificación, COP, IVA configurable y afectación
   por producto; factura `01`, notas `91/92`, CUFE/CUDE SHA-384, XAdES-EPES,
   SOAP 1.2 WS-Security/WS-Addressing, numeración, consulta, recuperación,
@@ -1383,7 +1404,7 @@ por inferencia.
 | Ventas: cotización → aprobación → pedido → logística | Se reprodujo el rechazo de aprobación, se distinguió vendedor de ADMIN y se verificó la aprobación administrativa; Playwright cubre aprobación, sustento, pedido y entrega a Logística. La integración pedido→CPE ahora reconsulta el CPE persistido por `id + tenant_id` y sus pruebas usan la salida real del mapper. | `PARCIAL + VISUAL AISLADO`; hardening y DB/runtime 534 desplegados | Recorrer en PROD el circuito completo hasta despacho, factura, cobranza, devolución/RMA y nota, con ADMIN, vendedor y aprobador separados. |
 | POS y Caja | Se vieron ventas y movimientos de una caja abierta, el botón ilegible de cambio de sesión y su corrección de contraste. Playwright cubre cierre, redondeo, supervisor/PIN y conservación de errores. | `PARCIAL + VISUAL AISLADO` | Cerrar una caja nueva en PROD sobre 518+, cambiar turno de extremo a extremo, cuadrar medios de pago y probar impresora/Tauri físicos. La sesión histórica sin evidencia de redondeo no se fuerza. |
 | Fiscal/CPE Perú | Se abrió una factura/boleta demo, se corrigió el visor blanco y se comprobó A4 `210 × 297 mm`, datos, totales, descarga/impresión y marca sin validez. | `BASE PRODUCTIVA; RETEST PARCIAL` | Subir logo real por Storage y repetir en el SHA final factura, boleta, NC/ND, QR/evidencia, correo/descarga y asiento originado. No se afirma aceptación SUNAT nueva. |
-| Fiscal/CPE Argentina y Colombia | Playwright localiza sus etiquetas y prohíbe QR fiscal falso en demos; API/SQL prueban CAE/evidencia AR. Para CO, Chrome Playwright cubre cliente maestro/perfil, factura demo, readiness, historial bloqueado, auditor, retry por `operationId`, importación, notas `91/92`, 030→032→033 + 034 y el desvío seguro de Documentos al Centro CPE. La prueba visible PROD creó `DEMO1`, abrió A4 y verificó transporte bloqueado, fail-closed y consola/red limpia. | Demo CPE CO `CERRADO VISUAL` sobre `dd813ab`; restantes flujos `VISUAL AISLADO + CÓDIGO/SQL` | AR: homologación con certificado/punto real. CO: recorrer pedido/RMA y ejecutar factura/notas/consulta/adjunto/eventos en TestSet y producción autorizada. La emisión legal exige trust/pins, TestSet y `HABILITADO`; RADIAN directo exige su set de 15 eventos. |
+| Fiscal/CPE Argentina y Colombia | Para AR, Chromium recorre la factura con clase A/B/C, concepto, fechas, tributos y USD/cotización sin exponer numeración ni identidad manipulable; API prueba CAE, evidencia, cotización oficial revalidada, QR y A4 de transparencia. Para CO, Chrome Playwright cubre cliente maestro/perfil, factura demo, readiness, historial bloqueado, auditor, retry por `operationId`, importación, notas `91/92`, 030→032→033 + 034 y el desvío seguro de Documentos al Centro CPE. La prueba visible PROD creó `DEMO1`, abrió A4 y verificó transporte bloqueado, fail-closed y consola/red limpia. | AR `VISUAL AISLADO + CÓDIGO/SQL`; demo CPE CO `CERRADO VISUAL` sobre `dd813ab` | AR: promover 535, desplegar el SHA y repetir en navegador integrado; la emisión legal exige certificado/punto/homologación propios del contribuyente. CO: recorrer pedido/RMA y ejecutar factura/notas/consulta/adjunto/eventos en TestSet y producción autorizada. |
 | Contabilidad: consignaciones | El HTTP 500 y el mensaje visible se reprodujeron, se corrigió el contrato RPC y se volvió a cargar la bandeja. | `PARCIAL` | Alta, venta, devolución y cierre de una consignación real; comprobar stock, tercero, asiento, CxC y mayor en una misma cadena. |
 | Analytics | Se revisaron parcialmente mora/comercial y fechas durante la pasada; el usuario pidió detener este frente para priorizar Caja y fiscal. | `PAUSADO` | Recorrer cada tablero, filtro, exportación y reconciliar sus cifras con Ventas, CxC, inventario y contabilidad. |
 | Configuración, empresa y logo | Hay contrato de API/Storage, validaciones y pruebas de wizard. La API y SQL aplican la misma allowlist al estado temporal; la 528 sanea progreso, auditoría e intenciones históricas y un trigger impide que writers directos reintroduzcan secretos. No existe aún retest visual productivo del upload 523. | `CÓDIGO + TEST` | Wizard real completo, logo subir/reemplazar/eliminar, sucursales/series, credenciales fiscales y persistencia tras relogin en PE/AR/CO. |

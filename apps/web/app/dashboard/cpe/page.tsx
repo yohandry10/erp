@@ -368,7 +368,7 @@ export default function CPEPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {(paisCodigo === 'PE' || isColombia) && (
+              {(paisCodigo === 'PE' || isColombia || isArgentina) && (
                 <Button
                   type="button"
                   variant="outline"
@@ -377,7 +377,11 @@ export default function CPEPage() {
                   data-testid="open-referenced-note"
                 >
                   <FileText className="h-4 w-4" />
-                  {isColombia ? 'Nueva NC / ND DIAN' : 'Nueva NC / ND'}
+                  {isColombia
+                    ? 'Nueva NC / ND DIAN'
+                    : isArgentina
+                      ? 'Nueva NC / ND ARCA'
+                      : 'Nueva NC / ND'}
                 </Button>
               )}
               <Button type="button" onClick={() => setIsModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
@@ -491,7 +495,7 @@ export default function CPEPage() {
         isOpen={isNoteModalOpen}
         onClose={() => setIsNoteModalOpen(false)}
         onSuccess={handleCpeCreated}
-        countryCode={isColombia ? 'CO' : 'PE'}
+        countryCode={isColombia ? 'CO' : isArgentina ? 'AR' : 'PE'}
       />
 
       {/* CPE View Modal */}

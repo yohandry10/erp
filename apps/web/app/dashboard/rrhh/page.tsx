@@ -21,11 +21,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { parseDateLocal } from '@/lib/date-utils'
+import { useCountryContext } from '@/hooks/use-country-context'
 
-const rrhhModules = [
-  { href: '/dashboard/rrhh/planillas', title: 'Planillas', description: 'Cálculo de sueldos y beneficios', icon: BadgeDollarSign },
-  { href: '/dashboard/rrhh/liquidaciones', title: 'Liquidaciones y CTS', description: 'Cese, pago, reversa y depósitos semestrales', icon: FileCheck2 },
-  { href: '/dashboard/rrhh/planilla-electronica', title: 'PLAME / T-Registro', description: 'Fuentes PVS, ticket y CIR de SUNAT', icon: FileCheck2 },
+const commonRrhhModules = [
   { href: '/dashboard/rrhh/asistencia', title: 'Asistencia', description: 'Control de horarios y marcaciones', icon: CalendarClock },
   { href: '/dashboard/rrhh/contratos', title: 'Contratos', description: 'Gestión de contratos laborales', icon: FileText },
   { href: '/dashboard/rrhh/candidatos', title: 'Candidatos', description: 'Reclutamiento y selección', icon: Users },
@@ -33,12 +31,13 @@ const rrhhModules = [
   { href: '/dashboard/rrhh/reportes', title: 'Reportes', description: 'Indicadores y trazabilidad RRHH', icon: Briefcase },
 ]
 
-const formatDate = (dateString?: string) => {
+const formatDate = (dateString: string | undefined, locale: string) => {
   if (!dateString) return 'N/A'
-  return parseDateLocal(dateString).toLocaleDateString('es-PE')
+  return parseDateLocal(dateString).toLocaleDateString(locale)
 }
 
 export default function RrhhPage() {
+  const country = useCountryContext()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [empleadoEditando, setEmpleadoEditando] = useState<any | null>(null)
   const { get, post, put, delete: del } = useApi()
@@ -75,7 +74,7 @@ export default function RrhhPage() {
   // datos cacheados al instante y se revalidan en segundo plano, en vez de
   // recargar de cero con spinner de pantalla completa cada vez.
   const { data, isLoading } = useQuery({
-    queryKey: ['rrhh-dashboard'],
+    queryKey: ['rrhh-dashboard', country.paisCodigo],
     enabled: rrhhEnabled,
     queryFn: async () => {
       const [empleadosData, departamentosData] = await Promise.all([
@@ -89,6 +88,34 @@ export default function RrhhPage() {
   const empleados = useMemo(() => data?.empleados ?? [], [data?.empleados])
   const departamentos = useMemo(() => data?.departamentos ?? [], [data?.departamentos])
   const loading = rrhhEnabled && isLoading
+
+  const rrhhModules = useMemo(() => [
+    {
+      href: '/dashboard/rrhh/planillas',
+      title: country.paisCodigo === 'AR' ? 'Sueldos y cargas sociales' : 'Planillas',
+      description: country.paisCodigo === 'AR'
+        ? 'Haberes, aportes, contribuciones, obra social, ART y SAC'
+        : 'Cálculo de sueldos y beneficios',
+      icon: BadgeDollarSign,
+    },
+    {
+      href: '/dashboard/rrhh/liquidaciones',
+      title: country.paisCodigo === 'PE'
+        ? 'Liquidaciones y CTS'
+        : country.paisCodigo === 'AR' ? 'Liquidaciones finales' : 'Liquidaciones laborales',
+      description: country.paisCodigo === 'PE'
+        ? 'Cese, pago, reversa y depósitos semestrales'
+        : 'Cese, indemnizaciones, pago y reversa con trazabilidad',
+      icon: FileCheck2,
+    },
+    ...(country.paisCodigo === 'PE' ? [{
+      href: '/dashboard/rrhh/planilla-electronica',
+      title: 'PLAME / T-Registro',
+      description: 'Fuentes PVS, ticket y CIR de SUNAT',
+      icon: FileCheck2,
+    }] : []),
+    ...commonRrhhModules,
+  ], [country.paisCodigo])
 
   const loadData = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['rrhh-dashboard'] })
@@ -207,7 +234,7 @@ export default function RrhhPage() {
         <CardHeader>
           <CardTitle className="text-white group-data-[erp-theme=light]/dashboard:text-foreground">Lista de Empleados</CardTitle>
           <p className="text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
-            Última actualización: {new Date().toLocaleString('es-PE')}
+            Última actualización: {new Date().toLocaleString(country.locale || 'es-AR')}
           </p>
         </CardHeader>
         <CardContent>
@@ -242,7 +269,7 @@ export default function RrhhPage() {
                       <td className="px-4 py-3 text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">{empleado.email || 'Sin email'}</td>
                       <td className="px-4 py-3 text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">{empleado.puesto || 'Sin asignar'}</td>
                       <td className="px-4 py-3 text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">{empleado.departamentos?.nombre || 'Sin departamento'}</td>
-                      <td className="px-4 py-3 text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">{formatDate(empleado.fecha_ingreso)}</td>
+                      <td className="px-4 py-3 text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">{formatDate(empleado.fecha_ingreso, country.locale || 'es-AR')}</td>
                       <td className="px-4 py-3">
                         <Badge className={empleado.estado === 'activo' ? 'border-cyan-300/30 bg-cyan-300/10 text-primary group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700' : 'border-border/25 bg-slate-300/10 text-foreground/90 group-data-[erp-theme=light]/dashboard:bg-muted group-data-[erp-theme=light]/dashboard:text-foreground/85'}>
                           {empleado.estado}

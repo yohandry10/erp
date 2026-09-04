@@ -103,6 +103,43 @@ describe('CrearComprobanteUiDto', () => {
     expect(errores.map((e) => e.property)).toContain('items');
   });
 
+  it('acepta el contrato visual ARCA para servicios y otros tributos', () => {
+    expect(validar({
+      ...comprobanteDeLaPantalla,
+      serie: undefined,
+      cliente_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      moneda: 'ARS',
+      arca_concepto: 2,
+      arca_fecha_servicio_desde: '2026-08-01',
+      arca_fecha_servicio_hasta: '2026-08-31',
+      arca_fecha_vencimiento_pago: '2026-09-10',
+      arca_tributos: [{
+        id: 2,
+        descripcion: 'Percepción provincial',
+        base_imponible: 100,
+        alicuota: 3,
+        importe: 3,
+      }],
+    })).toHaveLength(0);
+  });
+
+  it('rechaza conceptos o tributos fuera del catálogo WSFEv1', () => {
+    const errors = validar({
+      ...comprobanteDeLaPantalla,
+      arca_concepto: 4,
+      arca_tributos: [{
+        id: 98,
+        descripcion: 'Inválido',
+        base_imponible: 100,
+        alicuota: 1,
+        importe: 1,
+      }],
+    });
+    expect(errors.map((error) => error.property)).toEqual(
+      expect.arrayContaining(['arca_concepto', 'arca_tributos']),
+    );
+  });
+
   it.each([
     ['impuesto_isc', 'tasa_isc'],
     ['impuesto_inc', 'tasa_inc'],
