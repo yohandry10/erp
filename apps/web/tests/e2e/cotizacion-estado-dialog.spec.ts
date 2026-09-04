@@ -412,6 +412,12 @@ test('la representación A4 localiza etiquetas fiscales para Colombia y Argentin
   await expect(arDialog.getByTestId('cpe-arca-authorization')).toContainText('MUESTRA-SIN-CAE')
   await expect(arDialog.getByTestId('cpe-arca-authorization')).not.toContainText('Comprobante autorizado')
   await expect(arDialog.getByTestId('cpe-arca-authorization')).toContainText('00012')
+  await expect(arDialog.getByTestId('cpe-a4-sheet')).toHaveAttribute(
+    'aria-label',
+    'Resumen visual de la primera hoja A4; muestra sin validez fiscal',
+  )
+  await expect(arDialog.getByTestId('cpe-a4-sheet')).toContainText('Estado ARCA: MUESTRA LOCAL · NO TRANSMITIDO')
+  await expect(arDialog.getByTestId('cpe-a4-sheet')).not.toContainText('Estado ARCA: READY')
   await expect(arDialog.getByText('Código QR ARCA', { exact: true })).toHaveCount(0)
   await expect(arDialog.getByText(/Representación gráfica de la Nota de Crédito Electrónica/i)).toBeVisible()
   await expect(arDialog.getByText(/SUNAT|DIAN/i)).toHaveCount(0)
