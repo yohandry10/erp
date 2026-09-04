@@ -131,6 +131,15 @@ describe('CpeRegistrationService - snapshot desktop 476', () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
+  it('bloquea también XML desktop en una demo CO para no registrar un UBL SUNAT como muestra DIAN', async () => {
+    const { service, rpc, certificate } = createService(true, 'CO', true);
+
+    await expect(service.registerDesktopSignedXml(validPayload(), 'tenant-476', 'actor-476'))
+      .rejects.toThrow('una demo Colombia sólo genera muestras locales en el servidor');
+    expect(certificate.getXmlSigner).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it.each(['07', '08'] as const)('bloquea tipo %s y deriva al contrato 472', async (tipo) => {
     const { service, rpc, certificate } = createService();
 

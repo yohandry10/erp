@@ -1577,20 +1577,27 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       // ===== PRE-EMISSION VALIDATIONS =====
       this.logger.log(`Starting pre-emission validations for tenant: ${tenantId}`);
 
-      // 1. Validate certificate
-      const certificateValidation = await this.validationService.validateCertificate(tenantId);
-      if (!certificateValidation.isValid) {
-        this.logger.error(`Certificate validation failed: ${certificateValidation.errors.join(', ')}`);
-        throw new BadRequestException({
-          message: 'No se puede emitir el CPE: Certificado digital inválido',
-          errors: certificateValidation.errors,
-          code: 'CERT_VALIDATION_FAILED',
-        });
-      }
+      const isColombiaDemoCreation = paisCodigo === 'CO'
+        && dianCreationContext?.emisor.isDemo === true;
 
-      // Log certificate warnings (expiring soon)
-      if (certificateValidation.warnings.length > 0) {
-        this.logger.warn(`Certificate warnings: ${certificateValidation.warnings.join(', ')}`);
+      // 1. Validate certificate. Una demo CO nunca firma ni transmite: sólo
+      // persiste un artefacto interno explícitamente no fiscal para alimentar
+      // la representación A4. Todas las cuentas reales siguen fallando cerrado.
+      if (!isColombiaDemoCreation) {
+        const certificateValidation = await this.validationService.validateCertificate(tenantId);
+        if (!certificateValidation.isValid) {
+          this.logger.error(`Certificate validation failed: ${certificateValidation.errors.join(', ')}`);
+          throw new BadRequestException({
+            message: 'No se puede emitir el CPE: Certificado digital inválido',
+            errors: certificateValidation.errors,
+            code: 'CERT_VALIDATION_FAILED',
+          });
+        }
+
+        // Log certificate warnings (expiring soon)
+        if (certificateValidation.warnings.length > 0) {
+          this.logger.warn(`Certificate warnings: ${certificateValidation.warnings.join(', ')}`);
+        }
       }
 
       // 2. Validate RUC configuration
@@ -1726,10 +1733,15 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
         );
         signedXml = signedDian.xml;
         hash = signedDian.hash;
+      } else if (isColombiaDemoCreation) {
+        // No se crea un UBL DIAN ni una firma sintética. Este XML de dominio
+        // interno sólo permite cerrar el workflow demo y generar su A4 con
+        // marca de agua; getSignedXml y el transporte rechazan este formato.
+        const demoArtifact = this.generateColombiaDemoArtifact(createFacturaDto);
+        signedXml = demoArtifact.xml;
+        hash = demoArtifact.hash;
       } else {
-        // PE/AR conservan su pipeline existente. La demo CO usa esta evidencia
-        // interna sólo para cerrar su transacción local; la descarga se bloquea
-        // si no es un UBL DIAN nativo y nunca puede transmitirse.
+        // PE/AR conservan su pipeline existente.
         const xmlSigner = await this.getXmlSigner(tenantId);
         const xmlContent = this.generateXmlContent({
           ...createFacturaDto,
@@ -1784,6 +1796,14 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
           dian_medio_pago: (createFacturaDto as any).medio_pago,
           plazo_pago_dias: (createFacturaDto as any).plazo_pago_dias ?? 0,
           dian_is_demo: dianCreationContext?.emisor.isDemo === true,
+          ...(isColombiaDemoCreation ? {
+            dian_simulado: true,
+            dian_fixture_source: 'ERP_DEMO_LOCAL_REPRESENTATION_V1',
+            demo_artifact_format: 'ERP_DEMO_CPE_V1',
+            demo_artifact_signed: false,
+            demo_artifact_integrity: 'SHA-256',
+            fiscal_delivery_eligible: false,
+          } : {}),
           dian_receptor_tax_profile: dianCreationContext?.receiver.dianTaxProfile,
           dian_direccion_emisor: dianCreationContext?.emisor.direccion,
           dian_municipio_emisor: dianCreationContext?.emisor.ciudad,
@@ -2624,6 +2644,50 @@ async retrySendToOse(
 
   private generateXmlContent(factura: CreateFacturaDto): string {
     return this.xmlBuilder.generateXmlContent(factura);
+  }
+
+  private generateColombiaDemoArtifact(
+    factura: CreateFacturaDto,
+  ): { xml: string; hash: string } {
+    const canonicalPayload = {
+      version: 1,
+      country: 'CO',
+      authority: 'DIAN',
+      fiscalValidity: 'NONE',
+      documentType: String(factura.tipo_documento ?? ''),
+      series: String(factura.serie ?? ''),
+      number: Number(factura.numero ?? 0),
+      issueDate: String((factura as any).fecha_emision ?? ''),
+      currency: String(factura.moneda ?? 'COP').trim().toUpperCase(),
+      issuerTaxId: String(factura.ruc_emisor ?? ''),
+      receiverDocument: String(factura.documento_receptor ?? ''),
+      taxable: Number(factura.total_gravadas ?? 0),
+      exempt: Number((factura as any).total_exoneradas ?? 0),
+      excluded: Number((factura as any).total_inafectas ?? 0),
+      taxes: Number(factura.total_igv ?? 0),
+      payable: Number(factura.total_venta ?? 0),
+      items: (factura.items ?? []).map((item: any) => ({
+        code: String(item.codigo ?? item.producto_id ?? ''),
+        description: String(item.descripcion ?? ''),
+        quantity: Number(item.cantidad ?? 0),
+        unitPrice: Number(item.precio_unitario ?? item.precioUnitario ?? 0),
+        lineValue: Number(item.valor_venta ?? item.valorVenta ?? 0),
+        vat: Number(item.impuesto_igv ?? item.igv ?? 0),
+        affectation: String(item.tipo_afectacion_igv ?? item.afectacion_igv ?? ''),
+      })),
+    };
+    const payload = Buffer.from(JSON.stringify(canonicalPayload), 'utf8').toString('base64');
+    const xml = [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<DemoCpe xmlns="urn:erp-suite:demo:cpe:1" country="CO" authority="DIAN" fiscalValidity="NONE">',
+      '<Notice>MUESTRA DEMO SIN TRANSMISION NI VALIDEZ DIAN</Notice>',
+      `<CanonicalPayload encoding="base64-json">${payload}</CanonicalPayload>`,
+      '</DemoCpe>',
+    ].join('');
+    return {
+      xml,
+      hash: createHash('sha256').update(xml, 'utf8').digest('hex'),
+    };
   }
 
 

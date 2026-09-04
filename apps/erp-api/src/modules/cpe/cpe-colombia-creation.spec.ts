@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { CpeService } from './cpe.service';
 
 const TENANT_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -819,6 +820,87 @@ describe('CpeService · creación Colombia', () => {
       expect.objectContaining({ serie: 'FVCO', numero: 44 }),
       TENANT_ID,
       ACTOR_ID,
+    );
+  });
+
+  it('persiste una representación demo CO sin certificado ni firma fiscal', async () => {
+    const { service, client, validation, fiscalAdapter } = buildHarness();
+    const demoIssuer = { ...REAL_CO_ISSUER, isDemo: true };
+    jest.spyOn(service as any, 'loadDianCreationContext').mockResolvedValue({
+      emisor: demoIssuer,
+      receiver: {
+        id: CLIENTE_ID,
+        documentoTipo: 'NIT',
+        documentoNumero: VALID_RECEIVER.documento_numero,
+        razonSocial: VALID_RECEIVER.razon_social,
+        direccion: VALID_RECEIVER.direccion,
+        dianTaxProfile: {
+          profile: 'ADQUIRIENTE_NIT_B2B', taxLevelCode: 'O-99',
+          taxLevelListName: '04', taxSchemeId: '01', taxSchemeName: 'IVA',
+        },
+      },
+    });
+    validation.validateCertificate.mockResolvedValue({
+      isValid: false,
+      warnings: [],
+      errors: ['No hay certificado'],
+    });
+    const signerSpy = jest.spyOn(service as any, 'getXmlSigner');
+    let persistedPayload: any;
+    client.rpc.mockImplementation(async (name: string, args: any) => {
+      if (name !== 'emitir_factura_cliente_tx') {
+        throw new Error(`RPC no esperada: ${name}`);
+      }
+      persistedPayload = args.p_cpe;
+      return {
+        data: {
+          cpe: {
+            id: 'cpe-demo-co-local',
+            ...args.p_cpe,
+            simulated_origin: true,
+            fiscal_authority_evidence: {
+              contract_version: 525,
+              status: 'SIMULATED',
+              authority: 'DIAN',
+              country_code: 'CO',
+            },
+          },
+          documento_id: 'documento-demo-co-local',
+          cxc_id: null,
+        },
+        error: null,
+      };
+    });
+
+    const result = await service.create(
+      creationDto({ idempotency_key: 'cpe.co.demo:local-artifact' }),
+      TENANT_ID,
+      ACTOR_ID,
+    );
+
+    expect(result.id).toBe('cpe-demo-co-local');
+    expect(validation.validateCertificate).not.toHaveBeenCalled();
+    expect(signerSpy).not.toHaveBeenCalled();
+    expect(fiscalAdapter.generarYFirmarDocumentoSinTransmitir).not.toHaveBeenCalled();
+    expect(persistedPayload.metadata).toEqual(expect.objectContaining({
+      dian_is_demo: true,
+      dian_simulado: true,
+      dian_fixture_source: 'ERP_DEMO_LOCAL_REPRESENTATION_V1',
+      demo_artifact_format: 'ERP_DEMO_CPE_V1',
+      demo_artifact_signed: false,
+      demo_artifact_integrity: 'SHA-256',
+      fiscal_delivery_eligible: false,
+    }));
+    expect(persistedPayload.xml_firmado).toContain('<DemoCpe');
+    expect(persistedPayload.xml_firmado).toContain('fiscalValidity="NONE"');
+    expect(persistedPayload.xml_firmado).not.toContain('PE:SUNAT');
+    expect(persistedPayload.xml_firmado).not.toContain('Signature');
+    expect(persistedPayload.hash_firma).toBe(
+      createHash('sha256').update(persistedPayload.xml_firmado, 'utf8').digest('hex'),
+    );
+    expect(client.rpc).not.toHaveBeenCalledWith(
+      'reservar_numeracion_dian_ui_tx',
+      expect.anything(),
     );
   });
 

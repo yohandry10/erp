@@ -59,4 +59,25 @@ describe('RmaService - guards de aplicación 456', () => {
       ),
     ).rejects.toBeInstanceOf(expected as any);
   });
+
+  it.each([
+    'RMA_DIAN_FISCAL_LINE_BALANCE_EXCEEDED:11111111-1111-4111-8111-111111111111',
+    'RMA_DIAN_FISCAL_LINE_BALANCE_UNVERIFIABLE',
+  ])('explica al usuario cuando una nota previa agotó el saldo fiscal: %s', async (message) => {
+    const service = await build(
+      jest.fn().mockResolvedValue({ data: null, error: { code: '23514', message } }),
+    );
+
+    await expect(
+      service.aprobar(
+        'tenant-1',
+        'actor-1',
+        'rma-1',
+        { aprobar: true },
+        'rma:approve:saldo-fiscal',
+      ),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining('saldo fiscal disponible'),
+    });
+  });
 });

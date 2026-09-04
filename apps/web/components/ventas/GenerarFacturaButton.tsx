@@ -20,6 +20,8 @@ interface GenerarFacturaResponse {
   factura_id?: string;
   sugerir_gre?: boolean;
   message?: string;
+  warnings?: string[];
+  is_demo_representation?: boolean;
 }
 
 interface GenerarFacturaButtonProps {
@@ -47,8 +49,33 @@ export default function GenerarFacturaButton({
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [facturaId, setFacturaId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [generationFeedback, setGenerationFeedback] = useState<GenerarFacturaResponse | null>(null);
   const documentLabel = documentType === "BOLETA" ? "boleta" : "factura";
   const documentLabelTitle = documentType === "BOLETA" ? "Boleta" : "Factura";
+
+  const showCompletionToast = (
+    response: GenerarFacturaResponse | null,
+    greGenerated = false,
+  ) => {
+    if (response?.is_demo_representation === true) {
+      toast({
+        title: "Muestra demo generada",
+        description:
+          response.warnings?.[0] ||
+          "Comprobante de muestra local, sin transmisión ni validez DIAN",
+      });
+      return;
+    }
+
+    toast({
+      title: greGenerated
+        ? `${documentLabelTitle} y GRE generadas`
+        : `${documentLabelTitle} generada`,
+      description: greGenerated
+        ? `La ${documentLabel} y la guía de remisión han sido generadas exitosamente`
+        : `La ${documentLabel} ha sido generada exitosamente`,
+    });
+  };
 
   const resolveErrorMessage = (error: unknown): string => {
     if (!error) {
@@ -112,6 +139,7 @@ export default function GenerarFacturaButton({
       }
 
       setFacturaId(response?.factura_id || null);
+      setGenerationFeedback(response);
       onGenerated?.({
         facturaId: response?.factura_id || null,
         sugerioGre: !!response?.sugerir_gre,
@@ -121,10 +149,7 @@ export default function GenerarFacturaButton({
       if (response?.sugerir_gre) {
         setShowGREModal(true);
       } else {
-        toast({
-          title: `${documentLabelTitle} generada`,
-          description: `La ${documentLabel} ha sido generada exitosamente`,
-        });
+        showCompletionToast(response);
         await onSuccess();
         router.refresh();
       }
@@ -144,18 +169,7 @@ export default function GenerarFacturaButton({
   const handleGREModalClose = async (generated: boolean) => {
     setShowGREModal(false);
 
-    if (generated) {
-      toast({
-        title: `${documentLabelTitle} y GRE generadas`,
-        description:
-          `La ${documentLabel} y la guía de remisión han sido generadas exitosamente`,
-      });
-    } else {
-      toast({
-        title: `${documentLabelTitle} generada`,
-        description: `La ${documentLabel} ha sido generada exitosamente`,
-      });
-    }
+    showCompletionToast(generationFeedback, generated);
 
     await onSuccess();
     router.refresh();
@@ -188,12 +202,13 @@ export default function GenerarFacturaButton({
             <p>¿Desea generar la {documentLabel} para este pedido?</p>
             <div className="rounded-lg border border-border bg-muted/50 p-4 text-foreground">
               {config.usar_flujo_logistica
-                ? "Se emitirá el documento fiscal usando el despacho confirmado."
-                : "Se emitirá el documento fiscal y se descontará el stock inmediatamente."}
+                ? "Se generará el comprobante usando el despacho confirmado."
+                : "Se generará el comprobante y se descontará el stock inmediatamente."}
             </div>
             <p className="text-sm text-muted-foreground">
               La operación queda vinculada a CPE, cuentas por cobrar y
-              contabilidad.
+              contabilidad. La emisión fiscal sólo se confirma con la respuesta
+              de la autoridad; en una cuenta demo se crea una muestra local.
             </p>
           </div>
         }

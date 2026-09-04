@@ -140,9 +140,11 @@ async registerDesktopSignedXml(payload: DesktopSignedCpeDto, tenantId: string, u
     }
 
     const emisor = await this.getEmpresaEmisorInfoStrict(tenantId);
-    if (emisor.pais === 'CO' && !emisor.isDemo) {
+    if (emisor.pais === 'CO') {
       throw new BadRequestException(
-        'DIAN: el XML de una empresa real se genera y firma exclusivamente en el servidor con numeración autorizada; el registro desktop no está permitido',
+        emisor.isDemo
+          ? 'DIAN: una demo Colombia sólo genera muestras locales en el servidor; el registro desktop no está permitido'
+          : 'DIAN: el XML de una empresa real se genera y firma exclusivamente en el servidor con numeración autorizada; el registro desktop no está permitido',
       );
     }
 
