@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
 import { useApi } from '@/hooks/use-api'
 import { useToast } from '@/components/ui/use-toast'
@@ -37,8 +37,15 @@ export default function OrdenCompraModal({
   const defaultCurrency = country.moneda || (isArgentina ? 'ARS' : country.paisCodigo === 'CO' ? 'COP' : 'PEN')
   const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$')
   const { tasaIgv, nombreImpuesto } = useTaxConfig()
-  const { get, post, put } = useApi()
+  const { get, post, put } = useApi({ throwOnError: true, showErrorToast: false })
   const { toast } = useToast()
+  const createIdempotencyKeyRef = useRef<string | null>(null)
+  const openedOrderRef = useRef<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const submitErrorRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (submitError) submitErrorRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [submitError])
 
   // DEBUG: Log de props recibidas
 
@@ -178,15 +185,24 @@ export default function OrdenCompraModal({
 
   // Cargar datos iniciales
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) {
+      openedOrderRef.current = null
+      return
+    }
+    const opening = orden?.id || 'new'
+    if (openedOrderRef.current !== opening) {
+      openedOrderRef.current = opening
+      createIdempotencyKeyRef.current = null
+      setSubmitError(null)
       loadProveedores()
       loadProductos()
-      generateNumeroOrden()
       if (orden) {
         loadOrdenData()
       } else {
-        setFormData(prev => ({ ...prev, moneda: defaultCurrency }))
-        addItem() // Agregar un item por defecto
+        setFormData({ numero: '', proveedor_id: '', fecha_orden: new Date().toISOString().split('T')[0], fecha_entrega: '', moneda: defaultCurrency, subtotal: 0, igv: 0, total: 0, estado: 'PENDIENTE', observaciones: '' })
+        setItems([])
+        addItem()
+        generateNumeroOrden()
       }
     }
   }, [addItem, defaultCurrency, generateNumeroOrden, isOpen, loadOrdenData, loadProductos, loadProveedores, orden])
@@ -218,7 +234,7 @@ export default function OrdenCompraModal({
     }
 
     // Recalcular subtotal con validación
-    if (field === 'cantidad' || field === 'precio_unitario') {
+    if (field === 'cantidad' || field === 'precio_unitario' || field === 'producto_id') {
       const cantidad = Number(newItems[index].cantidad) || 0
       const precio = Number(newItems[index].precio_unitario) || 0
       newItems[index].subtotal = multiplicarMoneda(cantidad, precio)
@@ -233,17 +249,24 @@ export default function OrdenCompraModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isLoading) return
+    setSubmitError(null)
+    if (!items.length || items.some(item => !item.producto_id || !Number.isFinite(item.cantidad) || item.cantidad <= 0 || !Number.isFinite(item.precio_unitario) || item.precio_unitario < 0)) {
+      setSubmitError('Seleccione al menos un producto del catálogo, con cantidad mayor a cero y precio no negativo.')
+      return
+    }
     setIsLoading(true)
 
     try {
 
       // El backend (CreateOrdenCompraDto) usa whitelist estricta: espera `detalles[]`
       // con { producto_id, descripcion, cantidad, precio_unitario } y calcula él mismo
-      // subtotal/igv/total. Enviar items/moneda/subtotal/igv/total o un estado fuera
+      // subtotal/igv/total. Enviar items/subtotal/igv/total o un estado fuera
       // del enum (BORRADOR/APROBADA/…) provoca 400. El estado inicial lo pone el backend.
       const ordenData: Record<string, unknown> = {
         numero: formData.numero,
         proveedor_id: formData.proveedor_id,
+        moneda: formData.moneda,
         fecha_orden: formData.fecha_orden || undefined,
         fecha_entrega_esperada: formData.fecha_entrega || undefined,
         observaciones: formData.observaciones || undefined,
@@ -256,20 +279,24 @@ export default function OrdenCompraModal({
       }
 
 
+      if (!orden) {
+        createIdempotencyKeyRef.current ??= crypto.randomUUID()
+        ordenData.idempotency_key = createIdempotencyKeyRef.current
+      }
       const result = orden
         ? await put(`/api/compras/ordenes/${orden.id}`, ordenData)
         : await post('/api/compras/ordenes', ordenData)
 
-      if (result.success) {
+      if (result?.success && result.data?.id) {
         onSuccess()
         onClose()
         resetForm()
       } else {
-        toast({ variant: 'destructive', title: 'Error', description: result.message || 'Error al procesar la orden' })
+        setSubmitError(result?.message || 'No se pudo confirmar el guardado de la orden. Revise el listado antes de iniciar otra compra.')
       }
     } catch (error) {
       console.error('Error submitting order:', error)
-      toast({ variant: 'destructive', title: 'Error', description: 'Error al procesar la orden' })
+      setSubmitError(error instanceof Error ? error.message : 'Error al procesar la orden')
     } finally {
       setIsLoading(false)
     }
@@ -295,7 +322,7 @@ export default function OrdenCompraModal({
 
   return (
     <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] flex items-center justify-center z-[1100]">
-      <div className="bg-card rounded-xl p-8 w-[95%] max-w-[1200px] overflow-auto shadow">
+      <div className="bg-card rounded-xl p-8 w-[95%] max-w-[1200px] max-h-[90dvh] overflow-auto shadow">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-semibold text-foreground">
             {orden ? 'Editar Orden de Compra' : 'Nueva Orden de Compra'}
@@ -314,6 +341,7 @@ export default function OrdenCompraModal({
         </div>
 
         <form onSubmit={handleSubmit}>
+          {submitError && <div ref={submitErrorRef} role="alert" className="mb-4 rounded-md border border-red-500/50 bg-red-500/10 p-3 text-sm">{submitError}</div>}
           {/* Información básica */}
           <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4 mb-6">
             <div>
@@ -367,6 +395,8 @@ export default function OrdenCompraModal({
               >
                 {isArgentina ? (
                   <option value="ARS">ARS - Pesos argentinos</option>
+                ) : country.paisCodigo === 'CO' ? (
+                  <option value="COP">COP - Pesos colombianos</option>
                 ) : (
                   <option value="PEN">PEN - Soles</option>
                 )}
@@ -472,7 +502,9 @@ export default function OrdenCompraModal({
                       <td className="p-3 text-center">
                         <input aria-label="Cantidad"
                           type="number"
-                          min="1"
+                          min="0.01"
+                          step="0.01"
+                          required
                           value={item.cantidad || ''}
                           onChange={(e) => updateItem(index, 'cantidad', e.target.value)} className="w-[80px] p-1 border rounded text-center text-[0.875rem]"
                         />
@@ -482,7 +514,8 @@ export default function OrdenCompraModal({
                           type="number"
                           step="0.01"
                           min="0"
-                          value={item.precio_unitario || ''}
+                          required
+                          value={item.precio_unitario}
                           onChange={(e) => updateItem(index, 'precio_unitario', e.target.value)} className="w-[100px] p-1 border rounded text-right text-[0.875rem]"
                         />
                       </td>

@@ -68,6 +68,7 @@ export function OCWizard({
   const [loadingProveedores, setLoadingProveedores] = useState(false)
   const [loadingProductos, setLoadingProductos] = useState(false)
   const [loadingAlmacenes, setLoadingAlmacenes] = useState(false)
+  const [stepError, setStepError] = useState<string | null>(null)
   const createIdempotencyKeyRef = useRef<string | null>(null)
   const { get } = useApi()
 
@@ -142,11 +143,12 @@ export function OCWizard({
   }, [loadAlmacenes, loadProductos, loadProveedores])
 
   const handleNext = () => {
+    setStepError(null)
     if (currentStep === 1) {
       handleSubmit(() => setCurrentStep(2))()
     } else if (currentStep === 2) {
       if (detalles.length === 0) {
-        alert('Debe agregar al menos un producto')
+        setStepError('Debe agregar al menos un producto')
         return
       }
       setCurrentStep(3)
@@ -154,10 +156,12 @@ export function OCWizard({
   }
 
   const handleBack = () => {
+    setStepError(null)
     setCurrentStep(prev => Math.max(1, prev - 1))
   }
 
   const handleAddProducto = (producto: any, cantidad: number, precio: number) => {
+    setStepError(null)
     const subtotal = multiplicarMoneda(cantidad, precio)
     const newDetalle: ProductoDetalle = {
       producto_id: producto.id,
@@ -425,6 +429,7 @@ export function OCWizard({
       )}
 
       {/* Navigation Buttons */}
+      {stepError && <p role="alert" className="mt-4 rounded-lg border border-red-500/50 bg-red-500/10 p-3 text-sm">{stepError}</p>}
       <div className="mt-8 flex justify-between gap-4 border-t border-border pt-8">
         <button
           type="button"
@@ -480,23 +485,25 @@ function Step2AddProducts({
   const [selectedProducto, setSelectedProducto] = useState('')
   const [cantidad, setCantidad] = useState(1)
   const [precio, setPrecio] = useState(0)
+  const [productError, setProductError] = useState<string | null>(null)
 
   const handleAdd = () => {
     if (!selectedProducto) {
-      alert('Seleccione un producto')
+      setProductError('Seleccione un producto')
       return
     }
-    if (cantidad <= 0) {
-      alert('La cantidad debe ser mayor a 0')
+    if (!Number.isFinite(cantidad) || cantidad <= 0) {
+      setProductError('La cantidad debe ser mayor a 0')
       return
     }
-    if (precio < 0) {
-      alert('El precio no puede ser negativo')
+    if (!Number.isFinite(precio) || precio < 0) {
+      setProductError('El precio no puede ser negativo')
       return
     }
 
     const producto = productos.find((p: any) => p.id === selectedProducto)
     if (producto) {
+      setProductError(null)
       onAddProducto(producto, cantidad, precio)
       setSelectedProducto('')
       setCantidad(1)
@@ -578,6 +585,7 @@ function Step2AddProducts({
         </div>
       </div>
 
+      {productError && <p role="alert" className="mb-4 rounded-lg border border-red-500/50 bg-red-500/10 p-3 text-sm">{productError}</p>}
       {/* Products List */}
       {detalles.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-muted/30 px-6 py-12 text-center text-muted-foreground">
