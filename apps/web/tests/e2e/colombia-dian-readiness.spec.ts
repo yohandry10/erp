@@ -110,6 +110,7 @@ async function prepareColombiaSession(
   page: Page,
   fiscalStatus: FiscalStatus,
   permissions: PermissionFixture[] = dianAdminPermissions,
+  failDemoStatus = false,
 ) {
   const token = await new SignJWT({
     tenant_id: user.tenant_id,
@@ -157,6 +158,13 @@ async function prepareColombiaSession(
       return json({ success: true, data: fiscalStatus })
     }
     if (/\/api\/demo\/status\/?$/.test(pathname)) {
+      if (failDemoStatus) {
+        return route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: false, message: 'Estado demo no disponible' }),
+        })
+      }
       return json({ is_demo: fiscalStatus.isDemo, is_expired: false })
     }
     if (/\/api\/usuarios-sistema\/me\/permissions\/?$/.test(pathname)) {
@@ -198,6 +206,7 @@ async function prepareColombiaSession(
             total: 119_000,
             moneda: 'COP',
             estado: 'FIRMADO',
+            isDemoRepresentation: fiscalStatus.isDemo === true,
             fechaCreacion: '2026-08-29T12:00:00-05:00',
           },
         ],
@@ -232,6 +241,25 @@ async function prepareColombiaSession(
 }
 
 test.describe('habilitación fiscal DIAN en CPE', () => {
+  test('el estado demo desconocido no abre el wizard de credenciales reales', async ({
+    context,
+    page,
+  }) => {
+    await prepareColombiaSession(context, page, {
+      isDemo: false,
+      fiscal: { isReady: true, missingItems: [] },
+    }, dianAdminPermissions, true)
+
+    const failedStatus = page.waitForResponse((response) =>
+      /\/api\/demo\/status\/?$/.test(new URL(response.url()).pathname),
+    )
+    await page.goto('/dashboard/wizard', { waitUntil: 'domcontentloaded' })
+
+    expect((await failedStatus).status()).toBe(503)
+    await expect(page.getByText('¡Bienvenido al Asistente de Configuración!')).toHaveCount(0)
+    await expect(page.getByText('Carga de Certificado Digital')).toHaveCount(0)
+  })
+
   test('la fecha fiscal de Colombia no salta al día UTC siguiente', () => {
     expect(fiscalDateForCountry('CO', new Date('2026-08-30T03:30:00.000Z'))).toBe('2026-08-29')
   })
@@ -278,6 +306,264 @@ test.describe('habilitación fiscal DIAN en CPE', () => {
     await page.getByRole('button', { name: 'Ir al Centro CPE' }).first().click()
     await expect(page).toHaveURL(/\/dashboard\/cpe\/?$/)
     expect(legacyFiscalRequests).toEqual([])
+  })
+
+  test('el alta RMA describe el cierre fiscal DIAN y no hereda el CPE 07 de Perú', async ({
+    context,
+    page,
+  }) => {
+    await prepareColombiaSession(context, page, {
+      isDemo: true,
+      fiscal: { isReady: false, missingItems: ['Modo demo'] },
+    })
+
+    await page.goto('/dashboard/ventas/rma/nuevo', { waitUntil: 'domcontentloaded' })
+
+    await expect(page.getByRole('heading', { name: 'Nueva devolución de cliente' })).toBeVisible()
+    await expect(
+      page.getByText(/Nota crédito DIAN 91; CxC tras aceptación/),
+    ).toBeVisible()
+    await expect(page.getByText(/NC\/CPE 07, CxC y asiento/)).toHaveCount(0)
+  })
+
+  test('la RMA demo conserva la devolución física sin ofrecer una aceptación DIAN ficticia', async ({
+    context,
+    page,
+  }) => {
+    await prepareColombiaSession(context, page, {
+      isDemo: true,
+      fiscal: { isReady: false, missingItems: ['Modo demo'] },
+    })
+    const rmaId = '52600000-0000-4000-8000-000000000535'
+    await page.route('**/api/ventas/rma/**', async (route) => {
+      const pathname = new URL(route.request().url()).pathname
+      const data = /recursos-recepcion\/?$/.test(pathname)
+        ? { control_calidad_requerido: false, almacenes: [], ubicaciones: [] }
+        : {
+            id: rmaId,
+            numero: 'RMA-CO-DEMO-001',
+            estado: 'RECIBIDA',
+            motivo_general: 'Devolución demo',
+            created_by: user.id,
+            pedido_id: 'pedido-demo',
+            documento_origen_id: 'documento-demo',
+            cpe_origen_id: 'cpe-demo',
+            cxc_origen_id: 'cxc-demo',
+            nota_credito_documento_id: null,
+            nota_credito_cpe_id: null,
+            created_at: '2026-09-04T10:00:00-05:00',
+            items: [],
+            eventos: [],
+            saldo_favor: null,
+          }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data }),
+      })
+    })
+
+    await page.goto(`/dashboard/ventas/rma/${rmaId}`, { waitUntil: 'domcontentloaded' })
+
+    await expect(page.getByRole('heading', { name: 'RMA-CO-DEMO-001' })).toBeVisible()
+    await expect(page.getByText('Nota crédito DIAN 91 no disponible en demo')).toBeVisible()
+    await expect(page.getByText(/No se simulará aceptación fiscal ni se reducirá la CxC/)).toBeVisible()
+    await expect(page.getByRole('button', { name: /Crear NC 91/ })).toHaveCount(0)
+  })
+
+  test('la RMA falla cerrado si no puede confirmar si el tenant es demo', async ({
+    context,
+    page,
+  }) => {
+    await prepareColombiaSession(context, page, {
+      isDemo: false,
+      fiscal: { isReady: true, missingItems: [] },
+    }, dianAdminPermissions, true)
+    const rmaId = '52600000-0000-4000-8000-000000000539'
+    let noteRequests = 0
+    await page.route('**/api/ventas/rma/**', async (route) => {
+      const request = route.request()
+      const pathname = new URL(request.url()).pathname
+      if (request.method() === 'POST' && /\/nota-credito\/?$/.test(new URL(request.url()).pathname)) {
+        noteRequests += 1
+      }
+      const data = /recursos-recepcion\/?$/.test(pathname)
+        ? { control_calidad_requerido: false, almacenes: [], ubicaciones: [] }
+        : {
+            id: rmaId,
+            numero: 'RMA-CO-STATUS-UNKNOWN',
+            estado: 'RECIBIDA',
+            motivo_general: 'Estado demo temporalmente desconocido',
+            created_by: user.id,
+            pedido_id: 'pedido-real',
+            documento_origen_id: 'documento-real',
+            cpe_origen_id: 'cpe-real',
+            cxc_origen_id: 'cxc-real',
+            nota_credito_documento_id: null,
+            nota_credito_cpe_id: null,
+            created_at: '2026-09-04T10:00:00-05:00',
+            items: [],
+            eventos: [],
+            saldo_favor: null,
+          }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data,
+        }),
+      })
+    })
+
+    await page.goto(`/dashboard/ventas/rma/${rmaId}`, { waitUntil: 'domcontentloaded' })
+
+    await expect(page.getByText('Estado fiscal no disponible')).toBeVisible()
+    await expect(page.getByText(/Por seguridad no se habilita la Nota Crédito DIAN 91/)).toBeVisible()
+    await expect(page.getByRole('button', { name: /Crear NC 91/ })).toHaveCount(0)
+    expect(noteRequests).toBe(0)
+  })
+
+  test('la RMA Colombia real crea la 91 sólo con motivo y queda pendiente sin tocar CxC', async ({
+    context,
+    page,
+  }) => {
+    await prepareColombiaSession(context, page, {
+      isDemo: false,
+      fiscal: { isReady: true, missingItems: [] },
+    })
+    const rmaId = '52600000-0000-4000-8000-000000000536'
+    let linked = false
+    let postedBody: unknown
+    await page.route('**/api/ventas/rma/**', async (route) => {
+      const request = route.request()
+      const pathname = new URL(request.url()).pathname
+      const respond = (data: unknown) => route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data }),
+      })
+      if (/recursos-recepcion\/?$/.test(pathname)) {
+        return respond({ control_calidad_requerido: false, almacenes: [], ubicaciones: [] })
+      }
+      if (request.method() === 'POST' && /nota-credito\/?$/.test(pathname)) {
+        postedBody = request.postDataJSON()
+        linked = true
+        return respond({
+          cpe_id: '52600000-0000-4000-8000-000000000537',
+          documento_id: '52600000-0000-4000-8000-000000000538',
+          financial_effect_status: 'PENDING_FISCAL_ACCEPTANCE',
+        })
+      }
+      return respond({
+        id: rmaId,
+        numero: 'RMA-CO-REAL-001',
+        estado: 'RECIBIDA',
+        motivo_general: 'Devolución aceptada físicamente',
+        created_by: user.id,
+        pedido_id: 'pedido-real',
+        documento_origen_id: 'documento-real',
+        cpe_origen_id: 'cpe-real',
+        cxc_origen_id: 'cxc-real',
+        nota_credito_documento_id: linked
+          ? '52600000-0000-4000-8000-000000000538'
+          : null,
+        nota_credito_cpe_id: linked
+          ? '52600000-0000-4000-8000-000000000537'
+          : null,
+        created_at: '2026-09-04T10:00:00-05:00',
+        items: [],
+        eventos: [],
+        saldo_favor: null,
+      })
+    })
+
+    await page.goto(`/dashboard/ventas/rma/${rmaId}`, { waitUntil: 'domcontentloaded' })
+    await expect(page.getByText('Crear Nota Crédito DIAN 91')).toBeVisible()
+    await page.getByRole('button', { name: 'Crear NC 91 por líneas recibidas' }).click()
+
+    await expect(page.getByText('Nota crédito DIAN 91 pendiente')).toBeVisible()
+    await expect(page.getByText(/La CxC todavía no cambia/)).toBeVisible()
+    expect(postedBody).toEqual({ motivo: 'Devolución por ítems' })
+  })
+
+  test('el pedido demo CO informa muestra local y nunca afirma emisión DIAN', async ({
+    context,
+    page,
+  }) => {
+    await prepareColombiaSession(context, page, {
+      isDemo: true,
+      fiscal: { isReady: false, missingItems: ['Modo demo'] },
+    })
+
+    const pedidoId = '52600000-0000-4000-8000-000000000533'
+    await page.route(`**/api/ventas/pedidos/${pedidoId}**`, async (route) => {
+      const request = route.request()
+      const pathname = new URL(request.url()).pathname
+      const json = (body: unknown) => route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(body),
+      })
+
+      if (request.method() === 'POST' && /\/generar-factura\/?$/.test(pathname)) {
+        return json({
+          success: true,
+          factura_id: '52600000-0000-4000-8000-000000000534',
+          sugerir_gre: false,
+          is_demo_representation: true,
+          warnings: [
+            'Comprobante demo generado localmente: muestra sin transmisión ni validez DIAN',
+          ],
+          message: 'Muestra demo generada localmente, sin transmisión ni validez DIAN',
+        })
+      }
+
+      return json({
+        success: true,
+        data: {
+          id: pedidoId,
+          numero: 'PED-CO-0533',
+          estado: 'LISTO_FACTURAR',
+          created_at: '2026-09-04T10:00:00-05:00',
+          factura_id: null,
+          subtotal: 100_000,
+          igv: 19_000,
+          total: 119_000,
+          cliente: {
+            documento_tipo: 'NIT',
+            documento_numero: '9001234568',
+            razon_social: 'Cliente Demo Colombia S.A.S.',
+          },
+          detalle: [{
+            id: 'detalle-533',
+            descripcion: 'Producto demo Colombia',
+            cantidad: 1,
+            cantidad_despachada: 1,
+            precio_unitario: 100_000,
+            subtotal: 100_000,
+          }],
+        },
+      })
+    })
+
+    await page.goto(`/dashboard/ventas/pedidos/${pedidoId}`, {
+      waitUntil: 'domcontentloaded',
+    })
+    await page.getByRole('button', { name: 'Generar Factura' }).click()
+
+    await expect(page.getByText(/Se generará el comprobante/)).toBeVisible()
+    await expect(
+      page.getByText(/en una cuenta demo se crea una muestra local/),
+    ).toBeVisible()
+    await expect(page.getByText(/Se emitirá el documento fiscal/)).toHaveCount(0)
+    await page.getByRole('button', { name: 'Generar factura' }).click()
+
+    await expect(page.getByText('Muestra demo generada', { exact: true })).toBeVisible()
+    await expect(
+      page.getByText(/muestra sin transmisión ni validez DIAN/i),
+    ).toBeVisible()
+    await expect(page.getByText('Factura generada', { exact: true })).toHaveCount(0)
   })
 
   test('el administrador registra una constancia portal explícita e idempotente', async ({
@@ -393,6 +679,9 @@ test.describe('habilitación fiscal DIAN en CPE', () => {
     const readiness = page.getByTestId('colombia-fiscal-readiness')
     await expect(readiness).toHaveAttribute('data-ready', 'false')
     await expect(readiness).toContainText('Modo demo')
+    await expect(page.getByTestId('cpe-status-52600000-0000-4000-8000-000000000001'))
+      .toHaveText('MUESTRA LOCAL')
+    await expect(page.getByText('FIRMADO', { exact: true })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Enviar DIAN' })).toBeDisabled()
     await expect(page.getByTestId('dian-events-panel')).toHaveAttribute('data-operational', 'false')
     await expect(page.getByTestId('dian-events-panel')).toContainText(

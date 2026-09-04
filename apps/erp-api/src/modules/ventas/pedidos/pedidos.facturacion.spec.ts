@@ -130,6 +130,9 @@ describe('PedidosService (facturación)', () => {
   const cpeIntegrationService = {
     generarFacturaDesdePedido: jest.fn(),
   };
+  const notificationsService = {
+    createNotification: jest.fn().mockResolvedValue(undefined),
+  };
 
   beforeEach(async () => {
     mockSupabaseClient = createMockSupabaseClient({
@@ -156,7 +159,7 @@ describe('PedidosService (facturación)', () => {
           provide: SupabaseService,
           useValue: { getClient: jest.fn().mockReturnValue(mockSupabaseClient) },
         },
-        { provide: NotificationsService, useValue: {} },
+        { provide: NotificationsService, useValue: notificationsService },
         { provide: AuditService, useValue: {} },
         { provide: CPEIntegrationService, useValue: cpeIntegrationService },
         { provide: GREIntegrationService, useValue: { verificarSugerenciaGRE: jest.fn() } },
@@ -217,6 +220,89 @@ describe('PedidosService (facturación)', () => {
       /Certificado Digital/,
     );
     expect(findOne).not.toHaveBeenCalled();
+  });
+
+  it('permite cerrar un pedido demo CO sin exigir un certificado fiscal real', async () => {
+    mockSupabaseClient = createMockSupabaseClient({
+      empresa_config: {
+        single: [
+          {
+            data: {
+              ruc: '9001234568',
+              razon_social: 'Empresa Demo Colombia SAS',
+              direccion_fiscal: 'Carrera 7 # 10-20, Bogotá',
+              pais: 'CO',
+              is_demo: true,
+              certificado_pfx: null,
+              certificado_password: null,
+            },
+            error: null,
+          },
+        ],
+      },
+    });
+    (moduleRefSupabase(service) as any).getClient.mockReturnValue(mockSupabaseClient);
+    jest.spyOn(service as any, 'obtenerConfiguracionEmpresa').mockResolvedValue({
+      usar_flujo_logistica: false,
+    });
+    jest.spyOn(service as any, 'findOne').mockResolvedValue({
+      id: 'pedido-demo-co',
+      estado: 'LISTO_FACTURAR',
+      numero: 'PED-CO-0001',
+      cliente_id: 'cliente-co',
+      detalle: [{
+        id: 'detalle-co',
+        producto_id: 'producto-co',
+        cantidad: 1,
+        precio_unitario: 100,
+        subtotal: 100,
+      }],
+      factura_id: null,
+    });
+    cpeIntegrationService.generarFacturaDesdePedido.mockResolvedValue({
+      factura_id: 'cpe-demo-co',
+      documento_id: 'documento-demo-co',
+      total: 119,
+      estado: 'FIRMADO',
+      serie: 'FE',
+      numero: 1,
+      fecha_emision: '2026-09-03',
+      moneda: 'COP',
+      is_demo_representation: true,
+      warnings: [
+        'Comprobante demo generado localmente: muestra sin transmisión ni validez DIAN',
+      ],
+    });
+    (service as any).greIntegrationService.verificarSugerenciaGRE.mockResolvedValue({
+      sugerir: false,
+    });
+
+    await expect(
+      service.generarFactura('pedido-demo-co', 'tenant-demo-co', 'usuario-demo-co'),
+    ).resolves.toEqual({
+      success: true,
+      factura_id: 'cpe-demo-co',
+      sugerir_gre: false,
+      is_demo_representation: true,
+      message: 'Muestra demo generada localmente, sin transmisión ni validez DIAN',
+      warnings: [
+        'Comprobante demo generado localmente: muestra sin transmisión ni validez DIAN',
+      ],
+    });
+    expect(cpeIntegrationService.generarFacturaDesdePedido).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'pedido-demo-co' }),
+      'tenant-demo-co',
+      'ventas.cpe.factura:tenant-demo-co:pedido-demo-co',
+      'usuario-demo-co',
+    );
+    expect(notificationsService.createNotification).toHaveBeenCalledWith(
+      'tenant-demo-co',
+      expect.objectContaining({
+        severity: 'WARNING',
+        title: 'Muestra demo generada',
+        message: 'Muestra demo generada localmente, sin transmisión ni validez DIAN',
+      }),
+    );
   });
 
   it('no debe descontar stock (flujo simplificado) si falla la generación de CPE', async () => {
@@ -372,7 +458,12 @@ describe('PedidosService (facturación)', () => {
 
     const result = await service.generarFactura('pedido-1', 'tenant-1', 'user-1');
 
-    expect(result).toEqual({ success: true, factura_id: 'cpe-1', sugerir_gre: false });
+    expect(result).toEqual({
+      success: true,
+      factura_id: 'cpe-1',
+      sugerir_gre: false,
+      is_demo_representation: false,
+    });
     expect(cpeIntegrationService.generarFacturaDesdePedido).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'pedido-1' }),
       'tenant-1',
@@ -407,6 +498,17 @@ describe('PedidosService (facturación)', () => {
       pedidos_venta_detalle: {
         maybeSingle: [{ data: { id: 'det-1' }, error: null }],
       },
+      cpe: {
+        maybeSingle: [{
+          data: {
+            id: 'cpe-1',
+            pais: 'PE',
+            simulated_origin: false,
+            issuer_snapshot: { country_code: 'PE' },
+          },
+          error: null,
+        }],
+      },
     });
 
     (moduleRefSupabase(service) as any).getClient.mockReturnValue(mockSupabaseClient);
@@ -437,13 +539,81 @@ describe('PedidosService (facturación)', () => {
 
     const result = await service.generarFactura('pedido-1', 'tenant-1', 'user-1');
 
-    expect(result).toEqual({ success: true, factura_id: 'cpe-1', sugerir_gre: false });
+    expect(result).toEqual({
+      success: true,
+      factura_id: 'cpe-1',
+      sugerir_gre: false,
+      is_demo_representation: false,
+    });
     expect(cpeIntegrationService.generarFacturaDesdePedido).not.toHaveBeenCalled();
     expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
     expect(mockSupabaseClient.__spies.update).toHaveBeenCalledWith('pedidos_venta_detalle', {
       cantidad_facturada: 2,
       estado_item: 'FACTURADO',
     });
+  });
+
+  it('conserva como muestra un CPE histórico después de convertir el tenant demo CO a real', async () => {
+    mockSupabaseClient = createMockSupabaseClient({
+      empresa_config: {
+        single: [{
+          data: {
+            ruc: '9012345671',
+            razon_social: 'Empresa Colombia Real SAS',
+            direccion_fiscal: 'Carrera 7 # 10-20, Bogotá',
+            pais: 'CO',
+            is_demo: false,
+            certificado_pfx: 'pfx-real',
+            certificado_password: 'secret',
+          },
+          error: null,
+        }],
+      },
+      cpe: {
+        maybeSingle: [{
+          data: {
+            id: 'cpe-demo-historico',
+            pais: 'CO',
+            simulated_origin: true,
+            issuer_snapshot: { country_code: 'CO' },
+          },
+          error: null,
+        }],
+      },
+    });
+    (moduleRefSupabase(service) as any).getClient.mockReturnValue(mockSupabaseClient);
+    (service as any).greIntegrationService.verificarSugerenciaGRE.mockResolvedValue({ sugerir: false });
+    jest.spyOn(service as any, 'obtenerConfiguracionEmpresa').mockResolvedValue({
+      usar_flujo_logistica: false,
+    });
+    jest.spyOn(service as any, 'findOne').mockResolvedValue({
+      id: 'pedido-demo-historico',
+      estado: 'LISTO_FACTURAR',
+      numero: 'PED-CO-DEMO-1',
+      detalle: [{
+        id: 'detalle-demo-historico',
+        cantidad: 1,
+        cantidad_facturada: 1,
+      }],
+      factura_id: 'cpe-demo-historico',
+    });
+
+    await expect(
+      service.generarFactura('pedido-demo-historico', 'tenant-convertido-real', 'usuario-real'),
+    ).resolves.toEqual({
+      success: true,
+      factura_id: 'cpe-demo-historico',
+      sugerir_gre: false,
+      is_demo_representation: true,
+      warnings: ['Comprobante demo generado localmente: muestra sin transmisión ni validez DIAN'],
+      message: 'Muestra demo generada localmente, sin transmisión ni validez DIAN',
+    });
+    expect(cpeIntegrationService.generarFacturaDesdePedido).not.toHaveBeenCalled();
+    expect(mockSupabaseClient.__spies.eq).toHaveBeenCalledWith(
+      'cpe',
+      'tenant_id',
+      'tenant-convertido-real',
+    );
   });
 
   it('no oculta un fallo al reparar cantidad_facturada en reintentos idempotentes', async () => {

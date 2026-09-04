@@ -2,6 +2,7 @@ import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { CpeXmlBuilder } from './cpe-xml.builder';
 import { paisDelTenant, rangoDelDiaDelTenant } from '../../shared/utils/fecha-tenant.util';
 import { fechaDeDocumentoEnPais, zonaHorariaDePais } from '../../shared/utils/fecha-peru.util';
+import { isColombiaDemoRepresentation } from './historical-cpe-country.util';
 
 /** Consultas y exportaciones CPE; no participa en emisión ni anulación. */
 export class CpeReportingService {
@@ -95,27 +96,37 @@ async getComprobantesFromDatabase(filters: any = {}, tenantId?: string) {
       // como se guarda `fecha_emision`: el listado mostraba 2026-08-27 para una
       // boleta cuyo XML declaraba 2026-08-28. `fechaDeDocumentoEnPais` sólo
       // convierte lo que lleva hora.
-      const zonaTenant = zonaHorariaDePais(await paisDelTenant(client, tenantId));
+      const paisTenant = await paisDelTenant(client, tenantId);
+      const zonaTenant = zonaHorariaDePais(paisTenant);
       const fechaLocal = (valor: unknown): string =>
         fechaDeDocumentoEnPais(valor, zonaTenant);
 
       // Transformar datos al formato esperado por el frontend
-      const comprobantesFormateados = (cpeData || []).map(cpe => ({
-        id: cpe.id,
-        tipoDocumento: cpe.tipo_documento,
-        tipoComprobante: this.getTipoComprobanteText(cpe.tipo_documento),
-        serie: cpe.serie,
-        numero: cpe.numero,
-        fechaEmision: fechaLocal(cpe.fecha_emision ?? cpe.created_at),
-        cliente: cpe.razon_social_receptor || 'Cliente General',
-        clienteRuc: cpe.documento_receptor || '',
-        total: parseFloat(cpe.total_venta || 0),
-        moneda: cpe.moneda || 'PEN',
-        estado: cpe.estado || 'BORRADOR',
-        estadoSunat: cpe.estado,
-        observaciones: cpe.error_message || '',
-        fechaCreacion: cpe.created_at
-      }));
+      const comprobantesFormateados = (cpeData || []).map(cpe => {
+        const isDemoRepresentation = isColombiaDemoRepresentation(cpe, paisTenant);
+        return {
+          id: cpe.id,
+          tipoDocumento: cpe.tipo_documento,
+          tipoComprobante: this.getTipoComprobanteText(cpe.tipo_documento),
+          serie: cpe.serie,
+          numero: cpe.numero,
+          fechaEmision: fechaLocal(cpe.fecha_emision ?? cpe.created_at),
+          cliente: cpe.razon_social_receptor || 'Cliente General',
+          clienteRuc: cpe.documento_receptor || '',
+          total: parseFloat(cpe.total_venta || 0),
+          moneda: cpe.moneda || 'PEN',
+          // FIRMADO es el estado técnico que exige el writer atómico legado. En
+          // una demo Colombia el artefacto no tiene XMLDSig/XAdES, por lo que la
+          // presentación debe decir explícitamente que sólo es una muestra local.
+          estado: cpe.estado || 'BORRADOR',
+          estadoSunat: isDemoRepresentation
+            ? 'NO_TRANSMITIDO'
+            : (cpe.estado_sunat || cpe.sunat_status || cpe.estado),
+          isDemoRepresentation,
+          observaciones: cpe.error_message || '',
+          fechaCreacion: cpe.created_at
+        };
+      });
 
       console.log(`✅ Se formatearon ${comprobantesFormateados.length} comprobantes`);
 
@@ -172,7 +183,7 @@ async exportComprobantesCsv(filters: any = {}, tenantId?: string) {
       c.clienteRuc,
       c.moneda,
       c.total,
-      c.estado,
+      c.isDemoRepresentation ? 'MUESTRA_LOCAL' : c.estado,
       c.estadoSunat,
     ]);
 
