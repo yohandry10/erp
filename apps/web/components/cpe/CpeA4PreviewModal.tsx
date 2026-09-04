@@ -292,7 +292,9 @@ function CpeA4Sheet({
   const issuerTaxId = metadata.emisor?.ruc || metadata.ruc_emisor || `${profile.taxIdLabel} no consignado`
   const recipientName = metadata.razon_social_receptor || 'Cliente general'
   const recipientTaxId = metadata.documento_receptor || 'Documento no consignado'
-  const status = String(metadata.sunat_status || metadata.dian_status || metadata.arca_status || metadata.estado || 'PENDIENTE').replaceAll('_', ' ')
+  const status = metadata.simulated !== false
+    ? 'MUESTRA LOCAL · NO TRANSMITIDO'
+    : String(metadata.sunat_status || metadata.dian_status || metadata.arca_status || metadata.estado || 'PENDIENTE').replaceAll('_', ' ')
   const formatMoney = (amount: number) => `${symbol} ${amount.toFixed(2)}`
   const logoUrl = safeCpeImageUrl(metadata.emisor?.logo_url)
   const qrUrl = safeCpeImageUrl(
@@ -726,7 +728,9 @@ export default function CpeA4PreviewModal({
             <div
               className="mx-auto aspect-[210/297] w-full max-w-[794px] overflow-hidden bg-[#ffffff] shadow-2xl"
               data-testid="cpe-a4-sheet"
-              aria-label="Resumen visual de la primera hoja A4; el PDF descargable es autoritativo"
+              aria-label={lacksFiscalAcceptance
+                ? 'Resumen visual de la primera hoja A4; muestra sin validez fiscal'
+                : 'Resumen visual de la primera hoja A4; el PDF descargable es autoritativo'}
             >
               <CpeA4Sheet
                 metadata={metadata}
