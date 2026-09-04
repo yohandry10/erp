@@ -46,6 +46,10 @@ export default function LiquidacionesPage() {
   const { get, post } = useApi({ throwOnError: true });
   const queryClient = useQueryClient();
   const country = useCountryContext();
+  const isPeru = country.paisCodigo === "PE";
+  const pageTitle = isPeru ? "Liquidaciones y CTS" : country.paisCodigo === "AR"
+    ? "Liquidaciones finales"
+    : "Liquidaciones laborales";
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
   const [employeeId, setEmployeeId] = useState("");
@@ -201,8 +205,10 @@ export default function LiquidacionesPage() {
 
   return (
     <PageShell
-      title="Liquidaciones y CTS"
-      description="Calcula sin cesar, confirma con trazabilidad y ejecuta pagos o depósitos desde una frontera atómica."
+      title={pageTitle}
+      description={isPeru
+        ? "Calcula sin cesar, confirma con trazabilidad y ejecuta pagos o depósitos desde una frontera atómica."
+        : "Calcula la liquidación de egreso, confirma el cese y registra el pago con trazabilidad contable."}
       actions={
         <Button
           variant="outline"

@@ -175,18 +175,23 @@ Código principal: `apps/erp-api/src/modules/pos`,
   operación idempotente. No se aceptan data URLs ni hosts arbitrarios en la
   configuración empresarial. En demo, PDF y vista declaran que el documento no
   tiene validez tributaria.
-- Argentina emite por WSFEv1 únicamente comprobantes ordinarios A/B/C en pesos.
-  La clase se resuelve con la condición IVA del emisor y del receptor; una A
-  exige CUIT (`DocTipo=80`). La aceptación se cierra con CAE de 14 dígitos,
-  vencimiento, punto, tipo y número autorizados, que deben coincidir con el CPE.
-  `ImpNeto` contiene sólo la base gravada: las bases exentas y no gravadas se
-  informan por separado y nunca se duplican. El QR conserva exactamente el
-  `CbteFch` confirmado por ARCA y no vuelve a interpretar esa fecha por zona
-  horaria al preparar la representación.
-  Exportación E/WSFEXv1, CAEA, moneda extranjera, A-CBU y A sujeta a retención
-  permanecen bloqueadas mientras no exista su configuración e integración
-  específica. Los códigos históricos 51-53 representan A sujeta a retención,
-  no una clase M vigente.
+- Argentina emite por WSFEv1 comprobantes ordinarios A/B/C y sus notas en ARS o
+  USD. La clase se resuelve con la condición IVA del emisor y del receptor; una
+  A exige CUIT (`DocTipo=80`). El servidor obtiene la cotización oficial ARCA
+  para la fecha fiscal, persiste `MonId`, `MonCotiz` y `CanMisMonExt` y vuelve a
+  comprobarla antes del envío; el navegador no puede fijar punto, correlativo,
+  emisor, receptor ni cotización. Concepto `1/2/3` gobierna las fechas de
+  servicios y vencimiento, y los tributos se recalculan en servidor. La
+  aceptación se cierra con CAE de 14 dígitos, vencimiento, punto, tipo y número
+  autorizados, que deben coincidir con el CPE. `ImpNeto` contiene sólo la base
+  gravada: las bases exentas y no gravadas se informan por separado y nunca se
+  duplican. El QR conserva exactamente el `CbteFch` y la cotización confirmados
+  por ARCA y no vuelve a reinterpretarlos al preparar la representación. El A4
+  incluye el bloque de transparencia fiscal con IVA contenido y otros impuestos
+  nacionales indirectos.
+  Exportación E/WSFEXv1, CAEA, A-CBU y A sujeta a retención permanecen bloqueadas
+  mientras no exista su configuración e integración específica. Los códigos
+  51-53 representan A sujeta a retención, no una clase M vigente.
 - Colombia usa **UBL 2.1 conforme al Anexo Técnico de Factura Electrónica de
   Venta 1.9**; «1.9» es la versión del anexo DIAN y no otra versión de UBL.
   Factura `01`, nota crédito `91` y nota débito `92` declaran afectación,

@@ -665,6 +665,7 @@ export default function Sidebar() {
   const country = useCountryContext()
   const prefetchedRoutes = useRef<Set<string>>(new Set())
   const isPeru = country.paisCodigo === 'PE'
+  const isArgentina = country.paisCodigo === 'AR'
   const posEnabled = process.env.NEXT_PUBLIC_FEATURE_POS_ENABLED !== 'false'
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED !== 'false'
   const inventarioEnabled = process.env.NEXT_PUBLIC_FEATURE_INVENTARIO_ENABLED !== 'false'
@@ -714,6 +715,12 @@ export default function Sidebar() {
               title: `Comprobantes ${country.servicioFiscal || 'fiscales'}`,
             }
           }
+          if (item.href === '/dashboard/rrhh/liquidaciones' && !isPeru) {
+            return {
+              ...item,
+              title: isArgentina ? 'Liquidaciones finales' : 'Liquidaciones laborales',
+            }
+          }
           if (!rrhhEnabled && item.submenu) {
             return {
               ...item,
@@ -722,7 +729,7 @@ export default function Sidebar() {
           }
           return item
         }),
-    [country.servicioFiscal, inventarioEnabled, isPeru, posEnabled, rrhhEnabled],
+    [country.servicioFiscal, inventarioEnabled, isArgentina, isPeru, posEnabled, rrhhEnabled],
   )
 
   const menuHrefs = useMemo(() => collectMenuHrefs(filteredMenuItems), [filteredMenuItems])

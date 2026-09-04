@@ -18,7 +18,7 @@
     "desktop:build": "pnpm run tauri:build",
     "tauri": "tauri dev",
     "test:e2e": "playwright test",
-    "test:e2e:isolated": "playwright test tests/e2e/setup.spec.ts tests/e2e/middleware-auth.spec.ts tests/e2e/inventario-maestros-460.spec.ts tests/e2e/referenced-note-fiscal-gate.spec.ts tests/e2e/colombia-dian-readiness.spec.ts tests/e2e/colombia-referenced-notes.spec.ts tests/e2e/clientes-colombia-perfil-fiscal.spec.ts tests/e2e/qa-finance-kardex-496.spec.ts tests/e2e/contabilidad-monitoreo-outbox-492.spec.ts tests/e2e/usuarios-roles-resumen.spec.ts tests/e2e/cotizacion-estado-dialog.spec.ts tests/e2e/cajas-cierre-518.spec.ts --reporter=line && playwright test tests/e2e/theme-contract.spec.ts --grep \"login público\" --reporter=line",
+    "test:e2e:isolated": "playwright test tests/e2e/setup.spec.ts tests/e2e/middleware-auth.spec.ts tests/e2e/inventario-maestros-460.spec.ts tests/e2e/referenced-note-fiscal-gate.spec.ts tests/e2e/colombia-dian-readiness.spec.ts tests/e2e/colombia-referenced-notes.spec.ts tests/e2e/clientes-colombia-perfil-fiscal.spec.ts tests/e2e/pos-argentina-identidad-fiscal.spec.ts tests/e2e/argentina-country-isolation.spec.ts tests/e2e/qa-finance-kardex-496.spec.ts tests/e2e/contabilidad-monitoreo-outbox-492.spec.ts tests/e2e/usuarios-roles-resumen.spec.ts tests/e2e/cotizacion-estado-dialog.spec.ts tests/e2e/cajas-cierre-518.spec.ts --reporter=line && playwright test tests/e2e/theme-contract.spec.ts --grep \"login público\" --reporter=line",
     "test:e2e:dev": "node scripts/run-dev-e2e.mjs",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",

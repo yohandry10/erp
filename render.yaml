@@ -74,7 +74,7 @@ services:
       # Readiness compara este valor con la historia real de migraciones. El
       # contenedor no recibe tráfico si PROD aún no alcanzó este esquema.
       - key: REQUIRED_DATABASE_SCHEMA_VERSION
-        value: 534
+        value: 535
 
       # Las respuestas ApplicationResponse de DIAN sólo se aceptan cuando su
       # XAdES encadena al bundle público configurado y el firmante coincide con

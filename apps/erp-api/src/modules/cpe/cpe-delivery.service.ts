@@ -217,14 +217,37 @@ export function normalizePersistedFiscalTotals(cpe: Record<string, any>) {
     firstDefined(cpe, ['total_igv', 'igv', 'totalImpuestos', 'total_impuestos']),
     'total de impuestos', { min: 0 },
   );
+  const metadata = cpe.metadata && typeof cpe.metadata === 'object' && !Array.isArray(cpe.metadata)
+    ? cpe.metadata as Record<string, any>
+    : {};
+  const itemTributes = Array.isArray(cpe.items)
+    ? cpe.items.reduce((sum: number, item: Record<string, any>) => {
+        const raw = firstDefined(item ?? {}, [
+          'impuesto_isc', 'impuesto_inc', 'impuestoInc', 'inc',
+        ]);
+        return sum + (raw === undefined
+          ? 0
+          : finiteFiscalNumber(raw, 'tributo de ítem', { min: 0 }));
+      }, 0)
+    : 0;
+  const rawTotalTributos = firstDefined(cpe, ['total_isc', 'totalTributos', 'total_tributos'])
+    ?? metadata.arca_tributos_total
+    ?? itemTributes;
+  const totalTributos = finiteFiscalNumber(
+    rawTotalTributos,
+    'total de otros tributos',
+    { min: 0 },
+  );
   const importeTotal = finiteFiscalNumber(
     firstDefined(cpe, ['total_venta', 'total', 'importeTotal']),
     'importe total', { positive: true },
   );
-  if (Math.abs(subtotal + totalImpuestos - importeTotal) > 0.02) {
-    throw new Error('Dato fiscal inválido: subtotal + impuestos no coincide con el importe total');
+  if (Math.abs(subtotal + totalImpuestos + totalTributos - importeTotal) > 0.02) {
+    throw new Error(
+      'Dato fiscal inválido: subtotal + IVA + otros tributos no coincide con el importe total',
+    );
   }
-  return { subtotal, totalImpuestos, importeTotal };
+  return { subtotal, totalImpuestos, totalTributos, importeTotal };
 }
 
 /** Firma, consulta, representa y entrega CPE al proveedor fiscal. */
@@ -1237,12 +1260,13 @@ async retrySendToOse(
             : undefined,
           dianTaxProfile: dianReceiverTaxProfile,
         },
-        moneda: cpeData.moneda || (paisCodigo === 'CO' ? 'COP' : 'PEN'),
+        moneda: cpeData.moneda || (paisCodigo === 'CO' ? 'COP' : paisCodigo === 'AR' ? 'ARS' : 'PEN'),
         subtotal: totals.subtotal,
         totalGravadas: Number(cpeData.total_gravadas ?? totals.subtotal),
         totalExoneradas: Number(cpeData.total_exoneradas ?? 0),
         totalInafectas: Number(cpeData.total_inafectas ?? 0),
         totalImpuestos: totals.totalImpuestos,
+        totalTributos: totals.totalTributos,
         importeTotal: totals.importeTotal,
         tasaImpuesto: taxRate,
         formaPago: String(
@@ -1278,6 +1302,33 @@ async retrySendToOse(
           : undefined,
         arcaAuthorizationVariant: paisCodigo === 'AR'
           ? String(metadata.arca_modalidad_autorizacion ?? 'NORMAL').trim().toUpperCase() as DocumentoElectronico['arcaAuthorizationVariant']
+          : undefined,
+        arcaPagoMismaMoneda: paisCodigo === 'AR'
+          ? String(metadata.arca_can_mis_mon_ext ?? '').trim().toUpperCase() as DocumentoElectronico['arcaPagoMismaMoneda']
+          : undefined,
+        arcaCotizacion: paisCodigo === 'AR'
+          ? Number(metadata.arca_cotizacion ?? 1)
+          : undefined,
+        arcaConcepto: paisCodigo === 'AR'
+          ? Number(metadata.arca_concepto ?? 1) as DocumentoElectronico['arcaConcepto']
+          : undefined,
+        arcaFechaServicioDesde: paisCodigo === 'AR'
+          ? metadata.arca_fecha_servicio_desde ?? undefined
+          : undefined,
+        arcaFechaServicioHasta: paisCodigo === 'AR'
+          ? metadata.arca_fecha_servicio_hasta ?? undefined
+          : undefined,
+        arcaFechaVencimientoPago: paisCodigo === 'AR'
+          ? metadata.arca_fecha_vencimiento_pago ?? undefined
+          : undefined,
+        arcaTributos: paisCodigo === 'AR' && Array.isArray(metadata.arca_tributos)
+          ? metadata.arca_tributos.map((tribute: Record<string, any>) => ({
+              id: Number(tribute.id) as 1 | 2 | 3 | 4 | 99,
+              descripcion: String(tribute.descripcion ?? '').trim(),
+              baseImponible: Number(tribute.base_imponible ?? tribute.baseImponible),
+              alicuota: Number(tribute.alicuota),
+              importe: Number(tribute.importe),
+            }))
           : undefined,
         items,
         documentoReferencia: authorizedArcaReference ?? authorizedDianReference
@@ -1882,6 +1933,8 @@ async retrySendToOse(
       condicionIvaEmisor: response?.metadata?.condicionIvaEmisor ?? null,
       condicionIvaReceptorId: response?.metadata?.condicionIvaReceptorId ?? null,
       fechaFiscalAutorizada: response?.metadata?.fechaFiscalAutorizada ?? null,
+      cotizacion: response?.metadata?.cotizacion ?? null,
+      canMisMonExt: response?.metadata?.canMisMonExt ?? null,
     };
     const commonArgs = {
       p_tenant_id: claim.cpe.tenant_id,
@@ -2003,12 +2056,20 @@ private isTechnicalError(codigoRespuesta: string, descripcionRespuesta: string):
 
   private mapToPublicRecord(cpeData: any): Record<string, any> {
     const items = sanitizePublicCpeItems(cpeData?.items);
-    const totalIsc = items.reduce((sum, item) => {
+    const itemIsc = items.reduce((sum, item) => {
       const value = Number(
         item.impuesto_isc ?? item.impuesto_inc ?? item.impuestoInc ?? item.inc ?? 0,
       );
       return sum + (Number.isFinite(value) && value >= 0 ? value : 0);
     }, 0);
+    const bases = Number(cpeData.total_gravadas ?? 0)
+      + Number(cpeData.total_exoneradas ?? 0)
+      + Number(cpeData.total_inafectas ?? 0)
+      + Number(cpeData.total_exportacion ?? 0);
+    const derivedIsc = Number(cpeData.total_venta ?? cpeData.total ?? 0)
+      - bases
+      - Number(cpeData.total_igv ?? 0);
+    const totalIsc = Math.max(itemIsc, Number.isFinite(derivedIsc) ? derivedIsc : 0);
 
     return {
       id: cpeData.id,

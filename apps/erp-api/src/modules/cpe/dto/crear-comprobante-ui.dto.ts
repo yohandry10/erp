@@ -3,6 +3,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsISO8601,
   IsIn,
   IsInt,
   IsNumber,
@@ -79,6 +80,17 @@ export class ComprobanteItemUiDto {
   @IsOptional() @IsIn(['10', '20', '30', '40']) tipoAfectacionIgv?: string;
 }
 
+export class ArcaTributoUiDto {
+  @IsInt()
+  @IsIn([1, 2, 3, 4, 99])
+  id!: 1 | 2 | 3 | 4 | 99;
+
+  @IsOptional() @IsString() @MaxLength(80) descripcion?: string;
+  @IsNumber() @Min(0) base_imponible!: number;
+  @IsNumber() @Min(0) @Max(999.99) alicuota!: number;
+  @IsOptional() @IsNumber() @Min(0) importe?: number;
+}
+
 export class CrearComprobanteUiDto {
   // Tipo y numeración: tres alias históricos del mismo dato.
   @IsOptional() @IsString() @MaxLength(10) tipo_documento?: string;
@@ -104,6 +116,29 @@ export class CrearComprobanteUiDto {
   @IsOptional() @IsString() @MaxLength(500) clienteDireccion?: string;
 
   @IsOptional() @IsString() @MaxLength(10) moneda?: string;
+
+  @IsOptional() @IsInt() @IsIn([1, 2, 3]) arca_concepto?: 1 | 2 | 3;
+  @IsOptional() @IsInt() @IsIn([1, 2, 3]) arcaConcepto?: 1 | 2 | 3;
+  @IsOptional() @IsISO8601({ strict: true }) arca_fecha_servicio_desde?: string;
+  @IsOptional() @IsISO8601({ strict: true }) arcaFechaServicioDesde?: string;
+  @IsOptional() @IsISO8601({ strict: true }) arca_fecha_servicio_hasta?: string;
+  @IsOptional() @IsISO8601({ strict: true }) arcaFechaServicioHasta?: string;
+  @IsOptional() @IsISO8601({ strict: true }) arca_fecha_vencimiento_pago?: string;
+  @IsOptional() @IsISO8601({ strict: true }) arcaFechaVencimientoPago?: string;
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @ValidateNested({ each: true })
+  @Type(() => ArcaTributoUiDto)
+  arca_tributos?: ArcaTributoUiDto[];
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @ValidateNested({ each: true })
+  @Type(() => ArcaTributoUiDto)
+  arcaTributos?: ArcaTributoUiDto[];
+  @IsOptional() @IsIn(['S', 'N']) arca_pago_misma_moneda?: 'S' | 'N';
+  @IsOptional() @IsIn(['S', 'N']) arcaPagoMismaMoneda?: 'S' | 'N';
 
   @IsOptional() @IsIn(['CONTADO', 'CREDITO']) condicion_pago?: 'CONTADO' | 'CREDITO';
   @IsOptional() @IsIn(['CONTADO', 'CREDITO']) condicionPago?: 'CONTADO' | 'CREDITO';
