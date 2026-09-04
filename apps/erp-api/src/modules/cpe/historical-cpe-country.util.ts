@@ -64,3 +64,15 @@ export function isColombiaDemoRepresentation(
   return resolveHistoricalCpeCountry(cpe, currentTenantCountry) === 'CO'
     && cpe?.simulated_origin !== false;
 }
+
+/**
+ * Una muestra local de cualquier jurisdicción soportada conserva su modalidad
+ * en `simulated_origin`; nunca se vuelve a inferir desde el tenant mutable.
+ */
+export function isFiscalDemoRepresentation(
+  cpe: Record<string, any>,
+  currentTenantCountry?: unknown,
+): boolean {
+  resolveHistoricalCpeCountry(cpe, currentTenantCountry);
+  return cpe?.simulated_origin !== false;
+}

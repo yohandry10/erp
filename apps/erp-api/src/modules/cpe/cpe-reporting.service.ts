@@ -2,7 +2,7 @@ import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { CpeXmlBuilder } from './cpe-xml.builder';
 import { paisDelTenant, rangoDelDiaDelTenant } from '../../shared/utils/fecha-tenant.util';
 import { fechaDeDocumentoEnPais, zonaHorariaDePais } from '../../shared/utils/fecha-peru.util';
-import { isColombiaDemoRepresentation } from './historical-cpe-country.util';
+import { isFiscalDemoRepresentation } from './historical-cpe-country.util';
 
 /** Consultas y exportaciones CPE; no participa en emisión ni anulación. */
 export class CpeReportingService {
@@ -103,7 +103,7 @@ async getComprobantesFromDatabase(filters: any = {}, tenantId?: string) {
 
       // Transformar datos al formato esperado por el frontend
       const comprobantesFormateados = (cpeData || []).map(cpe => {
-        const isDemoRepresentation = isColombiaDemoRepresentation(cpe, paisTenant);
+        const isDemoRepresentation = isFiscalDemoRepresentation(cpe, paisTenant);
         return {
           id: cpe.id,
           tipoDocumento: cpe.tipo_documento,
@@ -116,7 +116,7 @@ async getComprobantesFromDatabase(filters: any = {}, tenantId?: string) {
           total: parseFloat(cpe.total_venta || 0),
           moneda: cpe.moneda || 'PEN',
           // FIRMADO es el estado técnico que exige el writer atómico legado. En
-          // una demo Colombia el artefacto no tiene XMLDSig/XAdES, por lo que la
+          // una demo local el artefacto no tiene XMLDSig/XAdES, por lo que la
           // presentación debe decir explícitamente que sólo es una muestra local.
           estado: cpe.estado || 'BORRADOR',
           estadoSunat: isDemoRepresentation
