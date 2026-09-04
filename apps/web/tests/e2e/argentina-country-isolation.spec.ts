@@ -304,6 +304,56 @@ test.describe('Argentina · aislamiento jurisdiccional y factura ARCA', () => {
     expect(submissions[2]).toMatchObject({ moneda: 'ARS', detalles: [{ cantidad: 0.5 }] })
   })
 
+  test('el asistente de compra valida sin alertas nativas y conserva proveedor, crédito y detalle hasta guardar', async ({ page }) => {
+    const nativeDialogs: string[] = []
+    page.on('dialog', async dialog => { nativeDialogs.push(dialog.message()); await dialog.dismiss() })
+    const supplier = { id: '11111111-1111-4111-8111-111111111111', razon_social: 'Proveedor Argentina', ruc: '30999888778' }
+    const product = { id: '22222222-2222-4222-8222-222222222222', nombre: 'Café QA', afectacion_igv: '10' }
+    const warehouse = { id: '33333333-3333-4333-8333-333333333333', nombre: 'Almacén QA' }
+    const submissions: Record<string, any>[] = []
+    await page.route(/\/api\/compras\/proveedores\/?(?:\?|$)/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: [supplier] }) }))
+    await page.route(/\/api\/inventario\/productos\/?(?:\?|$)/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: [product] }) }))
+    await page.route(/\/api\/inventario\/almacenes\/?(?:\?|$)/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: [warehouse] }) }))
+    await page.route(/\/api\/compras\/ordenes\/?(?:\?|$)/, route => {
+      if (route.request().method() === 'POST') {
+        submissions.push(route.request().postDataJSON())
+        return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ success: true, data: { id: '44444444-4444-4444-8444-444444444444' } }) })
+      }
+      return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: [] }) })
+    })
+    await page.goto('/dashboard/compras/ordenes/nueva/')
+    await page.locator('#ocwizard-numero-de-orden').fill('OC-QA-AR-001')
+    await page.locator('#ocwizard-proveedor').selectOption(supplier.id)
+    await page.locator('#ocwizard-condiciones-de-pago').selectOption('CREDITO_15')
+    await page.locator('#ocwizard-dias-de-credito').fill('15')
+    await page.locator('#ocwizard-almacen-destino').selectOption(warehouse.id)
+    await page.getByRole('button', { name: 'Siguiente', exact: true }).click()
+    await page.getByRole('button', { name: 'Siguiente', exact: true }).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'Debe agregar al menos un producto' })).toBeVisible()
+    await page.getByRole('button', { name: 'Agregar producto', exact: true }).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'Seleccione un producto' })).toBeVisible()
+    await page.locator('#ocwizard-producto').selectOption(product.id)
+    await page.locator('#ocwizard-cantidad').fill('0')
+    await page.getByRole('button', { name: 'Agregar producto', exact: true }).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'La cantidad debe ser mayor a 0' })).toBeVisible()
+    await page.locator('#ocwizard-cantidad').fill('10')
+    await page.locator('#ocwizard-precio-unit').fill('-1')
+    await page.getByRole('button', { name: 'Agregar producto', exact: true }).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'El precio no puede ser negativo' })).toBeVisible()
+    await page.locator('#ocwizard-precio-unit').fill('100')
+    await page.getByRole('button', { name: 'Agregar producto', exact: true }).click()
+    await expect(page.getByRole('alert').filter({ hasText: /producto|cantidad|precio/i })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Siguiente', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Revisión Final', exact: true })).toBeVisible()
+    await expect(page.getByText('OC-QA-AR-001', { exact: true })).toBeVisible()
+    await expect(page.getByText('Crédito 15 días', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Crear Orden de Compra', exact: true }).click()
+    await expect.poll(() => submissions.length).toBe(1)
+    expect(submissions[0]).toMatchObject({ numero: 'OC-QA-AR-001', proveedor_id: supplier.id, almacen_destino_id: warehouse.id, condiciones_pago: 'CREDITO_15', dias_credito: 15, idempotency_key: expect.any(String), detalles: [{ producto_id: product.id, cantidad: 10, precio_unitario: 100 }] })
+    expect(nativeDialogs).toEqual([])
+    await expect(page).toHaveURL(/\/dashboard\/compras\/ordenes\/?$/, { timeout: 20000 })
+  })
+
   test('el asiento conserva el borrador y explica el período faltante para corregir y reintentar', async ({ page }) => {
     const periodError = 'El período contable 2026-09 no existe. Debe crearse explícitamente antes de registrar movimientos.'
     const submissions: Record<string, unknown>[] = []
