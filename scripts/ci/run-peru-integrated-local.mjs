@@ -43,6 +43,7 @@ Object.assign(env, {
   LOCAL_API_URL: apiUrl, LOCAL_API_PORT: apiPort, LOCAL_WEB_URL: webUrl,
   LOCAL_POSTGREST_URL: `http://127.0.0.1:${restPort}`,
   LOCAL_INTEGRATED_OUTPUT_DIR: output,
+  DEMO_PFX_PATH: path.join(output, 'demo.pfx'),
   PGHOST: '127.0.0.1', PGPORT: pgPort, PGDATABASE: 'erp_e2e', PGUSER: 'postgres',
   PGPASSWORD: '', PSQL_BIN: process.env.PSQL_BIN || 'psql',
   DEPLOYMENT_ENV: 'PROD', NEXT_PUBLIC_API_URL: apiUrl,
@@ -142,6 +143,9 @@ try {
   for (const library of ['dtos', 'crypto']) {
     await run(`build-${library}`, process.execPath, [apiRequire.resolve('typescript/bin/tsc'), '--project', 'tsconfig.json'], path.join(root, 'libs', library));
   }
+  // El certificado desechable pertenece sólo a esta ejecución. No depender
+  // de un PFX local previo ni omitir las validaciones fiscales de la demo.
+  await run('demo-certificate', process.execPath, [path.join(apiDirectory, 'scripts/generate-demo-pfx.cjs'), env.DEMO_PFX_PATH]);
   await run('harness-typecheck', process.execPath, [apiRequire.resolve('typescript/bin/tsc'), '--project', 'tests/e2e/tsconfig.local.json'], apiDirectory);
   docker(['network', 'create', '--label', `com.erp.local-test=${runId}`, network]);
   createdNetwork = true;
