@@ -703,7 +703,6 @@ export class EventBusService {
     };
     
     console.log(`🎯 [EventBus] Emitiendo evento: ${eventType} desde ${module}`);
-    console.log(`🎯 [EventBus] Datos del evento:`, data);
     console.log(`🎯 [EventBus] Listeners registrados para ${eventType}:`, this.eventEmitter.listenerCount(eventType));
     
     // 🔴 CRÍTICO FIX: Persistir evento en outbox antes de emitirlo

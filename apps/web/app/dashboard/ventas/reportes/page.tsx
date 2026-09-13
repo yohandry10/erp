@@ -61,8 +61,8 @@ export default function ReportesPage() {
     }))
   }
 
-  const handleExportReport = async (reportType: string) => {
-    alert('📥 Exportando reporte... (Funcionalidad próximamente)')
+  const handleExportReport = () => {
+    window.print()
   }
 
   const tabs = [
@@ -80,7 +80,7 @@ export default function ReportesPage() {
   ].filter((tab) => isPeru || tab.id !== 'sunat')
 
   return (
-    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+    <div data-print-page className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
       <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div>
           <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Reportes y Estadísticas</h1>
@@ -88,10 +88,10 @@ export default function ReportesPage() {
         </div>
         <button
           className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-          onClick={() => handleExportReport(activeTab)}
+          onClick={handleExportReport}
         >
           <Download size={20} />
-          Exportar
+          Imprimir / PDF
         </button>
       </div>
 
@@ -164,7 +164,7 @@ export default function ReportesPage() {
         {/* Tab Navigation */}
         <div
           data-testid="sales-report-tabs"
-          className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6"
+          className="print:hidden mb-6 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6"
           role="tablist"
           aria-label="Secciones de reportes de ventas"
         >

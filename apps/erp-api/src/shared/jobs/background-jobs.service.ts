@@ -1,9 +1,10 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
-import { EventBusService, CierreVentasDiarioEvent, ProductoStockBajoEvent, VencimientoPagoEvent, ReporteSireGeneradoEvent } from '../events/event-bus.service';
+import { EventBusService, CierreVentasDiarioEvent, ProductoStockBajoEvent, VencimientoPagoEvent } from '../events/event-bus.service';
 import { TenantContextService } from '../tenant/tenant-context.service';
 import { v4 as uuidv4 } from 'uuid';
 import { fechaHoyDelTenant, rangoDelDiaDelTenant } from '../utils/fecha-tenant.util';
+import { appendIntegrationLog } from '../utils/integration-log';
 
 @Injectable()
 export class BackgroundJobsService {
@@ -47,8 +48,8 @@ export class BackgroundJobsService {
     // Verificación de vencimientos - cada día a las 8:00 AM
     this.scheduleDaily('08:00:00', () => this.runPerTenant('vencimientos', (t) => this.verificarVencimientosPagos(t)));
     
-    // Generación automática de reportes SIRE - primer día del mes a las 9:00 AM
-    this.scheduleMonthly(1, '09:00:00', () => this.runPerTenant('sire', (t) => this.generarReportesSireMensual(t)));
+    // SIRE se genera por el writer vigente con actor, registro e idempotencia.
+    // El cron anterior anunciaba un archivo inexistente y se retiró.
     
     // Consolidación de métricas del dashboard - cada 30 minutos
     this.scheduleInterval(30 * 60 * 1000, () => this.runPerTenant('metricas-dashboard', (t) => this.actualizarMetricasDashboard(t)));
@@ -246,9 +247,7 @@ export class BackgroundJobsService {
 
   private async logJob(jobName: string, tenantId: string, status: 'SUCCESS' | 'ERROR' | 'SKIP', errorMessage?: string) {
     try {
-      await this.supabase.getPublicClient()
-        .from('integration_logs')
-        .insert({
+      await appendIntegrationLog(this.supabase.getPublicClient(), {
           id: uuidv4(),
           tenant_id: tenantId,
           servicio: 'BACKGROUND_JOBS',
@@ -493,77 +492,8 @@ export class BackgroundJobsService {
     }
   }
 
-  async generarReportesSireMensual(tenantId: string) {
-    try {
-      console.log(`📊 [BackgroundJobs] Generando reportes SIRE mensuales automáticos (tenant ${tenantId})...`);
-      
-      const mesAnterior = new Date();
-      mesAnterior.setMonth(mesAnterior.getMonth() - 1);
-      const periodo = `${mesAnterior.getFullYear()}-${String(mesAnterior.getMonth() + 1).padStart(2, '0')}`;
-      const inicioPeriodoIso = new Date(Date.UTC(mesAnterior.getFullYear(), mesAnterior.getMonth(), 1)).toISOString();
-      const siguientePeriodoIso = new Date(Date.UTC(mesAnterior.getFullYear(), mesAnterior.getMonth() + 1, 1)).toISOString();
-
-      // Evitar duplicados: si ya hay SUCCESS desde el inicio del periodo, no volver a generar
-      const yaEjecutado = await this.hasRecentSuccess('sire', tenantId, inicioPeriodoIso);
-      if (yaEjecutado) {
-        console.log(`⏸️ [BackgroundJobs] Reporte SIRE ya generado para periodo ${periodo} (tenant ${tenantId}), se omite`);
-        return;
-      }
-
-      // TODO: Implement isMockMode() in SupabaseService if needed
-      const isMockMode = false; // Placeholder
-      if (isMockMode) {
-        console.log(`📊 [BackgroundJobs] Generación SIRE en modo mock para periodo ${periodo}`);
-        
-        const eventoSire: ReporteSireGeneradoEvent = {
-          reporteId: `SIRE-${periodo}-MOCK`,
-          periodo,
-          tipoReporte: 'VENTAS',
-          cantidadRegistros: 50, // Simular registros
-          fechaGeneracion: new Date().toISOString(),
-          requiereEnvioSunat: true,
-          archivoGenerado: `sire_ventas_${periodo}_mock.txt`
-        };
-
-        this.eventBus.emitReporteSireGenerado(eventoSire);
-        return;
-      }
-
-      const ventasQuery = this.supabase.query('ventas_pos')
-        .select('*')
-        .gte('created_at', inicioPeriodoIso)
-        .lt('created_at', siguientePeriodoIso);
-
-      const { data: ventas, error: ventasError } = await ventasQuery;
-
-      if (ventasError) throw ventasError;
-
-      if (!ventas || ventas.length === 0) {
-        console.log(`ℹ️ [BackgroundJobs] No hay ventas para SIRE en periodo ${periodo}`);
-        return;
-      }
-
-      // Simular generación de reporte SIRE
-      const reporteId = `SIRE-${periodo}-${Date.now()}`;
-      const archivoGenerado = `sire_ventas_${periodo}.txt`;
-
-      const eventoSire: ReporteSireGeneradoEvent = {
-        reporteId,
-        periodo,
-        tipoReporte: 'VENTAS',
-        cantidadRegistros: ventas.length,
-        fechaGeneracion: new Date().toISOString(),
-        requiereEnvioSunat: true,
-        archivoGenerado
-      };
-
-      this.eventBus.emitReporteSireGenerado(eventoSire);
-      
-      console.log(`📊 [BackgroundJobs] Reporte SIRE generado: ${reporteId} con ${ventas.length} registros`);
-      
-    } catch (error) {
-      console.error('❌ [BackgroundJobs] Error generando reportes SIRE:', error);
-    }
+  async generarReportesSireMensual(_tenantId: string): Promise<never> {
+    throw new Error('SIRE_LEGACY_JOB_RETIRED: use /api/sire/generar-reporte con actor, tipo de registro e idempotencia');
   }
 
   async actualizarMetricasDashboard(tenantId: string) {

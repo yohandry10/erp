@@ -1,7 +1,10 @@
 import { BackgroundJobsService } from './background-jobs.service';
 
 const createSupabaseMock = () => {
-  const rpc = jest.fn(async (_fn: string, _args?: any) => ({ data: true, error: null }));
+  const rpc = jest.fn(async (fn: string, args?: any) => ({
+    data: fn === 'registrar_auditoria_backend_tx' ? { id: args.p_event_id, idempotent: false } : true,
+    error: null,
+  }));
 
   const integrationLogsInsert = jest.fn(async () => ({ data: null, error: null }));
   const from = jest.fn(() => ({
@@ -32,6 +35,17 @@ const createSupabaseMock = () => {
 };
 
 describe('BackgroundJobsService - runPerTenant', () => {
+  it('rechaza el generador SIRE retirado sin inventar archivos ni emitir eventos', async () => {
+    const { supabase, query } = createSupabaseMock();
+    const eventBus = { emitReporteSireGenerado: jest.fn() };
+    const service = new BackgroundJobsService(supabase as any, eventBus as any, {} as any);
+
+    await expect(service.generarReportesSireMensual('tenant-1')).rejects.toThrow('SIRE_LEGACY_JOB_RETIRED');
+    expect(query).not.toHaveBeenCalled();
+    expect(eventBus.emitReporteSireGenerado).not.toHaveBeenCalled();
+    service.onModuleDestroy();
+  });
+
   it('adquiere lock por tenant, ejecuta handler y libera lock', async () => {
     process.env.BACKGROUND_JOBS_ENABLED = 'false'; // evita timers reales
     const { supabase, rpc, integrationLogsInsert } = createSupabaseMock();
@@ -56,8 +70,11 @@ describe('BackgroundJobsService - runPerTenant', () => {
     // Handler ejecutado por tenant
     expect(handler).toHaveBeenCalledTimes(2);
 
-    // Se registran logs en integration_logs
-    expect(integrationLogsInsert).toHaveBeenCalled();
+    expect(integrationLogsInsert).not.toHaveBeenCalled();
+    const logs = rpc.mock.calls.filter(([fn]) => fn === 'registrar_auditoria_backend_tx');
+    expect(logs).toHaveLength(2);
+    expect(logs.map(([, args]) => args.p_tenant_id).sort()).toEqual(['tenant-1', 'tenant-2']);
+    expect(logs.every(([, args]) => args.p_event.status === 'SUCCESS')).toBe(true);
   });
 });
 

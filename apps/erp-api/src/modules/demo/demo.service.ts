@@ -2,6 +2,7 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  ServiceUnavailableException,
   Logger,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -1583,9 +1584,7 @@ export class DemoService {
       .order("created_at", { ascending: true });
 
     if (error) {
-      throw new BadRequestException(
-        `No se pudieron leer las solicitudes: ${error.message}`,
-      );
+      throw new ServiceUnavailableException('No se pudieron leer las solicitudes de activación');
     }
 
     return { success: true, data: data || [], total: (data || []).length };

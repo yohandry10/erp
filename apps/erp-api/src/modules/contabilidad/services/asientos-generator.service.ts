@@ -918,11 +918,6 @@ export class AsientosGeneratorService {
     try {
       const { tenant_id, fecha, base_imponible, igv, centro_costo_id } = evento;
 
-      const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
-        tenant_id,
-        ['12', '122', '70', '40', '69', '20']
-      );
-
       const ajustes = {
         retencion: this.round2(Math.abs(Number(evento.ajustes?.retencion ?? 0))),
         percepcion: this.round2(Math.abs(Number(evento.ajustes?.percepcion ?? 0))),
@@ -978,6 +973,11 @@ export class AsientosGeneratorService {
           );
         }
       }
+
+      const codigos = ['12', '70', '40'];
+      if (saldoFavorCliente > 0) codigos.push('122');
+      if (costoAbs > 0) codigos.push('69', '20');
+      const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(tenant_id, codigos);
 
       const detalles: DetalleAsiento[] = [
         {

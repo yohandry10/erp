@@ -1,0 +1,40 @@
+@media print {
+  .dashboard:has([data-print-page]) [data-dashboard-chrome],
+  .dashboard:has([data-print-page]) [data-dashboard-content] nav,
+  .dashboard [data-print-page] button {
+    display: none !important;
+  }
+  .dashboard:has([data-print-page]),
+  .dashboard:has([data-print-page]) [data-dashboard-content] {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 25%;
+    --border: 0 0% 75%;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+    overflow: visible !important;
+    background: white !important;
+    color: black !important;
+  }
+  .dashboard [data-print-page] {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  .dashboard [data-print-page] * {
+    color: black !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+  .dashboard:has([data-print-page]) > div {
+    display: block;
+    overflow: visible;
+  }
+  .dashboard [data-print-page] table { font-size: 10pt; }
+  .dashboard [data-print-page] tr { break-inside: avoid; }
+}

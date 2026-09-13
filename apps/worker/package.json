@@ -7,6 +7,7 @@
     "start": "node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
+    "test:runtime-config": "pnpm build && node --test tests/runtime-config.test.cjs tests/legacy-sire.test.cjs tests/api-response.test.cjs tests/startup-readiness.test.cjs",
     "type-check": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
@@ -27,6 +28,6 @@
     "typescript": "^5.4.5"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "24.x"
   }
 }

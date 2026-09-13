@@ -3,6 +3,7 @@ import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CreateRecepcionDto, CerrarRecepcionDto, UpdateRecepcionDto } from '../dto';
 import { AuditService } from '../../audit/audit.service';
 import { CacheInvalidationService } from '../../../shared/cache/cache-invalidation.service';
+import { appendIntegrationLog } from '../../../shared/utils/integration-log';
 
 @Injectable()
 export class RecepcionesService {
@@ -26,10 +27,7 @@ export class RecepcionesService {
     durationMs?: number;
   }): Promise<void> {
     try {
-      await this.supabase
-        .getClient()
-        .from('integration_logs')
-        .insert({
+      await appendIntegrationLog(this.supabase.getClient(), {
           tenant_id: entry.tenantId,
           servicio: 'COMPRAS',
           operacion: entry.operacion,

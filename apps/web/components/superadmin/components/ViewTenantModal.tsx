@@ -13,7 +13,7 @@ interface Tenant {
   direccion?: string
   email?: string
   telefono?: string
-  estado?: 'ACTIVO' | 'INACTIVO'
+  estado?: 'ACTIVO' | 'INACTIVO' | 'PRUEBA' | 'SUSPENDIDO'
   tipo_empresa?: string
   usar_flujo_logistica?: boolean
   gre_obligatorio?: boolean

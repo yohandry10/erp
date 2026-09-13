@@ -5,7 +5,7 @@ import {
   CallHandler,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
-import { tap } from 'rxjs/operators';
+import { mergeMap, catchError } from 'rxjs/operators';
 import { AuditService } from '../audit.service';
 import { Reflector } from '@nestjs/core';
 
@@ -66,7 +66,7 @@ export class AuditInterceptor implements NestInterceptor {
 
     const request = context.switchToHttp().getRequest();
     const userId = request.user?.id;
-    const tenantId = request.user?.tenant_id || request.headers['x-tenant-id'];
+    const tenantId = request.user?.tenant_id;
 
     // Extract record ID from params if specified
     let recordId: string | undefined;
@@ -83,7 +83,7 @@ export class AuditInterceptor implements NestInterceptor {
       recordId,
       metadata: {
         method: request.method,
-        url: request.url,
+        url: request.url?.split('?')[0],
         ip: request.ip,
         userAgent: request.headers['user-agent'],
       },
@@ -97,8 +97,7 @@ export class AuditInterceptor implements NestInterceptor {
     }
 
     return next.handle().pipe(
-      tap({
-        next: (result) => {
+      mergeMap(async (result) => {
           // Include result if configured
           if (auditConfig.includeResult && result) {
             if (!auditData.cambios) {
@@ -107,14 +106,14 @@ export class AuditInterceptor implements NestInterceptor {
             auditData.cambios.new = result;
             
             // Extract record ID from result if not already set
-            if (!recordId && result?.id) {
-              auditData.recordId = result.id;
+            if (!recordId && (result?.id || result?.data?.id)) {
+              auditData.recordId = result.id || result.data.id;
             }
           }
 
           // Log the audit entry
           if (tenantId && userId) {
-            this.auditService.registrarCambio(
+            await this.auditService.registrarCambio(
               auditData.entity,
               auditData.action,
               auditData.usuario,
@@ -122,16 +121,17 @@ export class AuditInterceptor implements NestInterceptor {
               auditData.tenantId,
               auditData.recordId,
               auditData.metadata,
-            ).catch(err => {
+            ).catch(() => {
               // Log error but don't throw to avoid breaking the main operation
-              console.error('Error in audit interceptor:', err);
+              console.error('AUDIT_WRITE_FAILURE: interceptor de respuesta');
             });
           }
-        },
-        error: (error) => {
+          return result;
+      }),
+      catchError(async (error) => {
           // Log failed operations as well
           if (tenantId && userId) {
-            this.auditService.registrarCambio(
+            await this.auditService.registrarCambio(
               auditData.entity,
               auditData.action,
               auditData.usuario,
@@ -143,11 +143,11 @@ export class AuditInterceptor implements NestInterceptor {
                 error: error.message,
                 status: 'FAILED',
               },
-            ).catch(err => {
-              console.error('Error in audit interceptor:', err);
+            ).catch(() => {
+              console.error('AUDIT_WRITE_FAILURE: interceptor de error');
             });
           }
-        },
+          throw error;
       }),
     );
   }

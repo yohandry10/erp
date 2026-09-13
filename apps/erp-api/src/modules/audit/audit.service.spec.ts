@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import { ServiceUnavailableException } from '@nestjs/common';
 import { AuditService, AuditLog } from './audit.service';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { AuditOperation } from './dto';
@@ -15,7 +15,7 @@ describe('AuditService', () => {
         in: jest.fn().mockReturnThis(),
         gte: jest.fn().mockReturnThis(),
         lte: jest.fn().mockReturnThis(),
-        insert: jest.fn().mockReturnThis(),
+        rpc: jest.fn().mockResolvedValue({ error: null }),
         order: jest.fn().mockReturnThis(),
         range: jest.fn().mockReturnThis(),
     };
@@ -41,29 +41,29 @@ describe('AuditService', () => {
 
     describe('logAction', () => {
         it('should log action successfully', async () => {
-            mockSupabaseClient.insert.mockResolvedValueOnce({ error: null });
+            mockSupabaseClient.rpc.mockResolvedValueOnce({ error: null });
 
             const auditLog: AuditLog = {
                 table_name: 'pedidos',
                 operation: AuditOperation.INSERT,
                 record_id: 'record-123',
                 tenant_id: 'tenant-123',
-                user_id: 'user-123',
+                user_id: '22222222-2222-4222-8222-222222222222',
             };
 
             await expect(service.logAction(auditLog)).resolves.not.toThrow();
-            expect(mockSupabaseClient.insert).toHaveBeenCalled();
+            expect(mockSupabaseClient.rpc).toHaveBeenCalled();
         });
 
         it('should skip logging when required fields missing', async () => {
             const incompleteLog = { table_name: 'pedidos' } as AuditLog;
 
             await service.logAction(incompleteLog);
-            expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
+            expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
         });
 
         it('should not throw on insert error', async () => {
-            mockSupabaseClient.insert.mockResolvedValueOnce({
+            mockSupabaseClient.rpc.mockResolvedValueOnce({
                 error: { message: 'Insert error' }
             });
 
@@ -79,33 +79,33 @@ describe('AuditService', () => {
 
     describe('registrarCambio', () => {
         it('should calculate changed fields for UPDATE', async () => {
-            mockSupabaseClient.insert.mockResolvedValueOnce({ error: null });
+            mockSupabaseClient.rpc.mockResolvedValueOnce({ error: null });
 
             await service.registrarCambio(
                 'pedidos',
                 'UPDATE',
-                'user-123',
+                '22222222-2222-4222-8222-222222222222',
                 { old: { estado: 'PENDIENTE' }, new: { estado: 'APROBADO' } },
                 'tenant-123',
                 'record-123'
             );
 
-            expect(mockSupabaseClient.insert).toHaveBeenCalled();
+            expect(mockSupabaseClient.rpc).toHaveBeenCalled();
         });
 
         it('should handle INSERT without old values', async () => {
-            mockSupabaseClient.insert.mockResolvedValueOnce({ error: null });
+            mockSupabaseClient.rpc.mockResolvedValueOnce({ error: null });
 
             await service.registrarCambio(
                 'pedidos',
                 'INSERT',
-                'user-123',
+                '22222222-2222-4222-8222-222222222222',
                 { new: { id: 'new-id', estado: 'PENDIENTE' } },
                 'tenant-123',
                 'new-id'
             );
 
-            expect(mockSupabaseClient.insert).toHaveBeenCalled();
+            expect(mockSupabaseClient.rpc).toHaveBeenCalled();
         });
     });
 
@@ -134,7 +134,7 @@ describe('AuditService', () => {
             await service.getAuditLogs('tenant-123', {
                 table_name: 'pedidos',
                 operation: AuditOperation.INSERT,
-                user_id: 'user-123',
+                user_id: '22222222-2222-4222-8222-222222222222',
                 start_date: '2024-01-01',
                 end_date: '2024-12-31',
             });
@@ -151,7 +151,7 @@ describe('AuditService', () => {
             });
 
             await expect(service.getAuditLogs('tenant-123'))
-                .rejects.toThrow(BadRequestException);
+                .rejects.toThrow(ServiceUnavailableException);
         });
     });
 
@@ -162,7 +162,7 @@ describe('AuditService', () => {
                 error: null,
             });
 
-            const result = await service.getUserAuditLogs('tenant-123', 'user-123');
+            const result = await service.getUserAuditLogs('tenant-123', '22222222-2222-4222-8222-222222222222');
             expect(result).toHaveLength(1);
         });
     });
@@ -181,7 +181,7 @@ describe('AuditService', () => {
 
     describe('logIntegracion', () => {
         it('should log integration call', async () => {
-            mockSupabaseClient.insert.mockResolvedValueOnce({ error: null });
+            mockSupabaseClient.rpc.mockResolvedValueOnce({ error: null });
 
             await service.logIntegracion(
                 'SUNAT',
@@ -194,11 +194,11 @@ describe('AuditService', () => {
                 150
             );
 
-            expect(mockSupabaseClient.from).toHaveBeenCalledWith('integration_logs');
+            expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('registrar_auditoria_backend_tx', expect.objectContaining({ p_kind: 'integration' }));
         });
 
         it('should remove sensitive data from logs', async () => {
-            mockSupabaseClient.insert.mockResolvedValueOnce({ error: null });
+            mockSupabaseClient.rpc.mockResolvedValueOnce({ error: null });
 
             await service.logIntegracion(
                 'SUNAT',
@@ -210,7 +210,7 @@ describe('AuditService', () => {
             );
 
             // Should have been called but with redacted data
-            expect(mockSupabaseClient.insert).toHaveBeenCalled();
+            expect(mockSupabaseClient.rpc).toHaveBeenCalled();
         });
     });
 

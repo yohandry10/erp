@@ -105,15 +105,17 @@ test.describe('CASE-18 Analytics y Dashboard', () => {
     const ventaTotal = 321.9;
     const compraTotal = 210.5;
     const stockActual = 7;
-    const precio = 13.25;
+    const costoUnitario = 13.25;
+    const precioVenta = 19.9;
 
     const product = await insertRow(supabase, 'productos', {
       tenant_id: tenantId,
       codigo: `${unique}-PROD`,
       nombre: `Producto Analytics Dashboard ${unique}`,
       categoria: 'QA-PROD-READY-ANALYTICS-CASE18',
-      precio,
-      precio_venta: precio,
+      precio: 0,
+      precio_compra: costoUnitario,
+      precio_venta: precioVenta,
       stock_minimo: 2,
       activo: true,
       estado: 'activo',
@@ -286,12 +288,22 @@ test.describe('CASE-18 Analytics y Dashboard', () => {
       updated_at: new Date().toISOString(),
     });
 
+    // Inventario es saldo operativo y debe superponerse al snapshot general sin
+    // depender de una invalidación manual. Esta consulta conserva en Redis el
+    // baseline anterior para reproducir la discrepancia vista entre pantallas.
+    const statsSinInvalidar = await parseOk<any>(
+      await apiContext.get(api('/dashboard/stats')),
+      'dashboard stats con inventario vivo CASE-18',
+    );
+    expect(Number(statsSinInvalidar.totalInventario), 'Dashboard debe contar producto sin invalidar cache').toBeGreaterThanOrEqual(Number(baseline.totalInventario) + 1);
+    expect(Number(statsSinInvalidar.valorInventario), 'Dashboard debe valorizar a costo sin invalidar cache').toBeGreaterThanOrEqual(Number(baseline.valorInventario) + costoUnitario * stockActual - 0.01);
+
     await expectStatus(await apiContext.post(api('/dashboard/cache/invalidate'), { data: {} }), 201, 'invalidar cache con datos CASE-18');
     const stats = await parseOk<any>(await apiContext.get(api('/dashboard/stats')), 'dashboard stats con datos CASE-18');
     expect(Number(stats.ventasMes), 'Dashboard debe reflejar CPE real del periodo').toBeGreaterThanOrEqual(Number(baseline.ventasMes) + cpeTotal - 0.01);
     expect(Number(stats.comprasMes), 'Dashboard debe reflejar OC real del periodo').toBeGreaterThanOrEqual(Number(baseline.comprasMes) + compraTotal - 0.01);
     expect(Number(stats.totalInventario), 'Dashboard debe contar producto real').toBeGreaterThanOrEqual(Number(baseline.totalInventario) + 1);
-    expect(Number(stats.valorInventario), 'Dashboard debe valorizar stock_actual real').toBeGreaterThanOrEqual(Number(baseline.valorInventario) + precio * stockActual - 0.01);
+    expect(Number(stats.valorInventario), 'Dashboard debe valorizar stock_actual real a costo').toBeGreaterThanOrEqual(Number(baseline.valorInventario) + costoUnitario * stockActual - 0.01);
     expect(Number(stats.totalSire), 'Dashboard debe contar SIRE real').toBeGreaterThanOrEqual(Number(baseline.totalSire) + 1);
 
     const activity = await parseOk<any[]>(await apiContext.get(api('/dashboard/activities')), 'dashboard activities con datos CASE-18');

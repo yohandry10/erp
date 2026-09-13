@@ -1,14 +1,14 @@
+import { OperacionLogisticaDto } from './operacion-logistica.dto';
 import { IsEnum, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
 
 export enum TipoEventoLogisticoManual {
   PICKING = 'PICKING',
   PACKING = 'PACKING',
-  DESPACHO = 'DESPACHO',
   TRANSITO = 'TRANSITO',
   ENTREGA = 'ENTREGA',
 }
 
-export class RegistrarEventoLogisticoDto {
+export class RegistrarEventoLogisticoDto extends OperacionLogisticaDto {
   @IsEnum(TipoEventoLogisticoManual, { message: 'Tipo de evento logístico inválido' })
   tipo!: TipoEventoLogisticoManual;
 

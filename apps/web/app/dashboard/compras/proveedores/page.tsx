@@ -6,6 +6,8 @@ import { useApi } from '@/hooks/use-api'
 import { Proveedor } from '@/types/compras'
 import toast from 'react-hot-toast'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
+import { downloadCsv } from '@/lib/csv-export'
+import { MasterImportDialog } from '@/components/migration/MasterImportDialog'
 import {
   Search,
   Plus,
@@ -32,6 +34,7 @@ export default function ProveedoresPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalProveedores, setTotalProveedores] = useState(0)
+  const [showImport, setShowImport] = useState(false)
   const loadRequestIdRef = useRef(0)
   const itemsPerPage = 10
 
@@ -109,11 +112,14 @@ export default function ProveedoresPage() {
   }
 
   const handleExport = () => {
-    toast('📥 Funcionalidad de exportación próximamente')
+    downloadCsv(`proveedores-pagina-${currentPage}.csv`,
+      ['Documento', 'Razón social', 'Nombre comercial', 'Dirección', 'Email', 'Teléfono', 'Condiciones de pago', 'Activo'],
+      proveedores.map(proveedor => [proveedor.ruc, proveedor.razon_social, proveedor.nombre_comercial,
+        proveedor.direccion, proveedor.email, proveedor.telefono, proveedor.condiciones_pago, proveedor.activo]))
   }
 
   const handleImport = () => {
-    toast('📤 Funcionalidad de importación próximamente')
+    setShowImport(true)
   }
 
   const formatCurrency = (amount: number | undefined) => {
@@ -123,6 +129,7 @@ export default function ProveedoresPage() {
 
   return (
     <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+      <MasterImportDialog entity="proveedores" open={showImport} onOpenChange={setShowImport} onImported={loadProveedores} />
       {/* Header */}
       <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div>
@@ -218,10 +225,10 @@ export default function ProveedoresPage() {
           </button>
 
           <button
-            onClick={handleExport} className="py-3 px-4 rounded-lg border bg-card cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium"
+            disabled={loading || proveedores.length === 0} onClick={handleExport} className="py-3 px-4 rounded-lg border bg-card cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium disabled:opacity-50"
           >
             <Download size={16} />
-            Exportar
+            Exportar página (CSV)
           </button>
 
           <button

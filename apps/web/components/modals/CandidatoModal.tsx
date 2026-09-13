@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { useApi } from '@/hooks/use-api'
 import { toast } from '@/components/ui/use-toast'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { candidateFormValues, candidatePayload } from '@/lib/candidate-profile'
 
 interface CandidatoModalProps {
   isOpen: boolean
@@ -93,7 +94,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
     nivel_educacion: 'universitario',
     experiencia_años: 0,
     pretension_salarial: 0,
-    estado_civil: 'soltero',
+    estado_civil: '',
     cv_url: '',
     linkedin_url: '',
     portfolio_url: '',
@@ -112,7 +113,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
     try {
       const response = await get('/api/rrhh/vacantes')
       if (response?.success) {
-        const vacantesActivas = response.data.filter((v: any) => v.estado === 'activa')
+        const vacantesActivas = response.data.filter((v: any) => String(v.estado).toLowerCase() === 'activa')
         setVacantes(vacantesActivas)
       }
     } catch (error) {
@@ -136,7 +137,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
       nivel_educacion: 'universitario',
       experiencia_años: 0,
       pretension_salarial: 0,
-      estado_civil: 'soltero',
+      estado_civil: '',
       cv_url: '',
       linkedin_url: '',
       portfolio_url: '',
@@ -154,8 +155,6 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
   }, [isArgentina, isColombia])
 
   useEffect(() => {
-    console.log('🚀 CandidatoModal - isOpen:', isOpen, 'candidato:', candidato)
-
     if (isOpen) {
       if (vacantesProps) {
         setVacantes(vacantesProps)
@@ -164,7 +163,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
       }
 
       if (candidato) {
-        setFormData(candidato)
+        setFormData(candidateFormValues(candidato, isArgentina ? 'CUIL' : isColombia ? 'CC' : 'DNI') as CandidatoData)
       } else {
         resetForm()
       }
@@ -176,7 +175,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
     return () => {
       document.body.style.overflow = 'unset'
     }
-  }, [candidato, isOpen, loadVacantes, resetForm, vacantesProps])
+  }, [candidato, isOpen, loadVacantes, resetForm, vacantesProps, isArgentina, isColombia])
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -303,7 +302,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
       if (formData.idiomas.length > 1) puntuacion += 5
 
       const candidatoData = {
-        ...formData,
+        ...candidatePayload(formData),
         puntuacion_cv: Math.min(puntuacion, 100)
       }
 
@@ -549,6 +548,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                       onChange={(e) => handleInputChange('estado_civil', e.target.value)}
                       className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
+                      <option value="">Sin informar</option>
                       <option value="soltero">Soltero(a)</option>
                       <option value="casado">Casado(a)</option>
                       <option value="divorciado">Divorciado(a)</option>

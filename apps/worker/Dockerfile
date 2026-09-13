@@ -1,5 +1,5 @@
 # Multi-stage build for production
-FROM node:20-alpine AS base
+FROM node:24-alpine AS base
 
 RUN npm install -g pnpm@9.15.4
 
@@ -15,7 +15,7 @@ RUN pnpm --filter=@erp-suite/dtos build
 RUN pnpm --filter=@erp-suite/crypto build
 RUN pnpm --filter=@erp-suite/worker build
 
-FROM node:20-alpine AS production
+FROM node:24-alpine AS production
 
 RUN npm install -g pnpm@9.15.4
 
@@ -38,6 +38,6 @@ USER worker
 EXPOSE 3050
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD node -e "const port=process.env.WORKER_PORT||'3050'; const http=require('http'); const req=http.get(`http://localhost:${port}/health`, (res)=>process.exit(res.statusCode===200?0:1)); req.on('error', ()=>process.exit(1));"
+  CMD node -e "const port=process.env.WORKER_PORT||'3050'; const headers=process.env.HEALTH_TOKEN?{'x-health-token':process.env.HEALTH_TOKEN}:{}; const req=require('http').get({hostname:'localhost',port,path:'/health',headers},res=>process.exit(res.statusCode===200?0:1)); req.setTimeout(2000,()=>{req.destroy();process.exit(1)}); req.on('error',()=>process.exit(1));"
 
 CMD ["node", "apps/worker/dist/index.js"]

@@ -1,6 +1,7 @@
 import winston from 'winston';
 import { createClient } from '@supabase/supabase-js';
 import axios from 'axios';
+import { parseWorkerBatchResult } from '../api-response';
 import jwt from 'jsonwebtoken';
 
 const logger = winston.createLogger({
@@ -101,9 +102,9 @@ export async function runPosFacturaPendienteJob(): Promise<{
           },
         );
 
-        const data = resp?.data || {};
-        const proc = Number(data.procesadas || 0);
-        const err = Number(data.errores || 0);
+        const data = parseWorkerBatchResult(resp?.data);
+        const proc = data.procesadas;
+        const err = data.errores;
 
         procesadas += proc;
         errores += err;
@@ -117,7 +118,7 @@ export async function runPosFacturaPendienteJob(): Promise<{
     }
 
     logger.info(`🧾 [POS Facturación] Finalizado vía API: ${procesadas} ok, ${errores} con error, ${omitidas} omitidas`);
-    return { success: true, procesadas, errores, omitidas, tenantStats };
+    return { success: errores === 0, procesadas, errores, omitidas, tenantStats };
   } catch (error) {
     logger.error('❌ [POS Facturación] Error general:', error);
     return { success: false, procesadas, errores: errores + 1, omitidas, tenantStats };

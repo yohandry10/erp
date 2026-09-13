@@ -122,10 +122,11 @@ export class LogisticaController {
   @ApiResponse({ status: 404, description: 'Pedido no encontrado' })
   async marcarListoDespacho(
     @Param('pedidoId') pedidoId: string,
+    @Body() dto: PrepararPedidoDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
   ) {
-    return this.logisticaService.marcarListoDespacho(pedidoId, tenantId, user?.id);
+    return this.logisticaService.marcarListoDespacho(pedidoId, tenantId, user?.id, dto);
   }
 
   /**
@@ -260,7 +261,7 @@ export class LogisticaController {
    * POST /api/inventario/logistica/:pedidoId/eventos - Registrar evento logístico manual
    */
   @Post(':pedidoId/eventos')
-  @RequirePermission('inventario.logistica.preparar')
+  @RequirePermission('inventario.logistica.despachar')
   @ApiOperation({
     summary: 'Registrar evento logístico manual',
     description:

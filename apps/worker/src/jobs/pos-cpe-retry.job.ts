@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import winston from 'winston';
 import axios from 'axios';
+import { parseWorkerBatchResult } from '../api-response';
 import jwt from 'jsonwebtoken';
 
 const logger = winston.createLogger({
@@ -96,9 +97,9 @@ export async function runPosCpeRetryJob(): Promise<{
           },
         );
 
-        const data = resp?.data || {};
-        procesadas += Number(data.procesadas || 0);
-        errores += Number(data.errores || 0);
+        const data = parseWorkerBatchResult(resp?.data);
+        procesadas += data.procesadas;
+        errores += data.errores;
       } catch (err: any) {
         errores += 1;
         logger.error(`❌ [POS CPE Retry] Error procesando tenant ${tenant.id}:`, err?.message || err);
@@ -108,7 +109,7 @@ export async function runPosCpeRetryJob(): Promise<{
     logger.info(`✅ [POS CPE Retry] Job completado vía API: ${procesadas} procesadas, ${errores} errores`);
 
     return {
-      success: true,
+      success: errores === 0,
       procesadas,
       errores,
       omitidas

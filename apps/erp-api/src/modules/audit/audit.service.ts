@@ -1,7 +1,9 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
-import { AuditLogDto, AuditFiltersDto } from './dto';
+import { AuditFiltersDto } from './dto';
 import { sanitizePostgrestSearch } from '../../common/util/postgrest.util';
+import { randomUUID } from 'node:crypto';
+import { redactSensitiveData, redactSensitiveText } from '../../shared/utils/redact-sensitive';
 
 export interface AuditLog {
   id?: string;
@@ -26,6 +28,21 @@ export class AuditService {
 
   constructor(private readonly supabase: SupabaseService) {}
 
+  async getActors(tenantId: string) {
+    const actors: Array<{ id: string; nombre: string; email: string }> = [];
+    let after: string | undefined;
+    for (;;) {
+      let query = this.supabase.getClient().from('usuarios_sistema')
+        .select('id,nombre,email').eq('tenant_id', tenantId).order('id').limit(500);
+      if (after) query = query.gt('id', after);
+      const { data, error } = await query;
+      if (error) throw new ServiceUnavailableException('No se pudieron cargar los actores de auditoría');
+      if (!data?.length) return actors;
+      actors.push(...data.map(({ id, nombre, email }) => ({ id, nombre, email })));
+      after = data[data.length - 1].id;
+    }
+  }
+
   /**
    * Log an action to the audit_log table
    * Requirements: 8.1, 8.2
@@ -34,51 +51,50 @@ export class AuditService {
     if (!auditLog?.table_name || !auditLog?.operation || !auditLog?.tenant_id) {
       console.warn(
         '⚠️ [AUDIT] Acción ignorada: faltan campos obligatorios (table_name, operation o tenant_id)',
-        auditLog,
       );
       return;
     }
 
-    const client = this.supabase.getClient();
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     let normalizedUserId = auditLog.user_id || null;
     if (normalizedUserId && !uuidRegex.test(normalizedUserId)) {
-      auditLog.metadata = {
-        ...(auditLog.metadata || {}),
-        actor_label: normalizedUserId,
-      };
+      if (!/^system$/i.test(normalizedUserId)) {
+        this.logger.error('AUDIT_WRITE_FAILURE: actor inválido');
+        return;
+      }
       normalizedUserId = null;
     }
 
-    // Insert into audit_log table
-    const { error } = await client
-      .from('audit_log')
-      .insert({
+    await this.persistBackendEvent('audit', auditLog.tenant_id, {
         table_name: auditLog.table_name,
         operation: auditLog.operation,
         record_id: auditLog.record_id || null,
-        old_values: auditLog.old_values || null,
-        new_values: auditLog.new_values || null,
+        old_values: this.summarizeData(auditLog.old_values),
+        new_values: this.summarizeData(auditLog.new_values),
         changed_fields: auditLog.changed_fields || null,
         user_id: normalizedUserId,
-        tenant_id: auditLog.tenant_id,
         ip_address: auditLog.ip_address || null,
         user_agent: auditLog.user_agent || null,
-        timestamp: auditLog.timestamp || new Date().toISOString(),
-        metadata: auditLog.metadata || null
-      });
+        metadata: this.summarizeData(auditLog.metadata) || {},
+      }, auditLog.id);
+  }
 
-    if (error) {
-      this.auditFailureCount++;
-      this.logger.error(
-        `AUDIT_WRITE_FAILURE [count=${this.auditFailureCount}] ${auditLog.operation} on ${auditLog.table_name} ` +
-        `tenant=${auditLog.tenant_id} record=${auditLog.record_id || 'N/A'}: ${error.message}`,
-      );
-      // Non-blocking: don't throw to avoid breaking the main operation.
-      // The structured log above allows monitoring tools to alert on audit failures.
-    } else {
-      this.logger.log(`Action logged - ${auditLog.operation} on ${auditLog.table_name}`);
+  private async persistBackendEvent(kind: 'audit' | 'integration', tenantId: string, event: Record<string, any>, id: string = randomUUID()): Promise<void> {
+    const payload = { p_kind: kind, p_tenant_id: tenantId, p_event_id: id, p_event: redactSensitiveData(event) };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const { error } = await this.supabase.getClient().rpc('registrar_auditoria_backend_tx', payload);
+        if (!error) return;
+        if (attempt === 0 && /^(08|40001|40P01|PGRST000)/.test(error.code || '')) continue;
+        break;
+      } catch {
+        if (attempt === 0) continue;
+      }
     }
+    this.auditFailureCount++;
+    // No volcar payload ni errores del proveedor; la operación de negocio ya
+    // conserva su evidencia transaccional. Una caída complementaria se alerta.
+    this.logger.error(`AUDIT_WRITE_FAILURE count=${this.auditFailureCount} kind=${kind} tenant=${tenantId} event=${id}`);
   }
 
   /**
@@ -108,7 +124,7 @@ export class AuditService {
     // Calculate changed fields for UPDATE operations
     let changedFields: string[] | undefined;
     if (accion === 'UPDATE' && cambios.old && cambios.new) {
-      changedFields = Object.keys(cambios.new).filter(
+      changedFields = [...new Set([...Object.keys(cambios.old), ...Object.keys(cambios.new)])].filter(
         key => JSON.stringify(cambios.old?.[key]) !== JSON.stringify(cambios.new?.[key])
       );
     }
@@ -168,26 +184,25 @@ export class AuditService {
     }
 
     // Order by timestamp DESC and apply pagination
-    query = query
-      .order('timestamp', { ascending: false })
-      .range(0, fetchLimit - 1);
+    query = query.order('timestamp', { ascending: false }).order('id', { ascending: false });
 
-    const { data, error, count } = await query;
+    const { data, error, count } = await this.fetchAuditRows(query, fetchLimit);
 
     if (error) {
       console.error('Error fetching audit logs:', error);
-      throw new BadRequestException('Error al obtener logs de auditoría');
+      throw new ServiceUnavailableException('No se pudo consultar la auditoría. Intente nuevamente.');
     }
 
     const baseLogs = data || [];
     const supplemental = await this.getSupplementalAuditLogs(tenantId, filters, fetchLimit);
     const allLogs = [...baseLogs, ...supplemental.data]
-      .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+      .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime()
+        || b.table_name.localeCompare(a.table_name) || String(b.id).localeCompare(String(a.id)));
     const pagedLogs = allLogs.slice(offset, offset + limit);
     const total = (count || 0) + supplemental.count;
 
     return {
-      data: pagedLogs,
+      data: redactSensitiveData(pagedLogs),
       // Vacío cuando la traza está completa. Si trae fuentes, la pantalla debe
       // decir que faltan registros en vez de dar la lista por exhaustiva.
       fuentes_fallidas: supplemental.fuentesFallidas,
@@ -202,6 +217,22 @@ export class AuditService {
 
   private shouldIncludeSupplemental(filters: AuditFiltersDto | undefined, tableName: string): boolean {
     return !filters?.table_name || filters.table_name === tableName;
+  }
+
+  // PostgREST puede limitar filas por respuesta. Leer bloques impide que las
+  // páginas posteriores parezcan vacías mientras el contador sigue creciendo.
+  private async fetchAuditRows(query: any, fetchLimit: number) {
+    const rows: any[] = [];
+    let total = 0;
+    while (rows.length < fetchLimit) {
+      const result = await query.range(rows.length, Math.min(rows.length + 499, fetchLimit - 1));
+      if (result.error) return { data: [], error: result.error, count: 0 };
+      total = result.count ?? total;
+      if (!result.data?.length) break;
+      rows.push(...result.data);
+      if (rows.length >= total) break;
+    }
+    return { data: rows, count: total, error: null };
   }
 
   private applyDateFilters(query: any, filters?: AuditFiltersDto, column = 'timestamp') {
@@ -235,9 +266,16 @@ export class AuditService {
           .from('auth_login_attempts')
           .select('*', { count: 'exact' })
           .eq('tenant_id', tenantId);
+        if (filters?.user_id) {
+          const { data: user, error } = await client.from('usuarios_sistema').select('email')
+            .eq('tenant_id', tenantId).eq('id', filters.user_id).maybeSingle();
+          if (error) throw error;
+          // Un usuario ajeno no coincide con ningún intento de este tenant.
+          query = query.eq('user_email', user?.email || '');
+        }
         query = this.applyDateFilters(query, filters, 'created_at');
-        query = query.order('created_at', { ascending: false }).range(0, fetchLimit - 1);
-        const { data: attempts, error, count: attemptsCount } = await query;
+        query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
+        const { data: attempts, error, count: attemptsCount } = await this.fetchAuditRows(query, fetchLimit);
         if (error) throw error;
 
         const usersByEmail = await this.getUsersByEmail(tenantId, attempts || []);
@@ -245,7 +283,7 @@ export class AuditService {
           .map((attempt: any) => this.mapLoginAttempt(attempt, tenantId, usersByEmail))
           .filter((log: AuditLog) => !filters?.user_id || log.user_id === filters.user_id);
         data.push(...mapped);
-        count += filters?.user_id ? mapped.length : attemptsCount || mapped.length;
+        count += attemptsCount;
       } catch (error) {
         console.warn('⚠️ [AUDIT] No se pudieron cargar intentos de login en auditoría unificada:', error);
         fuentesFallidas.push('auth_login_attempts');
@@ -260,8 +298,8 @@ export class AuditService {
           .eq('tenant_id', tenantId);
         if (filters?.user_id) query = query.eq('usuario_id', filters.user_id);
         query = this.applyDateFilters(query, filters, 'timestamp');
-        query = query.order('timestamp', { ascending: false }).range(0, fetchLimit - 1);
-        const { data: cashLogs, error, count: cashCount } = await query;
+        query = query.order('timestamp', { ascending: false }).order('id', { ascending: false });
+        const { data: cashLogs, error, count: cashCount } = await this.fetchAuditRows(query, fetchLimit);
         if (error) throw error;
         const mapped = (cashLogs || []).map((item: any) => this.mapCashAuditLog(item, tenantId));
         data.push(...mapped);
@@ -280,8 +318,8 @@ export class AuditService {
           .eq('tenant_id', tenantId);
         if (filters?.user_id) query = query.eq('usuario_id', filters.user_id);
         query = this.applyDateFilters(query, filters, 'timestamp');
-        query = query.order('timestamp', { ascending: false }).range(0, fetchLimit - 1);
-        const { data: posLogs, error, count: posCount } = await query;
+        query = query.order('timestamp', { ascending: false }).order('id', { ascending: false });
+        const { data: posLogs, error, count: posCount } = await this.fetchAuditRows(query, fetchLimit);
         if (error) throw error;
         const mapped = (posLogs || []).map((item: any) => this.mapPosEvent(item, tenantId));
         data.push(...mapped);
@@ -302,8 +340,8 @@ export class AuditService {
           .select('*', { count: 'exact' })
           .eq('tenant_id', tenantId);
         query = this.applyDateFilters(query, filters, 'timestamp');
-        query = query.order('timestamp', { ascending: false }).range(0, fetchLimit - 1);
-        const { data: integrations, error, count: integrationsCount } = await query;
+        query = query.order('timestamp', { ascending: false }).order('id', { ascending: false });
+        const { data: integrations, error, count: integrationsCount } = await this.fetchAuditRows(query, fetchLimit);
         if (error) throw error;
         const mapped = (integrations || []).map((item: any) => this.mapIntegrationLog(item, tenantId));
         data.push(...mapped);
@@ -329,8 +367,7 @@ export class AuditService {
       .in('email', emails);
 
     if (error) {
-      console.warn('⚠️ [AUDIT] No se pudieron resolver usuarios de intentos de login:', error);
-      return new Map();
+      throw error;
     }
 
     return new Map((data || []).map((user: any) => [String(user.email || '').toLowerCase(), user.id]));
@@ -456,7 +493,7 @@ export class AuditService {
       throw new BadRequestException('Error al obtener historial de auditoría del usuario');
     }
 
-    return data || [];
+    return redactSensitiveData(data || []);
   }
 
   /**
@@ -478,7 +515,7 @@ export class AuditService {
       .select('*')
       .eq('tenant_id', tenantId)
       .eq('table_name', tableName)
-      .or(`old_values->>id.eq.${safeResourceId},new_values->>id.eq.${safeResourceId}`)
+      .or(`record_id.eq.${safeResourceId},old_values->>id.eq.${safeResourceId},new_values->>id.eq.${safeResourceId}`)
       .order('timestamp', { ascending: false });
 
     if (error) {
@@ -486,7 +523,7 @@ export class AuditService {
       throw new BadRequestException('Error al obtener historial de cambios del recurso');
     }
 
-    return data || [];
+    return redactSensitiveData(data || []);
   }
 
   /**
@@ -517,42 +554,23 @@ export class AuditService {
     durationMs?: number,
     metadata?: Record<string, any>
   ): Promise<void> {
-    const client = this.supabase.getClient();
-
-    // Summarize request (remove sensitive data)
-    const requestSummary = this.summarizeData(request, [
-      'password',
-      'token',
-      'api_key',
-      'secret',
-      'certificado',
-      'private_key'
-    ]);
-
-    // Summarize response (remove sensitive data)
-    const responseSummary = this.summarizeData(response, [
-      'password',
-      'token',
-      'api_key',
-      'secret'
-    ]);
+    const requestSummary = this.summarizeData(request);
+    const responseSummary = this.summarizeData(response);
 
     // Extract status code and error message from response
-    let statusCode: number | undefined;
+    let statusCode: number | null = null;
     let errorMessage: string | undefined;
 
     if (response) {
-      statusCode = response.status || response.statusCode || response.codigo;
+      const candidate = Number(response.statusCode ?? response.status ?? response.codigo);
+      if (Number.isInteger(candidate) && candidate >= 100 && candidate <= 599) statusCode = candidate;
       if (status === 'ERROR') {
-        errorMessage = response.error || response.mensaje || response.message || 'Unknown error';
+        const message = response.error || response.mensaje || response.message || 'Error de integración';
+        errorMessage = redactSensitiveText(typeof message === 'string' ? message : JSON.stringify(redactSensitiveData(message))).slice(0, 2000);
       }
     }
 
-    // Insert into integration_logs table
-    const { error } = await client
-      .from('integration_logs')
-      .insert({
-        tenant_id: tenantId,
+    await this.persistBackendEvent('integration', tenantId, {
         servicio,
         operacion,
         correlacion_id: correlacion.id || null,
@@ -563,16 +581,8 @@ export class AuditService {
         status_code: statusCode,
         error_message: errorMessage,
         duration_ms: durationMs,
-        timestamp: new Date().toISOString(),
-        metadata: metadata || null
+        metadata: this.summarizeData(metadata) || {},
       });
-
-    if (error) {
-      console.error('Error logging integration:', error);
-      // Don't throw error to avoid breaking the main operation
-    } else {
-      console.log(`🔗 [INTEGRATION] ${servicio}.${operacion} - ${status} (${durationMs}ms)`);
-    }
   }
 
   /**
@@ -639,7 +649,7 @@ export class AuditService {
     }
 
     return {
-      data: data || [],
+      data: redactSensitiveData(data || []),
       pagination: {
         page,
         limit,
@@ -652,29 +662,9 @@ export class AuditService {
   /**
    * Helper method to summarize data and remove sensitive fields
    */
-  private summarizeData(data: any, sensitiveFields: string[]): any {
-    if (!data) return null;
-
-    // If it's a primitive type, return as is
-    if (typeof data !== 'object') return data;
-
-    // Clone the data to avoid modifying the original
-    const summary = JSON.parse(JSON.stringify(data));
-
-    // Remove sensitive fields recursively
-    const removeSensitiveFields = (obj: any) => {
-      if (typeof obj !== 'object' || obj === null) return;
-
-      for (const key in obj) {
-        if (sensitiveFields.some(field => key.toLowerCase().includes(field.toLowerCase()))) {
-          obj[key] = '[REDACTED]';
-        } else if (typeof obj[key] === 'object') {
-          removeSensitiveFields(obj[key]);
-        }
-      }
-    };
-
-    removeSensitiveFields(summary);
+  private summarizeData(data: any): any {
+    if (data === undefined || data === null) return null;
+    const summary = redactSensitiveData(data);
 
     // Limit size of summary (max 5000 chars when stringified)
     const stringified = JSON.stringify(summary);
@@ -682,7 +672,7 @@ export class AuditService {
       return {
         _truncated: true,
         _original_size: stringified.length,
-        data: JSON.parse(stringified.substring(0, 5000))
+        preview: stringified.substring(0, 4500),
       };
     }
 

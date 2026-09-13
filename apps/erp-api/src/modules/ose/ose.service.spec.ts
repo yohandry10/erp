@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as zlib from 'zlib';
+import AdmZip = require('adm-zip');
 import { createHash } from 'crypto';
 import { OseService } from './ose.service';
 
@@ -47,21 +47,9 @@ describe('OseService certificate path resolution', () => {
   });
 
   const buildSunatCdrZipBase64 = (xml: string, fileName = 'R-20100066603-01-F001-1.xml') => {
-    const name = Buffer.from(fileName, 'utf8');
-    const compressed = zlib.deflateRawSync(Buffer.from(xml, 'utf8'));
-    const header = Buffer.alloc(30);
-    header.writeUInt32LE(0x04034b50, 0);
-    header.writeUInt16LE(20, 4);
-    header.writeUInt16LE(0, 6);
-    header.writeUInt16LE(8, 8);
-    header.writeUInt32LE(0, 10);
-    header.writeUInt32LE(0, 14);
-    header.writeUInt32LE(compressed.length, 18);
-    header.writeUInt32LE(Buffer.byteLength(xml), 22);
-    header.writeUInt16LE(name.length, 26);
-    header.writeUInt16LE(0, 28);
-
-    return Buffer.concat([header, name, compressed]).toString('base64');
+    const zip = new AdmZip();
+    zip.addFile(fileName, Buffer.from(xml, 'utf8'));
+    return zip.toBuffer().toString('base64');
   };
 
   it('carga el certificado real relativo al workspace aunque la API ejecute desde apps/erp-api', async () => {
@@ -539,7 +527,7 @@ describe('OseService certificate path resolution', () => {
     });
   });
 
-  it('parsea estado con CDR desde getStatus/getStatusCdr', () => {
+  it('no acepta un contenido base64 que no contiene un ZIP CDR válido', () => {
     const service = new OseService(createConfigService() as any, circuitBreaker as any);
 
     const response = (service as any).parseSunatResponse(`
@@ -557,10 +545,8 @@ describe('OseService certificate path resolution', () => {
     `);
 
     expect(response).toMatchObject({
-      success: true,
-      codigoRespuesta: '0',
-      descripcionRespuesta: 'Aceptado',
-      cdr: 'Q0RSX0JBU0U2NA==',
+      success: false,
+      codigoRespuesta: '97',
     });
   });
 
@@ -568,8 +554,12 @@ describe('OseService certificate path resolution', () => {
     const service = new OseService(createConfigService() as any, circuitBreaker as any);
     const cdr = buildSunatCdrZipBase64(`
       <ApplicationResponse xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
-        <cbc:ResponseCode>0</cbc:ResponseCode>
-        <cbc:Description>La Factura numero F001-1, ha sido aceptada</cbc:Description>
+        <cac:DocumentResponse xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2">
+          <cac:Response>
+            <cbc:ResponseCode>0</cbc:ResponseCode>
+            <cbc:Description>La Factura numero F001-1, ha sido aceptada</cbc:Description>
+          </cac:Response>
+        </cac:DocumentResponse>
         <cbc:Note>Observacion controlada</cbc:Note>
       </ApplicationResponse>
     `);
