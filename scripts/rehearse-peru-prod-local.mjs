@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { readMigrationVersions, preservedPrivilegesSql, assertReadPrivilegesPreserved } from './ci/read-migration-privileges.mjs';
+import { buildPeruPromotionBundle } from './ci/peru-promotion-bundle.mjs';
 
 // Sin URLs, dotenv, puertos publicados ni destinos de restauración configurables.
 // Sólo escribe en un contenedor nuevo, propio y sin red. Nunca toca PROD.
@@ -34,9 +35,13 @@ const report = { success: false, remoteWrites: false, archiveSha256: manifest.sh
 let container;
 let step = 'bootstrap';
 const started = Date.now();
-function docker(args, input) {
+function docker(args, input, expectedError) {
   const result = spawnSync('docker', args, { input, encoding: 'utf8', windowsHide: true,
     timeout: 180000, maxBuffer: 30 * 1024 * 1024 });
+  if (expectedError) {
+    assert.ok(result.status !== 0 && result.stderr?.includes(expectedError), 'El control negativo debe fallar por la causa inyectada');
+    return '';
+  }
   if (result.status !== 0) {
     // Errores PostgreSQL pueden contener valores reales. El log nunca se versiona.
     fs.appendFileSync(privateLog, `\n${step}\n${result.stderr || result.error?.message || 'Fallo sin stderr'}\n`);
@@ -44,8 +49,8 @@ function docker(args, input) {
   }
   return result.stdout.trim();
 }
-function sql(statement) {
-  return docker(['exec', '-i', container, 'psql', '-XqAt', '-U', 'postgres', '-d', 'erp_e2e', '-v', 'ON_ERROR_STOP=1'], statement);
+function sql(statement, expectedError) {
+  return docker(['exec', '-i', container, 'psql', '-XqAt', '-U', 'postgres', '-d', 'erp_e2e', '-v', 'ON_ERROR_STOP=1'], statement, expectedError);
 }
 const quote = value => "'" + value.replaceAll("'", "''") + "'";
 const hashes = `SET timezone='UTC';
@@ -140,6 +145,18 @@ FROM pg_tables WHERE schemaname IN ('public','app','auth','storage','supabase_mi
 \\gexec`);
   const pending = files.filter(file => { const n = Number(file.split('__')[0]); return n >= 537 && n <= 552; }).sort();
   assert.equal(pending.length, 16);
+  const bundle = buildPeruPromotionBundle(pending.map(filename => ({ filename,
+    version: Number(filename.split('__')[0]), body: fs.readFileSync(path.join(root, 'supabase/migrations', filename), 'utf8') })));
+  step = 'rollback atómico de la promoción completa';
+  sql(bundle.replace(/COMMIT;\s*$/, 'SELECT 1/0;\nCOMMIT;\n'), 'division by zero');
+  assert.deepEqual(fingerprint(), before, 'Un fallo al final debe revertir las 16 migraciones y sus backfills');
+  assert.deepEqual(security(), securityBefore);
+  assert.deepEqual(columns(), columnsBefore);
+  assert.equal(sql(preservedPrivilegesSql), originalPrivileges);
+  assert.equal(sql("SELECT to_regprocedure('public.operar_logistica_tx(uuid,uuid,uuid,text,jsonb,text)') IS NULL;"), 't');
+  report.atomicPromotionRollbackPassed = true;
+  report.promotionBundleSha256 = createHash('sha256').update(bundle).digest('hex');
+  fs.writeFileSync(path.join(root, 'artifacts', `peru-promotion-552-${report.promotionBundleSha256.slice(0,12)}.sql`), bundle);
   console.log('[peru-rehearsal] Respaldo restaurado; aplicando 537..552 en copia local');
   for (const filename of pending) {
     step = `migración ${filename}`;
