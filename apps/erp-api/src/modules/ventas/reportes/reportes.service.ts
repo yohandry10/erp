@@ -166,8 +166,9 @@ export class ReportesService {
 
     let query = client
       .from('pedidos_venta')
-      .select('estado, total')
+      .select(clienteFiltro ? 'estado,total,clientes!pedidos_venta_cliente_id_fkey!inner(razon_social)' : 'estado,total')
       .eq('tenant_id', tenantId);
+    if (clienteFiltro) query = query.ilike('clientes.razon_social', `%${clienteFiltro}%`);
 
     if (fechaDesde) {
       query = query.gte('fecha', fechaDesde);
@@ -180,8 +181,8 @@ export class ReportesService {
 
     if (error) throw error;
 
-    // Agrupar por estado
-    const grouped = pedidos.reduce((acc, pedido) => {
+    // La selección condicional sólo añade la relación utilizada por el filtro.
+    const grouped = (pedidos as unknown as Array<{ estado: string; total: number }>).reduce((acc, pedido) => {
       const estado = pedido.estado;
       if (!acc[estado]) {
         acc[estado] = {
@@ -226,14 +227,16 @@ export class ReportesService {
         cantidad,
         precio_unitario,
         subtotal,
+        productos!pedidos_venta_detalle_producto_id_fkey(codigo),
         pedidos_venta!pedidos_venta_detalle_pedido_id_fkey!inner (
           tenant_id,
           fecha,
-          estado
+          estado${clienteFiltro ? ', clientes!pedidos_venta_cliente_id_fkey!inner(razon_social)' : ''}
         )
       `)
       .eq('pedidos_venta.tenant_id', tenantId)
       .in('pedidos_venta.estado', ['FACTURADO', 'COMPLETADO', 'COMPLETADO_CON_GRE']);
+    if (clienteFiltro) query = query.ilike('pedidos_venta.clientes.razon_social', `%${clienteFiltro}%`);
 
     if (fechaDesde) {
       query = query.gte('pedidos_venta.fecha', fechaDesde);
@@ -253,7 +256,7 @@ export class ReportesService {
         acc[productoId] = {
           producto_id: productoId,
           producto_nombre: detalle.descripcion,
-          producto_codigo: productoId.substring(0, 8), // Simplificado
+          producto_codigo: (detalle.productos as any)?.codigo || '',
           unidades_vendidas: 0,
           importe_total: 0,
           cantidad_pedidos: 0,
@@ -366,14 +369,21 @@ export class ReportesService {
     fechaDesde?: string,
     fechaHasta?: string,
   ) {
+    for (const value of [fechaDesde, fechaHasta]) {
+      if (value && (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString().slice(0, 10) !== value)) {
+        throw new BadRequestException('El período debe contener fechas válidas YYYY-MM-DD');
+      }
+    }
+    if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) throw new BadRequestException('La fecha inicial no puede superar la fecha final');
     const client = this.supabase.getClient();
 
     // Obtener pedidos con cotización asociada y facturados
-    let query = client
+    const query = client
       .from('pedidos_venta')
       .select(`
         id,
         fecha,
+        factura_id,
         cotizacion_id,
         cotizaciones!pedidos_venta_cotizacion_id_fkey!inner (
           fecha
@@ -381,20 +391,41 @@ export class ReportesService {
       `)
       .eq('tenant_id', tenantId)
       .in('estado', ['FACTURADO', 'COMPLETADO', 'COMPLETADO_CON_GRE'])
-      .not('cotizacion_id', 'is', null);
+      .not('cotizacion_id', 'is', null)
+      .order('id');
 
-    if (fechaDesde) {
-      query = query.gte('fecha', fechaDesde);
+    const pedidos: any[] = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await query.range(offset, offset + 999);
+      if (error) throw error;
+      pedidos.push(...(data || []));
+      if (!data || data.length < 1000) break;
     }
-    if (fechaHasta) {
-      query = query.lte('fecha', fechaHasta);
+
+    const facturaIds = [...new Set((pedidos || []).map(pedido => pedido.factura_id).filter(Boolean))];
+    let comprobantes: { id: string; fecha_emision: string }[] = [];
+    for (let offset = 0; offset < facturaIds.length; offset += 100) {
+      let facturasQuery = client.from('cpe').select('id,fecha_emision')
+        .eq('tenant_id', tenantId).in('id', facturaIds.slice(offset, offset + 100));
+      if (fechaDesde) facturasQuery = facturasQuery.gte('fecha_emision', fechaDesde);
+      // La columna histórica es timestamp: incluir todo el último día fiscal.
+      if (fechaHasta) facturasQuery = facturasQuery.lt('fecha_emision', new Date(Date.parse(fechaHasta) + 86400000).toISOString().slice(0, 10));
+      const facturas = await facturasQuery;
+      if (facturas.error) throw facturas.error;
+      comprobantes.push(...(facturas.data || []));
     }
+    const fechasEmision = new Map(comprobantes.map(cpe => [cpe.id, cpe.fecha_emision]));
+    // factura_id apunta al CPE canónico; la fecha del pedido no es la emisión.
+    const leadTimes = (pedidos || []).filter(pedido => fechasEmision.has(pedido.factura_id)).map(pedido => {
+      const fecha = fechasEmision.get(pedido.factura_id)!.slice(0, 10);
+      const fechaCot = new Date(String((pedido.cotizaciones as any).fecha).slice(0, 10));
+      const fechaFactura = new Date(fecha);
+      const dias = Math.ceil((fechaFactura.getTime() - fechaCot.getTime()) / 86400000);
+      if (!Number.isFinite(dias) || dias < 0) throw new BadRequestException('Fechas inconsistentes entre cotización y comprobante');
+      return { dias, fecha };
+    });
 
-    const { data: pedidos, error } = await query;
-
-    if (error) throw error;
-
-    if (pedidos.length === 0) {
+    if (leadTimes.length === 0) {
       return {
         promedio_dias: 0,
         mediana_dias: 0,
@@ -406,18 +437,11 @@ export class ReportesService {
       };
     }
 
-    // Calcular días entre cotización y factura
-    const leadTimes = pedidos.map((pedido) => {
-      const fechaCot = new Date((pedido.cotizaciones as any).fecha);
-      const fechaPed = new Date(pedido.fecha);
-      const dias = Math.ceil((fechaPed.getTime() - fechaCot.getTime()) / (1000 * 60 * 60 * 24));
-      return { dias, fecha: pedido.fecha };
-    });
-
     // Estadísticas
     const dias = leadTimes.map((lt) => lt.dias).sort((a, b) => a - b);
     const promedio = dias.reduce((sum, d) => sum + d, 0) / dias.length;
-    const mediana = dias[Math.floor(dias.length / 2)];
+    const mitad = Math.floor(dias.length / 2);
+    const mediana = dias.length % 2 ? dias[mitad] : (dias[mitad - 1] + dias[mitad]) / 2;
     const minimo = Math.min(...dias);
     const maximo = Math.max(...dias);
 
@@ -439,16 +463,23 @@ export class ReportesService {
       };
     });
 
-    // Tendencia temporal (simplificada por mes)
-    const tendencia = [];
-    // TODO: Implementar agrupación por mes si se requiere más detalle
+    const meses = new Map<string, { dias: number; cantidad: number }>();
+    for (const item of leadTimes) {
+      const mes = item.fecha.slice(0, 7);
+      const acumulado = meses.get(mes) || { dias: 0, cantidad: 0 };
+      acumulado.dias += item.dias;
+      acumulado.cantidad += 1;
+      meses.set(mes, acumulado);
+    }
+    const tendencia = [...meses].sort(([a], [b]) => a.localeCompare(b))
+      .map(([periodo, acumulado]) => ({ periodo, promedio_dias: acumulado.dias / acumulado.cantidad }));
 
     return {
       promedio_dias: promedio,
       mediana_dias: mediana,
       minimo_dias: minimo,
       maximo_dias: maximo,
-      total_conversiones: pedidos.length,
+      total_conversiones: leadTimes.length,
       por_rango: porRango,
       tendencia,
     };

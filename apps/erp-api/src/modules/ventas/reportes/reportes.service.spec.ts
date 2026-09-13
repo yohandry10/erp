@@ -19,8 +19,12 @@ describe('ReportesService', () => {
         select: () => builder,
         eq: () => builder,
         in: () => builder,
+        not: () => builder,
+        order: () => builder,
+        range: () => builder,
         gte: () => builder,
         lte: () => builder,
+        lt: () => builder,
         then: (resolver: any) => {
           const fijada = respuestas[tabla] ?? { data: [], count: 0 };
           return Promise.resolve({ ...fijada, error: null }).then(resolver);
@@ -43,6 +47,39 @@ describe('ReportesService', () => {
     }).compile();
 
     service = module.get<ReportesService>(ReportesService);
+  });
+
+  describe('getLeadTime', () => {
+    it('usa emisión del CPE, promedia los dos valores centrales y ordena la tendencia mensual', async () => {
+      respuestas = {
+        pedidos_venta: { count: 4, data: [
+          { factura_id: 'c', fecha: '2026-07-01', cotizaciones: { fecha: '2026-07-01' } },
+          { factura_id: 'a', fecha: '2026-06-01', cotizaciones: { fecha: '2026-06-01' } },
+          { factura_id: 'd', fecha: '2026-07-01', cotizaciones: { fecha: '2026-07-01' } },
+          { factura_id: 'b', fecha: '2026-06-01', cotizaciones: { fecha: '2026-06-01' } },
+        ] },
+        cpe: { count: 4, data: [
+          { id: 'a', fecha_emision: '2026-06-03T23:59:59+00:00' },
+          { id: 'b', fecha_emision: '2026-06-05' },
+          { id: 'c', fecha_emision: '2026-07-09' },
+          { id: 'd', fecha_emision: '2026-07-11' },
+        ] },
+      };
+      const report = await service.getLeadTime('tenant-a');
+      expect(report).toMatchObject({ promedio_dias: 6, mediana_dias: 6, minimo_dias: 2, maximo_dias: 10, total_conversiones: 4 });
+      expect(report.tendencia).toEqual([{ periodo: '2026-06', promedio_dias: 3 }, { periodo: '2026-07', promedio_dias: 9 }]);
+      expect(report.por_rango.reduce((sum, item) => sum + item.cantidad, 0)).toBe(4);
+    });
+
+    it('devuelve un período sin conversiones cuando no hay comprobantes vinculados en el corte', async () => {
+      respuestas = { pedidos_venta: { count: 1, data: [{ factura_id: 'outside-period', cotizaciones: { fecha: '2026-01-01' } }] }, cpe: { count: 0, data: [] } };
+      expect(await service.getLeadTime('tenant-a', '2026-07-01', '2026-07-31')).toMatchObject({ total_conversiones: 0, tendencia: [], promedio_dias: 0 });
+    });
+
+    it('rechaza fechas históricas incoherentes sin publicar duraciones negativas', async () => {
+      respuestas = { pedidos_venta: { count: 1, data: [{ factura_id: 'invalid', cotizaciones: { fecha: '2026-07-10' } }] }, cpe: { count: 1, data: [{ id: 'invalid', fecha_emision: '2026-07-01' }] } };
+      await expect(service.getLeadTime('tenant-a')).rejects.toBeInstanceOf(BadRequestException);
+    });
   });
 
   describe('getPipelineVentas', () => {
