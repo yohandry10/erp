@@ -1,7 +1,9 @@
-import { ExecutionContext } from '@nestjs/common';
+import { ExecutionContext, UseGuards } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ThrottlerException } from '@nestjs/throttler';
 import { AuthRateLimitGuard } from './auth-rate-limit.guard';
+import { RateLimitGuard } from './rate-limit.guard';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
 
 class MemoryStorage {
   private readonly hits = new Map<string, number>();
@@ -30,6 +32,7 @@ const contextFor = (email: string, ip = '10.20.30.40'): ExecutionContext => {
   const response = { header: (name: string, value: number) => { headers[name] = value; } };
   const handler = () => undefined;
   class AuthControllerForTest {}
+  UseGuards(AuthRateLimitGuard)(AuthControllerForTest);
   return {
     switchToHttp: () => ({ getRequest: () => request, getResponse: () => response }),
     getHandler: () => handler,
@@ -38,16 +41,41 @@ const contextFor = (email: string, ip = '10.20.30.40'): ExecutionContext => {
 };
 
 const createGuard = async () => {
+  const storage = new MemoryStorage();
   const guard = new AuthRateLimitGuard(
     [{ name: 'default', limit: 5, ttl: 60_000 }] as any,
-    new MemoryStorage() as any,
+    storage as any,
     new Reflector(),
   );
   await guard.onModuleInit();
-  return guard;
+  const globalGuard = new RateLimitGuard(
+    [{ name: 'default', limit: 5, ttl: 60_000 }] as any,
+    storage as any,
+    new Reflector(),
+  );
+  await globalGuard.onModuleInit();
+  return { canActivate: async (context: ExecutionContext) => {
+    await globalGuard.canActivate(context);
+    return guard.canActivate(context);
+  } };
 };
 
 describe('AuthRateLimitGuard', () => {
+  it('conserva el límite global en rutas sin guard específico de autenticación', async () => {
+    const guard = new RateLimitGuard(
+      [{ name: 'default', limit: 5, ttl: 60_000 }] as any,
+      new MemoryStorage() as any,
+      new Reflector(),
+    );
+    await guard.onModuleInit();
+    const context = contextFor('ordinary@example.com');
+    Reflect.deleteMetadata(GUARDS_METADATA, context.getClass());
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await expect(guard.canActivate(context)).resolves.toBe(true);
+    }
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(ThrottlerException);
+  });
+
   it('permite diez cuentas distintas detrás de la misma IP y User-Agent', async () => {
     const guard = await createGuard();
     const results = await Promise.all(

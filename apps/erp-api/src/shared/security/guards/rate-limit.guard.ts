@@ -1,8 +1,20 @@
 import { Injectable, ExecutionContext } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { AuthRateLimitGuard } from './auth-rate-limit.guard';
 
 @Injectable()
 export class RateLimitGuard extends ThrottlerGuard {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const guards = this.reflector.getAllAndMerge<unknown[]>(GUARDS_METADATA, [
+      context.getHandler(), context.getClass(),
+    ]) || [];
+    // The route guard enforces both account+IP and aggregate office limits.
+    // Applying the same @Throttle globally first would collapse all accounts.
+    if (guards.includes(AuthRateLimitGuard)) return true;
+    return super.canActivate(context);
+  }
+
   protected async getTracker(req: Record<string, any>): Promise<string> {
     return this.resolveTracker(req);
   }
