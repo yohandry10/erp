@@ -133,4 +133,24 @@ export async function testRecordFlows({ request, sql, uuid, results, tenantId, p
   assert.equal(Number(sql(`SELECT stock_actual FROM producto_existencias WHERE tenant_id=${uuid(tenantId)} AND producto_id=${uuid(product.id)} AND almacen_id=${uuid(warehouseId)};`)), stockBefore + 1);
   results.push({ scenario: 'nota RMA contabilizada una vez sin duplicar retorno físico', passed: true });
 
+  const emissionDate = sql(`SELECT fecha_emision::date FROM cpe WHERE id=(SELECT factura_id FROM pedidos_venta WHERE id=${uuid(order.id)} AND tenant_id=${uuid(tenantId)}) AND tenant_id=${uuid(tenantId)};`);
+  assert.match(emissionDate, /^\d{4}-\d{2}-\d{2}$/);
+  const leadTime = (await request(`ventas/reportes/lead-time?fechaDesde=${emissionDate}&fechaHasta=${emissionDate}`)).data;
+  assert.ok(leadTime.total_conversiones >= 1);
+  assert.ok(leadTime.tendencia.some(item => item.periodo === emissionDate.slice(0, 7)));
+  assert.ok(Number.isFinite(leadTime.mediana_dias) && leadTime.mediana_dias >= 0);
+  const futureLeadTime = (await request('ventas/reportes/lead-time?fechaDesde=2099-01-01&fechaHasta=2099-01-31')).data;
+  assert.equal(futureLeadTime.total_conversiones, 0);
+  assert.deepEqual(futureLeadTime.tendencia, []);
+  await request('ventas/reportes/lead-time?fechaDesde=2026-02-30', undefined, 400);
+  await request('ventas/reportes/lead-time?fechaDesde=2026-09-30&fechaHasta=2026-09-01', undefined, 400);
+  results.push({ scenario: 'plazo comercial consulta el CPE canónico, genera tendencia y filtra por emisión', passed: true });
+  const productReport = (await request('ventas/reportes/productos-mas-vendidos')).data;
+  assert.ok(productReport.some(item => item.producto_id === product.id && item.producto_codigo === 'DEMO-003'));
+  for (const endpoint of ['pedidos-por-estado', 'productos-mas-vendidos']) {
+    const filtered = (await request(`ventas/reportes/${endpoint}?cliente=cliente-inexistente-${randomUUID()}`)).data;
+    assert.deepEqual(filtered, [], `${endpoint} debe respetar el filtro de cliente`);
+  }
+  results.push({ scenario: 'reportes comerciales respetan cliente y muestran el código real del producto', passed: true });
+
 }

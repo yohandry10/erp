@@ -18,6 +18,11 @@ el registro CSV (encabezado = 1), no sus líneas físicas cuando hay saltos inte
 Clientes, Proveedores y Cotizaciones de Compra exportan la página actual en CSV,
 con filtros vigentes y escape de fórmulas. Reportes de Ventas y el detalle de una
 Orden de Compra permiten imprimir/guardar PDF mediante el navegador.
+El plazo comercial cotización→factura se mide con la fecha de emisión del CPE
+vinculado al pedido; el período filtra esa emisión. Incluye tendencia mensual
+cronológica y mediana correcta también para un número par de conversiones.
+Pedidos por estado y productos más vendidos aplican el filtro de cliente; el
+reporte de productos muestra su código de catálogo, no un fragmento del UUID.
 
 Flujo principal:
 
