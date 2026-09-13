@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { ForbiddenException, Injectable, Logger, ServiceUnavailableException } from "@nestjs/common";
 import { SupabaseService } from "../../../shared/supabase/supabase.service";
 import { ACCOUNTING_EVENT_TYPES } from "../../../shared/outbox/accounting-event-types";
 
@@ -28,6 +28,14 @@ export class OutboxEventsService {
 
   constructor(private readonly supabaseService: SupabaseService) {}
 
+  private throwReadError(error: { code?: string; message?: string }): never {
+    this.logger.error(`No se pudo consultar la cola contable: ${error.code ?? "unknown"}`);
+    if (error.code === "42501") {
+      throw new ForbiddenException("La consulta de eventos requiere un usuario activo de esta empresa con permiso contable");
+    }
+    throw new ServiceUnavailableException("No se pudo consultar la cola contable. Inténtalo nuevamente");
+  }
+
   private normalizeEvent(row: any): OutboxEvent {
     if (row.event_data !== undefined || row.payload !== undefined) {
       return {
@@ -54,7 +62,7 @@ export class OutboxEventsService {
         p_limit: limit,
       });
     if (error) {
-      throw new Error(`Error leyendo eventos del tenant: ${error.message}`);
+      this.throwReadError(error);
     }
     return ((data ?? []) as any[]).map((row) => this.normalizeEvent(row));
   }
@@ -204,7 +212,7 @@ export class OutboxEventsService {
           "❌ [OutboxEvents] Error obteniendo estadísticas:",
           error,
         );
-        throw new Error(`Error obteniendo estadísticas: ${error.message}`);
+        this.throwReadError(error);
       }
 
       const raw = (data ?? {}) as Record<string, unknown>;

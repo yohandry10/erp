@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+const source = fs.readFileSync(new URL('../../lib/candidate-profile.ts', import.meta.url), 'utf8');
+const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+const module = { exports: {} };
+vm.runInNewContext(compiled, { module, exports: module.exports });
+const { candidateFormValues, candidatePayload } = module.exports;
+const form = candidateFormValues({ id: 'row', tenant_id: 'tenant', vacantes: {}, experiencia_anos: 5,
+  estado_civil: 'casado', idiomas: null, disponibilidad_inmediata: false }, 'DNI');
+assert.equal(form.experiencia_años, 5);
+assert.equal(form.estado_civil, 'casado');
+assert.equal(form.idiomas.length, 0);
+assert.equal(form.disponibilidad_inmediata, false);
+const payload = candidatePayload(form);
+assert.equal(payload.experiencia_anos, 5);
+for (const key of ['id', 'tenant_id', 'vacantes', 'experiencia_años']) assert.equal(key in payload, false);
+assert.equal(candidateFormValues({}, 'DNI').estado_civil, '');
+console.log('PASS: edición conserva perfil y excluye identidad, tenant y relaciones del payload');

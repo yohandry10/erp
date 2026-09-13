@@ -1,6 +1,7 @@
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
+import { resolveApiEnvFilePath } from '../src/config/env-files';
 import { XmlSigner } from '@erp-suite/crypto';
 import {
   evaluateSunatReadinessPreflight,
@@ -10,12 +11,7 @@ import {
 } from '../src/modules/fiscal/sunat-readiness-preflight';
 
 function loadEnvFiles(): void {
-  const candidates = [
-    path.join(getWorkspaceRoot(), '.env'),
-    path.join(getWorkspaceRoot(), 'apps', 'erp-api', '.env'),
-  ];
-
-  for (const envPath of candidates) {
+  for (const envPath of resolveApiEnvFilePath()) {
     if (fs.existsSync(envPath)) {
       dotenv.config({ path: envPath });
     }
@@ -59,6 +55,11 @@ function collectEnv(): SunatPreflightEnv {
     SUNAT_GRE_CLIENT_SECRET: process.env.SUNAT_GRE_CLIENT_SECRET,
     PFX_PATH: process.env.PFX_PATH,
     PFX_PASS: process.env.PFX_PASS,
+    SUNAT_USERNAME: process.env.SUNAT_USERNAME,
+    SUNAT_PASSWORD: process.env.SUNAT_PASSWORD,
+    OSE_USUARIO: process.env.OSE_USUARIO,
+    OSE_USERNAME: process.env.OSE_USERNAME,
+    OSE_PASSWORD: process.env.OSE_PASSWORD,
   };
 }
 

@@ -39,7 +39,7 @@ export class ClientesImporter implements Importer {
       'CLI-00001',
       'EMPRESA',
       'RUC',
-      '20123456789',
+      '20123456786',
       'EMPRESA DEMO SAC',
       'AV. EJEMPLO 123, LIMA',
       'contacto@demo.com',
@@ -49,7 +49,7 @@ export class ClientesImporter implements Importer {
     ];
     return {
       filename: 'plantilla_migracion_clientes.csv',
-      content: `${headers.join(',')}\n${sample.join(',')}\n`,
+      content: `${headers.join(',')}\n${sample.map(value => `"${value.replace(/"/g, '""')}"`).join(',')}\n`,
     };
   }
 

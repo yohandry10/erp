@@ -1,7 +1,9 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalDependencies": ["**/.env.*local"],
-  "pipeline": {
+  "globalDependencies": ["**/.env.production"],
+  "globalEnv": ["NODE_ENV", "NEXT_PUBLIC_*", "TAURI_*", "DEPLOYMENT_ENV", "EXPECTED_SUPABASE_PROJECT_REF", "NEXT_DIST_DIR"],
+  "envMode": "loose",
+  "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**", "out/**"]
@@ -44,4 +46,4 @@
       "outputs": ["src-tauri/target/**"]
     }
   }
-} 
+}

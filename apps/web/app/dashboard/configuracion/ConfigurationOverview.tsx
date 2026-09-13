@@ -472,7 +472,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
             !!empresa?.arcaPuntoVenta)
         : isColombia
           ? status?.fiscal?.isReady === true
-          : ose?.verificacion?.valid === true && ose?.configuracion?.certificateExists === true,
+          : status?.fiscal?.isReady === true && ose?.verificacion?.valid === true,
       fiscal: status?.fiscal?.isReady === true,
       sales: isArgentina
         ? !!empresa?.arcaPuntoVenta && !!empresa?.arcaCondicionIva
@@ -480,7 +480,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
           ? !!empresa?.dianResolucionNumero
           : !!empresa?.serieFactura && !!empresa?.serieBoleta,
       logistics: !isPeru || !logisticsEnabled || !!empresa?.serieGuiaRemision,
-      labor: isArgentina || isColombia ? data.rrhh?.readiness?.ready === true : true,
+      labor: data.rrhh?.readiness?.ready === true,
     }
   }, [data, isArgentina, isColombia, isPeru])
 
@@ -897,9 +897,18 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
                 </Link>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                AFP/ONP, EsSalud, gratificaciones, quinta categoría y CTS permanecen configurados para Perú.
-              </p>
+              <>
+                <FieldRow label="Normativa vigente por período" value={checks.labor} ok={checks.labor} />
+                <FieldRow label="Período de normativa" value={data.rrhh?.readiness?.periodo} ok={checks.labor} />
+                {!checks.labor && (
+                  <p className="text-sm text-muted-foreground">
+                    Revisa la normativa del período antes de calcular AFP/ONP, EsSalud, quinta categoría y beneficios laborales.
+                  </p>
+                )}
+                <Link className="mt-4 inline-flex min-h-10 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" href="/dashboard/configuracion/rrhh">
+                  Revisar RRHH Perú
+                </Link>
+              </>
             )}
           </SectionCard>
         )}

@@ -394,6 +394,7 @@ class AuthService {
       this.accessToken = session.access_token;
 
       this.saveSession(newSession);
+      if (isDesktopRuntime()) await desktopTokenMutation;
 
       return {
         data: { session: newSession },

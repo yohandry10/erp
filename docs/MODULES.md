@@ -5,6 +5,25 @@ exactos se consultan en código, OpenAPI y migraciones.
 
 ## Ventas
 
+Clientes y Proveedores permiten importar CSV UTF-8 desde sus listados: plantilla,
+vista previa sin escritura, validación por registro y confirmación explícita.
+El importador masivo valida documentos peruanos y requiere los permisos
+`migration.*` correspondientes; otros países conservan el alta individual.
+La UI admite 5 MiB, muestra resultados completos/parciales/fallidos y conserva
+`external_id` para reintentos idempotentes. No encola importaciones offline.
+Comas, comillas escapadas y saltos de línea dentro de campos se preservan;
+columnas desalineadas, encabezados duplicados y campos mayores a 4096 caracteres
+se rechazan antes de escribir, sin truncar datos. La numeración de errores sigue
+el registro CSV (encabezado = 1), no sus líneas físicas cuando hay saltos internos.
+Clientes, Proveedores y Cotizaciones de Compra exportan la página actual en CSV,
+con filtros vigentes y escape de fórmulas. Reportes de Ventas y el detalle de una
+Orden de Compra permiten imprimir/guardar PDF mediante el navegador.
+El plazo comercial cotización→factura se mide con la fecha de emisión del CPE
+vinculado al pedido; el período filtra esa emisión. Incluye tendencia mensual
+cronológica y mediana correcta también para un número par de conversiones.
+Pedidos por estado y productos más vendidos aplican el filtro de cliente; el
+reporte de productos muestra su código de catálogo, no un fragmento del UUID.
+
 Flujo principal:
 
 ```text
@@ -60,6 +79,10 @@ Cotización -> Pedido -> Reserva -> Despacho -> Documento/CPE -> Cobro -> Asient
   anular la factura original completa. La serie FC/BC se deriva del comprobante
   origen y la transmisión fiscal queda pendiente hasta que el cliente configure
   sus propias credenciales o firma; el flujo interno no exige habilitación legal.
+- La cuenta 122 del contrato de anticipos y saldo a favor se aprovisiona al
+  configurar Perú (551), preservando cuentas existentes. El generador de NC
+  sólo exige esa cuenta cuando la distribución realmente genera saldo a favor;
+  tampoco exige cuentas de inventario cuando no hay reversión de costo.
 - La nota de crédito reduce la cuenta por cobrar hasta cero y lleva el exceso a
   saldo a favor del cliente (cuenta 122). Ese pasivo puede aplicarse a una CxC
   futura o reembolsarse por una caja/sesión o cuenta bancaria explícita.
@@ -77,6 +100,10 @@ Apertura -> Venta -> Pago -> Ticket/CPE -> Movimiento de caja -> Cierre
 ```
 
 - La caja abierta determina sucursal y almacén.
+- La configuración expuesta por `pos/empresa-config` contiene sólo identidad,
+  contacto, logo, país, moneda, impuesto y series necesarios para venta/ticket;
+  nunca PFX, claves SOL, secretos OSE ni credenciales de otras autoridades.
+  Una lectura fallida responde con error, no con configuración vacía exitosa.
 - El ticket `Txxx` es interno; el comprobante fiscal usa serie `Bxxx/Fxxx`.
 - Pagos mixtos sólo afectan la gaveta por la porción en efectivo.
 - Venta, detalle, stock por almacén, pagos, movimiento de efectivo, documento,
@@ -378,6 +405,13 @@ Código principal: `apps/erp-api/src/modules/pos`,
   aceptación de la propuesta oficial usa la API SUNAT exclusivamente desde el
   backend, exige `sire_activo`, credenciales SOL/API y la referencia física de
   PROD; DEV y empresas demo fallan cerrado aunque contengan credenciales.
+- La cola histórica `sire-processing`, sin productores vigentes, ya no inventa
+  archivos completados. Sus trabajos se rechazan sin reintentar y deben
+  generarse mediante la API vigente con actor, tipo e idempotencia. Tampoco se
+  marcan como completados trabajos CPE que respondan función no implementada.
+- El cron SIRE antiguo de la API también se retiró: anunciaba un archivo sin
+  generarlo. Invocarlo falla explícitamente; la generación funcional permanece
+  en `/api/sire/generar-reporte` con permisos, actor e idempotencia.
 - Recibir `numTicket` deja el reporte en `PENDIENTE`; no se informa como
   aceptado hasta que la consulta oficial devuelve el código `06` (`Terminado`).
   Cada aceptación y consulta queda en `sire_operaciones` sin tokens ni secretos.
@@ -414,6 +448,10 @@ Cotización -> Aprobación -> Orden de compra -> Recepción -> CxP -> Pago
   factura real del proveedor, no al recibir la mercadería o el servicio.
 - Devoluciones al proveedor revierten existencia y obligación según estado.
 - Aprobaciones respetan tenant, rol, monto y estado.
+- La configuración de una empresa peruana provisiona las cuentas 4699 y 63
+  que faltan para recibir bienes y servicios. Conserva las cuentas existentes,
+  incluso si fueron personalizadas o desactivadas; una cuenta no apta sigue
+  bloqueando el asiento hasta que se corrija la configuración contable.
 
 Código principal: `apps/erp-api/src/modules/compras`.
 
@@ -443,6 +481,16 @@ Código principal: `apps/erp-api/src/modules/compras`.
   evidencia persistida y un snapshot confirmado no admite cambiar almacén,
   referencia, semántica de signo ni columnas de valorización.
 - Picking, packing, despacho, backorders y GRE mantienen referencia al pedido.
+  Preparación, packing, tracking, eventos manuales y reprogramación usan
+  `operar_logistica_tx` (550): bloqueo de pedido, actor activo del tenant,
+  fingerprint y clave idempotente; cambio, evento y auditoría se confirman juntos.
+  El despacho físico conserva su RPC canónico. Un evento manual no puede
+  fabricar un despacho, ni marcar entrega antes de éste o retroceder una entrega.
+  La UI envía IDs de líneas y conserva las claves al reintentar.
+  Una preparación interrumpida permanece visible para continuarla; un fallo
+  de consulta muestra error y reintento en vez de afirmar que no quedan pedidos.
+  La 552 concede al backend lectura de historial y backorders, manteniendo
+  RLS y los escritores cerrados.
 - Stock inicial exige `almacen_id` válido.
 - Productos, categorías, almacenes y ubicaciones se modifican exclusivamente
   mediante RPCs transaccionales `service_role`: reciben tenant y actor activo,
@@ -478,6 +526,11 @@ Código principal: `apps/erp-api/src/modules/inventario`,
 ## Finanzas y tesorería
 
 - CxC y CxP gestionan saldo, vencimiento, pagos y estados.
+- El alta de factura de proveedor conserva destino del crédito fiscal, código
+  de detracción y tipo de cambio de origen dentro de la transacción de deuda y
+  outbox. Repetir la misma intención devuelve la factura existente; cambiar
+  importes o contexto fiscal devuelve conflicto. Las elecciones históricas
+  perdidas no se reconstruyen ni se sobrescriben mediante un reintento.
 - Registrar cobros, aplicar notas y reprogramar una CxC exige
   `finanzas.cxc.cobros.write`; emitir CPE es una capacidad fiscal separada y no
   autoriza por sí sola acciones de cobranza.
@@ -555,6 +608,11 @@ Código principal: `apps/erp-api/src/modules/finanzas`,
 - Reabrir un período requiere superadministrador tanto en servidor como en
   la acción disponible en pantalla. Un rechazo de reapertura conserva el
   detalle y su estado cerrado, mostrando el motivo sin aparentar éxito.
+- Presupuestos conserva los importes al editar y recargar. Si falla alguno de
+  los tres catálogos del formulario, informa el error, bloquea el guardado y
+  ofrece reintentar la carga completa para evitar selecciones incompletas.
+  El detalle del centro muestra código y nombre de la cuenta desde la relación
+  `plan_cuentas` devuelta por la API, junto a los importes presupuestados.
 - Asientos se originan en eventos de ventas, compras, POS, caja, RRHH y activos.
 - Debe/haber debe cuadrar y el período debe permitir la operación.
 - Libros, estados financieros y materialized views son proyecciones.
@@ -589,6 +647,11 @@ Código principal: `apps/erp-api/src/modules/finanzas`,
   atómicas; sus barreras de idempotencia también viven en la base.
 - Multi-moneda conserva importe de origen y cotización, revalúa saldos abiertos
   y reconoce diferencias realizadas en pagos sin duplicar el asiento.
+- El evento de factura de proveedor conserva montos documentales y cotización
+  de origen. El listener convierte base, IGV, saldo y ajustes a moneda local
+  usando esa cotización congelada; la deuda conserva su moneda original. Un
+  evento extranjero sin cotización válida no genera asiento. No se recalcula
+  con una cotización actual ni se reescribe un asiento confirmado histórico.
 - Plantillas recurrentes generan una sola instancia por período. Activos fijos
   conservan cronograma, depreciación, valor residual y baja. Las partidas de
   terceros pueden conciliarse total o parcialmente y deshacerse sin alterar el
@@ -631,11 +694,17 @@ Código principal: `apps/erp-api/src/modules/contabilidad`.
 ## Recursos humanos
 
 - Empleados, contratos, asistencia, vacaciones y conceptos alimentan planillas.
+  Si falla la lectura de vacaciones, el cálculo devuelve indisponibilidad;
+  no interpreta un fallo de permisos o conexión como cero días.
 - Configuración laboral, maestros, reclutamiento, asistencia, solicitudes,
   beneficios, evaluaciones, capacitaciones, horarios, expediente, contratos y
   ficha PLAME convergen en un writer operativo con actor, permiso, huella e
   idempotencia. El job de ausencias exige un actor técnico explícito y falla
   cerrado si no está configurado.
+- Reclutamiento conserva los años de experiencia y el estado civil opcional
+  del candidato al crear y editar (writer 543). No completa datos personales
+  ausentes por defecto. La lista y el filtro usan la vacante persistida; un
+  fallo de carga muestra información incompleta y permite reintentar.
 - El país del tenant selecciona el motor normativo; no se mezclan reglas entre
   Perú, Argentina y Colombia.
 - Calcular una liquidación PE/AR/CO sólo congela el cálculo: no inactiva al
@@ -660,11 +729,29 @@ Código principal: `apps/erp-api/src/modules/contabilidad`.
   pago.
 - Perú calcula AFP/ONP, EsSalud, quinta categoría, gratificaciones, CTS,
   vacaciones y liquidación peruana con sus topes y libros idempotentes.
+- En la planilla peruana mensual, una remuneración asegurable positiva menor
+  que la RMV usa esta última como base mínima de EsSalud, incluso por un mes
+  incompleto. Un mes sin remuneración no genera ese aporte. La corrección se
+  aplica al cálculo ordinario y al personalizado; no incrementa AFP/ONP ni
+  descuenta la diferencia al trabajador. Criterio:
+  [Informe 003-2007-SUNAT/2B0000](https://www.sunat.gob.pe/legislacion/oficios/2007/oficios/i0032007.htm).
 - La configuración laboral Perú expone la normativa efectiva del período
   (UIT, RMV, asignación familiar, AFP/ONP, EsSalud, horas y sobretasas). Los
   contratos AFP conservan administradora, esquema de comisión y tasas
   individuales; la planilla usa esos valores y recurre a la normativa vigente
   sólo como respaldo.
+- El cálculo de planilla exige normativa peruana activa del período, propia o
+  global configurada. Una fila ausente o incompleta bloquea el cálculo; un
+  fallo de lectura devuelve indisponibilidad. No sustituye esos casos por tasas
+  constantes de otro período.
+- El sueldo y régimen pensionario peruanos se seleccionan entre contratos
+  vigentes que intersectan el mes liquidado: una renovación futura o una fecha
+  de fin anterior al mes no sustituyen el contrato correspondiente. Esto no
+  implementa prorrateo de varios contratos ni recalculo de empleados inactivos.
+- Los conceptos de gratificación, bonificación extraordinaria y remuneración
+  vacacional se aprovisionan para Perú al configurar la empresa (544), sin
+  sobrescribir conceptos existentes. La consulta de conceptos no inserta filas;
+  informa si faltan conceptos activos antes de procesar una planilla.
 - Argentina valida CUIL y configuración contractual (CCT, categoría, modalidad,
   obra social, sindicato y ART); calcula SIPA, INSSJP, obra social,
   contribuciones patronales, ART, horas extra 50/100, SAC, vacaciones con
@@ -708,6 +795,12 @@ Código principal: `apps/erp-api/src/modules/contabilidad`.
 Código principal: `apps/erp-api/src/modules/rrhh`.
 
 ## Administración, auth y configuración
+
+El resumen de Configuración marca SUNAT preparado sólo cuando el estado fiscal
+canónico y la verificación de configuración están listos. La mera presencia de
+un archivo PFX no acredita vigencia ni conectividad. RRHH Perú refleja la
+normativa del período consultado; no muestra configuración laboral completa
+si ese período carece de normativa aplicable.
 
 - Tenants, usuarios, roles y permisos determinan acceso.
 - En demo, `ADMIN_DEMO` puede crear usuarios y roles operativos del propio
@@ -853,6 +946,21 @@ Código principal: `apps/erp-api/src/modules/auth`,
 - Analytics consume métricas tenant-scoped.
 - Reportes exportan sin duplicar reglas de negocio.
 - Auditoría registra actor, tenant, acción, entidad, resultado y correlación.
+- La evidencia complementaria de auditoría e integraciones usa el append
+  canónico `registrar_auditoria_backend_tx`: valida empresa/actor, conserva
+  un identificador al reintentar, rechaza cambios en el mismo evento y depura
+  secretos. Las operaciones de negocio mantienen su propia auditoría atómica.
+  Alertas de integración, recepciones, CxC, CxP, inventario y jobs de la API
+  utilizan también ese append mediante un adaptador compartido: requieren
+  confirmación del evento y conservan su UUID ante una respuesta perdida.
+  Los errores del proveedor se depuran antes de persistir o notificar.
+  El historial de un recurso incluye `record_id` además del identificador
+  legado dentro del JSON; la lectura filtra por empresa y exige
+  `security.audit.read`. La paginación unificada recorre los bloques de cada
+  fuente y el filtro de usuario se aplica antes de paginar sus intentos de login.
+  La pantalla advierte fuentes incompletas, permite reintentar y muestra las
+  fechas de consulta con la zona del navegador. La búsqueda de texto indica
+  expresamente que se aplica a la página visible.
 - Métricas, logs y notificaciones no contienen secretos.
 
 ## Reglas transversales

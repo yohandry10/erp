@@ -20,7 +20,7 @@ describe('env.schema', () => {
     SESSION_SECRET: 'e'.repeat(40),
     CSRF_SECRET: 'f'.repeat(40),
     AUTH_SIGNATURE_SECRET: strongSecret,
-    REQUIRED_DATABASE_SCHEMA_VERSION: 534,
+    REQUIRED_DATABASE_SCHEMA_VERSION: 552,
     PFX_PATH: '/secure/certs/fiscal.pfx',
     PFX_PASS: 'securepass',
   };
@@ -61,7 +61,7 @@ describe('env.schema', () => {
     });
 
     expect(result.error).toBeUndefined();
-    expect(result.value.REQUIRED_DATABASE_SCHEMA_VERSION).toBe(536);
+    expect(result.value.REQUIRED_DATABASE_SCHEMA_VERSION).toBe(552);
   });
 
   it('falla con secreto JWT demasiado débil', () => {
@@ -181,18 +181,18 @@ describe('env.schema', () => {
     const result = envSchema.validate({
       ...baseConfig,
       SUNAT_ENVIRONMENT: 'produccion',
-      EMPRESA_RUC: '20616053575',
+      EMPRESA_RUC: '20616053675',
     });
 
     expect(result.error).toBeUndefined();
-    expect(result.value.EMPRESA_RUC).toBe('20616053575');
+    expect(result.value.EMPRESA_RUC).toBe('20616053675');
   });
 
   it('requiere razon documentada para confirmar mismatch de RUC del certificado', () => {
     const result = envSchema.validate({
       ...baseConfig,
       SUNAT_ENVIRONMENT: 'produccion',
-      EMPRESA_RUC: '20616053575',
+      EMPRESA_RUC: '20616053675',
       SUNAT_CERT_RUC_MISMATCH_CONFIRMED: 'true',
       SUNAT_CERT_RUC_MISMATCH_REASON: '',
     });

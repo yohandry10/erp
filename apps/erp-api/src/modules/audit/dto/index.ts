@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsObject, IsInt, Min, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsObject, IsInt, Min, Max, IsDateString, IsUUID, MaxLength, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export enum AuditOperation {
@@ -49,10 +49,12 @@ export class AuditFiltersDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(100)
   limit?: number;
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   table_name?: string;
 
   @IsOptional()
@@ -60,7 +62,7 @@ export class AuditFiltersDto {
   operation?: AuditOperation;
 
   @IsOptional()
-  @IsString()
+  @IsUUID()
   user_id?: string;
 
   @IsOptional()
@@ -70,4 +72,18 @@ export class AuditFiltersDto {
   @IsOptional()
   @IsDateString()
   end_date?: string;
+}
+
+export class IntegrationFiltersDto extends AuditFiltersDto {
+  @IsOptional() @IsString() @MaxLength(100)
+  servicio?: string;
+
+  @IsOptional() @IsString() @MaxLength(200)
+  correlacion_id?: string;
+
+  @IsOptional() @IsString() @MaxLength(100)
+  correlacion_tipo?: string;
+
+  @IsOptional() @IsIn(['SUCCESS', 'ERROR', 'SKIP', 'PENDING', 'TIMEOUT', 'GENERATED', 'COMPLETED', 'WARNING', 'INFO'])
+  status?: string;
 }

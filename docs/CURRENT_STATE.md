@@ -1,6 +1,48 @@
 # Estado actual del ERP
 
-Actualizado: 2026-09-04.
+Actualizado: 2026-09-13.
+
+La preparación Perú se integra sobre `main` `679e05bf`, en la rama
+`codex/peru-production-20260912`. La lectura autorizada del 12 de septiembre
+confirma ese mismo SHA en Render, DB/Redis disponibles y esquema requerido y
+aplicado 536. Las tres configuraciones PE no demo siguen fuera de SUNAT
+producción; no se han emitido documentos ni modificado datos remotos.
+
+Las migraciones locales de Perú se renumeran de 533..548 a 537..552 para
+preservar las 533..536 ya publicadas de Colombia/Argentina. El mapa exacto está
+en `artifacts/peru-migration-renumber-2026-09-12.json`. API, worker y CI exigen
+552. La integración pasó 299 suites/2876 pruebas API, los cinco builds (132
+páginas), type-check, lint, 23 pruebas worker, 84 contratos HTTP y siete flujos
+Chromium, además de 22 pantallas con registros. El 13 de septiembre pasaron
+también 104 contratos de navegador y el login móvil, los builds API/web finales,
+la imagen API y su rechazo de configuración antes de conexiones. El cron SIRE
+retirado pasa su prueba específica; la cadena SQL y los 84 contratos HTTP
+volvieron a pasar con el comparador de ACL. El recorrido conjunto de módulos y
+detalle presupuestal pasó 100 páginas sin errores HTTP/JS. La repetición de los
+siete flujos y 22 detalles también pasó. CI confirmó 299 suites/2877 pruebas
+API, pero detectó la superposición de los límites global y de autenticación:
+la corrección conserva los límites por cuenta/oficina y pasa cuatro pruebas
+con ambos guards. Su recorrido integrado y los checks finales están pendientes.
+
+El respaldo productivo del 12 de septiembre se restauró en PostgreSQL 17 sin
+red: las 537..552 y sus 16 verificadores pasaron, con 289 tablas y 206073 filas
+previas y 5451 columnas conservadas. Sólo se añadieron 171 cuentas, 240 conceptos de planilla
+y 16 entradas de historia. RLS permanece intacto y readiness local exige y
+encuentra 552. Evidencia: `artifacts/erp-peru-prod-rehearsal-20260913071340257-8992.json`.
+El respaldo no incluye archivos externos de Storage ni roles globales.
+El respaldo renovado del 13 de septiembre también se restauró y pasó las 16
+migraciones, verificadores y reversión atómica deliberada sin cambios remotos:
+`artifacts/erp-peru-prod-rehearsal-20260913074523417-18040.json`.
+
+PROD conserva ACL heredadas distintas de la cadena limpia: 181 tablas tenían
+DML para service_role. Las migraciones conservan esas ACL, excepto la retirada
+explícita de escritura de auditoría en 542. Los runners comparan permisos antes
+y después y detectan una ampliación deliberada. Este ensayo no certifica
+privilegio mínimo de todos los escritores históricos.
+
+Siguen pendientes el cierre de las pruebas finales, CI del commit, promoción
+DB-first y la identificación/configuración del emisor PE real. No se ha hecho
+despliegue ni emisión fiscal. Los resultados locales no acreditan aceptación SUNAT.
 
 Este archivo contiene únicamente el estado vigente. El historial de auditorías y
 decisiones anteriores se consulta en Git. Si este resumen contradice código o
@@ -85,9 +127,9 @@ migraciones verificados, prevalece la implementación actual.
   A4 físico, QR SUNAT Q en la parte inferior, logo, unidades, bases y leyenda.
   A4 es una elección de salida del ERP, no un tamaño obligatorio impuesto por
   SUNAT. La 524 añade la condición IVA del receptor y evidencia terminal CAE
-  para el flujo argentino, sin fingir un CDR de SUNAT. La promoción 529-532 exige
+  para el flujo argentino, sin fingir un CDR de SUNAT. La promoción 529-544 exige
   PostgreSQL 16 desde cero, verificadores vigentes, CI/PR, DB-first, gate efectivo
-  532 y revalidación visual en PROD. La 525 conserva por CPE la procedencia y el
+  544 y revalidación visual en PROD. La 525 conserva por CPE la procedencia y el
   emisor, trata el legado como simulado y separa CUFE/CUDE del hash XML; la 526
   congela el perfil tributario DIAN del receptor. La 527 importa y ancla la FEV
   recibida, separa RBAC de lectura/gestión/034 y reserva, sella, finaliza y

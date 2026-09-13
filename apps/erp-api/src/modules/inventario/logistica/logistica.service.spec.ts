@@ -60,10 +60,6 @@ describe('LogisticaService', () => {
         audit,
         pedidoLock,
       );
-      const eventoLogisticoLegacy = jest.spyOn(
-        service as unknown as { registrarEventoLogistico: (...args: unknown[]) => Promise<void> },
-        'registrarEventoLogistico',
-      );
       const dto: ConfirmarDespachoDto = {
         idempotency_key: 'despacho-pedido-0001',
         notas: 'Salida completa',
@@ -128,7 +124,6 @@ describe('LogisticaService', () => {
       expect(pedidoQuery.update).not.toHaveBeenCalled();
       expect(pedidoQuery.upsert).not.toHaveBeenCalled();
       expect(pedidoQuery.delete).not.toHaveBeenCalled();
-      expect(eventoLogisticoLegacy).not.toHaveBeenCalled();
       expect(Object.prototype.hasOwnProperty.call(service, 'eventBus')).toBe(false);
       expect(resultado).toEqual({ success: true, data: resultadoRpc });
     });

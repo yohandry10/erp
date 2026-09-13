@@ -548,7 +548,7 @@ export class RmaService {
   }
 
   private requireActor(userId?: string | null): string {
-    const actor = String(userId ?? '').trim();
+    const actor = typeof userId === 'string' ? userId.trim() : '';
     if (!actor) {
       throw new BadRequestException('La operación RMA requiere un actor autenticado');
     }

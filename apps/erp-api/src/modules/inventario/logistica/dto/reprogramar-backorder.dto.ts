@@ -1,6 +1,7 @@
+import { OperacionLogisticaDto } from './operacion-logistica.dto';
 import { IsDateString, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
-export class ReprogramarBackorderDto {
+export class ReprogramarBackorderDto extends OperacionLogisticaDto {
   @IsDateString({}, { message: 'La fecha comprometida debe tener formato ISO (YYYY-MM-DD).' })
   proxima_fecha_compromiso!: string;
 

@@ -55,6 +55,26 @@ sin datos de clientes.
   mantiene una segunda tabla manual en documentación.
 - Los endpoints públicos son excepciones explícitas, limitadas y protegidas con
   rate limiting cuando corresponde.
+- Las rutas con `AuthRateLimitGuard` usan sus límites por cuenta+IP (cinco
+  intentos/minuto en login) y por oficina (veinte). El guard global delega sólo
+  cuando ese guard está declarado; así no colapsa cuentas distintas en el
+  límite estricto de una sola cuenta. Las demás rutas conservan el límite global.
+- El JWT se contrasta con identidad, sesión revocable, contexto empresarial y
+  privilegio de superadministrador vigentes; una sesión válida de otro usuario
+  o contexto no autentica el token. El cambio de empresa crea sesión y auditoría
+  en `cambiar_contexto_sesion_auth_tx`, sin modificar la pertenencia original del
+  usuario. El destino vive en metadatos escritos por el RPC; la renovación y la
+  validación del token conservan ese destino. La UI instala la nueva sesión antes
+  de recargar y vacía sus consultas de la empresa anterior.
+  Un administrador global sin empresa propia mantiene sesión revocable con
+  pertenencia nula; sólo el writer de cambio asigna su contexto operativo.
+  Usuarios ordinarios sin empresa y privilegios globales retirados fallan cerrados.
+  En Tauri, instalar una sesión espera la escritura en el almacén seguro antes
+  de permitir la recarga; un fallo de persistencia se comunica al operador.
+- El selector de auditoría consulta `audit-logs/actors` con
+  `security.audit.read`: sólo recibe identificador, nombre y correo de usuarios
+  de la empresa actual, incluidos los históricos inactivos. No exige administrar
+  usuarios ni concede ese permiso a un auditor.
 
 ## Fiscal
 
@@ -68,8 +88,18 @@ sin datos de clientes.
 - El UBL 2.1 incluye totales legales, afectación tributaria por línea, firma y
   datos SUNAT.
 - SUNAT directo usa WS-Security UsernameToken, sin HTTP Basic para hosts
-  `*.sunat.gob.pe`.
-- Producción valida el RUC del certificado antes de firmar o enviar.
+  `*.sunat.gob.pe`. Usuario, clave SOL y referencias se codifican como texto XML
+  en envíos y consultas para preservar caracteres especiales sin romper SOAP.
+- Producción valida el RUC del certificado antes de firmar o enviar. La firma
+  comprueba su vigencia al cargar el PFX y en cada operación; un certificado
+  vencido o todavía no vigente nunca se sustituye por una firma demo.
+- SUNAT SOAP, GRE REST y OSE API comparten el lector del CDR. Sólo un ZIP
+  íntegro, acotado a 5 MiB descomprimidos, con un único ApplicationResponse y
+  `DocumentResponse/Response/ResponseCode` igual a `0` acredita aceptación.
+  HTTP 200, un mensaje favorable, un ticket o un base64 ilegible no bastan.
+  Una respuesta incompleta queda como error técnico consultable, sin inventar
+  aceptación ni rechazo definitivo. OSE API exige CDR ZIP base64, tiene timeout
+  de 120 segundos y no sigue redirecciones con credenciales.
 - Argentina usa CUIT/ARS/IVA y el adaptador ARCA: firma CMS del TRA para WSAA,
   autorización secuencial y consulta por WSFEv1, CAE y QR. Los códigos WSFE de
   Facturas A/B/C/E/M y sus notas viven en catálogos por país.
@@ -106,6 +136,8 @@ orquestan; servicios y generadores contienen reglas. Todo asiento debe:
 
 - Tauri usa SQLite local por tenant.
 - La outbox es durable, idempotente y no guarda secretos.
+- El bus registra el tipo y la entrega del evento sin volcar el payload:
+  documentos, datos personales y remuneraciones permanecen fuera de esos logs.
 - Los snapshots y cachés se aíslan por tenant.
 - Las escrituras offline se sincronizan con contratos explícitos.
 - Los correlativos fiscales locales no sustituyen la validación del backend.

@@ -1,0 +1,183 @@
+{
+  "remoteWrites": false,
+  "scope": "Carga de rutas con registros; no acredita todas las mutaciones",
+  "missingFixtures": [],
+  "findings": [
+    {
+      "template": "ventas/rma/[id]",
+      "route": "/dashboard/ventas/rma/f0cbfdb7-b086-40b7-9c71-65a6926294a3/",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "text": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nProductos\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nPLAME / T-Registro\nLiquidaciones y CTS\nConfiguración\nOffline\nAyuda\ndemo\nperu-integrated-1@example.test\nCerrar Sesión\n7\nClaro\nDashboard\nVentas\nRMA y devoluciones\nDetalle\nVolver a RMA\n\nDEVOLUCIÓN DE CLIENTE\n\nRMA-2026-00001\n\nInspección local de devolución\n\nCERRADA\n✓\nSolicitud\n✓\nDecisión\n✓\nRecepción\n✓\nNota de crédito\nLíneas autorizadas\n\nLa cantidad y clasificación quedan congeladas al crear la RMA.\n\nPRODUCTO\tCLASIFICACIÓN\tAUTORIZADA\tRECIBIDA\tESTADO\n\n\nDEMO-003 · Cuaderno A4 96 hojas\n\nInspección local de devolución\n\n\tStock físico\t1\t1\tCERRADO\nTrazabilidad\n\nEventos operativos independientes del asiento contable.\n\nCREADA\n12/9/2026, 6:30:03 p. m.\n\nRMA creada atómicamente\n\nDECISION\n12/9/2026, 6:30:04 p. m.\n\nRMA APROBADA\n\nRECEPCION\n12/9/2026, 6:30:04 p. m.\n\nRecepción RMA: RECIBIDA\n\nNOTA_CREDITO\n12/9/2026, 6:30:13 p. m.\n\nNota de crédito emitida desde RMA\n\nCierre financiero\n\nLa factura original permanece vigente; sólo se acreditaron las líneas devueltas.\n\nDOCUMENTO NC\n\nf96f929e-1208-462a-a610-7a66e03aba39\n\nCPE 07\n\n569db682-f2fe-47e2-a398-b32c6e02b3b6\n\nReferencias inmutables\nPedido\n3a01554b-dfe1-4397-af97-20a2d5e5edf0\nDocumento origen\n18ab0299-498e-4e7b-b5f0-a5665413dd3c\nCPE origen\n28803373-54d5-43c3-9dd3-e52a69abc855\nCxC origen\na863eb1f-4fe2-4b1e-b9c7-58bfac3dcd4f"
+    },
+    {
+      "template": "ventas/pedidos/[id]",
+      "route": "/dashboard/ventas/pedidos/3a01554b-dfe1-4397-af97-20a2d5e5edf0/",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "text": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nProductos\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nPLAME / T-Registro\nLiquidaciones y CTS\nConfiguración\nOffline\nAyuda\ndemo\nperu-integrated-1@example.test\nCerrar Sesión\n7\nClaro\nDashboard\nVentas\nPedidos\nDetalle\nPedido PED-2026-0001\nFACTURADO\n\nCreado el 12/09/2026\n\n¿Qué sigue?\n1) Confirmar pedido\n2) Preparar en Logística\n3) Despachar (si aplica)\n4) Facturar\nUsa el botón “Ir a Logística” para preparar y despachar. Luego regresa aquí para facturar cuando el pedido esté listo.\n\nEl comprobante ya está disponible. Revísalo en el mismo formato A4 que verá el cliente.\n\nVer boleta A4\nInformación del Cliente\n\nRazón Social\n\nCliente General\n\nDocumento\n\nDNI: 99999999\n\nProductos\nDescripción\tCantidad\tPrecio Unit.\tSubtotal\nCuaderno A4 96 hojas\t1\tS/ 20.00\tS/ 20.00\nTotales\nSubtotal:\nS/ 20.00\nIGV (18%):\nS/ 3.60\nTotal:\nS/ 23.60\nObservaciones\n\nCotización local para recorrido RMA"
+    },
+    {
+      "template": "ventas/cotizaciones/[id]",
+      "route": "/dashboard/ventas/cotizaciones/09642582-a684-471d-8799-2d9b9e253f0e/",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "text": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nProductos\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nPLAME / T-Registro\nLiquidaciones y CTS\nConfiguración\nOffline\nAyuda\ndemo\nperu-integrated-1@example.test\nCerrar Sesión\n7\nClaro\nDashboard\nVentas\nCotizaciones\nDetalle\nCotización COT-2026-0001\nCONVERTIDA\n\nDetalle de la cotización\n\nEsta cotización ya fue convertida a pedido\n\nNo se puede editar ni convertir nuevamente\n\nInformación del Cliente\n\nRazón Social\n\nCliente General\n\nDocumento\n\nDNI: 99999999\n\nFechas\n\nFecha de Emisión\n\n12/09/2026\n\nProductos\nDescripción\tCantidad\tPrecio Unit.\tSubtotal\nCuaderno A4 96 hojas\t1\tS/ 20.00\tS/ 20.00\nTotales\nSubtotal:\nS/ 20.00\nIGV (18%):\nS/ 3.60\nTotal:\nS/ 23.60\nNotas\n\nCotización local para recorrido RMA"
+    },
+    {
+      "template": "ventas/clientes/[id]",
+      "route": "/dashboard/ventas/clientes/7f2b5c8b-06df-447f-9a89-2282648a3203/",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "text": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nProductos\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nPLAME / T-Registro\nLiquidaciones y CTS\nConfiguración\nOffline\nAyuda\ndemo\nperu-integrated-1@example.test\nCerrar Sesión\n7\nClaro\nDashboard\nVentas\nClientes\nDetalle\nVolver\nEditar\nCliente General\n\nCliente General\n\nInformación General\nTipo de Cliente\nPERSONA\nTipo de Documento\n\nDNI\n\nNúmero de Documento\n\n99999999"
+    },
+    {
+      "template": "ventas/clientes/[id]/editar",
+      "route": "/dashboard/ventas/clientes/7f2b5c8b-06df-447f-9a89-2282648a3203/editar/",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "text": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nProductos\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nPLAME / T-Registro\nLiquidaciones y CTS\nConfiguración\nOffline\nAyuda\ndemo\nperu-integrated-1@example.test\nCerrar Sesión\n7\nClaro\nDashboard\nVentas\nClientes\nDetalle\nEditar\nVolver\nEditar Cliente\n\nCliente General\n\nInformación Básica\nTipo de Cliente *\nPersona Natural\nEmpresa\nTipo de Documento *\nDNI\nRUC\nCarné de Extranjería\nPasaporte\nNúmero de Documento * (8 dígitos)\nDatos del Cliente\nRazón Social / Nombre Completo *\nNombre Comercial (Opcional)\nDirección (Opcional)\nDatos de Contacto\nEmail (Opcional)\nTeléfono (Opcional)\nCancelar\nActualizar Cliente"
+    },
+    {
+      "template": "compras/recepciones/[id]",
+      "route": "/dashboard/compras/recepciones/28841969-fd82-4454-ab02-487a1c5257ba/",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "text": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nProductos\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nPLAME / T-Registro\nLiquidaciones y CTS\nConfiguración\nOffline\nAyuda\ndemo\nperu-integrated-1@example.test\nCerrar Sesión\n7\nClaro\nVolver a Recepciones\nRecepción REC-2026-0005\nCerrada\n\nOrden: OC-UI-1789255979672 - Proveedor: Proveedor integración local SAC\n\nVer Orden\nTOTAL ITEMS\n1\nOK\n1\nOBSERVADOS\n0\nRECHAZADOS\n0\nInformación General\nNÚMERO\nREC-2026-0005\nFECHA RECEPCIÓN\n12/9/2026\nALMACÉN\nAlmacen Principal (ALM-PRINCIPAL)\nOrden de Compra\nNÚMERO OC\nOC-UI-1789255979672\nPROVEEDOR\nProveedor integración local SAC\nRUC\n20123456786\nItems Recibidos\nCÓDIGO\tPRODUCTO\tCANTIDAD\tCALIDAD\tLOTE\tSERIE\tEXPIRACIÓN\tOBSERVACIONES\nDEMO-003\tCuaderno A4 96 hojas\t2\t\nOK\t-\t-\t-\t-\nObservaciones Generales\n\nRecepción cerrada automáticamente\n\nHistorial\nCreada\n12/9/2026, 6:33:11 p. m.\nCerrada\n12/9/2026, 6:33:11 p. m."
+    },
+    {
+      "template": "compras/proveedores/[id]",
+      "route": "/dashboard/compras/proveedores/3746478c-691d-45dd-ad23-30b51eb93aec/",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "text": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nProductos\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nPLAME / T-Registro\nLiquidaciones y CTS\nConfiguración\nOffline\nAyuda\ndemo\nperu-integrated-1@example.test\nCerrar Sesión\n7\nClaro\nVolver a Proveedores\nDistribuidora Andina S.A.C.\n\nRUC: 20512345671\n\nEditar\nDesactivar\nActivo\nInformación Básica\n\nRUC\n\n20512345671\n\nRazón Social\n\nDistribuidora Andina S.A.C.\n\nNombre Comercial\n\nDistribuidora Andina S.A.C.\n\nEmail\n\nventas@distribuidoraandina.demo\n\nInformación de Contacto\n\nContacto\n\n-\n\nTeléfono\n\n-\n\nDirección\n\n-\n\nCondiciones Comerciales\n\nCondiciones de Pago\n\nCrédito 30 días\n\nLímite de Crédito\n\nPEN 50,000.00\n\nDías de Crédito\n\n30 días\n\nInformación del Sistema\n\nFecha de Creación\n\n12/9/2026, 6:27:27 p. m.\n\nÚltima Actualización\n\n12/9/2026, 6:27:27 p. m.\n\nEstado\n\nACTIVO"
+    },
+    {
+      "template": "compras/proveedores/[id]/editar",
+      "route": "/dashboard/compras/proveedores/3746478c-691d-45dd-ad23-30b51eb93aec/editar/",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "text": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nProductos\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nPLAME / T-Registro\nLiquidaciones y CTS\nConfiguración\nOffline\nAyuda\ndemo\nperu-integrated-1@example.test\nCerrar Sesión\n7\nClaro\nVolver al Detalle\nEditar Proveedor\n\nActualice la información del proveedor Distribuidora Andina S.A.C.\n\nInformación importante\n\nLos cambios se aplicarán inmediatamente. Asegúrese de verificar toda la información antes de guardar.\n\nInformación Básica\nRUC *\n\nNo se pudo comprobar este RUC en la fuente auxiliar. Puede continuar.\n\nRazón Social *\nNombre Comercial\nEmail *\nInformación de Contacto\nNombre del Contacto\nTeléfono\nDirección\nCondiciones Comerciales\nCondiciones de Pago\nContado\nCrédito 15 días\nCrédito 30 días\nCrédito 45 días\nCrédito 60 días\nCrédito 90 días\nLímite de Crédito (PEN)\nRetención de cuarta categoría\n\nSi el proveedor le entregó su constancia de suspensión, anote hasta cuándo rige. Mientras esté vigente no se le retendrá el 8 % de sus recibos por honorarios. Déjelo vacío cuando caduque.\n\nSuspensión vigente hasta\nCancelar\nActualizar Proveedor"
+    },
+    {
+      "template": "compras/cotizaciones/[id]",
+      "route": "/dashboard/compras/cotizaciones/a457e950-1487-4e95-84ea-74a7d421ca28/",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "text": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nProductos\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nPLAME / T-Registro\nLiquidaciones y CTS\nConfiguración\nOffline\nAyuda\ndemo\nperu-integrated-1@example.test\nCerrar Sesión\n7\nClaro\nVolver a Cotizaciones\nCotización COT-LOCAL-545\nBorrador\n\nProveedor: Distribuidora Andina S.A.C.\n\nEnviar\nInformación General\nNÚMERO\n\nCOT-LOCAL-545\n\nFECHA COTIZACIÓN\n\n11/9/2026\n\nFECHA VENCIMIENTO\n\n11/10/2026\n\nMONEDA\n\nPEN\n\nProveedor\nRAZÓN SOCIAL\n\nDistribuidora Andina S.A.C.\n\nRUC\n\n20512345671\n\nEMAIL\n\nventas@distribuidoraandina.demo\n\nDetalle de Productos\nCÓDIGO\tPRODUCTO\tCANTIDAD\tPRECIO UNIT.\tSUBTOTAL\nDEMO-003\tCuaderno A4 96 hojas\t1 NIU\tPEN 5.00\tPEN 5.00\nSubtotal:\nPEN 5.00\nIGV (18%):\nPEN 0.90\nTotal:\nPEN 5.90"
+    },
+    {
+      "template": "compras/ordenes/[id]",
+      "route": "/dashboard/compras/ordenes/a077ff4b-aec1-4867-8ef8-2ec9f27b4223/",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "text": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nProductos\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nPLAME / T-Registro\nLiquidaciones y CTS\nConfiguración\nOffline\nAyuda\ndemo\nperu-integrated-1@example.test\nCerrar Sesión\n7\nClaro\nVolver a Órdenes de Compra\nOrden de Compra OC-LOCAL-1789255684326\nRecibida\n\nCreada el 12 de setiembre de 2026\n\nActualizar\nImprimir / PDF\nInformación del Proveedor\nRAZÓN SOCIAL\n\nProveedor integración local SAC\n\nRUC\n\n20123456786\n\nEMAIL\n\nsupplier-integrated@example.test\n\nProductos Solicitados\nPRODUCTO\tCANTIDAD\tRECIBIDO\tPENDIENTE\tPRECIO UNIT.\tSUBTOTAL\nCuaderno A4 96 hojas\t3\t3\t0\tS/ 5.00\tS/ 15.00\nResumen\nSubtotal\nS/ 15.00\nIGV (18%)\nS/ 2.70\nTotal\nS/ 17.70\nMoneda\nPEN\nFechas\nFECHA DE ORDEN\n\n12 de setiembre de 2026\n\nFECHA DE ENTREGA ESPERADA\n\n12 de octubre de 2026\n\nCONDICIONES DE PAGO\n\nCrédito 30 días (30 días)\n\nProgreso de Recepción\nRecibido\n100.0%\nVer Recepciones\nRecepciones de Mercancía\n1 recepción\nREC-2026-0001\nCerrada\n12 set. 2026"
+    },
+    {
+      "template": "compras/devoluciones/[id]",
+      "route": "/dashboard/compras/devoluciones/14f27c29-b42d-42c6-9ea1-1e527a71f76f/",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "text": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nProductos\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nPLAME / T-Registro\nLiquidaciones y CTS\nConfiguración\nOffline\nAyuda\ndemo\nperu-integrated-1@example.test\nCerrar Sesión\n7\nClaro\nVolver\nDevolución DEV-2026-0003\nEMITIDA\n\nCreada el 12/09/2026, 06:29 p. m.\n\nInformación de la Devolución\nNÚMERO\n\nDEV-2026-0003\n\nFECHA\n\n12/09/2026\n\nORDEN DE COMPRA\n\nOC-MIXTA-1789255723110\n\nRECEPCIÓN\n\nREC-2026-0004\n\nRecibida: Invalid Date\n\nMOTIVO\n\nDevolución documentada en infraestructura local\n\nDevolución emitida\n\nEmitida el 12/09/2026, 06:29 p. m. por fe0c60c0-b5ff-406d-851d-fb48bdc525cc\n\nItems Devueltos\nPRODUCTO\tCANTIDAD\tPRECIO UNIT.\tSUBTOTAL\tMOTIVO\n\nCuaderno A4 96 hojas\nDEMO-003\n\t1\tS/ 5.00\tS/ 5.00\tDevolución documentada en infraestructura local\nSubtotal:\nS/ 5.00\nIGV (18%):\nS/ 0.90\nTotal:\nS/ 5.90\nProveedor\n\nProveedor integración local SAC\n\nRUC: 20123456786\n\nAuditoría\n\nCreada\n\n12/09/2026, 06:29 p. m.\n\nCreada por\n\nfe0c60c0-b5ff-406d-851d-fb48bdc525cc\n\nEstado actual\n\nEMITIDA"
+    },
+    {
+      "template": "finanzas/cxp/[id]",
+      "route": "/dashboard/finanzas/cxp/eef6bf7f-a82e-47d5-a829-6955543472dc/",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "text": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nProductos\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nPLAME / T-Registro\nLiquidaciones y CTS\nConfiguración\nOffline\nAyuda\ndemo\nperu-integrated-1@example.test\nCerrar Sesión\n7\nClaro\nCuenta por Pagar\n\nF001-00000001\n\nTOTAL\nS/ 17.70\nMonto original\nPAGADO\nS/ 17.70\n100.0% del total\nSALDO\nS/ 0.00\nPor pagar\nVENCIMIENTO\n11 de octubre de 2026\nFecha límite\nInformación del Documento\nNúmero de Documento\nF001-00000001\nTipo de Documento\nFACTURA\nFecha de Emisión\n11 de setiembre de 2026\nFecha de Vencimiento\n11 de octubre de 2026\nCondiciones de Pago\nCREDITO_30 (30 días)\nProveedor\nRazón Social\nProveedor integración local SAC\nRUC\n20123456786\nEmail\nsupplier-integrated@example.test\nHistorial de Pagos\nFECHA\tCUENTA BANCARIA\tREFERENCIA\tMÉTODO\tESTADO\tMONTO\n11 de setiembre de 2026\t\nBCP\n194-1234567-0-56\n\tOPERACION-LOCAL-COMPRA\tTRANSFERENCIA\t\nPendiente\tS/ 17.70\nTotal Pagado\tS/ 17.70"
+    },
+    {
+      "template": "finanzas/bancos/[id]",
+      "route": "/dashboard/finanzas/bancos/957280a7-ddf6-45ab-837e-2be3dcefc236/",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "text": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nProductos\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nPLAME / T-Registro\nLiquidaciones y CTS\nConfiguración\nOffline\nAyuda\ndemo\nperu-integrated-1@example.test\nCerrar Sesión\n7\nClaro\nBCP Cuenta Corriente\n\nBCP • 194-1234567-0-56\n\nTransferir\nNuevo movimiento\nActualizar\nTipo de Cuenta\nCorriente\nMoneda\nPEN\nSaldo Disponible\nS/ 44,946.94\nEstado\nACTIVA\nMovimientos Bancarios\nExportar\nFiltros\nFECHA\tTIPO\tDESCRIPCIÓN\tPROVEEDOR\tREFERENCIA\tMONTO\tESTADO\n\n12/09/2026\n12/09/2026, 06:29 p. m.\n\t\nCARGO\t\nPago planilla 29de685d-5486-4025-a864-760e48c50257\n\t-\tPLANILLA-LOCAL-544\t- S/ 5,035.36\t\nPendiente\n\n12/09/2026\n12/09/2026, 06:28 p. m.\n\t\nCARGO\t\nPago a proveedor Proveedor integración local SAC - Doc: F001-00000001\n\t\nProveedor integración local SAC\nRUC: 20123456786\n\tOPERACION-LOCAL-COMPRA\t- S/ 17.70\t\nPendiente"
+    },
+    {
+      "template": "finanzas/bancos/[id]/editar",
+      "route": "/dashboard/finanzas/bancos/957280a7-ddf6-45ab-837e-2be3dcefc236/editar/",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "text": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nProductos\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nPLAME / T-Registro\nLiquidaciones y CTS\nConfiguración\nOffline\nAyuda\ndemo\nperu-integrated-1@example.test\nCerrar Sesión\n7\nClaro\nVolver\nEditar Cuenta Bancaria\n\nActualiza la información de la cuenta bancaria\n\nInformación de la Cuenta\n\nMoneda: PEN\n\nSaldo Actual: S/ 44,946.94\n\nNota: El saldo no se puede modificar directamente. Se actualiza automáticamente mediante movimientos bancarios.\n\nInformación Básica\nNombre de la Cuenta *\n\nNombre descriptivo para identificar la cuenta\n\nBanco *\nNúmero de Cuenta *\nTipo de Cuenta *\nCuenta Corriente\nCuenta de Ahorros\nPlazo Fijo\nCuenta de Detracción\nCuenta contable bancaria *\nSeleccione\n10 - Caja y bancos\n101 - Caja\n104 - Bancos\n\nEsta cuenta se usa como débito o crédito en los asientos bancarios.\n\nOpciones\nPermite Sobregiro\n\nPermite que el saldo de la cuenta sea negativo\n\nCuenta Activa\n\nSolo las cuentas activas pueden recibir movimientos\n\nCancelar\nGuardar Cambios"
+    },
+    {
+      "template": "finanzas/conciliacion/[id]",
+      "route": "/dashboard/finanzas/conciliacion/292946e9-4613-4816-b212-043e375f9b7d/",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "text": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nProductos\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nPLAME / T-Registro\nLiquidaciones y CTS\nConfiguración\nOffline\nAyuda\ndemo\nperu-integrated-1@example.test\nCerrar Sesión\n7\nClaro\nConciliación Bancaria\n\nBCP - 194-1234567-0-56\n\nABIERTA\nPeríodo\n\n2026-02\n\n1 de febrero de 2026 - 28 de febrero de 2026\n\nSaldo Libro\n\nS/ 0.00\n\nSaldo Banco\n\nS/ 0.00\n\nDiferencia\n\nS/ 0.00\n\nGuía Rápida: Proceso de Conciliación\n1. Importar\n\nSube el extracto bancario en formato CSV\n\n2. Auto-Match\n\nEl sistema concilia automáticamente\n\n3. Ajustar\n\nRevisa y ajusta manualmente\n\n4. Revisar\n\nVerifica saldos y diferencias\n\n5. Cerrar\n\nFinaliza la conciliación\n\n💡 Consejo: Usa el modo Wizard para una experiencia guiada paso a paso, o la vista detallada para control total del proceso.\n🧙 Modo Wizard\nImportar Extracto CSV\nMatch Automático\nMatch Manual\nRegistrar ajuste\nCerrar Conciliación\nPendiente\nConciliado Manual\nMatch Automático\nResaltado\nArrastra entre columnas para conciliar\nMovimientos Pendientes de Conciliar\nMOVIMIENTOS DEL SISTEMA\n0\n\nTodos los movimientos del sistema están conciliados\n\nMOVIMIENTOS DEL EXTRACTO\n0\n\nNo hay movimientos del extracto pendientes"
+    },
+    {
+      "template": "contabilidad/periodos/[id]",
+      "route": "/dashboard/contabilidad/periodos/5bd6d808-7cdc-4797-b1c6-8713fb419dc7/",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "text": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nProductos\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nPLAME / T-Registro\nLiquidaciones y CTS\nConfiguración\nOffline\nAyuda\ndemo\nperu-integrated-1@example.test\nCerrar Sesión\n7\nClaro\nVolver a Períodos\nPeríodo Contable\n\nSeptiembre 2026\n\nCerrar Período\n\nEstado\n\nABIERTO\n\nAño\n\n2026\n\nMes\n\n09\n\nID del Período\n\n5bd6d808-7cdc-4797-b1c6-8713fb419dc7\n\nFecha de Creación\n\n12 set. 2026\n\nPeríodo Abierto\n\nEste período está abierto y permite el registro de nuevos asientos contables. Puedes cerrarlo cuando hayas terminado todas las operaciones del mes."
+    },
+    {
+      "template": "contabilidad/asientos/[id]",
+      "route": "/dashboard/contabilidad/asientos/3153ebd6-d66d-4480-b0ec-68bef875bed6/",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "text": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nProductos\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nPLAME / T-Registro\nLiquidaciones y CTS\nConfiguración\nOffline\nAyuda\ndemo\nperu-integrated-1@example.test\nCerrar Sesión\n7\nClaro\nVolver a asientos\nAsiento 18\nConfirmado\n\nCreado el 12 de setiembre de 2026\n\nActualizar\nReversar\nDescargar PDF\nInformacion del asiento\nNUMERO\n18\nFECHA\n12 de setiembre de 2026\nREFERENCIA\nBC01-00000001\nORIGEN\nAutomático\nCONCEPTO\n\nNota de crédito\n\nDetalle debe / haber\nBalanceado\nCUENTA\tCONCEPTO\tCENTRO\tDEBE\tHABER\tANALÍTICA\n\n70\nVentas\n\tReversión de ingresos\t-\tS/ 20.00\t-\tDistribuir\n\n40\nTributos por pagar\n\tReversión IGV por pagar\t-\tS/ 3.60\t-\tDistribuir\n\n20\nInventarios\n\tReversión inventario\t-\tS/ 5.50\t-\tDistribuir\n\n69\nCosto de ventas\n\tReversión costo de ventas\t-\t-\tS/ 5.50\tDistribuir\n\n12\nClientes\n\tReversión de cuenta por cobrar del cliente\t-\t-\tS/ 23.60\tDistribuir\nTotales\tS/ 29.10\tS/ 29.10\t\nResumen\nTotal debe\nS/ 29.10\nTotal haber\nS/ 29.10\nDiferencia\nS/ 0.00\n\nEl asiento esta balanceado correctamente.\n\nMetadatos\nESTADO\nConfirmado\nFECHA DE CREACION\n12 de setiembre de 2026\nULTIMA ACTUALIZACION\n12 de setiembre de 2026\nEVENTO ORIGEN\n66d1edc7-f27e-4a01-9325-fef88c4efd30"
+    },
+    {
+      "template": "contabilidad/asientos/[id]/editar",
+      "route": "/dashboard/contabilidad/asientos/3153ebd6-d66d-4480-b0ec-68bef875bed6/editar/",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "text": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nProductos\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nPLAME / T-Registro\nLiquidaciones y CTS\nConfiguración\nOffline\nAyuda\ndemo\nperu-integrated-1@example.test\nCerrar Sesión\n7\nClaro\nNo se puede editar este asiento\n\nSolo se puede editar un asiento en borrador. Este asiento está CONFIRMADO. Para corregir un asiento confirmado use la reversión.\n\nVolver al asiento\nReintentar"
+    },
+    {
+      "template": "inventario/productos/[id]/editar",
+      "route": "/dashboard/inventario/productos/3675136e-8774-4e7a-905f-43f09bcc2bed/editar/",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "text": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nProductos\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nPLAME / T-Registro\nLiquidaciones y CTS\nConfiguración\nOffline\nAyuda\ndemo\nperu-integrated-1@example.test\nCerrar Sesión\n7\nClaro\nVolver a Productos\nEditar Producto\n\nModifique la información del producto\n\nInformación Básica\nCódigo *\nCódigo de Barras\nNombre *\nMarca\n\nLas ventas futuras congelan esta marca al calcular la comisión.\n\nUnidad de medida\nUnidad (NIU)\nKilogramo (KGM)\nLitro (LTR)\nMetro (MTR)\nServicio (ZZ)\n\nSi el producto ya tiene Kardex, el sistema preservará su unidad histórica.\n\nDescripción\nCategoría *\nSeleccione una categoría\nSERVICIOS LOCALES\nALIMENTOS\nOFICINA\nELECTRONICA\nHOGAR\nImagen del producto\n\nJPG, PNG o WebP. Máximo 5 MB. La foto se mostrará también en el POS.\n\nArrastre una imagen aquí o selecciónela desde su equipo.\n\nElegir imagen\nPrecios e Impuestos\nPrecio de Compra (PEN)\nPrecio de Venta (PEN) *\nIGV que se cobrara\n18% sobre el precio de venta\n\nSale de la afectación y de la tasa configurada para la empresa.\n\nAfectación IGV\nGravado (paga IGV)\nExonerado (sin IGV)\nInafecto (sin IGV)\nExportación\nInventario\n\n⚠️ El stock actual no se puede modificar desde aquí. Use movimientos de inventario para ajustar el stock. Abrir ajustes y transferencias\n\nStock Mínimo\nCancelar\nGuardar Cambios"
+    },
+    {
+      "template": "contabilidad/presupuestos/[id]",
+      "route": "/dashboard/contabilidad/presupuestos/168549ad-8b67-422b-b199-771633821d47/",
+      "tenant": 2,
+      "status": 200,
+      "errors": [],
+      "text": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nProductos\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nPLAME / T-Registro\nLiquidaciones y CTS\nConfiguración\nOffline\nAyuda\ndemo\nperu-integrated-2@example.test\nCerrar Sesión\n3\nClaro\nVolver a Presupuestos\nEditar Presupuesto\n\nActualice el monto presupuestado y las notas\n\nCentro de Costo *\nSeleccione un centro de costo\nLOCAL-COSTO-544 - Centro local de presupuesto\n\nNo se puede cambiar el centro de costo al editar\n\nCuenta Contable *\nSeleccione una cuenta\n60 - Compras\n621 - Sueldos\n627 - Seguridad, prevision social y otras contribuciones\n629 - Beneficios sociales\n63 - Gastos de servicios prestados por terceros\n65 - Otros gastos de gestión\n69 - Costo de ventas\n94 - Gastos de administracion\n\nNo se puede cambiar la cuenta al editar\n\nPeríodo Contable *\nSeleccione un período\n2026-09 (ABIERTO)\n\nNo se puede cambiar el período al editar\n\nMonto Presupuestado (PEN) *\nNotas (Opcional)\nEstado\nACTIVO\nBLOQUEADO\nCERRADO\nActualizar Presupuesto\nCancelar"
+    },
+    {
+      "template": "contabilidad/centros-costo/[id]",
+      "route": "/dashboard/contabilidad/centros-costo/f05ba662-9c5e-428e-aec7-22fe74820ff2/",
+      "tenant": 2,
+      "status": 200,
+      "errors": [],
+      "text": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nProductos\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nPLAME / T-Registro\nLiquidaciones y CTS\nConfiguración\nOffline\nAyuda\ndemo\nperu-integrated-2@example.test\nCerrar Sesión\n3\nClaro\nVolver\nCENTRO ACTIVO\nLOCAL-COSTO-544 - Centro local de presupuesto\nComparacion\nEditar\nPERIODO\nSeleccionar periodo\nsetiembre de 2026\nPresupuesto\nGastos\nPresupuesto vs real\nCUENTA\tPRESUPUESTADO\tEJECUTADO\tDISPONIBLE\t% EJECUTADO\tESTADO\n\n\tS/ 1,500.75\tS/ 0.00\tS/ 1,500.75\t0.0%\tNormal\nResumen\nPERIODO\n9/2026\nPRESUPUESTADO\nS/ 1,500.75\nEJECUTADO\nS/ 0.00\nDISPONIBLE\nS/ 1,500.75"
+    },
+    {
+      "template": "contabilidad/centros-costo/[id]/editar",
+      "route": "/dashboard/contabilidad/centros-costo/f05ba662-9c5e-428e-aec7-22fe74820ff2/editar/",
+      "tenant": 2,
+      "status": 200,
+      "errors": [],
+      "text": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nProductos\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nPLAME / T-Registro\nLiquidaciones y CTS\nConfiguración\nOffline\nAyuda\ndemo\nperu-integrated-2@example.test\nCerrar Sesión\n3\nClaro\nEditar Centro de Costo\n\nModifique la información del centro de costo\n\nCódigo *\n\nCódigo único para identificar el centro de costo\n\nNombre *\nDescripción\nCentro de costo activo\n\nLos centros de costo inactivos no se pueden asignar a nuevos asientos\n\nCancelar\nGuardar Cambios"
+    }
+  ]
+}

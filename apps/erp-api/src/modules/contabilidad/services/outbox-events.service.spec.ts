@@ -51,6 +51,28 @@ describe("OutboxEventsService", () => {
     const tenantId = "tenant-492";
     const actorId = "actor-492";
 
+    it.each(["leerEventosFallidos", "obtenerEstadisticasEventos"] as const)(
+      "%s conserva la denegación de acceso sin exponer errores SQL", async (method) => {
+        mockSupabaseService.getClient.mockReturnValue({ rpc: jest.fn().mockResolvedValue({
+          data: null, error: { code: "42501", message: "OUTBOX_ACTOR_NOT_ACTIVE_IN_TENANT" },
+        }) });
+        await expect(service[method](tenantId, actorId)).rejects.toMatchObject({
+          status: 403,
+          message: "La consulta de eventos requiere un usuario activo de esta empresa con permiso contable",
+        });
+      },
+    );
+
+    it.each(["leerEventosFallidos", "obtenerEstadisticasEventos"] as const)(
+      "%s distingue una caída de la base de una lista vacía", async (method) => {
+        mockSupabaseService.getClient.mockReturnValue({ rpc: jest.fn().mockResolvedValue({
+          data: null, error: { code: "08006", message: "internal connection details" },
+        }) });
+        await expect(service[method](tenantId, actorId)).rejects.toMatchObject({ status: 503,
+          message: "No se pudo consultar la cola contable. Inténtalo nuevamente" });
+      },
+    );
+
     it("lista eventos fallidos mediante el RPC con tenant y actor", async () => {
       const rpc = jest.fn().mockResolvedValue({
         data: [
@@ -108,7 +130,7 @@ describe("OutboxEventsService", () => {
       await expect(
         service.leerEventosFallidos(tenantId, actorId),
       ).rejects.toThrow(
-        "Error leyendo eventos del tenant: actor fuera del tenant",
+        "No se pudo consultar la cola contable. Inténtalo nuevamente",
       );
     });
   });
@@ -179,7 +201,7 @@ describe("OutboxEventsService", () => {
 
       await expect(
         service.obtenerEstadisticasEventos(tenantId, actorId),
-      ).rejects.toThrow("Error obteniendo estadísticas: actor inválido");
+      ).rejects.toThrow("No se pudo consultar la cola contable. Inténtalo nuevamente");
     });
   });
 });

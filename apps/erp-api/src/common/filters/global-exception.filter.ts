@@ -53,7 +53,16 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       error = exception.name;
 
       const normalizedMessage = message.toLowerCase();
-      if (normalizedMessage.includes('duplicate key value') || normalizedMessage.includes('unique constraint')) {
+      const parserError = exception as Error & { type?: string; status?: number };
+      if (parserError.type === 'entity.too.large' && parserError.status === 413) {
+        statusCode = HttpStatus.PAYLOAD_TOO_LARGE;
+        message = 'El archivo o solicitud supera el tamaño permitido';
+        error = 'PAYLOAD_TOO_LARGE';
+      } else if (parserError.type === 'entity.parse.failed' && parserError.status === 400) {
+        statusCode = HttpStatus.BAD_REQUEST;
+        message = 'El cuerpo JSON de la solicitud no es válido';
+        error = 'BAD_REQUEST';
+      } else if (normalizedMessage.includes('duplicate key value') || normalizedMessage.includes('unique constraint')) {
         statusCode = HttpStatus.CONFLICT;
         error = 'CONFLICT';
       } else if (
