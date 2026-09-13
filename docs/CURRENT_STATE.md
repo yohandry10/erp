@@ -18,7 +18,11 @@ también 104 contratos de navegador y el login móvil, los builds API/web finale
 la imagen API y su rechazo de configuración antes de conexiones. El cron SIRE
 retirado pasa su prueba específica; la cadena SQL y los 84 contratos HTTP
 volvieron a pasar con el comparador de ACL. El recorrido conjunto de módulos y
-detalle presupuestal sigue en ejecución.
+detalle presupuestal pasó 100 páginas sin errores HTTP/JS. La repetición de los
+siete flujos y 22 detalles también pasó. CI confirmó 299 suites/2877 pruebas
+API, pero detectó la superposición de los límites global y de autenticación:
+la corrección conserva los límites por cuenta/oficina y pasa cuatro pruebas
+con ambos guards. Su recorrido integrado y los checks finales están pendientes.
 
 El respaldo productivo del 12 de septiembre se restauró en PostgreSQL 17 sin
 red: las 537..552 y sus 16 verificadores pasaron, con 289 tablas y 206073 filas
@@ -26,6 +30,9 @@ previas y 5451 columnas conservadas. Sólo se añadieron 171 cuentas, 240 concep
 y 16 entradas de historia. RLS permanece intacto y readiness local exige y
 encuentra 552. Evidencia: `artifacts/erp-peru-prod-rehearsal-20260913071340257-8992.json`.
 El respaldo no incluye archivos externos de Storage ni roles globales.
+El respaldo renovado del 13 de septiembre también se restauró y pasó las 16
+migraciones, verificadores y reversión atómica deliberada sin cambios remotos:
+`artifacts/erp-peru-prod-rehearsal-20260913074523417-18040.json`.
 
 PROD conserva ACL heredadas distintas de la cadena limpia: 181 tablas tenían
 DML para service_role. Las migraciones conservan esas ACL, excepto la retirada

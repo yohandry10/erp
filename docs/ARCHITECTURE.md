@@ -55,6 +55,10 @@ sin datos de clientes.
   mantiene una segunda tabla manual en documentación.
 - Los endpoints públicos son excepciones explícitas, limitadas y protegidas con
   rate limiting cuando corresponde.
+- Las rutas con `AuthRateLimitGuard` usan sus límites por cuenta+IP (cinco
+  intentos/minuto en login) y por oficina (veinte). El guard global delega sólo
+  cuando ese guard está declarado; así no colapsa cuentas distintas en el
+  límite estricto de una sola cuenta. Las demás rutas conservan el límite global.
 - El JWT se contrasta con identidad, sesión revocable, contexto empresarial y
   privilegio de superadministrador vigentes; una sesión válida de otro usuario
   o contexto no autentica el token. El cambio de empresa crea sesión y auditoría
