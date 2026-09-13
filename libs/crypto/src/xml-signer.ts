@@ -32,6 +32,8 @@ export class CertificateOwnershipError extends Error {
   readonly esErrorDeTitularidad = true as const;
 }
 
+export class CertificateValidityError extends Error {}
+
 export class XmlSigner {
   private certificate!: forge.pki.Certificate;
   private privateKey!: forge.pki.PrivateKey;
@@ -55,7 +57,7 @@ export class XmlSigner {
       // La titularidad no se negocia: si el certificado no es del contribuyente,
       // caer a demo convertiria el bloqueo en una firma silenciosa con otro
       // certificado, que es justo lo que el guardia venia a impedir.
-      if (error instanceof CertificateOwnershipError) {
+      if (error instanceof CertificateOwnershipError || error instanceof CertificateValidityError) {
         throw error;
       }
       // El fallback a demo se pide, no se hereda. Antes bastaba con no decir
@@ -100,9 +102,25 @@ export class XmlSigner {
       this.certificate = certBags[forge.pki.oids.certBag]![0].cert!;
       this.privateKey = keyBags[forge.pki.oids.pkcs8ShroudedKeyBag]![0].key!;
       this.assertCertificateRuc();
+      this.assertCertificateValidity();
       console.log('✅ Certificado real cargado exitosamente');
     } else {
       throw new Error('No se pudo extraer certificado o clave privada del archivo .pfx');
+    }
+  }
+
+  private assertCertificateValidity(): void {
+    const now = Date.now();
+    const validFrom = this.certificate.validity?.notBefore?.getTime();
+    const validTo = this.certificate.validity?.notAfter?.getTime();
+    if (!Number.isFinite(validFrom) || !Number.isFinite(validTo)) {
+      throw new CertificateValidityError('No se pudo verificar la vigencia del certificado fiscal.');
+    }
+    if (now < validFrom) {
+      throw new CertificateValidityError('El certificado fiscal aún no está vigente.');
+    }
+    if (now >= validTo) {
+      throw new CertificateValidityError('El certificado fiscal está vencido; cargue uno vigente antes de firmar.');
     }
   }
 
@@ -207,6 +225,8 @@ export class XmlSigner {
 
   signXml(xmlContent: string): string {
     try {
+      // Un signer puede permanecer en memoria más tiempo que la vigencia del PFX.
+      this.assertCertificateValidity();
       console.log('🔐 Firmando XML con certificado...');
 
       const privateKeyPem = forge.pki.privateKeyToPem(this.privateKey);

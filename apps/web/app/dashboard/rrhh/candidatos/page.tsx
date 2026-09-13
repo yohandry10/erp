@@ -36,6 +36,7 @@ const CandidatosPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [candidatoEdit, setCandidatoEdit] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const { get, post } = useApi();
   const { toast } = useToast();
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED !== 'false';
@@ -50,12 +51,17 @@ const CandidatosPage = () => {
     }
     try {
       setLoading(true);
+      setLoadError(false);
 
       // Cargar candidatos
       const candidatosData = await get('/api/rrhh/candidatos');
       // El API responde { success, data: [...] }; hay que desempaquetar `.data`.
       // Antes se hacía Array.isArray(respuestaCruda) → siempre false → nunca cargaba.
-      const asList = (r: any) => Array.isArray(r) ? r : (Array.isArray(r?.data) ? r.data : []);
+      const asList = (r: any) => {
+        if (r?.success !== false && Array.isArray(r)) return r;
+        if (r?.success !== false && Array.isArray(r?.data)) return r.data;
+        throw new Error('Respuesta incompleta al cargar reclutamiento');
+      };
       setCandidatos(asList(candidatosData));
 
       // Cargar vacantes
@@ -66,6 +72,7 @@ const CandidatosPage = () => {
       const departamentosData = await get('/api/rrhh/departamentos');
       setDepartamentos(asList(departamentosData));
     } catch (error) {
+      setLoadError(true);
       console.error('Error cargando candidatos:', error);
     } finally {
       setLoading(false);
@@ -120,7 +127,7 @@ const CandidatosPage = () => {
     }
 
     if (filtroVacante !== 'todas') {
-      filtrados = filtrados.filter(c => c.vacante_id === filtroVacante);
+      filtrados = filtrados.filter(c => (c.id_vacante ?? c.vacante_id) === filtroVacante);
     }
 
     return filtrados;
@@ -205,6 +212,12 @@ const CandidatosPage = () => {
         </div>
       </div>
 
+      {loadError && (
+        <div role="alert" className="mb-6 rounded-lg border border-destructive p-4">
+          <p>No se pudo completar la carga de candidatos y vacantes. La información puede estar incompleta.</p>
+          <Button type="button" variant="outline" onClick={loadData}>Reintentar carga</Button>
+        </div>
+      )}
       {/* Estadísticas */}
       <div className="mb-8 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-5 mb-6">
         <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
@@ -309,7 +322,7 @@ const CandidatosPage = () => {
                     </div>
                   </td>
                   <td>
-                    {vacantes.find(v => v.id === candidato.vacante_id)?.titulo || 'N/A'}
+                    {vacantes.find(v => v.id === (candidato.id_vacante ?? candidato.vacante_id))?.titulo || 'N/A'}
                   </td>
                   <td>{candidato.telefono}</td>
                   <td>{candidato.experiencia_anos || 0} años</td>
@@ -431,6 +444,7 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
     direccion: '',
     nivel_educacion: 'universitario',
     experiencia_anos: 0,
+    estado_civil: '',
     pretension_salarial: 0,
     cv_url: '',
     linkedin_url: '',
@@ -456,6 +470,7 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
         direccion: candidato.direccion || '',
         nivel_educacion: candidato.nivel_educacion || 'universitario',
         experiencia_anos: candidato.experiencia_anos || 0,
+        estado_civil: candidato.estado_civil || '',
         pretension_salarial: candidato.pretension_salarial || 0,
         cv_url: candidato.cv_url || '',
         linkedin_url: candidato.linkedin_url || '',
@@ -621,6 +636,19 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
         </div>
       </div>
 
+      <div className="mb-6">
+        <label htmlFor="candidatos-estado-civil" className="block text-sm font-semibold mb-2">Estado civil</label>
+        <select id="candidatos-estado-civil" value={formData.estado_civil}
+          onChange={e => setFormData({ ...formData, estado_civil: e.target.value })}
+          className="w-full p-3 border rounded-md bg-card">
+          <option value="">Sin informar</option>
+          <option value="soltero">Soltero(a)</option>
+          <option value="casado">Casado(a)</option>
+          <option value="divorciado">Divorciado(a)</option>
+          <option value="viudo">Viudo(a)</option>
+          <option value="conviviente">Conviviente</option>
+        </select>
+      </div>
       {/* Información Profesional */}
       <div className="mb-6 rounded-lg border border-border bg-accent/35 p-4 sm:p-6">
         <h3 className="m-0 mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">

@@ -12,54 +12,56 @@ export interface ParsedCsvError {
 
 const MAX_FIELD_LEN = 4096;
 
-function splitCsvLine(line: string): string[] {
-  const cols: string[] = [];
-  let cur = '';
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (line[i + 1] === '"') {
-          cur += '"';
-          i++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        cur += ch;
-      }
-    } else if (ch === ',') {
-      cols.push(cur);
-      cur = '';
-    } else if (ch === '"' && cur.length === 0) {
-      inQuotes = true;
-    } else {
-      cur += ch;
-    }
-  }
-  cols.push(cur);
-  return cols.map((c) => c.trim());
-}
+export class CsvFormatError extends Error {}
 
 export function parseCsv(content: string): ParsedCsv {
-  const lines = content.split(/\r?\n/).filter((l) => l.length > 0);
-  if (lines.length === 0) {
-    return { headers: [], rows: [], totalLines: 0 };
+  const records: string[][] = [];
+  let columns: string[] = [];
+  let field = '';
+  let quoted = false;
+  let closedQuote = false;
+  const fail = (message: string): never => { throw new CsvFormatError(`Registro ${records.length + 1}: ${message}`); };
+  const finishField = () => {
+    columns.push(field.trim());
+    field = '';
+    closedQuote = false;
+  };
+  const finishRecord = () => {
+    finishField();
+    if (columns.some((value) => value !== '')) records.push(columns);
+    columns = [];
+  };
+  const input = content.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+  for (let i = 0; i < input.length; i++) {
+    const char = input[i];
+    if (quoted) {
+      if (char === '"' && input[i + 1] === '"') { field += '"'; i++; }
+      else if (char === '"') { quoted = false; closedQuote = true; }
+      else field += char;
+    } else if (char === ',') finishField();
+    else if (char === '\n') finishRecord();
+    else if (char === '"') {
+      if (field.length || closedQuote) fail('comillas inesperadas en el campo');
+      quoted = true;
+    } else if (closedQuote) {
+      if (!/^[ \t]$/.test(char)) fail('contenido después del cierre de comillas');
+    } else field += char;
+    if (field.length > MAX_FIELD_LEN) fail(`el campo supera ${MAX_FIELD_LEN} caracteres; no se truncará`);
   }
-  const headers = splitCsvLine(lines[0]).map((h) => h.toLowerCase().trim());
-  const rows: Record<string, string>[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    const cols = splitCsvLine(lines[i]);
-    if (cols.every((c) => c === '')) continue;
-    const row: Record<string, string> = {};
-    headers.forEach((h, idx) => {
-      const v = cols[idx] ?? '';
-      row[h] = v.length > MAX_FIELD_LEN ? v.slice(0, MAX_FIELD_LEN) : v;
-    });
-    rows.push(row);
+  if (quoted) fail('comillas sin cerrar');
+  if (field || columns.length || closedQuote) finishRecord();
+  if (!records.length) return { headers: [], rows: [], totalLines: 0 };
+  const headers = records[0].map((header) => header.toLowerCase().trim());
+  if (headers.some((header) => !header) || new Set(headers).size !== headers.length) {
+    throw new CsvFormatError('Encabezados vacíos o duplicados');
   }
-  return { headers, rows, totalLines: lines.length - 1 };
+  const rows = records.slice(1).map((values, index) => {
+    if (values.length !== headers.length) {
+      throw new CsvFormatError(`Registro ${index + 2}: se esperaban ${headers.length} columnas y se recibieron ${values.length}`);
+    }
+    return Object.fromEntries(headers.map((header, i) => [header, values[i]]));
+  });
+  return { headers, rows, totalLines: rows.length };
 }
 
 export function validateHeaders(headers: string[], required: string[]): string[] {

@@ -6,6 +6,7 @@ import { useApi } from '@/hooks/use-api'
 import { CotizacionCompra, Proveedor } from '@/types/compras'
 import toast from 'react-hot-toast'
 import { parseDateLocal } from '@/lib/date-utils'
+import { downloadCsv } from '@/lib/csv-export'
 import CompraEditarCabeceraModal from '@/components/modals/CompraEditarCabeceraModal'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import {
@@ -121,7 +122,11 @@ export default function CotizacionesCompraPage() {
   }
 
   const handleExport = () => {
-    toast('📥 Funcionalidad de exportación próximamente')
+    downloadCsv(`cotizaciones-compra-pagina-${currentPage}.csv`,
+      ['Número', 'Proveedor', 'Fecha', 'Vencimiento', 'Estado', 'Subtotal', 'Impuesto', 'Total'],
+      cotizaciones.map(cotizacion => [cotizacion.numero, cotizacion.proveedores?.razon_social,
+        cotizacion.fecha_cotizacion, cotizacion.fecha_vencimiento, cotizacion.estado,
+        cotizacion.subtotal, cotizacion.igv, cotizacion.total]))
   }
 
   const getEstadoBadge = (estado: string) => {
@@ -300,10 +305,10 @@ export default function CotizacionesCompraPage() {
           )}
 
           <button
-            onClick={handleExport} className="py-3 px-4 rounded-lg border bg-card cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium"
+            disabled={loading || cotizaciones.length === 0} onClick={handleExport} className="py-3 px-4 rounded-lg border bg-card cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium disabled:opacity-50"
           >
             <Download size={16} />
-            Exportar
+            Exportar página (CSV)
           </button>
 
           <button

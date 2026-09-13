@@ -13,9 +13,11 @@ import { StructuredLogger } from './shared/logging/structured-logger.service';
 import helmet from 'helmet';
 import compression from 'compression';
 import { ConfigService } from '@nestjs/config';
+import { migrationBodyParser } from './modules/migration/migration-body-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.use('/api/migration', migrationBodyParser());
   const configService = app.get(ConfigService);
 
   // Definir puerto al inicio

@@ -28,6 +28,7 @@ export default function OrdenesPendientesPage() {
 
   const [ordenes, setOrdenes] = useState<PedidoVenta[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [selectedPedido, setSelectedPedido] = useState<PedidoVenta | null>(null)
   const [showPreparacionModal, setShowPreparacionModal] = useState(false)
 
@@ -36,13 +37,17 @@ export default function OrdenesPendientesPage() {
 
     try {
       setLoading(true)
+      setLoadError(false)
       const response = await get('/inventario/logistica/ordenes-pendientes')
-      if (response?.success) {
-        setOrdenes(response.data || [])
+      if (response?.success && Array.isArray(response.data)) {
+        setOrdenes(response.data)
       } else if (Array.isArray(response)) {
         setOrdenes(response)
+      } else {
+        throw new Error('Respuesta de órdenes no válida')
       }
     } catch (error) {
+      setLoadError(true)
       console.error('Error loading ordenes:', error)
       toast({
         title: 'Error',
@@ -116,7 +121,7 @@ export default function OrdenesPendientesPage() {
           <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Órdenes Pendientes de Preparación</h1>
           <p className="mt-2 text-base text-muted-foreground">Gestiona los pedidos confirmados listos para preparar</p>
         </div>
-        <Button onClick={loadOrdenes} variant="outline">
+        <Button onClick={loadOrdenes} variant="outline" disabled={loading}>
           <RefreshCw />
           Actualizar
         </Button>
@@ -127,6 +132,12 @@ export default function OrdenesPendientesPage() {
           <div className="flex min-h-48 items-center justify-center">
             <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
             <p>Cargando órdenes...</p>
+          </div>
+        ) : loadError ? (
+          <div role="alert" className="px-4 py-10 text-center">
+            <h3>No se pudieron cargar las órdenes pendientes</h3>
+            <p className="mt-2 text-muted-foreground">Reintenta la consulta para comprobar qué pedidos requieren preparación.</p>
+            <Button onClick={loadOrdenes} variant="outline" className="mt-4">Reintentar</Button>
           </div>
         ) : ordenes.length === 0 ? (
           <div className="px-4 py-10 text-center text-muted-foreground">
@@ -151,7 +162,7 @@ export default function OrdenesPendientesPage() {
                   <td>
                     <div>
                       <strong>{orden.numero}</strong>
-                      <Badge className="inline-flex items-center rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-400 dark:text-emerald-300">Confirmado</Badge>
+                      <Badge className="inline-flex items-center rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-400 dark:text-emerald-300">{orden.estado === 'EN_PREPARACION' ? 'En preparación' : orden.estado === 'DESPACHO_PARCIAL' ? 'Despacho parcial' : 'Confirmado'}</Badge>
                     </div>
                   </td>
                   <td>
@@ -169,7 +180,7 @@ export default function OrdenesPendientesPage() {
                       size="sm"
                     >
                       <Package />
-                      Preparar
+                      {orden.estado === 'EN_PREPARACION' ? 'Continuar preparación' : 'Preparar'}
                     </Button>
                   </td>
                 </tr>

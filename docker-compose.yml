@@ -9,7 +9,7 @@ services:
     ports:
       - "${WEB_HOST_PORT:-13001}:3001"
     environment:
-      - NODE_ENV=${NODE_ENV:-development}
+      - NODE_ENV=${NODE_ENV:-production}
       - PORT=3001
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:13002}
       - SERVER_API_URL=http://erp-api:3002
@@ -114,7 +114,9 @@ services:
     ports:
       - "${WORKER_HOST_PORT:-3050}:3050"
     environment:
-      - NODE_ENV=${NODE_ENV:-development}
+      - NODE_ENV=${NODE_ENV:-production}
+      - DEPLOYMENT_ENV=${DEPLOYMENT_ENV:-PROD}
+      - EXPECTED_SUPABASE_PROJECT_REF=${EXPECTED_SUPABASE_PROJECT_REF:-wypnbcptofqdmoynlonq}
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - REDIS_HOST=redis
@@ -126,6 +128,7 @@ services:
       - FEATURE_RRHH_ENABLED=${FEATURE_RRHH_ENABLED:-true}
       - ERP_API_URL=http://erp-api:3002/api
       - WORKER_PORT=3050
+      - REQUIRED_DATABASE_SCHEMA_VERSION=${REQUIRED_DATABASE_SCHEMA_VERSION:-552}
       - POS_WORKER_JWT_SECRET=${POS_WORKER_JWT_SECRET}
       - DB_ENCRYPTION_KEY=${DB_ENCRYPTION_KEY}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}

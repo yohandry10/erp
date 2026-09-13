@@ -29,8 +29,7 @@ interface Periodo {
 interface PresupuestoItem {
   id: string
   cuenta_id: string
-  cuenta_codigo: string
-  cuenta_nombre: string
+  plan_cuentas: { codigo: string; nombre: string } | null
   monto_presupuestado: number
   monto_ejecutado: number
   porcentaje_ejecutado: number
@@ -465,8 +464,8 @@ function BudgetPanel({
               {presupuestos.map((item) => (
                 <tr key={item.id} className="border-b border-cyan-400/10 text-sm text-foreground/90 transition hover:bg-cyan-400/10">
                   <td className="px-4 py-3">
-                    <div className="font-semibold text-foreground">{item.cuenta_codigo}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">{item.cuenta_nombre}</div>
+                    <div className="font-semibold text-foreground">{item.plan_cuentas?.codigo || 'Cuenta no disponible'}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{item.plan_cuentas?.nombre}</div>
                   </td>
                   <td className="px-4 py-3 text-right font-semibold text-foreground">{formatCurrency(item.monto_presupuestado)}</td>
                   <td className="px-4 py-3 text-right font-semibold text-foreground">{formatCurrency(item.monto_ejecutado)}</td>

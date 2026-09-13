@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { MigrationRunsService } from './migration-runs.service';
 import { MigrationImportDto, MigrationPreviewDto, MigrationRunType, ImporterResult } from './dto/import.dto';
-import { parseCsv } from './util/csv-parser.util';
+import { CsvFormatError, parseCsv } from './util/csv-parser.util';
 import { Importer, ImporterContext } from './importers/importer.interface';
 import { ClientesImporter } from './importers/clientes.importer';
 import { ProveedoresImporter } from './importers/proveedores.importer';
@@ -54,7 +54,7 @@ export class MigrationService {
 
   preview(body: MigrationPreviewDto) {
     const csv = this.decodeCsv(body.fileBase64);
-    const parsed = parseCsv(csv);
+    const parsed = this.parseCsvFile(csv);
     const importer = this.getImporter(body.runType);
     const errors = importer.validate(parsed);
     return {
@@ -73,7 +73,7 @@ export class MigrationService {
     result: ImporterResult;
   }> {
     const csv = this.decodeCsv(body.fileBase64);
-    const parsed = parseCsv(csv);
+    const parsed = this.parseCsvFile(csv);
     if (parsed.totalLines === 0) {
       throw new BadRequestException('CSV vacío');
     }
@@ -168,6 +168,14 @@ export class MigrationService {
 
   getRunDetail(tenantId: string, runId: string) {
     return this.runs.getRunDetail(tenantId, runId);
+  }
+
+  private parseCsvFile(csv: string) {
+    try { return parseCsv(csv); }
+    catch (error) {
+      if (error instanceof CsvFormatError) throw new BadRequestException(error.message);
+      throw error;
+    }
   }
 
   private decodeCsv(fileBase64: string): string {

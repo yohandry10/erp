@@ -5,6 +5,7 @@ import {
   Building2,
   CheckCircle2,
   CircleOff,
+  Clock3,
   Eye,
   Mail,
   MapPin,
@@ -29,7 +30,7 @@ interface Tenant {
   direccion?: string
   email?: string
   telefono?: string
-  estado?: 'ACTIVO' | 'INACTIVO'
+  estado?: 'ACTIVO' | 'INACTIVO' | 'PRUEBA' | 'SUSPENDIDO'
   is_active?: boolean
   is_demo?: boolean
   demo_expires_at?: string
@@ -41,8 +42,8 @@ interface Props {
   error: string
   search: string
   onSearchChange: (v: string) => void
-  statusFilter: 'ALL' | 'ACTIVE' | 'INACTIVE'
-  onStatusChange: (v: 'ALL' | 'ACTIVE' | 'INACTIVE') => void
+  statusFilter: 'ALL' | 'ACTIVE' | 'INACTIVE' | 'TRIAL' | 'SUSPENDED'
+  onStatusChange: (v: 'ALL' | 'ACTIVE' | 'INACTIVE' | 'TRIAL' | 'SUSPENDED') => void
   onCreateClick: () => void
   onRefresh: () => void
   onViewTenant?: (tenant: Tenant) => void
@@ -129,12 +130,14 @@ export default function GestionTenants({
 
           <select id="gestiontenants-onsearchchange-e-target-value-classname-"
             value={statusFilter}
-            onChange={(e) => onStatusChange(e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE')}
+            onChange={(e) => onStatusChange(e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE' | 'TRIAL' | 'SUSPENDED')}
             className={`${field} rounded-md px-3 text-sm outline-none`}
           >
             <option value="ALL">Todos los estados</option>
             <option value="ACTIVE">Activos</option>
             <option value="INACTIVE">Inactivos</option>
+            <option value="TRIAL">En prueba</option>
+            <option value="SUSPENDED">Suspendidos</option>
           </select>
         </div>
 
@@ -213,8 +216,8 @@ export default function GestionTenants({
 
                     <div className="flex flex-col items-start gap-2">
                       <Badge className={active ? 'border-cyan-300/25 bg-cyan-400/15 text-primary group-data-[erp-theme=light]/dashboard:text-cyan-800' : 'border-slate-500/30 bg-slate-500/15 text-foreground/90 group-data-[erp-theme=light]/dashboard:text-foreground/85'}>
-                        {active ? <CheckCircle2 className="mr-1 h-3 w-3" /> : <CircleOff className="mr-1 h-3 w-3" />}
-                        {active ? 'Activo' : 'Inactivo'}
+                        {tenant.estado === 'PRUEBA' ? <Clock3 className="mr-1 h-3 w-3" /> : active ? <CheckCircle2 className="mr-1 h-3 w-3" /> : <CircleOff className="mr-1 h-3 w-3" />}
+                        {tenant.estado === 'PRUEBA' ? 'En prueba' : tenant.estado === 'SUSPENDIDO' ? 'Suspendido' : active ? 'Activo' : 'Inactivo'}
                       </Badge>
                       {tenant.is_demo && (
                         <Badge className="border-blue-300/25 bg-blue-400/15 text-blue-700 dark:text-blue-200 group-data-[erp-theme=light]/dashboard:text-blue-800">

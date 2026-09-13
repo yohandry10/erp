@@ -1,3 +1,4 @@
+import { escapeSunatXmlText } from '../fiscal/sunat-soap.util';
 import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { XmlSigner } from '@erp-suite/crypto';
@@ -5,7 +6,7 @@ import { createHash } from 'crypto';
 import * as https from 'https';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as zlib from 'zlib';
+import { incompleteSunatCdr, parseSunatCdr, parseSunatSoapResponse } from '../fiscal/sunat-response.util';
 import { CircuitBreakerService, CircuitBreakerOpenError, CircuitStats } from '../../shared/resilience/circuit-breaker.service';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { decryptBuffer, decryptText } from '../../shared/utils/secure-config.utils';
@@ -43,12 +44,6 @@ export interface SunatResponse {
   numeroComprobante?: string;
   hashCPE?: string;
   ticket?: string;
-}
-
-interface ParsedCdrMetadata {
-  codigoRespuesta: string;
-  descripcionRespuesta: string;
-  observaciones: string[];
 }
 
 export interface SunatRuntimeOptions {
@@ -955,11 +950,16 @@ export class OseService implements OnModuleInit {
       || payload?.msg
       || (codigo === '0' ? 'GRE aceptada por SUNAT' : codigo === '98' ? 'GRE en proceso' : 'GRE con error');
 
+    if (typeof cdr === 'string' && cdr) {
+      const parsed = parseSunatCdr(cdr);
+      if (!parsed || (codigo !== '0' && parsed.success)) return incompleteSunatCdr();
+      return parsed;
+    }
+    if (codigo === '0') return incompleteSunatCdr();
     return {
-      success: codigo === '0',
+      success: false,
       codigoRespuesta: codigo,
       descripcionRespuesta: String(descripcion),
-      cdr: typeof cdr === 'string' ? cdr : undefined,
       observaciones: this.extractGreRestErrors(payload),
     };
   }
@@ -1158,14 +1158,14 @@ export class OseService implements OnModuleInit {
   <soap:Header>
     <wsse:Security>
       <wsse:UsernameToken>
-        <wsse:Username>${config.usuario}</wsse:Username>
-        <wsse:Password>${config.password}</wsse:Password>
+        <wsse:Username>${escapeSunatXmlText(config.usuario)}</wsse:Username>
+        <wsse:Password>${escapeSunatXmlText(config.password)}</wsse:Password>
       </wsse:UsernameToken>
     </wsse:Security>
   </soap:Header>
   <soap:Body>
     <ser:${operation}>
-      <fileName>${fileName}.zip</fileName>
+      <fileName>${escapeSunatXmlText(fileName)}.zip</fileName>
       <contentFile>${zipBase64}</contentFile>
     </ser:${operation}>
   </soap:Body>
@@ -1185,74 +1185,7 @@ export class OseService implements OnModuleInit {
         };
       }
 
-      const faultMatch = this.extractXmlTag(soapResponse, 'faultstring');
-      if (faultMatch) {
-        const faultCode = this.extractSunatFaultCode(faultMatch);
-        return {
-          success: false,
-          codigoRespuesta: faultCode || '99',
-          descripcionRespuesta: faultMatch || 'Error SOAP desconocido'
-        };
-      }
-
-      const ticket = this.extractXmlTag(soapResponse, 'ticket');
-      if (ticket) {
-        return {
-          success: true,
-          codigoRespuesta: '0',
-          descripcionRespuesta: 'Ticket SUNAT recibido',
-          ticket,
-        };
-      }
-
-      const applicationResponse = this.extractXmlTag(soapResponse, 'applicationResponse');
-      const content = this.extractXmlTag(soapResponse, 'content');
-      const cdr = applicationResponse || content;
-      const statusCode = this.extractXmlTag(soapResponse, 'statusCode');
-      const statusMessage = this.extractXmlTag(soapResponse, 'statusMessage');
-      const parsedCdr = this.parseCdrMetadata(cdr);
-
-      if (cdr && parsedCdr) {
-        return {
-          success: parsedCdr.codigoRespuesta === '0',
-          codigoRespuesta: parsedCdr.codigoRespuesta,
-          descripcionRespuesta: parsedCdr.descripcionRespuesta || statusMessage || 'CDR SUNAT recibido',
-          cdr,
-          observaciones: parsedCdr.observaciones,
-        };
-      }
-
-      if (content && statusCode && (statusCode !== '0' || !this.looksLikeBase64(content))) {
-        return {
-          success: statusCode === '0',
-          codigoRespuesta: statusCode,
-          descripcionRespuesta: statusMessage || content || 'Respuesta de estado SUNAT recibida',
-        };
-      }
-
-      if (applicationResponse || (content && this.looksLikeBase64(content))) {
-        return {
-          success: !statusCode || statusCode === '0',
-          codigoRespuesta: statusCode || '0',
-          descripcionRespuesta: statusMessage || 'CDR SUNAT recibido',
-          cdr,
-        };
-      }
-
-      if (statusCode || statusMessage) {
-        const codigo = statusCode || '98';
-        return {
-          success: codigo === '0',
-          codigoRespuesta: codigo,
-          descripcionRespuesta: statusMessage || 'Respuesta de estado SUNAT recibida',
-        };
-      }
-
-      return {
-        success: false,
-        codigoRespuesta: '98',
-        descripcionRespuesta: 'Respuesta de SUNAT no reconocida'
-      };
+      return parseSunatSoapResponse(soapResponse);
 
     } catch (error) {
       this.logger.error('❌ Error parseando respuesta SUNAT:', error);
@@ -1299,10 +1232,10 @@ export class OseService implements OnModuleInit {
   ${this.buildSecurityHeader(config)}
   <soap:Body>
     <ser:getStatusCdr>
-      <rucComprobante>${ruc}</rucComprobante>
-      <tipoComprobante>${tipoDocumento}</tipoComprobante>
-      <serieComprobante>${serie}</serieComprobante>
-      <numeroComprobante>${numero}</numeroComprobante>
+      <rucComprobante>${escapeSunatXmlText(ruc)}</rucComprobante>
+      <tipoComprobante>${escapeSunatXmlText(tipoDocumento)}</tipoComprobante>
+      <serieComprobante>${escapeSunatXmlText(serie)}</serieComprobante>
+      <numeroComprobante>${escapeSunatXmlText(numero)}</numeroComprobante>
     </ser:getStatusCdr>
   </soap:Body>
 </soap:Envelope>`;
@@ -1315,7 +1248,7 @@ export class OseService implements OnModuleInit {
   ${this.buildSecurityHeader(config)}
   <soap:Body>
     <ser:getStatus>
-      <ticket>${ticket}</ticket>
+      <ticket>${escapeSunatXmlText(ticket)}</ticket>
     </ser:getStatus>
   </soap:Body>
 </soap:Envelope>`;
@@ -1325,105 +1258,11 @@ export class OseService implements OnModuleInit {
     return `<soap:Header>
     <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
       <wsse:UsernameToken>
-        <wsse:Username>${config.usuario}</wsse:Username>
-        <wsse:Password>${config.password}</wsse:Password>
+        <wsse:Username>${escapeSunatXmlText(config.usuario)}</wsse:Username>
+        <wsse:Password>${escapeSunatXmlText(config.password)}</wsse:Password>
       </wsse:UsernameToken>
     </wsse:Security>
   </soap:Header>`;
-  }
-
-  private extractSunatFaultCode(fault: string): string | null {
-    return fault.match(/\b(?:Client|Server|soap-env:Server)\.\d+\b/i)?.[0]
-      ?? fault.match(/^\s*(\d{3,5})\s*$/)?.[1]
-      ?? null;
-  }
-
-  private parseCdrMetadata(cdrBase64?: string): ParsedCdrMetadata | null {
-    if (!cdrBase64 || !this.looksLikeBase64(cdrBase64)) {
-      return null;
-    }
-
-    try {
-      const zip = Buffer.from(cdrBase64.replace(/\s/g, ''), 'base64');
-      const xml = this.extractFirstXmlFromZip(zip);
-      if (!xml) {
-        return null;
-      }
-
-      const codigoRespuesta = this.extractXmlTag(xml, 'ResponseCode') || '';
-      const descripcionRespuesta = this.extractXmlTag(xml, 'Description') || '';
-      const observaciones = this.extractXmlTags(xml, 'Note');
-
-      if (!codigoRespuesta && !descripcionRespuesta && observaciones.length === 0) {
-        return null;
-      }
-
-      return {
-        codigoRespuesta: codigoRespuesta || '0',
-        descripcionRespuesta: descripcionRespuesta || 'CDR SUNAT recibido',
-        observaciones,
-      };
-    } catch (error) {
-      this.logger.warn(
-        `⚠️ No se pudo decodificar metadata del CDR SUNAT: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      return null;
-    }
-  }
-
-  private extractFirstXmlFromZip(zip: Buffer): string | null {
-    let offset = 0;
-
-    while (offset <= zip.length - 30) {
-      if (zip.readUInt32LE(offset) !== 0x04034b50) {
-        offset += 1;
-        continue;
-      }
-
-      const flags = zip.readUInt16LE(offset + 6);
-      const method = zip.readUInt16LE(offset + 8);
-      const compressedSize = zip.readUInt32LE(offset + 18);
-      const fileNameLength = zip.readUInt16LE(offset + 26);
-      const extraLength = zip.readUInt16LE(offset + 28);
-      const nameStart = offset + 30;
-      const dataStart = nameStart + fileNameLength + extraLength;
-
-      if (dataStart > zip.length) {
-        return null;
-      }
-
-      const fileName = zip.slice(nameStart, nameStart + fileNameLength).toString('utf8');
-
-      if ((flags & 0x0008) !== 0 || compressedSize === 0) {
-        offset = dataStart + 1;
-        continue;
-      }
-
-      const dataEnd = dataStart + compressedSize;
-      if (dataEnd > zip.length) {
-        return null;
-      }
-
-      const compressed = zip.slice(dataStart, dataEnd);
-      const content = method === 8
-        ? zlib.inflateRawSync(compressed)
-        : method === 0
-          ? compressed
-          : null;
-
-      if (content && fileName.toLowerCase().endsWith('.xml')) {
-        return content.toString('utf8');
-      }
-
-      offset = dataEnd;
-    }
-
-    return null;
-  }
-
-  private looksLikeBase64(value: string): boolean {
-    const clean = value.replace(/\s/g, '');
-    return clean.length >= 16 && clean.length % 4 === 0 && /^[A-Za-z0-9+/]+={0,2}$/.test(clean);
   }
 
   private assertSunatConfigured(config: OseConfig = this.oseConfig): void {
@@ -1462,11 +1301,6 @@ export class OseService implements OnModuleInit {
   private extractXmlTag(xml: string, tag: string): string | null {
     const pattern = new RegExp(`<(?:\\w+:)?${tag}\\b[^>]*>([\\s\\S]*?)<\\/(?:\\w+:)?${tag}>`, 'i');
     return pattern.exec(xml)?.[1]?.trim() ?? null;
-  }
-
-  private extractXmlTags(xml: string, tag: string): string[] {
-    const pattern = new RegExp(`<(?:\\w+:)?${tag}\\b[^>]*>([\\s\\S]*?)<\\/(?:\\w+:)?${tag}>`, 'gi');
-    return Array.from(xml.matchAll(pattern), (match) => match[1]?.trim()).filter(Boolean);
   }
 
   private extractHtmlErrorMessage(html: string): string | null {

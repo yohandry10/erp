@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'fs';
+import { BadRequestException } from '@nestjs/common';
 import { join } from 'path';
 import { parseCsv, toBoolean, toDateOrNull, toNumber, validateHeaders } from './util/csv-parser.util';
 import { validateRuc, validateDni, validateDocumento, toSafeIntegerDocumento } from './util/peru-doc.util';
@@ -45,6 +46,17 @@ function readRepoFile(relativePath: string) {
   return readFileSync(filePath, 'utf8');
 }
 
+describe('Plantillas de alta de clientes y proveedores', () => {
+  it.each([ClientesImporter, ProveedoresImporter])('%p genera una plantilla que su propio importador acepta', (ImporterClass) => {
+    const importer = new ImporterClass(makeFakeSupabase().service, {} as MigrationRunsService);
+    const parsed = parseCsv(importer.getTemplate().content);
+    expect(importer.validate(parsed)).toEqual([]);
+    expect(parsed.rows[0].direccion).toContain(', ');
+    expect(parsed.rows[0].email).toMatch(/@/);
+    expect(parsed.rows[0].pais).toBe('PE');
+  });
+});
+
 describe('util/csv-parser', () => {
   it('parsea header y filas, ignora líneas vacías', () => {
     const csv = 'a,b,c\n1,2,3\n\n4,5,6\n';
@@ -61,6 +73,20 @@ describe('util/csv-parser', () => {
     const csv = 'a,b\n"hola, mundo","x"';
     const out = parseCsv(csv);
     expect(out.rows[0]).toEqual({ a: 'hola, mundo', b: 'x' });
+  });
+
+  it('preserva saltos de línea, comillas escapadas y BOM de un CSV exportado', () => {
+    const out = parseCsv('\uFEFFa,b\r\n1,"Av. Lima, 2\r\nOficina ""A"""\r\n');
+    expect(out.rows).toEqual([{ a: '1', b: 'Av. Lima, 2\nOficina "A"' }]);
+    expect(out.totalLines).toBe(1);
+  });
+
+  it.each([
+    'a,b\n1,2,3', 'a,b\n1', 'a,A\n1,2', 'a,\n1,2',
+    'a,b\n1,"sin cierre', 'a,b\n1,"dato"extra', 'a,b\n1,x"y',
+    `a,b\n1,${'x'.repeat(4097)}`,
+  ])('rechaza CSV ambiguo o truncable antes de importar (%#)', (csv) => {
+    expect(() => parseCsv(csv)).toThrow();
   });
 
   it('toNumber acepta coma como separador decimal', () => {
@@ -429,6 +455,13 @@ describe('MigrationService.decodeCsv', () => {
   it('rechaza base64 mal formado que Buffer decodificaría parcialmente', () => {
     const service = makeService();
     expect(() => (service as any).decodeCsv('@@@')).toThrow('fileBase64 inválido');
+  });
+
+  it('devuelve un error 400 ante estructura CSV inválida antes de crear un run o escribir filas', async () => {
+    const service = makeService();
+    const body = { fileBase64: Buffer.from('a,b\n1,2,3').toString('base64') };
+    expect(() => service.preview({ ...body, runType: 'clientes' })).toThrow(BadRequestException);
+    await expect(service.import('clientes', body, 'tenant')).rejects.toThrow(BadRequestException);
   });
 
   it('decodifica CSV UTF-8 válido', () => {

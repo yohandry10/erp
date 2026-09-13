@@ -2,6 +2,10 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { CacheService } from '../../shared/cache/cache.service';
 import Decimal from 'decimal.js';
+import {
+  calcularMetricasInventario,
+  InventarioMetrics,
+} from '../inventario/inventario-metrics.util';
 
 export interface DashboardStats {
   totalCpe: number;
@@ -38,7 +42,7 @@ export interface Activity {
 }
 
 @Injectable()
-export class DashboardMetricsService {
+export class DashboardMetricsService implements OnModuleDestroy {
   private readonly logger = new Logger(DashboardMetricsService.name);
   private cacheCleanupInterval?: NodeJS.Timeout;
 
@@ -161,15 +165,23 @@ export class DashboardMetricsService {
    * Obtiene estadísticas del dashboard con cache
    */
   async getStats(tenantId: string): Promise<DashboardStats> {
-    // Intentar obtener del cache
-    const cached = await this.getStatsFromCache(tenantId);
+    const client = this.supabase.getClient();
+
+    // El resto del dashboard admite un snapshot breve, pero inventario es un
+    // saldo operativo: siempre se contrasta contra el catálogo activo. Así un
+    // alta, recepción o ajuste no queda oculto diez minutos por una invalidación
+    // omitida, y el botón Actualizar realmente refleja el mismo dato que
+    // /inventario/stats.
+    // La lectura viva y la del snapshot pueden resolverse en paralelo.
+    const [cached, inventario] = await Promise.all([
+      this.getStatsFromCache(tenantId),
+      this.getInventarioActual(client, tenantId),
+    ]);
     if (cached) {
-      return cached;
+      return this.aplicarInventario(cached, inventario);
     }
 
     this.logger.log(`📊 [DashboardMetricsService] Calculando estadísticas para tenant: ${tenantId}`);
-
-    const client = this.supabase.getClient();
 
     // Obtener fechas para filtros
     const hoy = new Date();
@@ -185,7 +197,6 @@ export class DashboardMetricsService {
       cpeResult,
       cpeHoyResult,
       greResult,
-      productosResult,
       comprasTodasResult,
       usuariosResult,
       cotizacionesResult,
@@ -207,9 +218,6 @@ export class DashboardMetricsService {
         .select('id')
         .eq('tenant_id', tenantId)
         .gte('created_at', inicioMes.toISOString()),
-      client.from('productos')
-        .select('id, precio, precio_venta, stock_actual, stock, stock_minimo')
-        .eq('tenant_id', tenantId),
       client.from('ordenes_compra')
         .select('total, estado, fecha_orden, created_at')
         .eq('tenant_id', tenantId)
@@ -246,7 +254,6 @@ export class DashboardMetricsService {
     const cpeData = cpeResult.status === 'fulfilled' ? cpeResult.value.data : [];
     const cpeHoyData = cpeHoyResult.status === 'fulfilled' ? cpeHoyResult.value.data : [];
     const greData = greResult.status === 'fulfilled' ? greResult.value.data : [];
-    const productosData = productosResult.status === 'fulfilled' ? productosResult.value.data : [];
     const comprasData = comprasTodasResult.status === 'fulfilled' ? comprasTodasResult.value.data : [];
     const usuariosData = usuariosResult.status === 'fulfilled' ? usuariosResult.value.data : [];
     const cotizacionesData = cotizacionesResult.status === 'fulfilled' ? cotizacionesResult.value.data : [];
@@ -263,9 +270,6 @@ export class DashboardMetricsService {
     const ingresosMes = this.sumarTotalesCpe(cpeData) + this.sumarTotales(ventasPosSinCpe);
     const ingresosHoy = this.sumarTotalesCpe(cpeHoyData) + this.sumarTotales(ventasPosSinCpeHoy);
     const inversionCompras = this.sumarTotales(comprasData);
-    const totalProductos = productosData?.length || 0;
-    const valorInventario = this.calcularValorInventario(productosData);
-    const productosStockBajo = this.contarProductosStockBajo(productosData);
     const comprasPendientes = comprasData?.filter(c => this.estadoNormalizado(c.estado) === 'pendiente').length || 0;
 
     // Calcular tasa de conversión de cotizaciones
@@ -279,14 +283,14 @@ export class DashboardMetricsService {
       totalGre: greData?.length || 0,
       totalSire: sireData?.length || 0,
       totalUsers: usuariosData?.length || 0,
-      totalInventario: totalProductos,
+      totalInventario: inventario.totalProductos,
       totalCompras: comprasData?.length || 0,
       totalCotizaciones: totalCotizaciones,
       ventasMes: ingresosMes,
       ventasHoy: ingresosHoy,
       comprasMes: inversionCompras,
-      valorInventario: valorInventario,
-      productosConStockBajo: productosStockBajo,
+      valorInventario: inventario.valorInventario,
+      productosConStockBajo: inventario.productosStockBajo,
       cotizacionesPendientes: cotizacionesPendientesData?.length || 0,
       ordenesCompraPendientes: comprasPendientes,
       movimientosHoy: 0,
@@ -440,25 +444,33 @@ export class DashboardMetricsService {
     ).toDecimalPlaces(2).toNumber();
   }
 
-  private calcularValorInventario(productos: any[]): number {
-    if (!Array.isArray(productos)) return 0;
-    return productos.reduce(
-      (sum, p) => {
-        // `precio` es columna legacy que suele venir en 0/null; con `??` ese 0
-        // anulaba el fallback a precio_venta y el dashboard mostraba S/ 0.00.
-        const precio = Number(p.precio) || Number(p.precio_venta) || 0;
-        const stock = Number(p.stock_actual ?? p.stock ?? 0);
-        return sum.plus(new Decimal(precio).times(stock));
-      },
-      new Decimal(0)
-    ).toDecimalPlaces(2).toNumber();
+  private async getInventarioActual(client: any, tenantId: string): Promise<InventarioMetrics> {
+    const { data, error } = await client
+      .from('productos')
+      .select('precio_compra, costo, stock_actual, stock_minimo')
+      .eq('tenant_id', tenantId)
+      .eq('activo', true);
+
+    if (error) {
+      this.logger.error(
+        `No se pudo calcular el inventario vigente del tenant ${tenantId}: ${error.message ?? error}`,
+      );
+      throw error;
+    }
+
+    return calcularMetricasInventario(data);
   }
 
-  private contarProductosStockBajo(productos: any[]): number {
-    if (!Array.isArray(productos)) return 0;
-    return productos.filter(p =>
-      parseFloat((p as any).stock_actual ?? (p as any).stock ?? 0) <= parseFloat(p.stock_minimo || 0)
-    ).length;
+  private aplicarInventario(
+    stats: DashboardStats,
+    inventario: InventarioMetrics,
+  ): DashboardStats {
+    return {
+      ...stats,
+      totalInventario: inventario.totalProductos,
+      valorInventario: inventario.valorInventario,
+      productosConStockBajo: inventario.productosStockBajo,
+    };
   }
 
   private estadoNormalizado(estado: unknown): string {

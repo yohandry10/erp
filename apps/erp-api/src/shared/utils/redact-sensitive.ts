@@ -32,6 +32,7 @@ const SENSITIVE_KEY_EXACT_MATCHES = new Set([
 ]);
 
 const SENSITIVE_KEY_PATTERNS = [
+  /password|secret|private[-_]?key|certificado|(?:^|[-_])pfx|clave|(?:^|[-_])pin(?:$|[-_])/i,
   /(?:^|[-_])authorization(?:$|[-_])/i,
   /(?:^|[-_])cookie(?:$|[-_])/i,
   /(?:^|[-_])set[-_]?cookie(?:$|[-_])/i,
@@ -53,7 +54,13 @@ const isPlainObject = (value: unknown): value is Record<string, any> => {
   return value !== null && typeof value === 'object' && value.constructor === Object;
 };
 
-const normalizeKey = (key: string): string => key.toLowerCase().trim();
+const normalizeKey = (key: string): string => key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase().trim();
+
+// Errores de transporte pueden incluir cabeceras o parámetros dentro de texto.
+export const redactSensitiveText = (value: string): string => value
+  .replace(/\b(Bearer|Basic)\s+[^\s,"'<>]+/gi, '$1 [REDACTED]')
+  .replace(/((?:password|token|secret|api[_-]?key|clave|pin)[\w-]*["']?\s*[:=]\s*)[^\s&,;"'<>]+/gi, '$1[REDACTED]')
+  .replace(/-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----/g, REDACTED_VALUE);
 
 const isSensitiveKey = (key: string): boolean => {
   const normalized = normalizeKey(key);
@@ -90,7 +97,8 @@ const deepRedact = (input: unknown, depth = 0): any => {
     return input;
   }
 
-  if (typeof input === 'string' || typeof input === 'number' || typeof input === 'boolean') {
+  if (typeof input === 'string') return redactSensitiveText(input);
+  if (typeof input === 'number' || typeof input === 'boolean') {
     return input;
   }
 
@@ -103,7 +111,7 @@ const deepRedact = (input: unknown, depth = 0): any => {
   }
 
   if (!isPlainObject(input)) {
-    return input;
+    return REDACTED_VALUE;
   }
 
   const data = input as Record<string, any>;

@@ -11,6 +11,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Building2, RefreshCw, Check } from 'lucide-react'
+import { loadTenantCatalog } from '@/lib/tenant-catalog'
+import { Button } from '@/components/ui/button'
 
 interface Tenant {
   id: string
@@ -35,24 +37,20 @@ export function TenantSwitcher() {
   const fetchTenants = useCallback(async () => {
       if (!isSuperAdmin) return
       setLoading(true)
+      setSwitchError(null)
       try {
-        const response = await getRef.current('/tenants')
-        const rawTenants = response?.data ?? response
-        const tenantsData = Array.isArray(rawTenants)
-          ? rawTenants
-          : Array.isArray(rawTenants?.items)
-            ? rawTenants.items
-            : Array.isArray(rawTenants?.tenants)
-              ? rawTenants.tenants
-              : []
+        const tenantsData = await loadTenantCatalog<Tenant>(endpoint => getRef.current(endpoint))
         // Filter to only show active tenants
         const activeTenants = tenantsData.filter(
           (t: Tenant) => t.estado === 'ACTIVO' || t.estado === 'PRUEBA'
         )
-        setTenants(activeTenants)
+        setTenants(activeTenants.map((t: Tenant & { nombre_comercial?: string; razon_social?: string }) => ({
+          id: t.id, estado: t.estado, nombre: t.nombre || t.nombre_comercial || t.razon_social || t.id,
+        })))
       } catch (error) {
         console.error('Error fetching tenants:', error)
         setTenants([])
+        setSwitchError(error instanceof Error ? error.message : 'No se pudo cargar el catálogo de empresas')
       } finally {
         setLoading(false)
       }
@@ -92,7 +90,12 @@ export function TenantSwitcher() {
       </div>
 
       {switchError && (
-        <div className="text-destructive text-xs mb-2 px-1">{switchError}</div>
+        <div role="alert" className="text-destructive text-xs mb-2 px-1">
+          {switchError}
+          <Button type="button" variant="outline" size="sm" onClick={fetchTenants} disabled={loading || switching}>
+            Actualizar empresas
+          </Button>
+        </div>
       )}
 
       {/* Tenant Selector */}

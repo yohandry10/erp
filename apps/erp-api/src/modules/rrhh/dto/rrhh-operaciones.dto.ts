@@ -72,12 +72,11 @@ class CandidatoCamposComunes {
   @IsOptional() @IsString() @MaxLength(120) nivel_educacion?: string;
   @IsOptional() @IsNumber() @Min(0) experiencia_anos?: number;
 
-  /** Con eñe: así lo envía CandidatoModal. El writer sólo conoce
-   * `experiencia_anos` y descarta esta variante, pero declararla es lo que
-   * evita que el alta pase a 400. */
+  /** Compatibilidad con el formulario anterior; el servicio normaliza a
+   * experiencia_anos y rechaza dos valores contradictorios. */
   @IsOptional() @IsNumber() @Min(0) 'experiencia_años'?: number;
 
-  /** Aceptado y descartado: la pantalla lo envía y candidatos no tiene esa columna. */
+  /** Persistido y auditado por el writer canónico desde la migración 543. */
   @IsOptional() @IsString() @MaxLength(40) estado_civil?: string;
   @IsOptional() @IsNumber() @Min(0) pretension_salarial?: number;
   @IsOptional() @IsString() @MaxLength(1000) cv_url?: string;

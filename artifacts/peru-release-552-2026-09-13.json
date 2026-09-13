@@ -1,0 +1,42 @@
+{
+  "candidateBranch": "codex/peru-production-20260912",
+  "baseCommit": "679e05bf3c186ed017129c03baafcfd4fefdfd93",
+  "requiredSchema": 552,
+  "pendingMigrations": { "from": 537, "through": 552, "count": 16 },
+  "remoteWrites": false,
+  "checks": {
+    "apiBaseline": { "suitesPassed": 299, "testsPassed": 2876, "date": "2026-09-12" },
+    "latestApiChange": { "suite": "background-jobs.service.spec.ts", "testsPassed": 4, "date": "2026-09-13" },
+    "workerTestsPassed": 23,
+    "buildsPassed": ["crypto", "dtos", "worker", "api", "web"],
+    "latestApiWebBuildDate": "2026-09-13",
+    "webPagesBuilt": 132,
+    "typesPassed": true,
+    "isolatedBrowserTestsPassed": 104,
+    "mobileLoginPassed": true,
+    "webContractScriptsPassed": 13,
+    "apiImageBuilt": true,
+    "apiImageRejectsInvalidConfigWithoutNetwork": true,
+    "workerImageBuiltAndVerified": true,
+    "dependencyAudit": { "critical": 0, "high": 0, "moderate": 1, "package": "adm-zip" },
+    "styleContractPassed": true,
+    "testQualityFilesChecked": 363,
+    "documentationContractPassed": true
+  },
+  "latestSqlHttpEvidence": "peru-integrated-20260913071056413-20968/run.json",
+  "sqlHttp": { "migrations": 549, "through": 552, "currentVerifiers": 62, "historicalVerifiers": 67, "obsoleteVerifiers": 6, "httpChecksPassed": 84 },
+  "priorIntegratedBrowserEvidence": "peru-integrated-20260912232543981-12460/run.json",
+  "priorIntegratedBrowser": { "userFlowsPassed": 7, "recordPagesPassed": 22 },
+  "prodBackupManifest": "peru-prod-backup-20260912233613724.json",
+  "prodRestoreRehearsal": "erp-peru-prod-rehearsal-20260913071340257-8992.json",
+  "remaining": [
+    "Recorrido conjunto de todos los módulos con la última corrección del detalle presupuestal en ejecución",
+    "Checks del commit final en GitHub y promoción DB-first",
+    "Identificar y configurar el emisor PE real; no hubo envío ni aceptación SUNAT"
+  ],
+  "limits": [
+    "Carga de pantallas no acredita todas las mutaciones de cada módulo",
+    "El ensayo conserva ACL heredadas; no certifica privilegio mínimo de todos los escritores históricos",
+    "El respaldo no incluye objetos externos de Storage ni roles globales; tiempos locales no acreditan RTO del proveedor"
+  ]
+}
