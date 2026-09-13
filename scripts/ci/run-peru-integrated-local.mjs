@@ -137,6 +137,11 @@ for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143]]) {
 let success = false;
 try {
   console.log(`[peru-integrated] Evidencia: ${output}`);
+  // Un checkout limpio no tiene dist de los paquetes workspace. Prepararlos
+  // aquí hace al runner autosuficiente, también fuera de GitHub Actions.
+  for (const library of ['dtos', 'crypto']) {
+    await run(`build-${library}`, process.execPath, [apiRequire.resolve('typescript/bin/tsc'), '--project', 'tsconfig.json'], path.join(root, 'libs', library));
+  }
   await run('harness-typecheck', process.execPath, [apiRequire.resolve('typescript/bin/tsc'), '--project', 'tests/e2e/tsconfig.local.json'], apiDirectory);
   docker(['network', 'create', '--label', `com.erp.local-test=${runId}`, network]);
   createdNetwork = true;
