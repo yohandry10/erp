@@ -283,6 +283,17 @@ y demuestra que columnas, filas, políticas y permisos vuelven al estado 536.
 Este control negativo ocurre exclusivamente en la copia sin red; nunca se
 ejecutan verificadores ni fallos inyectados en PROD.
 
+`node scripts/promote-peru-prod.mjs --backup <manifiesto> --rehearsal <ensayo>`
+comprueba el respaldo de menos de 24 horas, su restauración, los hashes de las
+16 migraciones y del lote, el commit del PR 109 y todos sus checks. Sin
+`--apply` no conecta a PostgreSQL. La aplicación exige además `--env-file`
+hacia `.env.production` y `--pg-bin` hacia PostgreSQL 17, repite el preflight,
+contrasta la historia 533..536 y aplica únicamente el lote canónico ensayado.
+Conserva evidencia de historia/readiness antes y después; el diagnóstico DB
+queda en logs privados ignorados. Si se pierde la respuesta del commit, se
+debe comprobar la historia remota antes de reintentar. Tras un commit exitoso,
+una corrección se publica hacia adelante; no se restaura destructivamente PROD.
+
 La opción `--survey` añade inspección de carga de las pantallas estáticas de
 dashboard con navegador y API reales. Sus resultados y capturas quedan en
 `module-survey/` dentro de la evidencia del ensayo; no acreditan todas las
