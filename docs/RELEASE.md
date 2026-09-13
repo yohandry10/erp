@@ -320,6 +320,17 @@ Preparar antes del despliegue:
 Si una migración no es reversible, el rollback debe ser roll-forward con script
 correctivo probado. Nunca improvisarlo sobre PROD.
 
+Para 537..552 existe un lote transaccional generado desde los SQL canónicos.
+El ensayo `erp-peru-prod-rehearsal-20260913072919654-20908.json` inyecta una
+división por cero después de aplicar las 16 migraciones y comprobar readiness,
+pero antes de confirmar. PostgreSQL revierte todo el lote; se contrastan filas,
+columnas, políticas RLS, ACL e inexistencia de la RPC nueva de logística. La
+aplicación posterior por migraciones y los 16 verificadores también pasan.
+Si falla antes del commit, se conserva 536. Después de confirmar, no se borran
+cuentas, conceptos ni evidencia: se detiene la promoción de aplicaciones y se
+prepara una corrección hacia delante revisada. Un restore destructivo de PROD
+mantiene su requisito de autorización explícita y evaluación de datos posteriores.
+
 ## Bloqueantes actuales
 
 - Certificado productivo compatible con el RUC.

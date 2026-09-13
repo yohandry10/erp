@@ -274,6 +274,15 @@ sean iguales a las de PostgreSQL limpio; un control negativo demuestra que
 el comparador detecta nuevas escrituras. No respalda roles globales ni archivos
 externos de Storage, ni acredita privilegio mínimo de todos los módulos.
 
+El mismo ensayo genera el lote `peru-promotion-552-<hash>.sql` desde las
+migraciones canónicas. Reúne DDL, backfills e historia en una transacción con
+aislamiento repetible, verifica proyecto/esquema inicial y readiness final, y
+notifica la recarga de PostgREST sólo al confirmar. Antes de validar cada
+migración, el ensayo ejecuta ese lote con un fallo deliberado previo al commit
+y demuestra que columnas, filas, políticas y permisos vuelven al estado 536.
+Este control negativo ocurre exclusivamente en la copia sin red; nunca se
+ejecutan verificadores ni fallos inyectados en PROD.
+
 La opción `--survey` añade inspección de carga de las pantallas estáticas de
 dashboard con navegador y API reales. Sus resultados y capturas quedan en
 `module-survey/` dentro de la evidencia del ensayo; no acreditan todas las
