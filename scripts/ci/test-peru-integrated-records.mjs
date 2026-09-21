@@ -146,7 +146,11 @@ export async function testRecordFlows({ request, sql, uuid, results, tenantId, p
   await request('ventas/reportes/lead-time?fechaDesde=2026-09-30&fechaHasta=2026-09-01', undefined, 400);
   results.push({ scenario: 'plazo comercial consulta el CPE canónico, genera tendencia y filtra por emisión', passed: true });
   const productReport = (await request('ventas/reportes/productos-mas-vendidos')).data;
-  assert.ok(productReport.some(item => item.producto_id === product.id && item.producto_codigo === 'DEMO-003'));
+  assert.ok(productReport.some(item => item.producto_id === product.id && item.producto_codigo === 'DEMO-003' && item.moneda === 'PEN'));
+  for (const endpoint of ['ventas-por-cliente', 'pedidos-por-estado', 'top-clientes']) {
+    const report = (await request(`ventas/reportes/${endpoint}`)).data;
+    assert.ok(report.length > 0 && report.every(item => item.moneda === 'PEN'), `${endpoint} conserva la moneda del registro`);
+  }
   for (const endpoint of ['pedidos-por-estado', 'productos-mas-vendidos']) {
     const filtered = (await request(`ventas/reportes/${endpoint}?cliente=cliente-inexistente-${randomUUID()}`)).data;
     assert.deepEqual(filtered, [], `${endpoint} debe respetar el filtro de cliente`);

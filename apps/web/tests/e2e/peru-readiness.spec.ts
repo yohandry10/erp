@@ -26,6 +26,46 @@ async function installSession(context: BrowserContext, page: Page) {
     }, user)
 }
 
+test('Reportes Perú mantienen separados los totales PEN y USD', async ({ context, page }, testInfo) => {
+  await installSession(context, page)
+  const rows = ['PEN', 'USD'].map(moneda => ({
+    moneda, total: moneda === 'PEN' ? 100 : 20, estado: 'FACTURADO', cantidad: 1, porcentaje: 50,
+    cliente_id: 'same-client', cliente_nombre: 'Cliente multimoneda', cliente_documento: '20123456786',
+    cantidad_pedidos: 1, cantidad_facturas: 1, periodo: '2026-09',
+    producto_id: 'same-product', producto_nombre: 'Producto', producto_codigo: 'SKU-01', unidades_vendidas: 1,
+    importe_total: moneda === 'PEN' ? 100 : 20, precio_promedio: moneda === 'PEN' ? 100 : 20,
+    total_facturacion: moneda === 'PEN' ? 100 : 20, ticket_promedio: moneda === 'PEN' ? 100 : 20, porcentaje_total: 100,
+    id: `quote-${moneda}`, numero: `COT-${moneda}`, fecha: '2026-09-01', fecha_vencimiento: '2026-09-30', dias_vigencia: 10,
+  }))
+  await page.route('**/*', async route => {
+    const url = new URL(route.request().url())
+    if (!['localhost', '127.0.0.1', '::1'].includes(url.hostname)) return route.abort()
+    if (!url.pathname.includes('/api/')) return route.continue()
+    const endpoint = url.pathname.replace(/^.*\/api\//, '/').replace(/\/$/, '')
+    const payloads: Record<string, unknown> = {
+      '/auth/profile': user,
+      '/tenants/me': { data: { id: user.tenant_id, nombre: 'Empresa Perú', pais: 'PE', moneda: 'PEN', estado: 'ACTIVO' } },
+      '/demo/status': { is_demo: false, is_expired: false },
+      '/notifications/unread': { data: [], count: 0 },
+      '/usuarios-sistema/me/permissions': { data: [] },
+      '/configuration/context/country': { data: { pais_id: 1, pais: 'PE', paisCodigo: 'PE', moneda: 'PEN', monedaDefecto: 'PEN', locale: 'es-PE', timezone: 'America/Lima' } },
+      '/configuration/empresa': { success: true, data: { pais: 'PE', paisCodigo: 'PE', razonSocial: 'Empresa Perú', monedaDefecto: 'PEN' } },
+      '/configuration/status': { success: true, data: { isComplete: true, isDemo: false, completionPercentage: 100 } },
+    }
+    const report = /\/(ventas-por-cliente|pedidos-por-estado|productos-mas-vendidos|top-clientes|cotizaciones-pendientes)$/.test(endpoint)
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(report ? { success: true, data: rows } : payloads[endpoint] || { success: true, data: [] }) })
+  })
+  await page.goto('/dashboard/ventas/reportes/')
+  for (const name of ['Ventas por Cliente', 'Pedidos', 'Productos', 'Top Clientes', 'Cotizaciones']) {
+    await page.getByRole('tab', { name, exact: true }).click()
+    const totals = page.getByRole('tabpanel').getByTestId('report-currency-totals')
+    await expect(totals).toContainText('PEN 100.00')
+    await expect(totals).toContainText('USD 20.00')
+    await expect(totals).not.toContainText('120.00')
+  }
+  await page.screenshot({ path: testInfo.outputPath('report-currencies.png'), fullPage: true })
+})
+
 for (const laborReady of [false, true]) {
   test(`Configuración Perú muestra normativa ${laborReady ? 'vigente' : 'pendiente'} y SUNAT bloqueado con certificado inválido`, async ({ context, page }, testInfo) => {
     await installSession(context, page)

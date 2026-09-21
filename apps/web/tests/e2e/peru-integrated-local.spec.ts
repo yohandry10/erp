@@ -30,6 +30,34 @@ function isHandledHttpResponse(row: { path: string; status: number }) {
     || (row.status === 429 && pathname.endsWith('/api/auth/login'))
 }
 
+test('Perú: reportes muestran tendencia, código del producto y filtro de cliente real', async ({ page, context }) => {
+  test.setTimeout(180000)
+  if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere base local efímera')
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await context.route('**/*', route => ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(route.request().url()).hostname)
+    ? route.continue() : route.abort('blockedbyclient'))
+  await page.goto('/login/')
+  await page.locator('#email').fill('peru-integrated-1@example.test')
+  await page.locator('#password').fill('Local-Peru-2026-Only!')
+  await submitLocalLogin(page)
+  await page.waitForURL('**/dashboard/**')
+  await page.goto('/dashboard/ventas/reportes/')
+  await page.getByRole('tab', { name: 'Lead Time', exact: true }).click()
+  await expect(page.getByText('Tendencia Temporal', { exact: true })).toBeVisible()
+  await expect(page.locator('#report-panel-lead-time tbody tr')).not.toHaveCount(0)
+  await page.screenshot({ path: path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'commercial-lead-time.png'), fullPage: true })
+  await page.getByRole('tab', { name: 'Productos', exact: true }).click()
+  const panel = page.locator('#report-panel-productos')
+  await expect(panel.getByText('DEMO-003', { exact: true })).toBeVisible()
+  await page.locator('#reportes-cliente-opcional').fill('cliente-inexistente-local')
+  await expect(panel.getByText('No hay datos disponibles', { exact: true })).toBeVisible()
+  await page.locator('#reportes-cliente-opcional').fill('')
+  await expect(panel.getByText('DEMO-003', { exact: true })).toBeVisible()
+  await page.screenshot({ path: path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'commercial-product-report.png'), fullPage: true })
+  expect(errors).toEqual([])
+})
+
 test('Perú: crea centro de costo y conserva un presupuesto al editar y recargar', async ({ page, context }) => {
   test.setTimeout(180000)
   page.setDefaultTimeout(20000)

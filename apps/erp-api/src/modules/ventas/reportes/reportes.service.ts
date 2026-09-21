@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { paisDelTenant } from '../../../shared/utils/fecha-tenant.util';
+import { fechaDeDocumentoEnPais, zonaHorariaDePais } from '../../../shared/utils/fecha-peru.util';
 
 /**
  * ReportesService
@@ -9,6 +11,17 @@ import { SupabaseService } from '../../../shared/supabase/supabase.service';
 @Injectable()
 export class ReportesService {
   constructor(private readonly supabase: SupabaseService) {}
+
+  private async allReportRows(query: any): Promise<any[]> {
+    const rows: any[] = [];
+    const ordered = query.order('id');
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await ordered.range(offset, offset + 999);
+      if (error) throw error;
+      rows.push(...(data || []));
+      if (!data || data.length < 1000) return rows;
+    }
+  }
 
   /**
    * Reporte de ventas por cliente
@@ -53,20 +66,19 @@ export class ReportesService {
       query = query.ilike('clientes.razon_social', `%${clienteFiltro}%`);
     }
 
-    const { data: pedidos, error } = await query;
-
-    if (error) throw error;
+    const pedidos = await this.allReportRows(query);
 
     // Agrupar por cliente
     const grouped = pedidos.reduce((acc, pedido) => {
-      const clienteId = pedido.cliente_id;
+      const moneda = String(pedido.moneda || '').toUpperCase();
+      const clienteId = `${pedido.cliente_id}:${moneda}`;
       if (!acc[clienteId]) {
         acc[clienteId] = {
-          cliente_id: clienteId,
+          cliente_id: pedido.cliente_id,
           cliente_nombre: (pedido.clientes as any).razon_social,
           cliente_documento: (pedido.clientes as any).documento_numero,
           periodo: `${fechaDesde || 'Inicio'} - ${fechaHasta || 'Hoy'}`,
-          moneda: String((pedido as any).moneda || 'PEN').toUpperCase(),
+          moneda,
           estado: estadoFiltro || 'Todos',
           total: 0,
           cantidad_pedidos: 0,
@@ -107,6 +119,7 @@ export class ReportesService {
         fecha_vencimiento,
         estado,
         total,
+        moneda,
         clientes!cotizaciones_cliente_id_fkey!inner (
           razon_social,
           documento_numero:codigo
@@ -125,9 +138,7 @@ export class ReportesService {
       query = query.ilike('clientes.razon_social', `%${clienteFiltro}%`);
     }
 
-    const { data: cotizaciones, error } = await query;
-
-    if (error) throw error;
+    const cotizaciones = await this.allReportRows(query);
 
     // Calcular días de vigencia
     const hoy = new Date();
@@ -146,6 +157,7 @@ export class ReportesService {
         fecha_vencimiento: cot.fecha_vencimiento,
         estado: cot.estado,
         total: Number(cot.total),
+        moneda: String(cot.moneda || '').toUpperCase(),
         dias_vigencia: diasVigencia,
         probabilidad: null, // TODO: Implementar lógica de probabilidad si se requiere
       };
@@ -166,7 +178,7 @@ export class ReportesService {
 
     let query = client
       .from('pedidos_venta')
-      .select(clienteFiltro ? 'estado,total,clientes!pedidos_venta_cliente_id_fkey!inner(razon_social)' : 'estado,total')
+      .select(clienteFiltro ? 'estado,total,moneda,clientes!pedidos_venta_cliente_id_fkey!inner(razon_social)' : 'estado,total,moneda')
       .eq('tenant_id', tenantId);
     if (clienteFiltro) query = query.ilike('clientes.razon_social', `%${clienteFiltro}%`);
 
@@ -177,16 +189,16 @@ export class ReportesService {
       query = query.lte('fecha', fechaHasta);
     }
 
-    const { data: pedidos, error } = await query;
-
-    if (error) throw error;
+    const pedidos = await this.allReportRows(query);
 
     // La selección condicional sólo añade la relación utilizada por el filtro.
-    const grouped = (pedidos as unknown as Array<{ estado: string; total: number }>).reduce((acc, pedido) => {
-      const estado = pedido.estado;
+    const grouped = pedidos.reduce((acc, pedido) => {
+      const moneda = String(pedido.moneda || '').toUpperCase();
+      const estado = `${pedido.estado}:${moneda}`;
       if (!acc[estado]) {
         acc[estado] = {
-          estado,
+          estado: pedido.estado,
+          moneda,
           cantidad: 0,
           total: 0,
         };
@@ -222,6 +234,7 @@ export class ReportesService {
     let query = client
       .from('pedidos_venta_detalle')
       .select(`
+        pedido_id,
         producto_id,
         descripcion,
         cantidad,
@@ -231,6 +244,7 @@ export class ReportesService {
         pedidos_venta!pedidos_venta_detalle_pedido_id_fkey!inner (
           tenant_id,
           fecha,
+          moneda,
           estado${clienteFiltro ? ', clientes!pedidos_venta_cliente_id_fkey!inner(razon_social)' : ''}
         )
       `)
@@ -245,43 +259,42 @@ export class ReportesService {
       query = query.lte('pedidos_venta.fecha', fechaHasta);
     }
 
-    const { data: detalles, error } = await query;
-
-    if (error) throw error;
+    const detalles = await this.allReportRows(query);
 
     // Agrupar por producto
     const grouped = detalles.reduce((acc, detalle) => {
-      const productoId = detalle.producto_id;
+      const moneda = String((detalle.pedidos_venta as any)?.moneda || '').toUpperCase();
+      const productoId = `${detalle.producto_id}:${moneda}`;
       if (!acc[productoId]) {
         acc[productoId] = {
-          producto_id: productoId,
+          producto_id: detalle.producto_id,
+          moneda,
           producto_nombre: detalle.descripcion,
           producto_codigo: (detalle.productos as any)?.codigo || '',
           unidades_vendidas: 0,
           importe_total: 0,
           cantidad_pedidos: 0,
-          suma_precios: 0,
-          count_precios: 0,
+          pedidos: new Set<string>(),
         };
       }
 
       acc[productoId].unidades_vendidas += Number(detalle.cantidad);
       acc[productoId].importe_total += Number(detalle.subtotal);
-      acc[productoId].cantidad_pedidos += 1;
-      acc[productoId].suma_precios += Number(detalle.precio_unitario);
-      acc[productoId].count_precios += 1;
+      acc[productoId].pedidos.add(detalle.pedido_id);
+      acc[productoId].cantidad_pedidos = acc[productoId].pedidos.size;
 
       return acc;
     }, {});
 
     return Object.values(grouped).map((item: any) => ({
       producto_id: item.producto_id,
+      moneda: item.moneda,
       producto_nombre: item.producto_nombre,
       producto_codigo: item.producto_codigo,
       unidades_vendidas: item.unidades_vendidas,
       importe_total: item.importe_total,
       cantidad_pedidos: item.cantidad_pedidos,
-      precio_promedio: item.suma_precios / item.count_precios,
+      precio_promedio: item.unidades_vendidas > 0 ? item.importe_total / item.unidades_vendidas : 0,
     }));
   }
 
@@ -302,6 +315,7 @@ export class ReportesService {
       .select(`
         cliente_id,
         total,
+        moneda,
         estado,
         clientes!pedidos_venta_cliente_id_fkey!inner (
           razon_social,
@@ -318,16 +332,16 @@ export class ReportesService {
       query = query.lte('fecha', fechaHasta);
     }
 
-    const { data: pedidos, error } = await query;
-
-    if (error) throw error;
+    const pedidos = await this.allReportRows(query);
 
     // Agrupar por cliente
     const grouped = pedidos.reduce((acc, pedido) => {
-      const clienteId = pedido.cliente_id;
+      const moneda = String(pedido.moneda || '').toUpperCase();
+      const clienteId = `${pedido.cliente_id}:${moneda}`;
       if (!acc[clienteId]) {
         acc[clienteId] = {
-          cliente_id: clienteId,
+          cliente_id: pedido.cliente_id,
+          moneda,
           cliente_nombre: (pedido.clientes as any).razon_social,
           cliente_documento: (pedido.clientes as any).documento_numero,
           total_facturacion: 0,
@@ -343,21 +357,21 @@ export class ReportesService {
       return acc;
     }, {});
 
-    const totalFacturacion = Object.values(grouped).reduce(
-      (sum: number, item: any) => sum + Number(item.total_facturacion),
-      0,
-    );
+    const totales: Record<string, number> = {};
+    for (const item of Object.values(grouped) as any[]) {
+      totales[item.moneda] = (totales[item.moneda] || 0) + Number(item.total_facturacion);
+    }
 
     const result = Object.values(grouped)
       .map((item: any) => ({
         ...item,
         ticket_promedio: Number(item.total_facturacion) / item.cantidad_pedidos,
-        porcentaje_total: Number(totalFacturacion) > 0 ? (Number(item.total_facturacion) / Number(totalFacturacion)) * 100 : 0,
+        porcentaje_total: totales[item.moneda] > 0 ? (Number(item.total_facturacion) / totales[item.moneda]) * 100 : 0,
       }))
-      .sort((a: any, b: any) => Number(b.total_facturacion) - Number(a.total_facturacion))
-      .slice(0, limit);
+      .sort((a: any, b: any) => a.moneda.localeCompare(b.moneda) || Number(b.total_facturacion) - Number(a.total_facturacion));
+    const porMoneda: Record<string, number> = {};
 
-    return result;
+    return result.filter(item => (porMoneda[item.moneda] = (porMoneda[item.moneda] || 0) + 1) <= limit);
   }
 
   /**
@@ -370,12 +384,15 @@ export class ReportesService {
     fechaHasta?: string,
   ) {
     for (const value of [fechaDesde, fechaHasta]) {
-      if (value && (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString().slice(0, 10) !== value)) {
+      const parts = value?.split('-').map(Number);
+      const parsed = value ? new Date(value) : null;
+      if (value && (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !parsed || !Number.isFinite(parsed.getTime()) || parsed.getUTCFullYear() !== parts![0] || parsed.getUTCMonth() + 1 !== parts![1] || parsed.getUTCDate() !== parts![2])) {
         throw new BadRequestException('El período debe contener fechas válidas YYYY-MM-DD');
       }
     }
     if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) throw new BadRequestException('La fecha inicial no puede superar la fecha final');
     const client = this.supabase.getClient();
+    const zona = zonaHorariaDePais(await paisDelTenant(client, tenantId));
 
     // Obtener pedidos con cotización asociada y facturados
     const query = client
@@ -405,20 +422,21 @@ export class ReportesService {
     const facturaIds = [...new Set((pedidos || []).map(pedido => pedido.factura_id).filter(Boolean))];
     let comprobantes: { id: string; fecha_emision: string }[] = [];
     for (let offset = 0; offset < facturaIds.length; offset += 100) {
-      let facturasQuery = client.from('cpe').select('id,fecha_emision')
+      const facturasQuery = client.from('cpe').select('id,fecha_emision')
         .eq('tenant_id', tenantId).in('id', facturaIds.slice(offset, offset + 100));
-      if (fechaDesde) facturasQuery = facturasQuery.gte('fecha_emision', fechaDesde);
-      // La columna histórica es timestamp: incluir todo el último día fiscal.
-      if (fechaHasta) facturasQuery = facturasQuery.lt('fecha_emision', new Date(Date.parse(fechaHasta) + 86400000).toISOString().slice(0, 10));
       const facturas = await facturasQuery;
       if (facturas.error) throw facturas.error;
       comprobantes.push(...(facturas.data || []));
     }
-    const fechasEmision = new Map(comprobantes.map(cpe => [cpe.id, cpe.fecha_emision]));
+    // La misma regla que el listado CPE: medianoche UTC representa fecha pura;
+    // los instantes históricos con hora se convierten a la zona del tenant.
+    const fechasEmision = new Map(comprobantes.map(cpe => ({ id: cpe.id, fecha: fechaDeDocumentoEnPais(cpe.fecha_emision, zona) }))
+      .filter(cpe => (!fechaDesde || cpe.fecha >= fechaDesde) && (!fechaHasta || cpe.fecha <= fechaHasta))
+      .map(cpe => [cpe.id, cpe.fecha]));
     // factura_id apunta al CPE canónico; la fecha del pedido no es la emisión.
     const leadTimes = (pedidos || []).filter(pedido => fechasEmision.has(pedido.factura_id)).map(pedido => {
-      const fecha = fechasEmision.get(pedido.factura_id)!.slice(0, 10);
-      const fechaCot = new Date(String((pedido.cotizaciones as any).fecha).slice(0, 10));
+      const fecha = fechasEmision.get(pedido.factura_id)!;
+      const fechaCot = new Date(fechaDeDocumentoEnPais((pedido.cotizaciones as any).fecha, zona));
       const fechaFactura = new Date(fecha);
       const dias = Math.ceil((fechaFactura.getTime() - fechaCot.getTime()) / 86400000);
       if (!Number.isFinite(dias) || dias < 0) throw new BadRequestException('Fechas inconsistentes entre cotización y comprobante');

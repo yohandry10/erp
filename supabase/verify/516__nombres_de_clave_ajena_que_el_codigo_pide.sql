@@ -59,6 +59,7 @@ BEGIN
     ('pedidos_venta_cliente_id_fkey'),
     ('pedidos_venta_cotizacion_id_fkey'),
     ('pedidos_venta_detalle_pedido_id_fkey'),
+    ('pedidos_venta_detalle_producto_id_fkey'),
     ('recepcion_items_detalle_id_fkey_runtime'),
     ('recepcion_items_producto_id_fkey_runtime'),
     ('recepcion_items_recepcion_id_fkey_runtime'),

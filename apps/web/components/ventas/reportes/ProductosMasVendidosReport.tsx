@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Package, ArrowUpDown } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
-import { useCountryContext } from '@/hooks/use-country-context'
+import { reportMoney, ReportMoneyTotals } from './report-money'
 
 interface ProductoVendido {
   producto_id: string
@@ -14,6 +14,7 @@ interface ProductoVendido {
   producto_codigo: string
   unidades_vendidas: number
   importe_total: number
+  moneda: string
   cantidad_pedidos: number
   precio_promedio: number
 }
@@ -33,8 +34,6 @@ type SortOrder = 'asc' | 'desc'
 
 export default function ProductosMasVendidosReport({ filters }: Props) {
   const { get } = useApi()
-  const country = useCountryContext()
-  const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$')
   const [data, setData] = useState<ProductoVendido[]>([])
   const [loading, setLoading] = useState(true)
   const [sortField, setSortField] = useState<SortField>('unidades')
@@ -80,13 +79,12 @@ export default function ProductosMasVendidosReport({ filters }: Props) {
     if (sortField === 'unidades') {
       return (a.unidades_vendidas - b.unidades_vendidas) * multiplier
     } else {
-      return (a.importe_total - b.importe_total) * multiplier
+      return (a.moneda || '').localeCompare(b.moneda || '') || (a.importe_total - b.importe_total) * multiplier
     }
   })
 
   const totalUnidades = data.reduce((sum, item) => sum + item.unidades_vendidas, 0)
-  const totalImporte = data.reduce((sum, item) => sum + item.importe_total, 0)
-  const totalProductos = data.length
+  const totalProductos = new Set(data.map(row => row.producto_id)).size
 
   return (
     <Card>
@@ -124,7 +122,7 @@ export default function ProductosMasVendidosReport({ filters }: Props) {
               </div>
               <div className="rounded-lg border border-border/70 bg-muted/40 p-4">
                 <p className="text-sm text-violet-400 font-medium">Importe Total</p>
-                <p className="text-2xl font-bold text-violet-400">{currencySymbol} {totalImporte.toFixed(2)}</p>
+                <ReportMoneyTotals rows={data} amount={row => row.importe_total} className="text-2xl font-bold text-violet-400" />
               </div>
             </div>
 
@@ -182,7 +180,7 @@ export default function ProductosMasVendidosReport({ filters }: Props) {
                 </thead>
                 <tbody className="bg-card divide-y divide-border">
                   {sortedData.map((producto, index) => (
-                    <tr key={producto.producto_id} className="hover:bg-muted/30">
+                    <tr key={`${producto.producto_id}-${producto.moneda}`} className="hover:bg-muted/30">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-sm">
                           {index + 1}
@@ -205,7 +203,7 @@ export default function ProductosMasVendidosReport({ filters }: Props) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="text-sm font-medium text-foreground">
-                          {currencySymbol} {producto.importe_total.toFixed(2)}
+                          {reportMoney(producto.importe_total, producto.moneda)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
@@ -215,7 +213,7 @@ export default function ProductosMasVendidosReport({ filters }: Props) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="text-sm text-foreground">
-                          {currencySymbol} {producto.precio_promedio.toFixed(2)}
+                          {reportMoney(producto.precio_promedio, producto.moneda)}
                         </div>
                       </td>
                     </tr>
