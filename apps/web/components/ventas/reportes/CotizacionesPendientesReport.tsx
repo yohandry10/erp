@@ -8,8 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { FileText, Eye, AlertCircle } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
-import { format, differenceInDays } from 'date-fns'
-import { es } from 'date-fns/locale'
+import { formatDate } from '@/lib/format-utils'
 import { EstadoCotizacion } from '@/types/ventas'
 import { reportMoney, ReportMoneyTotals } from './report-money'
 
@@ -226,13 +225,13 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-foreground">
-                          {format(new Date(cotizacion.fecha), 'dd/MM/yyyy', { locale: es })}
+                          {formatDate(cotizacion.fecha)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-foreground">
                           {cotizacion.fecha_vencimiento
-                            ? format(new Date(cotizacion.fecha_vencimiento), 'dd/MM/yyyy', { locale: es })
+                            ? formatDate(cotizacion.fecha_vencimiento)
                             : 'Sin fecha'}
                         </div>
                       </td>

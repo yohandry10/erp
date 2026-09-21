@@ -28,6 +28,8 @@ top clientes preservan la moneda de cada registro. Totales y rankings monetarios
 se separan por moneda, sin sumar importes nominales PEN/USD ni rotular dólares
 como soles. Esos reportes recorren todas las páginas de PostgREST; el CSV de
 ventas reutiliza el escape de celdas y protección contra fórmulas.
+Las fechas civiles de emisión y vencimiento de cotizaciones se muestran sin
+desplazarlas al día anterior por la zona horaria del navegador.
 
 Flujo principal:
 

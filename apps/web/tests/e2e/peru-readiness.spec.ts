@@ -53,7 +53,9 @@ test('Reportes Perú mantienen separados los totales PEN y USD', async ({ contex
       '/configuration/status': { success: true, data: { isComplete: true, isDemo: false, completionPercentage: 100 } },
     }
     const report = /\/(ventas-por-cliente|pedidos-por-estado|productos-mas-vendidos|top-clientes|cotizaciones-pendientes)$/.test(endpoint)
-    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(report ? { success: true, data: rows } : payloads[endpoint] || { success: true, data: [] }) })
+    const reportRows = endpoint.endsWith('/cotizaciones-pendientes')
+      ? rows.map(row => ({ ...row, estado: 'BORRADOR' })) : rows
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(report ? { success: true, data: reportRows } : payloads[endpoint] || { success: true, data: [] }) })
   })
   await page.goto('/dashboard/ventas/reportes/')
   for (const name of ['Ventas por Cliente', 'Pedidos', 'Productos', 'Top Clientes', 'Cotizaciones']) {
@@ -63,6 +65,10 @@ test('Reportes Perú mantienen separados los totales PEN y USD', async ({ contex
     await expect(totals).toContainText('USD 20.00')
     await expect(totals).not.toContainText('120.00')
   }
+  const quote = page.getByRole('row').filter({ hasText: 'COT-PEN' })
+  await expect(quote).toContainText('01/09/2026')
+  await expect(quote).toContainText('30/09/2026')
+  await expect(quote).toContainText('Borrador')
   await page.screenshot({ path: testInfo.outputPath('report-currencies.png'), fullPage: true })
 })
 
