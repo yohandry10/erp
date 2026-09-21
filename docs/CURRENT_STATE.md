@@ -7,6 +7,10 @@ La preparación Perú se integra sobre `main` `679e05bf`, en la rama
 confirma ese mismo SHA en Render, DB/Redis disponibles y esquema requerido y
 aplicado 536. Las tres configuraciones PE no demo siguen fuera de SUNAT
 producción; no se han emitido documentos ni modificado datos remotos.
+El alcance aclarado por el usuario es preparar el producto para el primer
+cliente: todavía no existe una empresa que activar. La aceptación exige que
+ese cliente pueda registrar su identidad, cargar su PFX y credenciales y
+operar sin cambios de código; no exige emitir ahora con los registros QA.
 
 Las migraciones locales de Perú se renumeran de 533..548 a 537..552 para
 preservar las 533..536 ya publicadas de Colombia/Argentina. El mapa exacto está
@@ -58,7 +62,7 @@ y después y detectan una ampliación deliberada. Este ensayo no certifica
 privilegio mínimo de todos los escritores históricos.
 
 Siguen pendientes el cierre de las pruebas finales, CI del commit, promoción
-DB-first y la identificación/configuración del emisor PE real. No se ha hecho
+DB-first y la comprobación del alta del primer cliente. No se ha hecho
 despliegue ni emisión fiscal. Los resultados locales no acreditan aceptación SUNAT.
 
 Este archivo contiene únicamente el estado vigente. El historial de auditorías y

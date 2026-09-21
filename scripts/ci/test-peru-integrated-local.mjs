@@ -10,6 +10,7 @@ import { testAuthContext } from './test-peru-integrated-auth.mjs';
 import { testModuleReads } from './test-peru-integrated-module-reads.mjs';
 import { testPayroll } from './test-peru-integrated-payroll.mjs';
 import { testRecordFlows } from './test-peru-integrated-records.mjs';
+import { testPeruOnboarding } from './test-peru-onboarding-local.mjs';
 
 if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere E2E_EPHEMERAL_LOCAL_DB=1');
 const origin = new URL(process.env.LOCAL_API_URL || 'http://127.0.0.1:3122');
@@ -147,6 +148,8 @@ async function main() {
     setToken: value => { token = value; }, primaryToken, processAccounting, approverToken: purchaseContext.approverToken });
   await testRecordFlows({ request, sql, uuid, results, tenantId: auth.user.tenant_id,
     processAccounting, approverToken: purchaseContext.approverToken });
+  await testPeruOnboarding({ request, sql, uuid, results,
+    setToken: value => { token = value; }, primaryToken });
 }
 try {
   await main();

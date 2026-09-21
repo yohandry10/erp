@@ -857,6 +857,9 @@ si ese período carece de normativa aplicable.
   Cuando el cliente incorpora sus propias credenciales o certificado, el
   wizard los valida y cifra; las transmisiones reales siguen bloqueadas hasta
   que esa configuración sea válida para su jurisdicción.
+  La validación previa del PFX contrasta el RUC que el cliente está introduciendo,
+  sin cambiar el emisor persistido; al completar el alta se vuelve a validar el
+  certificado contra la identidad definitiva antes de guardar y cifrar.
 - La configuración fiscal SUNAT/OSE (PE), ARCA WSAA/WSFE (AR) o DIAN (CO) es
   por tenant y cifra secretos; GRE y SIRE sólo están disponibles para Perú.
   SIRE comparte las credenciales API SUNAT cifradas con GRE REST, pero su
