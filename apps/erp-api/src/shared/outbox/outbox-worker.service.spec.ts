@@ -69,4 +69,22 @@ describe('OutboxWorker claim contract', () => {
     eventBus.emitAndAwait.mockRejectedValueOnce(new Error('smtp down'));
     await expect(worker.processPendingEventsManual()).resolves.toEqual({ processed: 0, failed: 1 });
   });
+
+  it('cierra la constancia de configuración sin repetir la operación ya confirmada', async () => {
+    const claim = { ...emailClaim, event_type: 'configuracion.empresa.actualizada', payload: { tenant_id: 'tenant-1', operation: 'EMPRESA' } };
+    const { worker, outboxService, eventBus } = buildWorker([claim]);
+    eventBus.emitAndAwait.mockRejectedValue(new Error('OUTBOX_HANDLER_NOT_REGISTERED'));
+    await expect(worker.processPendingEventsManual()).resolves.toEqual({ processed: 1, failed: 0 });
+    expect(eventBus.emitAndAwait).not.toHaveBeenCalled();
+    expect(outboxService.markEventCompleted).toHaveBeenCalledWith('row-1', 'claim-1');
+    expect(outboxService.markEventFailed).not.toHaveBeenCalled();
+  });
+
+  it('conserva el fallo cerrado de integraciones sin handler', async () => {
+    const { worker, outboxService, eventBus } = buildWorker([emailClaim]);
+    eventBus.emitAndAwait.mockRejectedValue(new Error('OUTBOX_HANDLER_NOT_REGISTERED:email.send'));
+    await expect(worker.processPendingEventsManual()).resolves.toEqual({ processed: 0, failed: 1 });
+    expect(outboxService.markEventCompleted).not.toHaveBeenCalled();
+    expect(outboxService.markEventFailed).toHaveBeenCalledWith('row-1', 'claim-1', 'OUTBOX_HANDLER_NOT_REGISTERED:email.send');
+  });
 });
