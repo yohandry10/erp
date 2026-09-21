@@ -15,7 +15,9 @@ operar sin cambios de código; no exige emitir ahora con los registros QA.
 Las migraciones locales de Perú se renumeran de 533..548 a 537..552 para
 preservar las 533..536 ya publicadas de Colombia/Argentina. El mapa exacto está
 en `artifacts/peru-migration-renumber-2026-09-12.json`. API, worker y CI exigen
-552. La integración pasó 299 suites/2876 pruebas API, los cinco builds (132
+553. La migración 553 corrige el alta del primer administrador: recibe RBAC
+del tenant sin privilegios globales. El nuevo rango de promoción es 537..553
+y debe repetir restauración y CI antes de aplicarse. La integración pasó 299 suites/2876 pruebas API, los cinco builds (132
 páginas), type-check, lint, 23 pruebas worker, 84 contratos HTTP y siete flujos
 Chromium, además de 22 pantallas con registros. El 13 de septiembre pasaron
 también 104 contratos de navegador y el login móvil, los builds API/web finales,
@@ -60,6 +62,10 @@ DML para service_role. Las migraciones conservan esas ACL, excepto la retirada
 explícita de escritura de auditoría en 542. Los runners comparan permisos antes
 y después y detectan una ampliación deliberada. Este ensayo no certifica
 privilegio mínimo de todos los escritores históricos.
+
+El ensayo ampliado a 553 también pasa las 17 migraciones, conserva los datos
+y prueba que el administrador nuevo no puede administrar otro tenant:
+`artifacts/erp-peru-prod-rehearsal-20260921104004554-14144.json`.
 
 Siguen pendientes el cierre de las pruebas finales, CI del commit, promoción
 DB-first y la comprobación del alta del primer cliente. No se ha hecho

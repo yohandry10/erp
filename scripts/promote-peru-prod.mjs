@@ -42,7 +42,7 @@ assert.equal(rehearsal.network, 'none');
 const files = fs.readdirSync(path.join(root, 'supabase/migrations')).filter(name => /^\d+__.*\.sql$/.test(name));
 const versions = files.map(name => Number(name.split('__')[0]));
 assert.equal(new Set(versions).size, versions.length, 'Prefijos duplicados');
-assert.equal(Math.max(...versions), 552);
+assert.equal(Math.max(...versions), 553);
 const migrations = files.filter(name => Number(name.split('__')[0]) >= 537).sort().map(filename => ({
   filename, version: Number(filename.split('__')[0]), body: fs.readFileSync(path.join(root, 'supabase/migrations', filename), 'utf8'),
 }));
@@ -81,21 +81,21 @@ const connection = new URL(values.DATABASE_URL);
 const env = { ...process.env, PGHOST: connection.hostname, PGPORT: connection.port || '5432',
   PGDATABASE: decodeURIComponent(connection.pathname.slice(1)), PGUSER: decodeURIComponent(connection.username),
   PGPASSWORD: decodeURIComponent(connection.password), PGSSLMODE: 'require', PGCONNECT_TIMEOUT: '20',
-  PGAPPNAME: 'erp-peru-schema-552-promotion', PGOPTIONS: '-c statement_timeout=60000 -c lock_timeout=10000' };
+  PGAPPNAME: 'erp-peru-schema-553-promotion', PGOPTIONS: '-c statement_timeout=60000 -c lock_timeout=10000' };
 delete env.PGSERVICE;
 delete env.PGSERVICEFILE;
 const runId = new Date().toISOString().replace(/[^0-9]/g, '');
 const sql = (input, step) => {
   const result = spawnSync(psql, ['-X', '-qAt', '-v', 'ON_ERROR_STOP=1'], { cwd: root, input, env, encoding: 'utf8', windowsHide: true, timeout: 300000, maxBuffer: 5000000 });
-  fs.writeFileSync(path.join(root, 'artifacts/db-backups', `promotion-552-${runId}-${step}.log`), result.stderr || '');
+  fs.writeFileSync(path.join(root, 'artifacts/db-backups', `promotion-553-${runId}-${step}.log`), result.stderr || '');
   assert.equal(result.status, 0, `Falló ${step}; revisar diagnóstico privado y estado remoto antes de reintentar`);
   return result.stdout.trim();
 };
 const stateSql = `BEGIN READ ONLY;
 SELECT jsonb_build_object('project',(SELECT project_ref FROM app.deployment_environment WHERE singleton),
- 'readiness',public.outbox_runtime_health_492(p_required_schema_version => 552),
+ 'readiness',public.outbox_runtime_health_492(p_required_schema_version => 553),
  'history',(SELECT jsonb_agg(jsonb_build_object('version',version,'name',name) ORDER BY version)
- FROM supabase_migrations.schema_migrations WHERE version ~ '^[0-9]{1,9}$' AND version::integer BETWEEN 533 AND 552));
+ FROM supabase_migrations.schema_migrations WHERE version ~ '^[0-9]{1,9}$' AND version::integer BETWEEN 533 AND 553));
 COMMIT;`;
 try {
   report.before = JSON.parse(sql(stateSql, 'before'));
@@ -111,7 +111,7 @@ try {
   report.after = JSON.parse(sql(stateSql, 'after'));
   assert.equal(report.after.project, project);
   assert.equal(report.after.readiness.ready, true);
-  assert.equal(report.after.history.length, 20);
+  assert.equal(report.after.history.length, 21);
   report.success = true;
 } finally {
   report.completedAt = new Date().toISOString();

@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'fs';
 import { parse } from 'dotenv';
 
 export const PROD_SUPABASE_PROJECT_REF = 'wypnbcptofqdmoynlonq';
-export const MINIMUM_WORKER_SCHEMA_VERSION = 552;
+export const MINIMUM_WORKER_SCHEMA_VERSION = 553;
 
 export function loadWorkerEnvironment(cwd = process.cwd(), env: NodeJS.ProcessEnv = process.env): void {
   if (env.NODE_ENV === 'test') return;

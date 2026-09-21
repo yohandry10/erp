@@ -143,21 +143,21 @@ SELECT format('INSERT INTO local_rehearsal.original_rows SELECT %L,md5(jsonb_str
   schemaname||'.'||tablename,schemaname,tablename)
 FROM pg_tables WHERE schemaname IN ('public','app','auth','storage','supabase_migrations')
 \\gexec`);
-  const pending = files.filter(file => { const n = Number(file.split('__')[0]); return n >= 537 && n <= 552; }).sort();
-  assert.equal(pending.length, 16);
+  const pending = files.filter(file => { const n = Number(file.split('__')[0]); return n >= 537 && n <= 553; }).sort();
+  assert.equal(pending.length, 17);
   const bundle = buildPeruPromotionBundle(pending.map(filename => ({ filename,
     version: Number(filename.split('__')[0]), body: fs.readFileSync(path.join(root, 'supabase/migrations', filename), 'utf8') })));
   step = 'rollback atómico de la promoción completa';
   sql(bundle.replace(/COMMIT;\s*$/, 'SELECT 1/0;\nCOMMIT;\n'), 'division by zero');
-  assert.deepEqual(fingerprint(), before, 'Un fallo al final debe revertir las 16 migraciones y sus backfills');
+  assert.deepEqual(fingerprint(), before, 'Un fallo al final debe revertir las 17 migraciones y sus backfills');
   assert.deepEqual(security(), securityBefore);
   assert.deepEqual(columns(), columnsBefore);
   assert.equal(sql(preservedPrivilegesSql), originalPrivileges);
   assert.equal(sql("SELECT to_regprocedure('public.operar_logistica_tx(uuid,uuid,uuid,text,jsonb,text)') IS NULL;"), 't');
   report.atomicPromotionRollbackPassed = true;
   report.promotionBundleSha256 = createHash('sha256').update(bundle).digest('hex');
-  fs.writeFileSync(path.join(root, 'artifacts', `peru-promotion-552-${report.promotionBundleSha256.slice(0,12)}.sql`), bundle);
-  console.log('[peru-rehearsal] Respaldo restaurado; aplicando 537..552 en copia local');
+  fs.writeFileSync(path.join(root, 'artifacts', `peru-promotion-553-${report.promotionBundleSha256.slice(0,12)}.sql`), bundle);
+  console.log('[peru-rehearsal] Respaldo restaurado; aplicando 537..553 en copia local');
   for (const filename of pending) {
     step = `migración ${filename}`;
     const body = fs.readFileSync(path.join(root, 'supabase/migrations', filename), 'utf8');
@@ -199,12 +199,12 @@ FROM pg_tables WHERE schemaname IN ('public','app','auth','storage','supabase_mi
     report.verifiers.push(Number(filename.split('__')[0]));
   }
   assert.deepEqual(fingerprint(), after, 'Los verificadores deben revertir todos los datos sintéticos');
-  report.readiness = JSON.parse(sql('SELECT public.outbox_runtime_health_492(p_required_schema_version => 552);'));
+  report.readiness = JSON.parse(sql('SELECT public.outbox_runtime_health_492(p_required_schema_version => 553);'));
   assert.equal(report.readiness.ready, true);
   report.success = true;
   report.rlsPreserved = true;
   report.verifiersRolledBack = true;
-  console.log('[peru-rehearsal] PASS: 16 migraciones, datos existentes, RLS y verificadores');
+  console.log('[peru-rehearsal] PASS: 17 migraciones, datos existentes, RLS y verificadores');
 } catch (error) {
   report.failedStep = step;
   report.failure = error.message;
