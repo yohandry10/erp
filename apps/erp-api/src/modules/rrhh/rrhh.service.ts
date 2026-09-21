@@ -827,6 +827,18 @@ export class RrhhService {
     return { success: true, data: data || [] };
   }
 
+  private normalizarPerfilCandidato(input: Record<string, unknown> = {}) {
+    const { experiencia_años: alias, ...payload } = input ?? {};
+    if (alias !== undefined && alias !== null) {
+      if (payload.experiencia_anos !== undefined && payload.experiencia_anos !== null
+        && payload.experiencia_anos !== alias) {
+        throw new BadRequestException('Los años de experiencia enviados no coinciden');
+      }
+      payload.experiencia_anos = alias;
+    }
+    return payload;
+  }
+
   async createCandidato(
     candidatoData: any,
     tenantId?: string,
@@ -849,7 +861,7 @@ export class RrhhService {
     // opcionales (fecha_nacimiento, etc.) → se normalizan a null antes de insertar,
     // evitando el 500 "invalid input syntax for type date".
     const sanitized = Object.fromEntries(
-      Object.entries(candidatoData ?? {}).map(([k, v]) => [k, v === '' ? null : v]),
+      Object.entries(this.normalizarPerfilCandidato(candidatoData)).map(([k, v]) => [k, v === '' ? null : v]),
     );
 
     const data = await this.ejecutarOperacionRrhh(
@@ -867,7 +879,7 @@ export class RrhhService {
   ) {
     if (!tenantId) throw new BadRequestException('Tenant requerido para RRHH');
     const sanitized = Object.fromEntries(
-      Object.entries(candidatoData ?? {}).map(([key, value]) => [key, value === '' ? null : value]),
+      Object.entries(this.normalizarPerfilCandidato(candidatoData)).map(([key, value]) => [key, value === '' ? null : value]),
     );
     const data = await this.ejecutarOperacionRrhh(
       'CANDIDATE_UPDATE', { id: candidatoId, ...sanitized }, tenantId, actorId, idempotencyKey,

@@ -1,3 +1,5 @@
+import { escapeSunatXmlText } from './sunat-soap.util';
+import { parseSunatSoapResponse } from './sunat-response.util';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FiscalServiceAbstract } from '../../shared/integration/fiscal-service.abstract';
@@ -345,14 +347,14 @@ export class SunatFiscalService extends FiscalServiceAbstract {
   <soap:Header>
     <wsse:Security>
       <wsse:UsernameToken>
-        <wsse:Username>${this.config.usuario}</wsse:Username>
-        <wsse:Password>${this.config.password}</wsse:Password>
+        <wsse:Username>${escapeSunatXmlText(this.config.usuario)}</wsse:Username>
+        <wsse:Password>${escapeSunatXmlText(this.config.password)}</wsse:Password>
       </wsse:UsernameToken>
     </wsse:Security>
   </soap:Header>
   <soap:Body>
     <ser:${operation}>
-      <fileName>${fileName}.zip</fileName>
+      <fileName>${escapeSunatXmlText(fileName)}.zip</fileName>
       <contentFile>${zipBase64}</contentFile>
     </ser:${operation}>
   </soap:Body>
@@ -367,59 +369,23 @@ export class SunatFiscalService extends FiscalServiceAbstract {
   <soap:Header>
     <wsse:Security>
       <wsse:UsernameToken>
-        <wsse:Username>${this.config.usuario}</wsse:Username>
-        <wsse:Password>${this.config.password}</wsse:Password>
+        <wsse:Username>${escapeSunatXmlText(this.config.usuario)}</wsse:Username>
+        <wsse:Password>${escapeSunatXmlText(this.config.password)}</wsse:Password>
       </wsse:UsernameToken>
     </wsse:Security>
   </soap:Header>
   <soap:Body>
     <ser:getStatusCdr>
-      <rucComprobante>${ruc}</rucComprobante>
-      <tipoComprobante>${tipoDocumento}</tipoComprobante>
-      <serieComprobante>${serie}</serieComprobante>
-      <numeroComprobante>${numero}</numeroComprobante>
+      <rucComprobante>${escapeSunatXmlText(ruc)}</rucComprobante>
+      <tipoComprobante>${escapeSunatXmlText(tipoDocumento)}</tipoComprobante>
+      <serieComprobante>${escapeSunatXmlText(serie)}</serieComprobante>
+      <numeroComprobante>${escapeSunatXmlText(numero)}</numeroComprobante>
     </ser:getStatusCdr>
   </soap:Body>
 </soap:Envelope>`;
   }
 
   private parseSunatResponse(soapResponse: string): FiscalResponse {
-    const faultMatch = soapResponse.match(/<faultstring>(.*?)<\/faultstring>/);
-    if (faultMatch) {
-      return {
-        success: false,
-        codigoRespuesta: '99',
-        descripcionRespuesta: faultMatch[1],
-      };
-    }
-
-    const cdrMatch =
-      soapResponse.match(/<(?:\w+:)?applicationResponse\b[^>]*>([\s\S]*?)<\/(?:\w+:)?applicationResponse>/i) ||
-      soapResponse.match(/<(?:\w+:)?content\b[^>]*>([\s\S]*?)<\/(?:\w+:)?content>/i);
-    if (cdrMatch) {
-      return {
-        success: true,
-        codigoRespuesta: '0',
-        descripcionRespuesta: 'Aceptado por SUNAT',
-        cdr: cdrMatch[1].trim(),
-      };
-    }
-
-    const statusCodeMatch = soapResponse.match(/<(?:\w+:)?statusCode\b[^>]*>([\s\S]*?)<\/(?:\w+:)?statusCode>/i);
-    const statusMessageMatch = soapResponse.match(/<(?:\w+:)?statusMessage\b[^>]*>([\s\S]*?)<\/(?:\w+:)?statusMessage>/i);
-    if (statusCodeMatch || statusMessageMatch) {
-      const codigo = statusCodeMatch?.[1] || '0';
-      return {
-        success: codigo === '0',
-        codigoRespuesta: codigo,
-        descripcionRespuesta: statusMessageMatch?.[1] || 'Respuesta de estado SUNAT recibida',
-      };
-    }
-
-    return {
-      success: false,
-      codigoRespuesta: '98',
-      descripcionRespuesta: 'Respuesta de SUNAT no reconocida',
-    };
+    return parseSunatSoapResponse(soapResponse);
   }
 }

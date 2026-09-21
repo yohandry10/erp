@@ -112,6 +112,8 @@ export interface UpdateGREThresholdsDto {
 export interface ValidateWizardCertificateDto {
   certificateBase64: string;
   certificatePassword: string;
+  /** Identidad en edición: sólo valida el PFX, no modifica el emisor guardado. */
+  ruc?: string;
 }
 
 export interface WizardCertificateValidationResult {

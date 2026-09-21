@@ -8,6 +8,7 @@ export enum NotificationType {
   // Sales events
   COTIZACION_CONVERTIDA = 'cotizacion_convertida',
   PEDIDO_CONFIRMADO = 'pedido_confirmado',
+  PEDIDO_EN_PREPARACION = 'pedido_en_preparacion',
   PEDIDO_LISTO_DESPACHO = 'pedido_listo_despacho',
   PEDIDO_DESPACHO_PARCIAL = 'pedido_despacho_parcial',
   PEDIDO_LISTO_FACTURAR = 'pedido_listo_facturar',

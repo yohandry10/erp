@@ -189,6 +189,49 @@ describe('CxpService', () => {
       await expect(service.crearCuentaPorPagar(tenantId, dto, userId)).rejects.toThrow(BadRequestException);
     });
 
+    it('recupera la factura del mismo intento mediante la RPC sin duplicar el evento', async () => {
+      const dto = {
+        proveedor_id: 'prov-001', numero_documento: 'F001-00001',
+        fecha_emision: '2025-10-25', subtotal: 1000, igv: 180, total: 1180,
+      };
+      const existing = { id: 'cxp-existing', idempotency_key: 'cxp:factura:tenant-123:prov-001:f001-00001' };
+      mockSupabaseClient.single.mockResolvedValueOnce({ data: { id: dto.proveedor_id }, error: null });
+      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: existing, error: null });
+      mockSupabaseClient.rpc.mockResolvedValueOnce({ data: { ...existing, idempotent: true }, error: null });
+
+      const result = await service.crearCuentaPorPagar(tenantId, dto, userId);
+
+      expect(result.data).toEqual({ ...existing, idempotent: true });
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledTimes(1);
+      expect(eventBusService.emitFacturaProveedorRegistrada).not.toHaveBeenCalled();
+    });
+
+    it('rechaza una huella diferente para una factura existente', async () => {
+      const dto = {
+        proveedor_id: 'prov-001', numero_documento: 'F001-00001',
+        fecha_emision: '2025-10-25', subtotal: 2000, igv: 360, total: 2360,
+      };
+      mockSupabaseClient.single.mockResolvedValueOnce({ data: { id: dto.proveedor_id }, error: null });
+      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: {
+        id: 'cxp-existing', idempotency_key: 'cxp:factura:tenant-123:prov-001:f001-00001',
+      }, error: null });
+      mockSupabaseClient.rpc.mockResolvedValueOnce({ data: null, error: { code: '23505', message: 'SUPPLIER_INVOICE_IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD' } });
+
+      await expect(service.crearCuentaPorPagar(tenantId, dto, userId)).rejects.toMatchObject({ status: 409 });
+      expect(eventBusService.emitFacturaProveedorRegistrada).not.toHaveBeenCalled();
+    });
+
+    it('no escribe si falla la lectura para identificar una factura previa', async () => {
+      mockSupabaseClient.single.mockResolvedValueOnce({ data: { id: 'prov-001' }, error: null });
+      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: null, error: { code: '42501', message: 'permission denied' } });
+
+      await expect(service.crearCuentaPorPagar(tenantId, {
+        proveedor_id: 'prov-001', numero_documento: 'F001-00001', fecha_emision: '2025-10-25',
+        subtotal: 1000, igv: 180, total: 1180,
+      }, userId)).rejects.toMatchObject({ status: 503 });
+      expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
+    });
+
     it('should throw BadRequestException if total does not match subtotal + igv', async () => {
       const dto = {
         proveedor_id: 'prov-001',

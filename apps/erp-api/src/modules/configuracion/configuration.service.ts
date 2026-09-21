@@ -1334,6 +1334,13 @@ export class ConfigurationService {
         countryCode,
         expectedIssuer?.taxId ?? persistedIssuer,
       );
+      if (!result.perteneceAlEmisor) {
+        throw new BadRequestException(result.motivoTitularidad || 'El certificado no pertenece al emisor');
+      }
+      const now = Date.now();
+      if (result.validFrom.getTime() > now || result.validTo.getTime() <= now) {
+        throw new BadRequestException('El certificado digital no está vigente');
+      }
 
       this.logger.log(
         `Certificate payload validated for tenant ${tenantId} (expira: ${result.validTo.toISOString()})`,

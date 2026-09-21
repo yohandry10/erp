@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConsultaEstado, DocumentoElectronico, FiscalResponse } from '../../shared/integration/fiscal.interfaces';
+import { incompleteSunatCdr, parseSunatCdr } from './sunat-response.util';
 
 export type OseAuthTipo = 'BASIC' | 'BEARER' | 'API_KEY' | 'NONE';
 
@@ -57,10 +58,12 @@ export class OseApiFiscalService {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(120_000),
+        redirect: 'error',
       });
 
       const data = await this.safeJson(response);
-      return this.normalizeResponse(response.ok, data);
+      return this.normalizeResponse(response.ok, data, response.status);
     } catch (error) {
       this.logger.error('Error llamando OSE API:', error);
       return {
@@ -92,27 +95,38 @@ export class OseApiFiscalService {
     return headers;
   }
 
-  private normalizeResponse(ok: boolean, data: any): FiscalResponse {
-    const success = typeof data?.success === 'boolean' ? data.success : ok;
+  private normalizeResponse(ok: boolean, data: any, httpStatus?: number): FiscalResponse {
     const codigoRespuesta =
       data?.codigoRespuesta ??
       data?.codigo ??
       data?.code ??
-      (success ? '0' : '99');
+      (data?.success === false ? '99' : '97');
     const descripcionRespuesta =
       data?.descripcionRespuesta ??
       data?.message ??
       data?.mensaje ??
-      (success ? 'Operacion exitosa' : 'Error en OSE API');
+      'Error en OSE API';
+
+    if (!ok) {
+      return { success: false, codigoRespuesta: `HTTP_${httpStatus || 502}`, descripcionRespuesta: String(descripcionRespuesta) };
+    }
+    const cdr = data?.cdr ?? data?.cdrBase64 ?? data?.cdr_xml;
+    const parsed = parseSunatCdr(cdr);
+    if (parsed) {
+      if (parsed.success && data?.success === false) return incompleteSunatCdr();
+      return {
+        ...parsed,
+        hash: data?.hash ?? data?.hashDocumento ?? data?.hash_cpe,
+        numeroComprobante: data?.numeroComprobante ?? data?.numero ?? data?.numero_ticket,
+        metadata: { observaciones: parsed.observaciones, providerResponseCode: String(codigoRespuesta) },
+      };
+    }
+    if (cdr || ['0', '00', '200', '97'].includes(String(codigoRespuesta))) return incompleteSunatCdr();
 
     return {
-      success,
+      success: false,
       codigoRespuesta: String(codigoRespuesta),
       descripcionRespuesta: String(descripcionRespuesta),
-      cdr: data?.cdr ?? data?.cdrBase64 ?? data?.cdr_xml,
-      hash: data?.hash ?? data?.hashDocumento ?? data?.hash_cpe,
-      numeroComprobante: data?.numeroComprobante ?? data?.numero ?? data?.numero_ticket,
-      metadata: data,
     };
   }
 

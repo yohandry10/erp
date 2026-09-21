@@ -1,0 +1,226 @@
+{
+  "base": "679e05bf3c186ed017129c03baafcfd4fefdfd93",
+  "renames": [
+    {
+      "from": "supabase/migrations/533__runtime_pos_catalog_read_privileges.sql",
+      "to": "supabase/migrations/537__runtime_pos_catalog_read_privileges.sql"
+    },
+    {
+      "from": "supabase/migrations/534__runtime_purchase_read_privileges.sql",
+      "to": "supabase/migrations/538__runtime_purchase_read_privileges.sql"
+    },
+    {
+      "from": "supabase/migrations/535__peru_purchase_accounts_onboarding.sql",
+      "to": "supabase/migrations/539__peru_purchase_accounts_onboarding.sql"
+    },
+    {
+      "from": "supabase/migrations/536__supplier_invoice_fiscal_context.sql",
+      "to": "supabase/migrations/540__supplier_invoice_fiscal_context.sql"
+    },
+    {
+      "from": "supabase/migrations/537__runtime_inventory_category_read_privileges.sql",
+      "to": "supabase/migrations/541__runtime_inventory_category_read_privileges.sql"
+    },
+    {
+      "from": "supabase/migrations/538__backend_audit_canonical_append.sql",
+      "to": "supabase/migrations/542__backend_audit_canonical_append.sql"
+    },
+    {
+      "from": "supabase/migrations/539__auth_session_tenant_context.sql",
+      "to": "supabase/migrations/543__auth_session_tenant_context.sql"
+    },
+    {
+      "from": "supabase/migrations/540__runtime_activation_request_read_privilege.sql",
+      "to": "supabase/migrations/544__runtime_activation_request_read_privilege.sql"
+    },
+    {
+      "from": "supabase/migrations/541__global_admin_session_lifecycle.sql",
+      "to": "supabase/migrations/545__global_admin_session_lifecycle.sql"
+    },
+    {
+      "from": "supabase/migrations/542__runtime_module_read_privileges.sql",
+      "to": "supabase/migrations/546__runtime_module_read_privileges.sql"
+    },
+    {
+      "from": "supabase/migrations/543__rrhh_candidate_profile_persistence.sql",
+      "to": "supabase/migrations/547__rrhh_candidate_profile_persistence.sql"
+    },
+    {
+      "from": "supabase/migrations/544__peru_payroll_benefit_concepts.sql",
+      "to": "supabase/migrations/548__peru_payroll_benefit_concepts.sql"
+    },
+    {
+      "from": "supabase/migrations/545__runtime_record_detail_read_privileges.sql",
+      "to": "supabase/migrations/549__runtime_record_detail_read_privileges.sql"
+    },
+    {
+      "from": "supabase/migrations/546__logistics_lifecycle_atomic.sql",
+      "to": "supabase/migrations/550__logistics_lifecycle_atomic.sql"
+    },
+    {
+      "from": "supabase/migrations/547__peru_customer_credit_account_onboarding.sql",
+      "to": "supabase/migrations/551__peru_customer_credit_account_onboarding.sql"
+    },
+    {
+      "from": "supabase/migrations/548__runtime_logistics_trace_read_privileges.sql",
+      "to": "supabase/migrations/552__runtime_logistics_trace_read_privileges.sql"
+    },
+    {
+      "from": "supabase/verify/533__runtime_pos_catalog_read_privileges.sql",
+      "to": "supabase/verify/537__runtime_pos_catalog_read_privileges.sql"
+    },
+    {
+      "from": "supabase/verify/534__runtime_purchase_read_privileges.sql",
+      "to": "supabase/verify/538__runtime_purchase_read_privileges.sql"
+    },
+    {
+      "from": "supabase/verify/535__peru_purchase_accounts_onboarding.sql",
+      "to": "supabase/verify/539__peru_purchase_accounts_onboarding.sql"
+    },
+    {
+      "from": "supabase/verify/536__supplier_invoice_fiscal_context.sql",
+      "to": "supabase/verify/540__supplier_invoice_fiscal_context.sql"
+    },
+    {
+      "from": "supabase/verify/537__runtime_inventory_category_read_privileges.sql",
+      "to": "supabase/verify/541__runtime_inventory_category_read_privileges.sql"
+    },
+    {
+      "from": "supabase/verify/538__backend_audit_canonical_append.sql",
+      "to": "supabase/verify/542__backend_audit_canonical_append.sql"
+    },
+    {
+      "from": "supabase/verify/539__auth_session_tenant_context.sql",
+      "to": "supabase/verify/543__auth_session_tenant_context.sql"
+    },
+    {
+      "from": "supabase/verify/540__runtime_activation_request_read_privilege.sql",
+      "to": "supabase/verify/544__runtime_activation_request_read_privilege.sql"
+    },
+    {
+      "from": "supabase/verify/541__global_admin_session_lifecycle.sql",
+      "to": "supabase/verify/545__global_admin_session_lifecycle.sql"
+    },
+    {
+      "from": "supabase/verify/542__runtime_module_read_privileges.sql",
+      "to": "supabase/verify/546__runtime_module_read_privileges.sql"
+    },
+    {
+      "from": "supabase/verify/543__rrhh_candidate_profile_persistence.sql",
+      "to": "supabase/verify/547__rrhh_candidate_profile_persistence.sql"
+    },
+    {
+      "from": "supabase/verify/544__peru_payroll_benefit_concepts.sql",
+      "to": "supabase/verify/548__peru_payroll_benefit_concepts.sql"
+    },
+    {
+      "from": "supabase/verify/545__runtime_record_detail_read_privileges.sql",
+      "to": "supabase/verify/549__runtime_record_detail_read_privileges.sql"
+    },
+    {
+      "from": "supabase/verify/546__logistics_lifecycle_atomic.sql",
+      "to": "supabase/verify/550__logistics_lifecycle_atomic.sql"
+    },
+    {
+      "from": "supabase/verify/547__peru_customer_credit_account_onboarding.sql",
+      "to": "supabase/verify/551__peru_customer_credit_account_onboarding.sql"
+    },
+    {
+      "from": "supabase/verify/548__runtime_logistics_trace_read_privileges.sql",
+      "to": "supabase/verify/552__runtime_logistics_trace_read_privileges.sql"
+    }
+  ],
+  "renamedIdentifiers": {
+    "seed_peru_purchase_accounts_535": "seed_peru_purchase_accounts_539",
+    "peru_purchase_accounts_535": "peru_purchase_accounts_539",
+    "seed_peru_purchase_accounts_config_535": "seed_peru_purchase_accounts_config_539",
+    "trg_seed_peru_purchase_accounts_535": "trg_seed_peru_purchase_accounts_539",
+    "request_context_536": "request_context_540",
+    "redact_audit_payload_538": "redact_audit_payload_542",
+    "backend_audit_538": "backend_audit_542",
+    "auth_switch_539": "auth_switch_543",
+    "crear_sesion_login_auth_base_541": "crear_sesion_login_auth_base_545",
+    "validar_sesion_auth_base_541": "validar_sesion_auth_base_545",
+    "RRHH_543_WRITER_PICK_CONTRACT_CHANGED": "RRHH_547_WRITER_PICK_CONTRACT_CHANGED",
+    "RRHH_543_INSERT_CONTRACT_CHANGED": "RRHH_547_INSERT_CONTRACT_CHANGED",
+    "RRHH_543_VALUES_CONTRACT_CHANGED": "RRHH_547_VALUES_CONTRACT_CHANGED",
+    "RRHH_543_UPDATE_CONTRACT_CHANGED": "RRHH_547_UPDATE_CONTRACT_CHANGED",
+    "ensure_peru_payroll_benefits_544": "ensure_peru_payroll_benefits_548",
+    "peru_payroll_benefits_544": "peru_payroll_benefits_548",
+    "seed_peru_payroll_benefits_544": "seed_peru_payroll_benefits_548",
+    "seed_peru_customer_credit_account_547": "seed_peru_customer_credit_account_551",
+    "seed_peru_customer_credit_config_547": "seed_peru_customer_credit_config_551",
+    "trg_seed_peru_customer_credit_547": "trg_seed_peru_customer_credit_551",
+    "VERIFY_533_REQUIERE_BASE_EFIMERA_ERP_E2E": "VERIFY_537_REQUIERE_BASE_EFIMERA_ERP_E2E",
+    "VERIFY_533_RUNTIME_SELECT_MISSING": "VERIFY_537_RUNTIME_SELECT_MISSING",
+    "VERIFY_533_DIRECT_WRITER_REOPENED": "VERIFY_537_DIRECT_WRITER_REOPENED",
+    "VERIFY_534_REQUIERE_BASE_EFIMERA_ERP_E2E": "VERIFY_538_REQUIERE_BASE_EFIMERA_ERP_E2E",
+    "VERIFY_534_RUNTIME_SELECT_MISSING": "VERIFY_538_RUNTIME_SELECT_MISSING",
+    "VERIFY_534_DIRECT_WRITER_REOPENED": "VERIFY_538_DIRECT_WRITER_REOPENED",
+    "VERIFY_535_REQUIERE_BASE_EFIMERA_ERP_E2E": "VERIFY_539_REQUIERE_BASE_EFIMERA_ERP_E2E",
+    "VERIFY_535_NEW_PE_MISSING_PURCHASE_ACCOUNTS": "VERIFY_539_NEW_PE_MISSING_PURCHASE_ACCOUNTS",
+    "VERIFY_535_REPLAY_DUPLICATES_ACCOUNTS": "VERIFY_539_REPLAY_DUPLICATES_ACCOUNTS",
+    "VERIFY_535_CUSTOM_ACCOUNT_OVERWRITTEN": "VERIFY_539_CUSTOM_ACCOUNT_OVERWRITTEN",
+    "VERIFY_535_PERU_ACCOUNTS_LEAKED_TO_OTHER_COUNTRY": "VERIFY_539_PERU_ACCOUNTS_LEAKED_TO_OTHER_COUNTRY",
+    "VERIFY_535_HIDDEN_RUNTIME_WRITER_REOPENED": "VERIFY_539_HIDDEN_RUNTIME_WRITER_REOPENED",
+    "VERIFY_536_REQUIERE_BASE_EFIMERA_ERP_E2E": "VERIFY_540_REQUIERE_BASE_EFIMERA_ERP_E2E",
+    "verify_536_fail_fiscal_update": "verify_540_fail_fiscal_update",
+    "verify_536_fail": "verify_540_fail",
+    "VERIFY_536_LATE_FISCAL_FAILURE": "VERIFY_540_LATE_FISCAL_FAILURE",
+    "trg_verify_536_fail": "trg_verify_540_fail",
+    "VERIFY_536_FISCAL_SELECTION_LOST": "VERIFY_540_FISCAL_SELECTION_LOST",
+    "VERIFY_536_REPLAY_NOT_IDEMPOTENT": "VERIFY_540_REPLAY_NOT_IDEMPOTENT",
+    "VERIFY_536_NORMALIZED_REPLAY_REJECTED": "VERIFY_540_NORMALIZED_REPLAY_REJECTED",
+    "VERIFY_536_DIFFERENT_CONTEXT_ACCEPTED": "VERIFY_540_DIFFERENT_CONTEXT_ACCEPTED",
+    "VERIFY_536_DUPLICATE_OUTBOX": "VERIFY_540_DUPLICATE_OUTBOX",
+    "VERIFY_536_DOCUMENT_RATE_LOST": "VERIFY_540_DOCUMENT_RATE_LOST",
+    "VERIFY_536_LEGACY_REPLAY_CHANGED_EVIDENCE": "VERIFY_540_LEGACY_REPLAY_CHANGED_EVIDENCE",
+    "VERIFY_536_LEGACY_CONTEXT_INFERRED": "VERIFY_540_LEGACY_CONTEXT_INFERRED",
+    "VERIFY_536_PARTIAL_COMMIT": "VERIFY_540_PARTIAL_COMMIT",
+    "VERIFY_536_PRIVILEGES_INVALID": "VERIFY_540_PRIVILEGES_INVALID",
+    "VERIFY_537_REQUIERE_BASE_EFIMERA_ERP_E2E": "VERIFY_541_REQUIERE_BASE_EFIMERA_ERP_E2E",
+    "VERIFY_537_CATEGORY_PRIVILEGES_INVALID": "VERIFY_541_CATEGORY_PRIVILEGES_INVALID",
+    "VERIFY_538_REQUIERE_BASE_EFIMERA_ERP_E2E": "VERIFY_542_REQUIERE_BASE_EFIMERA_ERP_E2E",
+    "VERIFY_538_PRIVILEGES_INVALID": "VERIFY_542_PRIVILEGES_INVALID",
+    "VERIFY_538_FIRST_NOT_CREATED": "VERIFY_542_FIRST_NOT_CREATED",
+    "VERIFY_538_REPLAY_NOT_IDEMPOTENT": "VERIFY_542_REPLAY_NOT_IDEMPOTENT",
+    "VERIFY_538_TRACE_OR_REDACTION_INVALID": "VERIFY_542_TRACE_OR_REDACTION_INVALID",
+    "VERIFY_538_CONFLICT_ACCEPTED": "VERIFY_542_CONFLICT_ACCEPTED",
+    "VERIFY_538_FOREIGN_ACTOR_ACCEPTED": "VERIFY_542_FOREIGN_ACTOR_ACCEPTED",
+    "VERIFY_538_INVALID_FIELDS_ACCEPTED": "VERIFY_542_INVALID_FIELDS_ACCEPTED",
+    "VERIFY_538_PARTIAL_WRITE": "VERIFY_542_PARTIAL_WRITE",
+    "VERIFY_538_INTEGRATION_INVALID": "VERIFY_542_INTEGRATION_INVALID",
+    "VERIFY_538_FOREIGN_EVENT_REPLAY": "VERIFY_542_FOREIGN_EVENT_REPLAY",
+    "VERIFY_539_REQUIERE_ERP_E2E": "VERIFY_543_REQUIERE_ERP_E2E",
+    "VERIFY_542_REQUIERE_BASE_EFIMERA_ERP_E2E": "VERIFY_546_REQUIERE_BASE_EFIMERA_ERP_E2E",
+    "VERIFY_542_RUNTIME_SELECT_MISSING": "VERIFY_546_RUNTIME_SELECT_MISSING",
+    "VERIFY_542_DIRECT_WRITER_REOPENED": "VERIFY_546_DIRECT_WRITER_REOPENED",
+    "VERIFY_542_RLS_NOT_FORCED": "VERIFY_546_RLS_NOT_FORCED",
+    "VERIFY_545_REQUIERE_BASE_EFIMERA_ERP_E2E": "VERIFY_549_REQUIERE_BASE_EFIMERA_ERP_E2E",
+    "VERIFY_545_RUNTIME_SELECT_MISSING": "VERIFY_549_RUNTIME_SELECT_MISSING",
+    "VERIFY_545_DIRECT_WRITER_REOPENED": "VERIFY_549_DIRECT_WRITER_REOPENED",
+    "VERIFY_545_RLS_NOT_FORCED": "VERIFY_549_RLS_NOT_FORCED",
+    "VERIFY_546_PREPARATION_FAILED": "VERIFY_550_PREPARATION_FAILED",
+    "VERIFY_546_DUPLICATE": "VERIFY_550_DUPLICATE",
+    "VERIFY_546_CONFLICT_ACCEPTED": "VERIFY_550_CONFLICT_ACCEPTED",
+    "VERIFY_546_ACTOR_ACCEPTED": "VERIFY_550_ACTOR_ACCEPTED",
+    "VERIFY_546_ITEM_ACCEPTED": "VERIFY_550_ITEM_ACCEPTED",
+    "VERIFY_546_PARTIAL_COMMIT": "VERIFY_550_PARTIAL_COMMIT",
+    "VERIFY_546_PACKING": "VERIFY_550_PACKING",
+    "VERIFY_546_EARLY_DELIVERY": "VERIFY_550_EARLY_DELIVERY",
+    "VERIFY_546_BACKORDER": "VERIFY_550_BACKORDER",
+    "VERIFY_546_DELIVERY": "VERIFY_550_DELIVERY",
+    "VERIFY_546_REGRESSION_ACCEPTED": "VERIFY_550_REGRESSION_ACCEPTED",
+    "VERIFY_546_PERMISSIONS_REOPENED": "VERIFY_550_PERMISSIONS_REOPENED",
+    "VERIFY_547_REQUIERE_BASE_EFIMERA_ERP_E2E": "VERIFY_551_REQUIERE_BASE_EFIMERA_ERP_E2E",
+    "VERIFY_547_NEW_PE_MISSING_CREDIT_ACCOUNT": "VERIFY_551_NEW_PE_MISSING_CREDIT_ACCOUNT",
+    "VERIFY_547_REPLAY_DUPLICATES_ACCOUNTS": "VERIFY_551_REPLAY_DUPLICATES_ACCOUNTS",
+    "VERIFY_547_CUSTOM_ACCOUNT_OVERWRITTEN": "VERIFY_551_CUSTOM_ACCOUNT_OVERWRITTEN",
+    "VERIFY_547_PERU_ACCOUNTS_LEAKED_TO_OTHER_COUNTRY": "VERIFY_551_PERU_ACCOUNTS_LEAKED_TO_OTHER_COUNTRY",
+    "VERIFY_547_HIDDEN_RUNTIME_WRITER_REOPENED": "VERIFY_551_HIDDEN_RUNTIME_WRITER_REOPENED",
+    "VERIFY_548_REQUIERE_BASE_EFIMERA_ERP_E2E": "VERIFY_552_REQUIERE_BASE_EFIMERA_ERP_E2E",
+    "VERIFY_548_RUNTIME_SELECT_MISSING": "VERIFY_552_RUNTIME_SELECT_MISSING",
+    "VERIFY_548_DIRECT_WRITER_REOPENED": "VERIFY_552_DIRECT_WRITER_REOPENED",
+    "VERIFY_548_RLS_NOT_FORCED": "VERIFY_552_RLS_NOT_FORCED"
+  }
+}

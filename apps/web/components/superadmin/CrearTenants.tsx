@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useApiCall } from '@/hooks/use-api'
 import GestionTenants from './components/GestionTenants'
+import { loadTenantCatalog } from '@/lib/tenant-catalog'
 
 export interface Tenant {
   id?: string
@@ -13,7 +14,7 @@ export interface Tenant {
   direccion?: string
   email?: string
   telefono?: string
-  estado?: 'ACTIVO' | 'INACTIVO'
+  estado?: 'ACTIVO' | 'INACTIVO' | 'PRUEBA' | 'SUSPENDIDO'
   is_active?: boolean
   created_at?: string
   is_demo?: boolean
@@ -35,7 +36,7 @@ export default function CrearTenants() {
   const [demoModalOpen, setDemoModalOpen] = useState(false)
 
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL')
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE' | 'TRIAL' | 'SUSPENDED'>('ALL')
 
   useEffect(() => {
     getRef.current = get
@@ -46,21 +47,7 @@ export default function CrearTenants() {
     setLoading(true)
     setError('')
     try {
-      const res = await getRef.current('/tenants')
-      const rawTenants = res?.data ?? res
-      const nextTenants = Array.isArray(rawTenants)
-        ? rawTenants
-        : Array.isArray(rawTenants?.items)
-          ? rawTenants.items
-          : Array.isArray(rawTenants?.tenants)
-            ? rawTenants.tenants
-            : []
-
-      if (res && res.success !== false) {
-        setTenants(nextTenants)
-      } else {
-        setError(res?.message || 'No se pudo cargar los tenants')
-      }
+      setTenants(await loadTenantCatalog<Tenant>(endpoint => getRef.current(endpoint)))
     } catch (err: any) {
       setError(err?.message || 'Error al cargar los tenants')
     } finally {
@@ -81,9 +68,9 @@ export default function CrearTenants() {
           .filter(Boolean)
           .some(v => (v as string).toLowerCase().includes(q))
 
-      const active = t.estado ? t.estado === 'ACTIVO' : (t.is_active ?? true)
+      const estado = t.estado || (t.is_active === false ? 'INACTIVO' : 'ACTIVO')
       const matchesStatus =
-        statusFilter === 'ALL' ? true : statusFilter === 'ACTIVE' ? active : !active
+        statusFilter === 'ALL' || estado === ({ ACTIVE: 'ACTIVO', INACTIVE: 'INACTIVO', TRIAL: 'PRUEBA', SUSPENDED: 'SUSPENDIDO' } as const)[statusFilter]
 
       return matchesText && matchesStatus
     })

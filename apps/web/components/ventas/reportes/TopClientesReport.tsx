@@ -7,13 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { TrendingUp, Eye } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
-import { useCountryContext } from '@/hooks/use-country-context'
+import { reportMoney, reportTotals } from './report-money'
 
 interface TopCliente {
   cliente_id: string
   cliente_nombre: string
   cliente_documento: string
   total_facturacion: number
+  moneda: string
   cantidad_pedidos: number
   cantidad_facturas: number
   ticket_promedio: number
@@ -32,8 +33,6 @@ interface Props {
 export default function TopClientesReport({ filters }: Props) {
   const router = useRouter()
   const { get } = useApi()
-  const country = useCountryContext()
-  const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$')
   const [data, setData] = useState<TopCliente[]>([])
   const [loading, setLoading] = useState(true)
   const [topN, setTopN] = useState(10)
@@ -68,8 +67,8 @@ export default function TopClientesReport({ filters }: Props) {
     router.push(`/dashboard/ventas/clientes/${clienteId}`)
   }
 
-  const totalFacturacion = data.reduce((sum, item) => sum + item.total_facturacion, 0)
-  const maxFacturacion = Math.max(...data.map(item => item.total_facturacion), 1)
+  const totales = reportTotals(data, row => row.total_facturacion)
+  const maxFacturacion = (moneda: string) => Math.max(...data.filter(row => row.moneda === moneda).map(row => row.total_facturacion), 1)
 
   return (
     <Card>
@@ -124,35 +123,35 @@ export default function TopClientesReport({ filters }: Props) {
           <>
             {/* Summary Card */}
             <div className="rounded-lg border border-border/70 bg-muted/40 p-4 mb-6">
-              <p className="text-sm text-foreground/80 font-medium">Facturación Total (Top {topN})</p>
-              <p className="text-3xl font-bold text-foreground">{currencySymbol} {totalFacturacion.toFixed(2)}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Promedio por cliente: {currencySymbol} {(totalFacturacion / data.length).toFixed(2)}
-              </p>
+              <p className="text-sm text-foreground/80 font-medium">Facturación Total (Top {topN} por moneda)</p>
+              <div data-testid="report-currency-totals">{totales.map(([moneda, total]) => <div key={moneda}>
+                <p className="text-3xl font-bold text-foreground">{reportMoney(total, moneda)}</p>
+                <p className="text-xs text-muted-foreground mt-1">Promedio por cliente: {reportMoney(total / data.filter(row => (row.moneda || '') === moneda).length, moneda)}</p>
+              </div>)}</div>
             </div>
 
             {/* Visual Chart */}
             <div className="space-y-3 mb-6">
               <h3 className="text-sm font-medium text-foreground/85">Distribución de Facturación</h3>
-              {data.slice(0, 10).map((cliente, index) => (
-                <div key={cliente.cliente_id} className="space-y-1">
+              {data.map((cliente, index) => (
+                <div key={`${cliente.cliente_id}-${cliente.moneda}`} className="space-y-1">
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">
-                        {index + 1}
+                        {data.slice(0, index).filter(row => row.moneda === cliente.moneda).length + 1}
                       </span>
                       <span className="font-medium text-foreground/85 truncate">
                         {cliente.cliente_nombre}
                       </span>
                     </div>
                     <span className="text-foreground/80 font-medium ml-2 flex-shrink-0">
-                      {currencySymbol} {cliente.total_facturacion.toFixed(2)}
+                      {reportMoney(cliente.total_facturacion, cliente.moneda)}
                     </span>
                   </div>
                   <div className="w-full bg-muted rounded-full h-2 overflow-hidden ml-8">
                     <div
                       className="h-full bg-primary rounded-full transition-all duration-500"
-                      style={{ width: `${(cliente.total_facturacion / maxFacturacion) * 100}%` }}
+                      style={{ width: `${(cliente.total_facturacion / maxFacturacion(cliente.moneda)) * 100}%` }}
                     />
                   </div>
                 </div>
@@ -177,7 +176,7 @@ export default function TopClientesReport({ filters }: Props) {
                       Facturación
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      % Total
+                      % de su moneda
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Pedidos
@@ -195,10 +194,10 @@ export default function TopClientesReport({ filters }: Props) {
                 </thead>
                 <tbody className="bg-card divide-y divide-border">
                   {data.map((cliente, index) => (
-                    <tr key={cliente.cliente_id} className="hover:bg-muted/30">
+                    <tr key={`${cliente.cliente_id}-${cliente.moneda}`} className="hover:bg-muted/30">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm">
-                          {index + 1}
+                          {data.slice(0, index).filter(row => row.moneda === cliente.moneda).length + 1}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -213,7 +212,7 @@ export default function TopClientesReport({ filters }: Props) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="text-sm font-bold text-foreground">
-                          {currencySymbol} {cliente.total_facturacion.toFixed(2)}
+                          {reportMoney(cliente.total_facturacion, cliente.moneda)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
@@ -233,7 +232,7 @@ export default function TopClientesReport({ filters }: Props) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="text-sm text-foreground">
-                          {currencySymbol} {cliente.ticket_promedio.toFixed(2)}
+                          {reportMoney(cliente.ticket_promedio, cliente.moneda)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

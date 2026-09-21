@@ -11,6 +11,7 @@ import { sanitizePostgrestSearch } from '../../../common/util/postgrest.util';
 import Decimal from 'decimal.js';
 import { createHash } from 'crypto';
 import { fechaHoyDelTenant } from '../../../shared/utils/fecha-tenant.util';
+import { appendIntegrationLog } from '../../../shared/utils/integration-log';
 
 interface ListarCxcFilters {
   estado?: 'PENDIENTE' | 'PARCIAL' | 'CANCELADO' | 'VENCIDO';
@@ -49,10 +50,7 @@ export class CxcService {
     durationMs?: number;
   }): Promise<void> {
     try {
-      await this.supabase
-        .getClient()
-        .from('integration_logs')
-        .insert({
+      await appendIntegrationLog(this.supabase.getClient(), {
           tenant_id: entry.tenantId,
           servicio: entry.servicio,
           operacion: entry.operacion,

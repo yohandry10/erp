@@ -1,5 +1,5 @@
 # Multi-stage build for production
-FROM node:20-alpine AS build
+FROM node:24-alpine AS build
 
 RUN npm install -g pnpm@9.15.4
 WORKDIR /app
@@ -13,7 +13,7 @@ RUN pnpm --filter=@erp-suite/dtos build
 RUN pnpm --filter=@erp-suite/crypto build
 RUN pnpm --filter=@erp-suite/web build
 
-FROM node:20-alpine AS production
+FROM node:24-alpine AS production
 
 RUN npm install -g pnpm@9.15.4
 WORKDIR /app

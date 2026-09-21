@@ -1,5 +1,6 @@
 "use client";
 
+import printStyles from '../../components/layout/dashboard-print.module.css';
 import Sidebar from "../../components/layout/sidebar";
 import { useEffect, useLayoutEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
@@ -148,16 +149,18 @@ export default function DashboardLayout({
       <OnboardingProvider>
         <div
           data-erp-theme={dashboardTheme}
-          className="group/dashboard relative flex min-h-screen flex-col overflow-hidden"
+          className={`${printStyles.dashboard} group/dashboard relative flex min-h-screen flex-col overflow-hidden`}
         >
           <div className="relative flex flex-1 overflow-hidden">
-            <Sidebar />
+            <div data-dashboard-chrome><Sidebar /></div>
             <main
               className="relative ml-0 min-h-full max-w-[100vw] flex-1 overflow-auto bg-gradient-to-br from-background via-muted/50 to-background p-4 transition-[margin-left,background-color] duration-300 ease-out group-data-[erp-theme=light]/dashboard:from-slate-50 group-data-[erp-theme=light]/dashboard:via-slate-100 group-data-[erp-theme=light]/dashboard:to-slate-200 md:ml-[240px] md:max-w-[calc(100vw-240px)] md:p-6 lg:ml-[280px] lg:max-w-[calc(100vw-280px)] lg:p-8"
               data-theme={dashboardTheme}
+              data-dashboard-content
             >
               <div
                 data-testid="dashboard-utility-bar"
+                data-dashboard-chrome
                 className="relative z-[900] -mx-4 -mt-4 mb-5 border-b border-border/70 bg-background/90 px-4 py-3 pl-16 shadow-sm backdrop-blur-xl md:-mx-6 md:-mt-6 md:px-6 md:pl-6 lg:-mx-8 lg:-mt-8 lg:px-8"
               >
                 <div className="flex min-h-11 items-center justify-end gap-2">
@@ -176,7 +179,7 @@ export default function DashboardLayout({
           </div>
 
           {/* Centro de ayuda contextual: botón flotante, se abre solo si se pide */}
-          <CentroAyuda />
+          <div data-dashboard-chrome><CentroAyuda /></div>
         </div>
       </OnboardingProvider>
     </EmpresaConfigProvider>

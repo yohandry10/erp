@@ -45,7 +45,8 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       }
 
       const tenantData = await response.json()
-      setTenant(tenantData.data || tenantData)
+      const resolvedTenant = tenantData.data || tenantData
+      setTenant({ ...resolvedTenant, nombre: resolvedTenant.nombre || resolvedTenant.nombre_comercial || resolvedTenant.razon_social || 'Mi Empresa' })
     } catch (err) {
       setTenant({
         id: tenantId,
@@ -141,6 +142,15 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.message || 'Failed to switch tenant')
+      }
+
+      const switched = await response.json()
+      if (!switched.access_token || switched.tenant?.id !== targetTenantId) {
+        throw new Error('No se pudo confirmar la empresa seleccionada')
+      }
+      const established = await customAuth.setSession({ access_token: switched.access_token })
+      if (established.error || established.data.session?.user.tenant_id !== targetTenantId) {
+        throw established.error || new Error('La sesión no corresponde a la empresa seleccionada')
       }
 
       // Cambiar de empresa tiene que tirar lo que se leyó de la anterior. Sólo

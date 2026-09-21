@@ -26,6 +26,7 @@ import {
 } from './dto/maestro-inventario.dto';
 import { MAX_PRODUCT_IMAGE_BYTES, ProductImagesService, ProductImageUpload } from './product-images.service';
 import { rangoDelDiaDelTenant } from '../../shared/utils/fecha-tenant.util';
+import { calcularMetricasInventario } from './inventario-metrics.util';
 
 /**
  * ✅ MULTI-TENANT: Controlador de Inventario con soporte multi-tenant
@@ -331,19 +332,11 @@ export class InventarioController {
 
       if (productosError) throw productosError;
 
-      const totalProductos = productos?.length || 0;
-      const valorInventario =
-        productos?.reduce(
-          (sum, p) =>
-            sum +
-              (parseFloat(p.precio_compra || 0) || parseFloat((p as any).costo || 0)) *
-                parseFloat((p as any).stock_actual || 0),
-          0,
-        ) || 0;
-      const productosStockBajo =
-        productos?.filter(
-          p => parseFloat((p as any).stock_actual || 0) <= parseFloat(p.stock_minimo || 0),
-        ).length || 0;
+      const {
+        totalProductos,
+        valorInventario,
+        productosStockBajo,
+      } = calcularMetricasInventario(productos);
 
       // `created_at` es timestamptz: comparar contra un literal sin zona hacía que
       // «los movimientos de hoy» abarcaran desde las 19:00 de ayer para un tenant
@@ -773,7 +766,7 @@ export class InventarioController {
       return { success: true, data: data || [] };
     } catch (error) {
       this.logger.error('❌ Error obteniendo categorías', error as Error);
-      return { success: false, message: 'Error al obtener categorías: ' + (error as Error).message, data: [] };
+      throw new InternalServerErrorException('No se pudieron cargar las categorías de producto');
     }
   }
 

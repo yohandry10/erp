@@ -95,6 +95,8 @@ DECLARE
   v_country_cpe uuid;
   v_country_claim jsonb;
   v_num integer := 100;
+  -- Evidencia válida relativa a la emisión actual; los casos inválidos siguen explícitos.
+  v_valid_expiry text := to_char(current_date + 10, 'YYYYMMDD');
 BEGIN
   UPDATE app.deployment_environment
   SET environment = 'PROD', project_ref = 'wypnbcptofqdmoynlonq',
@@ -244,7 +246,7 @@ BEGIN
       v_tenant, (v_claim->'operation'->>'id')::uuid, (v_claim->'operation'->>'claim_token')::uuid,
       'ACCEPTED', 'A', 'CAE corto', NULL, '1234567890123', '00012-00000037',
       jsonb_build_object('success', true, 'countryCode', 'AR', 'resultKind', 'ACCEPTED',
-        'caeVencimiento', '20260908', 'puntoVenta', 12, 'tipoComprobante', 1,
+        'caeVencimiento', v_valid_expiry, 'puntoVenta', 12, 'tipoComprobante', 1,
         'numeroComprobante', '00012-00000037', 'condicionIvaEmisor', 'RESPONSABLE_INSCRIPTO',
         'condicionIvaReceptorId', 6)
     );
@@ -272,7 +274,7 @@ BEGIN
       v_tenant, (v_claim->'operation'->>'id')::uuid, (v_claim->'operation'->>'claim_token')::uuid,
       'ACCEPTED', 'A', 'País cruzado', NULL, '70417054367476', '00012-00000037',
       jsonb_build_object('success', true, 'countryCode', 'PE', 'resultKind', 'ACCEPTED',
-        'caeVencimiento', '20260908', 'puntoVenta', 12, 'tipoComprobante', 1,
+        'caeVencimiento', v_valid_expiry, 'puntoVenta', 12, 'tipoComprobante', 1,
         'numeroComprobante', '00012-00000037', 'condicionIvaEmisor', 'RESPONSABLE_INSCRIPTO',
         'condicionIvaReceptorId', 6)
     );
@@ -286,7 +288,7 @@ BEGIN
       v_tenant, (v_claim->'operation'->>'id')::uuid, (v_claim->'operation'->>'claim_token')::uuid,
       'ACCEPTED', 'A', 'Tipo E no habilitado', NULL, '70417054367476', '00012-00000037',
       jsonb_build_object('success', true, 'countryCode', 'AR', 'resultKind', 'ACCEPTED',
-        'caeVencimiento', '20260908', 'puntoVenta', 12, 'tipoComprobante', 19,
+        'caeVencimiento', v_valid_expiry, 'puntoVenta', 12, 'tipoComprobante', 19,
         'numeroComprobante', '00012-00000037', 'condicionIvaEmisor', 'RESPONSABLE_INSCRIPTO',
         'condicionIvaReceptorId', 6)
     );
@@ -298,14 +300,14 @@ BEGIN
     v_tenant, (v_claim->'operation'->>'id')::uuid, (v_claim->'operation'->>'claim_token')::uuid,
     'ACCEPTED', 'A', 'Autorizado por ARCA', NULL, '70417054367476', '00012-00000037',
     jsonb_build_object('success', true, 'countryCode', 'AR', 'resultKind', 'ACCEPTED',
-      'caeVencimiento', '20260908', 'puntoVenta', 12, 'tipoComprobante', 1,
+      'caeVencimiento', v_valid_expiry, 'puntoVenta', 12, 'tipoComprobante', 1,
       'numeroComprobante', '00012-00000037', 'qrUrl', 'https://www.arca.gob.ar/fe/qr/?p=verify524',
       'condicionIvaEmisor', 'RESPONSABLE_INSCRIPTO', 'condicionIvaReceptorId', 6)
   );
   IF v_result->'cpe'->>'estado' <> 'ACEPTADO'
      OR (SELECT cdr_sunat FROM public.cpe WHERE id = v_cpe) IS NOT NULL
      OR (SELECT hash FROM public.cpe WHERE id = v_cpe) <> '70417054367476'
-     OR (SELECT metadata->>'arca_cae_vencimiento' FROM public.cpe WHERE id = v_cpe) <> '20260908'
+     OR (SELECT metadata->>'arca_cae_vencimiento' FROM public.cpe WHERE id = v_cpe) <> v_valid_expiry
      OR (SELECT (metadata->>'arca_punto_venta')::integer FROM public.cpe WHERE id = v_cpe) <> 12
      OR (SELECT (metadata->>'arca_cbte_tipo')::integer FROM public.cpe WHERE id = v_cpe) <> 1 THEN
     RAISE EXCEPTION 'VERIFY_524_ARCA_CAE_NO_FINALIZO:%', v_result;
@@ -315,7 +317,7 @@ BEGIN
     v_tenant, (v_claim->'operation'->>'id')::uuid, (v_claim->'operation'->>'claim_token')::uuid,
     'ACCEPTED', 'A', 'Autorizado por ARCA', NULL, '70417054367476', '00012-00000037',
     jsonb_build_object('success', true, 'countryCode', 'AR', 'resultKind', 'ACCEPTED',
-      'caeVencimiento', '20260908', 'puntoVenta', 12, 'tipoComprobante', 1,
+      'caeVencimiento', v_valid_expiry, 'puntoVenta', 12, 'tipoComprobante', 1,
       'numeroComprobante', '00012-00000037', 'qrUrl', 'https://www.arca.gob.ar/fe/qr/?p=verify524',
       'condicionIvaEmisor', 'RESPONSABLE_INSCRIPTO', 'condicionIvaReceptorId', 6)
   );
@@ -329,7 +331,7 @@ BEGIN
       v_tenant, (v_claim->'operation'->>'id')::uuid, (v_claim->'operation'->>'claim_token')::uuid,
       'ACCEPTED', 'A', 'Autorizado por ARCA', NULL, '70417054367479', '00012-00000037',
       jsonb_build_object('success', true, 'countryCode', 'AR', 'resultKind', 'ACCEPTED',
-        'caeVencimiento', '20260908', 'puntoVenta', 12, 'tipoComprobante', 1,
+        'caeVencimiento', v_valid_expiry, 'puntoVenta', 12, 'tipoComprobante', 1,
         'numeroComprobante', '00012-00000037', 'qrUrl', 'https://www.arca.gob.ar/fe/qr/?p=verify524',
         'condicionIvaEmisor', 'RESPONSABLE_INSCRIPTO', 'condicionIvaReceptorId', 6)
     );
@@ -370,7 +372,7 @@ BEGIN
     'ACCEPTED', 'A', 'NC autorizada por ARCA', NULL,
     '70417054367478', '00012-' || v_note_number,
     jsonb_build_object('success', true, 'countryCode', 'AR', 'resultKind', 'ACCEPTED',
-      'caeVencimiento', '20260908', 'puntoVenta', 12, 'tipoComprobante', 3,
+      'caeVencimiento', v_valid_expiry, 'puntoVenta', 12, 'tipoComprobante', 3,
       'numeroComprobante', '00012-' || v_note_number,
       'condicionIvaEmisor', 'RESPONSABLE_INSCRIPTO', 'condicionIvaReceptorId', 6)
   );
@@ -434,7 +436,7 @@ BEGIN
       v_tenant, v_query_operation, v_query_token, 'ACCEPTED', 'A',
       'Consulta con identidad adulterada', NULL, '70417054367477', '00012-00000038',
       jsonb_build_object('success', true, 'countryCode', 'AR', 'resultKind', 'ACCEPTED',
-        'caeVencimiento', '20260908', 'puntoVenta', 12, 'tipoComprobante', 1,
+        'caeVencimiento', v_valid_expiry, 'puntoVenta', 12, 'tipoComprobante', 1,
         'numeroComprobante', '00012-00000038')
     );
   EXCEPTION WHEN check_violation THEN v_failed := SQLERRM LIKE '%ARCA_QUERY_PRIOR_IDENTITY_INVALID%';
@@ -446,7 +448,7 @@ BEGIN
     v_tenant, v_query_operation, v_query_token, 'ACCEPTED', 'A', 'Consulta ARCA autorizada',
     NULL, '70417054367477', '00012-00000038',
     jsonb_build_object('success', true, 'countryCode', 'AR', 'resultKind', 'ACCEPTED',
-      'caeVencimiento', '20260908', 'puntoVenta', 12, 'tipoComprobante', 1,
+      'caeVencimiento', v_valid_expiry, 'puntoVenta', 12, 'tipoComprobante', 1,
       'numeroComprobante', '00012-00000038')
   );
   IF (SELECT estado FROM public.cpe WHERE id = v_query_cpe) <> 'ACEPTADO' THEN

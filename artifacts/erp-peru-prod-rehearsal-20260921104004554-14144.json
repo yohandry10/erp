@@ -1,0 +1,403 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "archiveSha256": "d19c84a0278cfa5921ea6164e113bb26601f2dc6d27ff0b2d1765c4560ac8aac",
+  "archiveBytes": 17643929,
+  "network": "none",
+  "database": "erp_e2e",
+  "image": "postgres:17-alpine",
+  "migrations": [
+    {
+      "version": 537,
+      "sha256": "9116a587692861adda7ac507ddab7fc8b2baeeb6c28f6c198d1f000d78757301",
+      "elapsedMs": 317
+    },
+    {
+      "version": 538,
+      "sha256": "d635f0f72f00070364e0c5e10bad14ff158df8c4a0229e310a104d9482f5c308",
+      "elapsedMs": 281
+    },
+    {
+      "version": 539,
+      "sha256": "510fa4dbf5195ddd81c3657e344272345c18a95138d10034f264ccff204b6508",
+      "elapsedMs": 329
+    },
+    {
+      "version": 540,
+      "sha256": "70b55ddfae8448c53daa1140b0d57737ad30ba63ce39b609bd3ba4c0159179f7",
+      "elapsedMs": 281
+    },
+    {
+      "version": 541,
+      "sha256": "4b3aeeb9be514a2b074e452486f5bbbf52dc3e222d896fee7d6b709c80730e8b",
+      "elapsedMs": 264
+    },
+    {
+      "version": 542,
+      "sha256": "759f2281671f8950d3eab97cc57509c56126d9de2da0f654c54275deb28ecee2",
+      "elapsedMs": 108
+    },
+    {
+      "version": 543,
+      "sha256": "aa0351981653f758d562c630a5088dcea1aaac40fc993d96cfd789fd84eaef58",
+      "elapsedMs": 275
+    },
+    {
+      "version": 544,
+      "sha256": "2668aa4b1c0f790c2ad0806675b155c6410e07e5b165bd8d87ad154b998b7697",
+      "elapsedMs": 274
+    },
+    {
+      "version": 545,
+      "sha256": "050355eb18169675017b1ad235626b834426d62584161487321eaa9ab28edb24",
+      "elapsedMs": 323
+    },
+    {
+      "version": 546,
+      "sha256": "0b65b656c5942f0437103b9a3f390562265a1921d57b8007c306dfe2570aac3f",
+      "elapsedMs": 376
+    },
+    {
+      "version": 547,
+      "sha256": "22a265493fe6216c0a9f32ee19cf94b8aab1329f8b459bdb6ec0fe2b90dd6827",
+      "elapsedMs": 398
+    },
+    {
+      "version": 548,
+      "sha256": "8abf31e2e5e8856a7d14ec3e305cb17e6b76a5323a72097f0696a6cfb57bb041",
+      "elapsedMs": 544
+    },
+    {
+      "version": 549,
+      "sha256": "8f4e2e30b777ff96dbc283809da906bd95be4ee8e32def6aa3798c4b41a517d3",
+      "elapsedMs": 412
+    },
+    {
+      "version": 550,
+      "sha256": "9837806109066ea68817b9a862a04ccdeb5159846a42f44c670e357b5a995c57",
+      "elapsedMs": 371
+    },
+    {
+      "version": 551,
+      "sha256": "31fe262560f74134ed1a10016931f0b0c472a7ec16f2e756ba3af3da99df551b",
+      "elapsedMs": 353
+    },
+    {
+      "version": 552,
+      "sha256": "71639ffd2afdf0bb6928c9411069b85500a7ff6c86fe9805361fed4038ae84bb",
+      "elapsedMs": 279
+    },
+    {
+      "version": 553,
+      "sha256": "9c4658c04916f384209ac20ee3a48e1d7026581a0d9810dc914e89715a12ca35",
+      "elapsedMs": 281
+    }
+  ],
+  "verifiers": [
+    537,
+    538,
+    539,
+    540,
+    541,
+    542,
+    543,
+    544,
+    545,
+    546,
+    547,
+    548,
+    549,
+    550,
+    551,
+    552,
+    553
+  ],
+  "limits": [
+    "No restaura objetos externos de Storage ni roles globales.",
+    "Roles locales sin login; propietarios se reasignan a postgres sólo en la copia.",
+    "El tiempo local no acredita RTO del proveedor.",
+    "Conservar ACL heredadas no certifica privilegio mínimo de todos los módulos."
+  ],
+  "restoreMs": 7200,
+  "restoreVerified": true,
+  "serverVersion": "17.11",
+  "historyBefore": [
+    {
+      "version": "529",
+      "name": "_notas_dian_91_92_desde_ui"
+    },
+    {
+      "version": "530",
+      "name": "_numeracion_dian_ui_e_idempotencia_factura"
+    },
+    {
+      "version": "531",
+      "name": "_pedido_pago_dian_transaccional"
+    },
+    {
+      "version": "532",
+      "name": "_colombia_guards_rma_credit_note"
+    },
+    {
+      "version": "533",
+      "name": "_colombia_demo_cpe_fail_closed"
+    },
+    {
+      "version": "534",
+      "name": "_colombia_rma_dian_91_atomic"
+    },
+    {
+      "version": "535",
+      "name": "_argentina_catalogo_comprobantes_retencion"
+    },
+    {
+      "version": "536",
+      "name": "_argentina_demo_cpe_fail_closed"
+    }
+  ],
+  "policyBefore": {
+    "singleton": true,
+    "updated_at": "2026-08-05T07:08:19.687421+00:00",
+    "environment": "PROD",
+    "project_ref": "wypnbcptofqdmoynlonq",
+    "configured_at": "2026-07-15T04:02:15.658204+00:00",
+    "allow_demo_data": true
+  },
+  "inheritedRuntimeDml": [
+    "almacen_ubicaciones",
+    "almacenes",
+    "anticipos_terceros",
+    "asientos_contables",
+    "asientos_contables_rrhh",
+    "asignacion_costos",
+    "asistencia",
+    "asistencias",
+    "audit_log",
+    "audit_log_archive",
+    "auditoria",
+    "auditoria_cotizaciones",
+    "beneficios",
+    "calendario_empresa",
+    "candidatos",
+    "capacitaciones",
+    "categorias_producto",
+    "cobranzas",
+    "compras",
+    "comprobantes_electronicos",
+    "comunicaciones_baja",
+    "conceptos_planilla",
+    "conciliacion_operaciones",
+    "conciliaciones_bancarias",
+    "conciliaciones_partidas",
+    "conciliaciones_partidas_lineas",
+    "config_alertas_vencimiento",
+    "configuracion_fiscal",
+    "configuracion_retenciones",
+    "contabilidad_asientos_numeracion",
+    "contratos",
+    "cotizacion_compra_detalles",
+    "cotizacion_detalles",
+    "cotizaciones",
+    "cotizaciones_compra",
+    "cxc_cobro_reversas",
+    "cxc_pagos",
+    "demo_conversiones_pendientes",
+    "departamentos",
+    "depreciaciones",
+    "detalle_asientos",
+    "detalle_comunicacion_baja",
+    "detalle_planillas",
+    "detalle_resumen_diario",
+    "detalle_ventas_pos",
+    "devolucion_items",
+    "devoluciones_proveedor",
+    "diferidos_devengos",
+    "documento_archivos",
+    "documento_auditoria",
+    "documento_detalles",
+    "documento_series",
+    "documentos",
+    "egresos",
+    "empleado_beneficios",
+    "empleado_capacitaciones",
+    "empleado_horarios",
+    "empresa_config",
+    "empresa_logo_assets",
+    "empresa_logo_operaciones",
+    "evaluaciones",
+    "event_processing_log",
+    "eventos_pos",
+    "expediente_documentos",
+    "fe_configuracion",
+    "feriados",
+    "financial_forensic_repair_log",
+    "gastos",
+    "gestiones_cobranza",
+    "gre",
+    "gre_detalles",
+    "gre_guias",
+    "grupos_consolidacion",
+    "grupos_consolidacion_miembros",
+    "horarios_trabajo",
+    "integration_logs",
+    "inventarios_permanentes",
+    "knowledge_base",
+    "libro_retenciones",
+    "libros_electronicos_sunat",
+    "logistica_eventos",
+    "lotes_productos",
+    "metodos_pago",
+    "migration_row_operations",
+    "migration_run_rows",
+    "migration_runs",
+    "movimientos_bancarios",
+    "movimientos_consignacion",
+    "movimientos_inventario",
+    "movimientos_lotes",
+    "movimientos_stock",
+    "normativa_argentina_periodos",
+    "normativa_colombia_periodos",
+    "normativa_peru_periodos",
+    "notificacion_tipo_roles",
+    "oc_aprobaciones",
+    "operaciones_bancarias",
+    "operaciones_fiscales_financieras",
+    "orden_compra_detalles",
+    "ordenes_compra",
+    "padron_ruc",
+    "pagos_facturas",
+    "pagos_lote",
+    "pagos_ventas",
+    "paises",
+    "pedido_aprobaciones",
+    "pedido_backorders",
+    "pedido_despachos",
+    "pedido_gres",
+    "pedidos_venta",
+    "pedidos_venta_detalle",
+    "pii_encryption_log",
+    "plan_cuentas",
+    "plantillas_asientos",
+    "plantillas_asientos_detalle",
+    "plantillas_asientos_historial",
+    "plantillas_asientos_ventas",
+    "pos_numeracion",
+    "pos_ticket_canjes",
+    "producto_existencias",
+    "producto_imagen_operaciones",
+    "producto_imagenes",
+    "producto_precios_sucursal",
+    "producto_stock_sucursal",
+    "productos",
+    "profiles",
+    "proveedores_cuarta_categoria",
+    "provisiones_cobranza_dudosa",
+    "rate_limit_anomalies",
+    "rate_limit_baselines",
+    "rate_limit_blocks",
+    "rate_limit_configs",
+    "recepcion_items",
+    "recepciones",
+    "reportes_contables_configurables",
+    "reportes_contables_lineas",
+    "request_logs",
+    "resumenes_diarios",
+    "reversas_ajustes_fiscales_cxc",
+    "rls_alert_config",
+    "rls_alert_history",
+    "rls_audit_log",
+    "rma_eventos",
+    "rma_items",
+    "rma_operaciones",
+    "rma_solicitudes",
+    "rrhh_configuracion_argentina",
+    "rrhh_configuracion_colombia",
+    "rrhh_peru_fichas_laborales",
+    "rrhh_peru_presentaciones_planilla",
+    "saldos_favor_clientes",
+    "saldos_favor_movimientos",
+    "saldos_iniciales_cuentas",
+    "secret_rotation_state",
+    "sire_files",
+    "sire_operaciones",
+    "sire_registros_detalle",
+    "solicitudes",
+    "stock_movimientos",
+    "sucursales",
+    "supervisor_pins",
+    "system_alerts",
+    "tasas_detraccion",
+    "tenants",
+    "tipos_documentos_fiscales",
+    "tipos_impuestos",
+    "tributos_declaraciones_anuales",
+    "tributos_declaraciones_mensuales",
+    "trusted_ips",
+    "users",
+    "usuario_configuracion",
+    "usuario_sucursales",
+    "usuarios",
+    "usuarios_sistemas",
+    "vacantes",
+    "validaciones_sunat",
+    "venta_detalles",
+    "ventas",
+    "ventas_pos",
+    "ventas_pos_pagos",
+    "wizard_progress"
+  ],
+  "aclNegativeControlPassed": true,
+  "atomicPromotionRollbackPassed": true,
+  "promotionBundleSha256": "39777e40f1ad1f13517a208f1e9d9f8fd881a3fc2778e37691c29c80e87625cb",
+  "changedTables": [
+    {
+      "table": "public.conceptos_planilla",
+      "before": 1432,
+      "after": 1672
+    },
+    {
+      "table": "public.plan_cuentas",
+      "before": 2385,
+      "after": 2556
+    },
+    {
+      "table": "supabase_migrations.schema_migrations",
+      "before": 157,
+      "after": 174
+    }
+  ],
+  "existingColumnsPreserved": 5482,
+  "existingRowsPreserved": 206078,
+  "tables": 293,
+  "readiness": {
+    "ready": true,
+    "backlog": {
+      "failed": 0,
+      "limits": {
+        "max_claimable": 5000,
+        "max_dead_letter": 100,
+        "max_oldest_seconds": 900,
+        "processing_stale_seconds": 900
+      },
+      "claimable": 0,
+      "processing": 0,
+      "dead_letter": 7,
+      "stale_processing": 0,
+      "oldest_claimable_seconds": 0
+    },
+    "contract": {
+      "outbox_rpcs": true,
+      "schema_version": 553,
+      "service_role_reads": true,
+      "required_schema_applied": true,
+      "required_schema_version": 553,
+      "schema_history_available": true,
+      "missing_service_role_reads": []
+    },
+    "database": "ok"
+  },
+  "rlsPreserved": true,
+  "verifiersRolledBack": true,
+  "elapsedMs": 64974,
+  "completedAt": "2026-09-21T10:41:09.529Z"
+}

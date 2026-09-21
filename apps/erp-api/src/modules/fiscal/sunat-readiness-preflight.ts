@@ -11,6 +11,11 @@ export interface SunatPreflightEnv {
   SUNAT_GRE_CLIENT_SECRET?: string;
   PFX_PATH?: string;
   PFX_PASS?: string;
+  SUNAT_USERNAME?: string;
+  SUNAT_PASSWORD?: string;
+  OSE_USUARIO?: string;
+  OSE_USERNAME?: string;
+  OSE_PASSWORD?: string;
 }
 
 export interface SunatCertificatePreflightInfo {
@@ -80,6 +85,13 @@ export function evaluateSunatReadinessPreflight(
   const mismatchConfirmed = isTruthy(env.SUNAT_CERT_RUC_MISMATCH_CONFIRMED);
   const mismatchReason = env.SUNAT_CERT_RUC_MISMATCH_REASON?.trim();
 
+  if (env.SUNAT_ENVIRONMENT && !['homologacion', 'produccion', 'sandbox'].includes(env.SUNAT_ENVIRONMENT)) {
+    addCheck(checks, 'sunat.environment_invalid', 'FAIL', 'SUNAT_ENVIRONMENT no es un ambiente reconocido.');
+  }
+  if (env.SUNAT_GRE_TRANSPORT && !['soap', 'rest'].includes(env.SUNAT_GRE_TRANSPORT.toLowerCase())) {
+    addCheck(checks, 'gre.transport_invalid', 'FAIL', 'SUNAT_GRE_TRANSPORT debe ser soap o rest.');
+  }
+
   if (sunatEnvironment === 'produccion') {
     addCheck(checks, 'sunat.environment', 'PASS', 'SUNAT_ENVIRONMENT esta en produccion; se aplican compuertas estrictas.');
   } else {
@@ -117,6 +129,21 @@ export function evaluateSunatReadinessPreflight(
     addCheck(checks, 'certificate.config', 'WARN', 'PFX global no esta completamente configurado; solo valido si se usa certificado por tenant o pruebas demo.');
   }
 
+  const username = [env.SUNAT_USERNAME, env.OSE_USUARIO, env.OSE_USERNAME].find(nonEmpty)?.trim();
+  const password = [env.SUNAT_PASSWORD, env.OSE_PASSWORD].find(nonEmpty);
+  const hasCredentials = Boolean(username && password);
+  addCheck(
+    checks,
+    'sunat.credentials',
+    hasCredentials ? 'PASS' : sunatEnvironment === 'produccion' ? 'FAIL' : 'WARN',
+    hasCredentials
+      ? 'Usuario y clave SUNAT/OSE configurados; su autorización externa aún debe verificarse.'
+      : 'Faltan usuario y clave SUNAT/OSE para transmitir.',
+  );
+  if (sunatEnvironment === 'produccion' && /MODDATOS$/i.test(username || '')) {
+    addCheck(checks, 'sunat.beta_credentials', 'FAIL', 'El usuario de pruebas MODDATOS no permite operar en producción.');
+  }
+
   if (!certificate.loaded) {
     const severity: SunatPreflightSeverity = sunatEnvironment === 'produccion' ? 'FAIL' : 'WARN';
     addCheck(
@@ -130,6 +157,22 @@ export function evaluateSunatReadinessPreflight(
     addCheck(checks, 'certificate.load', severity, 'El certificado cargado esta en modo demo; no sirve para produccion SUNAT.');
   } else {
     addCheck(checks, 'certificate.load', 'PASS', 'El PFX local carga con certificado real no-demo.');
+  }
+
+  if (certificate.loaded) {
+    const now = Date.parse(generatedAt);
+    const validFrom = Date.parse(certificate.validFrom || '');
+    const validTo = Date.parse(certificate.validTo || '');
+    const valid = Number.isFinite(now) && Number.isFinite(validFrom) && Number.isFinite(validTo)
+      && validFrom <= now && now < validTo;
+    addCheck(
+      checks,
+      'certificate.validity',
+      valid ? 'PASS' : sunatEnvironment === 'produccion' ? 'FAIL' : 'WARN',
+      valid
+        ? 'El certificado está dentro de su período de vigencia.'
+        : 'El certificado está vencido, aún no es vigente o no se pudo verificar su vigencia.',
+    );
   }
 
   if (sunatEnvironment === 'produccion') {
@@ -198,9 +241,11 @@ export function evaluateSunatReadinessPreflight(
   addCheck(
     checks,
     'ra_rc.ticket_cdr',
-    'PASS',
-    'RA/RC tienen evidencia beta con CDR aceptado; este preflight no consulta SUNAT y solo referencia el estado documentado.',
+    'WARN',
+    'Este preflight no consulta tickets ni valida CDR de RA/RC; la aceptación debe acreditarse con la respuesta oficial del lote.',
   );
+  addCheck(checks, 'sunat.external_validation', 'WARN',
+    'Diagnóstico local de configuración global: no verifica habilitación del RUC, configuración de cada tenant ni aceptación SUNAT/OSE. No acredita el go-live.');
 
   const hasFail = checks.some((check) => check.severity === 'FAIL');
   const canAttemptProductionSend = sunatEnvironment === 'produccion' && !hasFail;

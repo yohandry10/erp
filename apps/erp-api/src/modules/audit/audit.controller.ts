@@ -1,11 +1,11 @@
-import { Controller, Get, UseGuards, Query, Param } from '@nestjs/common';
+import { Controller, Get, UseGuards, Query, Param, ParseUUIDPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuditService } from './audit.service';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { PermissionGuard } from '../../common/guards/permission.guard';
-import { AuditFiltersDto } from './dto';
+import { AuditFiltersDto, IntegrationFiltersDto } from './dto';
 
 /**
  * Audit Controller
@@ -38,6 +38,13 @@ export class AuditController {
     return this.auditService.getAuditLogs(tenantId, filters);
   }
 
+  @Get('actors')
+  @RequirePermission('security.audit.read')
+  @ApiOperation({ summary: 'Obtener actores de auditoría de la empresa actual' })
+  async getActors(@CurrentTenant() tenantId: string) {
+    return this.auditService.getActors(tenantId);
+  }
+
   /**
    * GET /audit-logs/user/:userId - Get audit logs for a specific user
    * Requirements: 8.6, 9.2
@@ -51,7 +58,7 @@ export class AuditController {
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
   async getUserAuditLogs(
     @CurrentTenant() tenantId: string,
-    @Param('userId') userId: string,
+    @Param('userId', new ParseUUIDPipe()) userId: string,
   ) {
     return this.auditService.getUserAuditLogs(tenantId, userId);
   }
@@ -86,24 +93,8 @@ export class AuditController {
   @ApiResponse({ status: 403, description: 'Sin permisos suficientes' })
   async getIntegrationLogs(
     @CurrentTenant() tenantId: string,
-    @Query('servicio') servicio?: string,
-    @Query('correlacion_id') correlacion_id?: string,
-    @Query('correlacion_tipo') correlacion_tipo?: string,
-    @Query('status') status?: string,
-    @Query('start_date') start_date?: string,
-    @Query('end_date') end_date?: string,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
+    @Query() filters: IntegrationFiltersDto,
   ) {
-    return this.auditService.getIntegrationLogs(tenantId, {
-      servicio,
-      correlacion_id,
-      correlacion_tipo,
-      status,
-      start_date,
-      end_date,
-      page,
-      limit,
-    });
+    return this.auditService.getIntegrationLogs(tenantId, filters);
   }
 }

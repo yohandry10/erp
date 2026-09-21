@@ -22,10 +22,10 @@ if (
 
 if (
   usesIsolatedBrowserMocks &&
-  process.env.npm_lifecycle_event !== "test:e2e:isolated"
+  !["test:e2e:isolated", "test:e2e:peru-readiness"].includes(process.env.npm_lifecycle_event || "")
 ) {
   throw new Error(
-    "El perfil E2E aislado sólo puede ejecutarse mediante pnpm --filter @erp-suite/web test:e2e:isolated; la suite completa requiere una base efímera real.",
+    "El perfil E2E aislado exige test:e2e:isolated o test:e2e:peru-readiness; la suite completa requiere una base efímera real.",
   );
 }
 

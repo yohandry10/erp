@@ -58,6 +58,7 @@ export default function PresupuestoForm({
   const [loading, setLoading] = useState(false)
   const [loadingData, setLoadingData] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [catalogError, setCatalogError] = useState(false)
 
   // Form data
   const [formData, setFormData] = useState<PresupuestoFormData>({
@@ -92,12 +93,16 @@ export default function PresupuestoForm({
     try {
       setLoadingData(true)
       setError(null)
+      setCatalogError(false)
 
       const [centrosRes, cuentasRes, periodosRes] = await Promise.all([
         get('/api/contabilidad/centros-costo'),
         get('/api/contabilidad/plan-cuentas'),
         get('/api/contabilidad/periodos')
       ])
+      if ([centrosRes, cuentasRes, periodosRes].some(response => !response?.success || !Array.isArray(response.data))) {
+        throw new Error('Catálogos incompletos')
+      }
 
       if (centrosRes?.success && centrosRes.data) {
         setCentrosCosto(centrosRes.data)
@@ -120,7 +125,8 @@ export default function PresupuestoForm({
       }
     } catch (err: any) {
       console.error('Error loading catalog data:', err)
-      setError('Error cargando datos del catálogo')
+      setCatalogError(true)
+      setError('No se pudieron cargar todos los catálogos del presupuesto')
     } finally {
       setLoadingData(false)
     }
@@ -133,6 +139,7 @@ export default function PresupuestoForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (catalogError) return
 
     // Validation
     if (!formData.centro_costo_id) {
@@ -224,9 +231,10 @@ export default function PresupuestoForm({
       </div>
 
       {error && (
-        <div className="p-4 mb-6 rounded-lg bg-[#fef2f2] border flex items-center gap-3">
+        <div role="alert" className="p-4 mb-6 rounded-lg bg-[#fef2f2] border flex items-center gap-3">
           <AlertCircle size={20} className="text-destructive shrink-0" />
           <p className="m-0 text-destructive text-[0.875rem]">{error}</p>
+          {catalogError && <button type="button" className="secondary-btn px-3 py-2" onClick={loadCatalogData}>Reintentar catálogos</button>}
         </div>
       )}
 
@@ -373,7 +381,7 @@ export default function PresupuestoForm({
       <div className="flex gap-4 mt-8 pt-8 border-t">
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || catalogError}
           className="primary-btn flex-[1] py-3 px-6 flex items-center justify-center gap-2"
         >
           <Save size={18} />

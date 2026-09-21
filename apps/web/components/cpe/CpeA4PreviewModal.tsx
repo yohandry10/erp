@@ -454,7 +454,7 @@ function CpeA4Sheet({
       </div>
 
       {profile.countryCode === 'AR' && (
-        <div className="relative z-10 mt-3 w-[58%] border border-slate-500 bg-slate-50 p-3" data-testid="cpe-arca-tax-transparency">
+        <div className="relative z-10 mt-3 w-[58%] border border-[#64748b] bg-[#f8fafc] p-3" data-testid="cpe-arca-tax-transparency">
           <p className="font-black">Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)</p>
           <div className="mt-2 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1">
             <span>IVA Contenido:</span><span className="font-semibold">{formatMoney(tax)}</span>

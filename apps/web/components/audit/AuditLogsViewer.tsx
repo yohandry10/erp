@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   AlertCircle,
   ChevronDown,
@@ -15,7 +15,6 @@ import {
   User,
 } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
-import { usePermission } from '@/hooks/use-permission'
 import { apiSucceeded, unwrapApiArray, unwrapApiData } from '@/lib/api-contract'
 import { PageShell } from '@/components/erp/page-shell'
 import { Button } from '@/components/ui/button'
@@ -69,41 +68,42 @@ const operationClass = (operation: string) => {
   }
 }
 
-const fieldBlockClass = 'rounded-2xl border border-cyan-400/15 bg-card/60 p-3 text-xs text-foreground/90 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground/85'
+const fieldBlockClass = 'min-w-0 max-w-full overflow-x-auto rounded-2xl border border-cyan-400/15 bg-card/60 p-3 text-xs text-foreground/90 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground/85'
 const inputClass = 'h-10 rounded-md border border-cyan-400/20 bg-card/70 px-3 text-sm text-foreground outline-none transition focus:border-cyan-300 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground group-data-[erp-theme=light]/dashboard:focus:border-blue-400'
 
 export default function AuditLogsViewer() {
   const { get } = useApi({ showErrorToast: false })
-  const { hasPermission: canLoadUsers, loading: usersPermissionLoading } = usePermission('users', 'manage', '')
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [failedSources, setFailedSources] = useState<string[]>([])
+  const latestRequest = useRef(0)
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set())
   const [filters, setFilters] = useState<AuditFilters>({ page: 1, limit: 50 })
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 50, total: 0, totalPages: 0 })
   const [searchTerm, setSearchTerm] = useState('')
   const [users, setUsers] = useState<Array<{ id: string; nombre: string; email: string }>>([])
+  const [actorsError, setActorsError] = useState(false)
 
   const loadUsers = useCallback(async () => {
-    if (usersPermissionLoading || !canLoadUsers) {
-      setUsers([])
-      return
-    }
-
     try {
-      const response = await get('/api/users')
+      setActorsError(false)
+      const response = await get('/api/audit-logs/actors')
       if (apiSucceeded(response)) {
         const usersData = unwrapApiArray<any>(response)
         setUsers(usersData.map((u: any) => ({ id: u.id, nombre: u.nombre || u.email, email: u.email })))
+      } else {
+        setActorsError(true)
       }
-    } catch (err) {
-      console.error('Error cargando usuarios:', err)
+    } catch {
+      setActorsError(true)
     }
-  }, [canLoadUsers, get, usersPermissionLoading])
+  }, [get])
 
   useEffect(() => { loadUsers() }, [loadUsers])
 
   const loadLogs = useCallback(async () => {
+    const requestId = ++latestRequest.current
     try {
       setLoading(true)
       setError(null)
@@ -112,12 +112,13 @@ export default function AuditLogsViewer() {
       if (filters.table_name) params.append('table_name', filters.table_name)
       if (filters.operation) params.append('operation', filters.operation)
       if (filters.user_id) params.append('user_id', filters.user_id)
-      if (filters.start_date) params.append('start_date', filters.start_date)
-      if (filters.end_date) params.append('end_date', filters.end_date)
+      if (filters.start_date) params.append('start_date', new Date(filters.start_date).toISOString())
+      if (filters.end_date) params.append('end_date', new Date(filters.end_date).toISOString())
       if (filters.page) params.append('page', filters.page.toString())
       if (filters.limit) params.append('limit', filters.limit.toString())
 
       const response = await get(`/api/audit-logs?${params.toString()}`)
+      if (requestId !== latestRequest.current) return
 
       if (apiSucceeded(response)) {
         const payload = unwrapApiData<any>(response, {})
@@ -125,14 +126,19 @@ export default function AuditLogsViewer() {
         const paginationData = payload.pagination ?? (response as any)?.pagination
         setLogs(Array.isArray(logsData) ? logsData : [])
         setPagination(prev => paginationData ?? prev)
+        setFailedSources(payload.fuentes_fallidas ?? (response as any)?.fuentes_fallidas ?? [])
       } else {
         throw new Error('Error al cargar logs de auditoría')
       }
     } catch (err: any) {
+      if (requestId !== latestRequest.current) return
       console.error('Error cargando logs:', err)
       setError(err.message || 'Error al cargar logs de auditoría')
+      setLogs([])
+      setFailedSources([])
+      setPagination({ page: filters.page || 1, limit: filters.limit || 50, total: 0, totalPages: 0 })
     } finally {
-      setLoading(false)
+      if (requestId === latestRequest.current) setLoading(false)
     }
   }, [filters, get])
 
@@ -193,21 +199,22 @@ export default function AuditLogsViewer() {
             <CardTitle className="flex items-center gap-2 text-white group-data-[erp-theme=light]/dashboard:text-foreground"><Filter className="h-5 w-5 text-primary group-data-[erp-theme=light]/dashboard:text-blue-600" /> Filtros</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
-            <label className="space-y-2 text-sm font-semibold text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">
-              <span>Buscar</span>
+            <label className="grid gap-2 text-sm font-semibold text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">
+              <span>Buscar en esta página</span>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary group-data-[erp-theme=light]/dashboard:text-blue-500" />
                 <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar en logs..." className={`${inputClass} pl-9`} />
               </div>
             </label>
 
-            <label className="space-y-2 text-sm font-semibold text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">
+            <label className="grid gap-2 text-sm font-semibold text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">
               <span>Tabla</span>
               <select value={filters.table_name || ''} onChange={(e) => setFilters({ ...filters, table_name: e.target.value || undefined, page: 1 })} className={inputClass}>
                 <option value="">Todas las tablas</option>
                 <option value="auth_login_attempts">Logins</option>
                 <option value="eventos_pos">Eventos POS</option>
                 <option value="caja_audit_log">Auditoría de Caja</option>
+                <option value="devoluciones_proveedor">Devoluciones a proveedor</option>
                 <option value="integration_logs">Integraciones</option>
                 <option value="clientes">Clientes</option>
                 <option value="proveedores">Proveedores</option>
@@ -225,7 +232,7 @@ export default function AuditLogsViewer() {
               </select>
             </label>
 
-            <label className="space-y-2 text-sm font-semibold text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">
+            <label className="grid gap-2 text-sm font-semibold text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">
               <span>Operación</span>
               <select value={filters.operation || ''} onChange={(e) => setFilters({ ...filters, operation: e.target.value as any || undefined, page: 1 })} className={inputClass}>
                 <option value="">Todas las operaciones</option>
@@ -235,7 +242,7 @@ export default function AuditLogsViewer() {
               </select>
             </label>
 
-            <label className="space-y-2 text-sm font-semibold text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">
+            <label className="grid gap-2 text-sm font-semibold text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">
               <span>Usuario</span>
               <select value={filters.user_id || ''} onChange={(e) => setFilters({ ...filters, user_id: e.target.value || undefined, page: 1 })} className={inputClass}>
                 <option value="">Todos los usuarios</option>
@@ -243,12 +250,12 @@ export default function AuditLogsViewer() {
               </select>
             </label>
 
-            <label className="space-y-2 text-sm font-semibold text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">
+            <label className="grid gap-2 text-sm font-semibold text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">
               <span>Desde</span>
               <input type="datetime-local" value={filters.start_date?.substring(0, 16) || ''} onChange={(e) => setFilters({ ...filters, start_date: e.target.value ? `${e.target.value}:00` : undefined, page: 1 })} className={inputClass} />
             </label>
 
-            <label className="space-y-2 text-sm font-semibold text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">
+            <label className="grid gap-2 text-sm font-semibold text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">
               <span>Hasta</span>
               <input type="datetime-local" value={filters.end_date?.substring(0, 16) || ''} onChange={(e) => setFilters({ ...filters, end_date: e.target.value ? `${e.target.value}:00` : undefined, page: 1 })} className={inputClass} />
             </label>
@@ -267,6 +274,17 @@ export default function AuditLogsViewer() {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {actorsError && (
+              <div role="alert" className="text-sm text-destructive">
+                No se pudieron cargar los usuarios del filtro.
+                <Button variant="ghost" onClick={loadUsers}>Reintentar carga de usuarios</Button>
+              </div>
+            )}
+            {failedSources.length > 0 && (
+              <div role="alert" className="mb-4 rounded-lg border border-amber-400 p-4 text-sm">
+                Auditoría incompleta: no se pudieron consultar {failedSources.join(', ')}. Pulse Actualizar para reintentar.
+              </div>
+            )}
             {error && (
               <div className="mb-4 flex items-center gap-3 rounded-2xl border border-amber-300/25 bg-amber-300/10 p-4 text-sm font-semibold text-amber-700 dark:text-amber-200 group-data-[erp-theme=light]/dashboard:border-amber-200 group-data-[erp-theme=light]/dashboard:bg-amber-50 group-data-[erp-theme=light]/dashboard:text-amber-800">
                 <AlertCircle className="h-5 w-5" />
@@ -274,7 +292,7 @@ export default function AuditLogsViewer() {
               </div>
             )}
 
-            {filteredLogs.length === 0 ? (
+            {error ? null : filteredLogs.length === 0 ? (
               <div className="rounded-2xl border border-cyan-400/15 bg-card/50 p-10 text-center group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-muted/30">
                 <Database className="mx-auto mb-4 h-10 w-10 text-primary group-data-[erp-theme=light]/dashboard:text-blue-500" />
                 <h3 className="font-bold text-white group-data-[erp-theme=light]/dashboard:text-foreground">No hay logs de auditoría</h3>
@@ -297,7 +315,7 @@ export default function AuditLogsViewer() {
                     </div>
 
                     {expandedLogs.has(log.id) && (
-                      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                      <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-2 [&>div]:min-w-0">
                         {log.old_values && Object.keys(log.old_values).length > 0 && (
                           <div>
                             <h4 className="mb-2 text-sm font-semibold text-foreground/90 group-data-[erp-theme=light]/dashboard:text-foreground/85">Valores anteriores</h4>
