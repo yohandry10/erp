@@ -2,9 +2,9 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { startWorkerAfterReadiness } = require('../dist/startup-readiness.js');
 
-const config = { apiBase: 'https://api.example.invalid/api', requiredSchemaVersion: 552 };
+const config = { apiBase: 'https://api.example.invalid/api', requiredSchemaVersion: 553 };
 const ready = () => ({ status: 'ready', checks: {
-  database: { ready: true, contract: { schema_version: 552, required_schema_version: 552,
+  database: { ready: true, contract: { schema_version: 553, required_schema_version: 553,
     required_schema_applied: true, service_role_reads: true, outbox_rpcs: true } },
   redis: { ready: true },
 } });

@@ -37,7 +37,7 @@ El worker independiente (`pnpm --filter @erp-suite/worker start`) carga sólo
 autorizado, validando antes de importar jobs que crean clientes. Su prueba de
 configuración usa dobles y archivos temporales, sin conexiones remotas.
 Antes de iniciar consumidores, consulta `/api/health/ready` y exige API, Redis
-y contrato DB listos, con `REQUIRED_DATABASE_SCHEMA_VERSION >= 552`. Respuestas
+y contrato DB listos, con `REQUIRED_DATABASE_SCHEMA_VERSION >= 553`. Respuestas
 incompletas, esquemas antiguos o HTTP fallido impiden el arranque. La imagen
 Docker verifica también ese orden mediante HTTP local con red externa deshabilitada.
 Se retiraron dos tareas simuladas del worker: la que sólo imprimía métricas sin
@@ -266,15 +266,15 @@ en `artifacts/db-backups/`, excluido de Git; el manifiesto sólo contiene hash,
 tamaño y alcance. `node scripts/rehearse-peru-prod-local.mjs <manifiesto>` valida
 ese hash y restaura public/app/auth/storage/supabase_migrations en un contenedor
 PostgreSQL 17 nuevo sin red ni puertos publicados. Contrasta historia 536,
-aplica 537..552 con registro transaccional, compara todas las filas previas y
-RLS, ejecuta los verificadores con rollback y comprueba readiness 552.
+aplica 537..553 con registro transaccional, compara todas las filas previas y
+RLS, ejecuta los verificadores con rollback y comprueba readiness 553.
 Conserva las ACL de tablas salvo SELECT del backend y la retirada explícita
 de DML de auditoría en 542. No supone que las concesiones heredadas de PROD
 sean iguales a las de PostgreSQL limpio; un control negativo demuestra que
 el comparador detecta nuevas escrituras. No respalda roles globales ni archivos
 externos de Storage, ni acredita privilegio mínimo de todos los módulos.
 
-El mismo ensayo genera el lote `peru-promotion-552-<hash>.sql` desde las
+El mismo ensayo genera el lote `peru-promotion-553-<hash>.sql` desde las
 migraciones canónicas. Reúne DDL, backfills e historia en una transacción con
 aislamiento repetible, verifica proyecto/esquema inicial y readiness final, y
 notifica la recarga de PostgREST sólo al confirmar. Antes de validar cada
@@ -285,7 +285,7 @@ ejecutan verificadores ni fallos inyectados en PROD.
 
 `node scripts/promote-peru-prod.mjs --backup <manifiesto> --rehearsal <ensayo>`
 comprueba el respaldo de menos de 24 horas, su restauración, los hashes de las
-16 migraciones y del lote, el commit del PR 109 y todos sus checks. Sin
+17 migraciones y del lote, el commit del PR 109 y todos sus checks. Sin
 `--apply` no conecta a PostgreSQL. La aplicación exige además `--env-file`
 hacia `.env.production` y `--pg-bin` hacia PostgreSQL 17, repite el preflight,
 contrasta la historia 533..536 y aplica únicamente el lote canónico ensayado.

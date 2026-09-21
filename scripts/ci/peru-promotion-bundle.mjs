@@ -5,9 +5,9 @@ const literal = value => "'" + value.replaceAll("'", "''") + "'";
 // Recibe exclusivamente las migraciones canónicas ya contrastadas con historia
 // y respaldo. No conecta a ninguna base ni contiene credenciales o fixtures.
 export function buildPeruPromotionBundle(migrations) {
-  assert.deepEqual(migrations.map(item => item.version), Array.from({ length: 16 }, (_, i) => 537 + i));
+  assert.deepEqual(migrations.map(item => item.version), Array.from({ length: 17 }, (_, i) => 537 + i));
   const parts = [
-    '-- Promoción Perú 536 -> 552. Exige preflight PROD, respaldo fresco y CI verde.',
+    '-- Promoción Perú 536 -> 553. Exige preflight PROD, respaldo fresco y CI verde.',
     '-- Generado desde supabase/migrations; no ejecutar verificadores con fixtures en PROD.',
     'BEGIN ISOLATION LEVEL REPEATABLE READ;',
     "SET LOCAL lock_timeout='10s'; SET LOCAL statement_timeout='60s';",
@@ -32,7 +32,7 @@ export function buildPeruPromotionBundle(migrations) {
       `INSERT INTO supabase_migrations.schema_migrations(version,statements,name) VALUES (${literal(String(version))},ARRAY[${literal(body)}],${literal(name)});`);
   }
   parts.push(`DO $ready$ BEGIN
-    IF NOT coalesce((public.outbox_runtime_health_492(p_required_schema_version => 552)->>'ready')::boolean,false) THEN
+    IF NOT coalesce((public.outbox_runtime_health_492(p_required_schema_version => 553)->>'ready')::boolean,false) THEN
       RAISE EXCEPTION 'PERU_PROMOTION_READINESS_FAILED';
     END IF;
   END $ready$;`, "NOTIFY pgrst, 'reload schema';", 'COMMIT;');

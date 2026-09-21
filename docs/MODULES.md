@@ -833,7 +833,9 @@ si ese período carece de normativa aplicable.
   crean el tenant con su país, moneda, impuesto, autoridad fiscal, documentos y
   opciones de módulos; el contexto se vuelve a resolver desde el tenant.
 - El alta administrativa de empresa, su primer administrador y el RBAC
-  operativo se confirman en una sola transacción idempotente. Los reintentos no
+  operativo se confirman en una sola transacción idempotente. El primer usuario
+  administra sólo su tenant: el bootstrap no concede `is_super_admin` ni omite
+  el asistente fiscal. Los reintentos no
   duplican tenants; activar o desactivar sincroniza `tenants` y
   `empresa_config`, y la desactivación revoca las sesiones sin borrar su
   evidencia.

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 // 542 retira DML de auditoría explícitamente; las demás preservan escritores
 // existentes. Sus nuevas RPC y helpers tienen verificadores de EXECUTE propios.
-export const readMigrationVersions = new Set([537, 538, 539, 540, 541, 543, 544, 545, 546, 547, 548, 549, 550, 551, 552]);
+export const readMigrationVersions = new Set([537, 538, 539, 540, 541, 543, 544, 545, 546, 547, 548, 549, 550, 551, 552, 553]);
 
 // Las lecturas del backend pueden añadirse. Toda otra ACL, incluidas columnas
 // y SELECT de anon/authenticated, debe permanecer exactamente como estaba.

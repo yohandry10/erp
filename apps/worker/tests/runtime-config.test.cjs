@@ -13,7 +13,7 @@ const valid = () => ({
   SUPABASE_SERVICE_ROLE_KEY: 'local-test-key-no-network',
   ERP_API_URL: 'https://api.example.invalid/api',
   POS_WORKER_JWT_SECRET: 'local-test-secret-with-24-characters',
-  REQUIRED_DATABASE_SCHEMA_VERSION: '552',
+  REQUIRED_DATABASE_SCHEMA_VERSION: '553',
 });
 
 test('acepta sólo la configuración PROD sin crear conexiones', () => {
