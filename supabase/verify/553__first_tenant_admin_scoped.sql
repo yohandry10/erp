@@ -2,6 +2,7 @@
 BEGIN;
 DO $guard$ BEGIN
   IF current_database() <> 'erp_e2e' THEN RAISE EXCEPTION 'VERIFY_553_SOLO_ERP_E2E'; END IF;
+  IF NOT has_table_privilege('service_role','public.wizard_progress','SELECT') THEN RAISE EXCEPTION 'VERIFY_553_WIZARD_READ_MISSING'; END IF;
 END $guard$;
 UPDATE app.deployment_environment SET environment='DEV', project_ref='localqaerpephemeralx', allow_demo_data=true, configured_at=now(), updated_at=now() WHERE singleton;
 DO $verify$

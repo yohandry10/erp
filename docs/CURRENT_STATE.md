@@ -64,8 +64,9 @@ y después y detectan una ampliación deliberada. Este ensayo no certifica
 privilegio mínimo de todos los escritores históricos.
 
 El ensayo ampliado a 553 también pasa las 17 migraciones, conserva los datos
-y prueba que el administrador nuevo no puede administrar otro tenant:
-`artifacts/erp-peru-prod-rehearsal-20260921104004554-14144.json`.
+y prueba que el administrador nuevo no puede administrar otro tenant. La lectura
+del progreso del asistente queda concedida al backend, sin DML directo:
+`artifacts/erp-peru-prod-rehearsal-20260921104704655-12116.json`.
 
 Siguen pendientes el cierre de las pruebas finales, CI del commit, promoción
 DB-first y la comprobación del alta del primer cliente. No se ha hecho
