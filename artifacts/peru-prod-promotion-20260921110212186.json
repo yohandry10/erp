@@ -1,0 +1,310 @@
+{
+  "commit": "b6fc060e8b1465560b7ff494406a8af66c233d74",
+  "project": "wypnbcptofqdmoynlonq",
+  "backupSha256": "d19c84a0278cfa5921ea6164e113bb26601f2dc6d27ff0b2d1765c4560ac8aac",
+  "bundleSha256": "f4dae66c4cb2d6164046a5274c96474a44f4f1f83670b2ab89769d16551e6232",
+  "remoteWrites": true,
+  "checks": [
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590727051/job/106307541498",
+      "name": "Security audit",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590755117/job/106307149652",
+      "name": "Security audit",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590727051/job/106306633619",
+      "name": "Build",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590755117/job/106306413830",
+      "name": "Build",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://vercel.com/github",
+      "name": "Vercel Preview Comments",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590755117/job/106304901745",
+      "name": "Tests",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/runs/106304848515",
+      "name": "CodeQL",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590727051/job/106304770539",
+      "name": "Tests",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590755117/job/106304628167",
+      "name": "Type-check",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590727051/job/106304573958",
+      "name": "Type-check",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590755117/job/106304467624",
+      "name": "Lint",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590755117/job/106304467519",
+      "name": "Peru API, browser and backup recovery",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590755117/job/106304467489",
+      "name": "PostgreSQL 16 fresh schema + SQL contracts",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590755117/job/106304467513",
+      "name": "DIAN FEV 1.9 official XML contract",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590755114/job/106304428229",
+      "name": "Playwright isolated browser contracts",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590727051/job/106304394312",
+      "name": "Lint",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590727051/job/106304394306",
+      "name": "DIAN FEV 1.9 official XML contract",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590727051/job/106304394300",
+      "name": "PostgreSQL 16 fresh schema + SQL contracts",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590727051/job/106304394297",
+      "name": "Peru API, browser and backup recovery",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590755185/job/106304354125",
+      "name": "CodeQL Analysis (typescript)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590755185/job/106304354420",
+      "name": "CodeQL Analysis (javascript)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590755117/job/106304353670",
+      "name": "Install dependencies",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590755185/job/106304354350",
+      "name": "NPM Audit",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590755109/job/106304354061",
+      "name": "Compose and observability config",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590727004/job/106304349139",
+      "name": "Playwright isolated browser contracts",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/yohandry10/erp/actions/runs/35590727051/job/106304263215",
+      "name": "Install dependencies",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://vercel.com/trivia1/erp-web/5LrMVK9pkhqmqiwzGaCA3wGyYucX",
+      "name": "Vercel",
+      "state": "SUCCESS"
+    }
+  ],
+  "success": true,
+  "before": {
+    "history": [
+      {
+        "name": "_colombia_demo_cpe_fail_closed",
+        "version": "533"
+      },
+      {
+        "name": "_colombia_rma_dian_91_atomic",
+        "version": "534"
+      },
+      {
+        "name": "_argentina_catalogo_comprobantes_retencion",
+        "version": "535"
+      },
+      {
+        "name": "_argentina_demo_cpe_fail_closed",
+        "version": "536"
+      }
+    ],
+    "project": "wypnbcptofqdmoynlonq",
+    "readiness": {
+      "ready": false,
+      "backlog": {
+        "failed": 0,
+        "limits": {
+          "max_claimable": 5000,
+          "max_dead_letter": 100,
+          "max_oldest_seconds": 900,
+          "processing_stale_seconds": 900
+        },
+        "claimable": 0,
+        "processing": 0,
+        "dead_letter": 7,
+        "stale_processing": 0,
+        "oldest_claimable_seconds": 0
+      },
+      "contract": {
+        "outbox_rpcs": true,
+        "schema_version": 536,
+        "service_role_reads": true,
+        "required_schema_applied": false,
+        "required_schema_version": 553,
+        "schema_history_available": true,
+        "missing_service_role_reads": []
+      },
+      "database": "ok"
+    }
+  },
+  "after": {
+    "history": [
+      {
+        "name": "_colombia_demo_cpe_fail_closed",
+        "version": "533"
+      },
+      {
+        "name": "_colombia_rma_dian_91_atomic",
+        "version": "534"
+      },
+      {
+        "name": "_argentina_catalogo_comprobantes_retencion",
+        "version": "535"
+      },
+      {
+        "name": "_argentina_demo_cpe_fail_closed",
+        "version": "536"
+      },
+      {
+        "name": "_runtime_pos_catalog_read_privileges",
+        "version": "537"
+      },
+      {
+        "name": "_runtime_purchase_read_privileges",
+        "version": "538"
+      },
+      {
+        "name": "_peru_purchase_accounts_onboarding",
+        "version": "539"
+      },
+      {
+        "name": "_supplier_invoice_fiscal_context",
+        "version": "540"
+      },
+      {
+        "name": "_runtime_inventory_category_read_privileges",
+        "version": "541"
+      },
+      {
+        "name": "_backend_audit_canonical_append",
+        "version": "542"
+      },
+      {
+        "name": "_auth_session_tenant_context",
+        "version": "543"
+      },
+      {
+        "name": "_runtime_activation_request_read_privilege",
+        "version": "544"
+      },
+      {
+        "name": "_global_admin_session_lifecycle",
+        "version": "545"
+      },
+      {
+        "name": "_runtime_module_read_privileges",
+        "version": "546"
+      },
+      {
+        "name": "_rrhh_candidate_profile_persistence",
+        "version": "547"
+      },
+      {
+        "name": "_peru_payroll_benefit_concepts",
+        "version": "548"
+      },
+      {
+        "name": "_runtime_record_detail_read_privileges",
+        "version": "549"
+      },
+      {
+        "name": "_logistics_lifecycle_atomic",
+        "version": "550"
+      },
+      {
+        "name": "_peru_customer_credit_account_onboarding",
+        "version": "551"
+      },
+      {
+        "name": "_runtime_logistics_trace_read_privileges",
+        "version": "552"
+      },
+      {
+        "name": "_first_tenant_admin_scoped",
+        "version": "553"
+      }
+    ],
+    "project": "wypnbcptofqdmoynlonq",
+    "readiness": {
+      "ready": true,
+      "backlog": {
+        "failed": 0,
+        "limits": {
+          "max_claimable": 5000,
+          "max_dead_letter": 100,
+          "max_oldest_seconds": 900,
+          "processing_stale_seconds": 900
+        },
+        "claimable": 0,
+        "processing": 0,
+        "dead_letter": 7,
+        "stale_processing": 0,
+        "oldest_claimable_seconds": 0
+      },
+      "contract": {
+        "outbox_rpcs": true,
+        "schema_version": 553,
+        "service_role_reads": true,
+        "required_schema_applied": true,
+        "required_schema_version": 553,
+        "schema_history_available": true,
+        "missing_service_role_reads": []
+      },
+      "database": "ok"
+    }
+  },
+  "completedAt": "2026-09-21T11:02:34.546Z"
+}

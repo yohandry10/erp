@@ -1,0 +1,40 @@
+{
+  "status": "ready",
+  "timestamp": "2026-09-21T11:08:24.139Z",
+  "checks": {
+    "database": {
+      "ready": true,
+      "backlog": {
+        "failed": 0,
+        "limits": {
+          "max_claimable": 5000,
+          "max_dead_letter": 100,
+          "max_oldest_seconds": 900,
+          "processing_stale_seconds": 900
+        },
+        "claimable": 0,
+        "processing": 0,
+        "dead_letter": 7,
+        "stale_processing": 0,
+        "oldest_claimable_seconds": 0
+      },
+      "contract": {
+        "outbox_rpcs": true,
+        "schema_version": 553,
+        "service_role_reads": true,
+        "required_schema_applied": true,
+        "required_schema_version": 553,
+        "schema_history_available": true,
+        "missing_service_role_reads": []
+      },
+      "database": "ok"
+    },
+    "redis": {
+      "ready": true,
+      "required": true,
+      "status": "ready",
+      "mode": "redis"
+    }
+  },
+  "version": "1.0.0"
+}
