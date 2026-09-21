@@ -1,0 +1,74 @@
+{
+  "date": "2026-09-21T11:10:35.654Z",
+  "scope": "Producto listo para configurar al primer cliente PE; sin emision fiscal real",
+  "sourceCommit": "b6fc060e8b1465560b7ff494406a8af66c233d74",
+  "deployedCommit": "841ab738f27e5f5cb8cfc03b9208bfb2cb0f8178",
+  "pullRequest": 109,
+  "schema": 553,
+  "promotion": "peru-prod-promotion-20260921110212186.json",
+  "rehearsal": "erp-peru-prod-rehearsal-20260921104704655-12116.json",
+  "tests": {
+    "apiSuites": 300,
+    "apiTests": 2894,
+    "isolatedBrowser": 107,
+    "mobileLogin": 1,
+    "integratedHttp": 89,
+    "integratedBrowser": 8,
+    "recordScreens": 22,
+    "worker": 23
+  },
+  "localRun": "peru-integrated-20260921104646945-4844/run.json",
+  "apiReadiness": {
+    "status": "ready",
+    "timestamp": "2026-09-21T11:08:24.139Z",
+    "checks": {
+      "database": {
+        "ready": true,
+        "backlog": {
+          "failed": 0,
+          "limits": {
+            "max_claimable": 5000,
+            "max_dead_letter": 100,
+            "max_oldest_seconds": 900,
+            "processing_stale_seconds": 900
+          },
+          "claimable": 0,
+          "processing": 0,
+          "dead_letter": 7,
+          "stale_processing": 0,
+          "oldest_claimable_seconds": 0
+        },
+        "contract": {
+          "outbox_rpcs": true,
+          "schema_version": 553,
+          "service_role_reads": true,
+          "required_schema_applied": true,
+          "required_schema_version": 553,
+          "schema_history_available": true,
+          "missing_service_role_reads": []
+        },
+        "database": "ok"
+      },
+      "redis": {
+        "ready": true,
+        "required": true,
+        "status": "ready",
+        "mode": "redis"
+      }
+    },
+    "version": "1.0.0"
+  },
+  "web": {
+    "deploymentId": "dpl_FREGc4KZZjgcpUHhHRuV8RjjR6Ht",
+    "url": "https://erp-web-zeta-neon.vercel.app",
+    "ready": true,
+    "loginVisuallyVerified": true,
+    "consoleErrors": 0,
+    "corsStatus": 204
+  },
+  "realFiscalEmission": false,
+  "syntheticProductionWrites": false,
+  "pending": [
+    "Confirmar plan de computo efectivo en Render; blueprint Starter, panel no autenticado."
+  ]
+}
