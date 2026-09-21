@@ -1,6 +1,6 @@
 # Estado actual del ERP
 
-Actualizado: 2026-09-13.
+Actualizado: 2026-09-21.
 
 La preparación Perú se integra sobre `main` `679e05bf`, en la rama
 `codex/peru-production-20260912`. La lectura autorizada del 12 de septiembre
@@ -22,7 +22,13 @@ detalle presupuestal pasó 100 páginas sin errores HTTP/JS. La repetición de l
 siete flujos y 22 detalles también pasó. CI confirmó 299 suites/2877 pruebas
 API, pero detectó la superposición de los límites global y de autenticación:
 la corrección conserva los límites por cuenta/oficina y pasa cuatro pruebas
-con ambos guards. Su recorrido integrado y los checks finales están pendientes.
+con ambos guards. Ese recorrido integrado pasó; la revisión posterior de
+reportes alcanzó 86 contratos HTTP y ocho flujos de navegador. El corte del 21
+de septiembre corrige además agrupaciones/totales por moneda, paginación completa,
+pedidos únicos y precio medio ponderado. La prueba visual de cinco reportes con
+PEN/USD y 18 pruebas de reportes/fechas/relaciones pasan. La suite completa, el
+recorrido integrado final y CI del nuevo commit están en ejecución; el respaldo
+del 13 de septiembre debe renovarse antes de promover.
 
 El respaldo productivo del 12 de septiembre se restauró en PostgreSQL 17 sin
 red: las 537..552 y sus 16 verificadores pasaron, con 289 tablas y 206073 filas

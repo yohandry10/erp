@@ -23,6 +23,11 @@ vinculado al pedido; el período filtra esa emisión. Incluye tendencia mensual
 cronológica y mediana correcta también para un número par de conversiones.
 Pedidos por estado y productos más vendidos aplican el filtro de cliente; el
 reporte de productos muestra su código de catálogo, no un fragmento del UUID.
+Ventas por cliente, pedidos por estado, productos, cotizaciones pendientes y
+top clientes preservan la moneda de cada registro. Totales y rankings monetarios
+se separan por moneda, sin sumar importes nominales PEN/USD ni rotular dólares
+como soles. Esos reportes recorren todas las páginas de PostgREST; el CSV de
+ventas reutiliza el escape de celdas y protección contra fórmulas.
 
 Flujo principal:
 
