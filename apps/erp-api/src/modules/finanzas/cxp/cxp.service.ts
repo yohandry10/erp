@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, NotFoundException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { v4 as uuidv4 } from 'uuid';
@@ -10,6 +10,7 @@ import { DevolucionProveedorEmitidaEvent } from '../../../shared/events/event-bu
 import { TesoreriaService } from '../tesoreria/tesoreria.service';
 import { createHash } from 'crypto';
 import { fechaHoyDelTenant } from '../../../shared/utils/fecha-tenant.util';
+import { appendIntegrationLog } from '../../../shared/utils/integration-log';
 
 @Injectable()
 export class CxpService {
@@ -33,10 +34,7 @@ export class CxpService {
     errorMessage?: string;
   }): Promise<void> {
     try {
-      await this.supabase
-        .getClient()
-        .from('integration_logs')
-        .insert({
+      await appendIntegrationLog(this.supabase.getClient(), {
           tenant_id: entry.tenantId,
           servicio: 'FINANZAS',
           operacion: entry.operacion,
@@ -49,7 +47,7 @@ export class CxpService {
           duration_ms: null,
         });
     } catch {
-      // No bloquear por errores de logging.
+      this.logger.error('INTEGRATION_LOG_WRITE_UNCONFIRMED: FINANZAS');
     }
   }
 
@@ -351,16 +349,21 @@ export class CxpService {
       throw new BadRequestException('Proveedor no encontrado');
     }
 
-    // Validar que no exista una CxP con el mismo número de documento para este proveedor
-    const { data: existente } = await client
+    // La RPC compara la huella del intento y recupera el resultado confirmado.
+    // Una lectura previa no debe convertir ese reintento en un error de duplicado.
+    const idempotencyKey = `cxp:factura:${tenantId}:${dto.proveedor_id}:${dto.numero_documento.trim().toUpperCase()}`;
+    const { data: existente, error: existenteError } = await client
       .from('cuentas_por_pagar')
-      .select('id')
+      .select('id, idempotency_key')
       .eq('tenant_id', tenantId)
       .eq('proveedor_id', dto.proveedor_id)
-      .eq('numero_documento', dto.numero_documento)
+      .eq('numero_documento', dto.numero_documento.trim().toUpperCase())
       .maybeSingle();
 
-    if (existente) {
+    if (existenteError) {
+      throw new ServiceUnavailableException('No se pudo verificar si la factura del proveedor ya está registrada');
+    }
+    if (existente && existente.idempotency_key?.trim().toLowerCase() !== idempotencyKey.toLowerCase()) {
       throw new BadRequestException(
         `Ya existe una cuenta por pagar con el número de documento ${dto.numero_documento} para este proveedor`,
       );
@@ -508,7 +511,6 @@ export class CxpService {
     };
 
     const eventId = uuidv4();
-    const idempotencyKey = `cxp:factura:${tenantId}:${dto.proveedor_id}:${dto.numero_documento.trim().toUpperCase()}`;
     const { data: cxpResult, error: cxpError } = await client.rpc(
       'crear_factura_proveedor_tx',
       {
@@ -520,6 +522,9 @@ export class CxpService {
     );
     const cxp = Array.isArray(cxpResult) ? cxpResult[0] : cxpResult;
 
+    if (cxpError?.code === '23505') {
+      throw new ConflictException('La factura del proveedor ya está registrada con otros datos; revise el documento existente');
+    }
     if (cxpError || !cxp?.id) {
       console.error('Error creando cuenta por pagar:', cxpError);
       throw new BadRequestException('No se pudo crear la cuenta por pagar');

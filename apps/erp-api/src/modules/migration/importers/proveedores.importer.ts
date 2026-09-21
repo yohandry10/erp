@@ -41,7 +41,7 @@ export class ProveedoresImporter implements Importer {
       'PROV-00001',
       'EMPRESA',
       'RUC',
-      '20987654321',
+      '20123456786',
       'PROVEEDOR DEMO SAC',
       'AV. SOL 456, AREQUIPA',
       'ventas@prov-demo.com',
@@ -54,7 +54,7 @@ export class ProveedoresImporter implements Importer {
     ];
     return {
       filename: 'plantilla_migracion_proveedores.csv',
-      content: `${headers.join(',')}\n${sample.join(',')}\n`,
+      content: `${headers.join(',')}\n${sample.map(value => `"${value.replace(/"/g, '""')}"`).join(',')}\n`,
     };
   }
 

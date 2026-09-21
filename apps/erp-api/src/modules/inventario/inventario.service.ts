@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { AuditService } from '../audit/audit.service';
+import { appendIntegrationLog } from '../../shared/utils/integration-log';
 import { EventBusService } from '../../shared/events/event-bus.service';
 import { OutboxEventBuilder } from '../../shared/outbox/outbox-event.interface';
 import { v4 as uuidv4 } from 'uuid';
@@ -1900,10 +1901,7 @@ export class InventarioService {
     durationMs?: number;
   }): Promise<void> {
     try {
-      await this.supabase
-        .getClient()
-        .from('integration_logs')
-        .insert({
+      await appendIntegrationLog(this.supabase.getClient(), {
           tenant_id: entry.tenantId,
           servicio: entry.servicio,
           operacion: entry.operacion,

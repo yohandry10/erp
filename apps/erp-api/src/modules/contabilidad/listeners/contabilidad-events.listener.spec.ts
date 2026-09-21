@@ -724,6 +724,35 @@ describe("ContabilidadEventsListener", () => {
   });
 
   describe("event handlers", () => {
+    it("convierte la factura USD y sus ajustes con la cotización congelada del evento", async () => {
+      const eventData = {
+        tenantId: "tenant-001", numeroDocumento: "F001-USD", fechaEmision: "2026-09-05",
+        subtotal: 100, igv: 18, total: 118, saldoProveedor: 87,
+        retencion: 3, percepcion: 2, detraccion: 10, anticipo: 20,
+        moneda: "USD", tipoCambio: 3.8,
+      };
+      asientosGenerator.generarAsientoFacturaProveedor.mockResolvedValue({ id: "asiento-usd" } as any);
+      await (listener as any).handleFacturaProveedorRegistrada({ event_id: "evento-usd", event_data: eventData });
+      expect(asientosGenerator.generarAsientoFacturaProveedor).toHaveBeenCalledWith(expect.objectContaining({
+        subtotal: 380, igv: 68.4, total: 448.4, saldoProveedor: 330.6,
+        ajustes: { retencion: 11.4, percepcion: 7.6, detraccion: 38, anticipo: 76 },
+      }));
+      expect(eventData.total).toBe(118);
+    });
+
+    it.each([undefined, 0, -1, "no-cotizado"])(
+      "impide contabilizar una factura USD con cotización inválida %s",
+      async (tipoCambio) => {
+        await expect((listener as any).handleFacturaProveedorRegistrada({
+          event_id: "evento-usd-invalido", event_data: {
+            tenantId: "tenant-001", moneda: "USD", tipoCambio,
+            subtotal: 100, igv: 18, total: 118,
+          },
+        })).rejects.toThrow(/tipo de cambio/i);
+        expect(asientosGenerator.generarAsientoFacturaProveedor).not.toHaveBeenCalled();
+      },
+    );
+
     it("should handle cobro registrado event", async () => {
       const mockEventos: OutboxEvent[] = [
         {

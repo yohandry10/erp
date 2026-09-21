@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EventBusService, PlanillaCalculadaEvent } from '../../shared/events/event-bus.service';
 import Decimal from 'decimal.js';
@@ -144,10 +144,20 @@ const CODIGO_CONCEPTO_QUINTA = '105';
  * inicio más reciente. Sin este orden el sueldo de la planilla dependía de en
  * qué orden devolviera las filas la base de datos.
  */
-export function contratoVigenteDe(empleado: any): any | undefined {
-  const vigentes = (empleado?.contratos ?? []).filter((contrato: any) =>
-    ESTADOS_CONTRATO_VIGENTE.includes(String(contrato?.estado ?? '').toLowerCase()),
-  );
+export function contratoVigenteDe(empleado: any, periodo?: string): any | undefined {
+  if (periodo !== undefined && !/^\d{4}-(0[1-9]|1[0-2])$/.test(periodo)) {
+    throw new BadRequestException('Período inválido para seleccionar el contrato');
+  }
+  const vigentes = (empleado?.contratos ?? []).filter((contrato: any) => {
+    if (!ESTADOS_CONTRATO_VIGENTE.includes(String(contrato?.estado ?? '').toLowerCase())) {
+      return false;
+    }
+    // Las columnas DATE se comparan por mes, sin conversiones de zona horaria.
+    // created_at ordena filas legacy, pero no sustituye el inicio contractual.
+    if (periodo && contrato.fecha_inicio && String(contrato.fecha_inicio).slice(0, 7) > periodo) return false;
+    if (periodo && contrato.fecha_fin && String(contrato.fecha_fin).slice(0, 7) < periodo) return false;
+    return true;
+  });
 
   if (vigentes.length <= 1) {
     return vigentes[0];
@@ -425,7 +435,7 @@ export class PlanillasService {
 
     // Procesar cada empleado
     for (const empleado of empleados) {
-      const contratoActual = contratoVigenteDe(empleado);
+      const contratoActual = contratoVigenteDe(empleado, paisLaboral === 'PE' ? planillaEstado.periodo : undefined);
       if (!contratoActual) {
         this.logger.debug(`Empleado sin contrato vigente: ID=${empleado.id}`);
         continue;
@@ -540,26 +550,33 @@ export class PlanillasService {
     periodo?: string,
     tenantId?: string,
   ): Promise<NormativaPeruPeriodo> {
-    const periodoNormalizado = /^\d{4}-\d{2}$/.test(String(periodo || ''))
-      ? String(periodo)
-      : '2026-05';
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(periodo || '')) || !tenantId) {
+      throw new BadRequestException('Empresa y período válido son obligatorios para resolver normativa peruana');
+    }
+    const periodoNormalizado = String(periodo);
     const client = this.supabaseService.getClient();
 
-    const mapNormativa = (data: any): NormativaPeruPeriodo => ({
-      uit: Number(data?.uit ?? NORMATIVA_PERU_2026_DEFAULT.uit),
-      rmv: Number(data?.rmv ?? NORMATIVA_PERU_2026_DEFAULT.rmv),
-      asignacionFamiliar: Number(data?.asignacion_familiar ?? NORMATIVA_PERU_2026_DEFAULT.asignacionFamiliar),
-      afpAporte: Number(data?.afp_aporte ?? NORMATIVA_PERU_2026_DEFAULT.afpAporte),
-      afpPrimaSeguro: Number(data?.afp_prima_seguro ?? NORMATIVA_PERU_2026_DEFAULT.afpPrimaSeguro),
-      afpComisionFlujoDefault: Number(
-        data?.afp_comision_flujo_default ?? NORMATIVA_PERU_2026_DEFAULT.afpComisionFlujoDefault,
-      ),
-      onpAporte: Number(data?.onp_aporte ?? NORMATIVA_PERU_2026_DEFAULT.onpAporte),
-      essaludAporte: Number(data?.essalud_aporte ?? NORMATIVA_PERU_2026_DEFAULT.essaludAporte),
-      quintaDeduccionUit: Number(
-        data?.quinta_deduccion_uit ?? NORMATIVA_PERU_2026_DEFAULT.quintaDeduccionUit,
-      ),
-    });
+    const mapNormativa = (data: any): NormativaPeruPeriodo => {
+      const number = (key: string, positive = false, rate = false) => {
+        const raw = data[key];
+        const value = Number(raw);
+        if (raw === null || raw === undefined || raw === '' || !Number.isFinite(value)
+          || value < 0 || (positive && value === 0) || (rate && value > 1)) {
+          throw new BadRequestException(`Normativa peruana incompleta o inválida para ${periodoNormalizado}: ${key}`);
+        }
+        return value;
+      };
+      return {
+        uit: number('uit', true), rmv: number('rmv', true),
+        asignacionFamiliar: number('asignacion_familiar'),
+        afpAporte: number('afp_aporte', false, true),
+        afpPrimaSeguro: number('afp_prima_seguro', false, true),
+        afpComisionFlujoDefault: number('afp_comision_flujo_default', false, true),
+        onpAporte: number('onp_aporte', false, true),
+        essaludAporte: number('essalud_aporte', false, true),
+        quintaDeduccionUit: number('quinta_deduccion_uit', true),
+      };
+    };
 
     try {
       if (tenantId) {
@@ -573,7 +590,8 @@ export class PlanillasService {
           .eq('activo', true)
           .maybeSingle();
 
-        if (!error && data) {
+        if (error) throw new ServiceUnavailableException('No se pudo consultar la normativa peruana; reintente el cálculo');
+        if (data) {
           return mapNormativa(data);
         }
       }
@@ -589,18 +607,16 @@ export class PlanillasService {
         .limit(1)
         .maybeSingle();
 
-      if (!error && data) {
+      if (error) throw new ServiceUnavailableException('No se pudo consultar la normativa peruana; reintente el cálculo');
+      if (data) {
         return mapNormativa(data);
       }
-
-      if (error) {
-        this.logger.warn(`No se pudo cargar normativa Perú ${periodoNormalizado}: ${error.message}`);
-      }
     } catch (error: any) {
-      this.logger.warn(`Normativa Perú no disponible para ${periodoNormalizado}; usando fallback 2026: ${error?.message ?? error}`);
+      if (error instanceof BadRequestException || error instanceof ServiceUnavailableException) throw error;
+      throw new ServiceUnavailableException('No se pudo consultar la normativa peruana; reintente el cálculo');
     }
 
-    return { ...NORMATIVA_PERU_2026_DEFAULT };
+    throw new BadRequestException(`Configure normativa peruana vigente para ${periodoNormalizado} antes de calcular la planilla`);
   }
 
   private async obtenerNormativaArgentinaPeriodo(
@@ -748,7 +764,7 @@ export class PlanillasService {
     const { data, error } = await query;
     if (error) {
       this.logger.warn(`No se pudieron leer las vacaciones del periodo ${periodo}: ${error.message}`);
-      return porEmpleado;
+      throw new ServiceUnavailableException('No se pudieron consultar las vacaciones aprobadas del período');
     }
 
     for (const solicitud of data || []) {
@@ -863,7 +879,7 @@ export class PlanillasService {
       }
     }
 
-    const contratoActual = contratoVigenteDe(empleado);
+    const contratoActual = contratoVigenteDe(empleado, periodo);
 
     // El régimen pensionario no se supone. Antes esta ruta caía a `|| 'AFP'` y
     // descontaba cerca del 13 % a un trabajador cuyo régimen nunca se declaró,
@@ -966,7 +982,7 @@ export class PlanillasService {
     // 3. APORTES DEL EMPLEADOR
 
     // ESSALUD (9%)
-    const aporteESSALUD = new Decimal(baseAsegurable).times(normativa.essaludAporte).toDecimalPlaces(2).toNumber();
+    const aporteESSALUD = this.calcularAporteEssaludPeru(baseAsegurable, normativa);
     const conceptoESSALUD = conceptos.find(c => c.codigo === '201');
     if (conceptoESSALUD) {
       conceptosDetalle.push({
@@ -1475,6 +1491,7 @@ export class PlanillasService {
 
   // ✅ FIX: Agregar soporte multi-tenant
   async getConceptos(tenantId?: string) {
+    if (!tenantId) throw new BadRequestException('Empresa obligatoria para consultar conceptos de planilla');
     const client = this.supabaseService.getClient();
     const paisLaboral = await this.obtenerPaisLaboral(tenantId);
     const conceptosPais =
@@ -1483,102 +1500,19 @@ export class PlanillasService {
         : paisLaboral === 'CO'
           ? CONCEPTOS_PLANILLA_COLOMBIA
           : CONCEPTOS_PLANILLA_BASE;
-    const buildConceptosBase = (existingCodes: Set<string> = new Set<string>()) =>
-      conceptosPais
-        .filter((concepto) => !existingCodes.has(concepto.codigo))
-        .map((concepto) => ({
-          tenant_id: tenantId,
-          codigo: concepto.codigo,
-          nombre: concepto.nombre,
-          estado: 'ACTIVO',
-          activo: true,
-          metadata: { tipo: concepto.tipo, seed: 'rrhh_runtime_default' },
-        }));
-
-    let query = client
+    const query = client
       .from('conceptos_planilla')
       .select('*')
+      .eq('tenant_id', tenantId)
       .eq('activo', true)
       .order('codigo', { ascending: true });
-
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
-    }
-
     const { data, error } = await query;
-    if (error) throw error;
-
-    if (tenantId) {
-      const existingCodes = new Set<string>((data || []).map((concepto: any) => String(concepto.codigo || '').trim()));
-      const missingConceptos = buildConceptosBase(existingCodes);
-
-      if (missingConceptos.length > 0) {
-        const { error: seedError } = await client
-          .from('conceptos_planilla')
-          .insert(missingConceptos);
-
-        if (seedError && (seedError as any)?.code !== '23505') {
-          throw seedError;
-        }
-
-        const { data: seeded, error: reloadError } = await client
-          .from('conceptos_planilla')
-          .select('*')
-          .eq('activo', true)
-          .eq('tenant_id', tenantId)
-          .order('codigo', { ascending: true });
-
-        if (reloadError) throw reloadError;
-        return {
-          success: true,
-          data: seeded || []
-        };
-      }
+    if (error) throw new ServiceUnavailableException('No se pudieron consultar los conceptos de planilla');
+    const existingCodes = new Set<string>((data || []).map((concepto: any) => String(concepto.codigo || '').trim()));
+    const missing = conceptosPais.filter(concepto => !existingCodes.has(concepto.codigo));
+    if (missing.length) {
+      throw new BadRequestException(`Faltan conceptos activos de planilla: ${missing.map(concepto => concepto.codigo).join(', ')}. Revise la configuración laboral`);
     }
-
-    if (!tenantId && (!data || data.length === 0)) {
-      return {
-        success: true,
-        data: conceptosPais.map((concepto) => ({
-          ...concepto,
-          activo: true,
-          estado: 'ACTIVO',
-          metadata: { tipo: concepto.tipo, seed: 'rrhh_runtime_default_readonly' },
-        }))
-      };
-    }
-
-    return {
-      success: true,
-      data: data || []
-    };
-  }
-
-  async seedConceptosPlanillaTenant(tenantId: string) {
-    const client = this.supabaseService.getClient();
-    const paisLaboral = await this.obtenerPaisLaboral(tenantId);
-    const conceptosPais =
-      paisLaboral === 'AR'
-        ? CONCEPTOS_PLANILLA_ARGENTINA
-        : paisLaboral === 'CO'
-          ? CONCEPTOS_PLANILLA_COLOMBIA
-          : CONCEPTOS_PLANILLA_BASE;
-    const conceptosBase = conceptosPais.map((concepto) => ({
-      tenant_id: tenantId,
-      codigo: concepto.codigo,
-      nombre: concepto.nombre,
-      estado: 'ACTIVO',
-      activo: true,
-      metadata: { tipo: concepto.tipo, seed: 'rrhh_runtime_default' },
-    }));
-
-    const { data, error } = await client
-        .from('conceptos_planilla')
-        .upsert(conceptosBase, { onConflict: 'tenant_id,codigo', ignoreDuplicates: true })
-        .select('*')
-        .order('codigo', { ascending: true });
-
-    if (error) throw error;
     return {
       success: true,
       data: data || []
@@ -1687,7 +1621,7 @@ export class PlanillasService {
 
     for (const empleadoCanonico of empleadosCanonicos || []) {
       const entrada = entradasPorId.get(empleadoCanonico.id);
-      const contrato = contratoVigenteDe(empleadoCanonico);
+      const contrato = contratoVigenteDe(empleadoCanonico, paisLaboral === 'PE' ? planillaInfo.periodo : undefined);
       if (!contrato) {
         throw new BadRequestException(
           `El empleado ${empleadoCanonico.nombres || empleadoCanonico.id} no tiene contrato vigente`,
@@ -2022,7 +1956,7 @@ export class PlanillasService {
     }
 
     // Descuentos automáticos (AFP/ONP) - usar datos del empleado si están disponibles
-    const contratoVigente = contratoVigenteDe(empleado);
+    const contratoVigente = contratoVigenteDe(empleado, periodo);
     if (!contratoVigente) {
       throw new BadRequestException(
         `El empleado ${empleado.nombres || empleado.id} no tiene contrato vigente`,
@@ -2108,7 +2042,7 @@ export class PlanillasService {
       totalDescuentos += impuestoRenta;
     }
 
-    const aporteESSALUD = new Decimal(totalIngresos).times(normativa.essaludAporte).toDecimalPlaces(2).toNumber();
+    const aporteESSALUD = this.calcularAporteEssaludPeru(totalIngresos, normativa);
     const conceptoESSALUD = conceptos.find(c => c.codigo === '201');
     if (conceptoESSALUD && aporteESSALUD > 0) {
       conceptosDetalle.push({
@@ -2135,9 +2069,16 @@ export class PlanillasService {
     };
   }
 
-  /**
-   * Pagar planilla completa - Genera pagos individuales y emite evento contable
-   */
+  private calcularAporteEssaludPeru(remuneracionAsegurable: number, normativa: NormativaPeruPeriodo): number {
+    // Informe 003-2007-SUNAT/2B0000: con remuneración positiva por un mes
+    // incompleto se aplica la RMV mensual; sin remuneración no nace el aporte.
+    // La base mínima corresponde al empleador, no aumenta AFP/ONP ni el neto.
+    if (remuneracionAsegurable <= 0) return 0;
+    return Decimal.max(remuneracionAsegurable, normativa.rmv)
+      .times(normativa.essaludAporte).toDecimalPlaces(2).toNumber();
+  }
+
+  /** Pagar planilla completa con pagos individuales y evento contable. */
   async pagarPlanillaCompleta(
     planillaId: string,
     pagoData: {

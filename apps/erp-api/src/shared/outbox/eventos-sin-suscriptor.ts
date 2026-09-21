@@ -29,6 +29,11 @@ export const EVENTOS_SIN_SUSCRIPTOR: ReadonlySet<string> = new Set([
   // Constancia de que el asistente de configuración terminó. El writer deja la
   // configuración escrita y el progreso marcado en la misma transacción.
   'configuracion.wizard.completado',
+
+  // El RPC 464 ya actualiza empresa_config, sincroniza tenants y registra la
+  // auditoría en la misma transacción. Este evento sólo deja constancia del
+  // cambio; no representa una integración ni una tarea adicional pendiente.
+  'configuracion.empresa.actualizada',
 ]);
 
 export function esEventoSinSuscriptor(eventType: string): boolean {

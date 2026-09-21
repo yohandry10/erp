@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleInit } from '@nestjs/common';
+import Decimal from 'decimal.js';
 import { cuadranImportes } from '../../../shared/utils/cuadre-contable.util';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { AsientosGeneratorService } from '../services/asientos-generator.service';
@@ -316,81 +317,6 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
   }
 
   /**
-   * Registra el inicio del procesamiento de un evento en event_processing_log
-   */
-  private async registrarInicioProcesamiento(evento: OutboxEvent, tenantId: string): Promise<string | null> {
-    try {
-      const { data, error } = await this.supabaseService
-        .getClient()
-        .from('event_processing_log')
-        .insert({
-          tenant_id: tenantId,
-          event_id: evento.event_id || evento.id,
-          processor_name: 'ContabilidadEventsListener',
-          started_at: new Date().toISOString(),
-          status: 'PROCESSING',
-        })
-        .select('id')
-        .single();
-
-      if (error) {
-        this.logger.warn('⚠️ [ContabilidadEventsListener] No se pudo registrar inicio en event_processing_log:', error);
-        return null;
-      }
-
-      return data?.id || null;
-    } catch (error) {
-      this.logger.warn('⚠️ [ContabilidadEventsListener] Error registrando inicio de procesamiento:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Registra la finalización exitosa del procesamiento de un evento
-   */
-  private async registrarFinalizacionExitosa(logId: string | null): Promise<void> {
-    if (!logId) return;
-
-    try {
-      await this.supabaseService
-        .getClient()
-        .from('event_processing_log')
-        .update({
-          completed_at: new Date().toISOString(),
-          status: 'COMPLETED',
-        })
-        .eq('id', logId);
-    } catch (error) {
-      this.logger.warn('⚠️ [ContabilidadEventsListener] Error registrando finalización exitosa:', error);
-    }
-  }
-
-  /**
-   * Registra el error en el procesamiento de un evento
-   */
-  private async registrarErrorProcesamiento(logId: string | null, error: any): Promise<void> {
-    if (!logId) return;
-
-    try {
-      await this.supabaseService
-        .getClient()
-        .from('event_processing_log')
-        .update({
-          completed_at: new Date().toISOString(),
-          status: 'FAILED',
-          error_details: {
-            message: error?.message || 'Error desconocido',
-            stack: error?.stack || null,
-            name: error?.name || 'Error',
-          },
-        })
-        .eq('id', logId);
-    } catch (err) {
-      this.logger.warn('⚠️ [ContabilidadEventsListener] Error registrando error de procesamiento:', err);
-    }
-  }
-
-  /**
    * Procesa un evento individual y genera el asiento correspondiente
    * Implementa lógica de reintentos con backoff exponencial
    */
@@ -405,7 +331,6 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
 
     const maxRetries = 3;
     const retryCount = evento.retry_count || 0;
-    let logId: string | null = null;
 
     // Extraer tenantId del evento
     const tenantId = evento.event_data?.tenantId || evento.event_data?.tenant_id || null;
@@ -434,8 +359,9 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
           `🎯 [ContabilidadEventsListener] Procesando evento: ${evento.event_type} (${evento.event_id}) - Intento ${retryCount + 1}/${maxRetries}`
         );
 
-        // Registrar inicio del procesamiento
-        logId = await this.registrarInicioProcesamiento(evento, tenantId);
+        // El claim y sus transiciones conservan la evidencia durable en outbox.
+        // Los intentos individuales quedan en el logger; no usar DML auxiliar
+        // que omita el writer canónico y su token de claim.
 
         // Mapear el tipo de evento al handler correspondiente
         switch (evento.event_type) {
@@ -593,18 +519,11 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
             return;
         }
 
-        this.logger.log(`✅ [ContabilidadEventsListener] Evento procesado exitosamente: ${evento.event_id}`);
-        
         await this.asientosGenerator.marcarEventoComoProcesado(evento.event_id);
-
-        // Registrar finalización exitosa
-        await this.registrarFinalizacionExitosa(logId);
+        this.logger.log(`✅ [ContabilidadEventsListener] Evento procesado exitosamente: ${evento.event_id}`);
       } catch (error) {
         const errorMessage = error.message || 'Error desconocido';
         const isRetryable = this.isRetryableError(error);
-        
-        // Registrar error en event_processing_log
-        await this.registrarErrorProcesamiento(logId, error);
         
         this.logger.error(
           `❌ [ContabilidadEventsListener] Error procesando evento ${evento.event_id} (intento ${retryCount + 1}/${maxRetries}):`,
@@ -1841,18 +1760,30 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
     const eventData = evento.event_data;
     const tenantId = this.ensureEventTenant(eventData, 'factura.proveedor.registrada');
     const eventId = evento.event_id || eventData.eventId;
+    // El writer 465 congela el TC junto con la deuda. Los importes del evento
+    // siguen en moneda documental; el asiento utiliza moneda local, al igual
+    // que los ajustes fiscales y la posterior liquidación de tesorería.
+    const currency = String(eventData.moneda ?? 'PEN').trim().toUpperCase();
+    const rateValue = eventData.tipoCambio ?? (currency === 'PEN' ? 1 : undefined);
+    const rate = Number(rateValue);
+    if (!Number.isFinite(rate) || rate <= 0) {
+      throw new Error('Factura de proveedor sin tipo de cambio de origen válido');
+    }
+    const localAmount = (value: unknown): number => new Decimal(String(value ?? 0))
+      .mul(rate).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
+    const supplierBalance = eventData.saldoProveedor ?? eventData.saldo_proveedor;
     const asiento = await this.asientosGenerator.generarAsientoFacturaProveedor({
       tenant_id: tenantId,
       fecha: eventData.fechaEmision,
-      subtotal: eventData.subtotal,
-      igv: eventData.igv,
-      total: eventData.total,
-      saldoProveedor: eventData.saldoProveedor ?? eventData.saldo_proveedor,
+      subtotal: localAmount(eventData.subtotal),
+      igv: localAmount(eventData.igv),
+      total: localAmount(eventData.total),
+      saldoProveedor: supplierBalance == null ? undefined : localAmount(supplierBalance),
       ajustes: {
-        retencion: eventData.retencion ?? 0,
-        percepcion: eventData.percepcion ?? 0,
-        detraccion: eventData.detraccion ?? 0,
-        anticipo: eventData.anticipo ?? 0,
+        retencion: localAmount(eventData.retencion),
+        percepcion: localAmount(eventData.percepcion),
+        detraccion: localAmount(eventData.detraccion),
+        anticipo: localAmount(eventData.anticipo),
       },
       recepcion_id: eventData.recepcionId ?? null,
       referencia: eventData.numeroDocumento ?? eventData.facturaProvId,

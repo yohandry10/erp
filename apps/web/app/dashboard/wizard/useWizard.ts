@@ -109,9 +109,9 @@ export function useWizard() {
             }
           })
 
-          // Si el paso de validación (paso 6, índice 5) está completado, ir al último paso
-          if (progress.pasosCompletados.includes(6)) {
-            console.log('✅ Validation step completed - going to final step')
+          // Completar un paso no acredita que la configuración se haya guardado.
+          // El paso 6 corresponde a SUNAT; sólo el servidor confirma el cierre.
+          if (progress.completado === true) {
             goToStep(state.steps.length - 1)
             setLoading(false)
             return
@@ -251,6 +251,7 @@ export function useWizard() {
         body: JSON.stringify({
           certificateBase64,
           certificatePassword,
+          ruc: state.configuration.ruc,
         }),
       })
 

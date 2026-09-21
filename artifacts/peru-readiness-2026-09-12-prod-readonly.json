@@ -1,0 +1,31 @@
+{
+  "checkedAt": "2026-09-12T23:12:12.623Z",
+  "project": "wypnbcptofqdmoynlonq",
+  "operation": "GET empresa_config PE is_demo=false",
+  "nonDemoPeruConfigurations": 3,
+  "productionConfigured": 0,
+  "limitations": "Sólo metadatos de configuración. No inspecciona PFX/SOL, habilitación ni realiza emisión.",
+  "apiOrigin": "https://erp-api-2p7i.onrender.com",
+  "runtime": {
+    "ready": {
+      "httpStatus": 200,
+      "status": "ready",
+      "contract": {
+        "outbox_rpcs": true,
+        "schema_version": 536,
+        "service_role_reads": true,
+        "required_schema_applied": true,
+        "required_schema_version": 536,
+        "schema_history_available": true,
+        "missing_service_role_reads": []
+      },
+      "databaseReady": true,
+      "redisReady": true
+    },
+    "version": {
+      "httpStatus": 200,
+      "commit": "679e05bf3c186ed017129c03baafcfd4fefdfd93",
+      "nodeEnv": "production"
+    }
+  }
+}

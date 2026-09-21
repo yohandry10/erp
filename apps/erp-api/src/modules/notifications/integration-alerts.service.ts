@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { NotificationsService } from './notifications.service';
+import { appendIntegrationLog } from '../../shared/utils/integration-log';
+import { redactSensitiveText } from '../../shared/utils/redact-sensitive';
 import {
   NotificationSeverity,
   NotificationType,
@@ -59,10 +61,7 @@ export class IntegrationAlertsService {
     } = options;
 
     try {
-      const { error } = await this.supabase
-        .getClient()
-        .from('integration_logs')
-        .insert({
+      await appendIntegrationLog(this.supabase.getClient(), {
           tenant_id: tenantId,
           servicio,
           operacion,
@@ -77,12 +76,6 @@ export class IntegrationAlertsService {
           metadata: metadata ?? null,
         });
 
-      if (error) {
-        this.logger.error(
-          `No se pudo registrar el evento de integración ${servicio}/${operacion}: ${error.message}`,
-          error,
-        );
-      }
     } catch (error) {
       this.logger.error(
         `Fallo inesperado registrando integración ${servicio}/${operacion}`,
@@ -133,7 +126,7 @@ export class IntegrationAlertsService {
     correlacionId?: string | null,
   ): string {
     const base = `La operación ${operacion} del servicio ${servicio} falló.`;
-    const detalle = errorMessage ? ` Detalle: ${errorMessage}` : '';
+    const detalle = errorMessage ? ` Detalle: ${redactSensitiveText(errorMessage).slice(0, 2000)}` : '';
     const correlacion = correlacionId ? ` Correlación: ${correlacionId}.` : '';
     return `${base}${detalle}${correlacion}`.trim();
   }

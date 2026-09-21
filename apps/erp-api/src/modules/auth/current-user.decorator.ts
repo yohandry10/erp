@@ -1,8 +1,2 @@
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-
-export const CurrentUser = createParamDecorator(
-  (data: unknown, ctx: ExecutionContext) => {
-    const request = ctx.switchToHttp().getRequest();
-    return request.user;
-  },
-); 
+// Compatibilidad de imports: una sola implementación para usuario y propiedades.
+export { CurrentUser } from '../../common/decorators/current-user.decorator';

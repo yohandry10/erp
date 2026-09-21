@@ -10,7 +10,7 @@ describe('JwtStrategy', () => {
 
   it('rechaza access tokens sin sesión revocable', async () => {
     const authService = {
-      validateSession: jest.fn(),
+      validateSessionContext: jest.fn(),
     } as unknown as AuthService;
     const strategy = new JwtStrategy(authService, configService);
 
@@ -23,7 +23,7 @@ describe('JwtStrategy', () => {
 
   it('rechaza access tokens con sesión revocada', async () => {
     const authService = {
-      validateSession: jest.fn().mockResolvedValue(false),
+      validateSessionContext: jest.fn().mockResolvedValue(false),
     } as unknown as AuthService;
     const strategy = new JwtStrategy(authService, configService);
 
@@ -37,7 +37,7 @@ describe('JwtStrategy', () => {
 
   it('propaga session_token al request user cuando la sesión está activa', async () => {
     const authService = {
-      validateSession: jest.fn().mockResolvedValue(true),
+      validateSessionContext: jest.fn().mockResolvedValue(true),
     } as unknown as AuthService;
     const strategy = new JwtStrategy(authService, configService);
 

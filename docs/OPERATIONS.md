@@ -2,18 +2,25 @@
 
 ## Requisitos
 
-- Node.js 18 o superior.
+- Node.js 24 LTS, con parche vigente; CI y las tres imágenes Docker usan la rama 24.
 - pnpm 9.
 - Docker, si se usa el stack local.
 - PowerShell para scripts operativos.
 - Acceso Supabase sólo al entorno autorizado.
 
-## Inicio local
+## Preparación y arranque
 
 ```powershell
 pnpm install
-pnpm dev
+pnpm build
 ```
+
+`pnpm dev` no es un arranque válido del monorepo: la API bloquea ese modo.
+Para pruebas con escritura se usa el runner aislado
+`node scripts/ci/run-peru-integrated-local.mjs --browser`, que crea y elimina
+únicamente su infraestructura efímera y no carga secretos productivos.
+El arranque operativo requiere primero el preflight PROD indicado más abajo;
+después se ejecuta el paquete compilado mediante `pnpm --filter @erp-suite/erp-api start`.
 
 Servicios principales:
 
@@ -21,9 +28,33 @@ Servicios principales:
 - API: puerto definido por `PORT`.
 - Supabase, Redis y observabilidad: según variables del entorno o Docker.
 
-El arranque filtrado de la API (`pnpm --filter erp-api start`) resuelve
+El arranque filtrado de la API (`pnpm --filter @erp-suite/erp-api start`) resuelve
 `.env.production` tanto desde la raíz del workspace como desde
 `apps/erp-api`; nunca recurre a `.env` ni `.env.local`.
+El worker independiente (`pnpm --filter @erp-suite/worker start`) carga sólo
+`.env.production` de su paquete y raíz, preservando secretos inyectados. Exige
+`NODE_ENV=production`, `DEPLOYMENT_ENV=PROD` y la referencia del único Supabase
+autorizado, validando antes de importar jobs que crean clientes. Su prueba de
+configuración usa dobles y archivos temporales, sin conexiones remotas.
+Antes de iniciar consumidores, consulta `/api/health/ready` y exige API, Redis
+y contrato DB listos, con `REQUIRED_DATABASE_SCHEMA_VERSION >= 553`. Respuestas
+incompletas, esquemas antiguos o HTTP fallido impiden el arranque. La imagen
+Docker verifica también ese orden mediante HTTP local con red externa deshabilitada.
+Se retiraron dos tareas simuladas del worker: la que sólo imprimía métricas sin
+actualizar el dashboard y la que anunciaba limpieza sin borrar archivos. Las
+métricas de usuario siguen en la API; no existe purga automática de logs por
+esta vía. Cualquier borrado productivo conserva el requisito de autorización,
+respaldo y evidencia.
+Los envíos/consultas CPE del worker atestiguan el actor de origen del CPE en
+el JWT; la RPC valida que siga activo en el tenant. No sustituyen ese actor
+por un UUID inventado. Las consultas programadas usan ENVIADO/SENDING y una
+clave por ciclo; éxito técnico de la API no equivale a aceptación fiscal.
+Los reintentos GRE leen `gre_guias` y validan el resultado de la operación.
+La generación PDF verifica la cabecera del archivo y registra el resultado;
+no intenta escribir directamente metadatos ni logs en tablas protegidas.
+Los crons globales registran su resultado estructurado en el log del proceso,
+sin insertar un tenant ficticio `system` en columnas UUID. Los lotes POS exigen
+conteos explícitos válidos; fallos parciales se registran como error.
 
 Comandos frecuentes:
 
@@ -78,6 +109,9 @@ Reglas:
 
 - No versionar secretos.
 - PROD usa `.env.production` o secretos inyectados.
+- El caché de compilación de Turbo incluye `.env.production` como dependencia
+  global y las variables públicas del build, modo Node, Tauri y destino
+  autorizado para invalidarse al cambiar esa configuración, incluso inyectada.
 - `.env.local`, `.env` y el antiguo proyecto DEV no son fuentes operativas.
 - El frontend sólo recibe variables `NEXT_PUBLIC_*` expresamente públicas.
 - Logs y evidencia deben redactar tokens, passwords y claves.
@@ -214,6 +248,57 @@ Antes de borrar o reconstruir una base, consultar como mínimo:
 Esos artefactos son forenses; pueden estar superados. Deben contrastarse con
 `supabase/migrations/`, código actual y `docs/CURRENT_STATE.md`.
 
+## Ensayo local de recuperación
+
+`node scripts/ci/run-peru-integrated-local.mjs --browser` reconstruye PostgreSQL
+16 efímero, verifica SQL y flujos HTTP y toma un respaldo con snapshot exportado.
+`test-peru-backup-restore-local.mjs` sólo acepta el contenedor efímero del runner:
+restaura en otro contenedor nuevo sin red, compara huellas/conteos de todas las
+tablas de public/app/auth/storage y comprueba ACL/RLS. Guarda dump, SHA-256 y
+resultados en el directorio `artifacts/peru-integrated-*/backup/`; retira únicamente
+el contenedor que creó. No acredita respaldos de PROD, objetos externos de
+Storage ni RTO del proveedor. El tiempo medido sólo corresponde al ensayo local.
+
+El respaldo productivo se obtiene con `scripts/backup-peru-prod.mjs`, pasando
+`--env-file` hacia `.env.production` y `--pg-bin` hacia un cliente PostgreSQL 17.
+El script ejecuta el preflight, fuerza sólo lectura y conserva el dump privado
+en `artifacts/db-backups/`, excluido de Git; el manifiesto sólo contiene hash,
+tamaño y alcance. `node scripts/rehearse-peru-prod-local.mjs <manifiesto>` valida
+ese hash y restaura public/app/auth/storage/supabase_migrations en un contenedor
+PostgreSQL 17 nuevo sin red ni puertos publicados. Contrasta historia 536,
+aplica 537..553 con registro transaccional, compara todas las filas previas y
+RLS, ejecuta los verificadores con rollback y comprueba readiness 553.
+Conserva las ACL de tablas salvo SELECT del backend y la retirada explícita
+de DML de auditoría en 542. No supone que las concesiones heredadas de PROD
+sean iguales a las de PostgreSQL limpio; un control negativo demuestra que
+el comparador detecta nuevas escrituras. No respalda roles globales ni archivos
+externos de Storage, ni acredita privilegio mínimo de todos los módulos.
+
+El mismo ensayo genera el lote `peru-promotion-553-<hash>.sql` desde las
+migraciones canónicas. Reúne DDL, backfills e historia en una transacción con
+aislamiento repetible, verifica proyecto/esquema inicial y readiness final, y
+notifica la recarga de PostgREST sólo al confirmar. Antes de validar cada
+migración, el ensayo ejecuta ese lote con un fallo deliberado previo al commit
+y demuestra que columnas, filas, políticas y permisos vuelven al estado 536.
+Este control negativo ocurre exclusivamente en la copia sin red; nunca se
+ejecutan verificadores ni fallos inyectados en PROD.
+
+`node scripts/promote-peru-prod.mjs --backup <manifiesto> --rehearsal <ensayo>`
+comprueba el respaldo de menos de 24 horas, su restauración, los hashes de las
+17 migraciones y del lote, el commit del PR 109 y todos sus checks. Sin
+`--apply` no conecta a PostgreSQL. La aplicación exige además `--env-file`
+hacia `.env.production` y `--pg-bin` hacia PostgreSQL 17, repite el preflight,
+contrasta la historia 533..536 y aplica únicamente el lote canónico ensayado.
+Conserva evidencia de historia/readiness antes y después; el diagnóstico DB
+queda en logs privados ignorados. Si se pierde la respuesta del commit, se
+debe comprobar la historia remota antes de reintentar. Tras un commit exitoso,
+una corrección se publica hacia adelante; no se restaura destructivamente PROD.
+
+La opción `--survey` añade inspección de carga de las pantallas estáticas de
+dashboard con navegador y API reales. Sus resultados y capturas quedan en
+`module-survey/` dentro de la evidencia del ensayo; no acreditan todas las
+operaciones de cada módulo ni las páginas que requieren un identificador.
+
 ## Operaciones destructivas en PROD
 
 Requisitos obligatorios:
@@ -258,7 +343,26 @@ el backfill revisa eventos laborales `pending`, `failed` y `processing`; si un
 movimiento histórico no contiene un snapshot contable 1:1, la migración aborta
 con `REGULARIZATION_REQUIRED` en vez de inferir el mapping bancario actual.
 
+El listener contable conserva estado, intentos y errores en el outbox mediante
+sus RPCs y registra el detalle de ejecución en el logger. No intenta duplicar
+ese seguimiento con DML sobre `event_processing_log`, cuyos datos históricos
+permanecen intactos. El mensaje de éxito sólo se escribe después de confirmar
+la transición durable del evento.
+
 ## Pruebas operativas
+
+El preflight `apps/erp-api/scripts/sunat-readiness-preflight.ts` carga únicamente
+`.env.production` o secretos inyectados, igual que el runtime. Verifica ambiente,
+transporte GRE, aliases SOL/OSE y vigencia del certificado; bloquea MODDATOS en
+producción. Su informe es una comprobación local de configuración global:
+no consulta credenciales del tenant, no envía documentos y no acredita un
+ticket/CDR ni habilitación del contribuyente. `ra_rc.ticket_cdr` permanece en
+advertencia hasta tener evidencia externa; no debe usarse para declarar go-live.
+
+Las rutas `/api/migration` admiten JSON de hasta 21 MiB para el contrato existente
+de 20 MiB base64. Las demás rutas conservan el límite JSON predeterminado de
+100 KiB. El navegador ofrece CSV de hasta 5 MiB; cargas mayores al límite HTTP
+devuelven 413 y un CSV estructuralmente inválido devuelve 400 antes de crear runs.
 
 Antes de promover:
 
@@ -286,10 +390,10 @@ El suelo vive en `apps/erp-api/jest.config.js` y CI lo hace cumplir desde que el
 job de tests ejecuta `pnpm test:cov`. Antes declaraba 80% pero Jest nunca lo
 evaluaba: sin `--coverage`, el bloque `coverageThreshold` ni se lee.
 
-Suelo actual: **32% líneas · 29% ramas · 30% funciones · 32% sentencias**. Es un
-suelo, no una meta, y la regla es que puede subir pero nunca bajar. Dos tercios
-del backend no los cubre ninguna prueba; conviene saberlo antes de confiar en un
-verde.
+Suelo vigente en código: **31% líneas · 28% ramas · 29% funciones · 31% sentencias**. Es un
+suelo, no una meta, y la regla es que puede subir pero nunca bajar. Este dato
+describe la configuración actual de Jest; no cambia sus umbrales. Un resultado
+verde no acredita cobertura completa ni aceptación fiscal externa.
 
 Dónde subirla primero, por riesgo y no por facilidad: `modules/cpe/` (emisión y
 afectación de IGV), `ple-export.service.ts` (libros electrónicos),
@@ -311,6 +415,36 @@ corre los verificadores requeridos y prueba el readiness contra la versión
 final; Playwright usa sólo localhost y mocks controlados para los recorridos sin
 base. Las specs que necesiten datos reales continúan bloqueadas salvo que reciban
 una base efímera explícita. Ningún E2E puede apuntar a PROD ni al DEV retirado.
+
+El recorrido integrado Perú se ejecuta con
+`node scripts/ci/run-peru-integrated-local.mjs --browser` (Docker, PostgreSQL
+cliente 16 en PATH o `PSQL_BIN` y Chromium de Playwright). Reserva los puertos
+locales 55456/55457/3126/3125 y crea contenedores nuevos sin volúmenes. Aplica
+la cadena y los verificadores completos, prepara dos empresas sintéticas y
+ejecuta Nest con sus guards/servicios y PostgREST real. Comprueba venta, IGV,
+stock, caja, repetición de intención, aislamiento entre empresas y consumo
+contable del outbox. También recorre alta de proveedor, orden, aprobación por
+otro usuario, recepción, factura y pago bancario con sus asientos; contrasta
+el contexto fiscal persistido y los conflictos al reintentar. `--browser`
+añade login, apertura y cobro desde el POS, además de crear, aprobar y recibir
+una compra desde la interfaz.
+El ejecutor conserva logs/JSON/capturas en `artifacts/peru-integrated-<ejecución>`
+y detiene sólo los recursos que creó. No carga archivos operativos ni cambia
+la lista blanca PROD del runtime; la dependencia Supabase local se inyecta en
+el módulo de prueba. GoTrue, Storage HTTP, SUNAT y OSE externos no forman parte
+de este ensayo. Las migraciones 537/538 fijan lecturas explícitas del backend
+para estos recorridos; no habilitan escrituras directas ni alteran RLS.
+La 541 completa la lectura de categorías. El ensayo también incluye altas de
+categoría/servicio, recepciones parciales con calidad mixta y devoluciones antes
+y después de facturar, con rollback al devolver una compra ya pagada.
+También contrasta factura en USD: deuda en moneda documental y asiento en
+soles con la cotización de origen, sin consulta ni emisión fiscal externa.
+La 542 añade el append complementario de auditoría/integraciones y sus lecturas
+del backend. El ensayo prepara auditores independientes y usuarios sin permiso
+en la base efímera, conserva la prohibición de auditoría de ADMIN_DEMO y prueba
+historial, filtros, paginación, aislamiento y acceso denegado. El recorrido
+visual verifica la consulta real y, mediante una inyección de respuesta parcial
+explícita, que la pantalla advierta el fallo de una fuente y permita recuperarse.
 
 La frontera PostgreSQL crea también un catálogo mínimo efímero de Supabase
 Storage (`storage.buckets`, `storage.objects`, roles y RLS). Así las migraciones

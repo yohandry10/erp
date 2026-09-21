@@ -1,3 +1,4 @@
+import { OperacionLogisticaDto } from './operacion-logistica.dto';
 import { IsOptional, IsString, IsArray } from 'class-validator';
 
 /**
@@ -5,7 +6,7 @@ import { IsOptional, IsString, IsArray } from 'class-validator';
  * DTO para iniciar la preparación de un pedido
  * Requirements: 9.3, 9.4, 9.5
  */
-export class PrepararPedidoDto {
+export class PrepararPedidoDto extends OperacionLogisticaDto {
   @IsOptional()
   @IsString()
   notas?: string;
@@ -20,5 +21,6 @@ export class PrepararPedidoDto {
 
   @IsOptional()
   @IsArray()
+  @IsString({ each: true })
   items_preparados?: string[];
 }

@@ -284,6 +284,7 @@ function buildHarness(country: Country) {
 
   return {
     service,
+    employee,
     countryService,
     eventBus,
     getEmployeePayload: () => employeePlanillaPayload,
@@ -292,6 +293,20 @@ function buildHarness(country: Country) {
 }
 
 describe('PlanillasService — despacho normativo por país', () => {
+  it('persiste sueldo y pensión del período PE aunque exista una renovación futura', async () => {
+    const harness = buildHarness('PE');
+    harness.employee.contratos.unshift({
+      estado: 'vigente', fecha_inicio: '2026-09-01', sueldo_bruto: 5000,
+      regimen_pensionario: 'AFP',
+    });
+    await harness.service.calcularPlanillaMensual('payroll-1', 'tenant-PE', 'actor-PE');
+    expect(harness.getEmployeePayload()).toMatchObject({
+      total_ingresos: 2000, total_descuentos: 260, neto_pagar: 1740,
+      conceptos: expect.arrayContaining([{ concepto_id: 'concept-104', monto: 260, observaciones: expect.any(String) }]),
+    });
+    expect(harness.getEmployeePayload().conceptos.some((c: any) => c.concepto_id === 'concept-101')).toBe(false);
+  });
+
   it.each([
     ['PE', 2_000, 260, 1_740],
     ['AR', 1_000_000, 170_000, 830_000],

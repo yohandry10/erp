@@ -35,7 +35,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -64,7 +64,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -96,7 +96,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -128,7 +128,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -140,6 +140,16 @@ jobs:
       # cobertura baja del suelo declarado en jest.config.js.
       - name: Run tests with coverage
         run: pnpm test:cov
+
+      - name: Verify desktop session persistence
+        run: pnpm --filter @erp-suite/web test:auth-session
+
+      - name: Verify complete tenant catalog
+        run: pnpm --filter @erp-suite/web test:tenant-catalog
+      - name: Candidate profile contract
+        run: pnpm --filter @erp-suite/web test:candidate-profile
+      - name: Worker PROD-only configuration
+        run: pnpm --filter @erp-suite/worker test:runtime-config
 
       - name: Publicar reporte de cobertura
         if: always()
@@ -171,7 +181,7 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: erp_e2e
         ports:
-          - 5432:5432
+          - 5442:5432
         options: >-
           --health-cmd "pg_isready -U postgres -d erp_e2e"
           --health-interval 5s
@@ -179,10 +189,10 @@ jobs:
           --health-retries 20
     env:
       E2E_EPHEMERAL_LOCAL_DB: "1"
-      REQUIRED_DATABASE_SCHEMA_VERSION: "536"
+      REQUIRED_DATABASE_SCHEMA_VERSION: "553"
       PGPASSWORD: postgres
       PGHOST: 127.0.0.1
-      PGPORT: 5432
+      PGPORT: 5442
       PGUSER: postgres
       PGDATABASE: erp_e2e
     steps:
@@ -192,7 +202,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Ensure PostgreSQL 16 client
         run: |
@@ -213,6 +223,42 @@ jobs:
           echo '- Todos los verificadores SQL desde 491 hasta el esquema requerido, más los históricos vigentes.' >> "$GITHUB_STEP_SUMMARY"
           echo '- Una migración nueva sin verificador del mismo prefijo falla el job.' >> "$GITHUB_STEP_SUMMARY"
 
+  peru-integrated:
+    name: Peru API, browser and backup recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    needs: [install]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-16
+      - name: Install Chromium
+        run: pnpm --filter @erp-suite/web exec playwright install --with-deps chromium
+      - name: Verify integrated Peru flows and recovery
+        run: node scripts/ci/run-peru-integrated-local.mjs --records
+      - name: Preserve local test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: peru-integrated-local
+          path: |
+            artifacts/peru-integrated-*/
+            apps/web/test-results/
+          retention-days: 14
+          if-no-files-found: error
+
   dian-official-contract:
     name: DIAN FEV 1.9 official XML contract
     runs-on: ubuntu-latest
@@ -228,7 +274,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -255,7 +301,7 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    needs: [test, database-contracts, dian-official-contract]
+    needs: [test, database-contracts, dian-official-contract, peru-integrated]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -268,7 +314,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -277,6 +323,14 @@ jobs:
 
       - name: Build monorepo
         run: pnpm build
+
+      - name: Build production API image
+        run: docker build -f apps/erp-api/Dockerfile -t erp-peru-api-validation:ci .
+
+      - name: Build and verify production worker image
+        run: |
+          docker build -f apps/worker/Dockerfile -t erp-peru-worker-validation:ci .
+          node scripts/ci/verify-worker-image.mjs erp-peru-worker-validation:ci
 
       - name: Resumen de CI
         run: |
@@ -300,7 +354,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -312,7 +366,7 @@ jobs:
         run: |
           max_attempts=3
           for attempt in $(seq 1 "$max_attempts"); do
-            if output=$(pnpm audit --audit-level=critical 2>&1); then
+            if output=$(pnpm audit --audit-level=high 2>&1); then
               printf '%s\n' "$output"
               exit 0
             else
@@ -334,4 +388,4 @@ jobs:
       - name: Resumen de CI
         run: |
           echo "## CI: Audit ✅" >> $GITHUB_STEP_SUMMARY
-          echo "- pnpm audit --audit-level=critical" >> $GITHUB_STEP_SUMMARY
+          echo "- pnpm audit --audit-level=high" >> $GITHUB_STEP_SUMMARY

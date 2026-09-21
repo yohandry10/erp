@@ -4,6 +4,26 @@ import { contratoVigenteDe, PlanillasService } from './planillas.service';
 // con qué régimen pensionario se le descuenta. Filtrar solo por 'vigente' dejaba fuera
 // del pago a los contratos renovados o en periodo de prueba.
 describe('contratoVigenteDe', () => {
+  it('no usa una renovación futura para liquidar un mes anterior', () => {
+    const anterior = { estado: 'renovado', fecha_inicio: '2026-01-01', fecha_fin: '2026-06-30', sueldo_bruto: 2000 };
+    const futuro = { estado: 'vigente', fecha_inicio: '2026-07-01', sueldo_bruto: 3000 };
+    expect(contratoVigenteDe({ contratos: [futuro, anterior] }, '2026-02')).toBe(anterior);
+  });
+
+  it('excluye contratos terminados antes del mes aunque el estado no se haya actualizado', () => {
+    expect(contratoVigenteDe({ contratos: [
+      { estado: 'vigente', fecha_inicio: '2025-01-01', fecha_fin: '2026-01-31' },
+    ] }, '2026-02')).toBeUndefined();
+  });
+
+  it('incluye los límites del mes y admite contratos sin fecha de fin', () => {
+    const contrato = { estado: 'vigente', fecha_inicio: '2026-02-28' };
+    expect(contratoVigenteDe({ contratos: [contrato] }, '2026-02')).toBe(contrato);
+    expect(contratoVigenteDe({ contratos: [
+      { ...contrato, fecha_inicio: '2025-01-01', fecha_fin: '2026-02-01' },
+    ] }, '2026-02')).toBeDefined();
+  });
+
   it('toma el contrato vigente', () => {
     const empleado = {
       contratos: [{ estado: 'vigente', regimen_pensionario: 'ONP' }],
@@ -113,6 +133,13 @@ const montoDe = (r: any, codigo: string) =>
 // AFP/ONP y del aporte del empleador a ESSALUD. Calcularla solo sobre el sueldo básico
 // sub-declaraba el aporte a ESSALUD y sub-retenía el aporte previsional.
 describe('calcularEmpleado — base asegurable peruana', () => {
+
+  it('aplica la RMV como base mínima EsSalud sin aumentar la retención ONP', () => {
+    const r = calcular({ contratos: [{ estado: 'vigente', regimen_pensionario: 'ONP' }] }, 750);
+    expect(montoDe(r, '201')).toBe(101.7);
+    expect(montoDe(r, '104')).toBe(97.5);
+    expect(r.netoPagar).toBe(652.5);
+  });
 
   it('incluye la asignacion familiar en la base de ONP y ESSALUD', () => {
     const empleado = {
@@ -265,8 +292,33 @@ describe('calcularEmpleado — remuneracion vacacional', () => {
 });
 
 describe('calcularEmpleadoPersonalizado — contrato autoritativo', () => {
+  it('retiene ONP del período y no el AFP de una renovación futura', () => {
+    const resultado = (service as any).calcularEmpleadoPersonalizado({
+      id: 'historico', sueldo_base: 2000, dias_trabajados: 30,
+      contratos: [
+        { estado: 'vigente', fecha_inicio: '2026-07-01', regimen_pensionario: 'AFP' },
+        { estado: 'renovado', fecha_inicio: '2026-01-01', fecha_fin: '2026-06-30', regimen_pensionario: 'ONP' },
+      ],
+    }, conceptos, normativa, '2026-03');
+    expect(montoDe(resultado, '104')).toBe(260);
+    expect(montoDe(resultado, '101')).toBeUndefined();
+    expect(resultado.netoPagar).toBe(1740);
+  });
+
   const calcularPersonalizado = (empleado: any, periodo = '2026-01') =>
     (service as any).calcularEmpleadoPersonalizado(empleado, conceptos, normativa, periodo);
+
+  it.each([
+    { dias: 15, aporte: 101.7, ingresos: 750 },
+    { dias: 30, aporte: 135, ingresos: 1500 },
+    { dias: 0, aporte: 0, ingresos: 0 },
+  ])('EsSalud con $dias días usa la base mínima sólo si hay remuneración', ({ dias, aporte, ingresos }) => {
+    const r = calcularPersonalizado({ id: 'parcial', sueldo_base: 1500, dias_trabajados: dias,
+      contratos: [{ estado: 'vigente', regimen_pensionario: 'ONP' }] });
+    expect(r.totalIngresos).toBe(ingresos);
+    expect(r.totalAportes).toBe(aporte);
+    expect(r.totalDescuentos).toBe(ingresos * 0.13);
+  });
 
   it('respeta cero dias trabajados y no lo convierte en treinta', () => {
     const r = calcularPersonalizado({

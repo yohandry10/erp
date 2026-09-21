@@ -267,14 +267,14 @@ export class AuthService {
   async validateToken(token: string): Promise<any> {
     try {
       const payload = this.jwtService.verify(token);
-      if (!payload?.session_token || !(await this.validateSession(payload.session_token))) {
+      if (!payload?.session_token || !(await this.validateSessionContext(payload))) {
         throw new UnauthorizedException('Sesión expirada o revocada');
       }
       const user = await this.findUserById(payload.sub);
       if (!user || !user.activo) {
         throw new UnauthorizedException('Token inválido');
       }
-      return this.toAuthenticatedUserView(user);
+      return this.toAuthenticatedUserView({ ...user, tenant_id: payload.tenant_id });
     } catch (error) {
       throw new UnauthorizedException('Token inválido');
     }
@@ -440,7 +440,7 @@ export class AuthService {
       throw new UnauthorizedException('Token sin sesión activa');
     }
 
-    const sessionIsActive = await this.validateSession(user.session_token);
+    const sessionIsActive = await this.validateSessionContext(user);
     if (!sessionIsActive) {
       throw new UnauthorizedException('Sesión expirada o revocada');
     }
@@ -450,7 +450,7 @@ export class AuthService {
       throw new UnauthorizedException('Usuario inactivo o inexistente');
     }
 
-    const payload = this.buildJwtPayloadFromUser(freshUser, user.session_token);
+    const payload = this.buildJwtPayloadFromUser({ ...freshUser, tenant_id: user.tenant_id }, user.session_token);
 
     return {
       access_token: this.jwtService.sign(payload)
@@ -651,76 +651,38 @@ export class AuthService {
     }
   }
 
-  // Tenant switching for super-admins
-  async switchTenant(userId: string, targetTenantId: string): Promise<any> {
+  async switchTenant(userId: string, targetTenantId: string, sessionToken?: string): Promise<any> {
+    const user = await this.findUserById(userId);
+    if (!user) throw new UnauthorizedException('Usuario no encontrado');
+    if (!user.is_super_admin) throw new UnauthorizedException('Solo super-admins pueden cambiar de tenant');
+    if (!sessionToken) throw new UnauthorizedException('Token sin sesión activa');
+    const newSessionToken = crypto.randomBytes(32).toString('hex');
+    const { data, error } = await this.supabaseService.getAdminClient().rpc('cambiar_contexto_sesion_auth_tx', {
+      p_usuario_id: userId, p_session_token: sessionToken,
+      p_target_tenant_id: targetTenantId, p_new_session_token: newSessionToken,
+    });
+    if (error) {
+      if (error.code === '42501') throw new UnauthorizedException('Sesión, privilegios o empresa destino no válidos');
+      throw new ServiceUnavailableException('No se pudo cambiar de empresa');
+    }
+    if (!data?.session_id || data.tenant?.id !== targetTenantId) {
+      throw new ServiceUnavailableException('No se pudo confirmar el cambio de empresa');
+    }
+    this.permissionService?.invalidateUserPermissions(userId);
+    const payload = this.buildJwtPayloadFromUser({ ...user, tenant_id: targetTenantId }, newSessionToken);
+    return { access_token: this.jwtService.sign(payload), tenant: data.tenant };
+  }
+
+  async validateSessionContext(payload: { sub?: string; id?: string; session_token?: string; tenant_id?: string; is_super_admin?: boolean }): Promise<boolean> {
+    if (!payload.session_token || !(payload.sub || payload.id) || (!payload.tenant_id && payload.is_super_admin !== true)) return false;
     try {
-      const user = await this.findUserById(userId);
-      if (!user) {
-        throw new UnauthorizedException('Usuario no encontrado');
-      }
-
-      // Validate user is super-admin
-      if (!user.is_super_admin) {
-        throw new UnauthorizedException('Solo super-admins pueden cambiar de tenant');
-      }
-
-      // Validate target tenant exists - usar cliente público para validación
-      const client = this.supabaseService.getAdminClient();
-      const { data: tenant, error } = await client
-        .from('tenants')
-        .select('id, nombre, estado')
-        .eq('id', targetTenantId)
-        .single();
-
-      if (error || !tenant) {
-        throw new UnauthorizedException('Tenant no encontrado');
-      }
-
-      if (tenant.estado !== 'ACTIVO') {
-        throw new UnauthorizedException('Tenant no está activo');
-      }
-
-      // Generate new JWT with target tenant_id
-      const payload: JwtPayload = {
-        sub: user.id,
-        email: user.email,
-        username: user.nombre_usuario || user.nombre,
-        roles: user.roles || [],
-        tenant_id: targetTenantId,
-        is_super_admin: true // Maintain super-admin flag
-      };
-
-      // Log tenant switch action to audit_log
-      await client
-        .from('audit_log')
-        .insert({
-          table_name: 'usuarios_sistema',
-          operation: 'UPDATE',
-          old_values: { tenant_id: user.tenant_id },
-          new_values: { tenant_id: targetTenantId },
-          user_id: user.id,
-          tenant_id: targetTenantId,
-          timestamp: new Date().toISOString()
-        });
-
-      // ✅ B1: Invalidar cache de permisos al cambiar de tenant
-      if (this.permissionService) {
-        this.permissionService.invalidateUserPermissions(userId);
-        this.logger.log(`✅ [B1] Cache de permisos invalidado para usuario ${userId} al cambiar de tenant`);
-      }
-
-      console.log('🔄 [AUTH] Tenant switch - Usuario:', user.email, 'De:', user.tenant_id, 'A:', targetTenantId);
-
-      return {
-        access_token: this.jwtService.sign(payload),
-        tenant: {
-          id: tenant.id,
-          nombre: tenant.nombre
-        }
-      };
-    } catch (error) {
-      console.error('Error switching tenant:', error);
-      throw error;
+      const { data, error } = await this.supabaseService.getAdminClient().rpc('validar_contexto_sesion_auth_tx', {
+        p_session_token: payload.session_token, p_usuario_id: payload.sub || payload.id,
+        p_tenant_id: payload.tenant_id || null, p_super_admin: payload.is_super_admin === true,
+      });
+      return !error && data?.valid === true;
+    } catch {
+      return false;
     }
   }
 

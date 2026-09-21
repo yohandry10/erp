@@ -6,12 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { BarChart3 } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
 import { EstadoPedido } from '@/types/ventas'
-import { useCountryContext } from '@/hooks/use-country-context'
+import { reportMoney, ReportMoneyTotals } from './report-money'
 
 interface PedidoPorEstado {
   estado: EstadoPedido
   cantidad: number
   total: number
+  moneda: string
   porcentaje: number
 }
 
@@ -54,8 +55,6 @@ const ESTADO_LABELS: Record<EstadoPedido, string> = {
 }
 
 export default function PedidosPorEstadoReport({ filters }: Props) {
-  const country = useCountryContext()
-  const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$')
   const { get } = useApi()
   const [data, setData] = useState<PedidoPorEstado[]>([])
   const [loading, setLoading] = useState(true)
@@ -87,7 +86,6 @@ export default function PedidosPorEstadoReport({ filters }: Props) {
   }, [loadData])
 
   const totalPedidos = data.reduce((sum, item) => sum + item.cantidad, 0)
-  const totalMonto = data.reduce((sum, item) => sum + item.total, 0)
   const maxCantidad = Math.max(...data.map(item => item.cantidad), 1)
 
   return (
@@ -122,7 +120,7 @@ export default function PedidosPorEstadoReport({ filters }: Props) {
               </div>
               <div className="rounded-lg border border-border/70 bg-muted/40 p-4">
                 <p className="text-sm text-emerald-400 font-medium">Monto Total</p>
-                <p className="text-2xl font-bold text-emerald-400">{currencySymbol} {totalMonto.toFixed(2)}</p>
+                <ReportMoneyTotals rows={data} amount={row => row.total} className="text-2xl font-bold text-emerald-400" />
               </div>
             </div>
 
@@ -130,10 +128,10 @@ export default function PedidosPorEstadoReport({ filters }: Props) {
             <div className="space-y-4 mb-6">
               <h3 className="text-sm font-medium text-foreground/85">Distribución por Estado</h3>
               {data.map((item) => (
-                <div key={item.estado} className="space-y-2">
+                <div key={`${item.estado}-${item.moneda}`} className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-medium text-foreground/85">
-                      {ESTADO_LABELS[item.estado]}
+                      {ESTADO_LABELS[item.estado]} · {item.moneda || 'Moneda no informada'}
                     </span>
                     <span className="text-foreground/80">
                       {item.cantidad} pedidos ({item.porcentaje.toFixed(1)}%)
@@ -141,7 +139,8 @@ export default function PedidosPorEstadoReport({ filters }: Props) {
                   </div>
                   <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
                     <div
-                      className="h-full rounded-full transition-all duration-500"
+                      className="h-full bg-primary rounded-full transition-all duration-500"
+                      style={{ width: `${(item.cantidad / maxCantidad) * 100}%` }}
                     />
                   </div>
                 </div>
@@ -172,7 +171,7 @@ export default function PedidosPorEstadoReport({ filters }: Props) {
                 </thead>
                 <tbody className="bg-card divide-y divide-border">
                   {data.map((item) => (
-                    <tr key={item.estado} className="hover:bg-muted/30">
+                    <tr key={`${item.estado}-${item.moneda}`} className="hover:bg-muted/30">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <div
@@ -195,12 +194,12 @@ export default function PedidosPorEstadoReport({ filters }: Props) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="text-sm font-medium text-foreground">
-                          {currencySymbol} {item.total.toFixed(2)}
+                          {reportMoney(item.total, item.moneda)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="text-sm text-foreground">
-                          {currencySymbol} {(item.total / item.cantidad).toFixed(2)}
+                          {reportMoney(item.total / item.cantidad, item.moneda)}
                         </div>
                       </td>
                     </tr>

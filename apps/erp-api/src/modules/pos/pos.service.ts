@@ -604,9 +604,17 @@ export class PosService {
   async getEmpresaConfig(user: any) {
     return this.runWithTenantContext(user, async () => {
       try {
+        // Este endpoint pertenece a pos.read: sólo datos para venta y ticket.
+        // La fila completa contiene PFX y credenciales fiscales de la empresa.
+        const fields = [
+          'id', 'tenant_id', 'ruc', 'razon_social', 'nombre_comercial',
+          'direccion_fiscal', 'direccion', 'email', 'telefono', 'logo_url',
+          'pais', 'pais_id', 'moneda_defecto', 'igv_porcentaje',
+          'incluir_igv_en_precio', 'serie_factura', 'serie_boleta', 'is_demo',
+        ];
         const { data, error } = await this.supabase.getClient()
           .from('empresa_config')
-          .select('*')
+          .select(fields.join(','))
           .eq('tenant_id', user.tenant_id)
           .maybeSingle();
 
@@ -614,11 +622,11 @@ export class PosService {
 
         return {
           success: true,
-          data: data ?? null,
+          data: data ? Object.fromEntries(fields.filter(field => field in data).map(field => [field, data[field]])) : null,
         };
       } catch (error) {
         this.logger.error('Error obteniendo configuración de empresa para POS:', error);
-        return { success: true, data: null };
+        throw error;
       }
     });
   }

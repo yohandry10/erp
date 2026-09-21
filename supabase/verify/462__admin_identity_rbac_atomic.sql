@@ -463,7 +463,8 @@ BEGIN
   );
   IF v_first->>'id' IS DISTINCT FROM v_retry->>'id'
      OR COALESCE((v_retry->>'idempotent')::boolean, false) IS NOT TRUE
-     OR NOT (SELECT is_super_admin FROM public.usuarios_sistema WHERE id = (v_first->>'id')::uuid)
+     -- Contrato vigente desde 553: bootstrap local no concede autoridad global.
+     OR (SELECT is_super_admin FROM public.usuarios_sistema WHERE id = (v_first->>'id')::uuid) IS DISTINCT FROM false
      OR (SELECT count(*) FROM public.user_roles WHERE usuario_sistema_id = (v_first->>'id')::uuid) <> 1 THEN
     RAISE EXCEPTION 'VERIFY_462_BOOTSTRAP_NOT_ATOMIC_OR_IDEMPOTENT';
   END IF;

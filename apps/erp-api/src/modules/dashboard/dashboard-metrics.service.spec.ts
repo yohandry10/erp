@@ -63,9 +63,9 @@ describe('DashboardMetricsService', () => {
   const tenantId = 'tenant-dashboard';
   const otherTenantId = 'tenant-other';
 
-  function createService(tables: TableData) {
+  function createService(tables: TableData, cachedStats: any = null) {
     const cache = {
-      get: jest.fn().mockResolvedValue(null),
+      get: jest.fn().mockResolvedValue(cachedStats),
       set: jest.fn().mockResolvedValue(undefined),
       del: jest.fn().mockResolvedValue(undefined),
       delPattern: jest.fn().mockResolvedValue(0),
@@ -90,9 +90,10 @@ describe('DashboardMetricsService', () => {
       ],
       gre_guias: [{ tenant_id: tenantId, created_at: currentMonth }, { tenant_id: otherTenantId, created_at: currentMonth }],
       productos: [
-        { tenant_id: tenantId, precio: 10, precio_venta: 99, stock_actual: 3, stock: 100, stock_minimo: 5 },
-        { tenant_id: tenantId, precio_venta: 20, stock: 4, stock_minimo: 1 },
-        { tenant_id: otherTenantId, precio: 999, stock_actual: 999, stock_minimo: 1 },
+        { tenant_id: tenantId, precio_compra: 10, costo: 99, stock_actual: 3, stock_minimo: 5, activo: true },
+        { tenant_id: tenantId, precio_compra: 0, costo: 20, stock_actual: 4, stock_minimo: 1, activo: true },
+        { tenant_id: tenantId, precio_compra: 999, stock_actual: 999, stock_minimo: 1, activo: false },
+        { tenant_id: otherTenantId, precio_compra: 999, stock_actual: 999, stock_minimo: 1, activo: true },
       ],
       ordenes_compra: [
         { tenant_id: tenantId, total: 200, estado: 'pendiente', created_at: currentMonth },
@@ -121,6 +122,54 @@ describe('DashboardMetricsService', () => {
     expect(stats.totalSire).toBe(1);
     expect(stats.totalUsers).toBe(1);
     expect(stats.tasaConversionCotizaciones).toBe(50);
+  });
+
+  it('superpone el inventario vivo al snapshot cacheado usando la misma valorización a costo', async () => {
+    const cachedStats = {
+      totalInventario: 0,
+      valorInventario: 0,
+      productosConStockBajo: 0,
+      ultimaActualizacion: '2026-08-29T00:00:00.000Z',
+    };
+    const productos = [
+      { tenant_id: tenantId, precio_compra: 18_000, stock_actual: 50, stock_minimo: 5, activo: true },
+      { tenant_id: tenantId, precio_compra: 4_800, stock_actual: 120, stock_minimo: 5, activo: true },
+      { tenant_id: tenantId, precio_compra: 5_500, stock_actual: 80, stock_minimo: 5, activo: true },
+      { tenant_id: tenantId, precio_compra: 60_000, stock_actual: 15, stock_minimo: 5, activo: true },
+      { tenant_id: tenantId, precio_compra: 10_000, stock_actual: 40, stock_minimo: 5, activo: true },
+      { tenant_id: tenantId, precio_compra: 2_200, stock_actual: 200, stock_minimo: 5, activo: true },
+    ];
+    const service = createService({ productos }, cachedStats);
+
+    const stats = await service.getStats(tenantId);
+
+    expect(stats.totalInventario).toBe(6);
+    expect(stats.valorInventario).toBe(3_656_000);
+    expect(stats.productosConStockBajo).toBe(0);
+    expect(stats.ultimaActualizacion).toBe(cachedStats.ultimaActualizacion);
+  });
+
+  it('no convierte un fallo de lectura de inventario en ceros cacheables', async () => {
+    const queryError = { message: 'inventory read failed' };
+    const builder: any = {
+      select: jest.fn(() => builder),
+      eq: jest.fn(() => builder),
+      then: (resolve: (value: any) => void) => resolve({ data: null, error: queryError }),
+    };
+    const cache = {
+      get: jest.fn().mockResolvedValue({ totalInventario: 0, valorInventario: 0 }),
+      set: jest.fn().mockResolvedValue(undefined),
+      del: jest.fn().mockResolvedValue(undefined),
+      delPattern: jest.fn().mockResolvedValue(0),
+      cleanExpired: jest.fn(),
+    };
+    const service = new DashboardMetricsService({
+      getClient: () => ({ from: jest.fn(() => builder) }),
+    } as any, cache as any);
+    service.onModuleDestroy();
+
+    await expect(service.getStats(tenantId)).rejects.toBe(queryError);
+    expect(cache.set).not.toHaveBeenCalled();
   });
 
   it('nombra las actividades CPE según el tipo de documento SUNAT', async () => {

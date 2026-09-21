@@ -8,7 +8,8 @@ import { Download, TrendingUp } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { useCountryContext } from '@/hooks/use-country-context'
+import { reportMoney, ReportMoneyTotals } from './report-money'
+import { downloadCsv } from '@/lib/csv-export'
 
 interface VentaPorCliente {
   cliente_id: string
@@ -35,8 +36,6 @@ interface Props {
 
 export default function VentasPorClienteReport({ filters }: Props) {
   const { get } = useApi()
-  const country = useCountryContext()
-  const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$')
   const [data, setData] = useState<VentaPorCliente[]>([])
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState<'total' | 'cantidad'>('total')
@@ -83,21 +82,7 @@ export default function VentasPorClienteReport({ filters }: Props) {
         row.cantidad_facturas
       ])
 
-      const csv = [
-        headers.join(','),
-        ...csvData.map(row => row.join(','))
-      ].join('\n')
-
-      // Create download link
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-      const link = document.createElement('a')
-      const url = URL.createObjectURL(blob)
-      link.setAttribute('href', url)
-      link.setAttribute('download', `ventas-por-cliente-${format(new Date(), 'yyyy-MM-dd')}.csv`)
-      link.style.visibility = 'hidden'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
+      downloadCsv(`ventas-por-cliente-${format(new Date(), 'yyyy-MM-dd')}.csv`, headers, csvData)
 
       toast({
         title: 'Reporte exportado',
@@ -116,13 +101,13 @@ export default function VentasPorClienteReport({ filters }: Props) {
   const sortedData = [...data].sort((a, b) => {
     const multiplier = sortOrder === 'asc' ? 1 : -1
     if (sortBy === 'total') {
+      if (a.moneda !== b.moneda) return (a.moneda || '').localeCompare(b.moneda || '')
       return (a.total - b.total) * multiplier
     } else {
       return (a.cantidad_pedidos - b.cantidad_pedidos) * multiplier
     }
   })
 
-  const totalGeneral = data.reduce((sum, item) => sum + item.total, 0)
   const totalPedidos = data.reduce((sum, item) => sum + item.cantidad_pedidos, 0)
   const totalFacturas = data.reduce((sum, item) => sum + item.cantidad_facturas, 0)
 
@@ -171,7 +156,7 @@ export default function VentasPorClienteReport({ filters }: Props) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div className="bg-primary/10 rounded-lg p-4">
                 <p className="text-sm text-primary font-medium">Total Ventas</p>
-                <p className="text-2xl font-bold text-primary">{currencySymbol} {totalGeneral.toFixed(2)}</p>
+                <ReportMoneyTotals rows={data} amount={row => row.total} className="text-2xl font-bold text-primary" />
               </div>
               <div className="rounded-lg border border-border/70 bg-muted/40 p-4">
                 <p className="text-sm text-emerald-400 font-medium">Total Pedidos</p>
@@ -250,7 +235,7 @@ export default function VentasPorClienteReport({ filters }: Props) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="text-sm font-medium text-foreground">
-                          {currencySymbol} {row.total.toFixed(2)}
+                          {reportMoney(row.total, row.moneda)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">

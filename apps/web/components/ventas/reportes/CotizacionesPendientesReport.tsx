@@ -8,10 +8,9 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { FileText, Eye, AlertCircle } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
-import { format, differenceInDays } from 'date-fns'
-import { es } from 'date-fns/locale'
+import { formatDate } from '@/lib/format-utils'
 import { EstadoCotizacion } from '@/types/ventas'
-import { useCountryContext } from '@/hooks/use-country-context'
+import { reportMoney, ReportMoneyTotals } from './report-money'
 
 interface CotizacionPendiente {
   id: string
@@ -22,6 +21,7 @@ interface CotizacionPendiente {
   fecha_vencimiento: string | null
   estado: EstadoCotizacion
   total: number
+  moneda: string
   dias_vigencia: number
   probabilidad?: number
 }
@@ -39,8 +39,6 @@ interface Props {
 export default function CotizacionesPendientesReport({ filters }: Props) {
   const router = useRouter()
   const { get } = useApi()
-  const country = useCountryContext()
-  const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$')
   const [data, setData] = useState<CotizacionPendiente[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -111,7 +109,6 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
   }
 
   const totalCotizaciones = data.length
-  const totalMonto = data.reduce((sum, item) => sum + item.total, 0)
   const porVencer = data.filter(c => c.dias_vigencia >= 0 && c.dias_vigencia <= 3).length
   const vencidas = data.filter(c => c.dias_vigencia < 0).length
 
@@ -151,7 +148,7 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
               </div>
               <div className="rounded-lg border border-border/70 bg-muted/40 p-4">
                 <p className="text-sm text-emerald-400 font-medium">Monto Total</p>
-                <p className="text-2xl font-bold text-emerald-400">{currencySymbol} {totalMonto.toFixed(2)}</p>
+                <ReportMoneyTotals rows={data} amount={row => row.total} className="text-2xl font-bold text-emerald-400" />
               </div>
               <div className="rounded-lg border border-border/70 bg-muted/40 p-4">
                 <p className="text-sm text-amber-400 font-medium">Por Vencer</p>
@@ -228,13 +225,13 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-foreground">
-                          {format(new Date(cotizacion.fecha), 'dd/MM/yyyy', { locale: es })}
+                          {formatDate(cotizacion.fecha)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-foreground">
                           {cotizacion.fecha_vencimiento
-                            ? format(new Date(cotizacion.fecha_vencimiento), 'dd/MM/yyyy', { locale: es })
+                            ? formatDate(cotizacion.fecha_vencimiento)
                             : 'Sin fecha'}
                         </div>
                       </td>
@@ -248,7 +245,7 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="text-sm font-medium text-foreground">
-                          {currencySymbol} {cotizacion.total.toFixed(2)}
+                          {reportMoney(cotizacion.total, cotizacion.moneda)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">

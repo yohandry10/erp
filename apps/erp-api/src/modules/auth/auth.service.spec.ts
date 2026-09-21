@@ -327,7 +327,7 @@ describe('AuthService', () => {
             (jwtService.verify as jest.Mock).mockReturnValueOnce({
                 sub: 'user-123', email: 'test@example.com', tenant_id: 'tenant-123', session_token: 'session-123',
             });
-            jest.spyOn(service, 'validateSession').mockResolvedValueOnce(true);
+            jest.spyOn(service, 'validateSessionContext').mockResolvedValueOnce(true);
 
             const result = await service.validateToken('valid-token');
 
@@ -353,7 +353,7 @@ describe('AuthService', () => {
             (jwtService.verify as jest.Mock).mockReturnValueOnce({
                 sub: 'user-123', email: 'test@example.com', tenant_id: 'tenant-123', session_token: 'session-123',
             });
-            jest.spyOn(service, 'validateSession').mockResolvedValueOnce(true);
+            jest.spyOn(service, 'validateSessionContext').mockResolvedValueOnce(true);
 
             await expect(service.validateToken('valid-token'))
                 .rejects.toThrow(UnauthorizedException);
@@ -363,7 +363,7 @@ describe('AuthService', () => {
             (jwtService.verify as jest.Mock).mockReturnValueOnce({
                 sub: 'user-123', email: 'test@example.com', tenant_id: 'tenant-123', session_token: 'revoked-session',
             });
-            jest.spyOn(service, 'validateSession').mockResolvedValueOnce(false);
+            jest.spyOn(service, 'validateSessionContext').mockResolvedValueOnce(false);
 
             await expect(service.validateToken('signed-but-revoked'))
                 .rejects.toThrow(UnauthorizedException);
@@ -624,62 +624,48 @@ describe('AuthService', () => {
 
     // ==================== SWITCH TENANT ====================
     describe('switchTenant', () => {
-        it('should switch tenant for super admin', async () => {
-            const superAdmin = { ...mockUser, is_super_admin: true };
-            const targetTenant = { id: 'new-tenant-123', nombre: 'New Tenant', estado: 'ACTIVO' };
-
-            const mockClient = supabaseService.getPublicClient() as any;
-            mockClient.single
-                .mockResolvedValueOnce({ data: superAdmin, error: null })     // findUserById
-                .mockResolvedValueOnce({ data: targetTenant, error: null });  // getTenant
-
-            const result = await service.switchTenant('user-123', 'new-tenant-123');
-
-            expect(result).toHaveProperty('access_token');
-            expect(result).toHaveProperty('tenant');
-            expect(result.tenant.id).toBe('new-tenant-123');
-            expect(permissionService.invalidateUserPermissions).toHaveBeenCalledWith('user-123');
+        it('crea sesión y auditoría por RPC antes de firmar el token de destino', async () => {
+            const client = supabaseService.getAdminClient() as any;
+            client.single.mockResolvedValueOnce({ data: { ...mockUser, is_super_admin: true }, error: null });
+            client.rpc.mockResolvedValueOnce({ data: { session_id: 'session-new', tenant: { id: 'target', nombre: 'Destino' } }, error: null });
+            const result = await service.switchTenant(mockUser.id, 'target', 'old-session');
+            const args = client.rpc.mock.calls[0][1];
+            expect(args.p_new_session_token).toMatch(/^[0-9a-f]{64}$/);
+            expect(args.p_session_token).toBe('old-session');
+            expect(jwtService.sign).toHaveBeenCalledWith(expect.objectContaining({ tenant_id: 'target', session_token: args.p_new_session_token }));
+            expect(client.insert).not.toHaveBeenCalled();
+            expect(result.tenant.id).toBe('target');
         });
 
-        it('should throw UnauthorizedException for non super admin', async () => {
-            const mockClient = supabaseService.getPublicClient() as any;
-            mockClient.single.mockResolvedValueOnce({ data: mockUser, error: null });
-
-            await expect(service.switchTenant('user-123', 'new-tenant-123'))
-                .rejects.toThrow('Solo super-admins pueden cambiar de tenant');
+        it.each([['42501', UnauthorizedException], ['08006', ServiceUnavailableException]])('no firma token si la transacción falla: %s', async (code, errorClass) => {
+            const client = supabaseService.getAdminClient() as any;
+            client.single.mockResolvedValueOnce({ data: { ...mockUser, is_super_admin: true }, error: null });
+            client.rpc.mockResolvedValueOnce({ error: { code } });
+            await expect(service.switchTenant(mockUser.id, 'target', 'old-session')).rejects.toThrow(errorClass);
+            expect(jwtService.sign).not.toHaveBeenCalled();
         });
 
-        it('should throw UnauthorizedException when user not found', async () => {
-            const mockClient = supabaseService.getPublicClient() as any;
-            mockClient.single.mockResolvedValueOnce({ data: null, error: null });
-
-            await expect(service.switchTenant('user-123', 'new-tenant-123'))
-                .rejects.toThrow('Usuario no encontrado');
+        it('rechaza usuarios ordinarios antes de escribir', async () => {
+            const client = supabaseService.getAdminClient() as any;
+            client.single.mockResolvedValueOnce({ data: mockUser, error: null });
+            await expect(service.switchTenant(mockUser.id, 'target', 'old-session')).rejects.toThrow('Solo super-admins');
+            expect(client.rpc).not.toHaveBeenCalled();
         });
 
-        it('should throw UnauthorizedException when target tenant not found', async () => {
-            const superAdmin = { ...mockUser, is_super_admin: true };
-
-            const mockClient = supabaseService.getPublicClient() as any;
-            mockClient.single
-                .mockResolvedValueOnce({ data: superAdmin, error: null })
-                .mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } });
-
-            await expect(service.switchTenant('user-123', 'non-existent'))
-                .rejects.toThrow('Tenant no encontrado');
+        it('rechaza cambios sin sesión', async () => {
+            const client = supabaseService.getAdminClient() as any;
+            client.single.mockResolvedValueOnce({ data: { ...mockUser, is_super_admin: true }, error: null });
+            await expect(service.switchTenant(mockUser.id, 'target')).rejects.toThrow('Token sin sesión');
+            expect(client.rpc).not.toHaveBeenCalled();
         });
 
-        it('should throw UnauthorizedException when tenant is inactive', async () => {
-            const superAdmin = { ...mockUser, is_super_admin: true };
-            const inactiveTenant = { id: 'inactive-tenant', nombre: 'Inactive', estado: 'INACTIVO' };
-
-            const mockClient = supabaseService.getPublicClient() as any;
-            mockClient.single
-                .mockResolvedValueOnce({ data: superAdmin, error: null })
-                .mockResolvedValueOnce({ data: inactiveTenant, error: null });
-
-            await expect(service.switchTenant('user-123', 'inactive-tenant'))
-                .rejects.toThrow('Tenant no está activo');
+        it('renueva el contexto seleccionado sin regresar a la empresa original', async () => {
+            const client = supabaseService.getAdminClient() as any;
+            client.single.mockResolvedValueOnce({ data: { ...mockUser, is_super_admin: true }, error: null });
+            client.rpc.mockResolvedValueOnce({ data: { valid: true }, error: null });
+            await service.refreshToken({ ...mockUser, is_super_admin: true, tenant_id: 'target', session_token: 'switched-session' });
+            expect(jwtService.sign).toHaveBeenCalledWith(expect.objectContaining({ tenant_id: 'target', session_token: 'switched-session' }));
+            expect(client.rpc).toHaveBeenCalledWith('validar_contexto_sesion_auth_tx', expect.objectContaining({ p_tenant_id: 'target', p_usuario_id: mockUser.id }));
         });
     });
 

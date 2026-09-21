@@ -1,6 +1,19 @@
 import { EventBusService } from './event-bus.service';
 
 describe('EventBusService', () => {
+  it('entrega el evento sin volcar datos personales o remuneraciones en logs', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const service = new EventBusService();
+      const listener = jest.fn();
+      service.on('planilla.calculada', listener);
+      const payload = { empleados: [{ nombre: 'EMPLOYEE_PRIVATE_TEST', neto: 9876.54 }] };
+      await service.emit('planilla.calculada', payload, 'rrhh');
+      expect(listener).toHaveBeenCalledWith(expect.objectContaining({ data: payload }));
+      expect(JSON.stringify(log.mock.calls)).not.toContain('EMPLOYEE_PRIVATE_TEST');
+      expect(JSON.stringify(log.mock.calls)).not.toContain('9876.54');
+    } finally { log.mockRestore(); }
+  });
   it('conserva el eventId fiscal de factura.emitida en el outbox contable', async () => {
     const outboxService = {
       persistEventStandard: jest.fn().mockResolvedValue('evt-cpe-1'),

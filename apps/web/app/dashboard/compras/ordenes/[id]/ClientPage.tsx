@@ -278,7 +278,7 @@ export default function OrdenCompraDetallePage() {
   }
 
   return (
-    <div className={pageClass}>
+    <div data-print-page className={pageClass}>
       <div className="mb-6 rounded-3xl border border-blue-400/20 bg-card/80 p-6 shadow-2xl shadow-blue-950/30">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div>
@@ -310,16 +310,16 @@ export default function OrdenCompraDetallePage() {
                 </button>
               </ProtectedComponent>
             )}
-            <button onClick={() => toast('📥 Funcionalidad de descarga próximamente')} className={secondaryActionClass}>
+            <button onClick={() => window.print()} className={secondaryActionClass}>
               <Download size={16} />
-              Descargar PDF
+              Imprimir / PDF
             </button>
           </div>
         </div>
       </div>
 
       <div className="mb-6 grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
-        <div className="grid gap-6">
+        <div className="grid min-w-0 grid-cols-1 content-start gap-6">
           <div className={panelClass}>
             <div className={panelHeaderClass}>
               <div className={iconBoxClass}><User size={20} /></div>
@@ -340,7 +340,7 @@ export default function OrdenCompraDetallePage() {
               {orden.proveedor?.email && (
                 <div>
                   <label className={labelClass}>Email</label>
-                  <p className="m-0 text-sm text-foreground/90">{orden.proveedor.email}</p>
+                  <p className="m-0 break-all text-sm text-foreground/90">{orden.proveedor.email}</p>
                 </div>
               )}
 
@@ -396,7 +396,7 @@ export default function OrdenCompraDetallePage() {
           </div>
         </div>
 
-        <div className="grid content-start gap-6">
+        <div className="grid min-w-0 content-start gap-6">
           <div className={panelClass}>
             <div className={panelHeaderClass}>
               <div className={iconBoxClass}><DollarSign size={20} /></div>

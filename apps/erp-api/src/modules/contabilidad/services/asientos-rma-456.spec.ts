@@ -37,6 +37,16 @@ describe('AsientosGeneratorService - RMA 456', () => {
     ]));
   });
 
+  it('no exige cuentas de saldo a favor ni inventario si la nota sólo reduce una CxC', async () => {
+    plan.obtenerCuentasPorCodigos.mockImplementationOnce(async (_tenant, codigos) => {
+      if (codigos.some(codigo => ['122', '69', '20'].includes(codigo))) throw new Error('Cuenta no utilizada');
+      return new Map(codigos.map(codigo => [codigo, cuenta(codigo)]));
+    });
+    await service.generarAsientoNotaCredito({ tenant_id: 'tenant-1', fecha: '2026-09-12',
+      base_imponible: 100, igv: 18, total: 118, monto_pendiente: 118, customerCreditBalance: 0 });
+    expect(detalles()).toEqual(expect.arrayContaining([expect.objectContaining({ cuenta_id: 'cuenta-12', haber: 118 })]));
+  });
+
   it('falla cerrado si Cr 12 + Cr 122 no suma la reversión financiera', async () => {
     await expect(service.generarAsientoNotaCredito({
       tenant_id: 'tenant-1', fecha: '2026-08-09', base_imponible: 100,

@@ -63,7 +63,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         throw new UnauthorizedException('Token inválido: falta sesión');
       }
 
-      const sessionIsActive = await this.authService.validateSession(payload.session_token);
+      const sessionIsActive = await this.authService.validateSessionContext(payload);
       if (!sessionIsActive) {
         throw new UnauthorizedException('Sesión expirada o revocada');
       }

@@ -30,7 +30,7 @@ describe('CxcService - FacturaEmitidaEvent', () => {
   beforeEach(async () => {
     const defaultQuery = createDefaultQuery();
 
-    mockSupabaseClient = { from: jest.fn(() => defaultQuery) };
+    mockSupabaseClient = { from: jest.fn(() => defaultQuery), rpc: jest.fn(async (_name, args) => ({ data: { id: args.p_event_id, idempotent: false }, error: null })) };
     auditMock = { registrarCambio: jest.fn(), logIntegration: jest.fn() };
     retencionesMock = {
       validarCalculoAjustes: jest.fn().mockResolvedValue({ valido: true, errores: [] }),
@@ -178,10 +178,13 @@ describe('CxcService - FacturaEmitidaEvent', () => {
       idempotencyKey: facturaEvent.idempotencyKey,
     }));
 
-    expect(integrationLogQuery.insert).toHaveBeenCalledWith(expect.objectContaining({
-      tenant_id: tenantId,
+    expect(integrationLogQuery.insert).not.toHaveBeenCalled();
+    expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('registrar_auditoria_backend_tx', expect.objectContaining({
+      p_tenant_id: tenantId,
+      p_event: expect.objectContaining({
       operacion: 'cxc.crear_desde_factura',
       status: 'SUCCESS',
+      }),
     }));
   });
 
@@ -235,10 +238,13 @@ describe('CxcService - FacturaEmitidaEvent', () => {
     await service.crearCuentaPorCobrarDesdeFactura(facturaEvent);
 
     expect(eventBusService.emitCuentaPorCobrarCreadaEvent).not.toHaveBeenCalled();
-    expect(integrationLogQuery.insert).toHaveBeenCalledWith(expect.objectContaining({
-      tenant_id: tenantId,
+    expect(integrationLogQuery.insert).not.toHaveBeenCalled();
+    expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('registrar_auditoria_backend_tx', expect.objectContaining({
+      p_tenant_id: tenantId,
+      p_event: expect.objectContaining({
       status: 'SUCCESS',
       response_summary: expect.objectContaining({ skipped: true }),
+      }),
     }));
   });
 

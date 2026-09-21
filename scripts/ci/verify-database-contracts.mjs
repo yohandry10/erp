@@ -306,12 +306,19 @@ runPsql([], "bootstrap efímero del catálogo Supabase Storage", {
   input: readSqlForPsql(storageBootstrapFile),
 });
 
+const { readMigrationVersions, preservedPrivilegesSql, assertReadPrivilegesPreserved } = await import('./read-migration-privileges.mjs');
 for (const migration of migrations) {
+  const privilegesBefore = readMigrationVersions.has(migration.version)
+    ? runPsql(['-At'], 'ACL anteriores a migración de lectura', { capture: true, input: preservedPrivilegesSql }) : null;
   process.stdout.write(`[database-contracts] apply ${migration.name}\n`);
   runPsql([], `migración ${migration.name}`, {
     capture: true,
     input: readSqlForPsql(migration.file),
   });
+  if (privilegesBefore !== null) {
+    const privilegesAfter = runPsql(['-At'], 'ACL posteriores a migración de lectura', { capture: true, input: preservedPrivilegesSql });
+    assertReadPrivilegesPreserved(privilegesBefore, privilegesAfter, migration.version);
+  }
 }
 
 // El `name` se sella con la misma convención que producción y el CLI de Supabase:

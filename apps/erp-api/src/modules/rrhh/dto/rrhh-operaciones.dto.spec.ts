@@ -11,7 +11,7 @@ import {
  * descartaba en silencio, y que sin declarar habrían pasado a devolver 400:
  *
  * - `experiencia_años` con eñe, cuando la columna es `experiencia_anos`.
- * - `estado_civil`, que no es columna de candidatos.
+ * - `estado_civil`, persistido desde la migración 543.
  * - Cuatro campos que viajan como arreglos porque en la base son `jsonb`.
  *
  * Estas pruebas fijan ese comportamiento para que un futuro "limpiemos el DTO"

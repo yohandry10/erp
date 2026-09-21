@@ -1,6 +1,76 @@
 # Estado actual del ERP
 
-Actualizado: 2026-09-04.
+Actualizado: 2026-09-21.
+
+La preparación Perú se integra sobre `main` `679e05bf`, en la rama
+`codex/peru-production-20260912`. La lectura autorizada del 21 de septiembre
+confirma ese mismo SHA en Render, DB/Redis disponibles y esquema requerido y
+aplicado 536. Las tres configuraciones PE no demo siguen fuera de SUNAT
+producción; no se han emitido documentos ni modificado datos remotos.
+El alcance aclarado por el usuario es preparar el producto para el primer
+cliente: todavía no existe una empresa que activar. La aceptación exige que
+ese cliente pueda registrar su identidad, cargar su PFX y credenciales y
+operar sin cambios de código; no exige emitir ahora con los registros QA.
+
+Las migraciones locales de Perú se renumeran de 533..548 a 537..552 para
+preservar las 533..536 ya publicadas de Colombia/Argentina. El mapa exacto está
+en `artifacts/peru-migration-renumber-2026-09-12.json`. API, worker y CI exigen
+553. La migración 553 corrige el alta del primer administrador: recibe RBAC
+del tenant sin privilegios globales. El nuevo rango de promoción es 537..553
+y debe repetir restauración y CI antes de aplicarse. La integración pasó 299 suites/2876 pruebas API, los cinco builds (132
+páginas), type-check, lint, 23 pruebas worker, 84 contratos HTTP y siete flujos
+Chromium, además de 22 pantallas con registros. El 13 de septiembre pasaron
+también 104 contratos de navegador y el login móvil, los builds API/web finales,
+la imagen API y su rechazo de configuración antes de conexiones. El cron SIRE
+retirado pasa su prueba específica; la cadena SQL y los 84 contratos HTTP
+volvieron a pasar con el comparador de ACL. El recorrido conjunto de módulos y
+detalle presupuestal pasó 100 páginas sin errores HTTP/JS. La repetición de los
+siete flujos y 22 detalles también pasó. CI confirmó 299 suites/2877 pruebas
+API, pero detectó la superposición de los límites global y de autenticación:
+la corrección conserva los límites por cuenta/oficina y pasa cuatro pruebas
+con ambos guards. Ese recorrido integrado pasó; la revisión posterior de
+reportes alcanzó 86 contratos HTTP y ocho flujos de navegador. El corte del 21
+de septiembre corrige además agrupaciones/totales por moneda, paginación completa,
+pedidos únicos y precio medio ponderado. La prueba visual de cinco reportes con
+PEN/USD y 18 pruebas de reportes/fechas/relaciones pasan. CI confirmó 299 suites
+y 2886 pruebas API en `698aa981`; el ensayo local renovado pasa 86 escenarios
+HTTP, ocho recorridos de usuario y 22 pantallas con registros. La inspección
+visual detectó fechas civiles desplazadas un día en cotizaciones: se usa el
+formateador canónico y la prueba verifica emisión/vencimiento en America/Lima.
+El build remoto y los checks del commit final siguen pendientes.
+El corte posterior pasó 299 suites/2888 pruebas API y los 105 contratos de
+navegador más login móvil. La auditoría final detectó GHSA-7q85-xj36-vmfc en
+`adm-zip 0.6.0`; se actualiza a 0.6.1 y la auditoría local queda sin
+vulnerabilidades. La promoción exige repetir los checks del lockfile corregido.
+
+El respaldo productivo del 12 de septiembre se restauró en PostgreSQL 17 sin
+red: las 537..552 y sus 16 verificadores pasaron, con 289 tablas y 206073 filas
+previas y 5451 columnas conservadas. Sólo se añadieron 171 cuentas, 240 conceptos de planilla
+y 16 entradas de historia. RLS permanece intacto y readiness local exige y
+encuentra 552. Evidencia: `artifacts/erp-peru-prod-rehearsal-20260913071340257-8992.json`.
+El respaldo no incluye archivos externos de Storage ni roles globales.
+El respaldo renovado del 13 de septiembre también se restauró y pasó las 16
+migraciones, verificadores y reversión atómica deliberada sin cambios remotos:
+`artifacts/erp-peru-prod-rehearsal-20260913074523417-18040.json`.
+El respaldo fresco del 21 de septiembre también pasó restauración, las 16
+migraciones, verificadores y reversión atómica: conserva 293 tablas, 206078
+filas y 5482 columnas previas, con los mismos tres backfills previstos.
+Evidencia: `artifacts/erp-peru-prod-rehearsal-20260921093330513-19808.json`.
+
+PROD conserva ACL heredadas distintas de la cadena limpia: 181 tablas tenían
+DML para service_role. Las migraciones conservan esas ACL, excepto la retirada
+explícita de escritura de auditoría en 542. Los runners comparan permisos antes
+y después y detectan una ampliación deliberada. Este ensayo no certifica
+privilegio mínimo de todos los escritores históricos.
+
+El ensayo ampliado a 553 también pasa las 17 migraciones, conserva los datos
+y prueba que el administrador nuevo no puede administrar otro tenant. La lectura
+del progreso del asistente queda concedida al backend, sin DML directo:
+`artifacts/erp-peru-prod-rehearsal-20260921104704655-12116.json`.
+
+Siguen pendientes el cierre de las pruebas finales, CI del commit, promoción
+DB-first y la comprobación del alta del primer cliente. No se ha hecho
+despliegue ni emisión fiscal. Los resultados locales no acreditan aceptación SUNAT.
 
 Este archivo contiene únicamente el estado vigente. El historial de auditorías y
 decisiones anteriores se consulta en Git. Si este resumen contradice código o
@@ -85,9 +155,9 @@ migraciones verificados, prevalece la implementación actual.
   A4 físico, QR SUNAT Q en la parte inferior, logo, unidades, bases y leyenda.
   A4 es una elección de salida del ERP, no un tamaño obligatorio impuesto por
   SUNAT. La 524 añade la condición IVA del receptor y evidencia terminal CAE
-  para el flujo argentino, sin fingir un CDR de SUNAT. La promoción 529-532 exige
+  para el flujo argentino, sin fingir un CDR de SUNAT. La promoción 529-544 exige
   PostgreSQL 16 desde cero, verificadores vigentes, CI/PR, DB-first, gate efectivo
-  532 y revalidación visual en PROD. La 525 conserva por CPE la procedencia y el
+  544 y revalidación visual en PROD. La 525 conserva por CPE la procedencia y el
   emisor, trata el legado como simulado y separa CUFE/CUDE del hash XML; la 526
   congela el perfil tributario DIAN del receptor. La 527 importa y ancla la FEV
   recibida, separa RBAC de lectura/gestión/034 y reserva, sella, finaliza y

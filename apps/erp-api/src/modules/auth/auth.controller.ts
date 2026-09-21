@@ -1,5 +1,6 @@
 import {
   Controller,
+  ParseUUIDPipe,
   Post,
   Body,
   UseGuards,
@@ -245,9 +246,9 @@ export class AuthController {
   async switchTenant(
     @Request() req,
     @NestResponse({ passthrough: true }) response: ExpressResponse,
-    @Body('targetTenantId') targetTenantId: string
+    @Body('targetTenantId', new ParseUUIDPipe()) targetTenantId: string
   ) {
-    const result = await this.authService.switchTenant(req.user.id, targetTenantId);
+    const result = await this.authService.switchTenant(req.user.id, targetTenantId, req.user.session_token);
     if (result?.access_token) {
       this.setAuthCookie(response, result.access_token);
     }
