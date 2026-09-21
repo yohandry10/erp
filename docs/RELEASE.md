@@ -25,24 +25,24 @@ Debe cumplirse:
 
 Estado actual y pendientes: `docs/CURRENT_STATE.md`.
 
-La candidata Perú del 2026-09-12 se prepara sobre `main` `679e05bf`. La lectura
-actual de PROD confirma esquema 536 y ese SHA; las migraciones Perú pendientes
-ocupan 537..552, conservando las 533..536 publicadas. Los resultados anteriores
-a esta integración no certifican la nueva candidata. Antes de promover se
-exigen reconstrucción y ensayo del rango contra un respaldo restaurado, checks
-del commit final en CI y respaldo productivo verificable. API/worker exigen
-552; no se despliegan antes de la base compatible. La configuración local o
-un readiness técnico no acreditan habilitación ni aceptación SUNAT real.
+El release Perú del 21 de septiembre está integrado por el PR
+[#109](https://github.com/yohandry10/erp/pull/109), merge `841ab738`.
+Los checks de `b6fc060e` pasaron antes de promover 537..553; el script canónico
+contrastó respaldo, restauración, hashes, historia inicial y proyecto autorizado.
+La transacción confirmó a las 11:02 UTC; el control posterior exige y encuentra
+553. Render y Vercel sirven el merge y la API confirma DB/Redis listos. Evidencia:
+`artifacts/peru-prod-promotion-20260921110212186.json` y
+`artifacts/peru-first-client-release-20260921.json`.
 
-El ensayo del 13 de septiembre sobre el respaldo productivo
-`prod-pre-peru-552-20260912233613724.dump` pasó las 16 migraciones/verificadores:
-289 tablas y 206073 filas existentes conservadas, RLS sin cambios y readiness
-local 552. SHA-256 del respaldo: `1a68fdd65107f4c023233411a12b19cd90e586d631fd699a057f95d78ae5bdfe`.
-El resultado se registra en
-`artifacts/erp-peru-prod-rehearsal-20260913071340257-8992.json` y no acredita
-objetos externos de Storage, roles globales, RTO del proveedor ni aceptación
-fiscal. Las ACL heredadas se contrastan antes/después, sin presumir que son las
-de una reconstrucción limpia. La promoción y los checks del commit siguen pendientes.
+El ensayo `erp-peru-prod-rehearsal-20260921104704655-12116.json` restaura el
+respaldo del mismo día sin red: las 17 migraciones/verificadores y la reversión
+atómica pasan, conservando 293 tablas, 206078 filas previas y 5482 columnas.
+No incluye objetos externos de Storage ni roles globales ni certifica RTO.
+La preparación para el primer cliente incluye alta, permisos del administrador,
+RUC, validación y almacenamiento cifrado del PFX y credenciales, y recuperación
+del asistente. La activación fiscal de cada contribuyente requiere sus datos y
+habilitación; no se ha emitido en SUNAT con datos QA ni se exige hacerlo para
+cerrar la preparación técnica del producto.
 
 ## Promoción de migraciones
 
@@ -320,20 +320,22 @@ Preparar antes del despliegue:
 Si una migración no es reversible, el rollback debe ser roll-forward con script
 correctivo probado. Nunca improvisarlo sobre PROD.
 
-Para 537..552 existe un lote transaccional generado desde los SQL canónicos.
-El ensayo `erp-peru-prod-rehearsal-20260913072919654-20908.json` inyecta una
-división por cero después de aplicar las 16 migraciones y comprobar readiness,
+Para 537..553 existe un lote transaccional generado desde los SQL canónicos.
+El ensayo `erp-peru-prod-rehearsal-20260921104704655-12116.json` inyecta una
+división por cero después de aplicar las 17 migraciones y comprobar readiness,
 pero antes de confirmar. PostgreSQL revierte todo el lote; se contrastan filas,
 columnas, políticas RLS, ACL e inexistencia de la RPC nueva de logística. La
-aplicación posterior por migraciones y los 16 verificadores también pasan.
+aplicación posterior por migraciones y los 17 verificadores también pasan.
 Si falla antes del commit, se conserva 536. Después de confirmar, no se borran
 cuentas, conceptos ni evidencia: se detiene la promoción de aplicaciones y se
 prepara una corrección hacia delante revisada. Un restore destructivo de PROD
 mantiene su requisito de autorización explícita y evaluación de datos posteriores.
 
-## Bloqueantes actuales
+## Activación de clientes y verificaciones externas
 
-- Certificado productivo compatible con el RUC.
+- Cada cliente Perú debe aportar certificado productivo compatible con su RUC y
+  habilitación SUNAT. No hay todavía un cliente real que activar; su ausencia no
+  es un defecto pendiente del producto.
 - Interno Colombia: código, PR/CI, respaldo, promoción DB-first 533-534,
   Render/Vercel y retest visible de la muestra CPE están cerrados en
   `dd813ab`/534. El circuito comercial completo y RMA→NC 91 real siguen sin
