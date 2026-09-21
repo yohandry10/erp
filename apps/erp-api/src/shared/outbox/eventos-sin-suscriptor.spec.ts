@@ -11,9 +11,10 @@ import { EVENTOS_SIN_SUSCRIPTOR, esEventoSinSuscriptor } from './eventos-sin-sus
  *   propiedad que impide que una integración se caiga en silencio.
  */
 describe('eventos de outbox sin suscriptor', () => {
-  it('declara los dos hitos de la migración 464', () => {
+  it('declara los hitos ya completados en la transacción de configuración 464', () => {
     expect(esEventoSinSuscriptor('demo.lista')).toBe(true);
     expect(esEventoSinSuscriptor('configuracion.wizard.completado')).toBe(true);
+    expect(esEventoSinSuscriptor('configuracion.empresa.actualizada')).toBe(true);
   });
 
   it('no exime a ningún evento de negocio', () => {

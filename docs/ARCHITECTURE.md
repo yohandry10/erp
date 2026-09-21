@@ -157,6 +157,11 @@ orquestan; servicios y generadores contienen reglas. Todo asiento debe:
 
 ## Integraciones y observabilidad
 
+`configuracion.empresa.actualizada` es una constancia sin suscriptor: el RPC
+464 ya confirma empresa, tenant y auditoría en una transacción. El worker
+cierra su claim sin repetir escrituras; las integraciones desconocidas
+conservan el fallo cerrado por falta de handler.
+
 - Redis/BullMQ coordina jobs, locks y reintentos.
 - Logs estructurados incluyen correlación y tenant sin exponer secretos.
 - Health checks distinguen proceso vivo, disponibilidad y dependencias.
