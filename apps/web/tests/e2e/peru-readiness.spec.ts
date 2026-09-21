@@ -9,11 +9,11 @@ const user = {
   roles: ['ADMIN'], is_super_admin: true,
 }
 
-async function installSession(context: BrowserContext, page: Page) {
+async function installSession(context: BrowserContext, page: Page, sessionUser = user) {
     const secret = process.env.JWT_SECRET
     if (!secret) throw new Error('El navegador aislado necesita JWT_SECRET local inyectado')
-    const token = await new SignJWT({ tenant_id: user.tenant_id, roles: user.roles, email: user.email })
-      .setProtectedHeader({ alg: 'HS256' }).setSubject(user.id).setIssuedAt().setExpirationTime('10m')
+    const token = await new SignJWT({ tenant_id: sessionUser.tenant_id, roles: sessionUser.roles, email: sessionUser.email })
+      .setProtectedHeader({ alg: 'HS256' }).setSubject(sessionUser.id).setIssuedAt().setExpirationTime('10m')
       .sign(new TextEncoder().encode(secret))
     await context.addCookies([{ name: 'access_token', value: token, httpOnly: true,
       sameSite: 'Lax', url: process.env.BASE_URL || 'http://localhost:3001' }])
@@ -23,7 +23,7 @@ async function installSession(context: BrowserContext, page: Page) {
       sessionStorage.setItem('erp.auth.session.snapshot', snapshot)
       localStorage.setItem('erp_onboarding_completed', JSON.stringify(['admin', 'superadmin']))
       localStorage.setItem('selectedCountry', '1')
-    }, user)
+    }, sessionUser)
 }
 
 test('Reportes Perú mantienen separados los totales PEN y USD', async ({ context, page }, testInfo) => {
@@ -71,6 +71,65 @@ test('Reportes Perú mantienen separados los totales PEN y USD', async ({ contex
   await expect(quote).toContainText('Borrador')
   await page.screenshot({ path: testInfo.outputPath('report-currencies.png'), fullPage: true })
 })
+
+for (const resumeStep of [4, 6]) {
+  test(`Alta Perú: certificado propio y recuperación del paso ${resumeStep}`, async ({ context, page }) => {
+    const clientUser = { ...user, is_super_admin: false }
+    await installSession(context, page, clientUser)
+    const draft = { pais: 'PE', pais_id: 1, ruc: '20100047218', razonSocial: 'Primer cliente local',
+      direccion: 'Av. Local 123', ubigeo: '150101', tipo_empresa: 'COMERCIAL',
+      regimen_tributario: 'GENERAL', serie_factura: 'F001', serie_boleta: 'B001', serie_guia_remision: 'T001' }
+    let validation: Record<string, unknown> | undefined
+    let completed: Record<string, unknown> | undefined
+    await page.route('**/*', async route => {
+      const url = new URL(route.request().url())
+      if (!['localhost', '127.0.0.1', '::1'].includes(url.hostname)) return route.abort()
+      if (!url.pathname.includes('/api/')) return route.continue()
+      const endpoint = url.pathname.replace(/^.*\/api\//, '/').replace(/\/$/, '')
+      let data: unknown
+      if (endpoint === '/configuration/wizard/validate-certificate') {
+        validation = route.request().postDataJSON()
+        data = { rucEmisor: draft.ruc, perteneceAlEmisor: true, daysUntilExpiration: 365,
+          validFrom: '2026-01-01T00:00:00Z', validTo: '2027-12-31T00:00:00Z' }
+      } else if (endpoint === '/configuration/complete') {
+        completed = route.request().postDataJSON().configuration
+        data = { completed: true }
+      }
+      const payloads: Record<string, unknown> = {
+        '/auth/profile': clientUser,
+        '/tenants/me': { data: { id: user.tenant_id, nombre: draft.razonSocial, pais: 'PE', moneda: 'PEN', estado: 'ACTIVO' } },
+        '/demo/status': { is_demo: false, is_expired: false },
+        '/notifications/unread': { data: [], count: 0 },
+        '/usuarios-sistema/me/permissions': { data: ['configuracion.read', 'configuracion.write'] },
+        '/configuration/context/country': { data: { pais_id: 1, paisCodigo: 'PE', moneda: 'PEN', monedaDefecto: 'PEN', locale: 'es-PE', timezone: 'America/Lima' } },
+        '/configuration/empresa': { success: true, data: { ...draft, ruc: completed ? draft.ruc : '20123456786', monedaDefecto: 'PEN' } },
+        '/configuration/status': { success: true, data: { isComplete: Boolean(completed), isDemo: false, ruc: { isConfigured: Boolean(completed) } } },
+        '/configuration/wizard/progress': { success: true, data: { pasoActual: resumeStep, pasosCompletados: Array.from({ length: resumeStep }, (_, i) => i + 1),
+          configuracionTemporal: draft, completado: false } },
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(
+        data ? { success: true, data } : payloads[endpoint] || { success: true, data: {} },
+      ) })
+    })
+    await page.goto('/dashboard/wizard/')
+    if (resumeStep === 6) {
+      await expect(page.getByRole('heading', { name: 'Autoridad fiscal', exact: true })).toBeVisible()
+      expect(completed).toBeUndefined()
+      await page.getByRole('button', { name: 'Anterior', exact: true }).click()
+      await page.getByRole('button', { name: 'Anterior', exact: true }).click()
+    }
+    await expect(page.getByRole('heading', { name: 'Certificado Digital', exact: true })).toBeVisible()
+    await page.locator('input[type="file"]').setInputFiles({ name: 'cliente.pfx', mimeType: 'application/x-pkcs12', buffer: Buffer.from('fixture-pfx-browser') })
+    await page.getByLabel(/Contraseña del Certificado/).fill('clave-solo-memoria')
+    for (let step = 0; step < 3; step++) await page.getByRole('button', { name: 'Siguiente', exact: true }).click()
+    await expect.poll(() => validation?.ruc).toBe(draft.ruc)
+    await expect.poll(() => completed?.ruc).toBe(draft.ruc)
+    expect(completed?.certificatePassword).toBe('clave-solo-memoria')
+    const storage = await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }))
+    expect(storage).not.toContain('clave-solo-memoria')
+    expect(storage).not.toContain(Buffer.from('fixture-pfx-browser').toString('base64'))
+  })
+}
 
 for (const laborReady of [false, true]) {
   test(`Configuración Perú muestra normativa ${laborReady ? 'vigente' : 'pendiente'} y SUNAT bloqueado con certificado inválido`, async ({ context, page }, testInfo) => {

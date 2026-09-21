@@ -231,7 +231,9 @@ export class ConfigurationController {
         );
       }
 
-      const result = await this.configurationService.validateCertificatePayload(tenantId, payload);
+      const result = await this.configurationService.validateCertificatePayload(
+        tenantId, payload, payload.ruc ? { taxId: payload.ruc } : undefined,
+      );
 
       return {
         success: true,
