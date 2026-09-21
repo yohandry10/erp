@@ -618,6 +618,8 @@ Código principal: `apps/erp-api/src/modules/finanzas`,
 - Presupuestos conserva los importes al editar y recargar. Si falla alguno de
   los tres catálogos del formulario, informa el error, bloquea el guardado y
   ofrece reintentar la carga completa para evitar selecciones incompletas.
+  Las respuestas de cargas reemplazadas se descartan: un error anterior no
+  vuelve a bloquear el formulario después de recuperar los catálogos.
   El detalle del centro muestra código y nombre de la cuenta desde la relación
   `plan_cuentas` devuelta por la API, junto a los importes presupuestados.
 - Asientos se originan en eventos de ventas, compras, POS, caja, RRHH y activos.
