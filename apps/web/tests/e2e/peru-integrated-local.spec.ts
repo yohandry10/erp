@@ -72,8 +72,10 @@ test('Perú: crea centro de costo y conserva un presupuesto al editar y recargar
   await submitLocalLogin(page)
   await page.waitForURL('**/dashboard/**')
   await page.goto('/dashboard/contabilidad/centros-costo/nuevo/')
-  await page.locator('#nuevo-codigo').fill('LOCAL-COSTO-544')
-  await page.locator('#nuevo-nombre').fill('Centro local de presupuesto')
+  const centerCode = `LOCAL-${Date.now()}-${test.info().retry}`
+  const centerName = `Centro presupuesto ${centerCode}`
+  await page.locator('#nuevo-codigo').fill(centerCode)
+  await page.locator('#nuevo-nombre').fill(centerName)
   const [createdCenter] = await Promise.all([
     page.waitForResponse(r => /\/contabilidad\/centros-costo\/?$/.test(new URL(r.url()).pathname) && r.request().method() === 'POST'),
     page.getByRole('button', { name: 'Crear Centro de Costo', exact: true }).click(),
@@ -81,7 +83,7 @@ test('Perú: crea centro de costo y conserva un presupuesto al editar y recargar
   expect(createdCenter.ok(), await createdCenter.text()).toBeTruthy()
   const center = (await createdCenter.json()).data
   await page.waitForURL('**/contabilidad/centros-costo/')
-  await expect(page.getByText('Centro local de presupuesto', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText(centerName, { exact: true }).first()).toBeVisible()
   await page.goto('/dashboard/contabilidad/presupuestos/nuevo/')
   await page.locator('#presupuesto-form-centro-costo-id').selectOption(center.id)
   for (const selector of ['#presupuesto-form-cuenta-id', '#presupuesto-form-periodo-contable-id']) {
@@ -99,7 +101,7 @@ test('Perú: crea centro de costo y conserva un presupuesto al editar y recargar
   const budget = (await createdBudget.json()).data
   expect(Number(budget.monto_presupuestado)).toBe(1250.5)
   await page.waitForURL('**/presupuestos/lista/')
-  const row = page.getByRole('row').filter({ hasText: 'Centro local de presupuesto' })
+  const row = page.getByRole('row').filter({ hasText: centerName })
   await expect(row).toBeVisible()
   await row.getByTitle('Editar', { exact: true }).click()
   await expect(page.locator('#presupuesto-form-monto-presupuestado')).toHaveValue('1250.5')
@@ -130,8 +132,13 @@ test('Perú: crea centro de costo y conserva un presupuesto al editar y recargar
   await expect(page.getByRole('alert').filter({ hasText: 'catálogos del presupuesto' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Actualizar Presupuesto', exact: true })).toBeDisabled()
   await context.unroute(accountsUrl)
-  await page.getByRole('button', { name: 'Reintentar catálogos', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Actualizar Presupuesto', exact: true })).toBeEnabled()
+  const [recoveredAccounts] = await Promise.all([
+    page.waitForResponse(r => accountsUrl.test(r.url()) && r.request().method() === 'GET' && r.status() === 200),
+    page.getByRole('button', { name: 'Reintentar catálogos', exact: true }).click(),
+  ])
+  expect((await recoveredAccounts.json()).success).toBe(true)
+  await expect(page.getByRole('alert').filter({ hasText: 'catálogos del presupuesto' })).toBeHidden({ timeout: 20000 })
+  await expect(page.getByRole('button', { name: 'Actualizar Presupuesto', exact: true })).toBeEnabled({ timeout: 20000 })
   await expect(page.locator('#presupuesto-form-monto-presupuestado')).toHaveValue('1500.75')
   expect(failures).toEqual([])
 })

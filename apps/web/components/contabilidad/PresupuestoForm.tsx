@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { DollarSign, Save, X, AlertCircle } from 'lucide-react'
@@ -59,6 +59,7 @@ export default function PresupuestoForm({
   const [loadingData, setLoadingData] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [catalogError, setCatalogError] = useState(false)
+  const catalogRequest = useRef(0)
 
   // Form data
   const [formData, setFormData] = useState<PresupuestoFormData>({
@@ -90,6 +91,7 @@ export default function PresupuestoForm({
   }, [initialData])
 
   const loadCatalogData = useCallback(async () => {
+    const requestId = ++catalogRequest.current
     try {
       setLoadingData(true)
       setError(null)
@@ -100,6 +102,7 @@ export default function PresupuestoForm({
         get('/api/contabilidad/plan-cuentas'),
         get('/api/contabilidad/periodos')
       ])
+      if (requestId !== catalogRequest.current) return
       if ([centrosRes, cuentasRes, periodosRes].some(response => !response?.success || !Array.isArray(response.data))) {
         throw new Error('Catálogos incompletos')
       }
@@ -124,17 +127,19 @@ export default function PresupuestoForm({
         setPeriodos(periodosAbiertos)
       }
     } catch (err: any) {
+      if (requestId !== catalogRequest.current) return
       console.error('Error loading catalog data:', err)
       setCatalogError(true)
       setError('No se pudieron cargar todos los catálogos del presupuesto')
     } finally {
-      setLoadingData(false)
+      if (requestId === catalogRequest.current) setLoadingData(false)
     }
   }, [get])
 
   // Load catalog data
   useEffect(() => {
     loadCatalogData()
+    return () => { catalogRequest.current++ }
   }, [loadCatalogData])
 
   const handleSubmit = async (e: React.FormEvent) => {
