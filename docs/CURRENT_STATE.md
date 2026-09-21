@@ -32,6 +32,10 @@ HTTP, ocho recorridos de usuario y 22 pantallas con registros. La inspección
 visual detectó fechas civiles desplazadas un día en cotizaciones: se usa el
 formateador canónico y la prueba verifica emisión/vencimiento en America/Lima.
 El build remoto y los checks del commit final siguen pendientes.
+El corte posterior pasó 299 suites/2888 pruebas API y los 105 contratos de
+navegador más login móvil. La auditoría final detectó GHSA-7q85-xj36-vmfc en
+`adm-zip 0.6.0`; se actualiza a 0.6.1 y la auditoría local queda sin
+vulnerabilidades. La promoción exige repetir los checks del lockfile corregido.
 
 El respaldo productivo del 12 de septiembre se restauró en PostgreSQL 17 sin
 red: las 537..552 y sus 16 verificadores pasaron, con 289 tablas y 206073 filas
