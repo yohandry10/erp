@@ -135,4 +135,7 @@ BEGIN
 END;
 $function$;
 
+-- El backend debe recuperar el progreso sin habilitar escrituras directas.
+GRANT SELECT ON public.wizard_progress TO service_role;
+
 COMMIT;
