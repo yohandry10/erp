@@ -30,7 +30,7 @@ El release Perú del 21 de septiembre está integrado por el PR
 Los checks de `b6fc060e` pasaron antes de promover 537..553; el script canónico
 contrastó respaldo, restauración, hashes, historia inicial y proyecto autorizado.
 La transacción confirmó a las 11:02 UTC; el control posterior exige y encuentra
-553. Render y Vercel sirven el merge y la API confirma DB/Redis listos. Evidencia:
+553. El corte inicial verificó el merge en Render y Vercel, con DB/Redis listos. Evidencia:
 `artifacts/peru-prod-promotion-20260921110212186.json` y
 `artifacts/peru-first-client-release-20260921.json`.
 
@@ -43,6 +43,13 @@ RUC, validación y almacenamiento cifrado del PFX y credenciales, y recuperació
 del asistente. La activación fiscal de cada contribuyente requiere sus datos y
 habilitación; no se ha emitido en SUNAT con datos QA ni se exige hacerlo para
 cerrar la preparación técnica del producto.
+
+El ajuste posterior [#110](https://github.com/yohandry10/erp/pull/110) evita
+que respuestas antiguas de los catálogos sobrescriban la recuperación de un
+presupuesto y separa los datos de cada intento del ensayo. Tras todos sus checks
+aprobados, se verificó `667f3c57` en Render y Vercel, esquema 553, login público
+HTTP 200 y CORS 204. No requiere otra migración. El corte queda en
+`artifacts/peru-production-final-20260921.json`.
 
 ## Promoción de migraciones
 

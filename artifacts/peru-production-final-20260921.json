@@ -1,0 +1,81 @@
+{
+  "verifiedAt": "2026-09-21T11:37:07.9809220Z",
+  "deployedCommit": "667f3c57013dd974ea2842e164c14b3238bd0b10",
+  "sourceCommit": "c8a168849ced8453ea224f92e1c27603d69e779e",
+  "pullRequests": [
+    109,
+    110
+  ],
+  "schema": 553,
+  "apiVersion": {
+    "service": "erp-api",
+    "version": "1.0.0",
+    "commit": "667f3c57013dd974ea2842e164c14b3238bd0b10",
+    "buildDate": "unknown",
+    "renderServiceId": "srv-d9plnou417fc73e6qbfg",
+    "nodeEnv": "production",
+    "timestamp": "2026-09-21T11:37:03.153Z"
+  },
+  "apiReadiness": {
+    "status": "ready",
+    "timestamp": "2026-09-21T11:37:03.362Z",
+    "checks": {
+      "database": {
+        "ready": true,
+        "backlog": {
+          "failed": 0,
+          "limits": {
+            "max_claimable": 5000,
+            "max_dead_letter": 100,
+            "max_oldest_seconds": 900,
+            "processing_stale_seconds": 900
+          },
+          "claimable": 0,
+          "processing": 0,
+          "dead_letter": 7,
+          "stale_processing": 0,
+          "oldest_claimable_seconds": 0
+        },
+        "contract": {
+          "outbox_rpcs": true,
+          "schema_version": 553,
+          "service_role_reads": true,
+          "required_schema_applied": true,
+          "required_schema_version": 553,
+          "schema_history_available": true,
+          "missing_service_role_reads": []
+        },
+        "database": "ok"
+      },
+      "redis": {
+        "ready": true,
+        "required": true,
+        "status": "ready",
+        "mode": "redis"
+      }
+    },
+    "version": "1.0.0"
+  },
+  "web": {
+    "deployment": "dpl_2rYEdVkjqYK64X3L2uis6rd7BwNs",
+    "url": "https://erp-web-zeta-neon.vercel.app",
+    "state": "READY",
+    "commit": "667f3c57013dd974ea2842e164c14b3238bd0b10",
+    "loginStatus": 200
+  },
+  "cors": {
+    "status": 204,
+    "origin": [
+      "https://erp-web-zeta-neon.vercel.app"
+    ],
+    "credentials": [
+      "true"
+    ]
+  },
+  "integratedRun": "peru-integrated-20260921111516642-7968/run.json",
+  "syntheticProductionWrites": false,
+  "realFiscalEmission": false,
+  "pending": [
+    "Confirmar plan de cómputo efectivo de Render desde una sesión administrativa."
+  ]
+}

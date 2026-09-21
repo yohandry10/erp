@@ -2,10 +2,10 @@
 
 Actualizado: 2026-09-21.
 
-El release Perú está integrado mediante el PR #109 en `main` `841ab738`.
+El release Perú se integró por el PR #109 (`841ab738`) y el ajuste de
+recuperación de presupuestos por el PR #110 (`667f3c57`).
 PROD `wypnbcptofqdmoynlonq` recibió 537..553 en una sola transacción,
-conservando 533..536. Render y Vercel sirven `841ab738`; la comprobación del
-21 de septiembre confirma esquema aplicado y requerido 553, PostgreSQL y Redis
+conservando 533..536. El corte del 21 de septiembre verificó `667f3c57` en Render y Vercel y confirma esquema aplicado y requerido 553, PostgreSQL y Redis
 listos, cero tareas claimable, processing, failed o stale y siete dead-letter
 históricos de configuración conservados. CORS y la pantalla pública de acceso
 se verificaron después del despliegue, sin crear datos de prueba en PROD.
@@ -18,11 +18,13 @@ recuperar el progreso del asistente. El PFX valida el RUC en edición, contrase�
 titularidad y vigencia; el cierre vuelve a validar y comprueba la persistencia
 cifrada. Reanudar el paso SUNAT no se confunde con haber terminado el alta.
 
-El commit fuente `b6fc060e` pasó todos los checks del PR: 300 suites/2894
+Los commits fuente `b6fc060e` y `c8a16884` pasaron todos los checks de sus PR: 300 suites/2894
 pruebas API, 107 contratos de navegador y login móvil, SQL, lint, type-check,
 builds, seguridad y contrato DIAN. El ensayo integrado final pasó 89 escenarios
 HTTP, ocho recorridos de navegador y 22 pantallas con registros, además de
-recuperación de 257 tablas locales. La cadena limpia aplica 550 migraciones
+recuperación de 257 tablas locales. La recuperación de catálogos descarta respuestas reemplazadas y las pruebas
+aislan sus datos por intento. Ese ajuste volvió a pasar localmente y en ambas
+ejecuciones de CI del PR, sin cambiar la base. La cadena limpia aplica 550 migraciones
 hasta 553 y ejecuta 63 verificadores actuales y 67 históricos. El recorrido
 previo de 100 pantallas estáticas no acredita todas las mutaciones de cada módulo.
 
@@ -38,6 +40,8 @@ Evidencia:
 - `artifacts/peru-prod-promotion-20260921110212186.json`.
 - `artifacts/erp-peru-prod-rehearsal-20260921104704655-12116.json`.
 - `artifacts/peru-first-client-release-20260921.json`.
+- `artifacts/peru-production-final-20260921.json` y el ensayo final
+  `artifacts/peru-integrated-20260921111516642-7968/run.json`.
 
 La instancia Starter está declarada en `render.yaml`. Falta confirmar en el
 panel el plan de cómputo efectivo; el documento anterior dejó Free→Starter
