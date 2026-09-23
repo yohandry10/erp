@@ -1,6 +1,35 @@
 # Estado actual del ERP
 
-Actualizado: 2026-09-21.
+Actualizado: 2026-09-23.
+
+El PR #111 quedó integrado en `main` (`62068eec`). El 23 de septiembre se
+comprobó ese SHA en Render y Vercel, con esquema requerido/aplicado 553, API,
+PostgreSQL, Redis, login y CORS listos, sin escrituras sintéticas en PROD
+(`artifacts/peru-production-verification-20260923.json`). CI 35826660731,
+E2E 35826660734 y Security Scan 35826660864 terminaron en verde. Un nuevo
+ensayo local efímero añadió la cadena pedido despachado→CPE/CxC→dos cobros
+parcial/total→banco→dos asientos únicos al reintentar: 90 escenarios HTTP y
+restauración local pasaron (`artifacts/peru-integrated-20260923063745572-21668`).
+Una prueba de navegador detectó `PGRST100` al buscar CxC: la lista y su CSV
+quedaban vacíos por mezclar una columna relacionada en el `or` de PostgREST.
+La búsqueda ahora resuelve clientes del mismo tenant y combina sus IDs con
+serie y número. El ensayo repetido pasó 90 escenarios HTTP, nueve recorridos
+integrados de navegador y restauración (`artifacts/peru-integrated-20260923070817259-4196`).
+El navegador comprueba también que un 503 muestre error, bloquee el CSV vacío y
+permita reintentar; el HTTP comprueba rechazo anónimo y aislamiento por empresa.
+Estos cambios de búsqueda/UI están en el PR #112, todavía no desplegados.
+La extensión local de SIRE pasó 93 escenarios HTTP en total: RVIE y RCE
+congelados, hash de descarga, reintento, filtros, estadísticas, aislamiento y
+bloqueo de envío desde demo (`artifacts/peru-integrated-20260923071858181-5776`).
+Esto no acredita aceptación de la propuesta ni ticket oficial SUNAT.
+Otro ensayo local pasó 94 escenarios HTTP: los cinco TXT PLE se exportaron
+individualmente y en lote, el Diario mantuvo 21 campos y debe=haber, el
+contenido quedó aislado por empresa y un mes inválido se rechazó
+(`artifacts/peru-integrated-20260923073133928-14620`). La validez ante el
+PVS de SUNAT y la conciliación de todos los libros siguen pendientes.
+La matriz `artifacts/peru-acceptance-matrix-20260923.md` distingue estas
+operaciones de las rutas que sólo se han leído o mostrado; todavía no acredita
+aceptación funcional de todas las acciones del ERP ni transmisión real SUNAT.
 
 El release Perú se integró por el PR #109 (`841ab738`) y el ajuste de
 recuperación de presupuestos por el PR #110 (`667f3c57`).

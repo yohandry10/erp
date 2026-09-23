@@ -87,6 +87,7 @@ export default function CuentasPorCobrarPage() {
   const { hasPermission: canReadClientes, loading: clientesPermissionLoading } = usePermission('ventas', 'ver', 'clientes')
 
   const [cuentas, setCuentas] = useState<CuentaPorCobrar[]>([])
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [clientes, setClientes] = useState<ClienteLigero[]>([])
   const [filters, setFilters] = useState(initialFilters)
   const [loading, setLoading] = useState(true)
@@ -101,6 +102,7 @@ export default function CuentasPorCobrarPage() {
   const fetchCuentas = useCallback(async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const params = new URLSearchParams()
       if (filters.estado) params.append('estado', filters.estado)
       if (filters.clienteId) params.append('cliente_id', filters.clienteId)
@@ -110,10 +112,14 @@ export default function CuentasPorCobrarPage() {
 
       const endpoint = params.toString() ? `/finanzas/cxc?${params.toString()}` : '/finanzas/cxc'
       const response = await get(endpoint)
-      setCuentas(response?.success && Array.isArray(response.data) ? (response.data as CuentaPorCobrar[]) : [])
+      if (!response?.success || !Array.isArray(response.data)) {
+        throw new Error('La respuesta de cuentas por cobrar no es válida')
+      }
+      setCuentas(response.data as CuentaPorCobrar[])
     } catch (error) {
       console.error('Error cargando cuentas por cobrar', error)
       setCuentas([])
+      setLoadError('No se pudieron cargar las cuentas por cobrar. Reintenta la consulta.')
     } finally {
       setLoading(false)
     }
@@ -305,7 +311,7 @@ export default function CuentasPorCobrarPage() {
                 <RefreshCw className="h-4 w-4" />
                 Actualizar
               </Button>
-              <Button type="button" onClick={exportarCuentas} variant="outline" className="gap-2 border-cyan-400/20 bg-muted/30 text-primary hover:bg-muted/50 hover:text-foreground">
+              <Button type="button" onClick={exportarCuentas} disabled={loading || !!loadError || cuentas.length === 0} variant="outline" className="gap-2 border-cyan-400/20 bg-muted/30 text-primary hover:bg-muted/50 hover:text-foreground">
                 <Download className="h-4 w-4" />
                 Exportar
               </Button>
@@ -388,6 +394,11 @@ export default function CuentasPorCobrarPage() {
               <div className="flex min-h-[360px] flex-col items-center justify-center gap-3 text-muted-foreground">
                 <RefreshCw className="h-8 w-8 animate-spin text-primary" />
                 <p>Cargando cuentas por cobrar...</p>
+              </div>
+            ) : loadError ? (
+              <div role="alert" className="flex min-h-[340px] flex-col items-center justify-center gap-4 p-8 text-center">
+                <p className="text-sm text-destructive">{loadError}</p>
+                <Button type="button" onClick={fetchCuentas} variant="outline">Reintentar consulta</Button>
               </div>
             ) : cuentas.length === 0 ? (
               <div className="flex min-h-[340px] flex-col items-center justify-center p-8 text-center">
