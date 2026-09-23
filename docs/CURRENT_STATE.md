@@ -13,10 +13,15 @@ el primer administrador no demo descubrió dos bloqueos reales: el catálogo
 la consulta de un lote ajeno de 200 vacío a 404. La 554 pasó verificador SQL,
 ensayo funcional y restauración sin red de un respaldo PROD tomado el 23/09:
 un fallo inyectado antes del commit revirtió filas/ACL/función y la copia
-avanzó 553→554. **PROD sigue en 553; la 554 aún no está promovida ni el
-runtime que la exige desplegado.** Evidencia: `artifacts/peru-integrated-20260923081953182-18656`,
+avanzó 553→554. Evidencia: `artifacts/peru-integrated-20260923081953182-18656`,
 `artifacts/erp-peru-554-rehearsal-20260923082158466-284.json` y respaldo
-privado en `artifacts/db-backups/`.
+privado en `artifacts/db-backups/`. El 23/09 a las 08:41 UTC, la 554 se
+promovió DB-first en una transacción tras pasar todos los checks del PR #113.
+La lectura posterior confirmó esquema 554 y readiness 554. En PROD la ACL
+de `migration_runs` ya existía; el defecto de ACL se observó en la base
+limpia y queda fijado explícitamente para instalaciones nuevas. Evidencia:
+`artifacts/peru-554-promotion-20260923084115078.json`. El código del PR #113
+todavía requiere integración y verificación de despliegue.
 
 El PR #111 quedó integrado en `main` (`62068eec`). El 23 de septiembre se
 comprobó ese SHA en Render y Vercel, con esquema requerido/aplicado 553, API,
