@@ -128,6 +128,51 @@ export async function testMigrationImport({ request, sql, uuid, results, tenantI
     { authorization: `Bearer ${otherTenantToken}` });
   results.push({ scenario: 'stock inicial acepta código del producto creado por UI/API, dry-run detecta ajeno y reintento no duplica',
     passed: true, run_id: stockImport.runId });
+  const accountCodes = sql(`SELECT string_agg(codigo,',' ORDER BY codigo) FROM (SELECT codigo FROM plan_cuentas WHERE tenant_id=${uuid(tenantId)} AND activo AND acepta_movimiento ORDER BY codigo LIMIT 2) accounts;`).split(',');
+  assert.equal(accountCodes.length, 2, 'primer cliente debe tener dos cuentas de movimiento');
+  const balanceCsv = `cuenta_contable_codigo,debe,haber,descripcion\n${accountCodes[0]},100,0,Apertura local\n${accountCodes[1]},0,100,Contrapartida local\n`;
+  const balanceBase64 = Buffer.from(balanceCsv).toString('base64');
+  const unbalanced = await request('migration/balance-apertura/import', {
+    fileBase64: Buffer.from(balanceCsv.replace(',0,100,', ',0,99,')).toString('base64'), fechaCorte, dryRun: true });
+  assert.equal(unbalanced.result.okRows, 0);
+  assert.ok(unbalanced.result.errors.some(error => /no cuadra/.test(error.message)));
+  const dryBalance = await request('migration/balance-apertura/import', { fileBase64: balanceBase64, fechaCorte, dryRun: true });
+  assert.equal(dryBalance.result.okRows, 2);
+  const beforeBalance = sql(`SELECT count(*) FROM asientos_contables WHERE tenant_id=${uuid(tenantId)} AND external_id='APERTURA-${fechaCorte}';`);
+  assert.equal(beforeBalance, '0');
+  const balance = await request('migration/balance-apertura/import', { fileBase64: balanceBase64, fechaCorte });
+  assert.equal(balance.status, 'completed');
+  assert.equal(balance.result.created, 1);
+  assert.equal(sql(`SELECT count(*) FROM asientos_contables WHERE tenant_id=${uuid(tenantId)} AND external_id='APERTURA-${fechaCorte}' AND total_debe=total_haber AND total_debe=100;`), '1');
+  const balanceReplay = await request('migration/balance-apertura/import', { fileBase64: balanceBase64, fechaCorte });
+  assert.equal(balanceReplay.result.skippedRows, 2);
+  const openingChecks = await request(`migration/validar-apertura?fechaCorte=${fechaCorte}`);
+  assert.equal(openingChecks.checks.find(check => check.check_name === 'CHK_001_balance_apertura_cuadrado')?.status, 'OK');
+  await request(`migration/runs/${balance.runId}`, undefined, 404,
+    { authorization: `Bearer ${otherTenantToken}` });
+  results.push({ scenario: 'balance de apertura valida cuadre, persiste asiento cuadrado y reintenta sin duplicar',
+    passed: true, run_id: balance.runId });
+  const cpeExternalId = `HIST-CPE-${suffix}`;
+  const fiscalNumber = String(Number.parseInt(suffix, 16) % 100_000_000 || 1);
+  const cpeHeader = 'external_id,tipo_documento,serie,numero,fecha_emision,external_id_cliente,moneda,subtotal,igv,total';
+  const cpeLine = (externalId, clientExternalId) => `${externalId},FACTURA,F001,${fiscalNumber},2025-01-01,${clientExternalId},PEN,100,18,118`;
+  const cpeCsv = `${cpeHeader}\n${cpeLine(cpeExternalId, masterExternalIds.clientes)}\n${cpeLine(`AJENO-${suffix}`, `NO-CLIENTE-${suffix}`)}\n`;
+  const cpeBase64 = Buffer.from(cpeCsv).toString('base64');
+  const dryCpe = await request('migration/comprobantes/import', { fileBase64: cpeBase64, dryRun: true });
+  assert.equal(dryCpe.result.okRows, 1);
+  assert.equal(dryCpe.result.errorRows, 1);
+  assert.equal(sql(`SELECT count(*) FROM cpe WHERE tenant_id=${uuid(tenantId)} AND metadata->>'external_id'='${cpeExternalId}';`), '0');
+  const historical = await request('migration/comprobantes/import', { fileBase64: cpeBase64 });
+  assert.equal(historical.status, 'partial');
+  assert.equal(historical.result.created, 1);
+  assert.equal(sql(`SELECT count(*) FROM cpe WHERE tenant_id=${uuid(tenantId)} AND metadata->>'external_id'='${cpeExternalId}' AND estado='MIGRADO' AND metadata->>'no_sunat'='true';`), '1');
+  assert.equal(sql(`SELECT count(*) FROM outbox_events WHERE tenant_id=${uuid(tenantId)} AND event_type='factura.emitida' AND aggregate_id IN (SELECT id::text FROM cpe WHERE tenant_id=${uuid(tenantId)} AND metadata->>'external_id'='${cpeExternalId}');`), '0');
+  const historicalReplay = await request('migration/comprobantes/import', { fileBase64: cpeBase64 });
+  assert.equal(historicalReplay.result.skippedRows, 1);
+  await request(`migration/runs/${historical.runId}`, undefined, 404,
+    { authorization: `Bearer ${otherTenantToken}` });
+  results.push({ scenario: 'CPE histórico local valida cliente, persiste sólo lectura sin SUNAT/outbox y reintenta aislado',
+    passed: true, run_id: historical.runId });
   await request('migration/preview', { runType: 'clientes', fileBase64: 'base64-malformado' }, 400);
   results.push({ scenario: 'importación rechaza base64 inválido antes de crear registros', passed: true });
 }

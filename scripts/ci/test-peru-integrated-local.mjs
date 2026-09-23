@@ -38,17 +38,27 @@ function uuid(value) {
   return `'${value}'::uuid`;
 }
 async function request(path, body, expected = body === undefined ? 200 : 201, extraHeaders = {}) {
-  const response = await fetch(new URL(`/api/${path}`, origin), {
-    method: body === undefined ? 'GET' : 'POST', redirect: 'error',
-    headers: { 'content-type': 'application/json', connection: 'close', ...(token ? { authorization: `Bearer ${token}` } : {}), ...extraHeaders },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    signal: AbortSignal.timeout(30000),
-  });
-  const text = await response.text();
-  let data;
-  try { data = JSON.parse(text); } catch { throw new Error(`${path}: respuesta no JSON (${response.status})`); }
-  assert.equal(response.status, expected, `${path}: HTTP ${response.status}; ${typeof data.message === 'string' ? data.message : 'contrato HTTP inesperado'}`);
-  return data;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const response = await fetch(new URL(`/api/${path}`, origin), {
+      method: body === undefined ? 'GET' : 'POST', redirect: 'error',
+      headers: { 'content-type': 'application/json', connection: 'close', ...(token ? { authorization: `Bearer ${token}` } : {}), ...extraHeaders },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      signal: AbortSignal.timeout(30000),
+    });
+    const text = await response.text();
+    let data;
+    try { data = JSON.parse(text); } catch { throw new Error(`${path}: respuesta no JSON (${response.status})`); }
+    if (response.status === 429 && expected !== 429 && attempt < 2) {
+      const retryAfter = Number(response.headers.get('retry-after'));
+      const seconds = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 61;
+      assert.ok(seconds <= 65, `${path}: Retry-After inesperado`);
+      await new Promise(resolve => setTimeout(resolve, (seconds + 1) * 1000));
+      continue;
+    }
+    assert.equal(response.status, expected, `${path}: HTTP ${response.status}; ${typeof data.message === 'string' ? data.message : 'contrato HTTP inesperado'}`);
+    return data;
+  }
+  throw new Error(`${path}: agotó los reintentos del límite HTTP`);
 }
 function processAccounting(label) {
   const apiDirectory = path.resolve('apps/erp-api');
