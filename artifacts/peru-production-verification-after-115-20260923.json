@@ -1,0 +1,31 @@
+{
+  "date": "2026-09-23",
+  "project": "wypnbcptofqdmoynlonq",
+  "remoteSyntheticWrites": false,
+  "mergeCommit": "5c5b5d45e25fef488215f620077ee211359a1ffd",
+  "schemaVersion": 555,
+  "requiredSchemaVersion": 555,
+  "migrationPromotionEvidence": "artifacts/peru-555-promotion-20260923105820309.json",
+  "apiVersionEndpoint": "https://erp-api-2p7i.onrender.com/api/health/version",
+  "apiReady": true,
+  "databaseReady": true,
+  "redisReady": true,
+  "outboxClaimable": 0,
+  "outboxProcessing": 0,
+  "outboxFailed": 0,
+  "outboxDeadLetterHistorical": 7,
+  "webProductionDeploymentId": 6612316879,
+  "webProductionDeploymentState": "success",
+  "webLoginHttpStatus": 200,
+  "corsPreflightHttpStatus": 204,
+  "mainWorkflows": {
+    "e2eWeb": { "id": 35851841762, "conclusion": "success" },
+    "securityScan": { "id": 35851841775, "conclusion": "success" },
+    "ci": { "id": 35851841768, "conclusion": "failure", "failedJob": "Peru API, browser and backup recovery", "detail": "La descarga CSV intermitente en Chromium agotó el test; los 100 escenarios HTTP, contratos SQL y restauración pasaron." }
+  },
+  "remaining": [
+    "Corregir descarga CSV y repetir CI de main",
+    "Confirmar administrativamente el plan efectivo de Render",
+    "Aceptar funcionalmente las operaciones parciales de la matriz"
+  ]
+}
