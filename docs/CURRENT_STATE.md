@@ -1,6 +1,18 @@
 # Estado actual del ERP
 
-Actualizado: 2026-09-21.
+Actualizado: 2026-09-23.
+
+El PR #111 quedó integrado en `main` (`62068eec`). El 23 de septiembre se
+comprobó ese SHA en Render y Vercel, con esquema requerido/aplicado 553, API,
+PostgreSQL, Redis, login y CORS listos, sin escrituras sintéticas en PROD
+(`artifacts/peru-production-verification-20260923.json`). CI 35826660731,
+E2E 35826660734 y Security Scan 35826660864 terminaron en verde. Un nuevo
+ensayo local efímero añadió la cadena pedido despachado→CPE/CxC→dos cobros
+parcial/total→banco→dos asientos únicos al reintentar: 90 escenarios HTTP y
+restauración local pasaron (`artifacts/peru-integrated-20260923063745572-21668`).
+La matriz `artifacts/peru-acceptance-matrix-20260923.md` distingue estas
+operaciones de las rutas que sólo se han leído o mostrado; todavía no acredita
+aceptación funcional de todas las acciones del ERP ni transmisión real SUNAT.
 
 El release Perú se integró por el PR #109 (`841ab738`) y el ajuste de
 recuperación de presupuestos por el PR #110 (`667f3c57`).

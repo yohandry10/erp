@@ -157,4 +157,60 @@ export async function testRecordFlows({ request, sql, uuid, results, tenantId, p
   }
   results.push({ scenario: 'reportes comerciales respetan cliente y muestran el código real del producto', passed: true });
 
+  // Circuito separado del RMA: factura de pedido, cobros parciales y totales.
+  // La demo local nunca transmite este CPE a SUNAT.
+  const collectionQuote = (await request('ventas/cotizaciones', {
+    cliente_id: client.id, notas: 'Cobranza parcial local',
+    detalle: [{ producto_id: product.id, descripcion: product.nombre, cantidad: 1, precio_unitario: 20 }],
+  })).data;
+  await request(`ventas/cotizaciones/${collectionQuote.id}/enviar`, {});
+  await request(`ventas/cotizaciones/${collectionQuote.id}/aprobar`, { motivo: 'Circuito de cobranza local' }, 201,
+    { authorization: `Bearer ${approverToken}` });
+  const collectionOrderId = (await request(`ventas/cotizaciones/${collectionQuote.id}/convertir-pedido`, {})).data.pedido_id;
+  const collectionOrder = (await request(`ventas/pedidos/${collectionOrderId}`)).data;
+  const collectionDetailId = collectionOrder.detalle[0].id;
+  await request(`ventas/pedidos/${collectionOrderId}/confirmar`, {});
+  await request(`inventario/logistica/${collectionOrderId}/preparar`, {
+    idempotency_key: randomUUID(), responsable: 'Operador local', ubicacion: 'LOCAL', items_preparados: [collectionDetailId],
+  }, 200);
+  await request(`inventario/logistica/${collectionOrderId}/marcar-listo`, { idempotency_key: randomUUID() }, 200);
+  await request(`inventario/logistica/${collectionOrderId}/confirmar-despacho`, {
+    idempotency_key: randomUUID(), almacen_id: warehouseId,
+    items_despachados: [{ detalle_id: collectionDetailId, cantidad: 1, almacen_id: warehouseId }],
+    transportista: 'Transporte local', placa: 'ABC-545', conductor: 'Conductor local', bultos: 1, peso_total: 1,
+  }, 200);
+  const collectionDocument = await request(`ventas/pedidos/${collectionOrderId}/generar-documento`, { tipo_documento: '01' });
+  assert.ok(collectionDocument.documento?.id && collectionDocument.cpe?.id && collectionDocument.cxc?.id);
+  const cxcId = collectionDocument.cxc.id;
+  const cxcBeforeResponse = await request(`finanzas/cxc/${cxcId}`);
+  const cxcBefore = cxcBeforeResponse.data ?? cxcBeforeResponse;
+  const due = Number(cxcBefore.saldo);
+  assert.ok(due > 0);
+  const collectionBank = (await request('finanzas/bancos/cuentas')).data.find(row => row.moneda === 'PEN' && row.activo);
+  assert.ok(collectionBank?.id);
+  const bankBeforeCollection = Number(collectionBank.saldo);
+  const today = sql(`SELECT app.hoy_tenant(${uuid(tenantId)});`);
+  const partial = Math.round(due * 40) / 100;
+  const firstPayment = { monto: partial, fecha_pago: today, moneda: 'PEN', metodo_pago: 'TRANSFERENCIA',
+    cuenta_bancaria_id: collectionBank.id, referencia: 'COBRO-PARCIAL-LOCAL', idempotency_key: randomUUID() };
+  const first = await request(`finanzas/cxc/${cxcId}/pagos`, firstPayment);
+  assert.equal(first.success, true);
+  assert.equal((await request(`finanzas/cxc/${cxcId}/pagos`, firstPayment)).data.idempotent_replay, true);
+  const cxcPartialResponse = await request(`finanzas/cxc/${cxcId}`);
+  const cxcPartial = cxcPartialResponse.data ?? cxcPartialResponse;
+  assert.equal(Math.round(Number(cxcPartial.saldo) * 100), Math.round((due - partial) * 100));
+  const finalPayment = { ...firstPayment, monto: Number(cxcPartial.saldo), referencia: 'COBRO-FINAL-LOCAL', idempotency_key: randomUUID() };
+  await request(`finanzas/cxc/${cxcId}/pagos`, finalPayment);
+  assert.equal((await request(`finanzas/cxc/${cxcId}/pagos`, finalPayment)).data.idempotent_replay, true);
+  const cxcPaidResponse = await request(`finanzas/cxc/${cxcId}`);
+  const cxcPaid = cxcPaidResponse.data ?? cxcPaidResponse;
+  assert.equal(Number(cxcPaid.saldo), 0);
+  assert.equal(sql(`SELECT count(*) FROM cxc_pagos WHERE cuenta_id=${uuid(cxcId)};`), '2');
+  const bankAfterCollection = (await request(`finanzas/bancos/cuentas/${collectionBank.id}`)).data;
+  assert.equal(Math.round((Number(bankAfterCollection.saldo) - bankBeforeCollection) * 100), Math.round(due * 100));
+  processAccounting('accounting-sales-collection');
+  assert.equal(sql(`SELECT count(*) FROM asientos_contables a JOIN outbox_events e ON e.event_id=a.source_event_id WHERE e.tenant_id=${uuid(tenantId)} AND e.idempotency_key IN (${uuid(firstPayment.idempotency_key)}::text,${uuid(finalPayment.idempotency_key)}::text) AND a.estado='CONFIRMADO' AND a.total_debe=a.total_haber;`), '2');
+  results.push({ scenario: 'pedido despachado genera CPE/CxC; cobros parcial y total aumentan banco y crean asientos únicos al reintentar', passed: true,
+    pedido_id: collectionOrderId, cxc_id: cxcId });
+
 }
