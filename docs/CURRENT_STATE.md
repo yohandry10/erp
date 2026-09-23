@@ -18,6 +18,10 @@ integrados de navegador y restauración (`artifacts/peru-integrated-202609230708
 El navegador comprueba también que un 503 muestre error, bloquee el CSV vacío y
 permita reintentar; el HTTP comprueba rechazo anónimo y aislamiento por empresa.
 Estos cambios de búsqueda/UI están en el PR #112, todavía no desplegados.
+La extensión local de SIRE pasó 93 escenarios HTTP en total: RVIE y RCE
+congelados, hash de descarga, reintento, filtros, estadísticas, aislamiento y
+bloqueo de envío desde demo (`artifacts/peru-integrated-20260923071858181-5776`).
+Esto no acredita aceptación de la propuesta ni ticket oficial SUNAT.
 La matriz `artifacts/peru-acceptance-matrix-20260923.md` distingue estas
 operaciones de las rutas que sólo se han leído o mostrado; todavía no acredita
 aceptación funcional de todas las acciones del ERP ni transmisión real SUNAT.
