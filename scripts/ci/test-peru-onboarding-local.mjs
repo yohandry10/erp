@@ -30,7 +30,8 @@ export async function testPeruOnboarding({ request, sql, uuid, results, setToken
     assert.equal(client.user.is_super_admin, false);
     setToken(client.access_token);
     await request('tenants', undefined, 403);
-    results.push({ scenario: 'alta no demo y primer administrador por API, reintento sin duplicados y login del cliente', passed: true });
+    results.push({ scenario: 'alta no demo y primer administrador por API, reintento sin duplicados y login del cliente', passed: true,
+      client_email: email });
 
     const certificateBase64 = readFileSync(process.env.DEMO_PFX_PATH).toString('base64');
     const certificatePassword = '12345678910';

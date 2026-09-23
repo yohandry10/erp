@@ -2,6 +2,21 @@
 
 Actualizado: 2026-09-23.
 
+El PR #113 se integró como `75c71435`; sus workflows `main` CI 35840086065,
+E2E 35840086078 y Security Scan 35840086076 terminaron en verde. Render
+sirve ese SHA y exige/aplica el esquema 554; PostgreSQL y Redis están listos,
+con cero eventos claimable, processing, failed o stale y siete dead-letter
+históricos. Vercel registró despliegue Production exitoso del mismo SHA;
+login web 200 y CORS 204. No se escribieron datos sintéticos en PROD
+(`artifacts/peru-production-verification-after-113-20260923.json`). El plan
+efectivo de Render sigue sin confirmarse administrativamente. Un recorrido
+local posterior cubrió la importación de clientes/proveedores desde navegador:
+plantilla, CSV inválido, 503 recuperable, importación persistida, búsqueda y
+descarga. Pasaron 97 operaciones HTTP, diez recorridos de navegador, SQL y
+restauración (`artifacts/peru-integrated-20260923092617881-10028`). El test
+destapó pérdida intermitente de descargas por revocar el Blob URL justo tras
+el clic; la corrección de interfaz aún requiere PR/CI/despliegue.
+
 El PR #112 se integró en `main` como `8f74ea3b`. CI 35834006091,
 E2E 35834006107 y Security Scan 35834006093 pasaron. La API PROD sirvió
 ese SHA con DB/Redis listos, esquema requerido/aplicado 553, CORS 204 y login
@@ -21,7 +36,7 @@ La lectura posterior confirmó esquema 554 y readiness 554. En PROD la ACL
 de `migration_runs` ya existía; el defecto de ACL se observó en la base
 limpia y queda fijado explícitamente para instalaciones nuevas. Evidencia:
 `artifacts/peru-554-promotion-20260923084115078.json`. El código del PR #113
-todavía requiere integración y verificación de despliegue.
+quedó integrado y desplegado, según el corte descrito arriba.
 
 El PR #111 quedó integrado en `main` (`62068eec`). El 23 de septiembre se
 comprobó ese SHA en Render y Vercel, con esquema requerido/aplicado 553, API,

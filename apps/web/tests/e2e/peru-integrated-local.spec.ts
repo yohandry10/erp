@@ -110,6 +110,70 @@ test('Perú: CxC cobrada se busca, muestra dos pagos y se exporta desde la inter
   await expect(page.getByRole('row').filter({ hasText: String(detail.numero) })).toBeVisible()
 })
 
+test('Perú: primer administrador importa clientes y proveedores desde CSV en navegador', async ({ page, context }) => {
+  test.setTimeout(180000)
+  if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere base local efímera')
+  const evidence = JSON.parse(await fs.readFile(path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'http.json'), 'utf8'))
+  const onboarding = evidence.results.find((row: { scenario: string }) => row.scenario.startsWith('alta no demo y primer administrador'))
+  expect(onboarding?.client_email).toBeTruthy()
+  await context.route('**/*', route => ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(route.request().url()).hostname)
+    ? route.continue() : route.abort('blockedbyclient'))
+  await page.goto('/login/')
+  await page.locator('#email').fill(onboarding.client_email)
+  await page.locator('#password').fill('Cliente-Local-2026-Only!')
+  await submitLocalLogin(page)
+  await page.waitForURL('**/dashboard/**')
+  for (const item of [
+    { entity: 'clientes', route: '/dashboard/ventas/clientes/', document: '76543211', documentType: 'DNI', kind: 'PERSONA' },
+    { entity: 'proveedores', route: '/dashboard/compras/proveedores/', document: '20456789014', documentType: 'RUC', kind: 'EMPRESA' },
+  ]) {
+    const name = `IMPORT UI LOCAL ${item.entity.toUpperCase()}`
+    await page.goto(item.route)
+    await page.getByRole('button', { name: 'Importar', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: `Importar ${item.entity} desde CSV` })
+    await expect(dialog).toBeVisible()
+    const [template] = await Promise.all([
+      page.waitForEvent('download'), dialog.getByRole('button', { name: 'Descargar plantilla CSV' }).click(),
+    ])
+    expect(await fs.readFile(await template.path(), 'utf8')).toContain('external_id,tipo,tipo_documento')
+    const input = dialog.locator('input[type="file"]')
+    const header = 'external_id,tipo,tipo_documento,numero_documento,razon_social,email'
+    const valid = `UI-${item.entity},${item.kind},${item.documentType},${item.document},${name},ui-local@example.test`
+    await input.setInputFiles({ name: `${item.entity}-error.csv`, mimeType: 'text/csv',
+      buffer: Buffer.from(`${header}\n${valid.replace('ui-local@example.test', 'correo-invalido')}\n`) })
+    await expect(dialog.getByRole('alert')).toContainText('email')
+    await expect(dialog.getByRole('button', { name: `Confirmar importación de ${item.entity}` })).toBeDisabled()
+    if (item.entity === 'clientes') {
+      const previewRoute = /\/api\/migration\/preview\/?$/
+      await context.route(previewRoute, route => route.fulfill({ status: 503, json: { message: 'Interrupción local' } }))
+      await input.setInputFiles({ name: 'clientes-interrumpido.csv', mimeType: 'text/csv',
+        buffer: Buffer.from(`${header}\n${valid}\n`) })
+      await expect(dialog.getByRole('alert')).toContainText('Interrupción local')
+      await expect(dialog.getByRole('button', { name: `Confirmar importación de ${item.entity}` })).toBeDisabled()
+      await context.unroute(previewRoute)
+    }
+    await input.setInputFiles({ name: `${item.entity}-ok.csv`, mimeType: 'text/csv',
+      buffer: Buffer.from(`${header}\n${valid}\n`) })
+    await expect(dialog.getByText('1 filas encontradas')).toBeVisible()
+    await expect(dialog.getByRole('button', { name: `Confirmar importación de ${item.entity}` })).toBeEnabled()
+    const [importResponse] = await Promise.all([
+      page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith(`/api/migration/${item.entity}/import`)
+        && response.request().method() === 'POST'),
+      dialog.getByRole('button', { name: `Confirmar importación de ${item.entity}` }).click(),
+    ])
+    expect(importResponse.status(), await importResponse.text()).toBe(201)
+    await expect(dialog.getByRole('status').filter({ hasText: 'Importación completada' })).toContainText('1 creados')
+    await dialog.getByRole('button', { name: 'Cerrar' }).click()
+    await expect(dialog).toBeHidden()
+    await page.getByRole('textbox', { name: 'Buscar' }).fill(name)
+    await expect(page.getByRole('row').filter({ hasText: name })).toBeVisible()
+    const [download] = await Promise.all([
+      page.waitForEvent('download'), page.getByRole('button', { name: 'Exportar página (CSV)' }).click(),
+    ])
+    expect(await fs.readFile(await download.path(), 'utf8')).toContain(name)
+  }
+})
+
 test('Perú: crea centro de costo y conserva un presupuesto al editar y recargar', async ({ page, context }) => {
   test.setTimeout(180000)
   page.setDefaultTimeout(20000)
