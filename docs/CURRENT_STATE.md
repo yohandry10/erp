@@ -2,6 +2,21 @@
 
 Actualizado: 2026-09-23.
 
+El PR #115 se integró como `5c5b5d45` y la migración 555 avanzó PROD
+transaccionalmente de 554 a 555 tras respaldo privado, restauración sin red y
+rollback inyectado (`artifacts/peru-555-promotion-20260923105820309.json`).
+Render sirve ese commit y exige/aplica 555 con DB y Redis listos; Vercel
+Production 6612316879 terminó en verde, login 200 y CORS 204, sin escrituras
+sintéticas (`artifacts/peru-production-verification-after-115-20260923.json`).
+E2E web aislado y Security Scan de `main` pasaron, pero CI principal
+35851841768 falló en un navegador integrado: Chromium perdió la descarga CSV
+de clientes. Las pruebas HTTP, SQL y restauración de ese job pasaron. La rama
+actual conserva el enlace de descarga hasta liberar el Blob y genera DNI/RUC
+válidos únicos para cada reintento; un nuevo ensayo local pasó 100 HTTP, diez
+navegadores, SQL y restauración
+(`artifacts/peru-integrated-20260923111137269-19612`). Requiere nuevo PR,
+CI y despliegue para cerrar ese fallo.
+
 El ensayo local más reciente del PR #115 abarca 100 escenarios HTTP, diez
 recorridos de navegador, contratos SQL y restauración
 (`artifacts/peru-integrated-20260923102951518-2884`). CxC/CxP de apertura
