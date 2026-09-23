@@ -68,7 +68,8 @@ export function MasterImportDialog({ entity, open, onOpenChange, onImported }: {
       const url = URL.createObjectURL(await response.blob())
       const anchor = document.createElement('a')
       anchor.href = url; anchor.download = `plantilla-${entity}.csv`
-      document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url)
+      document.body.appendChild(anchor); anchor.click(); anchor.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
     } catch (err) { setError(err instanceof Error ? err.message : 'No se pudo descargar la plantilla') }
     finally { setBusy(false) }
   }

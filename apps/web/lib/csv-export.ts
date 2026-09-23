@@ -29,5 +29,7 @@ export function downloadCsv(
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()
-  URL.revokeObjectURL(url)
+  // Chromium puede resolver la descarga después del clic. Revocar de inmediato
+  // pierde el archivo de forma intermitente, especialmente tras otra descarga.
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
