@@ -2,6 +2,23 @@
 
 Actualizado: 2026-09-23.
 
+El PR #117 se integró como `1dc54b73`. Corrigió el dry-run de CPE histórico
+para validar clientes del tenant y amplió el ensayo de primer cliente a balance
+de apertura y CPE histórico: 102 escenarios HTTP, contratos SQL y restauración
+local (`artifacts/peru-integrated-20260923114009161-23644`). Render sirve ese
+SHA y reporta PostgreSQL/Redis listos con esquema 555; Vercel Production
+6613505015 tuvo éxito, login 200 y CORS 204. E2E 35858257146 y Security
+Scan 35858257180 y CI 35858257119 de `main` pasaron.
+La verificación remota fue sólo lectura
+(`artifacts/peru-production-verification-after-117-20260923.json`).
+Otro ensayo local de 102 escenarios comprobó cobro CxC parcial a banco y saldo
+en efectivo a caja, arqueo/cierre, asientos únicos e idempotencia
+(`artifacts/peru-integrated-20260923120517636-15160`). La repetición posterior
+añadió rechazo de sesión de caja inexistente sin mutar saldo ni pagos y pasó
+102 HTTP, SQL, restauración y diez recorridos de navegador
+(`artifacts/peru-integrated-20260923122407762-17892`).
+Las operaciones restantes de la matriz impiden acreditar el lanzamiento integral.
+
 El PR #116 se integró como `0e80dedf`: Render sirve ese commit, exige/aplica
 esquema 555 y reporta DB/Redis listos. Vercel Production 6612939724 terminó
 en verde; login 200 y CORS 204. CI 35855300809, E2E 35855300778 y Security
@@ -18,8 +35,8 @@ de CI de `main` falló por pérdida intermitente de descarga CSV en Chromium;
 y CPE histórico, con 102 escenarios HTTP, contratos SQL y restauración
 (`artifacts/peru-integrated-20260923114009161-23644`). El CPE histórico queda
 en solo lectura y no genera evento fiscal ni envío a SUNAT. Esta última
-ampliación todavía requiere PR, CI y despliegue; el lanzamiento integral
-continúa sin acreditarse por los demás pendientes de la matriz.
+ampliación se integró en #117; el lanzamiento integral continúa sin
+acreditarse por los demás pendientes de la matriz.
 
 El PR #114 se integró como `7f8ba396`. Sus tres workflows de `main` (CI
 35845131497, E2E 35845131419, Security Scan 35845131425) pasaron. Render
