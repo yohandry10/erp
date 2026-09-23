@@ -2,6 +2,27 @@
 
 Actualizado: 2026-09-23.
 
+El PR #112 se integró en `main` como `8f74ea3b`. CI 35834006091,
+E2E 35834006107 y Security Scan 35834006093 pasaron. La API PROD sirvió
+ese SHA con DB/Redis listos, esquema requerido/aplicado 553, CORS 204 y login
+web HTTP 200; no se escribieron datos sintéticos. El ensayo efímero posterior
+pasó 97 comprobaciones HTTP y restauración local. Al importar maestros con
+el primer administrador no demo descubrió dos bloqueos reales: el catálogo
+`migration.*` faltaba en el tenant nuevo y `service_role` no podía escribir
+`migration_runs`. La migración propuesta 554 corrige ambos; también cambia
+la consulta de un lote ajeno de 200 vacío a 404. La 554 pasó verificador SQL,
+ensayo funcional y restauración sin red de un respaldo PROD tomado el 23/09:
+un fallo inyectado antes del commit revirtió filas/ACL/función y la copia
+avanzó 553→554. Evidencia: `artifacts/peru-integrated-20260923081953182-18656`,
+`artifacts/erp-peru-554-rehearsal-20260923082158466-284.json` y respaldo
+privado en `artifacts/db-backups/`. El 23/09 a las 08:41 UTC, la 554 se
+promovió DB-first en una transacción tras pasar todos los checks del PR #113.
+La lectura posterior confirmó esquema 554 y readiness 554. En PROD la ACL
+de `migration_runs` ya existía; el defecto de ACL se observó en la base
+limpia y queda fijado explícitamente para instalaciones nuevas. Evidencia:
+`artifacts/peru-554-promotion-20260923084115078.json`. El código del PR #113
+todavía requiere integración y verificación de despliegue.
+
 El PR #111 quedó integrado en `main` (`62068eec`). El 23 de septiembre se
 comprobó ese SHA en Render y Vercel, con esquema requerido/aplicado 553, API,
 PostgreSQL, Redis, login y CORS listos, sin escrituras sintéticas en PROD
@@ -17,7 +38,7 @@ serie y número. El ensayo repetido pasó 90 escenarios HTTP, nueve recorridos
 integrados de navegador y restauración (`artifacts/peru-integrated-20260923070817259-4196`).
 El navegador comprueba también que un 503 muestre error, bloquee el CSV vacío y
 permita reintentar; el HTTP comprueba rechazo anónimo y aislamiento por empresa.
-Estos cambios de búsqueda/UI están en el PR #112, todavía no desplegados.
+Estos cambios de búsqueda/UI se desplegaron en el PR #112.
 La extensión local de SIRE pasó 93 escenarios HTTP en total: RVIE y RCE
 congelados, hash de descarga, reintento, filtros, estadísticas, aislamiento y
 bloqueo de envío desde demo (`artifacts/peru-integrated-20260923071858181-5776`).
