@@ -367,6 +367,33 @@ describe('StockInicialImporter.validate', () => {
 });
 
 describe('StockInicialImporter.run', () => {
+  it('valida producto del tenant en dry-run y acepta código de catálogo', async () => {
+    const tenantId = '11111111-1111-1111-1111-111111111111';
+    const builder = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      in: jest.fn()
+        .mockResolvedValueOnce({ data: [], error: null })
+        .mockResolvedValueOnce({ data: [{ id: 'producto-local', codigo: 'SKU-LOCAL' }], error: null }),
+    };
+    const client = { from: jest.fn().mockReturnValue(builder), rpc: jest.fn() };
+    const importer = new StockInicialImporter(
+      { getClient: jest.fn().mockReturnValue(client) } as any,
+      { recordRow: jest.fn() } as any,
+    );
+    const parsed = parseCsv([
+      'external_id_producto,sucursal_id,almacen_id,cantidad,costo_unitario',
+      'sku-local,22222222-2222-2222-2222-222222222222,33333333-3333-3333-3333-333333333333,10,2.5',
+      'AJENO,22222222-2222-2222-2222-222222222222,33333333-3333-3333-3333-333333333333,10,2.5',
+    ].join('\n'));
+    const result = await importer.run(parsed, { tenantId, startedBy: null, fechaCorte: '2026-05-01', dryRun: true });
+    expect(result.okRows).toBe(1);
+    expect(result.errorRows).toBe(1);
+    expect(result.errors[0].externalId).toBe('AJENO');
+    expect(builder.eq).toHaveBeenCalledWith('tenant_id', tenantId);
+    expect(client.rpc).not.toHaveBeenCalled();
+  });
+
   it('delega huella, actor y agregado físico al RPC histórico canónico', async () => {
     const tenantId = '11111111-1111-1111-1111-111111111111';
     const sucursalId = '22222222-2222-2222-2222-222222222222';

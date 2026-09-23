@@ -1,6 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { randomUUID } from 'node:crypto'
 
 async function submitLocalLogin(page: Page) {
   // Todos los usuarios del ensayo comparten la IP local. Conservar el límite
@@ -123,11 +124,12 @@ test('Perú: primer administrador importa clientes y proveedores desde CSV en na
   await page.locator('#password').fill('Cliente-Local-2026-Only!')
   await submitLocalLogin(page)
   await page.waitForURL('**/dashboard/**')
+  const importSuffix = randomUUID().slice(0, 8)
   for (const item of [
     { entity: 'clientes', route: '/dashboard/ventas/clientes/', document: '76543211', documentType: 'DNI', kind: 'PERSONA' },
     { entity: 'proveedores', route: '/dashboard/compras/proveedores/', document: '20456789014', documentType: 'RUC', kind: 'EMPRESA' },
   ]) {
-    const name = `IMPORT UI LOCAL ${item.entity.toUpperCase()}`
+    const name = `IMPORT UI LOCAL ${item.entity.toUpperCase()} ${importSuffix}`
     await page.goto(item.route)
     await page.getByRole('button', { name: 'Importar', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: `Importar ${item.entity} desde CSV` })
@@ -138,7 +140,7 @@ test('Perú: primer administrador importa clientes y proveedores desde CSV en na
     expect(await fs.readFile(await template.path(), 'utf8')).toContain('external_id,tipo,tipo_documento')
     const input = dialog.locator('input[type="file"]')
     const header = 'external_id,tipo,tipo_documento,numero_documento,razon_social,email'
-    const valid = `UI-${item.entity},${item.kind},${item.documentType},${item.document},${name},ui-local@example.test`
+    const valid = `UI-${item.entity}-${importSuffix},${item.kind},${item.documentType},${item.document},${name},ui-local@example.test`
     await input.setInputFiles({ name: `${item.entity}-error.csv`, mimeType: 'text/csv',
       buffer: Buffer.from(`${header}\n${valid.replace('ui-local@example.test', 'correo-invalido')}\n`) })
     await expect(dialog.getByRole('alert')).toContainText('email')

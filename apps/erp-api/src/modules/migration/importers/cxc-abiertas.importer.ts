@@ -145,7 +145,7 @@ export class CxcAbiertasImporter implements Importer {
       new Set(parsed.rows.map((r) => nonEmpty(r['external_id_cliente'])).filter((v): v is string => !!v)),
     );
     const clienteMap = new Map<string, string>();
-    if (externalCliIds.length > 0 && !ctx.dryRun) {
+    if (externalCliIds.length > 0) {
       const { data: clientes, error: cliErr } = await client
         .from('clientes')
         .select('id, external_id')
@@ -187,7 +187,7 @@ export class CxcAbiertasImporter implements Importer {
       }
 
       const externalCliente = nonEmpty(row['external_id_cliente'])!;
-      const clienteId = ctx.dryRun ? '00000000-0000-0000-0000-000000000000' : clienteMap.get(externalCliente);
+      const clienteId = clienteMap.get(externalCliente);
       if (!clienteId) {
         const msg = `cliente con external_id="${externalCliente}" no existe en este tenant. Importa primero los clientes.`;
         result.errors.push({ rowIndex, externalId, field: 'external_id_cliente', message: msg });
