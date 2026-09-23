@@ -86,6 +86,7 @@ export class MigrationRunsService {
 
   async finishRun(opts: {
     runId: string;
+    tenantId: string;
     result: ImporterResult;
     extraMetadata?: Record<string, any>;
   }): Promise<void> {
@@ -107,6 +108,7 @@ export class MigrationRunsService {
       .getClient()
       .from('migration_runs')
       .select('metadata')
+      .eq('tenant_id', opts.tenantId)
       .eq('id', opts.runId)
       .single();
     if (readError || !current) {
@@ -133,6 +135,7 @@ export class MigrationRunsService {
         },
         updated_at: new Date().toISOString(),
       })
+      .eq('tenant_id', opts.tenantId)
       .eq('id', opts.runId);
 
     if (error) {

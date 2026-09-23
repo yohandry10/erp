@@ -133,7 +133,7 @@ export class MigrationService {
       };
     }
 
-    await this.runs.finishRun({ runId: runCtx.runId, result });
+    await this.runs.finishRun({ runId: runCtx.runId, tenantId, result });
 
     return {
       runId: runCtx.runId,
