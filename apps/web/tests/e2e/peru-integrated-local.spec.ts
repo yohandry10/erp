@@ -125,9 +125,14 @@ test('Perú: primer administrador importa clientes y proveedores desde CSV en na
   await submitLocalLogin(page)
   await page.waitForURL('**/dashboard/**')
   const importSuffix = randomUUID().slice(0, 8)
+  const numericSuffix = String(Number.parseInt(importSuffix, 16) % 100_000_000).padStart(8, '0')
+  const rucBase = `20${numericSuffix}`
+  const rucFactors = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2]
+  const rucRemainder = 11 - rucFactors.reduce((sum, factor, index) => sum + factor * Number(rucBase[index]), 0) % 11
+  const uniqueRuc = `${rucBase}${rucRemainder === 10 ? 0 : rucRemainder === 11 ? 1 : rucRemainder}`
   for (const item of [
-    { entity: 'clientes', route: '/dashboard/ventas/clientes/', document: '76543211', documentType: 'DNI', kind: 'PERSONA' },
-    { entity: 'proveedores', route: '/dashboard/compras/proveedores/', document: '20456789014', documentType: 'RUC', kind: 'EMPRESA' },
+    { entity: 'clientes', route: '/dashboard/ventas/clientes/', document: numericSuffix, documentType: 'DNI', kind: 'PERSONA' },
+    { entity: 'proveedores', route: '/dashboard/compras/proveedores/', document: uniqueRuc, documentType: 'RUC', kind: 'EMPRESA' },
   ]) {
     const name = `IMPORT UI LOCAL ${item.entity.toUpperCase()} ${importSuffix}`
     await page.goto(item.route)

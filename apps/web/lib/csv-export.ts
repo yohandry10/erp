@@ -28,8 +28,8 @@ export function downloadCsv(
   anchor.download = filename.replace(/[^a-zA-Z0-9._-]/g, '_')
   document.body.appendChild(anchor)
   anchor.click()
-  anchor.remove()
   // Chromium puede resolver la descarga después del clic. Revocar de inmediato
-  // pierde el archivo de forma intermitente, especialmente tras otra descarga.
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  // o retirar el enlace antes de que empiece pierde el archivo de forma
+  // intermitente, especialmente tras otra descarga.
+  window.setTimeout(() => { URL.revokeObjectURL(url); anchor.remove() }, 60_000)
 }
