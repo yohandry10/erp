@@ -148,7 +148,7 @@ export class ComprobantesHistoricoImporter implements Importer {
       new Set(parsed.rows.map((r) => nonEmpty(r['external_id_cliente'])).filter((v): v is string => !!v)),
     );
     const clienteMap = new Map<string, string>();
-    if (externalCliIds.length > 0 && !ctx.dryRun) {
+    if (externalCliIds.length > 0) {
       const { data: clientes, error: cliErr } = await client
         .from('clientes')
         .select('id, external_id')
@@ -190,8 +190,8 @@ export class ComprobantesHistoricoImporter implements Importer {
       }
 
       const externalCli = nonEmpty(row['external_id_cliente'])!;
-      const clienteId = ctx.dryRun ? null : clienteMap.get(externalCli);
-      if (!ctx.dryRun && !clienteId) {
+      const clienteId = clienteMap.get(externalCli);
+      if (!clienteId) {
         const msg = `cliente con external_id="${externalCli}" no existe. Importa clientes primero.`;
         result.errors.push({ rowIndex, externalId, message: msg });
         result.errorRows++;
