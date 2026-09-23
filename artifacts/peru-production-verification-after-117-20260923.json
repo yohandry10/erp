@@ -1,0 +1,30 @@
+{
+  "date_utc": "2026-09-23",
+  "merge_sha": "1dc54b73e5828ca5d8629a3e331ebd74279b286a",
+  "read_only": true,
+  "synthetic_prod_writes": false,
+  "github_main": {
+    "ci": { "run_id": 35858257119, "conclusion": "success" },
+    "e2e_web_aislado": { "run_id": 35858257146, "conclusion": "success" },
+    "security_scan": { "run_id": 35858257180, "conclusion": "success" }
+  },
+  "render": {
+    "version_commit": "1dc54b73e5828ca5d8629a3e331ebd74279b286a",
+    "ready_status": "ready",
+    "database_ready": true,
+    "redis_ready": true,
+    "schema_version": 555,
+    "required_schema_version": 555,
+    "claimable_outbox": 0,
+    "failed_outbox": 0,
+    "stale_processing_outbox": 0,
+    "dead_letter_historical": 7,
+    "effective_plan": "not_verified_administratively"
+  },
+  "vercel": {
+    "production_deployment_id": 6613505015,
+    "deployment_state": "success",
+    "login_follow_redirect_http_status": 200
+  },
+  "cors_preflight_http_status": 204
+}
