@@ -101,6 +101,20 @@ export class MigrationRunsService {
 
     const errorsSummary = result.errors.slice(0, 50);
 
+    // Los importadores de saldos anotan el total conciliado durante el run.
+    // Conservar esos metadatos al cerrar evita perder el total de CHK_002.
+    const { data: current, error: readError } = await this.supabase
+      .getClient()
+      .from('migration_runs')
+      .select('metadata')
+      .eq('id', opts.runId)
+      .single();
+    if (readError || !current) {
+      throw new Error(`No se pudo recuperar metadata del run ${opts.runId}: ${readError?.message}`);
+    }
+    const metadata = current.metadata && typeof current.metadata === 'object' && !Array.isArray(current.metadata)
+      ? current.metadata : {};
+
     const { error } = await this.supabase
       .getClient()
       .from('migration_runs')
@@ -112,6 +126,7 @@ export class MigrationRunsService {
         finished_at: new Date().toISOString(),
         errors_summary: errorsSummary,
         metadata: {
+          ...metadata,
           created: result.created,
           updated: result.updated,
           ...(opts.extraMetadata ?? {}),
