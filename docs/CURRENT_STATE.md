@@ -2,6 +2,26 @@
 
 Actualizado: 2026-09-23.
 
+El PR #118 se integró como `5d6071fb`. El cobro CxC por transferencia parcial
+y efectivo final pasó 102 escenarios HTTP, SQL, restauración y diez recorridos
+de navegador, incluido historial/exportación; una sesión de caja inexistente
+rechaza el cobro sin mutar saldo ni pagos
+(`artifacts/peru-integrated-20260923122407762-17892`). Los tres workflows
+de `main` pasaron: CI 35863101576, E2E 35863101547 y Security Scan
+35863101540. Render sirve ese SHA con DB/Redis listos y esquema 555; Vercel
+Production 6614420218 tuvo éxito, login 200 y CORS 204. La verificación fue
+de sólo lectura (`artifacts/peru-production-verification-after-118-20260923.json`).
+En el siguiente ensayo local, 104 escenarios HTTP, SQL, restauración y diez
+recorridos de navegador
+probaron edición persistida y búsqueda de clientes/proveedores importados,
+validación de email e aislamiento de lectura/escritura. Detectó un 500 al
+consultar un proveedor ajeno; el repositorio ya se corrigió localmente para
+devolver 404. El navegador detectó que el formulario peruano enviaba un campo
+argentino vacío y recibía 400 al editar un cliente; la corrección pasó el
+ensayo completo (`artifacts/peru-integrated-20260923130308975-23476`).
+El lanzamiento integral aún depende de las operaciones
+pendientes de la matriz.
+
 El PR #117 se integró como `1dc54b73`. Corrigió el dry-run de CPE histórico
 para validar clientes del tenant y amplió el ensayo de primer cliente a balance
 de apertura y CPE histórico: 102 escenarios HTTP, contratos SQL y restauración

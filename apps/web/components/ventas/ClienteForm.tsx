@@ -227,6 +227,7 @@ export default function ClienteForm({
         direccion: data.direccion?.trim() || undefined,
         email: data.email?.trim() || undefined,
         telefono: data.telefono?.trim() || undefined,
+        arca_condicion_iva: isArgentina ? data.arca_condicion_iva || undefined : undefined,
         dian_perfil_fiscal: isColombia ? data.dian_perfil_fiscal || undefined : undefined,
       }
 
