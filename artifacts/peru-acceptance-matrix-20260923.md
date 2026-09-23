@@ -28,7 +28,7 @@ ni ejecución de esas acciones.
 | CPE: emitir, consultar, anular, descargar/impresión, reintentar | Pruebas de firma y A4, visual de factura/boleta demo; `http.json` nota RMA y ticket interno | Emisión fiscal local completa ligada a pedido y CxC; RA/RC, boleta/factura/NC/ND, PDF/XML, timeout/reintento | Parcial; aceptación externa pendiente |
 | SIRE: preparar, consultar, exportar, presentar/rectificar | Pruebas API/SQL previas; ruta web disponible | Recorrido local persistido de propuesta/libro y validaciones; respuesta oficial SUNAT | Sin aceptación integral |
 | CxP, bancos, tesorería, conciliación, detracciones | `http.json`: deuda, pago, banco, asiento; conciliación creada/consultada | Pagos parciales, programación/lotes, reversos, conciliación aplicada, detracción y recuperación de fallos | Parcial |
-| CxC, cobranzas, caja, reportes financieros | `artifacts/peru-integrated-20260923063745572-21668/http.json`: CxC de pedido cobrada en dos pagos, banco y asientos únicos; RMA afecta saldo | Cobro en efectivo→caja, nota sobre cuenta pagada, conciliación, exportación y permisos por rol | Parcial; transferencia OK local |
+| CxC, cobranzas, caja, reportes financieros | `artifacts/peru-integrated-20260923070817259-4196/http.json`: CxC de pedido cobrada en dos pagos, banco y asientos únicos; búsqueda por número/cliente, rechazo anónimo y aislamiento entre empresas. El navegador buscó la cuenta, mostró ambos cobros, exportó la fila CSV y recuperó un 503 tras reintentar. RMA afecta saldo. | Cobro en efectivo→caja, nota sobre cuenta pagada, conciliación y permisos diferenciados por rol | Parcial; transferencia, búsqueda e historial/exportación OK local |
 | Contabilidad: asientos, periodos, centros, plan, presupuestos | `http.json`: asientos automáticos únicos/cuadrados; lecturas de centros, presupuestos, eventos | Asiento manual/edición/reverso, cierre/rehabilitación de periodo, presupuestos y centros persistidos con roles | Parcial |
 | Contabilidad: activos, diferidos, consignación, consolidación, revaluación | `http.json`: sólo lecturas de activos/diferidos/consignación/consolidación/tipos de cambio | Alta→proceso→asiento→reporte por cada submódulo, reversos y aislamiento | Sólo lectura verificada |
 | Reportes contables y tributarios, libros, impuestos anual | Páginas disponibles; pruebas de algunos cálculos/exports y reportes comerciales | Cifras reconciliadas contra asientos y comprobantes, filtros, exportación/impresión, rectificación | Sin aceptación integral |
@@ -46,6 +46,15 @@ ni ejecución de esas acciones.
   despacho y RMA. Faltan cobros parciales, CPE/guías y fallos de red ambiguos.
 - Navegador: ocho recorridos integrados y 22 pantallas con registros sólo acreditan
   sus acciones observadas; no equivalen a aceptar todas las acciones visibles.
+- El nuevo recorrido CxC elevó a nueve los recorridos integrados locales. Descubrió
+  `PGRST100` al buscar por número: el `or` combinaba una columna de relación y
+  borraba las filas visibles/CSV. Se corrigió en `cxc.service.ts` resolviendo
+  clientes por tenant; la pantalla distingue fallos de resultados vacíos, bloquea
+  CSV sin filas y permite reintentar. HTTP+navegador pasaron en
+  `artifacts/peru-integrated-20260923070817259-4196/run.json`. Para no construir
+  URLs sin límite, una búsqueda que coincide con más de 100 clientes pide
+  precisar el texto; esta restricción de escala requiere validación con datos
+  reales del futuro cliente.
 - Producción: `artifacts/peru-production-verification-20260923.json` acredita
   versión 62068eec, esquema 553, DB, Redis, login y CORS sin escrituras sintéticas.
 - CI de `main`: ejecuciones 35826660731, E2E 35826660734 y Security Scan

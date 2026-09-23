@@ -147,7 +147,7 @@ async function main() {
   await testPayroll({ request, sql, uuid, results, tenantId: auth.user.tenant_id,
     setToken: value => { token = value; }, primaryToken, processAccounting, approverToken: purchaseContext.approverToken });
   await testRecordFlows({ request, sql, uuid, results, tenantId: auth.user.tenant_id,
-    processAccounting, approverToken: purchaseContext.approverToken });
+    processAccounting, approverToken: purchaseContext.approverToken, otherTenantToken: second.access_token });
   await testPeruOnboarding({ request, sql, uuid, results,
     setToken: value => { token = value; }, primaryToken });
 }
