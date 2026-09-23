@@ -22,6 +22,11 @@ La extensión local de SIRE pasó 93 escenarios HTTP en total: RVIE y RCE
 congelados, hash de descarga, reintento, filtros, estadísticas, aislamiento y
 bloqueo de envío desde demo (`artifacts/peru-integrated-20260923071858181-5776`).
 Esto no acredita aceptación de la propuesta ni ticket oficial SUNAT.
+Otro ensayo local pasó 94 escenarios HTTP: los cinco TXT PLE se exportaron
+individualmente y en lote, el Diario mantuvo 21 campos y debe=haber, el
+contenido quedó aislado por empresa y un mes inválido se rechazó
+(`artifacts/peru-integrated-20260923073133928-14620`). La validez ante el
+PVS de SUNAT y la conciliación de todos los libros siguen pendientes.
 La matriz `artifacts/peru-acceptance-matrix-20260923.md` distingue estas
 operaciones de las rutas que sólo se han leído o mostrado; todavía no acredita
 aceptación funcional de todas las acciones del ERP ni transmisión real SUNAT.

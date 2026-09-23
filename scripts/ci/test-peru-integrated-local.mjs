@@ -11,6 +11,7 @@ import { testModuleReads } from './test-peru-integrated-module-reads.mjs';
 import { testPayroll } from './test-peru-integrated-payroll.mjs';
 import { testRecordFlows } from './test-peru-integrated-records.mjs';
 import { testSire } from './test-peru-integrated-sire.mjs';
+import { testPle } from './test-peru-integrated-ple.mjs';
 import { testPeruOnboarding } from './test-peru-onboarding-local.mjs';
 
 if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere E2E_EPHEMERAL_LOCAL_DB=1');
@@ -150,6 +151,7 @@ async function main() {
   await testRecordFlows({ request, sql, uuid, results, tenantId: auth.user.tenant_id,
     processAccounting, approverToken: purchaseContext.approverToken, otherTenantToken: second.access_token });
   await testSire({ request, sql, uuid, results, tenantId: auth.user.tenant_id, otherTenantToken: second.access_token });
+  await testPle({ request, sql, uuid, results, tenantId: auth.user.tenant_id, otherTenantToken: second.access_token });
   await testPeruOnboarding({ request, sql, uuid, results,
     setToken: value => { token = value; }, primaryToken });
 }
