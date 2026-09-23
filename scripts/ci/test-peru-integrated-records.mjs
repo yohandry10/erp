@@ -199,8 +199,27 @@ export async function testRecordFlows({ request, sql, uuid, results, tenantId, p
   const cxcPartialResponse = await request(`finanzas/cxc/${cxcId}`);
   const cxcPartial = cxcPartialResponse.data ?? cxcPartialResponse;
   assert.equal(Math.round(Number(cxcPartial.saldo) * 100), Math.round((due - partial) * 100));
-  const finalPayment = { ...firstPayment, monto: Number(cxcPartial.saldo), referencia: 'COBRO-FINAL-LOCAL', idempotency_key: randomUUID() };
-  await request(`finanzas/cxc/${cxcId}/pagos`, finalPayment);
+  await request(`finanzas/cxc/${cxcId}/pagos`, {
+    monto: Number(cxcPartial.saldo), fecha_pago: today, moneda: 'PEN', metodo_pago: 'EFECTIVO',
+    sesion_caja_id: randomUUID(), referencia: 'COBRO-CAJA-INEXISTENTE-LOCAL', idempotency_key: randomUUID(),
+  }, 400);
+  assert.equal(sql(`SELECT count(*) FROM cxc_pagos WHERE cuenta_id=${uuid(cxcId)};`), '1');
+  const cxcAfterRejectedCashResponse = await request(`finanzas/cxc/${cxcId}`);
+  const cxcAfterRejectedCash = cxcAfterRejectedCashResponse.data ?? cxcAfterRejectedCashResponse;
+  assert.equal(Number(cxcAfterRejectedCash.saldo), Number(cxcPartial.saldo));
+  const cashBox = (await request('cajas')).data[0];
+  assert.ok(cashBox?.id);
+  const cashSession = await request('pos/caja/abrir', {
+    monto_inicial: 100, caja_id: cashBox.id, moneda: 'PEN', dispositivo: 'integrated-cxc-cash',
+  });
+  assert.ok(cashSession.data?.id);
+  const finalPayment = { monto: Number(cxcPartial.saldo), fecha_pago: today, moneda: 'PEN',
+    metodo_pago: 'EFECTIVO', sesion_caja_id: cashSession.data.id,
+    referencia: 'COBRO-FINAL-EFECTIVO-LOCAL', idempotency_key: randomUUID() };
+  const final = await request(`finanzas/cxc/${cxcId}/pagos`, finalPayment);
+  assert.ok(final.data.movimiento_caja?.id);
+  assert.equal(final.data.movimiento_bancario, null);
+  assert.equal(final.data.movimiento_caja.sesion_caja_id, cashSession.data.id);
   assert.equal((await request(`finanzas/cxc/${cxcId}/pagos`, finalPayment)).data.idempotent_replay, true);
   const cxcPaidResponse = await request(`finanzas/cxc/${cxcId}`);
   const cxcPaid = cxcPaidResponse.data ?? cxcPaidResponse;
@@ -215,11 +234,20 @@ export async function testRecordFlows({ request, sql, uuid, results, tenantId, p
     { authorization: `Bearer ${otherTenantToken}` });
   assert.ok(isolatedSearch.data.every(row => row.id !== cxcId));
   assert.equal(sql(`SELECT count(*) FROM cxc_pagos WHERE cuenta_id=${uuid(cxcId)};`), '2');
+  assert.equal(sql(`SELECT count(*) FROM movimientos_caja WHERE id=${uuid(final.data.movimiento_caja.id)} AND sesion_caja_id=${uuid(cashSession.data.id)} AND tenant_id=${uuid(tenantId)};`), '1');
   const bankAfterCollection = (await request(`finanzas/bancos/cuentas/${collectionBank.id}`)).data;
-  assert.equal(Math.round((Number(bankAfterCollection.saldo) - bankBeforeCollection) * 100), Math.round(due * 100));
+  assert.equal(Math.round((Number(bankAfterCollection.saldo) - bankBeforeCollection) * 100), Math.round(partial * 100));
+  const cashBalance = await request(`cajas/saldo-esperado/${cashSession.data.id}`);
+  assert.equal(Math.round(Number(cashBalance.data.saldo) * 100), Math.round((100 + Number(finalPayment.monto)) * 100));
+  const cashClose = await request('pos/caja/cerrar', {
+    sesion_id: cashSession.data.id, caja_id: cashBox.id, monto_contado: cashBalance.data.saldo,
+    notas: 'Arqueo integrado tras cobro CxC en efectivo',
+  });
+  assert.equal(cashClose.success, true);
+  assert.equal((await request('pos/sesion-caja')).data, null);
   processAccounting('accounting-sales-collection');
   assert.equal(sql(`SELECT count(*) FROM asientos_contables a JOIN outbox_events e ON e.event_id=a.source_event_id WHERE e.tenant_id=${uuid(tenantId)} AND e.idempotency_key IN (${uuid(firstPayment.idempotency_key)}::text,${uuid(finalPayment.idempotency_key)}::text) AND a.estado='CONFIRMADO' AND a.total_debe=a.total_haber;`), '2');
-  results.push({ scenario: 'pedido despachado genera CPE/CxC; cobros parcial y total aumentan banco y crean asientos únicos al reintentar', passed: true,
+  results.push({ scenario: 'pedido despachado genera CPE/CxC; cobro parcial entra al banco, saldo en efectivo entra a caja, arqueo cierra y ambos crean asientos únicos al reintentar', passed: true,
     pedido_id: collectionOrderId, cxc_id: cxcId });
 
 }

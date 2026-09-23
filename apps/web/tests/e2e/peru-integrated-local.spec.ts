@@ -63,7 +63,8 @@ test('Perú: CxC cobrada se busca, muestra dos pagos y se exporta desde la inter
   test.setTimeout(180000)
   if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere base local efímera')
   const evidence = JSON.parse(await fs.readFile(path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'http.json'), 'utf8'))
-  const collection = evidence.results.find((row: { scenario: string }) => row.scenario.startsWith('pedido despachado genera CPE/CxC; cobros parcial'))
+  const collection = evidence.results.find((row: { scenario: string; cxc_id?: string }) =>
+    row.cxc_id && row.scenario.startsWith('pedido despachado genera CPE/CxC;'))
   expect(collection?.cxc_id).toBeTruthy()
   await context.route('**/*', route => ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(route.request().url()).hostname)
     ? route.continue() : route.abort('blockedbyclient'))
@@ -94,7 +95,7 @@ test('Perú: CxC cobrada se busca, muestra dos pagos y se exporta desde la inter
   await expect(dialog).toBeVisible()
   await expect(dialog).toContainText('Cobros registrados: 2')
   await expect(dialog).toContainText('COBRO-PARCIAL-LOCAL')
-  await expect(dialog).toContainText('COBRO-FINAL-LOCAL')
+  await expect(dialog).toContainText('COBRO-FINAL-EFECTIVO-LOCAL')
   await page.keyboard.press('Escape')
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Exportar' }).click()])
   const csv = await fs.readFile(await download.path(), 'utf8')
