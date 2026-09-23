@@ -1,0 +1,17 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "network": "none",
+  "project": "wypnbcptofqdmoynlonq",
+  "archiveSha256": "bb70e5c8b4f4e146d1d606a75cc112b899c7bc8f935f09100123cc80fde22ce6",
+  "migrationSha256": "fbe43c69d5b67987d7794b212be6b8d202114b76ca13646a10c9643af47e786b",
+  "bundleSha256": "5315014708158f7cd961234257d2135d21741a592b042be83bce6d9b445f3b8a",
+  "limits": [
+    "Sin objetos externos de Storage ni roles globales; tiempo local no acredita RTO."
+  ],
+  "restoreVerified": true,
+  "historyBefore": 553,
+  "atomicRollbackPassed": true,
+  "historyAfter": 554,
+  "completedAt": "2026-09-23T08:22:11.155Z"
+}
