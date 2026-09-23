@@ -1,0 +1,30 @@
+{
+  "compiledAt": "2026-09-23T09:16:00Z",
+  "project": "wypnbcptofqdmoynlonq",
+  "remoteWrites": false,
+  "apiCommit": "75c714357771369ffe8c7487e5d7256de49db606",
+  "apiReady": true,
+  "schemaVersion": 554,
+  "requiredSchemaVersion": 554,
+  "databaseReady": true,
+  "redisReady": true,
+  "outbox": {
+    "claimable": 0,
+    "processing": 0,
+    "failed": 0,
+    "staleProcessing": 0,
+    "deadLetterHistorical": 7
+  },
+  "webLoginHttpStatus": 200,
+  "corsOptionsHttpStatus": 204,
+  "corsAllowedOrigin": "https://erp-web-zeta-neon.vercel.app",
+  "vercelProductionDeployment": 6610204625,
+  "vercelProductionStatus": "success",
+  "mainWorkflows": {
+    "ci": { "id": 35840086065, "conclusion": "success" },
+    "e2e": { "id": 35840086078, "conclusion": "success" },
+    "security": { "id": 35840086076, "conclusion": "success" }
+  },
+  "effectiveRenderPlan": "No confirmado por falta de sesión administrativa",
+  "scope": "Consultas de salud, versión, web, CORS, despliegue y CI; sin operaciones sintéticas en PROD"
+}
