@@ -35,7 +35,7 @@ ni ejecución de esas acciones.
 | RR. HH.: candidatos, empleado, contrato, asistencia | `http.json`: lecturas; ensayo visual de candidato | Alta/edición, contratación, asistencia y permisos/aislamiento completos | Parcial |
 | Planilla, pagos, T-Registro, PLAME, liquidaciones | `http.json`: cálculo PE con norma, aprobación distinta, pago/banco/asiento únicos y bloqueo sin norma | Altas laborales desde UI, liquidación, CTS, exportaciones T-Registro/PLAME y constancias externas | OK local cadena planilla; resto pendiente |
 | Configuración comercial, fiscal, RR. HH., establecimientos | `http.json`: primer cliente completa identidad/PFX/credenciales cifrados | Series, impuestos, GRE/SIRE, sucursales y parámetros con edición, permisos, recarga y errores desde UI | Parcial |
-| Migración/importación de maestros y exportaciones | Suites API/SQL previas; rutas de descarga | CSV real con errores por fila, duplicados, rollback y exportes descargables por rol | Sin aceptación integral |
+| Migración/importación de maestros y exportaciones | `artifacts/peru-integrated-20260923081953182-18656/http.json`: primer ADMIN no demo previsualiza clientes/proveedores, ejecuta dry-run sin escritura, importa archivo mixto con error por fila, consulta lote, reintenta sin duplicar y oculta lote ajeno con 404. La 554 pasó rollback atómico en copia restaurada de PROD y se promovió a PROD con readiness 554 (`artifacts/peru-554-promotion-20260923084115078.json`). | Desplegar runtime #113; importaciones CxC/CxP/saldos/stock/comprobantes; actualización y exportes descargables por rol; navegador y archivos grandes | Clientes/proveedores OK local API; resto pendiente |
 | Documentos, descargas, auditoría, ayuda, offline | `http.json`: auditoría real paginada, aislada y con permisos; documentos sólo lectura | Descarga/impresión y búsqueda; cola offline, reinicio/replay; controles de auditoría desde UI | Auditoría API OK; resto parcial |
 
 ## Comprobaciones transversales
@@ -56,8 +56,10 @@ ni ejecución de esas acciones.
   URLs sin límite, una búsqueda que coincide con más de 100 clientes pide
   precisar el texto; esta restricción de escala requiere validación con datos
   reales del futuro cliente.
-- Producción: `artifacts/peru-production-verification-20260923.json` acredita
-  versión 62068eec, esquema 553, DB, Redis, login y CORS sin escrituras sintéticas.
+- Producción: el PR #112 (`8f74ea3b`) pasó CI/E2E/seguridad y su API respondió
+  con esquema 553, DB/Redis listos, login web y CORS; sin escrituras sintéticas.
+  La 554 se promovió tras respaldo, restauración sin red, rollback inyectado y
+  checks del PR #113; el runtime de ese PR aún requiere despliegue.
 - CI de `main`: ejecuciones 35826660731, E2E 35826660734 y Security Scan
   35826660864 terminaron en verde para `62068eec`. El escenario de cobro nuevo
   aún es cambio local; no forma parte de ese CI.

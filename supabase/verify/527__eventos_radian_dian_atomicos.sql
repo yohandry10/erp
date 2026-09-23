@@ -110,7 +110,10 @@ BEGIN
   SELECT pg_get_functiondef('public.sellar_evento_dian_tx(uuid,uuid,uuid,text,text,text,jsonb)'::regprocedure) INTO v_seal;
   SELECT pg_get_functiondef('public.finalizar_evento_dian_tx(uuid,uuid,uuid,text,text,text,jsonb,text)'::regprocedure) INTO v_finalize;
   SELECT pg_get_functiondef('app.dian_application_response_contract_valid_527(text,text,text,text,text)'::regprocedure) INTO v_xml_contract;
-  SELECT pg_get_functiondef('app.seed_operational_rbac_for_tenant(uuid,uuid)'::regprocedure) INTO v_seed;
+  -- 554 añade un wrapper de migración; el contrato DIAN vive en su base 554.
+  SELECT pg_get_functiondef('app.seed_operational_rbac_for_tenant(uuid,uuid)'::regprocedure)
+    || coalesce(pg_get_functiondef(to_regprocedure('app.seed_operational_rbac_for_tenant_base_554(uuid,uuid)')), '')
+  INTO v_seed;
   IF strpos(v_seed, 'seed_operational_rbac_for_tenant_base_527') = 0
      OR strpos(v_seed, 'sembrar_permisos_dian_eventos_527') = 0
      OR strpos(v_register, 'idempotency_key = v_key') = 0

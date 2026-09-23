@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -136,7 +136,9 @@ export class MigrationController {
   @Get('runs/:id')
   @RequirePermission('migration.runs.read')
   async getRun(@CurrentTenant() tenantId: string, @Param('id') id: string) {
-    return this.service.getRunDetail(tenantId, id);
+    const run = await this.service.getRunDetail(tenantId, id);
+    if (!run) throw new NotFoundException('Lote de migración no encontrado');
+    return run;
   }
 
   @Get('validar-apertura')
