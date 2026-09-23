@@ -144,7 +144,7 @@ export class CxpAbiertasImporter implements Importer {
       new Set(parsed.rows.map((r) => nonEmpty(r['external_id_proveedor'])).filter((v): v is string => !!v)),
     );
     const provMap = new Map<string, string>();
-    if (externalProvIds.length > 0 && !ctx.dryRun) {
+    if (externalProvIds.length > 0) {
       const { data: proveedores, error: provErr } = await client
         .from('proveedores')
         .select('id, external_id')
@@ -186,7 +186,7 @@ export class CxpAbiertasImporter implements Importer {
       }
 
       const externalProv = nonEmpty(row['external_id_proveedor'])!;
-      const proveedorId = ctx.dryRun ? '00000000-0000-0000-0000-000000000000' : provMap.get(externalProv);
+      const proveedorId = provMap.get(externalProv);
       if (!proveedorId) {
         const msg = `proveedor con external_id="${externalProv}" no existe en este tenant. Importa primero los proveedores.`;
         result.errors.push({ rowIndex, externalId, field: 'external_id_proveedor', message: msg });
