@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 
 // Registros reales creados por HTTP en la infraestructura efímera del runner.
 // Alimentan las pantallas con identificador sin inventar estados por SQL.
-export async function testRecordFlows({ request, sql, uuid, results, tenantId, processAccounting, approverToken }) {
+export async function testRecordFlows({ request, sql, uuid, results, tenantId, processAccounting, approverToken, otherTenantToken }) {
   const product = (await request('pos/productos')).data.find(row => row.codigo === 'DEMO-003');
   assert.ok(product);
   const provider = (await request('compras/proveedores')).data[0];
@@ -205,6 +205,15 @@ export async function testRecordFlows({ request, sql, uuid, results, tenantId, p
   const cxcPaidResponse = await request(`finanzas/cxc/${cxcId}`);
   const cxcPaid = cxcPaidResponse.data ?? cxcPaidResponse;
   assert.equal(Number(cxcPaid.saldo), 0);
+  const byNumber = await request(`finanzas/cxc?search=${encodeURIComponent(String(cxcPaid.numero))}`);
+  assert.ok(byNumber.data.some(row => row.id === cxcId));
+  const byCustomer = await request(`finanzas/cxc?search=${encodeURIComponent(cxcPaid.clientes.razon_social)}`);
+  assert.ok(byCustomer.data.some(row => row.id === cxcId));
+  assert.deepEqual((await request('finanzas/cxc?search=CLIENTE-INEXISTENTE-LOCAL')).data, []);
+  await request(`finanzas/cxc?search=${encodeURIComponent(String(cxcPaid.numero))}`, undefined, 401, { authorization: '' });
+  const isolatedSearch = await request(`finanzas/cxc?search=${encodeURIComponent(String(cxcPaid.numero))}`, undefined, 200,
+    { authorization: `Bearer ${otherTenantToken}` });
+  assert.ok(isolatedSearch.data.every(row => row.id !== cxcId));
   assert.equal(sql(`SELECT count(*) FROM cxc_pagos WHERE cuenta_id=${uuid(cxcId)};`), '2');
   const bankAfterCollection = (await request(`finanzas/bancos/cuentas/${collectionBank.id}`)).data;
   assert.equal(Math.round((Number(bankAfterCollection.saldo) - bankBeforeCollection) * 100), Math.round(due * 100));

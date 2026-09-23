@@ -10,6 +10,14 @@ E2E 35826660734 y Security Scan 35826660864 terminaron en verde. Un nuevo
 ensayo local efímero añadió la cadena pedido despachado→CPE/CxC→dos cobros
 parcial/total→banco→dos asientos únicos al reintentar: 90 escenarios HTTP y
 restauración local pasaron (`artifacts/peru-integrated-20260923063745572-21668`).
+Una prueba de navegador detectó `PGRST100` al buscar CxC: la lista y su CSV
+quedaban vacíos por mezclar una columna relacionada en el `or` de PostgREST.
+La búsqueda ahora resuelve clientes del mismo tenant y combina sus IDs con
+serie y número. El ensayo repetido pasó 90 escenarios HTTP, nueve recorridos
+integrados de navegador y restauración (`artifacts/peru-integrated-20260923070817259-4196`).
+El navegador comprueba también que un 503 muestre error, bloquee el CSV vacío y
+permita reintentar; el HTTP comprueba rechazo anónimo y aislamiento por empresa.
+Estos cambios de búsqueda/UI están en el PR #112, todavía no desplegados.
 La matriz `artifacts/peru-acceptance-matrix-20260923.md` distingue estas
 operaciones de las rutas que sólo se han leído o mostrado; todavía no acredita
 aceptación funcional de todas las acciones del ERP ni transmisión real SUNAT.

@@ -123,8 +123,27 @@ export class CxcService {
         const searchFilters = [
           `serie.ilike.${term}`,
           `numero.ilike.${term}`,
-          `clientes.razon_social.ilike.${term}`,
         ];
+
+        // PostgREST no admite una columna de relación dentro del OR de la
+        // tabla principal (PGRST100). Resolver los clientes dentro del mismo
+        // tenant y combinar sólo sus IDs mantiene el filtro y la paginación.
+        const { data: matchingClients, error: clientsError, count: clientsCount } = await client
+          .from('clientes')
+          .select('id', { count: 'exact' })
+          .eq('tenant_id', tenantId)
+          .ilike('razon_social', term)
+          .range(0, 99);
+        if (clientsError) {
+          throw new BadRequestException('No se pudo buscar clientes para la cuenta por cobrar');
+        }
+        if ((clientsCount ?? 0) > 100) {
+          throw new BadRequestException('La búsqueda de clientes es demasiado amplia; agregue más caracteres');
+        }
+        const clientIds = (matchingClients ?? []).map((customer) => customer.id).filter((id) => this.isUuid(id));
+        if (clientIds.length > 0) {
+          searchFilters.push(`cliente_id.in.(${clientIds.join(',')})`);
+        }
 
         if (this.isUuid(filters.search)) {
           searchFilters.push(`cliente_id.eq.${filters.search}`);

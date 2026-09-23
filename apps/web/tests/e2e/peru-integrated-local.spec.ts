@@ -58,6 +58,58 @@ test('Perú: reportes muestran tendencia, código del producto y filtro de clien
   expect(errors).toEqual([])
 })
 
+test('Perú: CxC cobrada se busca, muestra dos pagos y se exporta desde la interfaz real', async ({ page, context }) => {
+  test.setTimeout(180000)
+  if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere base local efímera')
+  const evidence = JSON.parse(await fs.readFile(path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'http.json'), 'utf8'))
+  const collection = evidence.results.find((row: { scenario: string }) => row.scenario.startsWith('pedido despachado genera CPE/CxC; cobros parcial'))
+  expect(collection?.cxc_id).toBeTruthy()
+  await context.route('**/*', route => ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(route.request().url()).hostname)
+    ? route.continue() : route.abort('blockedbyclient'))
+  await page.goto('/login/')
+  await page.locator('#email').fill('peru-integrated-1@example.test')
+  await page.locator('#password').fill('Local-Peru-2026-Only!')
+  const [login] = await Promise.all([
+    page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith('/api/auth/login') && response.status() === 201),
+    submitLocalLogin(page),
+  ])
+  const auth = await login.json()
+  const token = auth.access_token ?? auth.data?.access_token
+  expect(token).toBeTruthy()
+  const detailResponse = await page.request.get(`${process.env.LOCAL_API_URL}/api/finanzas/cxc/${collection.cxc_id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  expect(detailResponse.ok(), await detailResponse.text()).toBeTruthy()
+  const rawDetail = await detailResponse.json()
+  const detail = rawDetail.data ?? rawDetail
+  expect(detail.pagos).toHaveLength(2)
+  await page.goto('/dashboard/finanzas/cxc/')
+  await page.getByPlaceholder('Serie, numero, cliente, moneda').fill(String(detail.numero))
+  const row = page.getByRole('row').filter({ hasText: String(detail.numero) })
+  await expect(row).toBeVisible()
+  await expect(row).toContainText('Cancelado')
+  await row.getByRole('button', { name: 'Historial' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Historial de cobranza' })
+  await expect(dialog).toBeVisible()
+  await expect(dialog).toContainText('Cobros registrados: 2')
+  await expect(dialog).toContainText('COBRO-PARCIAL-LOCAL')
+  await expect(dialog).toContainText('COBRO-FINAL-LOCAL')
+  await page.keyboard.press('Escape')
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Exportar' }).click()])
+  const csv = await fs.readFile(await download.path(), 'utf8')
+  expect(csv).toContain(String(detail.numero))
+  expect(csv).toContain('CANCELADO')
+  const cxcListRoute = /\/finanzas\/cxc\/?(?:\?.*)?$/
+  await context.route(cxcListRoute, route => route.fulfill({ status: 503, json: { message: 'Fallo temporal local' } }))
+  await page.getByRole('button', { name: 'Actualizar' }).click()
+  await expect(page.getByRole('alert').filter({ hasText: 'No se pudieron cargar las cuentas por cobrar' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Exportar' })).toBeDisabled()
+  await context.unroute(cxcListRoute)
+  await page.getByRole('button', { name: 'Reintentar consulta' }).click()
+  await expect(page.getByRole('alert').filter({ hasText: 'No se pudieron cargar las cuentas por cobrar' })).toBeHidden()
+  await expect(page.getByRole('row').filter({ hasText: String(detail.numero) })).toBeVisible()
+})
+
 test('Perú: crea centro de costo y conserva un presupuesto al editar y recargar', async ({ page, context }) => {
   test.setTimeout(180000)
   page.setDefaultTimeout(20000)
