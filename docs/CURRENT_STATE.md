@@ -2,6 +2,31 @@
 
 Actualizado: 2026-09-23.
 
+El ensayo local más reciente del PR #115 abarca 100 escenarios HTTP, diez
+recorridos de navegador, contratos SQL y restauración
+(`artifacts/peru-integrated-20260923102951518-2884`). CxC/CxP de apertura
+validan referencias de su empresa también en dry-run y conservan el total
+conciliado. Stock inicial admite el código único del producto creado por la
+interfaz, valida referencias en dry-run y no duplica existencias al reintentar.
+Una empresa nueva necesitaba permisos de `service_role` para crear sucursales:
+la migración propuesta 555 concede sólo el CRUD usado por API en sucursales y
+asignaciones; el verificador comprueba RLS y que `authenticated` no obtiene
+escritura directa. El navegador también evita bloquear el cierre del diálogo
+después de una importación ya confirmada. Todo esto sigue pendiente de CI,
+promoción 555 y despliegue; PROD permanece en esquema 554.
+
+El PR #114 se integró como `7f8ba396`. Los tres workflows de `main` (CI
+35845131497, E2E 35845131419, Security Scan 35845131425) pasaron. Render
+sirve ese SHA con esquema aplicado/requerido 554, PostgreSQL y Redis listos,
+Vercel Production confirmó el mismo commit, login web 200 y CORS 204, sin
+datos sintéticos en PROD (`artifacts/peru-production-verification-after-114-20260923.json`).
+El ensayo local del 23/09 amplió importación a saldos iniciales CxC/CxP: 99
+escenarios HTTP, SQL y restauración pasaron
+(`artifacts/peru-integrated-20260923095925889-23988`). Detectó que dry-run
+omitía la consulta de maestros y aceptaba referencias inexistentes; además,
+el cierre de la bitácora borraba `total_real_importado`, necesario para el
+cuadre. Las correcciones están sólo en la rama de trabajo y requieren PR/CI.
+
 El PR #113 se integró como `75c71435`; sus workflows `main` CI 35840086065,
 E2E 35840086078 y Security Scan 35840086076 terminaron en verde. Render
 sirve ese SHA y exige/aplica el esquema 554; PostgreSQL y Redis están listos,

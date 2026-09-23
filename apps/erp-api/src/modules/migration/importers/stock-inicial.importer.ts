@@ -96,10 +96,11 @@ export class StockInicialImporter implements Importer {
       new Set(parsed.rows.map((r) => nonEmpty(r['external_id_producto'])).filter((v): v is string => !!v)),
     );
     const prodMap = new Map<string, string>();
-    if (externalProdIds.length > 0 && !ctx.dryRun) {
+    const codigoMap = new Map<string, string>();
+    if (externalProdIds.length > 0) {
       const { data: prods, error: prodErr } = await client
         .from('productos')
-        .select('id, external_id')
+        .select('id, external_id, codigo')
         .eq('tenant_id', ctx.tenantId)
         .in('external_id', externalProdIds);
       if (prodErr) {
@@ -109,6 +110,21 @@ export class StockInicialImporter implements Importer {
       }
       (prods ?? []).forEach((p) => {
         if (p.external_id) prodMap.set(p.external_id, p.id);
+      });
+      // El alta normal de productos no asigna external_id. El código único por
+      // tenant permite importar stock sin exigir una importación de catálogo.
+      const { data: byCode, error: codeErr } = await client
+        .from('productos')
+        .select('id, codigo')
+        .eq('tenant_id', ctx.tenantId)
+        .in('codigo', externalProdIds.map((id) => id.toUpperCase()));
+      if (codeErr) {
+        result.errors.push({ rowIndex: 1, message: `Error precargando códigos de productos: ${codeErr.message}` });
+        result.errorRows = parsed.rows.length;
+        return result;
+      }
+      (byCode ?? []).forEach((p) => {
+        if (p.codigo) codigoMap.set(p.codigo.toUpperCase(), p.id);
       });
     }
 
@@ -135,9 +151,9 @@ export class StockInicialImporter implements Importer {
         continue;
       }
 
-      const productoId = ctx.dryRun ? '00000000-0000-0000-0000-000000000000' : prodMap.get(externalProd);
+      const productoId = prodMap.get(externalProd) ?? codigoMap.get(externalProd.toUpperCase());
       if (!productoId) {
-        const msg = `producto con external_id="${externalProd}" no existe en este tenant. Importa productos primero.`;
+        const msg = `producto con external_id o código="${externalProd}" no existe en este tenant.`;
         result.errors.push({ rowIndex, externalId: externalProd, message: msg });
         result.errorRows++;
         if (ctx.runCtx) {
