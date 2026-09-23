@@ -26,7 +26,7 @@ ni ejecución de esas acciones.
 | RMA y notas de crédito | `http.json`: alta, rechazo anticipado, aprobación por otro actor, recepción, nota/CxC/asiento únicos | Recepción parcial, saldo a favor/cobro previo, impresión y anulación de nota | Parcial |
 | Logística y GRE: picking, despacho, traslado, guía, reintento | `http.json`: preparación/despacho y lecturas; pruebas API/SQL previas de GRE | Guía local completa desde UI, traslado entre sucursales y transmisión/acuse SUNAT externa | Parcial |
 | CPE: emitir, consultar, anular, descargar/impresión, reintentar | Pruebas de firma y A4, visual de factura/boleta demo; `http.json` nota RMA y ticket interno | Emisión fiscal local completa ligada a pedido y CxC; RA/RC, boleta/factura/NC/ND, PDF/XML, timeout/reintento | Parcial; aceptación externa pendiente |
-| SIRE: preparar, consultar, exportar, presentar/rectificar | Pruebas API/SQL previas; ruta web disponible | Recorrido local persistido de propuesta/libro y validaciones; respuesta oficial SUNAT | Sin aceptación integral |
+| SIRE: preparar, consultar, exportar, presentar/rectificar | `artifacts/peru-integrated-20260923071858181-5776/http.json`: RVIE/RCE locales generados, repetidos sin duplicar, listados, descargados con SHA-256 verificado, aislados por tenant; período inválido y envío desde demo rechazados | Navegador, conciliación con fuentes fiscales, respuesta oficial SUNAT y rectificación | Instantánea local OK; presentación externa pendiente |
 | CxP, bancos, tesorería, conciliación, detracciones | `http.json`: deuda, pago, banco, asiento; conciliación creada/consultada | Pagos parciales, programación/lotes, reversos, conciliación aplicada, detracción y recuperación de fallos | Parcial |
 | CxC, cobranzas, caja, reportes financieros | `artifacts/peru-integrated-20260923070817259-4196/http.json`: CxC de pedido cobrada en dos pagos, banco y asientos únicos; búsqueda por número/cliente, rechazo anónimo y aislamiento entre empresas. El navegador buscó la cuenta, mostró ambos cobros, exportó la fila CSV y recuperó un 503 tras reintentar. RMA afecta saldo. | Cobro en efectivo→caja, nota sobre cuenta pagada, conciliación y permisos diferenciados por rol | Parcial; transferencia, búsqueda e historial/exportación OK local |
 | Contabilidad: asientos, periodos, centros, plan, presupuestos | `http.json`: asientos automáticos únicos/cuadrados; lecturas de centros, presupuestos, eventos | Asiento manual/edición/reverso, cierre/rehabilitación de periodo, presupuestos y centros persistidos con roles | Parcial |
@@ -43,7 +43,8 @@ ni ejecución de esas acciones.
 - Aislamiento entre dos empresas y rechazo anónimo/sin permiso: probado en login,
   ventas POS, compras y auditoría. Debe repetirse en mutaciones de cada módulo.
 - Idempotencia y contabilidad: probadas en POS, compras, planilla, cotizaciones,
-  despacho y RMA. Faltan cobros parciales, CPE/guías y fallos de red ambiguos.
+  despacho, RMA, cobros parciales y generación local SIRE. Faltan CPE/guías
+  externos y fallos de red ambiguos en sus transportes.
 - Navegador: ocho recorridos integrados y 22 pantallas con registros sólo acreditan
   sus acciones observadas; no equivalen a aceptar todas las acciones visibles.
 - El nuevo recorrido CxC elevó a nueve los recorridos integrados locales. Descubrió
