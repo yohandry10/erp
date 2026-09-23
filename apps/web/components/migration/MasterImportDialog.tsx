@@ -34,7 +34,9 @@ export function MasterImportDialog({ entity, open, onOpenChange, onImported }: {
   const [busy, setBusy] = useState(false)
   const [inputVersion, setInputVersion] = useState(0)
   const reset = (clearInput = true) => { setFile(null); setPreview(null); setResult(null); setError(''); if (clearInput) setInputVersion(v => v + 1) }
-  const changeOpen = (value: boolean) => { if (!busy) { reset(); onOpenChange(value) } }
+  // La respuesta ya confirma la escritura; refrescar el listado puede continuar
+  // mientras el usuario cierra el diálogo.
+  const changeOpen = (value: boolean) => { if (!busy || result) { reset(); onOpenChange(value) } }
   const errors = result?.result.errors ?? preview?.errors ?? []
 
   const loadFile = async (selected?: File) => {

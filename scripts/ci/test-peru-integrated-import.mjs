@@ -92,6 +92,42 @@ export async function testMigrationImport({ request, sql, uuid, results, tenantI
     results.push({ scenario: `${item.runType}: dry-run detecta referencia ajena, saldo parcial persiste, bitácora y reintento aislados`,
       passed: true, run_id: imported.runId });
   }
+  const sucursal = (await request('sucursales', { nombre: `Sucursal apertura ${suffix}`,
+    codigo: `AP-${suffix}`, direccion: 'Av. Local 123', ubigeo: '150101' })).data;
+  const almacen = (await request('inventario/almacenes', { idempotency_key: randomUUID(),
+    codigo: `AL-${suffix}`, nombre: `Almacén apertura ${suffix}`, es_principal: true })).data;
+  const sucursalId = sucursal.id;
+  const almacenId = almacen.id;
+  assert.ok(sucursalId && almacenId, 'primer cliente puede crear sucursal y almacén para stock inicial');
+  const categoryName = `Categoría apertura ${suffix}`;
+  await request('inventario/categorias', { idempotency_key: randomUUID(), codigo: `AP-${suffix}`,
+    nombre: categoryName });
+  const productCode = `APERTURA-${suffix}`.toUpperCase();
+  const product = (await request('inventario/productos', { idempotency_key: randomUUID(), codigo: productCode,
+    nombre: `Producto apertura ${suffix}`, categoria: categoryName, unidad_medida: 'NIU',
+    precio_compra: 8, precio_venta: 12, controla_stock: true })).data;
+  assert.ok(product.id);
+  assert.equal(sql(`SELECT external_id IS NULL FROM productos WHERE id=${uuid(product.id)} AND tenant_id=${uuid(tenantId)};`), 't');
+  const stockHeader = 'external_id_producto,sucursal_id,almacen_id,cantidad,costo_unitario';
+  const stockCsv = `${stockHeader}\n${productCode},${sucursalId},${almacenId},7,8.50\nAJENO-${suffix},${sucursalId},${almacenId},3,8.50\n`;
+  const stockBase64 = Buffer.from(stockCsv).toString('base64');
+  const beforeStock = Number(sql(`SELECT COALESCE(stock_actual,0) FROM producto_existencias WHERE tenant_id=${uuid(tenantId)} AND producto_id=${uuid(product.id)} AND almacen_id=${uuid(almacenId)};`) || 0);
+  const dryStock = await request('migration/stock-inicial/import', { fileBase64: stockBase64, fechaCorte, dryRun: true });
+  assert.equal(dryStock.result.okRows, 1);
+  assert.equal(dryStock.result.errorRows, 1);
+  assert.equal(dryStock.result.errors[0].externalId, `AJENO-${suffix}`);
+  assert.equal(Number(sql(`SELECT COALESCE(stock_actual,0) FROM producto_existencias WHERE tenant_id=${uuid(tenantId)} AND producto_id=${uuid(product.id)} AND almacen_id=${uuid(almacenId)};`) || 0), beforeStock);
+  const stockImport = await request('migration/stock-inicial/import', { fileBase64: stockBase64, fechaCorte });
+  assert.equal(stockImport.status, 'partial');
+  assert.equal(stockImport.result.created, 1);
+  assert.equal(Number(sql(`SELECT stock_actual FROM producto_existencias WHERE tenant_id=${uuid(tenantId)} AND producto_id=${uuid(product.id)} AND almacen_id=${uuid(almacenId)};`)), beforeStock + 7);
+  const stockReplay = await request('migration/stock-inicial/import', { fileBase64: stockBase64, fechaCorte });
+  assert.equal(stockReplay.result.skippedRows, 1);
+  assert.equal(Number(sql(`SELECT stock_actual FROM producto_existencias WHERE tenant_id=${uuid(tenantId)} AND producto_id=${uuid(product.id)} AND almacen_id=${uuid(almacenId)};`)), beforeStock + 7);
+  await request(`migration/runs/${stockImport.runId}`, undefined, 404,
+    { authorization: `Bearer ${otherTenantToken}` });
+  results.push({ scenario: 'stock inicial acepta código del producto creado por UI/API, dry-run detecta ajeno y reintento no duplica',
+    passed: true, run_id: stockImport.runId });
   await request('migration/preview', { runType: 'clientes', fileBase64: 'base64-malformado' }, 400);
   results.push({ scenario: 'importación rechaza base64 inválido antes de crear registros', passed: true });
 }
