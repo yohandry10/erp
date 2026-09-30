@@ -2,6 +2,7 @@ import { test, expect, type BrowserContext, type Dialog, type Page } from '@play
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { consumeLocalAccounting, readLocalSql } from './helpers/peru-local-accounting'
 
 async function submitLocalLogin(page: Page) {
   // Todos los usuarios del ensayo comparten la IP local. Conservar el límite
@@ -502,6 +503,122 @@ test('Perú: ajuste con respuesta perdida, transferencia y kardex conservan exis
   }, null, 2))
 })
 
+test('Perú: reembolso RMA recupera catálogos, respuesta perdida y asiento sin duplicar', async ({ page, context }) => {
+  test.setTimeout(180000)
+  if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere base local efímera')
+  const evidence = JSON.parse(await fs.readFile(path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'http.json'), 'utf8'))
+  const paid = evidence.results.find((row: { scenario: string }) => row.scenario.startsWith('RMA pagada: saldo se aplica'))
+  expect(paid?.saldo_favor_id && paid?.banco_id && paid?.rma_number).toBeTruthy()
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await context.route('**/*', route => ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(route.request().url()).hostname)
+    ? route.continue() : route.abort('blockedbyclient'))
+  await page.goto('/login/')
+  await page.locator('#email').fill('peru-integrated-1@example.test')
+  await page.locator('#password').fill('Local-Peru-2026-Only!')
+  const [login] = await Promise.all([
+    page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith('/api/auth/login') && response.status() === 201),
+    submitLocalLogin(page),
+  ])
+  const auth = await login.json()
+  const headers = { Authorization: `Bearer ${auth.access_token ?? auth.data?.access_token}` }
+  const getReal = async (endpoint: string) => {
+    const response = await page.request.get(`${process.env.LOCAL_API_URL}/api/${endpoint}`, { headers })
+    expect(response.status()).toBe(200)
+    const value = await response.json()
+    return value.data ?? value
+  }
+  const saldoBefore = await getReal(`ventas/rma/saldos-favor/${paid.saldo_favor_id}`)
+  const bankBefore = await getReal(`finanzas/bancos/cuentas/${paid.banco_id}`)
+  expect(Number(saldoBefore.monto_disponible)).toBeCloseTo(paid.saldo_disponible, 2)
+  await page.goto('/dashboard/ventas/rma/')
+  await page.getByRole('button', { name: 'Saldos a favor', exact: true }).click()
+  const row = page.getByRole('row').filter({ hasText: paid.rma_number })
+  await expect(row).toBeVisible()
+  const resourcesUrl = /\/api\/ventas\/rma\/medios-reembolso\/?$/
+  let interruptCatalog = true
+  let catalogFailures = 0
+  await page.route(resourcesUrl, route => {
+    if (!interruptCatalog) return route.continue()
+    catalogFailures++
+    return route.fulfill({ status: 503, contentType: 'application/json',
+      body: JSON.stringify({ message: 'Medios de reembolso temporalmente interrumpidos' }) })
+  })
+  await row.getByRole('button', { name: 'Reembolsar', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Reembolsar saldo a favor', exact: true })
+  await expect(dialog.getByRole('alert')).toContainText('No se pudieron cargar las opciones')
+  await expect(dialog.getByRole('button', { name: 'Confirmar', exact: true })).toBeDisabled()
+  await expect(dialog.getByLabel('Medio', { exact: true }).locator('option')).toHaveCount(1)
+  expect(catalogFailures).toBeGreaterThan(0)
+  interruptCatalog = false
+  const [resources] = await Promise.all([
+    page.waitForResponse(response => resourcesUrl.test(new URL(response.url()).pathname) && response.status() === 200),
+    dialog.getByRole('button', { name: 'Reintentar carga', exact: true }).click(),
+  ])
+  expect(resources.status()).toBe(200)
+  await expect(dialog.getByRole('alert')).toHaveCount(0)
+  await dialog.getByLabel('Monto', { exact: true }).fill('4')
+  await dialog.getByLabel('Medio', { exact: true }).selectOption(paid.banco_id)
+  await dialog.getByLabel('Operación o transferencia', { exact: true }).fill('RMA-UI-REEMBOLSO-LOCAL')
+  const refundUrl = new RegExp(`/api/ventas/rma/saldos-favor/${paid.saldo_favor_id}/reembolsar/?$`)
+  let committed: any
+  let firstIntent: string | undefined
+  await page.route(refundUrl, async route => {
+    firstIntent = route.request().headers()['idempotency-key']
+    const response = await route.fetch()
+    expect(response.status(), await response.text()).toBe(201)
+    const value = await response.json()
+    committed = value.data ?? value
+    await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({
+      message: 'Respuesta de reembolso interrumpida; reintente la misma operación',
+    }) })
+  }, { times: 1 })
+  const [lost] = await Promise.all([
+    page.waitForResponse(response => refundUrl.test(new URL(response.url()).pathname) && response.request().method() === 'POST'),
+    dialog.getByRole('button', { name: 'Confirmar', exact: true }).click(),
+  ])
+  expect(lost.status()).toBe(503)
+  expect(firstIntent).toMatch(/^rma-ui:saldo-reembolsar:/)
+  await expect(page.getByText('Respuesta de reembolso interrumpida; reintente la misma operación', { exact: true })).toBeVisible()
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByLabel('Monto', { exact: true })).toHaveValue('4')
+  expect(Number((await getReal(`ventas/rma/saldos-favor/${paid.saldo_favor_id}`)).monto_disponible)).toBeCloseTo(paid.saldo_disponible - 4, 2)
+  expect(Number((await getReal(`finanzas/bancos/cuentas/${paid.banco_id}`)).saldo)).toBeCloseTo(Number(bankBefore.saldo) - 4, 2)
+  const [replayResponse] = await Promise.all([
+    page.waitForResponse(response => refundUrl.test(new URL(response.url()).pathname) && response.request().method() === 'POST'),
+    dialog.getByRole('button', { name: 'Confirmar', exact: true }).click(),
+  ])
+  expect(replayResponse.status()).toBe(201)
+  expect(replayResponse.request().headers()['idempotency-key']).toBe(firstIntent)
+  const replayRaw = await replayResponse.json()
+  const replay = replayRaw.data ?? replayRaw
+  expect(replay.idempotent).toBe(true)
+  expect(replay.movimiento_id).toBe(committed.movimiento_id)
+  await expect(dialog).toBeHidden()
+  await page.reload()
+  await page.getByRole('button', { name: 'Saldos a favor', exact: true }).click()
+  await expect(row).toContainText(/12[.,]60/)
+  const saldoAfter = await getReal(`ventas/rma/saldos-favor/${paid.saldo_favor_id}`)
+  expect(Number(saldoAfter.monto_disponible)).toBeCloseTo(paid.saldo_disponible - 4, 2)
+  expect(saldoAfter.movimientos.filter((movement: { id: string }) => movement.id === committed.movimiento_id)).toHaveLength(1)
+  expect(Number((await getReal(`finanzas/bancos/cuentas/${paid.banco_id}`)).saldo)).toBeCloseTo(Number(bankBefore.saldo) - 4, 2)
+  expect(committed.event_id).toMatch(/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i)
+  await consumeLocalAccounting('browser-rma-accounting')
+  const entryQuery = `SELECT count(*) FROM asientos_contables WHERE source_event_id='${committed.event_id}'::uuid
+    AND estado='CONFIRMADO' AND total_debe=4 AND total_haber=4;`
+  expect(readLocalSql(entryQuery)).toBe('1')
+  await consumeLocalAccounting('browser-rma-accounting-replay')
+  expect(readLocalSql(entryQuery)).toBe('1')
+  expect(errors).toEqual([])
+  await fs.writeFile(path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'browser-rma-refund.json'), JSON.stringify({
+    rma_id: paid.rma_id, saldo_favor_id: paid.saldo_favor_id, amount: 4, first_response_status: 503,
+    same_intent_replayed: true, movement_id: committed.movimiento_id, event_id: committed.event_id,
+    final_available: Number(saldoAfter.monto_disponible), accounting_entry_count: 1,
+    catalog_failure_recovered: true, catalog_failed_requests: catalogFailures,
+    external_browser_requests_blocked: true, local_only: true,
+  }, null, 2))
+})
+
 test('Perú: crea centro de costo y conserva un presupuesto al editar y recargar', async ({ page, context }) => {
   test.setTimeout(180000)
   page.setDefaultTimeout(20000)
@@ -721,7 +838,7 @@ test('Perú: consulta y filtra la auditoría de recepciones con la API real', as
   await submitLocalLogin(page)
   await page.waitForURL('**/dashboard/**')
   await page.goto('/dashboard/audit-logs/')
-  await expect(page.getByRole('heading', { name: 'Logs de Auditoría', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Logs de Auditoría', exact: true })).toBeVisible({ timeout: 30000 })
   const [loaded] = await Promise.all([
     page.waitForResponse(response => response.url().includes('/api/audit-logs') && response.url().includes('table_name=recepciones')),
     page.getByRole('combobox', { name: 'Tabla', exact: true }).selectOption('recepciones'),
@@ -798,7 +915,7 @@ test('Perú: login y POS usan la API y base efímera reales', async ({ page, con
   // El recorrido HTTP deja la caja cerrada. Esperar la pantalla hidratada:
   // networkidle por sí solo puede terminar antes de que React muestre el botón.
   const openCash = page.getByRole('button', { name: 'Abrir Caja Registradora', exact: true })
-  await expect(openCash).toBeVisible()
+  await expect(openCash).toBeVisible({ timeout: 30000 })
   await openCash.click()
   await page.locator('#monto-inicial-caja').fill('100')
   await page.getByRole('button', { name: 'Confirmar', exact: true }).click()

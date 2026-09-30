@@ -1,0 +1,44 @@
+{
+  "commit": "8728e6597860056c63056d454d5a55ee059d374a",
+  "prNumber": 122,
+  "project": "wypnbcptofqdmoynlonq",
+  "backupSha256": "68c79db924ce9303599e0aa3c0c307ebf6dcb3951e99ec27d66f9301bfc9d5d4",
+  "migrationSha256": "884088593ec1d4dd27485951dbd9a30aae484b6ffc6d6d4a05b6f48001f85bd5",
+  "bundleSha256": "f79f7b37115ee31ce103687d0e32bc726f60cf87a6f870735eed77b436aeebcb",
+  "success": true,
+  "remoteWrites": true,
+  "before": {
+    "project": "wypnbcptofqdmoynlonq",
+    "environment": "PROD",
+    "schema": 555,
+    "ready": true,
+    "permissions": "cdcd6bd95d55703531a715b24f6bc33b",
+    "rolePermissions": "fc86271e2ae58d1938e2736704087bd8",
+    "tableSecurity": "92f02af82f9772575f9398944bc7d6e6",
+    "policies": "73f1acf7f8e7d9058cf2dc7f3f159507",
+    "triggers556": 0,
+    "missingOperatingAccounts": 871,
+    "accountCount": 2556,
+    "functions556": []
+  },
+  "after": {
+    "project": "wypnbcptofqdmoynlonq",
+    "environment": "PROD",
+    "schema": 556,
+    "ready": true,
+    "permissions": "cdcd6bd95d55703531a715b24f6bc33b",
+    "rolePermissions": "fc86271e2ae58d1938e2736704087bd8",
+    "tableSecurity": "92f02af82f9772575f9398944bc7d6e6",
+    "policies": "73f1acf7f8e7d9058cf2dc7f3f159507",
+    "triggers556": 1,
+    "missingOperatingAccounts": 0,
+    "accountCount": 3427,
+    "functions556": [
+      "seed_peru_operating_accounts_556",
+      "seed_peru_operating_config_556"
+    ]
+  },
+  "existingAccountsPreserved": true,
+  "tableSecurityPreserved": true,
+  "completedAt": "2026-09-30T21:53:44.713Z"
+}
