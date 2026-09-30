@@ -1,0 +1,20 @@
+
+Running 11 tests using 1 worker
+
+(node:21908) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:21908) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 [chromium] › tests\e2e\peru-integrated-local.spec.ts:34:5 › Perú: reportes muestran tendencia, código del producto y filtro de cliente real (16.1s)
+  ok  2 [chromium] › tests\e2e\peru-integrated-local.spec.ts:62:5 › Perú: CxC cobrada se busca, muestra dos pagos y se exporta desde la interfaz real (5.4s)
+  ok  3 [chromium] › tests\e2e\peru-integrated-local.spec.ts:115:5 › Perú: primer administrador importa y edita clientes y proveedores desde navegador (24.7s)
+  ok  4 [chromium] › tests\e2e\peru-integrated-local.spec.ts:195:5 › Perú: primer administrador reintenta cobro CxC con respuesta perdida sin duplicar y cierra caja (3.8s)
+  ok  5 [chromium] › tests\e2e\peru-integrated-local.spec.ts:291:5 › Perú: crea centro de costo y conserva un presupuesto al editar y recargar (26.1s)
+  ok  6 [chromium] › tests\e2e\peru-integrated-local.spec.ts:376:5 › Perú: candidato conserva perfil y vacante después de crear, editar y recargar (10.3s)
+  ok  7 [chromium] › tests\e2e\peru-integrated-local.spec.ts:449:5 › Perú: superadministrador cambia de empresa y conserva la sesión al recargar (8.2s)
+  ok  8 [chromium] › tests\e2e\peru-integrated-local.spec.ts:491:5 › Perú: consulta y filtra la auditoría de recepciones con la API real (7.2s)
+  ok  9 [chromium] › tests\e2e\peru-integrated-local.spec.ts:550:5 › Perú: login y POS usan la API y base efímera reales (14.1s)
+  ok 10 [chromium] › tests\e2e\peru-integrated-local.spec.ts:617:5 › Perú: crea, aprueba y recibe una compra desde la interfaz real (29.5s)
+  ok 11 [chromium] › tests\e2e\peru-integrated-local.spec.ts:710:5 › Perú: retoma preparación logística tras fallo de packing y recarga (8.9s)
+
+  11 passed (2.6m)
