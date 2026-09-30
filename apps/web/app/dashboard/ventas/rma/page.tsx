@@ -103,6 +103,9 @@ export default function RmaPage() {
   const [medioId, setMedioId] = useState('')
   const [referencia, setReferencia] = useState('')
   const [saving, setSaving] = useState(false)
+  const [resourcesLoading, setResourcesLoading] = useState(false)
+  const [resourcesError, setResourcesError] = useState('')
+  const resourcesRequest = useRef(0)
   const operationKeys = useRef<Record<string, string>>({})
 
   const operationKey = (kind: string, signature: string) => {
@@ -143,6 +146,31 @@ export default function RmaPage() {
 
   const disponibleTotal = saldos.reduce((sum, saldo) => sum + Number(saldo.monto_disponible || 0), 0)
 
+  const loadActionResources = async (saldo: SaldoFavor, nextAction: 'aplicar' | 'reembolsar') => {
+    const requestId = ++resourcesRequest.current
+    setResourcesLoading(true)
+    setResourcesError('')
+    setCxc([])
+    setMedios({ bancos: [], sesiones_caja: [] })
+    try {
+      if (nextAction === 'aplicar') {
+        const response = await get(`/api/ventas/rma/saldos-favor/${saldo.id}/cxc-aplicables`)
+        const options = unwrap<Cxc[] | null>(response, null)
+        if (!Array.isArray(options)) throw new Error('La respuesta de cuentas por cobrar está incompleta')
+        if (requestId === resourcesRequest.current) setCxc(options)
+      } else {
+        const response = await get('/api/ventas/rma/medios-reembolso')
+        const options = unwrap<Medios | null>(response, null)
+        if (!options || !Array.isArray(options.bancos) || !Array.isArray(options.sesiones_caja)) throw new Error('La respuesta de medios de reembolso está incompleta')
+        if (requestId === resourcesRequest.current) setMedios(options)
+      }
+    } catch (error: any) {
+      if (requestId === resourcesRequest.current) setResourcesError(error?.message ?? 'No se pudieron cargar las opciones')
+    } finally {
+      if (requestId === resourcesRequest.current) setResourcesLoading(false)
+    }
+  }
+
   const openAction = async (saldo: SaldoFavor, nextAction: 'aplicar' | 'reembolsar') => {
     setSaldoActivo(saldo)
     setAccion(nextAction)
@@ -150,23 +178,18 @@ export default function RmaPage() {
     setCxcId('')
     setMedioId('')
     setReferencia('')
-    if (nextAction === 'aplicar') {
-      const response = await get(`/api/ventas/rma/saldos-favor/${saldo.id}/cxc-aplicables`)
-      setCxc(unwrap<Cxc[]>(response, []))
-    } else {
-      const response = await get('/api/ventas/rma/medios-reembolso')
-      setMedios(unwrap<Medios>(response, { bancos: [], sesiones_caja: [] }))
-    }
+    await loadActionResources(saldo, nextAction)
   }
 
   const closeAction = () => {
     if (saving) return
+    resourcesRequest.current++
     setSaldoActivo(null)
     setAccion(null)
   }
 
   const submitAction = async () => {
-    if (!saldoActivo || !accion) return
+    if (!saldoActivo || !accion || resourcesLoading || resourcesError) return
     const amount = Number(monto)
     if (!Number.isFinite(amount) || amount <= 0 || amount > Number(saldoActivo.monto_disponible)) {
       toast({ variant: 'destructive', title: 'Monto inválido', description: 'Usa un monto positivo que no exceda el saldo disponible.' })
@@ -297,9 +320,11 @@ export default function RmaPage() {
           <div className="w-full max-w-lg rounded-2xl border border-border bg-background p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold">{accion === 'aplicar' ? 'Aplicar saldo a una CxC' : 'Reembolsar saldo a favor'}</h2><p className="mt-1 text-sm text-muted-foreground">Disponible: {formatCurrency(Number(saldoActivo.monto_disponible), saldoActivo.moneda)}</p></div><Button variant="ghost" size="icon" onClick={closeAction}><X className="h-4 w-4" /></Button></div>
             <div className="mt-6 space-y-4">
+              {resourcesLoading && <p role="status">Cargando opciones…</p>}
+              {resourcesError && <div role="alert" className="space-y-2 rounded-md border border-destructive p-3 text-sm"><p>No se pudieron cargar las opciones: {resourcesError}</p><Button variant="outline" onClick={() => void loadActionResources(saldoActivo, accion)}>Reintentar carga</Button></div>}
               <Field label={`Monto (${saldoActivo.moneda})`}><Input aria-label="Monto" type="number" min="0.01" step="0.01" max={saldoActivo.monto_disponible} value={monto} onChange={(event) => setMonto(event.target.value)} /></Field>
               {accion === 'aplicar' ? (
-                <Field label="Cuenta por cobrar compatible"><select aria-label="Cxc" className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={cxcId} onChange={(event) => setCxcId(event.target.value)}><option value="">Selecciona una CxC</option>{cxc.map((item) => <option key={item.id} value={item.id}>{item.numero_documento ?? item.id.slice(0, 8)} · {formatCurrency(Number(item.monto_pendiente ?? item.saldo_pendiente ?? item.saldo ?? 0), item.moneda)}</option>)}</select>{cxc.length === 0 && <p className="mt-2 text-xs text-amber-600">No hay CxC pendientes del mismo cliente y moneda.</p>}</Field>
+                <Field label="Cuenta por cobrar compatible"><select aria-label="Cxc" className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={cxcId} onChange={(event) => setCxcId(event.target.value)}><option value="">Selecciona una CxC</option>{cxc.map((item) => <option key={item.id} value={item.id}>{item.numero_documento ?? item.id.slice(0, 8)} · {formatCurrency(Number(item.monto_pendiente ?? item.saldo_pendiente ?? item.saldo ?? 0), item.moneda)}</option>)}</select>{!resourcesLoading && !resourcesError && cxc.length === 0 && <p className="mt-2 text-xs text-amber-600">No hay CxC pendientes del mismo cliente y moneda.</p>}</Field>
               ) : (
                 <>
                   <Field label="Medio"><div className="grid grid-cols-2 gap-2"><Button type="button" variant={medio === 'BANCO' ? 'default' : 'outline'} onClick={() => { setMedio('BANCO'); setMedioId('') }}>Banco</Button><Button type="button" variant={medio === 'CAJA' ? 'default' : 'outline'} onClick={() => { setMedio('CAJA'); setMedioId('') }}>Caja</Button></div></Field>
@@ -308,7 +333,7 @@ export default function RmaPage() {
                 </>
               )}
             </div>
-            <div className="mt-6 flex justify-end gap-2"><Button variant="outline" onClick={closeAction} disabled={saving}>Cancelar</Button><Button onClick={() => void submitAction()} disabled={saving}>{saving ? 'Registrando…' : 'Confirmar'}</Button></div>
+            <div className="mt-6 flex justify-end gap-2"><Button variant="outline" onClick={closeAction} disabled={saving}>Cancelar</Button><Button onClick={() => void submitAction()} disabled={saving || resourcesLoading || Boolean(resourcesError)}>{saving ? 'Registrando…' : 'Confirmar'}</Button></div>
           </div>
         </div>
       )}

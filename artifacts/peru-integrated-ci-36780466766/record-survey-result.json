@@ -1,0 +1,138 @@
+{
+  "success": true,
+  "scope": "Carga de rutas con registros; no acredita todas las mutaciones",
+  "findings": [
+    {
+      "template": "ventas/rma/[id]",
+      "status": 200,
+      "errors": [],
+      "scriptErrors": []
+    },
+    {
+      "template": "ventas/pedidos/[id]",
+      "status": 200,
+      "errors": [],
+      "scriptErrors": []
+    },
+    {
+      "template": "ventas/cotizaciones/[id]",
+      "status": 200,
+      "errors": [],
+      "scriptErrors": []
+    },
+    {
+      "template": "ventas/clientes/[id]",
+      "status": 200,
+      "errors": [],
+      "scriptErrors": []
+    },
+    {
+      "template": "ventas/clientes/[id]/editar",
+      "status": 200,
+      "errors": [],
+      "scriptErrors": []
+    },
+    {
+      "template": "compras/recepciones/[id]",
+      "status": 200,
+      "errors": [],
+      "scriptErrors": []
+    },
+    {
+      "template": "compras/proveedores/[id]",
+      "status": 200,
+      "errors": [],
+      "scriptErrors": []
+    },
+    {
+      "template": "compras/proveedores/[id]/editar",
+      "status": 200,
+      "errors": [],
+      "scriptErrors": []
+    },
+    {
+      "template": "compras/cotizaciones/[id]",
+      "status": 200,
+      "errors": [],
+      "scriptErrors": []
+    },
+    {
+      "template": "compras/ordenes/[id]",
+      "status": 200,
+      "errors": [],
+      "scriptErrors": []
+    },
+    {
+      "template": "compras/devoluciones/[id]",
+      "status": 200,
+      "errors": [],
+      "scriptErrors": []
+    },
+    {
+      "template": "finanzas/cxp/[id]",
+      "status": 200,
+      "errors": [],
+      "scriptErrors": []
+    },
+    {
+      "template": "finanzas/bancos/[id]",
+      "status": 200,
+      "errors": [],
+      "scriptErrors": []
+    },
+    {
+      "template": "finanzas/bancos/[id]/editar",
+      "status": 200,
+      "errors": [],
+      "scriptErrors": []
+    },
+    {
+      "template": "finanzas/conciliacion/[id]",
+      "status": 200,
+      "errors": [],
+      "scriptErrors": []
+    },
+    {
+      "template": "contabilidad/periodos/[id]",
+      "status": 200,
+      "errors": [],
+      "scriptErrors": []
+    },
+    {
+      "template": "contabilidad/asientos/[id]",
+      "status": 200,
+      "errors": [],
+      "scriptErrors": []
+    },
+    {
+      "template": "contabilidad/asientos/[id]/editar",
+      "status": 200,
+      "errors": [],
+      "scriptErrors": []
+    },
+    {
+      "template": "inventario/productos/[id]/editar",
+      "status": 200,
+      "errors": [],
+      "scriptErrors": []
+    },
+    {
+      "template": "contabilidad/presupuestos/[id]",
+      "status": 200,
+      "errors": [],
+      "scriptErrors": []
+    },
+    {
+      "template": "contabilidad/centros-costo/[id]",
+      "status": 200,
+      "errors": [],
+      "scriptErrors": []
+    },
+    {
+      "template": "contabilidad/centros-costo/[id]/editar",
+      "status": 200,
+      "errors": [],
+      "scriptErrors": []
+    }
+  ]
+}

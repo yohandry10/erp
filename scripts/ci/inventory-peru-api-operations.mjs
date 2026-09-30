@@ -76,6 +76,17 @@ if (process.argv[2]) {
   const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const routePattern = endpoint => new RegExp('^' + endpoint.split('/').map(part => part.startsWith(':') ? '[^/]+' : escape(part)).join('/') + '/?$');
   const requestMatches = new Map(operations.map(operation => [operation, []]));
+  const acceptancePath = 'artifacts/peru-operation-acceptance-cases-20260930.json';
+  const acceptance = JSON.parse(readFileSync(path.join(root, acceptancePath), 'utf8'));
+  for (const testCase of acceptance.cases) for (const declared of testCase.operations) {
+    if (!operations.some(operation => operation.method === declared.method && operation.endpoint === declared.endpoint)) {
+      throw new Error(`Caso ${testCase.id}: operación inexistente ${declared.method} ${declared.endpoint}`);
+    }
+  }
+  const verifiedCases = acceptance.cases.filter(testCase => testCase.required_scenario_prefixes.every(prefix =>
+    http.results.some(result => result.passed === true && result.scenario.startsWith(prefix))));
+  const casesFor = operation => verifiedCases.filter(testCase => testCase.operations.some(declared =>
+    declared.method === operation.method && declared.endpoint === operation.endpoint));
   for (const [index, request] of http.request_traces.entries()) {
     const candidates = operations.filter(operation => (operation.method === request.method || operation.method === 'ALL') && routePattern(operation.endpoint).test(request.pathname));
     // Una ruta literal tiene precedencia sobre :id, como en el router de Nest.
@@ -86,13 +97,16 @@ if (process.argv[2]) {
     evidence: path.relative(root, evidenceDirectory).replaceAll('\\', '/'),
     evidence_scope: run.scope ?? 'full',
     evidence_kind: 'HTTP contra Nest/PostgREST/PostgreSQL efímeros; no contiene cuerpos, tokens ni credenciales',
-    acceptance_rule: 'HTTP observado no acredita persistencia, aislamiento, permisos, UI ni flujo completo; la aceptación funcional de escenarios permanece en la matriz manual.',
+    acceptance_rule: 'HTTP observado no acredita aceptación funcional. verified_cases sólo recoge contratos cuyo escenario funcional pasó; conserva pendientes explícitos y no acepta toda la operación.',
+    acceptance_cases: acceptancePath,
     excluded: ['Analytics'], operational_accounting_tax_reports_included: true,
     operations: operations.map(operation => ({ module: operation.module, operation: operation.operation,
       method: operation.method, endpoint: operation.endpoint, source: `${operation.source}:${operation.line}`,
       existing_evidence: requestMatches.get(operation), defects: [],
-      result: requestMatches.get(operation).length ? 'http_contract_observed_not_full_acceptance' : 'pending_functional_execution',
-      pending_checks: operation.remaining_checks,
+      verified_cases: casesFor(operation).map(({ id, source, verified_checks }) => ({ id, source, verified_checks })),
+      result: casesFor(operation).length ? 'functional_cases_verified_with_remaining_checks'
+        : requestMatches.get(operation).length ? 'http_contract_observed_not_full_acceptance' : 'pending_functional_execution',
+      pending_checks: casesFor(operation).length ? [...new Set(casesFor(operation).flatMap(testCase => testCase.pending_checks))] : operation.remaining_checks,
     })),
   };
   const matrixOutput = path.join(root, 'artifacts/peru-api-operation-matrix-20260930.json');

@@ -1,0 +1,151 @@
+{
+  "country": "PE",
+  "role": "ADMIN",
+  "tenant_kind": "first_client_non_demo",
+  "excluded": [
+    "Analytics"
+  ],
+  "links": [
+    {
+      "label": "Dashboard",
+      "href": "/dashboard"
+    },
+    {
+      "label": "POS",
+      "href": "/dashboard/pos"
+    },
+    {
+      "label": "Documentos",
+      "href": "/dashboard/documentos"
+    },
+    {
+      "label": "Contabilidad",
+      "href": "/dashboard/contabilidad"
+    },
+    {
+      "label": "Catálogo",
+      "href": "/dashboard/inventario"
+    },
+    {
+      "label": "Categorías",
+      "href": "/dashboard/inventario/categorias"
+    },
+    {
+      "label": "Almacenes",
+      "href": "/dashboard/inventario/almacenes"
+    },
+    {
+      "label": "Recepciones",
+      "href": "/dashboard/inventario/recepciones"
+    },
+    {
+      "label": "Kardex",
+      "href": "/dashboard/inventario/kardex"
+    },
+    {
+      "label": "Ajustes y transferencias",
+      "href": "/dashboard/inventario/operaciones"
+    },
+    {
+      "label": "Órdenes de Preparación",
+      "href": "/dashboard/inventario/logistica/ordenes-pendientes"
+    },
+    {
+      "label": "Listo para Despacho",
+      "href": "/dashboard/inventario/logistica/listo-despacho"
+    },
+    {
+      "label": "CPE",
+      "href": "/dashboard/cpe"
+    },
+    {
+      "label": "GRE",
+      "href": "/dashboard/gre"
+    },
+    {
+      "label": "Reportes SIRE",
+      "href": "/dashboard/sire"
+    },
+    {
+      "label": "Compras",
+      "href": "/dashboard/compras"
+    },
+    {
+      "label": "Clientes",
+      "href": "/dashboard/ventas/clientes"
+    },
+    {
+      "label": "Cotizaciones",
+      "href": "/dashboard/ventas/cotizaciones"
+    },
+    {
+      "label": "Pedidos",
+      "href": "/dashboard/ventas/pedidos"
+    },
+    {
+      "label": "Aprobaciones",
+      "href": "/dashboard/ventas/aprobaciones"
+    },
+    {
+      "label": "RMA y devoluciones",
+      "href": "/dashboard/ventas/rma"
+    },
+    {
+      "label": "Cuentas por Cobrar",
+      "href": "/dashboard/finanzas/cxc"
+    },
+    {
+      "label": "Cuentas por Pagar",
+      "href": "/dashboard/finanzas/cxp"
+    },
+    {
+      "label": "Bancos",
+      "href": "/dashboard/finanzas/bancos"
+    },
+    {
+      "label": "Tesorería",
+      "href": "/dashboard/finanzas/tesoreria"
+    },
+    {
+      "label": "Conciliación bancaria",
+      "href": "/dashboard/finanzas/conciliacion"
+    },
+    {
+      "label": "Reportes financieros",
+      "href": "/dashboard/finanzas/reportes"
+    },
+    {
+      "label": "Usuarios",
+      "href": "/dashboard/usuarios"
+    },
+    {
+      "label": "RRHH",
+      "href": "/dashboard/rrhh"
+    },
+    {
+      "label": "PLAME / T-Registro",
+      "href": "/dashboard/rrhh/planilla-electronica"
+    },
+    {
+      "label": "Liquidaciones y CTS",
+      "href": "/dashboard/rrhh/liquidaciones"
+    },
+    {
+      "label": "Configuración",
+      "href": "/dashboard/configuracion"
+    },
+    {
+      "label": "Offline",
+      "href": "/dashboard/offline"
+    },
+    {
+      "label": "Auditoría",
+      "href": "/dashboard/audit-logs"
+    },
+    {
+      "label": "Ayuda",
+      "href": "/dashboard/ayuda"
+    }
+  ],
+  "limits": "Enlaces realmente renderizados con las banderas del ensayo; las acciones internas requieren la matriz por operación."
+}

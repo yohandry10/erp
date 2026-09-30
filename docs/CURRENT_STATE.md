@@ -2,7 +2,29 @@
 
 Actualizado: 2026-09-30.
 
-El estado productivo comprobado corresponde al PR #121, integrado como
+La ampliación local de RMA sobre factura pagada pasó 124 escenarios HTTP,
+catorce recorridos UI, 22 pantallas, contratos SQL y restauración
+(`artifacts/peru-integrated-local-rma-20260930`). Comprueba recepción parcial,
+reversa previa a NC, crédito 122, reembolso parcial por banco/caja, reversas,
+aplicación a CxC futura, permisos, aislamiento y asientos únicos/cuadrados.
+La UI recupera un fallo agotado del catálogo y una respuesta perdida tras el
+commit sin duplicar reembolso ni asiento. Se corrigió el error de catálogo
+sin captura y se bloquea confirmar mientras falten opciones verificadas.
+Los controles visibles de las 22 pantallas se conservan como inventario,
+sin convertir exposición en aceptación. CI y despliegue de este cambio pendientes.
+
+El PR #122 se integró como `5d98b214`. PROD avanzó transaccionalmente de 555
+a 556 tras CI completo, respaldo privado, restauración sin red, rollback
+inyectado y comprobación de hashes. Se completaron 871 cuentas operativas
+ausentes conservando las 2.556 anteriores, permisos, saldos y RLS
+(`artifacts/peru-556-promotion-20260930215330681.json`). No se crearon
+empresas ni documentos sintéticos. CI 36782425972, E2E 36782426005 y
+Security Scan 36782425958 de `main` pasaron. Render sirve `5d98b214`
+con DB/Redis listos y esquema requerido/aplicado 556; Vercel Production
+6771061047, login 200 y CORS 204 pasaron. La comprobación fue sólo lectura
+con preflight PROD (`artifacts/peru-production-verification-after-122-20260930.json`).
+
+La última comprobación productiva anterior corresponde al PR #121, integrado como
 `875bb7d8`: CI 36776906199, E2E 36776905987 y Security Scan
 36776905938 de `main` pasaron. Render sirve ese SHA con DB/Redis listos y
 esquema 555; Vercel Production 6770134168, login 200 y CORS 204 pasaron.
@@ -28,15 +50,18 @@ bajas/reactivación y respuesta perdida tras commit sin duplicación
 (`artifacts/peru-integrated-20260930211559712-22696`). Detectó cuentas 20/76
 ausentes al contabilizar el primer ajuste de una empresa nueva. La migración
 556 completa el catálogo operativo al crear/configurar Perú, preserva cuentas
-existentes y mantiene al consumidor en sólo lectura. Está pendiente de CI y
-promoción: PROD sigue en 555. El ensayo del respaldo privado sin red pasó
+existentes y mantiene al consumidor en sólo lectura. La 556 está promovida en
+PROD; CI del PR pasó 119 HTTP, trece recorridos UI y 22 pantallas
+(`artifacts/peru-integrated-ci-36780466766`). El ensayo del respaldo privado sin red pasó
 restauración, rollback inyectado, contratos SQL y preservación de cuentas,
 permisos y RLS (`artifacts/erp-peru-556-rehearsal-20260930212300192-22512.json`).
 Los 119 escenarios HTTP, SQL, restauración y trece flujos UI pasaron
 (`artifacts/peru-integrated-20260930212136146-24116`), incluido faltante
 físico con asiento 68 contra 20. El barrido adicional falló por SyntaxError
-JavaScript en `finanzas/conciliacion/[id]`: el ensayo global permanece fallido,
-con repetición y traza ampliada en curso. CI comprobará navegación ADMIN PE.
+JavaScript en `finanzas/conciliacion/[id]`: esa primera ejecución global conserva
+su resultado fallido. Una segunda ejecución local y CI pasaron las 22 pantallas
+sin reproducirlo, con traza ampliada. El navegador capturó 35 enlaces reales
+para ADMIN del primer cliente Perú; Analytics quedó excluido.
 
 El cobro CxC inicial del primer ADMIN no demo pasó desde navegador con
 respuesta perdida después del commit local: el formulario conserva los datos
