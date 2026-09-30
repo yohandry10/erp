@@ -37,10 +37,10 @@ function uuid(value) {
   assert.match(value, /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i);
   return `'${value}'::uuid`;
 }
-async function request(path, body, expected = body === undefined ? 200 : 201, extraHeaders = {}) {
+async function request(path, body, expected = body === undefined ? 200 : 201, extraHeaders = {}, method) {
   for (let attempt = 0; attempt < 3; attempt++) {
     const response = await fetch(new URL(`/api/${path}`, origin), {
-      method: body === undefined ? 'GET' : 'POST', redirect: 'error',
+      method: method ?? (body === undefined ? 'GET' : 'POST'), redirect: 'error',
       headers: { 'content-type': 'application/json', connection: 'close', ...(token ? { authorization: `Bearer ${token}` } : {}), ...extraHeaders },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       signal: AbortSignal.timeout(30000),
