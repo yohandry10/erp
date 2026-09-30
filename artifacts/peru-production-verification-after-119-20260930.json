@@ -1,0 +1,32 @@
+{
+  "date_utc": "2026-09-30",
+  "merge_sha": "3bf774c498d59932c696b32fc78926050aedf0d2",
+  "read_only": true,
+  "synthetic_prod_writes": false,
+  "prod_preflight": "passed: authorized project and internal marker",
+  "github_main": {
+    "ci": { "run_id": 36764608565, "conclusion": "failure", "failed_job": "Security audit", "all_other_jobs": "success", "vulnerabilities": { "high": 17, "moderate": 14, "low": 1 } },
+    "e2e_web_aislado": { "run_id": 36764608474, "conclusion": "success" },
+    "security_scan": { "run_id": 36764608488, "conclusion": "success" }
+  },
+  "render": {
+    "version_commit": "3bf774c498d59932c696b32fc78926050aedf0d2",
+    "ready_status": "ready",
+    "database_ready": true,
+    "redis_ready": true,
+    "schema_version": 555,
+    "required_schema_version": 555,
+    "claimable_outbox": 0,
+    "failed_outbox": 0,
+    "stale_processing_outbox": 0,
+    "dead_letter_historical": 7,
+    "effective_plan": "not_verified_administratively"
+  },
+  "vercel": {
+    "production_deployment_id": 6768077437,
+    "deployment_state": "success",
+    "login_follow_redirect_http_status": 200
+  },
+  "cors_preflight_http_status": 204,
+  "launch_result": "not_accepted: dependency audit and functional matrix gaps remain"
+}
