@@ -1,0 +1,22 @@
+
+Running 13 tests using 1 worker
+
+(node:20180) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:20180) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 [chromium] › tests\e2e\peru-integrated-local.spec.ts:34:5 › Perú: reportes muestran tendencia, código del producto y filtro de cliente real (15.7s)
+  ok  2 [chromium] › tests\e2e\peru-integrated-local.spec.ts:62:5 › Perú: CxC cobrada se busca, muestra dos pagos y se exporta desde la interfaz real (5.4s)
+  ok  3 [chromium] › tests\e2e\peru-integrated-local.spec.ts:115:5 › Perú: primer administrador importa, edita y desactiva maestros con recuperación de error (28.0s)
+  ok  4 [chromium] › tests\e2e\peru-integrated-local.spec.ts:252:5 › Perú: primer administrador filtra usuarios por rol y estado con API real (6.7s)
+  ok  5 [chromium] › tests\e2e\peru-integrated-local.spec.ts:293:5 › Perú: primer administrador reintenta cobro CxC con respuesta perdida sin duplicar y cierra caja (3.7s)
+  ok  6 [chromium] › tests\e2e\peru-integrated-local.spec.ts:401:5 › Perú: ajuste con respuesta perdida, transferencia y kardex conservan existencias reales (7.3s)
+  ok  7 [chromium] › tests\e2e\peru-integrated-local.spec.ts:490:5 › Perú: crea centro de costo y conserva un presupuesto al editar y recargar (29.8s)
+  ok  8 [chromium] › tests\e2e\peru-integrated-local.spec.ts:576:5 › Perú: candidato conserva perfil y vacante después de crear, editar y recargar (10.7s)
+  ok  9 [chromium] › tests\e2e\peru-integrated-local.spec.ts:649:5 › Perú: superadministrador cambia de empresa y conserva la sesión al recargar (7.0s)
+  ok 10 [chromium] › tests\e2e\peru-integrated-local.spec.ts:691:5 › Perú: consulta y filtra la auditoría de recepciones con la API real (7.9s)
+  ok 11 [chromium] › tests\e2e\peru-integrated-local.spec.ts:750:5 › Perú: login y POS usan la API y base efímera reales (17.1s)
+  ok 12 [chromium] › tests\e2e\peru-integrated-local.spec.ts:817:5 › Perú: crea, aprueba y recibe una compra desde la interfaz real (31.8s)
+  ok 13 [chromium] › tests\e2e\peru-integrated-local.spec.ts:910:5 › Perú: retoma preparación logística tras fallo de packing y recarga (8.4s)
+
+  13 passed (3.0m)

@@ -2,29 +2,41 @@
 
 Actualizado: 2026-09-30.
 
-El PR #120 se integró como `8b6db30d`; CI 36770807955, E2E
-36770807974 y Security Scan 36770807986 de `main` pasaron, incluida la
-auditoría de dependencias. Render sirve ese SHA con DB/Redis listos y esquema
-555; Vercel Production 6769134544 tuvo éxito, login 200 y CORS 204. La
-comprobación fue sólo lectura, con preflight PROD, sin migraciones ni datos
-sintéticos (`artifacts/peru-production-verification-after-120-20260930.json`).
+El estado productivo comprobado corresponde al PR #121, integrado como
+`875bb7d8`: CI 36776906199, E2E 36776905987 y Security Scan
+36776905938 de `main` pasaron. Render sirve ese SHA con DB/Redis listos y
+esquema 555; Vercel Production 6770134168, login 200 y CORS 204 pasaron.
+La comprobación fue sólo lectura con preflight PROD
+(`artifacts/peru-production-verification-after-121-20260930.json`).
 La actualización de Axios, Nodemailer, fast-uri, brace-expansion, Multer y
 DOMPurify cerró los 32 avisos que bloquearon el CI del PR #119; la auditoría
 local no encontró vulnerabilidades conocidas y pasaron tipos en siete
 proyectos y 300 suites/2895 pruebas API. El plan efectivo de Render continúa
 sin confirmación administrativa.
 
-La ampliación local de maestros y administración pasó 113 escenarios HTTP,
-SQL y restauración; once de doce recorridos UI pasaron, incluidos importación,
-edición y desactivación de clientes/proveedores con error 503 y reintento,
-y filtros reales de usuarios por rol/estado. El recorrido de presupuestos agotó
-una espera de cinco segundos durante compilación local; se ajustó a navegación
-y carga explícitas. La suite completa queda pendiente de CI. Se corrigieron
-la búsqueda de usuarios por email, el valor UUID del filtro de rol y la falsa
-confirmación de bajas ante error de red. Bajas lógicas conservan saldos,
-una sola auditoría y rechazan permisos/identidades ajenas; desactivar un usuario
-revoca su sesión. El correo está deshabilitado explícitamente en el harness local
-(`artifacts/peru-integrated-20260930203532432-24284`).
+La ampliación de maestros y administración del PR #121 se integró como
+`875bb7d8`. Su CI de PR 36775048567 pasó 113 escenarios HTTP, SQL,
+restauración y los doce recorridos UI, incluidos maestros y filtros de usuarios
+(`artifacts/peru-integrated-ci-36775048567`). Se corrigieron búsqueda por email,
+filtro de rol UUID y falsas confirmaciones ante error de red. Bajas lógicas
+conservan saldos y una sola auditoría; desactivar un usuario revoca su sesión.
+El correo permanece explícitamente deshabilitado en el harness local.
+
+La ampliación de inventario pasó un ensayo específico de 28 HTTP y cuatro
+recorridos UI: ajustes/transferencias, kardex, validaciones, permisos y tenant,
+bajas/reactivación y respuesta perdida tras commit sin duplicación
+(`artifacts/peru-integrated-20260930211559712-22696`). Detectó cuentas 20/76
+ausentes al contabilizar el primer ajuste de una empresa nueva. La migración
+556 completa el catálogo operativo al crear/configurar Perú, preserva cuentas
+existentes y mantiene al consumidor en sólo lectura. Está pendiente de CI y
+promoción: PROD sigue en 555. El ensayo del respaldo privado sin red pasó
+restauración, rollback inyectado, contratos SQL y preservación de cuentas,
+permisos y RLS (`artifacts/erp-peru-556-rehearsal-20260930212300192-22512.json`).
+Los 119 escenarios HTTP, SQL, restauración y trece flujos UI pasaron
+(`artifacts/peru-integrated-20260930212136146-24116`), incluido faltante
+físico con asiento 68 contra 20. El barrido adicional falló por SyntaxError
+JavaScript en `finanzas/conciliacion/[id]`: el ensayo global permanece fallido,
+con repetición y traza ampliada en curso. CI comprobará navegación ADMIN PE.
 
 El cobro CxC inicial del primer ADMIN no demo pasó desde navegador con
 respuesta perdida después del commit local: el formulario conserva los datos

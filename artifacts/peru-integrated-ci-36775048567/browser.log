@@ -1,0 +1,17 @@
+
+Running 12 tests using 1 worker
+
+  ✓   1 [chromium] › tests/e2e/peru-integrated-local.spec.ts:34:5 › Perú: reportes muestran tendencia, código del producto y filtro de cliente real (16.7s)
+  ✓   2 [chromium] › tests/e2e/peru-integrated-local.spec.ts:62:5 › Perú: CxC cobrada se busca, muestra dos pagos y se exporta desde la interfaz real (5.6s)
+  ✓   3 [chromium] › tests/e2e/peru-integrated-local.spec.ts:115:5 › Perú: primer administrador importa, edita y desactiva maestros con recuperación de error (27.4s)
+  ✓   4 [chromium] › tests/e2e/peru-integrated-local.spec.ts:252:5 › Perú: primer administrador filtra usuarios por rol y estado con API real (7.7s)
+  ✓   5 [chromium] › tests/e2e/peru-integrated-local.spec.ts:293:5 › Perú: primer administrador reintenta cobro CxC con respuesta perdida sin duplicar y cierra caja (4.0s)
+  ✓   6 [chromium] › tests/e2e/peru-integrated-local.spec.ts:401:5 › Perú: crea centro de costo y conserva un presupuesto al editar y recargar (21.4s)
+  ✓   7 [chromium] › tests/e2e/peru-integrated-local.spec.ts:487:5 › Perú: candidato conserva perfil y vacante después de crear, editar y recargar (9.5s)
+  ✓   8 [chromium] › tests/e2e/peru-integrated-local.spec.ts:560:5 › Perú: superadministrador cambia de empresa y conserva la sesión al recargar (7.0s)
+  ✓   9 [chromium] › tests/e2e/peru-integrated-local.spec.ts:602:5 › Perú: consulta y filtra la auditoría de recepciones con la API real (6.1s)
+  ✓  10 [chromium] › tests/e2e/peru-integrated-local.spec.ts:661:5 › Perú: login y POS usan la API y base efímera reales (13.7s)
+  ✓  11 [chromium] › tests/e2e/peru-integrated-local.spec.ts:728:5 › Perú: crea, aprueba y recibe una compra desde la interfaz real (26.9s)
+  ✓  12 [chromium] › tests/e2e/peru-integrated-local.spec.ts:821:5 › Perú: retoma preparación logística tras fallo de packing y recarga (8.6s)
+
+  12 passed (2.6m)

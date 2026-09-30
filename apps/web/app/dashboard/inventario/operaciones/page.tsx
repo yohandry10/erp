@@ -58,7 +58,7 @@ function SinPermiso() {
 }
 
 export default function OperacionesInventarioPage() {
-  const { get, post } = useApi()
+  const { get, post } = useApi({ throwOnError: true })
   const [modo, setModo] = useState<'ajuste' | 'transferencia'>('ajuste')
   const [productos, setProductos] = useState<Producto[]>([])
   const [almacenes, setAlmacenes] = useState<Almacen[]>([])
