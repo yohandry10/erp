@@ -9,9 +9,12 @@ import { setTimeout as delay } from 'node:timers/promises';
 // y sólo detiene los procesos/contenedores cuyo identificador obtuvo al crearlos.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const withSurvey = process.argv.includes('--survey');
-const withRecords = process.argv.includes('--records');
+const recordsOnly = process.argv.includes('--records-only');
+const withRecords = process.argv.includes('--records') || recordsOnly;
 const withBrowser = process.argv.includes('--browser') || withSurvey || withRecords;
-if (process.argv.slice(2).some(arg => !['--browser', '--survey', '--records'].includes(arg))) throw new Error('Uso: node scripts/ci/run-peru-integrated-local.mjs [--browser] [--survey] [--records]');
+const focusOnboarding = process.argv.includes('--focus-onboarding');
+if (focusOnboarding && (withSurvey || withRecords)) throw new Error('El foco de onboarding no acredita el recorrido general de pantallas');
+if (process.argv.slice(2).some(arg => !['--browser', '--survey', '--records', '--focus-onboarding', '--records-only'].includes(arg))) throw new Error('Uso: node scripts/ci/run-peru-integrated-local.mjs [--browser] [--survey] [--records] [--focus-onboarding] [--records-only]');
 const runId = new Date().toISOString().replace(/[^0-9]/g, '') + '-' + process.pid;
 const output = path.join(root, 'artifacts', `peru-integrated-${runId}`);
 mkdirSync(output, { recursive: true });
@@ -40,6 +43,7 @@ for (const key of Object.keys(env)) {
 Object.assign(env, {
   NODE_ENV: 'development', JWT_SECRET: 'local-api-integration-jwt-key-20260905-never-production',
   EMAIL_DISABLED: 'true', EMAIL_PROVIDER: 'smtp',
+  LOCAL_INTEGRATED_FOCUS: focusOnboarding ? 'onboarding' : 'full',
   E2E_EPHEMERAL_LOCAL_DB: '1', E2E_ISOLATED_BROWSER: '0',
   LOCAL_API_URL: apiUrl, LOCAL_API_PORT: apiPort, LOCAL_WEB_URL: webUrl,
   LOCAL_POSTGREST_URL: `http://127.0.0.1:${restPort}`,
@@ -172,16 +176,18 @@ try {
   if (withBrowser) {
     const web = launch('web', process.execPath, [webRequire.resolve('next/dist/bin/next'), 'dev', '-p', webPort, '--hostname', '127.0.0.1'], webDirectory);
     await waitReady('Web', () => readFileSync(path.join(output, 'web.log'), 'utf8').includes('Ready in') && httpReady(`${webUrl}/login/`), web);
-    await run('browser', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-integrated-local.spec.ts', '--reporter=list'], webDirectory);
+    await run('browser', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-integrated-local.spec.ts', '--reporter=list',
+      ...(focusOnboarding ? ['--grep', 'primer administrador|ajuste con respuesta perdida'] : [])], webDirectory);
     if (withSurvey) await run('module-survey', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-module-survey-local.spec.ts', '--reporter=list'], webDirectory);
     if (withRecords) await run('record-survey', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-record-survey-local.spec.ts', '--reporter=list'], webDirectory);
   }
   success = true;
-  console.log('[peru-integrated] PASS: contratos SQL, HTTP y contabilidad' + (withBrowser ? ', más venta desde navegador' : ''));
+  console.log('[peru-integrated] PASS: contratos SQL, HTTP y contabilidad; alcance ' + (focusOnboarding ? 'onboarding/inventario' : recordsOnly ? 'pantallas con registros' : 'completo') + (withBrowser ? ', con recorridos de navegador' : ''));
 } catch (error) {
   console.error(error);
   process.exitCode = 1;
 } finally {
   await cleanup();
-  writeFileSync(path.join(output, 'run.json'), JSON.stringify({ completedAt: new Date().toISOString(), success, withBrowser, withSurvey, withRecords, database: 'PostgreSQL 16 efímero', output, remoteWrites: false }, null, 2));
+  writeFileSync(path.join(output, 'run.json'), JSON.stringify({ completedAt: new Date().toISOString(), success, withBrowser, withSurvey, withRecords,
+    scope: focusOnboarding ? 'onboarding_inventory_subset' : recordsOnly ? 'record_survey_subset' : 'full', database: 'PostgreSQL 16 efímero', output, remoteWrites: false }, null, 2));
 }

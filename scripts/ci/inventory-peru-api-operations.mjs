@@ -84,6 +84,7 @@ if (process.argv[2]) {
   }
   const matrix = { generated_at: new Date().toISOString(), inventory: path.relative(root, output).replaceAll('\\', '/'),
     evidence: path.relative(root, evidenceDirectory).replaceAll('\\', '/'),
+    evidence_scope: run.scope ?? 'full',
     evidence_kind: 'HTTP contra Nest/PostgREST/PostgreSQL efímeros; no contiene cuerpos, tokens ni credenciales',
     acceptance_rule: 'HTTP observado no acredita persistencia, aislamiento, permisos, UI ni flujo completo; la aceptación funcional de escenarios permanece en la matriz manual.',
     excluded: ['Analytics'], operational_accounting_tax_reports_included: true,

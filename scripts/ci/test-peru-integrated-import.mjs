@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { testPeruMasterLifecycle } from './test-peru-master-lifecycle.mjs';
+import { testPeruInventoryLifecycle } from './test-peru-inventory-lifecycle.mjs';
 
 // Importación de maestros por la API local; incluye filas válidas e inválidas.
 // El runner exige una base efímera y bloquea destinos remotos.
-export async function testMigrationImport({ request, sql, uuid, results, tenantId, otherTenantToken }) {
+export async function testMigrationImport({ request, sql, uuid, results, tenantId, otherTenantToken, processAccounting }) {
   const suffix = randomUUID().slice(0, 8);
   const masterExternalIds = {};
   for (const kind of ['clientes', 'proveedores']) {
@@ -205,4 +206,5 @@ export async function testMigrationImport({ request, sql, uuid, results, tenantI
   await request('migration/preview', { runType: 'clientes', fileBase64: 'base64-malformado' }, 400);
   results.push({ scenario: 'importación rechaza base64 inválido antes de crear registros', passed: true });
   await testPeruMasterLifecycle({ request, sql, uuid, results, tenantId, otherTenantToken, masterExternalIds });
+  await testPeruInventoryLifecycle({ request, sql, uuid, results, tenantId, otherTenantToken, processAccounting });
 }
