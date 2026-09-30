@@ -1,0 +1,45 @@
+{
+  "scope": "Casos funcionales concretos; no acepta todas las variantes de una operación ni sustituye navegador o aceptación externa",
+  "cases": [
+    {
+      "id": "rma-paid-partial-receipt-reversal",
+      "source": "scripts/ci/test-peru-paid-rma.mjs",
+      "required_scenario_prefixes": ["RMA pagada: recepción parcial", "RMA pagada: lector no reembolsa"],
+      "operations": [{ "method": "POST", "endpoint": "/api/ventas/rma/:id/revertir-recepcion" }],
+      "verified_checks": ["stock persistido", "reversión previa a NC y replay", "lector rechazado", "reversión posterior a NC bloqueada sin mutar"],
+      "pending_checks": ["UI", "aislamiento de esta mutación", "variantes de servicio y varias líneas"]
+    },
+    {
+      "id": "rma-paid-credit-note",
+      "source": "scripts/ci/test-peru-paid-rma.mjs",
+      "required_scenario_prefixes": ["RMA pagada: recepción parcial", "RMA pagada: saldo se aplica"],
+      "operations": [{ "method": "POST", "endpoint": "/api/ventas/rma/:id/nota-credito" }],
+      "verified_checks": ["recepción parcial bloquea NC", "NC de factura pagada genera crédito", "replay conserva un documento", "cuenta 122 y asiento único cuadrado"],
+      "pending_checks": ["UI", "permisos e aislamiento de emisión", "otras variantes fiscales", "transmisión externa", "impresión/XML"]
+    },
+    {
+      "id": "rma-paid-refund-bank-cash",
+      "source": "scripts/ci/test-peru-paid-rma.mjs",
+      "required_scenario_prefixes": ["RMA pagada: lector no reembolsa", "RMA pagada: nota genera saldo", "RMA pagada: reembolso en caja", "RMA pagada: saldo se aplica"],
+      "operations": [{ "method": "POST", "endpoint": "/api/ventas/rma/saldos-favor/:id/reembolsar" }],
+      "verified_checks": ["crédito, banco y caja persistidos", "lector rechazado", "tenant ajeno y UUID inexistente devuelven el mismo error sin mutar", "exceso rechazado", "replay conserva movimiento y asiento único cuadrado"],
+      "pending_checks": ["UI de reembolso en caja", "variantes de moneda", "otras validaciones de medios"]
+    },
+    {
+      "id": "rma-paid-refund-reversal",
+      "source": "scripts/ci/test-peru-paid-rma.mjs",
+      "required_scenario_prefixes": ["RMA pagada: nota genera saldo", "RMA pagada: reembolso en caja", "RMA pagada: saldo se aplica"],
+      "operations": [{ "method": "POST", "endpoint": "/api/ventas/rma/saldos-favor/:id/reembolsos/:movimientoId/revertir" }],
+      "verified_checks": ["restauración de crédito, banco y caja", "replay conserva reversa única", "contra-asiento 122 único cuadrado"],
+      "pending_checks": ["UI", "permisos e aislamiento de esta mutación", "validaciones de sesión y período"]
+    },
+    {
+      "id": "rma-paid-apply-future-cxc",
+      "source": "scripts/ci/test-peru-paid-rma.mjs",
+      "required_scenario_prefixes": ["RMA pagada: saldo se aplica"],
+      "operations": [{ "method": "POST", "endpoint": "/api/ventas/rma/saldos-favor/:id/aplicar" }],
+      "verified_checks": ["crédito y CxC futura persisten", "lector rechazado", "replay no fabrica cobro ni movimiento bancario", "asiento 122 único cuadrado"],
+      "pending_checks": ["UI", "aislamiento de esta mutación", "cuenta ajena, moneda y exceso"]
+    }
+  ]
+}

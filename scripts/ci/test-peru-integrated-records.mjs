@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { testPeruPaidRma } from './test-peru-paid-rma.mjs';
 import { randomUUID } from 'node:crypto';
 
 // Registros reales creados por HTTP en la infraestructura efímera del runner.
@@ -249,5 +250,7 @@ export async function testRecordFlows({ request, sql, uuid, results, tenantId, p
   assert.equal(sql(`SELECT count(*) FROM asientos_contables a JOIN outbox_events e ON e.event_id=a.source_event_id WHERE e.tenant_id=${uuid(tenantId)} AND e.idempotency_key IN (${uuid(firstPayment.idempotency_key)}::text,${uuid(finalPayment.idempotency_key)}::text) AND a.estado='CONFIRMADO' AND a.total_debe=a.total_haber;`), '2');
   results.push({ scenario: 'pedido despachado genera CPE/CxC; cobro parcial entra al banco, saldo en efectivo entra a caja, arqueo cierra y ambos crean asientos únicos al reintentar', passed: true,
     pedido_id: collectionOrderId, cxc_id: cxcId });
+  await testPeruPaidRma({ request, sql, uuid, results, tenantId, otherTenantToken, approverToken,
+    client, product, warehouseId, processAccounting });
 
 }
