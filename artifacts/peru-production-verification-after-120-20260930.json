@@ -1,0 +1,95 @@
+{
+  "verified_at_utc": "2026-09-30T20:34:56.499Z",
+  "merge_sha": "8b6db30d6ba4e41db6d14153185968df712aed86",
+  "read_only": true,
+  "synthetic_prod_writes": false,
+  "prod_preflight": "passed 2026-09-30T20:10Z: authorized project and internal marker",
+  "github_main": [
+    {
+      "conclusion": "success",
+      "headSha": "8b6db30d6ba4e41db6d14153185968df712aed86",
+      "name": "CI",
+      "status": "completed",
+      "url": "https://github.com/yohandry10/erp/actions/runs/36770807955"
+    },
+    {
+      "conclusion": "success",
+      "headSha": "8b6db30d6ba4e41db6d14153185968df712aed86",
+      "name": "E2E web aislado",
+      "status": "completed",
+      "url": "https://github.com/yohandry10/erp/actions/runs/36770807974"
+    },
+    {
+      "conclusion": "success",
+      "headSha": "8b6db30d6ba4e41db6d14153185968df712aed86",
+      "name": "Security Scan",
+      "status": "completed",
+      "url": "https://github.com/yohandry10/erp/actions/runs/36770807986"
+    }
+  ],
+  "render": {
+    "version": {
+      "service": "erp-api",
+      "version": "1.0.0",
+      "commit": "8b6db30d6ba4e41db6d14153185968df712aed86",
+      "buildDate": "unknown",
+      "renderServiceId": "srv-d9plnou417fc73e6qbfg",
+      "nodeEnv": "production",
+      "timestamp": "2026-09-30T20:34:43.908Z"
+    },
+    "ready": {
+      "status": "ready",
+      "timestamp": "2026-09-30T20:34:44.404Z",
+      "checks": {
+        "database": {
+          "ready": true,
+          "backlog": {
+            "failed": 0,
+            "limits": {
+              "max_claimable": 5000,
+              "max_dead_letter": 100,
+              "max_oldest_seconds": 900,
+              "processing_stale_seconds": 900
+            },
+            "claimable": 0,
+            "processing": 0,
+            "dead_letter": 7,
+            "stale_processing": 0,
+            "oldest_claimable_seconds": 0
+          },
+          "contract": {
+            "outbox_rpcs": true,
+            "schema_version": 555,
+            "service_role_reads": true,
+            "required_schema_applied": true,
+            "required_schema_version": 555,
+            "schema_history_available": true,
+            "missing_service_role_reads": []
+          },
+          "database": "ok"
+        },
+        "redis": {
+          "ready": true,
+          "required": true,
+          "status": "ready",
+          "mode": "redis"
+        }
+      },
+      "version": "1.0.0"
+    },
+    "health": {
+      "status": "healthy",
+      "timestamp": "2026-09-30T20:34:44.580Z",
+      "uptime": 1335.135927448,
+      "version": "1.0.0"
+    },
+    "effective_plan": "not_verified_administratively"
+  },
+  "vercel": {
+    "production_deployment_id": 6769134544,
+    "deployment_state": "success",
+    "login_follow_redirect_http_status": 200
+  },
+  "cors_preflight_http_status": 204,
+  "launch_result": "not_accepted: functional matrix gaps remain"
+}

@@ -23,7 +23,7 @@ import {
 
 export default function ProveedoresPage() {
   const router = useRouter()
-  const { get, del } = useApi()
+  const { get, del } = useApi({ throwOnError: true })
   const { formatCurrency: formatLocalizedCurrency, taxIdLabel } = useLocalizedMoney()
 
   const [proveedores, setProveedores] = useState<Proveedor[]>([])

@@ -10,7 +10,7 @@ import * as crypto from 'crypto';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EmailService } from '../../shared/email/email.service';
 import { PermissionService } from '../permissions/permission.service';
-import { sanitizePostgrestSearch } from '../../common/util/postgrest.util';
+import { quotedPostgrestContainsPattern } from '../../common/util/postgrest.util';
 import { CreateUserDto, UpdateUserDto, UserFiltersDto } from './dto';
 
 const USER_SAFE_SELECT = `
@@ -141,8 +141,11 @@ export class UserManagementService {
       .select(USER_SAFE_SELECT, { count: 'exact' })
       .eq('tenant_id', tenantId);
     if (filters?.search) {
-      const safe = sanitizePostgrestSearch(filters.search);
-      if (safe) query = query.or(`nombre.ilike.%${safe}%,email.ilike.%${safe}%`);
+      const search = filters.search.trim();
+      if (search) {
+        const pattern = quotedPostgrestContainsPattern(search);
+        query = query.or(`nombre.ilike.${pattern},email.ilike.${pattern}`);
+      }
     }
     if (filters?.estado) query = query.eq('estado', filters.estado);
     const { data, error, count } = await query

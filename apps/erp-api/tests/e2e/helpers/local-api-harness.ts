@@ -18,6 +18,7 @@ for (const name of Object.keys(process.env)) {
 }
 Object.assign(process.env, {
   NODE_ENV: 'test', DEPLOYMENT_ENV: 'PROD',
+  EMAIL_DISABLED: 'true', EMAIL_PROVIDER: 'smtp',
   FRONTEND_URL: webUrl.origin,
   ALLOWED_ORIGINS: webUrl.origin,
   ENCRYPTION_KEY: 'local-integration-encryption-key-20260905-only',
