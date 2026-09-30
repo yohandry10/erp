@@ -1,4 +1,4 @@
-import { test, expect, type BrowserContext, type Page } from '@playwright/test'
+import { test, expect, type BrowserContext, type Dialog, type Page } from '@playwright/test'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -112,7 +112,7 @@ test('Perú: CxC cobrada se busca, muestra dos pagos y se exporta desde la inter
   await expect(page.getByRole('row').filter({ hasText: String(detail.numero) })).toBeVisible()
 })
 
-test('Perú: primer administrador importa y edita clientes y proveedores desde navegador', async ({ page, context }) => {
+test('Perú: primer administrador importa, edita y desactiva maestros con recuperación de error', async ({ page, context }) => {
   test.setTimeout(240000)
   if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere base local efímera')
   const evidence = JSON.parse(await fs.readFile(path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'http.json'), 'utf8'))
@@ -123,7 +123,14 @@ test('Perú: primer administrador importa y edita clientes y proveedores desde n
   await page.goto('/login/')
   await page.locator('#email').fill(onboarding.client_email)
   await page.locator('#password').fill('Cliente-Local-2026-Only!')
-  await submitLocalLogin(page)
+  const [login] = await Promise.all([
+    page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith('/api/auth/login') && response.status() === 201),
+    submitLocalLogin(page),
+  ])
+  const auth = await login.json()
+  const token = auth.access_token ?? auth.data?.access_token
+  expect(token).toBeTruthy()
+  const headers = { Authorization: `Bearer ${token}` }
   await page.waitForURL('**/dashboard/**')
   const importSuffix = randomUUID().slice(0, 8)
   const numericSuffix = String(Number.parseInt(importSuffix, 16) % 100_000_000).padStart(8, '0')
@@ -181,6 +188,8 @@ test('Perú: primer administrador importa y edita clientes y proveedores desde n
     expect(await fs.readFile(await download.path(), 'utf8')).toContain(name)
     await page.getByRole('row').filter({ hasText: name }).getByRole('button', { name: 'Editar' }).click()
     await expect(page).toHaveURL(/\/editar\/?$/)
+    const masterId = new URL(page.url()).pathname.split('/').filter(Boolean).at(-2)!
+    expect(masterId).toMatch(/^[0-9a-f-]{36}$/i)
     const editedName = `${name} EDITADO`
     await page.locator(item.entity === 'clientes' ? '#razon_social' : '#proveedorform-razon-social').fill(editedName)
     if (item.entity === 'clientes') page.once('dialog', dialog => dialog.accept())
@@ -189,7 +198,96 @@ test('Perú: primer administrador importa y edita clientes y proveedores desde n
     await page.goto(item.route)
     await page.getByRole('textbox', { name: 'Buscar' }).fill(editedName)
     await expect(page.getByRole('row').filter({ hasText: editedName })).toBeVisible()
+    const masterPath = item.entity === 'clientes' ? 'ventas/clientes' : 'compras/proveedores'
+    const deleteRoute = new RegExp(`/api/${masterPath}/${masterId}/?$`)
+    const nativeMessages: string[] = []
+    const acceptNativeDialog = async (nativeDialog: Dialog) => {
+      nativeMessages.push(nativeDialog.message())
+      await nativeDialog.accept()
+    }
+    page.on('dialog', acceptNativeDialog)
+    await page.route(deleteRoute, route => route.fulfill({ status: 503, contentType: 'application/json',
+      body: JSON.stringify({ message: 'Interrupción local de desactivación' }) }), { times: 1 })
+    const editedRow = page.getByRole('row').filter({ hasText: editedName })
+    const [failedDelete] = await Promise.all([
+      page.waitForResponse(response => deleteRoute.test(new URL(response.url()).pathname) && response.request().method() === 'DELETE'),
+      editedRow.getByRole('button', { name: 'Desactivar' }).click(),
+    ])
+    expect(failedDelete.status()).toBe(503)
+    if (item.entity === 'clientes') {
+      await expect.poll(() => nativeMessages.join('\n')).toContain('Interrupción local de desactivación')
+      expect(nativeMessages.some(message => message.includes('desactivado correctamente'))).toBe(false)
+    } else {
+      await expect(page.getByText('Interrupción local de desactivación', { exact: false }).first()).toBeVisible()
+      await expect(page.getByText('✅ Proveedor desactivado correctamente')).toHaveCount(0)
+    }
+    await expect(editedRow.getByRole('cell', { name: 'ACTIVO', exact: true })).toBeVisible()
+    const activeResponse = await page.request.get(`${process.env.LOCAL_API_URL}/api/${masterPath}/${masterId}`, { headers })
+    expect(activeResponse.ok(), await activeResponse.text()).toBeTruthy()
+    const activeRaw = await activeResponse.json()
+    expect((activeRaw.data ?? activeRaw).activo).toBe(true)
+    const [deleted] = await Promise.all([
+      page.waitForResponse(response => deleteRoute.test(new URL(response.url()).pathname) && response.request().method() === 'DELETE'),
+      editedRow.getByRole('button', { name: 'Desactivar' }).click(),
+    ])
+    expect(deleted.status()).toBe(item.entity === 'clientes' ? 204 : 200)
+    await expect(editedRow).toContainText('INACTIVO')
+    await expect(editedRow.getByRole('button', { name: 'Desactivar' })).toHaveCount(0)
+    await page.goto(item.route)
+    await page.getByRole('textbox', { name: 'Buscar' }).fill(editedName)
+    await expect(page.getByRole('row').filter({ hasText: editedName })).toContainText('INACTIVO')
+    const inactiveResponse = await page.request.get(`${process.env.LOCAL_API_URL}/api/${masterPath}/${masterId}`, { headers })
+    const inactiveRaw = await inactiveResponse.json()
+    expect((inactiveRaw.data ?? inactiveRaw).activo).toBe(false)
+    const [inactiveExport] = await Promise.all([
+      page.waitForEvent('download'), page.getByRole('button', { name: 'Exportar página (CSV)' }).click(),
+    ])
+    const inactiveCsv = await fs.readFile(await inactiveExport.path(), 'utf8')
+    expect(inactiveCsv).toContain(editedName)
+    expect(inactiveCsv).toContain(item.entity === 'clientes' ? 'INACTIVO' : 'false')
+    page.off('dialog', acceptNativeDialog)
   }
+})
+
+test('Perú: primer administrador filtra usuarios por rol y estado con API real', async ({ page, context }) => {
+  test.setTimeout(180000)
+  if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere base local efímera')
+  const evidence = JSON.parse(await fs.readFile(path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'http.json'), 'utf8'))
+  const onboarding = evidence.results.find((row: { scenario: string }) => row.scenario.startsWith('alta no demo y primer administrador'))
+  const reader = evidence.results.find((row: { scenario: string }) => row.scenario.startsWith('primer ADMIN crea, reintenta, edita y busca usuario/rol'))
+  expect(onboarding?.client_email && reader?.reader_email).toBeTruthy()
+  await context.route('**/*', route => ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(route.request().url()).hostname)
+    ? route.continue() : route.abort('blockedbyclient'))
+  await page.goto('/login/')
+  await page.locator('#email').fill(onboarding.client_email)
+  await page.locator('#password').fill('Cliente-Local-2026-Only!')
+  await submitLocalLogin(page)
+  await page.waitForURL('**/dashboard/**')
+  await page.goto('/dashboard/usuarios/')
+  await expect(page.getByRole('row').filter({ hasText: onboarding.client_email })).toBeVisible()
+  const roleFilter = page.getByRole('combobox', { name: 'Filtro rol' })
+  const adminRoleId = await roleFilter.locator('option').filter({ hasText: /^ADMIN$/ }).getAttribute('value')
+  expect(adminRoleId).toMatch(/^[0-9a-f-]{36}$/i)
+  const [roleResponse] = await Promise.all([
+    page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith('/api/usuarios-sistema')
+      && new URL(response.url()).searchParams.get('rol') === adminRoleId),
+    roleFilter.selectOption(adminRoleId!),
+  ])
+  expect(roleResponse.status()).toBe(200)
+  await expect(page.getByRole('row').filter({ hasText: onboarding.client_email })).toBeVisible()
+  await expect(page.getByRole('row').filter({ hasText: reader.reader_email })).toHaveCount(0)
+  await roleFilter.selectOption('todos')
+  const [stateResponse] = await Promise.all([
+    page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith('/api/usuarios-sistema')
+      && new URL(response.url()).searchParams.get('estado') === 'INACTIVO'),
+    page.getByRole('combobox', { name: 'Filtro estado' }).selectOption('INACTIVO'),
+  ])
+  expect(stateResponse.status()).toBe(200)
+  await expect(page.getByRole('row').filter({ hasText: reader.reader_email })).toBeVisible()
+  await expect(page.getByRole('row').filter({ hasText: onboarding.client_email })).toHaveCount(0)
+  await page.reload()
+  await page.getByRole('combobox', { name: 'Filtro estado' }).selectOption('INACTIVO')
+  await expect(page.getByRole('row').filter({ hasText: reader.reader_email })).toBeVisible()
 })
 
 test('Perú: primer administrador reintenta cobro CxC con respuesta perdida sin duplicar y cierra caja', async ({ page, context }) => {
@@ -346,7 +444,8 @@ test('Perú: crea centro de costo y conserva un presupuesto al editar y recargar
   const row = page.getByRole('row').filter({ hasText: centerName })
   await expect(row).toBeVisible()
   await row.getByTitle('Editar', { exact: true }).click()
-  await expect(page.locator('#presupuesto-form-monto-presupuestado')).toHaveValue('1250.5')
+  await page.waitForURL(`**/presupuestos/${budget.id}/`)
+  await expect(page.locator('#presupuesto-form-monto-presupuestado')).toHaveValue('1250.5', { timeout: 20000 })
   await page.locator('#presupuesto-form-monto-presupuestado').fill('1500.75')
   const [updated] = await Promise.all([
     page.waitForResponse(r => r.url().includes(`/contabilidad/presupuestos/${budget.id}`) && r.request().method() === 'PUT'),

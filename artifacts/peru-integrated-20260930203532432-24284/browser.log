@@ -1,0 +1,57 @@
+
+Running 12 tests using 1 worker
+
+(node:3064) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:3064) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 [chromium] › tests\e2e\peru-integrated-local.spec.ts:34:5 › Perú: reportes muestran tendencia, código del producto y filtro de cliente real (16.2s)
+  ok  2 [chromium] › tests\e2e\peru-integrated-local.spec.ts:62:5 › Perú: CxC cobrada se busca, muestra dos pagos y se exporta desde la interfaz real (5.5s)
+  ok  3 [chromium] › tests\e2e\peru-integrated-local.spec.ts:115:5 › Perú: primer administrador importa, edita y desactiva maestros con recuperación de error (27.5s)
+  ok  4 [chromium] › tests\e2e\peru-integrated-local.spec.ts:252:5 › Perú: primer administrador filtra usuarios por rol y estado con API real (7.5s)
+  ok  5 [chromium] › tests\e2e\peru-integrated-local.spec.ts:293:5 › Perú: primer administrador reintenta cobro CxC con respuesta perdida sin duplicar y cierra caja (3.8s)
+  x   6 [chromium] › tests\e2e\peru-integrated-local.spec.ts:401:5 › Perú: crea centro de costo y conserva un presupuesto al editar y recargar (15.2s)
+(node:18564) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:18564) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  7 [chromium] › tests\e2e\peru-integrated-local.spec.ts:486:5 › Perú: candidato conserva perfil y vacante después de crear, editar y recargar (10.7s)
+  ok  8 [chromium] › tests\e2e\peru-integrated-local.spec.ts:559:5 › Perú: superadministrador cambia de empresa y conserva la sesión al recargar (8.1s)
+  ok  9 [chromium] › tests\e2e\peru-integrated-local.spec.ts:601:5 › Perú: consulta y filtra la auditoría de recepciones con la API real (7.2s)
+  ok 10 [chromium] › tests\e2e\peru-integrated-local.spec.ts:660:5 › Perú: login y POS usan la API y base efímera reales (14.2s)
+  ok 11 [chromium] › tests\e2e\peru-integrated-local.spec.ts:727:5 › Perú: crea, aprueba y recibe una compra desde la interfaz real (27.0s)
+  ok 12 [chromium] › tests\e2e\peru-integrated-local.spec.ts:820:5 › Perú: retoma preparación logística tras fallo de packing y recarga (7.5s)
+
+
+  1) [chromium] › tests\e2e\peru-integrated-local.spec.ts:401:5 › Perú: crea centro de costo y conserva un presupuesto al editar y recargar 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoHaveValue[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('#presupuesto-form-monto-presupuestado')
+    Expected: [32m"1250.5"[39m
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toHaveValue" with timeout 5000ms[22m
+    [2m  - waiting for locator('#presupuesto-form-monto-presupuestado')[22m
+
+
+      445 |   await expect(row).toBeVisible()
+      446 |   await row.getByTitle('Editar', { exact: true }).click()
+    > 447 |   await expect(page.locator('#presupuesto-form-monto-presupuestado')).toHaveValue('1250.5')
+          |                                                                       ^
+      448 |   await page.locator('#presupuesto-form-monto-presupuestado').fill('1500.75')
+      449 |   const [updated] = await Promise.all([
+      450 |     page.waitForResponse(r => r.url().includes(`/contabilidad/presupuestos/${budget.id}`) && r.request().method() === 'PUT'),
+        at C:\Users\PC\Desktop\erp-peru-production\apps\web\tests\e2e\peru-integrated-local.spec.ts:447:71
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\peru-integrated-local-Perú-94189-puesto-al-editar-y-recargar-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\peru-integrated-local-Perú-94189-puesto-al-editar-y-recargar-chromium\error-context.md
+
+  1 failed
+    [chromium] › tests\e2e\peru-integrated-local.spec.ts:401:5 › Perú: crea centro de costo y conserva un presupuesto al editar y recargar 
+  11 passed (2.5m)

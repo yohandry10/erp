@@ -23,7 +23,7 @@ export default function UsersFilters({
       >
         <option value="todos">Todos los roles</option>
         {roles.map((rol) => (
-          <option key={rol.id} value={rol.nombre}>{rol.nombre}</option>
+          <option key={rol.id} value={rol.id}>{rol.nombre}</option>
         ))}
       </select>
 

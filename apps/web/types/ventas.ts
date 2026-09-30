@@ -38,6 +38,8 @@ export interface Cliente {
   codigo?: string | null
   ruc?: string | null
   razon_social: string
+  activo?: boolean
+  estado?: string
   nombre_comercial?: string
   direccion?: string
   email?: string
