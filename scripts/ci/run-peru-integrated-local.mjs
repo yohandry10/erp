@@ -39,6 +39,7 @@ for (const key of Object.keys(env)) {
 }
 Object.assign(env, {
   NODE_ENV: 'development', JWT_SECRET: 'local-api-integration-jwt-key-20260905-never-production',
+  EMAIL_DISABLED: 'true', EMAIL_PROVIDER: 'smtp',
   E2E_EPHEMERAL_LOCAL_DB: '1', E2E_ISOLATED_BROWSER: '0',
   LOCAL_API_URL: apiUrl, LOCAL_API_PORT: apiPort, LOCAL_WEB_URL: webUrl,
   LOCAL_POSTGREST_URL: `http://127.0.0.1:${restPort}`,

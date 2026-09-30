@@ -29,3 +29,12 @@ export function sanitizePostgrestSearch(input: string | null | undefined, maxLen
   const collapsed = cleaned.replace(/\s+/g, ' ').trim();
   return collapsed.slice(0, maxLen);
 }
+
+/** Valor ilike entrecomillado para `.or()`: conserva correos y puntuación sin
+ * convertirlos en sintaxis de filtros. Escapa los comodines SQL del texto;
+ * `*` mantiene su significado de comodín propio de PostgREST.
+ */
+export function quotedPostgrestContainsPattern(input: string, maxLen = 100): string {
+  const value = input.trim().slice(0, maxLen).replace(/[\\%_]/g, '\\$&');
+  return JSON.stringify(`%${value}%`);
+}
