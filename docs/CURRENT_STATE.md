@@ -2,17 +2,29 @@
 
 Actualizado: 2026-09-30.
 
-El PR #119 se integró como `3bf774c4`; corrigió edición de clientes Perú y
-lectura de proveedores de otro tenant. Render sirve ese SHA con DB/Redis
-listos y esquema 555; Vercel Production 6768077437, login y CORS pasaron.
-E2E 36764608474 y Security Scan 36764608488 pasaron. CI 36764608565 pasó
-pruebas, tipos, SQL, flujo integrado y build, pero falló Security audit con
-17 vulnerabilidades altas, 14 moderadas y una baja
-(`artifacts/peru-production-verification-after-119-20260930.json`).
-La actualización local de Axios, Nodemailer, fast-uri, brace-expansion,
-Multer y DOMPurify deja `pnpm audit --audit-level=low` sin vulnerabilidades
-conocidas; pasó tipos en siete proyectos y 300 suites/2895 pruebas API.
-Su integración y despliegue todavía deben confirmarse.
+El PR #120 se integró como `8b6db30d`; CI 36770807955, E2E
+36770807974 y Security Scan 36770807986 de `main` pasaron, incluida la
+auditoría de dependencias. Render sirve ese SHA con DB/Redis listos y esquema
+555; Vercel Production 6769134544 tuvo éxito, login 200 y CORS 204. La
+comprobación fue sólo lectura, con preflight PROD, sin migraciones ni datos
+sintéticos (`artifacts/peru-production-verification-after-120-20260930.json`).
+La actualización de Axios, Nodemailer, fast-uri, brace-expansion, Multer y
+DOMPurify cerró los 32 avisos que bloquearon el CI del PR #119; la auditoría
+local no encontró vulnerabilidades conocidas y pasaron tipos en siete
+proyectos y 300 suites/2895 pruebas API. El plan efectivo de Render continúa
+sin confirmación administrativa.
+
+La ampliación local de maestros y administración pasó 113 escenarios HTTP,
+SQL y restauración; once de doce recorridos UI pasaron, incluidos importación,
+edición y desactivación de clientes/proveedores con error 503 y reintento,
+y filtros reales de usuarios por rol/estado. El recorrido de presupuestos agotó
+una espera de cinco segundos durante compilación local; se ajustó a navegación
+y carga explícitas. La suite completa queda pendiente de CI. Se corrigieron
+la búsqueda de usuarios por email, el valor UUID del filtro de rol y la falsa
+confirmación de bajas ante error de red. Bajas lógicas conservan saldos,
+una sola auditoría y rechazan permisos/identidades ajenas; desactivar un usuario
+revoca su sesión. El correo está deshabilitado explícitamente en el harness local
+(`artifacts/peru-integrated-20260930203532432-24284`).
 
 El cobro CxC inicial del primer ADMIN no demo pasó desde navegador con
 respuesta perdida después del commit local: el formulario conserva los datos

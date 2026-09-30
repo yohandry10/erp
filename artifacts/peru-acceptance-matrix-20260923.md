@@ -22,9 +22,9 @@ por operación conserva las comprobaciones pendientes aunque exista respuesta HT
 | Módulo / operaciones ofrecidas | Evidencia de operación | Pendiente funcional concreto | Resultado |
 | --- | --- | --- | --- |
 | Alta empresa, login, wizard fiscal, PFX y SUNAT | `http.json`: alta no demo, reintento, login, validación de RUC/titular/clave, secretos cifrados y reanudación | Recorrer wizard desde navegador con errores de red y roles; aceptación fiscal externa cuando exista cliente | OK local API; navegador parcial |
-| Usuarios, roles, sesiones, sucursales | `http.json`: cambio de empresa, revocación de privilegio, aislamiento; `artifacts/peru-integrated-20260923102951518-2884`: primer cliente crea sucursal en API con ACL 555, ya promovida | Edición/desactivación de usuarios, asignaciones de sucursal, búsqueda y recuperación desde navegador | Parcial |
-| Clientes y proveedores: alta, edición, consulta, búsqueda | `artifacts/peru-integrated-20260923130308975-23476`: importación→detalle→email inválido rechazado sin cambio→edición persistida→búsqueda por nuevo nombre→lectura/escritura de otra empresa rechazadas para ambos maestros; navegador importó, editó, buscó tras recarga y exportó. El proveedor ajeno daba 500; `maybeSingle` local lo lleva a 404. El formulario peruano enviaba el campo fiscal argentino vacío y daba 400; ahora lo omite. | Desactivación con/sin dependencias, duplicados, roles diferenciados y errores recuperables de edición | Parcial; alta/edición/consulta/búsqueda API+UI OK local |
-| Productos, categorías, almacenes, stock, kardex | `http.json`: alta idempotente de servicio, stock por recepción/venta/devolución y lecturas POS; `artifacts/peru-integrated-20260923102951518-2884`: primer cliente crea categoría, almacén, producto físico y stock inicial por código, dry-run rechaza referencia ajena y replay no duplica; 555 promovida | Edición/búsqueda, ajustes, transferencias, kardex exportado; carga masiva de productos: `productos` está en `MIGRATION_RUN_TYPES`, pero no en `MIGRATION_IMPORTER_RUN_TYPES` ni tiene ruta/importador | Parcial |
+| Usuarios, roles, sesiones, sucursales | `artifacts/peru-integrated-20260930203532432-24284/http.json`: primer ADMIN crea/reintenta/edita usuario y rol; búsqueda por email/dominio sin inyección, login, sesión revocada, rol único protegido, bajas lógicas. UI filtra rol UUID y estado con API real. Sucursal inicial API con ACL 555. | Altas/edición/bajas por UI y permisos diferenciados de sucursales; entrega externa de correo | API de usuario/rol y filtros UI OK para casos observados; resto parcial |
+| Clientes y proveedores: alta, edición, búsqueda, consulta, desactivación, importación/exportación | `artifacts/peru-integrated-20260930203532432-24284`: alta repetida conserva ID, duplicados rechazan; lectura/escritura/baja ajena oculta y rol de lectura no muta. Baja lógica con deuda conserva filas/saldos y una auditoría tras replay. UI importa, edita, busca, exporta activos/inactivos, recibe 503 sin falso éxito, reintenta y confirma persistencia al recargar. | Reactivación si se ofrece, variantes fiscales de cada tipo/documento, escala de archivos | OK local en casos observados API/UI; variantes pendientes |
+| Productos, categorías, almacenes, stock, kardex | `http.json`: alta idempotente de servicio, stock por recepción/venta/devolución y lecturas POS; `artifacts/peru-integrated-20260923102951518-2884`: primer cliente crea categoría, almacén, producto físico y stock inicial por código, dry-run rechaza referencia ajena y replay no duplica; 555 promovida | Edición/búsqueda, ajustes, transferencias, consulta y filtros de kardex; carga masiva de productos: `productos` está en `MIGRATION_RUN_TYPES`, pero no en `MIGRATION_IMPORTER_RUN_TYPES` ni tiene ruta/importador | Parcial |
 | Cotizaciones de compra y venta: alta, consulta, aprobación, conversión | `http.json`: ambas creadas/reintentadas, venta aprobada por otro actor y convertida sin duplicar | Edición, rechazo/anulación, búsqueda, exportación/impresión y roles desde navegador | OK local en ruta principal; resto pendiente |
 | Compra: orden, aprobación, recepción parcial/total, factura, CxP, pago, asiento | `http.json`: cadena persistida con dos actores, stock, cuenta, cargo bancario, asiento y reintentos; variantes USD/servicio/rechazo | Navegador de pago/factura y errores recuperables; impresión/exportación; autorizaciones de cada transición | OK local API en cadena principal; parcial UI |
 | Devolución de compra y nota | `http.json`: antes de factura y saldo pendiente, reverso de inventario/contabilidad, incompatibilidad con factura pagada | Nota fiscal externa y recuperación por UI; devolución parcial múltiple | Parcial |
@@ -45,15 +45,24 @@ por operación conserva las comprobaciones pendientes aunque exista respuesta HT
 | Migración/importación de maestros y exportaciones | `artifacts/peru-integrated-20260923092617881-10028`: primer ADMIN no demo previsualiza clientes/proveedores, ejecuta dry-run sin escritura, importa archivo mixto con error por fila, consulta lote, reintenta sin duplicar y oculta lote ajeno con 404. Navegador descarga plantilla, bloquea CSV inválido/503, reintenta, importa, busca y exporta ambas filas. La 554 y el exportador #114 están desplegados (`artifacts/peru-production-verification-after-114-20260923.json`). `artifacts/peru-integrated-20260923102951518-2884`: CxC/CxP iniciales con saldo, referencia inexistente, total conciliado, reintento y colisión sin alterar deuda; stock inicial por código de producto, persistencia y replay; diez navegadores pasan. El ajuste posterior de descarga pasó diez navegadores locales en `artifacts/peru-integrated-20260923111137269-19612`; CI de main para #116 pasó tras el ajuste. `artifacts/peru-integrated-20260923114009161-23644`: balance de apertura cuadrado, validación y replay; CPE histórico local sin SUNAT/outbox, referencia de cliente y replay. | Actualización por CSV, roles diferenciados, archivos grandes, validación contable integral con saldos reales y aceptación SUNAT del futuro cliente | Clientes/proveedores OK API+navegador; CxC/CxP, stock, balance y CPE histórico OK local API; #116 desplegado y CI verde |
 | Documentos, descargas, auditoría, ayuda, offline | `http.json`: auditoría real paginada, aislada y con permisos; documentos sólo lectura | Descarga/impresión y búsqueda; cola offline, reinicio/replay; controles de auditoría desde UI | Auditoría API OK; resto parcial |
 
+## Defectos corregidos en validación
+
+- Búsqueda de usuarios: reemplazar `@` y puntos impedía encontrar emails completos;
+  filtro entrecomillado pasó contra PostgREST real, incluidas entradas maliciosas.
+- Filtro UI de usuarios por rol: enviaba nombre donde el backend espera UUID.
+- Baja de clientes/proveedores: errores absorbidos por `useApi` podían confirmar éxito;
+  ahora se propagan y el recorrido 503→reintento confirma estado activo/inactivo.
+- El ensayo completo del 30/09 pasó 113 HTTP, SQL/restauración y once de doce UI.
+  El único fallo fue espera de compilación del editor de presupuestos; la espera
+  se corrigió y se exige CI completo antes de integrar.
+
 ## Comprobaciones transversales
 
-- El PR #119 (`3bf774c4`) está fusionado y desplegado; DB/Redis, esquema 555,
-  login y CORS respondieron en sólo lectura el 30/09. E2E y Security Scan
-  pasaron. CI 36764608565 falló en auditoría de dependencias, con el resto de
-  jobs en verde. La corrección local tiene auditoría limpia y tipos/API pasando;
-  requiere completar CI y despliegue
-  (`artifacts/peru-production-verification-after-119-20260930.json`,
-  `artifacts/peru-dependency-audit-20260930.json`).
+- El PR #120 (`8b6db30d`) está fusionado y desplegado. CI 36770807955,
+  E2E 36770807974 y Security Scan 36770807986 de `main` pasaron, incluida
+  la auditoría de dependencias. Render/Vercel, DB/Redis, esquema 555, login
+  y CORS se verificaron sólo en lectura, sin migraciones ni datos sintéticos
+  (`artifacts/peru-production-verification-after-120-20260930.json`).
 - El cobro en efectivo desde navegador con respuesta perdida pasó en el ensayo
   local del 30/09, junto con 105 escenarios HTTP, SQL/restauración y once
   recorridos de navegador; esa evidencia acredita sus acciones observadas.
@@ -101,8 +110,8 @@ por operación conserva las comprobaciones pendientes aunque exista respuesta HT
   efectivo de Render sigue sin confirmar.
 - CI de `main`: ejecuciones 35826660731, E2E 35826660734 y Security Scan
   35826660864 terminaron en verde para `62068eec`. Los tres workflows de
-  `1dc54b73` también pasaron; el escenario de cobro en efectivo añadido después
-  permanece en validación local y aún no forma parte de CI.
+  `8b6db30d` también pasaron e incluyen el cobro en efectivo desde UI con
+  respuesta perdida y reintento idempotente.
 - Plan efectivo de Render: pendiente de inspección administrativa; `render.yaml`
   declara Starter, sin prueba de facturación/plan efectivo.
 

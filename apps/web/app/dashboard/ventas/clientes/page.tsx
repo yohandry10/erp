@@ -24,7 +24,7 @@ export default function ClientesPage() {
   const taxIdLabel =
     country.paisCodigo === 'AR' ? 'CUIT/DNI' : country.paisCodigo === 'CO' ? 'NIT/CC' : 'RUC/DNI'
   const router = useRouter()
-  const { get, del } = useApi()
+  const { get, del } = useApi({ throwOnError: true })
 
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [loading, setLoading] = useState(true)
@@ -79,24 +79,25 @@ export default function ClientesPage() {
   }
 
   const handleDelete = async (id: string, razonSocial: string) => {
-    if (!confirm(`¿Está seguro de eliminar el cliente "${razonSocial}"?`)) {
+    if (!confirm(`¿Está seguro de desactivar el cliente "${razonSocial}"?`)) {
       return
     }
 
     try {
       await del(`/api/ventas/clientes/${id}`)
-      alert('✅ Cliente eliminado correctamente')
+      alert('✅ Cliente desactivado correctamente')
       loadClientes()
     } catch (error: any) {
-      alert(`❌ Error: ${error.message || 'No se pudo eliminar el cliente'}`)
+      alert(`❌ Error: ${error.message || 'No se pudo desactivar el cliente'}`)
     }
   }
 
   const handleExport = () => {
     downloadCsv(`clientes-pagina-${currentPage}.csv`,
-      ['Tipo', 'Tipo de documento', 'Documento', 'Razón social', 'Nombre comercial', 'Dirección', 'Email', 'Teléfono'],
+      ['Tipo', 'Tipo de documento', 'Documento', 'Razón social', 'Nombre comercial', 'Dirección', 'Email', 'Teléfono', 'Estado'],
       clientes.map(cliente => [cliente.tipo, cliente.documento_tipo, getDocumentoCliente(cliente), cliente.razon_social,
-        cliente.nombre_comercial, cliente.direccion, cliente.email, cliente.telefono]))
+        cliente.nombre_comercial, cliente.direccion, cliente.email, cliente.telefono,
+        cliente.activo === false || cliente.estado === 'INACTIVO' ? 'INACTIVO' : 'ACTIVO']))
   }
 
   const handleImport = () => {
@@ -222,6 +223,9 @@ export default function ClientesPage() {
                       <th className="text-left p-4 font-semibold text-xs text-muted-foreground">
                         Teléfono
                       </th>
+                      <th className="text-left p-4 font-semibold text-xs text-muted-foreground">
+                        Estado
+                      </th>
                       <th className="text-right p-4 font-semibold text-xs text-muted-foreground">
                         Acciones
                       </th>
@@ -256,6 +260,9 @@ export default function ClientesPage() {
                         <td className="p-4 text-[0.875rem] text-muted-foreground">
                           {cliente.telefono || '-'}
                         </td>
+                        <td className="p-4 text-[0.875rem]">
+                          {cliente.activo === false || cliente.estado === 'INACTIVO' ? 'INACTIVO' : 'ACTIVO'}
+                        </td>
                         <td className="p-4">
                           <div className="flex justify-end gap-1">
                             <button
@@ -274,14 +281,14 @@ export default function ClientesPage() {
                             >
                               <Edit size={15} />
                             </button>
-                            <button
+                            {cliente.activo !== false && cliente.estado !== 'INACTIVO' && <button
                               onClick={() => handleDelete(cliente.id, cliente.razon_social)}
                               className="inline-flex size-8 items-center justify-center rounded-md border border-border bg-transparent text-muted-foreground transition-colors cursor-pointer hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40"
-                              title="Eliminar"
-                              aria-label="Eliminar"
+                              title="Desactivar"
+                              aria-label="Desactivar"
                             >
                               <Trash2 size={15} />
-                            </button>
+                            </button>}
                           </div>
                         </td>
                       </tr>
