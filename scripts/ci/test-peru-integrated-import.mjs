@@ -45,10 +45,32 @@ export async function testMigrationImport({ request, sql, uuid, results, tenantI
     assert.equal(replay.result.created, 0);
     assert.equal(replay.result.skippedRows, 1);
     assert.equal(sql(`SELECT count(*) FROM ${table} WHERE tenant_id=${uuid(tenantId)} AND razon_social='${name}';`), String(Number(before) + 1));
+    const masterId = sql(`SELECT id FROM ${table} WHERE tenant_id=${uuid(tenantId)} AND external_id='${externalId}';`);
+    uuid(masterId);
+    const masterPath = kind === 'clientes' ? 'ventas/clientes' : 'compras/proveedores';
+    const newName = `${name} EDITADO`;
+    const priorResponse = await request(`${masterPath}/${masterId}`);
+    assert.equal((priorResponse.data ?? priorResponse).razon_social, name);
+    await request(`${masterPath}/${masterId}`, { razon_social: newName, email: 'invalido' }, 400, {}, 'PUT');
+    assert.equal(sql(`SELECT razon_social FROM ${table} WHERE id=${uuid(masterId)} AND tenant_id=${uuid(tenantId)};`), name);
+    const updatedResponse = await request(`${masterPath}/${masterId}`, {
+      razon_social: newName, email: `editado-${suffix}@example.test`,
+    }, 200, {}, 'PUT');
+    assert.equal((updatedResponse.data ?? updatedResponse).razon_social, newName);
+    assert.equal(sql(`SELECT razon_social FROM ${table} WHERE id=${uuid(masterId)} AND tenant_id=${uuid(tenantId)};`), newName);
+    const searchResponse = await request(`${masterPath}?search=${encodeURIComponent(newName)}`);
+    assert.ok(searchResponse.data.some(row => row.id === masterId));
+    await request(`${masterPath}/${masterId}`, undefined, 404,
+      { authorization: `Bearer ${otherTenantToken}` });
+    await request(`${masterPath}/${masterId}`, { razon_social: 'CAMBIO AJENO' }, 404,
+      { authorization: `Bearer ${otherTenantToken}` }, 'PUT');
+    assert.equal(sql(`SELECT razon_social FROM ${table} WHERE id=${uuid(masterId)} AND tenant_id=${uuid(tenantId)};`), newName);
     await request(`migration/runs/${imported.runId}`, undefined, 404,
       { authorization: `Bearer ${otherTenantToken}` });
     results.push({ scenario: `${kind}: previsualización, dry-run, importación parcial, bitácora, reintento y aislamiento`, passed: true,
       run_id: imported.runId });
+    results.push({ scenario: `${kind}: edición validada y persistida, búsqueda por nombre nuevo y lectura/escritura ajenas rechazadas`,
+      passed: true, master_id: masterId });
   }
   const fechaCorte = sql(`SELECT app.hoy_tenant(${uuid(tenantId)})::text;`);
   for (const item of [

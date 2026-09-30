@@ -16,7 +16,7 @@ ni ejecución de esas acciones.
 | --- | --- | --- | --- |
 | Alta empresa, login, wizard fiscal, PFX y SUNAT | `http.json`: alta no demo, reintento, login, validación de RUC/titular/clave, secretos cifrados y reanudación | Recorrer wizard desde navegador con errores de red y roles; aceptación fiscal externa cuando exista cliente | OK local API; navegador parcial |
 | Usuarios, roles, sesiones, sucursales | `http.json`: cambio de empresa, revocación de privilegio, aislamiento; `artifacts/peru-integrated-20260923102951518-2884`: primer cliente crea sucursal en API con ACL 555, ya promovida | Edición/desactivación de usuarios, asignaciones de sucursal, búsqueda y recuperación desde navegador | Parcial |
-| Clientes y proveedores: alta, edición, consulta, búsqueda | `http.json`: alta/consulta de proveedor; 22 pantallas con registros | Edición y búsqueda persistidas de ambos; duplicados, permisos y aislamiento por acción | Parcial |
+| Clientes y proveedores: alta, edición, consulta, búsqueda | `artifacts/peru-integrated-20260923130308975-23476`: importación→detalle→email inválido rechazado sin cambio→edición persistida→búsqueda por nuevo nombre→lectura/escritura de otra empresa rechazadas para ambos maestros; navegador importó, editó, buscó tras recarga y exportó. El proveedor ajeno daba 500; `maybeSingle` local lo lleva a 404. El formulario peruano enviaba el campo fiscal argentino vacío y daba 400; ahora lo omite. | Desactivación con/sin dependencias, duplicados, roles diferenciados y errores recuperables de edición | Parcial; alta/edición/consulta/búsqueda API+UI OK local |
 | Productos, categorías, almacenes, stock, kardex | `http.json`: alta idempotente de servicio, stock por recepción/venta/devolución y lecturas POS; `artifacts/peru-integrated-20260923102951518-2884`: primer cliente crea categoría, almacén, producto físico y stock inicial por código, dry-run rechaza referencia ajena y replay no duplica; 555 promovida | Edición/búsqueda, ajustes, transferencias, kardex exportado; carga masiva de productos: `productos` está en `MIGRATION_RUN_TYPES`, pero no en `MIGRATION_IMPORTER_RUN_TYPES` ni tiene ruta/importador | Parcial |
 | Cotizaciones de compra y venta: alta, consulta, aprobación, conversión | `http.json`: ambas creadas/reintentadas, venta aprobada por otro actor y convertida sin duplicar | Edición, rechazo/anulación, búsqueda, exportación/impresión y roles desde navegador | OK local en ruta principal; resto pendiente |
 | Compra: orden, aprobación, recepción parcial/total, factura, CxP, pago, asiento | `http.json`: cadena persistida con dos actores, stock, cuenta, cargo bancario, asiento y reintentos; variantes USD/servicio/rechazo | Navegador de pago/factura y errores recuperables; impresión/exportación; autorizaciones de cada transición | OK local API en cadena principal; parcial UI |
@@ -40,6 +40,10 @@ ni ejecución de esas acciones.
 
 ## Comprobaciones transversales
 
+- El PR #118 (`5d6071fb`) pasó CI, E2E y Security Scan de `main` y está
+  desplegado en Render/Vercel; API, DB, Redis, esquema 555, login y CORS
+  respondieron, sin escrituras sintéticas en PROD
+  (`artifacts/peru-production-verification-after-118-20260923.json`).
 - El PR #117 (`1dc54b73`) está fusionado y desplegado en Render/Vercel.
   Render exige/aplica 555 y tiene DB/Redis listos; login 200 y CORS 204.
   E2E, Security Scan y CI 35858257119 de `main` pasaron.

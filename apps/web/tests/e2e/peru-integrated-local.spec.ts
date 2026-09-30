@@ -112,8 +112,8 @@ test('Perú: CxC cobrada se busca, muestra dos pagos y se exporta desde la inter
   await expect(page.getByRole('row').filter({ hasText: String(detail.numero) })).toBeVisible()
 })
 
-test('Perú: primer administrador importa clientes y proveedores desde CSV en navegador', async ({ page, context }) => {
-  test.setTimeout(180000)
+test('Perú: primer administrador importa y edita clientes y proveedores desde navegador', async ({ page, context }) => {
+  test.setTimeout(240000)
   if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere base local efímera')
   const evidence = JSON.parse(await fs.readFile(path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'http.json'), 'utf8'))
   const onboarding = evidence.results.find((row: { scenario: string }) => row.scenario.startsWith('alta no demo y primer administrador'))
@@ -179,6 +179,16 @@ test('Perú: primer administrador importa clientes y proveedores desde CSV en na
       page.waitForEvent('download'), page.getByRole('button', { name: 'Exportar página (CSV)' }).click(),
     ])
     expect(await fs.readFile(await download.path(), 'utf8')).toContain(name)
+    await page.getByRole('row').filter({ hasText: name }).getByRole('button', { name: 'Editar' }).click()
+    await expect(page).toHaveURL(/\/editar\/?$/)
+    const editedName = `${name} EDITADO`
+    await page.locator(item.entity === 'clientes' ? '#razon_social' : '#proveedorform-razon-social').fill(editedName)
+    if (item.entity === 'clientes') page.once('dialog', dialog => dialog.accept())
+    await page.getByRole('button', { name: item.entity === 'clientes' ? 'Actualizar Cliente' : 'Actualizar Proveedor' }).click()
+    await expect(page).not.toHaveURL(/\/editar\/?$/)
+    await page.goto(item.route)
+    await page.getByRole('textbox', { name: 'Buscar' }).fill(editedName)
+    await expect(page.getByRole('row').filter({ hasText: editedName })).toBeVisible()
   }
 })
 
