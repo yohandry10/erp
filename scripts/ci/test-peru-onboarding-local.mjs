@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { testMigrationImport } from './test-peru-integrated-import.mjs';
 
-export async function testPeruOnboarding({ request, sql, uuid, results, setToken, primaryToken }) {
+export async function testPeruOnboarding({ request, sql, uuid, results, setToken, primaryToken, processAccounting }) {
   assert.equal(process.env.E2E_EPHEMERAL_LOCAL_DB, '1');
   assert.equal(sql('SELECT current_database();'), 'erp_e2e');
   const actor = sql("SELECT id FROM usuarios_sistema WHERE email='peru-integrated-restricted-1@example.test';");
@@ -62,7 +62,7 @@ export async function testPeruOnboarding({ request, sql, uuid, results, setToken
     assert.equal(sql(`SELECT completado FROM wizard_progress WHERE tenant_id=${uuid(tenantId)};`), 't');
     assert.equal(sql(`SELECT count(*) FROM outbox_events WHERE tenant_id=${uuid(tenantId)} AND event_type='configuracion.wizard.completado';`), '1');
     results.push({ scenario: 'cliente completa configuración y recarga certificado y credenciales cifrados, sin filtrarlos ni duplicar el cierre', passed: true });
-    await testMigrationImport({ request, sql, uuid, results, tenantId, otherTenantToken: primaryToken });
+    await testMigrationImport({ request, sql, uuid, results, tenantId, otherTenantToken: primaryToken, processAccounting });
   } finally {
     sql(`UPDATE usuarios_sistema SET is_super_admin=false WHERE id=${uuid(actor)};`);
     setToken(primaryToken);

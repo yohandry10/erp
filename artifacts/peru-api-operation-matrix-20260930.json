@@ -1,7 +1,8 @@
 {
-  "generated_at": "2026-09-30T20:44:57.702Z",
+  "generated_at": "2026-09-30T21:25:26.463Z",
   "inventory": "artifacts/peru-api-operation-inventory-20260930.json",
-  "evidence": "artifacts/peru-integrated-ci-36770807955",
+  "evidence": "artifacts/peru-integrated-ci-36775048567",
+  "evidence_scope": "full",
   "evidence_kind": "HTTP contra Nest/PostgREST/PostgreSQL efímeros; no contiene cuerpos, tokens ni credenciales",
   "acceptance_rule": "HTTP observado no acredita persistencia, aislamiento, permisos, UI ni flujo completo; la aceptación funcional de escenarios permanece en la matriz manual.",
   "excluded": [
@@ -475,6 +476,10 @@
         {
           "trace_index": 286,
           "status": 201
+        },
+        {
+          "trace_index": 367,
+          "status": 201
         }
       ],
       "defects": [],
@@ -504,6 +509,10 @@
         },
         {
           "trace_index": 136,
+          "status": 401
+        },
+        {
+          "trace_index": 402,
           "status": 401
         }
       ],
@@ -1885,6 +1894,22 @@
         {
           "trace_index": 21,
           "status": 201
+        },
+        {
+          "trace_index": 387,
+          "status": 403
+        },
+        {
+          "trace_index": 389,
+          "status": 201
+        },
+        {
+          "trace_index": 390,
+          "status": 201
+        },
+        {
+          "trace_index": 391,
+          "status": 409
         }
       ],
       "defects": [],
@@ -1910,6 +1935,10 @@
         },
         {
           "trace_index": 318,
+          "status": 200
+        },
+        {
+          "trace_index": 399,
           "status": 200
         }
       ],
@@ -1958,6 +1987,18 @@
         {
           "trace_index": 319,
           "status": 404
+        },
+        {
+          "trace_index": 384,
+          "status": 200
+        },
+        {
+          "trace_index": 395,
+          "status": 200
+        },
+        {
+          "trace_index": 398,
+          "status": 200
         }
       ],
       "defects": [],
@@ -1988,6 +2029,14 @@
         {
           "trace_index": 320,
           "status": 404
+        },
+        {
+          "trace_index": 385,
+          "status": 403
+        },
+        {
+          "trace_index": 392,
+          "status": 409
         }
       ],
       "defects": [],
@@ -2006,9 +2055,34 @@
       "method": "DELETE",
       "endpoint": "/api/compras/proveedores/:id",
       "source": "apps/erp-api/src/modules/compras/controllers/proveedores.controller.ts:224",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 386,
+          "status": 403
+        },
+        {
+          "trace_index": 388,
+          "status": 404
+        },
+        {
+          "trace_index": 393,
+          "status": 200
+        },
+        {
+          "trace_index": 394,
+          "status": 200
+        },
+        {
+          "trace_index": 396,
+          "status": 200
+        },
+        {
+          "trace_index": 397,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "result": "pending_functional_execution",
+      "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
         "persistencia y resultado funcional",
         "permisos",
@@ -8907,9 +8981,14 @@
       "method": "GET",
       "endpoint": "/api/roles",
       "source": "apps/erp-api/src/modules/permissions/role.controller.ts:32",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 368,
+          "status": 403
+        }
+      ],
       "defects": [],
-      "result": "pending_functional_execution",
+      "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
         "persistencia y resultado funcional",
         "permisos",
@@ -8924,9 +9003,22 @@
       "method": "GET",
       "endpoint": "/api/roles/:id",
       "source": "apps/erp-api/src/modules/permissions/role.controller.ts:46",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 357,
+          "status": 200
+        },
+        {
+          "trace_index": 358,
+          "status": 404
+        },
+        {
+          "trace_index": 404,
+          "status": 404
+        }
+      ],
       "defects": [],
-      "result": "pending_functional_execution",
+      "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
         "persistencia y resultado funcional",
         "permisos",
@@ -8941,9 +9033,18 @@
       "method": "POST",
       "endpoint": "/api/roles",
       "source": "apps/erp-api/src/modules/permissions/role.controller.ts:64",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 354,
+          "status": 201
+        },
+        {
+          "trace_index": 355,
+          "status": 201
+        }
+      ],
       "defects": [],
-      "result": "pending_functional_execution",
+      "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
         "persistencia y resultado funcional",
         "permisos",
@@ -8958,9 +9059,14 @@
       "method": "PUT",
       "endpoint": "/api/roles/:id",
       "source": "apps/erp-api/src/modules/permissions/role.controller.ts:84",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 356,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "result": "pending_functional_execution",
+      "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
         "persistencia y resultado funcional",
         "permisos",
@@ -8975,9 +9081,18 @@
       "method": "DELETE",
       "endpoint": "/api/roles/:id",
       "source": "apps/erp-api/src/modules/permissions/role.controller.ts:105",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 400,
+          "status": 400
+        },
+        {
+          "trace_index": 403,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "result": "pending_functional_execution",
+      "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
         "persistencia y resultado funcional",
         "permisos",
@@ -11952,9 +12067,22 @@
       "method": "GET",
       "endpoint": "/api/users",
       "source": "apps/erp-api/src/modules/usuarios/user-management.controller.ts:34",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 363,
+          "status": 200
+        },
+        {
+          "trace_index": 364,
+          "status": 200
+        },
+        {
+          "trace_index": 365,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "result": "pending_functional_execution",
+      "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
         "persistencia y resultado funcional",
         "permisos",
@@ -11969,9 +12097,18 @@
       "method": "GET",
       "endpoint": "/api/users/:id",
       "source": "apps/erp-api/src/modules/usuarios/user-management.controller.ts:51",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 362,
+          "status": 200
+        },
+        {
+          "trace_index": 366,
+          "status": 404
+        }
+      ],
       "defects": [],
-      "result": "pending_functional_execution",
+      "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
         "persistencia y resultado funcional",
         "permisos",
@@ -11986,9 +12123,18 @@
       "method": "POST",
       "endpoint": "/api/users",
       "source": "apps/erp-api/src/modules/usuarios/user-management.controller.ts:69",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 359,
+          "status": 201
+        },
+        {
+          "trace_index": 360,
+          "status": 201
+        }
+      ],
       "defects": [],
-      "result": "pending_functional_execution",
+      "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
         "persistencia y resultado funcional",
         "permisos",
@@ -12003,9 +12149,14 @@
       "method": "PUT",
       "endpoint": "/api/users/:id",
       "source": "apps/erp-api/src/modules/usuarios/user-management.controller.ts:89",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 361,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "result": "pending_functional_execution",
+      "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
         "persistencia y resultado funcional",
         "permisos",
@@ -12020,9 +12171,14 @@
       "method": "DELETE",
       "endpoint": "/api/users/:id",
       "source": "apps/erp-api/src/modules/usuarios/user-management.controller.ts:110",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 401,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "result": "pending_functional_execution",
+      "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
         "persistencia y resultado funcional",
         "permisos",
@@ -12280,9 +12436,26 @@
       "method": "POST",
       "endpoint": "/api/ventas/clientes",
       "source": "apps/erp-api/src/modules/ventas/clientes/clientes.controller.ts:67",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 372,
+          "status": 403
+        },
+        {
+          "trace_index": 374,
+          "status": 201
+        },
+        {
+          "trace_index": 375,
+          "status": 201
+        },
+        {
+          "trace_index": 376,
+          "status": 409
+        }
+      ],
       "defects": [],
-      "result": "pending_functional_execution",
+      "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
         "persistencia y resultado funcional",
         "permisos",
@@ -12305,6 +12478,18 @@
         {
           "trace_index": 306,
           "status": 404
+        },
+        {
+          "trace_index": 369,
+          "status": 200
+        },
+        {
+          "trace_index": 380,
+          "status": 200
+        },
+        {
+          "trace_index": 383,
+          "status": 200
         }
       ],
       "defects": [],
@@ -12335,6 +12520,14 @@
         {
           "trace_index": 307,
           "status": 404
+        },
+        {
+          "trace_index": 370,
+          "status": 403
+        },
+        {
+          "trace_index": 377,
+          "status": 409
         }
       ],
       "defects": [],
@@ -12353,9 +12546,34 @@
       "method": "DELETE",
       "endpoint": "/api/ventas/clientes/:id",
       "source": "apps/erp-api/src/modules/ventas/clientes/clientes.controller.ts:133",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 371,
+          "status": 403
+        },
+        {
+          "trace_index": 373,
+          "status": 404
+        },
+        {
+          "trace_index": 378,
+          "status": 204
+        },
+        {
+          "trace_index": 379,
+          "status": 204
+        },
+        {
+          "trace_index": 381,
+          "status": 204
+        },
+        {
+          "trace_index": 382,
+          "status": 204
+        }
+      ],
       "defects": [],
-      "result": "pending_functional_execution",
+      "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
         "persistencia y resultado funcional",
         "permisos",

@@ -80,6 +80,10 @@ async function main() {
   assert.ok(token);
   assert.equal(auth.user.tenant_id, sql("SELECT tenant_id FROM usuarios_sistema WHERE email='peru-integrated-1@example.test';"));
   results.push({ scenario: 'login real con sesión persistida', passed: true, tenant_id: auth.user.tenant_id });
+  if (process.env.LOCAL_INTEGRATED_FOCUS === 'onboarding') {
+    await testPeruOnboarding({ request, sql, uuid, results, setToken: value => { token = value; }, primaryToken: token, processAccounting });
+    return;
+  }
   const catalog = {};
   for (const path of ['pos/productos', 'pos/clientes', 'pos/metodos-pago', 'pos/sesion-caja', 'cajas', 'pos/empresa-config']) {
     const data = await request(path);
@@ -167,7 +171,7 @@ async function main() {
   await testSire({ request, sql, uuid, results, tenantId: auth.user.tenant_id, otherTenantToken: second.access_token });
   await testPle({ request, sql, uuid, results, tenantId: auth.user.tenant_id, otherTenantToken: second.access_token });
   await testPeruOnboarding({ request, sql, uuid, results,
-    setToken: value => { token = value; }, primaryToken });
+    setToken: value => { token = value; }, primaryToken, processAccounting });
 }
 try {
   await main();

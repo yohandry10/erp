@@ -53,7 +53,11 @@ test('Perú: carga las pantallas con identificador usando registros de la empres
   const pending = new Map<string, readonly string[]>(catalogs)
   const findings: any[] = []
   let errors: string[] = []
-  page.on('pageerror', error => errors.push(error.message))
+  let scriptErrors: { name: string; message: string; stack?: string }[] = []
+  page.on('pageerror', error => {
+    errors.push(error.message)
+    scriptErrors.push({ name: error.name, message: error.message, stack: error.stack })
+  })
   page.on('response', response => {
     const pathname = new URL(response.url()).pathname.replace(/\/$/, '')
     if (pathname.includes('/api/') && response.status() >= 400
@@ -93,6 +97,7 @@ test('Perú: carga las pantallas con identificador usando registros de la empres
           ? records.find(row => String(row.estado).toUpperCase() === 'BORRADOR') ?? records[0] : records[0]
         const route = '/dashboard/' + template.replace('[id]', record.id) + '/'
         errors = []
+        scriptErrors = []
         let status: number | null = null
         try {
           status = (await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 45000 }))?.status() ?? null
@@ -103,7 +108,7 @@ test('Perú: carga las pantallas con identificador usando registros de la empres
         if (!text.trim()) errors.push('Pantalla vacía')
         if (new URL(page.url()).pathname.startsWith('/login')) errors.push('Sesión perdida')
         if (/Acceso denegado|Acceso restringido/i.test(text)) errors.push('Acceso denegado al usuario operativo')
-        const finding = { template, route, tenant, status, errors: [...new Set(errors)], text }
+        const finding = { template, route, tenant, status, errors: [...new Set(errors)], scriptErrors, text }
         findings.push(finding)
         await page.screenshot({ path: path.join(output, `${findings.length}-${finding.errors.length ? 'failure' : 'page'}.png`), fullPage: true })
         console.log(`[record-survey] ${template}: ${finding.errors.join('; ') || 'carga sin errores HTTP/JS'}`)
