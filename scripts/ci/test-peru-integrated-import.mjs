@@ -111,8 +111,10 @@ export async function testMigrationImport({ request, sql, uuid, results, tenantI
     assert.equal(Number(sql(`SELECT saldo_pendiente FROM ${item.table} WHERE tenant_id=${uuid(tenantId)} AND external_id='${externalId}';`)), 59);
     await request(`migration/runs/${imported.runId}`, undefined, 404,
       { authorization: `Bearer ${otherTenantToken}` });
+    const cuentaId = sql(`SELECT id FROM ${item.table} WHERE tenant_id=${uuid(tenantId)} AND external_id='${externalId}';`);
+    uuid(cuentaId);
     results.push({ scenario: `${item.runType}: dry-run detecta referencia ajena, saldo parcial persiste, bitácora y reintento aislados`,
-      passed: true, run_id: imported.runId });
+      passed: true, run_id: imported.runId, cuenta_id: cuentaId });
   }
   const sucursal = (await request('sucursales', { nombre: `Sucursal apertura ${suffix}`,
     codigo: `AP-${suffix}`, direccion: 'Av. Local 123', ubigeo: '150101' })).data;
@@ -121,6 +123,10 @@ export async function testMigrationImport({ request, sql, uuid, results, tenantI
   const sucursalId = sucursal.id;
   const almacenId = almacen.id;
   assert.ok(sucursalId && almacenId, 'primer cliente puede crear sucursal y almacén para stock inicial');
+  const caja = (await request('cajas', { nombre: `Caja primer cliente ${suffix}`, almacen_id: almacenId,
+    sucursal_id: sucursalId }, 201, { 'idempotency-key': randomUUID() })).data;
+  assert.ok(caja.id);
+  results.push({ scenario: 'primer cliente crea caja vinculada a su almacén y sucursal', passed: true, caja_id: caja.id });
   const categoryName = `Categoría apertura ${suffix}`;
   await request('inventario/categorias', { idempotency_key: randomUUID(), codigo: `AP-${suffix}`,
     nombre: categoryName });

@@ -1,4 +1,4 @@
-# Matriz de aceptación funcional Perú — 2026-09-23
+# Matriz de aceptación funcional Perú — corte 2026-09-30
 
 Alcance: rutas visibles de `apps/web/components/layout/sidebar.tsx`, páginas de
 `apps/web/app/dashboard`, flujos de `docs/MODULES.md` y escenarios de
@@ -12,6 +12,13 @@ de Analytics; sus indicadores de búsqueda/exportación/impresión/aprobación/a
 son coincidencias estáticas del código de la página, no pruebas de disponibilidad
 ni ejecución de esas acciones.
 
+El inventario reproducible de contratos API declara 717 operaciones fuera de
+Analytics en `artifacts/peru-api-operation-inventory-20260930.json`, con método,
+ruta, controlador y permisos declarados. Incluye soporte, workers y administración;
+la exposición de una acción en Perú exige contrastar navegación y reglas del
+servicio. El inventario no representa operaciones aceptadas. La matriz API
+por operación conserva las comprobaciones pendientes aunque exista respuesta HTTP.
+
 | Módulo / operaciones ofrecidas | Evidencia de operación | Pendiente funcional concreto | Resultado |
 | --- | --- | --- | --- |
 | Alta empresa, login, wizard fiscal, PFX y SUNAT | `http.json`: alta no demo, reintento, login, validación de RUC/titular/clave, secretos cifrados y reanudación | Recorrer wizard desde navegador con errores de red y roles; aceptación fiscal externa cuando exista cliente | OK local API; navegador parcial |
@@ -21,24 +28,35 @@ ni ejecución de esas acciones.
 | Cotizaciones de compra y venta: alta, consulta, aprobación, conversión | `http.json`: ambas creadas/reintentadas, venta aprobada por otro actor y convertida sin duplicar | Edición, rechazo/anulación, búsqueda, exportación/impresión y roles desde navegador | OK local en ruta principal; resto pendiente |
 | Compra: orden, aprobación, recepción parcial/total, factura, CxP, pago, asiento | `http.json`: cadena persistida con dos actores, stock, cuenta, cargo bancario, asiento y reintentos; variantes USD/servicio/rechazo | Navegador de pago/factura y errores recuperables; impresión/exportación; autorizaciones de cada transición | OK local API en cadena principal; parcial UI |
 | Devolución de compra y nota | `http.json`: antes de factura y saldo pendiente, reverso de inventario/contabilidad, incompatibilidad con factura pagada | Nota fiscal externa y recuperación por UI; devolución parcial múltiple | Parcial |
-| Pedido de venta, preparación, despacho, CPE, CxC, cobro, caja, contabilidad | `artifacts/peru-integrated-20260923122407762-17892/http.json`: cotización→pedido→despacho→CPE/CxC→cobro parcial bancario→saldo en efectivo a caja→arqueo/cierre→dos asientos; reintentos, caja inválida rechazada sin mutación; POS ticket→caja→asiento. Navegador consulta ambos cobros e historial/exportación. | Registrar cobranza desde navegador, anulación y reintento incierto; transmisión externa | OK local API con transferencia y efectivo; consulta UI OK; resto pendiente |
+| Pedido de venta, preparación, despacho, CPE, CxC, cobro, caja, contabilidad | `artifacts/peru-integrated-20260923122407762-17892/http.json`: cotización→pedido→despacho→CPE/CxC→cobro parcial bancario→saldo en efectivo a caja→arqueo/cierre→dos asientos; reintentos, caja inválida rechazada sin mutación; POS ticket→caja→asiento. Navegador consulta ambos cobros e historial/exportación. El ensayo del 30/09 añade cobro en efectivo UI con respuesta perdida/replay y cierre. | Cobro bancario desde navegador, anulación y transmisión externa | OK local API con transferencia/efectivo y UI efectivo con reintento; resto pendiente |
 | POS y cajas: abrir, vender, cerrar, arqueo | `http.json`: venta de ticket, stock, efectivo, cierre, asiento e idempotencia; navegador integrado previo | Venta CPE, cambio de turno, pagos mixtos, devolución, impresora/Tauri físicos y errores de red | OK local ticket; fiscal/hardware pendiente |
 | RMA y notas de crédito | `http.json`: alta, rechazo anticipado, aprobación por otro actor, recepción, nota/CxC/asiento únicos | Recepción parcial, saldo a favor/cobro previo, impresión y anulación de nota | Parcial |
 | Logística y GRE: picking, despacho, traslado, guía, reintento | `http.json`: preparación/despacho y lecturas; pruebas API/SQL previas de GRE | Guía local completa desde UI, traslado entre sucursales y transmisión/acuse SUNAT externa | Parcial |
 | CPE: emitir, consultar, anular, descargar/impresión, reintentar | Pruebas de firma y A4, visual de factura/boleta demo; `http.json` nota RMA y ticket interno | Emisión fiscal local completa ligada a pedido y CxC; RA/RC, boleta/factura/NC/ND, PDF/XML, timeout/reintento | Parcial; aceptación externa pendiente |
 | SIRE: preparar, consultar, exportar, presentar/rectificar | `artifacts/peru-integrated-20260923071858181-5776/http.json`: RVIE/RCE locales generados, repetidos sin duplicar, listados, descargados con SHA-256 verificado, aislados por tenant; período inválido y envío desde demo rechazados | Navegador, conciliación con fuentes fiscales, respuesta oficial SUNAT y rectificación | Instantánea local OK; presentación externa pendiente |
 | CxP, bancos, tesorería, conciliación, detracciones | `http.json`: deuda, pago, banco, asiento; conciliación creada/consultada | Pagos parciales, programación/lotes, reversos, conciliación aplicada, detracción y recuperación de fallos | Parcial |
-| CxC, cobranzas, caja, reportes financieros | `artifacts/peru-integrated-20260923122407762-17892`: dos cobros de pedido, transferencia a banco y efectivo a caja, replay sin duplicación, sesión inválida rechazada sin mutación, saldo cero, arqueo/cierre y dos asientos cuadrados. Navegador mostró historial con ambos cobros, exportó CSV y recuperó un 503 en consulta. `artifacts/peru-integrated-20260923070817259-4196`: búsqueda por número/cliente, rechazo anónimo y aislamiento. RMA afecta saldo. | Registrar cobro desde UI, nota sobre cuenta pagada, conciliación, permisos diferenciados por rol, recuperación de red durante cobro y reportes financieros | Parcial; transferencia/efectivo API, búsqueda e historial/exportación UI OK local |
-| Contabilidad: asientos, periodos, centros, plan, presupuestos | `http.json`: asientos automáticos únicos/cuadrados; lecturas de centros, presupuestos, eventos | Asiento manual/edición/reverso, cierre/rehabilitación de periodo, presupuestos y centros persistidos con roles | Parcial |
+| CxC, cobranzas, caja, reportes financieros | `artifacts/peru-integrated-20260923122407762-17892`: dos cobros de pedido, banco/caja, sesión inválida rechazada sin mutación, arqueo/cierre y dos asientos cuadrados. Historial y CSV UI. `artifacts/peru-integrated-20260930192830556-23344`: primer ADMIN no demo crea caja, cobra CxC inicial desde navegador y cierra; la API confirma pero se pierde la respuesta. El diálogo muestra error y conserva datos; reintentar devuelve el mismo pago y movimiento de caja, un solo pago, saldo cero y caja correcta. | Cobro bancario desde UI, nota sobre cuenta pagada, conciliación, permisos diferenciados por rol y reportes financieros | Parcial; efectivo UI con respuesta perdida/replay OK local; transferencia API e historial/exportación UI OK local |
+| Contabilidad: asientos, periodos, centros, plan, presupuestos | `http.json`: asientos automáticos únicos/cuadrados. Navegador integrado: crea centro de costo, presupuesto y asignación; edita y confirma persistencia después de recargar | Asiento manual/edición/reverso, cierre/rehabilitación de periodo y permisos diferenciados para centros/presupuestos | Parcial; centros/presupuestos UI persistidos |
 | Contabilidad: activos, diferidos, consignación, consolidación, revaluación | `http.json`: sólo lecturas de activos/diferidos/consignación/consolidación/tipos de cambio | Alta→proceso→asiento→reporte por cada submódulo, reversos y aislamiento | Sólo lectura verificada |
 | Reportes contables y tributarios, libros, impuestos anual | `artifacts/peru-integrated-20260923073133928-14620/http.json`: cinco TXT PLE exportados individualmente y en lote, RUC del emisor, Diario con 21 campos y debe=haber, contenido aislado por tenant, mes inválido rechazado; reportes comerciales filtrados | PVS SUNAT, conciliación completa de RV/RCE con documentos, UI/impresión y cálculos/declaraciones anuales | PLE local parcial; aceptación tributaria externa pendiente |
-| RR. HH.: candidatos, empleado, contrato, asistencia | `http.json`: lecturas; ensayo visual de candidato | Alta/edición, contratación, asistencia y permisos/aislamiento completos | Parcial |
+| RR. HH.: candidatos, empleado, contrato, asistencia | `http.json`: lecturas. Navegador integrado: candidato creado y editado, perfil y vacante conservados tras recarga | Contratación, alta/edición de empleados/contratos, asistencia y permisos/aislamiento completos | Parcial; alta/edición de candidato UI persistidas |
 | Planilla, pagos, T-Registro, PLAME, liquidaciones | `http.json`: cálculo PE con norma, aprobación distinta, pago/banco/asiento únicos y bloqueo sin norma | Altas laborales desde UI, liquidación, CTS, exportaciones T-Registro/PLAME y constancias externas | OK local cadena planilla; resto pendiente |
 | Configuración comercial, fiscal, RR. HH., establecimientos | `http.json`: primer cliente completa identidad/PFX/credenciales cifrados | Series, impuestos, GRE/SIRE, sucursales y parámetros con edición, permisos, recarga y errores desde UI | Parcial |
 | Migración/importación de maestros y exportaciones | `artifacts/peru-integrated-20260923092617881-10028`: primer ADMIN no demo previsualiza clientes/proveedores, ejecuta dry-run sin escritura, importa archivo mixto con error por fila, consulta lote, reintenta sin duplicar y oculta lote ajeno con 404. Navegador descarga plantilla, bloquea CSV inválido/503, reintenta, importa, busca y exporta ambas filas. La 554 y el exportador #114 están desplegados (`artifacts/peru-production-verification-after-114-20260923.json`). `artifacts/peru-integrated-20260923102951518-2884`: CxC/CxP iniciales con saldo, referencia inexistente, total conciliado, reintento y colisión sin alterar deuda; stock inicial por código de producto, persistencia y replay; diez navegadores pasan. El ajuste posterior de descarga pasó diez navegadores locales en `artifacts/peru-integrated-20260923111137269-19612`; CI de main para #116 pasó tras el ajuste. `artifacts/peru-integrated-20260923114009161-23644`: balance de apertura cuadrado, validación y replay; CPE histórico local sin SUNAT/outbox, referencia de cliente y replay. | Actualización por CSV, roles diferenciados, archivos grandes, validación contable integral con saldos reales y aceptación SUNAT del futuro cliente | Clientes/proveedores OK API+navegador; CxC/CxP, stock, balance y CPE histórico OK local API; #116 desplegado y CI verde |
 | Documentos, descargas, auditoría, ayuda, offline | `http.json`: auditoría real paginada, aislada y con permisos; documentos sólo lectura | Descarga/impresión y búsqueda; cola offline, reinicio/replay; controles de auditoría desde UI | Auditoría API OK; resto parcial |
 
 ## Comprobaciones transversales
+
+- El PR #119 (`3bf774c4`) está fusionado y desplegado; DB/Redis, esquema 555,
+  login y CORS respondieron en sólo lectura el 30/09. E2E y Security Scan
+  pasaron. CI 36764608565 falló en auditoría de dependencias, con el resto de
+  jobs en verde. La corrección local tiene auditoría limpia y tipos/API pasando;
+  requiere completar CI y despliegue
+  (`artifacts/peru-production-verification-after-119-20260930.json`,
+  `artifacts/peru-dependency-audit-20260930.json`).
+- El cobro en efectivo desde navegador con respuesta perdida pasó en el ensayo
+  local del 30/09, junto con 105 escenarios HTTP, SQL/restauración y once
+  recorridos de navegador; esa evidencia acredita sus acciones observadas.
 
 - El PR #118 (`5d6071fb`) pasó CI, E2E y Security Scan de `main` y está
   desplegado en Render/Vercel; API, DB, Redis, esquema 555, login y CORS

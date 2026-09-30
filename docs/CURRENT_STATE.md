@@ -1,6 +1,28 @@
 # Estado actual del ERP
 
-Actualizado: 2026-09-23.
+Actualizado: 2026-09-30.
+
+El PR #119 se integró como `3bf774c4`; corrigió edición de clientes Perú y
+lectura de proveedores de otro tenant. Render sirve ese SHA con DB/Redis
+listos y esquema 555; Vercel Production 6768077437, login y CORS pasaron.
+E2E 36764608474 y Security Scan 36764608488 pasaron. CI 36764608565 pasó
+pruebas, tipos, SQL, flujo integrado y build, pero falló Security audit con
+17 vulnerabilidades altas, 14 moderadas y una baja
+(`artifacts/peru-production-verification-after-119-20260930.json`).
+La actualización local de Axios, Nodemailer, fast-uri, brace-expansion,
+Multer y DOMPurify deja `pnpm audit --audit-level=low` sin vulnerabilidades
+conocidas; pasó tipos en siete proyectos y 300 suites/2895 pruebas API.
+Su integración y despliegue todavía deben confirmarse.
+
+El cobro CxC inicial del primer ADMIN no demo pasó desde navegador con
+respuesta perdida después del commit local: el formulario conserva los datos
+y muestra el error; reintentar la misma intención devuelve el mismo pago y
+movimiento, sin duplicar saldo ni caja, y permite arqueo/cierre. Se corrigió
+la propagación de errores del modal. El ensayo completo pasó 105 escenarios
+HTTP, SQL, restauración y once recorridos de navegador
+(`artifacts/peru-integrated-20260930194037755-22260`), repetido con las
+dependencias actualizadas. Analytics sigue excluido y los
+reportes permanecen incluidos; la matriz enumera operaciones aún pendientes.
 
 El PR #118 se integró como `5d6071fb`. El cobro CxC por transferencia parcial
 y efectivo final pasó 102 escenarios HTTP, SQL, restauración y diez recorridos

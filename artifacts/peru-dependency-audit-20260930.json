@@ -1,0 +1,42 @@
+{
+  "date_utc": "2026-09-30",
+  "failed_main_run_id": 36764608565,
+  "before": {
+    "low": 1,
+    "high": 17,
+    "moderate": 14,
+    "critical": 0
+  },
+  "after": {
+    "info": 0,
+    "low": 0,
+    "moderate": 0,
+    "high": 0,
+    "critical": 0
+  },
+  "audit_exit_code": 0,
+  "patched_resolutions": {
+    "dompurify": "3.4.16",
+    "axios": "1.20.0",
+    "brace-expansion": [
+      "1.1.21",
+      "2.1.7",
+      "5.0.12"
+    ],
+    "fast-uri": "4.1.5",
+    "nodemailer": "10.0.13",
+    "multer": "2.4.0"
+  },
+  "typecheck": {
+    "projects": 7,
+    "result": "passed"
+  },
+  "api_compatibility_tests": {
+    "complete_module_acceptance": false,
+    "suites": 300,
+    "tests": 2895,
+    "result": "passed"
+  },
+  "deployment": "pending",
+  "remote_writes": false
+}
