@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { visiblePeruActions } from './helpers/peru-visible-actions'
 
 const catalogs = [
   ['ventas/rma', ['ventas/rma/[id]']],
@@ -108,7 +109,8 @@ test('Perú: carga las pantallas con identificador usando registros de la empres
         if (!text.trim()) errors.push('Pantalla vacía')
         if (new URL(page.url()).pathname.startsWith('/login')) errors.push('Sesión perdida')
         if (/Acceso denegado|Acceso restringido/i.test(text)) errors.push('Acceso denegado al usuario operativo')
-        const finding = { template, route, tenant, status, errors: [...new Set(errors)], scriptErrors, text }
+        const controls = await visiblePeruActions(page)
+        const finding = { template, route, tenant, status, errors: [...new Set(errors)], scriptErrors, controls, text }
         findings.push(finding)
         await page.screenshot({ path: path.join(output, `${findings.length}-${finding.errors.length ? 'failure' : 'page'}.png`), fullPage: true })
         console.log(`[record-survey] ${template}: ${finding.errors.join('; ') || 'carga sin errores HTTP/JS'}`)

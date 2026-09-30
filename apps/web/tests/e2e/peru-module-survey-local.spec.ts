@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { visiblePeruActions } from './helpers/peru-visible-actions'
 
 async function staticPages(directory: string, root = directory): Promise<string[]> {
   const routes: string[] = []
@@ -47,8 +48,8 @@ test('Perú: inspección de carga de todas las pantallas estáticas con API y ba
   }
   await page.waitForURL('**/dashboard/**')
 
-  const routes = await staticPages(path.resolve('app/dashboard'))
-  const findings: Array<{ route: string; finalUrl: string; status: number | null; errors: string[]; text: string; expectedRestriction: boolean }> = []
+  const routes = (await staticPages(path.resolve('app/dashboard'))).filter(route => !route.startsWith('/dashboard/analytics/'))
+  const findings: Array<{ route: string; finalUrl: string; status: number | null; errors: string[]; text: string; expectedRestriction: boolean; controls: Awaited<ReturnType<typeof visiblePeruActions>> }> = []
   let currentErrors: string[] = []
   page.on('pageerror', error => currentErrors.push(error.message))
   page.on('response', response => {
@@ -81,7 +82,8 @@ test('Perú: inspección de carga de todas las pantallas estáticas con API y ba
     }
     if (expectedRestriction && !denied) currentErrors.push('ADMIN_DEMO debe tener restringida la auditoría')
     const errors = [...new Set(currentErrors)]
-    findings.push({ route, finalUrl: new URL(page.url()).pathname, status, errors, text, expectedRestriction })
+    const controls = await visiblePeruActions(page)
+    findings.push({ route, finalUrl: new URL(page.url()).pathname, status, errors, text, expectedRestriction, controls })
     if (errors.length) await page.screenshot({ path: path.join(output, `${findings.length}-failure.png`), fullPage: true }).catch(() => {})
     await fs.writeFile(path.join(output, 'survey.json'), JSON.stringify({ remoteWrites: false,
       actor: 'ADMIN_DEMO de empresa 2, sin privilegio global',

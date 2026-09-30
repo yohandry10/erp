@@ -176,7 +176,7 @@ try {
   if (withBrowser) {
     const web = launch('web', process.execPath, [webRequire.resolve('next/dist/bin/next'), 'dev', '-p', webPort, '--hostname', '127.0.0.1'], webDirectory);
     await waitReady('Web', () => readFileSync(path.join(output, 'web.log'), 'utf8').includes('Ready in') && httpReady(`${webUrl}/login/`), web);
-    await run('browser', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-integrated-local.spec.ts', '--reporter=list',
+    if (!recordsOnly) await run('browser', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-integrated-local.spec.ts', '--reporter=list',
       ...(focusOnboarding ? ['--grep', 'primer administrador|ajuste con respuesta perdida'] : [])], webDirectory);
     if (withSurvey) await run('module-survey', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-module-survey-local.spec.ts', '--reporter=list'], webDirectory);
     if (withRecords) await run('record-survey', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-record-survey-local.spec.ts', '--reporter=list'], webDirectory);
