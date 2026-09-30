@@ -1,0 +1,24 @@
+{
+  "sha": "62068eecb5b7b7c23db6a56f8baa00f92a4a330d",
+  "read_only": true,
+  "workflows": [
+    {
+      "conclusion": "success",
+      "name": "CI",
+      "status": "completed",
+      "url": "https://github.com/yohandry10/erp/actions/runs/35826660731"
+    },
+    {
+      "conclusion": "success",
+      "name": "Security Scan",
+      "status": "completed",
+      "url": "https://github.com/yohandry10/erp/actions/runs/35826660864"
+    },
+    {
+      "conclusion": "success",
+      "name": "E2E web aislado",
+      "status": "completed",
+      "url": "https://github.com/yohandry10/erp/actions/runs/35826660734"
+    }
+  ]
+}

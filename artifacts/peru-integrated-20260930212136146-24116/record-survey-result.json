@@ -1,0 +1,119 @@
+{
+  "success": false,
+  "scope": "Carga de rutas con registros; no acredita todas las mutaciones",
+  "missingFixtures": [],
+  "findings": [
+    {
+      "template": "ventas/rma/[id]",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "template": "ventas/pedidos/[id]",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "template": "ventas/cotizaciones/[id]",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "template": "ventas/clientes/[id]",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "template": "ventas/clientes/[id]/editar",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "template": "compras/recepciones/[id]",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "template": "compras/proveedores/[id]",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "template": "compras/proveedores/[id]/editar",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "template": "compras/cotizaciones/[id]",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "template": "compras/ordenes/[id]",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "template": "compras/devoluciones/[id]",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "template": "finanzas/cxp/[id]",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "template": "finanzas/bancos/[id]",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "template": "finanzas/bancos/[id]/editar",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "template": "finanzas/conciliacion/[id]",
+      "status": 200,
+      "errors": [
+        "Invalid or unexpected token"
+      ]
+    },
+    {
+      "template": "contabilidad/periodos/[id]",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "template": "contabilidad/asientos/[id]",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "template": "contabilidad/asientos/[id]/editar",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "template": "inventario/productos/[id]/editar",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "template": "contabilidad/presupuestos/[id]",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "template": "contabilidad/centros-costo/[id]",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "template": "contabilidad/centros-costo/[id]/editar",
+      "status": 200,
+      "errors": []
+    }
+  ]
+}

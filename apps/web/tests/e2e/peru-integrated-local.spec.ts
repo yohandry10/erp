@@ -398,6 +398,110 @@ test('Perú: primer administrador reintenta cobro CxC con respuesta perdida sin 
   }, null, 2))
 })
 
+test('Perú: ajuste con respuesta perdida, transferencia y kardex conservan existencias reales', async ({ page, context }) => {
+  test.setTimeout(180000)
+  if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere base local efímera')
+  const evidence = JSON.parse(await fs.readFile(path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'http.json'), 'utf8'))
+  const owner = evidence.results.find((row: { scenario: string }) => row.scenario.startsWith('alta no demo y primer administrador'))
+  const inventory = evidence.results.find((row: { scenario: string }) => row.scenario.startsWith('inventario: altas repetidas'))
+  expect(owner?.client_email && inventory?.producto_id).toBeTruthy()
+  await context.route('**/*', route => ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(route.request().url()).hostname)
+    ? route.continue() : route.abort('blockedbyclient'))
+  await page.goto('/login/')
+  await page.locator('#email').fill(owner.client_email)
+  await page.locator('#password').fill('Cliente-Local-2026-Only!')
+  const [login] = await Promise.all([
+    page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith('/api/auth/login') && response.status() === 201),
+    submitLocalLogin(page),
+  ])
+  const auth = await login.json()
+  const token = auth.access_token ?? auth.data?.access_token
+  expect(token).toBeTruthy()
+  const headers = { Authorization: `Bearer ${token}` }
+  const getReal = async (endpoint: string) => {
+    const response = await page.request.get(`${process.env.LOCAL_API_URL}/api/inventario/${endpoint}`, { headers })
+    expect(response.ok()).toBeTruthy()
+    return response.json()
+  }
+  const productBefore = (await getReal(`productos/${inventory.producto_id}`)).data
+  const movementsBefore = (await getReal('movimientos?limit=500')).data.filter((row: { producto_id: string }) => row.producto_id === inventory.producto_id)
+  const stockBefore = Number(productBefore.stock_actual)
+  expect(stockBefore).toBe(12.25)
+  await page.goto('/dashboard/inventario/operaciones/')
+  await page.getByLabel('Producto del ajuste', { exact: true }).selectOption(inventory.producto_id)
+  await page.getByLabel('Almacén del ajuste', { exact: true }).selectOption(inventory.almacen_origen_id)
+  await page.getByLabel('Diferencia del ajuste', { exact: true }).fill('1.5')
+  await page.getByLabel('Motivo del ajuste', { exact: true }).fill('Conteo desde navegador local')
+  const adjustmentRoute = /\/api\/inventario\/movimientos\/?$/
+  let originalIntent: { idempotency_key: string } | undefined
+  await page.route(adjustmentRoute, async route => {
+    originalIntent = route.request().postDataJSON()
+    const committed = await route.fetch()
+    expect(committed.status()).toBe(201)
+    await route.fulfill({ status: 503, json: { message: 'Respuesta de ajuste perdida después del commit local' } })
+  }, { times: 1 })
+  await page.getByRole('button', { name: 'Registrar ajuste y asiento', exact: true }).click()
+  await expect(page.getByRole('alert').filter({ hasText: 'Respuesta de ajuste perdida' })).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: 'registrado' })).toHaveCount(0)
+  await expect(page.getByLabel('Diferencia del ajuste', { exact: true })).toHaveValue('1.5')
+  expect(Number((await getReal(`productos/${inventory.producto_id}`)).data.stock_actual)).toBe(stockBefore + 1.5)
+  const [retried] = await Promise.all([
+    page.waitForResponse(response => adjustmentRoute.test(new URL(response.url()).pathname) && response.request().method() === 'POST' && response.status() === 201),
+    page.getByRole('button', { name: 'Registrar ajuste y asiento', exact: true }).click(),
+  ])
+  expect(retried.request().postDataJSON().idempotency_key).toBe(originalIntent!.idempotency_key)
+  await expect(page.getByRole('status').filter({ hasText: 'registrado' })).toBeVisible()
+  expect(Number((await getReal(`productos/${inventory.producto_id}`)).data.stock_actual)).toBe(stockBefore + 1.5)
+  expect((await getReal('movimientos?limit=500')).data.filter((row: { producto_id: string }) => row.producto_id === inventory.producto_id)).toHaveLength(movementsBefore.length + 1)
+  await page.getByRole('tab', { name: 'Transferencia entre almacenes' }).click()
+  await page.getByLabel('Producto de la transferencia', { exact: true }).selectOption(inventory.producto_id)
+  await page.getByLabel('Almacén de origen', { exact: true }).selectOption(inventory.almacen_origen_id)
+  await page.getByLabel('Almacén de destino', { exact: true }).selectOption(inventory.almacen_destino_id)
+  await page.getByLabel('Cantidad a transferir', { exact: true }).fill('2')
+  await page.getByLabel('Motivo de la transferencia', { exact: true }).fill('Traslado desde navegador local')
+  const [transferred] = await Promise.all([
+    page.waitForResponse(response => /\/api\/inventario\/transferencias\/?$/.test(new URL(response.url()).pathname) && response.request().method() === 'POST'),
+    page.getByRole('button', { name: 'Confirmar transferencia', exact: true }).click(),
+  ])
+  expect(transferred.status()).toBe(201)
+  await expect(page.getByRole('status').filter({ hasText: 'Transferencia confirmada' })).toBeVisible()
+  expect(Number((await getReal(`productos/${inventory.producto_id}`)).data.stock_actual)).toBe(stockBefore + 1.5)
+  expect((await getReal('movimientos?limit=500')).data.filter((row: { producto_id: string }) => row.producto_id === inventory.producto_id)).toHaveLength(movementsBefore.length + 3)
+  await page.reload()
+  await page.goto('/dashboard/inventario/kardex/')
+  await page.getByLabel('Producto', { exact: true }).selectOption(inventory.producto_id)
+  await page.getByLabel('Almacén', { exact: true }).selectOption(inventory.almacen_destino_id)
+  const [kardex] = await Promise.all([
+    page.waitForResponse(response => /\/api\/inventario\/kardex\/?$/.test(new URL(response.url()).pathname)
+      && new URL(response.url()).searchParams.get('productoId') === inventory.producto_id
+      && new URL(response.url()).searchParams.get('almacenId') === inventory.almacen_destino_id),
+    page.getByRole('button', { name: 'Aplicar filtros', exact: true }).click(),
+  ])
+  expect(kardex.status()).toBe(200)
+  const ledger = await kardex.json()
+  expect(Number(ledger.resumen.saldoCantidad)).toBe(6.5)
+  await expect(page.getByRole('row').filter({ hasText: productBefore.nombre }).first()).toBeVisible()
+  const navigation = page.locator('aside nav')
+  for (const name of ['Productos', 'Ventas', 'Finanzas']) {
+    const button = navigation.getByRole('button', { name, exact: true })
+    if (await button.count() && await button.locator('..').locator('a').count() === 0) await button.click()
+  }
+  const links = await navigation.locator('a').evaluateAll(anchors => anchors.map(anchor => ({
+    label: anchor.textContent?.trim(), href: anchor.getAttribute('href')?.replace(/\/$/, ''),
+  })).filter(row => row.href && !row.href.startsWith('/dashboard/analytics')))
+  for (const href of ['/dashboard/gre', '/dashboard/sire', '/dashboard/cpe', '/dashboard/inventario/operaciones']) {
+    expect(links.some(row => row.href === href)).toBeTruthy()
+  }
+  await fs.writeFile(path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'peru-navigation-admin.json'), JSON.stringify({
+    country: 'PE', role: 'ADMIN', tenant_kind: 'first_client_non_demo', excluded: ['Analytics'], links,
+    limits: 'Enlaces realmente renderizados con las banderas del ensayo; las acciones internas requieren la matriz por operación.',
+  }, null, 2))
+  await fs.writeFile(path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'browser-inventory.json'), JSON.stringify({
+    producto_id: inventory.producto_id, initial_stock: stockBefore, final_stock: stockBefore + 1.5,
+    destination_stock: 6.5, added_ledger_rows: 3, response_lost_after_local_commit: true, same_intent_replayed: true,
+  }, null, 2))
+})
+
 test('Perú: crea centro de costo y conserva un presupuesto al editar y recargar', async ({ page, context }) => {
   test.setTimeout(180000)
   page.setDefaultTimeout(20000)
