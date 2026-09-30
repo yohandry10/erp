@@ -192,6 +192,114 @@ test('Perú: primer administrador importa y edita clientes y proveedores desde n
   }
 })
 
+test('Perú: primer administrador reintenta cobro CxC con respuesta perdida sin duplicar y cierra caja', async ({ page, context }) => {
+  test.setTimeout(180000)
+  if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere base local efímera')
+  const evidence = JSON.parse(await fs.readFile(path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'http.json'), 'utf8'))
+  const onboarding = evidence.results.find((row: { scenario: string }) => row.scenario.startsWith('alta no demo y primer administrador'))
+  const opening = evidence.results.find((row: { scenario: string; cuenta_id?: string }) => row.scenario.startsWith('cxc_abiertas:'))
+  const cashBox = evidence.results.find((row: { scenario: string; caja_id?: string }) => row.scenario.startsWith('primer cliente crea caja'))
+  expect(onboarding?.client_email && opening?.cuenta_id && cashBox?.caja_id).toBeTruthy()
+  await context.route('**/*', route => ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(route.request().url()).hostname)
+    ? route.continue() : route.abort('blockedbyclient'))
+  await page.goto('/login/')
+  await page.locator('#email').fill(onboarding.client_email)
+  await page.locator('#password').fill('Cliente-Local-2026-Only!')
+  const [login] = await Promise.all([
+    page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith('/api/auth/login') && response.status() === 201),
+    submitLocalLogin(page),
+  ])
+  const auth = await login.json()
+  const token = auth.access_token ?? auth.data?.access_token
+  expect(token).toBeTruthy()
+  const headers = { Authorization: `Bearer ${token}` }
+  const detailResponse = await page.request.get(`${process.env.LOCAL_API_URL}/api/finanzas/cxc/${opening.cuenta_id}`, { headers })
+  expect(detailResponse.ok(), await detailResponse.text()).toBeTruthy()
+  const rawDetail = await detailResponse.json()
+  const detail = rawDetail.data ?? rawDetail
+  const due = Number(detail.saldo)
+  expect(due).toBeGreaterThan(0)
+  const openResponse = await page.request.post(`${process.env.LOCAL_API_URL}/api/pos/caja/abrir`, {
+    headers, data: { monto_inicial: 100, caja_id: cashBox.caja_id, moneda: 'PEN', dispositivo: 'integrated-cxc-browser' },
+  })
+  expect(openResponse.status(), await openResponse.text()).toBe(201)
+  const opened = await openResponse.json()
+  expect(opened.data?.id).toBeTruthy()
+  await page.goto('/dashboard/finanzas/cxc/')
+  await page.getByPlaceholder('Serie, numero, cliente, moneda').fill(String(detail.numero))
+  const row = page.getByRole('row').filter({ hasText: String(detail.numero) })
+  await expect(row).toBeVisible()
+  await row.getByRole('button', { name: 'Cobro' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Registrar cobro' })
+  await expect(dialog).toBeVisible()
+  await dialog.locator('#metodo_pago').selectOption('EFECTIVO')
+  await dialog.locator('#referencia').fill(`COBRO-UI-LOCAL-${randomUUID().slice(0, 8)}`)
+  // El servidor local confirma el pago; sólo se pierde su respuesta al navegador.
+  // La prueba usa PostgreSQL real y conserva la misma intención al reintentar.
+  const paymentUrl = new RegExp(`/api/finanzas/cxc/${opening.cuenta_id}/pagos/?$`)
+  let committedPayment: any
+  let firstIntent: string | undefined
+  await page.route(paymentUrl, async route => {
+    firstIntent = route.request().postDataJSON().idempotency_key
+    const committed = await route.fetch()
+    expect(committed.status(), await committed.text()).toBe(201)
+    committedPayment = await committed.json()
+    await route.fulfill({ status: 503, contentType: 'application/json',
+      body: JSON.stringify({ success: false, message: 'Respuesta de cobro interrumpida; reintente la misma operación' }) })
+  }, { times: 1 })
+  const [lostResponse] = await Promise.all([
+    page.waitForResponse(response => paymentUrl.test(new URL(response.url()).pathname) && response.request().method() === 'POST'),
+    dialog.getByRole('button', { name: 'Registrar cobro' }).click(),
+  ])
+  expect(lostResponse.status()).toBe(503)
+  expect(firstIntent).toMatch(/^cxc-cobro:/)
+  expect(committedPayment.data?.pago?.id).toBeTruthy()
+  expect(committedPayment.data?.movimiento_caja?.id).toBeTruthy()
+  await expect(dialog.getByRole('alert')).toContainText('Respuesta de cobro interrumpida')
+  await expect(dialog).toBeVisible()
+  await expect(dialog.locator('#monto')).toHaveValue(String(due))
+  const uncertainResponse = await page.request.get(`${process.env.LOCAL_API_URL}/api/finanzas/cxc/${opening.cuenta_id}`, { headers })
+  const uncertainRaw = await uncertainResponse.json()
+  expect(Number((uncertainRaw.data ?? uncertainRaw).saldo)).toBe(0)
+  expect((uncertainRaw.data ?? uncertainRaw).pagos).toHaveLength(1)
+  const [paymentResponse] = await Promise.all([
+    page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith(`/api/finanzas/cxc/${opening.cuenta_id}/pagos`)
+      && response.request().method() === 'POST'),
+    dialog.getByRole('button', { name: 'Registrar cobro' }).click(),
+  ])
+  expect(paymentResponse.status(), await paymentResponse.text()).toBe(201)
+  const payment = await paymentResponse.json()
+  expect(paymentResponse.request().postDataJSON().idempotency_key).toBe(firstIntent)
+  expect(payment.data?.idempotent_replay).toBe(true)
+  expect(payment.data?.pago?.id).toBe(committedPayment.data?.pago?.id)
+  expect(payment.data?.movimiento_caja?.id).toBe(committedPayment.data?.movimiento_caja?.id)
+  expect(payment.data?.movimiento_caja?.sesion_caja_id).toBe(opened.data.id)
+  await expect(dialog).toBeHidden()
+  await expect(row).toContainText('Cancelado')
+  const paidResponse = await page.request.get(`${process.env.LOCAL_API_URL}/api/finanzas/cxc/${opening.cuenta_id}`, { headers })
+  const paidRaw = await paidResponse.json()
+  expect(Number((paidRaw.data ?? paidRaw).saldo)).toBe(0)
+  expect((paidRaw.data ?? paidRaw).pagos).toHaveLength(1)
+  const balanceResponse = await page.request.get(`${process.env.LOCAL_API_URL}/api/cajas/saldo-esperado/${opened.data.id}`, { headers })
+  expect(balanceResponse.ok(), await balanceResponse.text()).toBeTruthy()
+  const balance = await balanceResponse.json()
+  expect(Number(balance.data.saldo)).toBeCloseTo(100 + due, 2)
+  const closeResponse = await page.request.post(`${process.env.LOCAL_API_URL}/api/pos/caja/cerrar`, {
+    headers, data: { sesion_id: opened.data.id, caja_id: cashBox.caja_id, monto_contado: balance.data.saldo,
+      notas: 'Arqueo local tras cobro visual de CxC inicial' },
+  })
+  expect(closeResponse.status(), await closeResponse.text()).toBe(201)
+  await fs.writeFile(path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'browser-cxc-collection.json'), JSON.stringify({
+    scenario: 'primer ADMIN no demo cobra saldo inicial, pierde respuesta y reintenta sin duplicar',
+    first_response_status: 503, committed_payment_id: committedPayment.data.pago.id,
+    replay_status: paymentResponse.status(), idempotent_replay: payment.data.idempotent_replay,
+    payment_id: payment.data.pago.id, cash_movement_id: payment.data.movimiento_caja.id,
+    payment_count: (paidRaw.data ?? paidRaw).pagos.length, final_balance: Number((paidRaw.data ?? paidRaw).saldo),
+    cash_balance: Number(balance.data.saldo), expected_cash_balance: 100 + due, close_status: closeResponse.status(),
+    external_browser_requests_blocked: true, local_only: true,
+  }, null, 2))
+})
+
 test('Perú: crea centro de costo y conserva un presupuesto al editar y recargar', async ({ page, context }) => {
   test.setTimeout(180000)
   page.setDefaultTimeout(20000)

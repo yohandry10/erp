@@ -18,6 +18,7 @@ if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere E2E_EP
 const origin = new URL(process.env.LOCAL_API_URL || 'http://127.0.0.1:3122');
 if (!['127.0.0.1', 'localhost', '[::1]'].includes(origin.hostname)) throw new Error('La API debe ser local');
 const results = [];
+const requestTraces = [];
 const outputDir = path.resolve(process.env.LOCAL_INTEGRATED_OUTPUT_DIR || 'artifacts/peru-integrated-local');
 mkdirSync(outputDir, { recursive: true });
 let token;
@@ -47,7 +48,7 @@ async function request(path, body, expected = body === undefined ? 200 : 201, ex
     });
     const text = await response.text();
     let data;
-    try { data = JSON.parse(text); } catch { throw new Error(`${path}: respuesta no JSON (${response.status})`); }
+    try { data = response.status === 204 ? null : JSON.parse(text); } catch { throw new Error(`${path}: respuesta no JSON (${response.status})`); }
     if (response.status === 429 && expected !== 429 && attempt < 2) {
       const retryAfter = Number(response.headers.get('retry-after'));
       const seconds = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 61;
@@ -55,7 +56,10 @@ async function request(path, body, expected = body === undefined ? 200 : 201, ex
       await new Promise(resolve => setTimeout(resolve, (seconds + 1) * 1000));
       continue;
     }
-    assert.equal(response.status, expected, `${path}: HTTP ${response.status}; ${typeof data.message === 'string' ? data.message : 'contrato HTTP inesperado'}`);
+    assert.equal(response.status, expected, `${path}: HTTP ${response.status}; ${typeof data?.message === 'string' ? data.message : 'contrato HTTP inesperado'}`);
+    requestTraces.push({ method: method ?? (body === undefined ? 'GET' : 'POST'),
+      pathname: new URL(`/api/${path}`, origin).pathname, status: response.status,
+      scenario_index_hint: results.length });
     return data;
   }
   throw new Error(`${path}: agotó los reintentos del límite HTTP`);
@@ -167,10 +171,10 @@ async function main() {
 }
 try {
   await main();
-  writeFileSync(path.join(outputDir, 'http.json'), JSON.stringify({ date: new Date().toISOString(), success: true, results }, null, 2));
+  writeFileSync(path.join(outputDir, 'http.json'), JSON.stringify({ date: new Date().toISOString(), success: true, results, request_traces: requestTraces }, null, 2));
   console.log(`PASS ${results.length} comprobaciones integradas locales`);
 } catch (error) {
-  writeFileSync(path.join(outputDir, 'http.json'), JSON.stringify({ date: new Date().toISOString(), success: false, results, error: error.message }, null, 2));
+  writeFileSync(path.join(outputDir, 'http.json'), JSON.stringify({ date: new Date().toISOString(), success: false, results, request_traces: requestTraces, error: error.message }, null, 2));
   console.error(error);
   process.exitCode = 1;
 }

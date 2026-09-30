@@ -69,7 +69,7 @@ const formatCurrency = (value: number, currency: string = 'PEN') =>
 
 export function CobroModal({ isOpen, cuenta, onClose, onSuccess }: CobroModalProps) {
   const country = useCountryContext()
-  const { get, post } = useApi({ showSuccessToast: true })
+  const { get, post } = useApi({ showSuccessToast: true, throwOnError: true })
   const [monto, setMonto] = useState('')
   const [fechaPago, setFechaPago] = useState(() => new Date().toISOString().split('T')[0])
   const [metodoPago, setMetodoPago] = useState('EFECTIVO')
@@ -327,7 +327,7 @@ export function CobroModal({ isOpen, cuenta, onClose, onSuccess }: CobroModalPro
             </div>
           </div>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
           <DialogFooter className="gap-2">
             <Button type="button" variant="outline" onClick={handleClose} disabled={saving}>
