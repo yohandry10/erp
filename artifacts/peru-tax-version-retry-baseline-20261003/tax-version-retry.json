@@ -1,0 +1,114 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "local_only": true,
+  "scope": "Diagnóstico de replay/colisión del guardado mensual por API real; no presenta documentos",
+  "scenarios": [
+    {
+      "scenario": "Impuesto mensual: replay del mismo cuerpo/Idempotency-Key conserva borrador y versión",
+      "passed": false,
+      "first_id": "05dbb297-c685-4dc3-8e74-fb6ee53e0bcf",
+      "replay_id": "740d817d-8161-48a3-8eae-7b36ce69bdaa",
+      "first_version": 1,
+      "replay_version": 2,
+      "status": 201
+    },
+    {
+      "scenario": "Impuesto mensual: cuerpo distinto con la misma clave rechaza sin nueva versión",
+      "passed": false,
+      "status": 201,
+      "version": 3
+    },
+    {
+      "scenario": "Impuesto anual: replay conserva ID y versión",
+      "passed": false,
+      "first_id": "8befbbef-70d7-4465-8bbd-cbd921ccafc6",
+      "replay_id": "f0f9e961-890e-447f-b22d-96eaffffb424",
+      "first_version": 1,
+      "replay_version": 2,
+      "status": 201
+    },
+    {
+      "scenario": "Constancia mensual: respuesta perdida recupera mismo resultado, sólo referencia local simulada",
+      "passed": false,
+      "status": 500,
+      "first_status": 201,
+      "error": "No se pudo registrar la constancia SUNAT: Borrador vigente no encontrado o ya presentado"
+    }
+  ],
+  "defects": [
+    {
+      "scenario": "Impuesto mensual: replay del mismo cuerpo/Idempotency-Key conserva borrador y versión",
+      "passed": false,
+      "first_id": "05dbb297-c685-4dc3-8e74-fb6ee53e0bcf",
+      "replay_id": "740d817d-8161-48a3-8eae-7b36ce69bdaa",
+      "first_version": 1,
+      "replay_version": 2,
+      "status": 201
+    },
+    {
+      "scenario": "Impuesto mensual: cuerpo distinto con la misma clave rechaza sin nueva versión",
+      "passed": false,
+      "status": 201,
+      "version": 3
+    },
+    {
+      "scenario": "Impuesto anual: replay conserva ID y versión",
+      "passed": false,
+      "first_id": "8befbbef-70d7-4465-8bbd-cbd921ccafc6",
+      "replay_id": "f0f9e961-890e-447f-b22d-96eaffffb424",
+      "first_version": 1,
+      "replay_version": 2,
+      "status": 201
+    },
+    {
+      "scenario": "Constancia mensual: respuesta perdida recupera mismo resultado, sólo referencia local simulada",
+      "passed": false,
+      "status": 500,
+      "first_status": 201,
+      "error": "No se pudo registrar la constancia SUNAT: Borrador vigente no encontrado o ya presentado"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/mensual",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/mensual",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/mensual",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/anual",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/anual",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/declaraciones/:id/constancia",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/declaraciones/:id/constancia",
+      "status": 500
+    }
+  ],
+  "sources": [
+    "https://mef.gob.pe/en/normatividad-sp-9322/por-instrumento/decretos-supremos/32370-decreto-supremo-n-309-2023-ef-1/file",
+    "https://www.gob.pe/institucion/mef/normas-legales/7540449-301-2025-ef",
+    "https://www.drelm.gob.pe/drelm/wp-content/uploads/2025/01/DECRETO-SUPREMO-260-2024-APROBACION-DE-UIT-2025.pdf"
+  ]
+}

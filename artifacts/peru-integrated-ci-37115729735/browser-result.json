@@ -1,0 +1,6 @@
+{
+  "passed": 21,
+  "failed": 0,
+  "flaky": 1,
+  "scope": "Recorridos de peru-integrated-local.spec.ts; no acepta todas las acciones del producto"
+}

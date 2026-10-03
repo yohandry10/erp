@@ -4,6 +4,7 @@ import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EstadosFinancierosService } from './estados-financieros.service';
 import { AdvertenciaTributaria, normalizarRegimenPeru } from './tributos-mensuales.service';
 import { uitPeruPorEjercicio } from './uit-peru';
+import { mutarTributo, TributoIntent } from './tributos-intent';
 
 export interface AjustesTributariosAnuales {
   adiciones_tributarias?: number;
@@ -215,7 +216,10 @@ export class TributosAnualesService {
     return { ...calculo, source_snapshot: snapshot, declaracion_vigente: declaracion || null };
   }
 
-  async guardar(tenantId: string, userId: string, ejercicio: number, ajustes: AjustesTributariosAnuales) {
+  async guardar(tenantId: string, userId: string, ejercicio: number, ajustes: AjustesTributariosAnuales, idempotencyKey?: string) {
+    const intent: TributoIntent = { tenantId, actorId: userId, key: idempotencyKey, operation: 'ANNUAL_SAVE', request: { ejercicio, ...ajustes, notas: ajustes.notas?.trim() || null } };
+    const replay = await mutarTributo(this.supabase, intent);
+    if (replay.pending !== true) return replay;
     const calculo = await this.calcular(tenantId, ejercicio, ajustes);
     const payload: any = {
       ...calculo,
@@ -223,13 +227,7 @@ export class TributosAnualesService {
       notas: ajustes.notas?.trim() || null,
     };
     delete payload.declaracion_vigente;
-    const { data, error } = await this.supabase.getClient().rpc('guardar_tributo_anual_tx', {
-      p_tenant_id: tenantId,
-      p_user_id: userId,
-      p_payload: payload,
-    });
-    if (error) throw new Error(`No se pudo guardar el borrador anual: ${error.message}`);
-    return data;
+    return mutarTributo(this.supabase, intent, payload);
   }
 
   async listar(tenantId: string, limite = 12) {
@@ -240,7 +238,10 @@ export class TributosAnualesService {
     return data || [];
   }
 
-  async registrarConstancia(tenantId: string, userId: string, id: string, constancia: string, fecha?: string) {
+  async registrarConstancia(tenantId: string, userId: string, id: string, constancia: string, fecha?: string, idempotencyKey?: string) {
+    const intent: TributoIntent = { tenantId, actorId: userId, key: idempotencyKey, operation: 'ANNUAL_RECEIPT', recordId: id, request: { constancia: constancia.trim(), fecha_presentacion: fecha ? new Date(fecha).toISOString() : null } };
+    const replay = await mutarTributo(this.supabase, intent);
+    if (replay.pending !== true) return replay;
     const { data: row, error: findError } = await this.supabase.getClient()
       .from('tributos_declaraciones_anuales').select('id, warnings')
       .eq('tenant_id', tenantId).eq('id', id).maybeSingle();
@@ -249,14 +250,6 @@ export class TributosAnualesService {
     if (Array.isArray(row.warnings) && row.warnings.some((warning: any) => warning?.bloquea_presentacion)) {
       throw new BadRequestException('Cierre el ejercicio y corrija el balance antes de registrar la constancia.');
     }
-    const { data, error } = await this.supabase.getClient().rpc('registrar_constancia_tributo_anual_tx', {
-      p_tenant_id: tenantId,
-      p_user_id: userId,
-      p_declaracion_id: id,
-      p_constancia: constancia,
-      p_fecha_presentacion: fecha || null,
-    });
-    if (error) throw new Error(`No se pudo registrar la constancia anual: ${error.message}`);
-    return data;
+    return mutarTributo(this.supabase, intent, {});
   }
 }

@@ -719,12 +719,10 @@
           "endpoint": "/api/configuracion/series/:tipo"
         }
       ],
-      "status": "merged_pr_ci_passed_main_deployment_pending",
+      "status": "corrected_merged_main_deployment_verified",
       "proof": "artifacts/peru-series-defects-20261003/series-lifecycle.json",
       "correction": "Candidato: SQL 23505 devuelve 409; 22023/23514 devuelven 400; estados previos conservados",
-      "pending": [
-        "CI main y verificación del despliegue exacto de #129"
-      ],
+      "pending": [],
       "cases": [
         "conflicto de replay",
         "máximo cero",
@@ -739,7 +737,9 @@
         "branch": 37111841817,
         "checks_success": 26,
         "merge": "5a23c4c1bc16b58c3bf324c15681ff00f8eb395a"
-      }
+      },
+      "main_ci": 37114135464,
+      "deployment_proof": "artifacts/peru-production-verification-after-129-20261003.json"
     },
     {
       "id": "document-series-unsupported-type-persisted",
@@ -750,12 +750,10 @@
           "endpoint": "/api/configuracion/series/:tipo"
         }
       ],
-      "status": "merged_pr_ci_passed_main_deployment_pending",
+      "status": "corrected_merged_main_deployment_verified",
       "proof": "artifacts/peru-series-defects-20261003/series-lifecycle.json",
       "correction": "API canónica valida tipos de DTOs operativos/fiscales y los tipos internos vigentes antes de llamar el writer; NO_EXISTE ahora 400 sin filas/intención/auditoría",
-      "pending": [
-        "CI main y verificación del despliegue exacto de #129"
-      ],
+      "pending": [],
       "canonical_proof": "artifacts/peru-tax-series-canonical-subset-20261003",
       "ci": {
         "sha": "22cf5bb62b8cd4848f815d9175c2243de92e0874",
@@ -763,12 +761,14 @@
         "branch": 37111841817,
         "checks_success": 26,
         "merge": "5a23c4c1bc16b58c3bf324c15681ff00f8eb395a"
-      }
+      },
+      "main_ci": 37114135464,
+      "deployment_proof": "artifacts/peru-production-verification-after-129-20261003.json"
     },
     {
       "id": "tax-adjustments-unhandled-ui-rejection",
       "module": "finanzas/ajustes-fiscales",
-      "status": "merged_pr_ci_passed_main_deployment_pending",
+      "status": "corrected_merged_main_deployment_verified",
       "proof": "artifacts/peru-tax-adjustments-ui-defect-20261003.json",
       "operations": [
         {
@@ -785,9 +785,7 @@
         }
       ],
       "correction": "UI canónica captura el rechazo ya mostrado por useApi, conserva campos y llave; evita pageerror sin esconder fallo ni limpiar datos",
-      "pending": [
-        "CI main y verificación del despliegue exacto de #129"
-      ],
+      "pending": [],
       "canonical_proof": "artifacts/peru-tax-series-canonical-subset-20261003",
       "ci": {
         "sha": "22cf5bb62b8cd4848f815d9175c2243de92e0874",
@@ -795,7 +793,9 @@
         "branch": 37111841817,
         "checks_success": 26,
         "merge": "5a23c4c1bc16b58c3bf324c15681ff00f8eb395a"
-      }
+      },
+      "main_ci": 37114135464,
+      "deployment_proof": "artifacts/peru-production-verification-after-129-20261003.json"
     },
     {
       "id": "monthly-tax-uses-2026-uit-for-other-exercises",
@@ -846,6 +846,60 @@
       "canonical_proof": "artifacts/peru-monthly-recovery-canonical-subset-20261003",
       "pending": [
         "CI/global y despliegue exacto; variantes de error de declaración vigente, fuentes y UI"
+      ]
+    },
+    {
+      "id": "monthly-tax-save-retry-duplicates-version",
+      "module": "contabilidad/impuestos",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/impuestos/mensual"
+        }
+      ],
+      "status": "candidate_subset_passed_canonical_full_ci_deployment_pending",
+      "proof": "artifacts/peru-tax-version-retry-baseline-20261003/tax-version-retry.json",
+      "correction": "Intención durable, conflicto de cuerpo y respuesta congelada; transacción única y web retiene clave durante fallo",
+      "candidate_proof": "artifacts/peru-tax-intents-candidate-subset-20261003",
+      "pending": [
+        "Reconstrucción canónica 562, CI exacto, ensayo/preservación y promoción DB-first, main/despliegue",
+        "Variantes normativas, fuentes no vacías e interoperabilidad SUNAT siguen separadas"
+      ]
+    },
+    {
+      "id": "annual-tax-save-retry-duplicates-version",
+      "module": "contabilidad/impuestos",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/impuestos/anual"
+        }
+      ],
+      "status": "candidate_subset_passed_canonical_full_ci_deployment_pending",
+      "proof": "artifacts/peru-tax-version-retry-baseline-20261003/tax-version-retry.json",
+      "correction": "Intención anual durable y replay del corte congelado antes de recalcular fuentes",
+      "candidate_proof": "artifacts/peru-tax-intents-candidate-subset-20261003",
+      "pending": [
+        "Reconstrucción canónica 562, CI exacto, ensayo/preservación y promoción DB-first, main/despliegue",
+        "Variantes normativas, fuentes no vacías e interoperabilidad SUNAT siguen separadas"
+      ]
+    },
+    {
+      "id": "monthly-tax-receipt-retry-500",
+      "module": "contabilidad/impuestos",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/impuestos/declaraciones/:id/constancia"
+        }
+      ],
+      "status": "candidate_subset_passed_canonical_full_ci_deployment_pending",
+      "proof": "artifacts/peru-tax-version-retry-baseline-20261003/tax-version-retry.json",
+      "correction": "Constancia e intención atómicas; replay confirmado se recupera antes de exigir estado BORRADOR",
+      "candidate_proof": "artifacts/peru-tax-intents-candidate-subset-20261003",
+      "pending": [
+        "Reconstrucción canónica 562, CI exacto, ensayo/preservación y promoción DB-first, main/despliegue",
+        "Variantes normativas, fuentes no vacías e interoperabilidad SUNAT siguen separadas"
       ]
     }
   ]
