@@ -248,3 +248,11 @@ mocks sólo apoyan regresión y no sustituyen estas operaciones reales.
 
 No hay aceptación global. Cada operación conserva comprobaciones restantes.
 Sólo Analytics está excluido; reportes operativos, contables y tributarios incluidos.
+
+## Cierre posterior de #132 y GRE canónico — 03/10
+
+#132 cerró main 37125486977 y despliegue cf868067/esquema 563 con preflight. Se conserva el timeout inicial de lectura de 20 segundos. No reaplicar 563.
+
+GRE 094be1a7 completó 298 API/29 UI sin reintentos, 99 pantallas, 22 vistas con registros, SQL y restore. Once casos GRE se vinculan a la matriz; 288 de 717 contratos HTTP observados, 77 casos vinculados y 1298 controles visibles. Los siete defectos GRE quedan corregidos localmente, pendientes de CI/main/despliegue. No acredita aceptación SUNAT ni impresora física.
+
+La aceptación por módulo sigue incompleta; sólo Analytics excluido.

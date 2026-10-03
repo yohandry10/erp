@@ -1,0 +1,16 @@
+{
+  "scenario": "primer ADMIN no demo cobra saldo inicial, pierde respuesta y reintenta sin duplicar",
+  "first_response_status": 503,
+  "committed_payment_id": "372f2c42-0d98-491c-b5be-207a784695ea",
+  "replay_status": 201,
+  "idempotent_replay": true,
+  "payment_id": "372f2c42-0d98-491c-b5be-207a784695ea",
+  "cash_movement_id": "2b17eaf5-546f-475e-a8fd-2dee7187b153",
+  "payment_count": 1,
+  "final_balance": 0,
+  "cash_balance": 159,
+  "expected_cash_balance": 159,
+  "close_status": 201,
+  "external_browser_requests_blocked": true,
+  "local_only": true
+}

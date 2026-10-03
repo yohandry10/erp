@@ -1,0 +1,383 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "local_only": true,
+  "scope": "Anticipos y ajustes fiscales de CxP por API real, primer ADMIN no demo; parámetros de prueba no acreditan tasas legales ni depósito externo en SUNAT",
+  "scenarios": [
+    {
+      "scenario": "Ajustes: cálculo y validación por API; quinta no ofrecida y base cero rechazadas",
+      "passed": true
+    },
+    {
+      "scenario": "Anticipo proveedor: cargo bancario y saldo disponible persistidos; replay sin residuos",
+      "passed": true
+    },
+    {
+      "scenario": "Anticipo cliente: abono bancario, consulta y replay persistidos",
+      "passed": true
+    },
+    {
+      "scenario": "Anticipo proveedor: aplicación parcial reduce deuda y disponible una vez",
+      "passed": true
+    },
+    {
+      "scenario": "CxP: retención, percepción y detracción alteran deuda correctamente sin tocar banco",
+      "passed": true
+    },
+    {
+      "scenario": "Ajustes: exceso de deuda/anticipo, cálculo incompatible y tercero incorrecto rechazados sin residuos",
+      "passed": true
+    },
+    {
+      "scenario": "Ajustes: consulta y depósito ajenos aislados",
+      "passed": true
+    },
+    {
+      "scenario": "Detracción: depósito contable local y replay cargan banco una vez sin repetir reducción de CxP",
+      "passed": true
+    },
+    {
+      "scenario": "Ajustes: consulta por ID y filtros de origen/tipo/estado; anticipos por cliente",
+      "passed": true
+    },
+    {
+      "scenario": "Ajustes: rol sin finanzas no consulta ni aplica movimientos",
+      "passed": true
+    },
+    {
+      "scenario": "CxP ajustada: pago neto y replay liquidan deuda, banco y obligación sin doble movimiento",
+      "passed": true
+    },
+    {
+      "scenario": "Ajustes: consumidor real publica asientos únicos y cuadrados de deuda, anticipos, reclasificación y depósito",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/plan-cuentas",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/cuentas",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/movimientos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/proveedores",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/clientes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/calcular",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/calcular",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/calcular",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/calcular",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/calcular",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/calcular",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxp",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/anticipos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/anticipos",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/anticipos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/anticipos",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/ajustes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/ajustes",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/ajustes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/ajustes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/ajustes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/ajustes",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/ajustes",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/ajustes",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/ajustes",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/ajustes",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "retenciones/:id",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/:id/depositar-detraccion",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/:id/depositar-detraccion",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/:id/depositar-detraccion",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "retenciones?origen=PROVEEDOR&tipo=DETRACCION&estado=APLICADO",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "retenciones/anticipos?origen=CLIENTE",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "retenciones",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "retenciones/ajustes",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/tesoreria/pagos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/tesoreria/pagos",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxp",
+      "status": 201
+    }
+  ],
+  "postings": [
+    {
+      "id": "1b8e6db2-c9ab-4531-affd-751355be4e36",
+      "debe": 100,
+      "haber": 100,
+      "estado": "CONFIRMADO",
+      "event_id": "df7927c4-9678-4b59-bd5c-f694e9765c19"
+    },
+    {
+      "id": "228f2201-b387-48f8-aeec-19ec986c1343",
+      "debe": 10,
+      "haber": 10,
+      "estado": "CONFIRMADO",
+      "event_id": "a40c777c-f49f-4563-80d7-a32e1e21fe2b"
+    },
+    {
+      "id": "28c001d0-8854-427f-b516-f7ed06b05728",
+      "debe": 50,
+      "haber": 50,
+      "estado": "CONFIRMADO",
+      "event_id": "7f0a8b59-f2a1-4ba8-bf1e-bffaeb7f41bf"
+    },
+    {
+      "id": "36efd952-0810-470e-9be5-8a996ba042a5",
+      "debe": 50,
+      "haber": 50,
+      "estado": "CONFIRMADO",
+      "event_id": "4fab8c4c-e7d0-4ccc-9441-1f472a2a89ff"
+    },
+    {
+      "id": "37b3b821-4b76-43d3-a5d6-76370d214d58",
+      "debe": 20,
+      "haber": 20,
+      "estado": "CONFIRMADO",
+      "event_id": "db40bcd0-eb5c-46b4-8c7f-1e987f6edab4"
+    },
+    {
+      "id": "8174c3da-c8bc-4f7a-9b10-4a85a4321ff4",
+      "debe": 2,
+      "haber": 2,
+      "estado": "CONFIRMADO",
+      "event_id": "ab772e21-df94-4864-8615-13b5e5623923"
+    },
+    {
+      "id": "aeba7979-b421-45ff-8f88-136c76b3c887",
+      "debe": 118,
+      "haber": 118,
+      "estado": "CONFIRMADO",
+      "event_id": "e0faf54d-b77c-4de1-9bac-7b56e88f70e1"
+    },
+    {
+      "id": "b11e2dc6-e6e0-4bc0-b1fb-3e8cc319ac24",
+      "debe": 118,
+      "haber": 118,
+      "estado": "CONFIRMADO",
+      "event_id": "00169a10-4a41-450b-8df9-54e4ee29472e"
+    },
+    {
+      "id": "e139cd5d-4925-46a1-9762-1db9a50709b7",
+      "debe": 1000,
+      "haber": 1000,
+      "estado": "CONFIRMADO",
+      "event_id": "66b5e8b6-46a3-416b-b081-78f333292cde"
+    },
+    {
+      "id": "e46dad86-6304-4363-8dd1-7ab718de949b",
+      "debe": 40,
+      "haber": 40,
+      "estado": "CONFIRMADO",
+      "event_id": "e8dbc6d8-bb5d-4159-8b80-323646fa15cb"
+    },
+    {
+      "id": "f5d85c9b-bd07-4f0c-b87a-a4e6af1589aa",
+      "debe": 20,
+      "haber": 20,
+      "estado": "CONFIRMADO",
+      "event_id": "1e7eaf57-ba5f-4034-a404-c3c64a1298c0"
+    }
+  ],
+  "checkedAt": "2026-10-03T13:48:35.123Z"
+}

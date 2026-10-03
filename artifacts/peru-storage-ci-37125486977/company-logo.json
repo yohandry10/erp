@@ -1,0 +1,156 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "local_only": true,
+  "scope": "Logo: API/SQL y Supabase Storage file real; origen contractual adaptado al transporte loopback. No valida configuración/servicio Storage remoto",
+  "scenarios": [
+    {
+      "scenario": "Logo: alta real, ruta por tenant, bytes SHA y empresa persistidos",
+      "passed": true
+    },
+    {
+      "scenario": "Logo: mismo intento recupera ID sin otro asset/objeto",
+      "passed": true
+    },
+    {
+      "scenario": "Logo: clave nueva con mismo contenido adopta el objeto activo",
+      "passed": true
+    },
+    {
+      "scenario": "Logo: conflicto, MIME, bytes corruptos, falta de archivo y límite rechazan sin residuos",
+      "passed": true
+    },
+    {
+      "scenario": "Logo: reemplazo limpia objeto anterior y conserva historia",
+      "passed": true
+    },
+    {
+      "scenario": "Logo: lector no carga ni elimina sin mutación",
+      "passed": true
+    },
+    {
+      "scenario": "Logo: RLS impide listar/escribir directamente; URL pública permite sólo lectura del archivo",
+      "passed": true
+    },
+    {
+      "scenario": "Logo: fallo real después de almacenar recupera objeto por SHA y finaliza sin duplicar",
+      "passed": true
+    },
+    {
+      "scenario": "Logo: otra empresa obtiene ruta aislada y no cambia configuración del propietario",
+      "passed": true
+    },
+    {
+      "scenario": "Logo: eliminación y replay limpian empresa/objeto sin afectar el otro tenant",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "roles",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "users",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/empresa/logo",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/empresa/logo",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/empresa/logo",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/empresa/logo",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/empresa/logo",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/empresa/logo",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/empresa/logo",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/empresa/logo",
+      "status": 413
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/empresa/logo",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/empresa/logo",
+      "status": 403
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "configuration/empresa/logo",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/empresa/logo",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/empresa/logo",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/empresa/logo",
+      "status": 201
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "configuration/empresa/logo",
+      "status": 200
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "configuration/empresa/logo",
+      "status": 200
+    }
+  ],
+  "checkedAt": "2026-10-03T13:19:40.603Z"
+}

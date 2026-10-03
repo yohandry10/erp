@@ -947,7 +947,7 @@
     {
       "id": "consolidation-report-missing-service-select",
       "module": "contabilidad/consolidacion",
-      "status": "corrected_merged_main_deployment_pending",
+      "status": "corrected_merged_main_deployment_verified",
       "proof": "artifacts/peru-reports-consolidation-read-baseline-20261003/reports-consignations.json",
       "operations": [
         {
@@ -957,9 +957,7 @@
       ],
       "correction": "Candidato local concede únicamente SELECT de los tres orígenes de consolidación a service_role; preserva escrituras RPC y no concede lectura a anon/authenticated.",
       "candidate_proof": "artifacts/peru-reports-consignations-candidate-20261003",
-      "pending": [
-        "CI main 37125486977 y despliegue exacto"
-      ],
+      "pending": [],
       "canonical_proof": "artifacts/peru-integrated-local-reports-consignations-20261003",
       "local_sha": "96c2a8258fe2f37162c3aa0f6030790da7085842",
       "candidate_ci": [
@@ -967,7 +965,10 @@
         "artifacts/peru-integrated-ci-37123224846"
       ],
       "database_promotion": "artifacts/peru-563-promotion-20261003131306420.json",
-      "merge_sha": "cf8680678f0e065cd439c3fafdea81a23db89670"
+      "merge_sha": "cf8680678f0e065cd439c3fafdea81a23db89670",
+      "main_sha": "cf8680678f0e065cd439c3fafdea81a23db89670",
+      "production_proof": "artifacts/peru-production-verification-after-132-20261003.json",
+      "main_ci": "37125486977"
     },
     {
       "id": "consolidation-domain-rejections-return-500",
@@ -991,11 +992,9 @@
         }
       ],
       "correction": "Candidato distingue colisión 409, pertenencia 403, estado/datos 400 y fallo de infraestructura 503; no cambia escrituras ni límites.",
-      "status": "corrected_merged_main_deployment_pending",
+      "status": "corrected_merged_main_deployment_verified",
       "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
-      "pending": [
-        "CI main 37125486977 y despliegue exacto"
-      ],
+      "pending": [],
       "candidate_proof": "artifacts/peru-reports-consignations-candidate-20261003",
       "canonical_proof": "artifacts/peru-integrated-local-reports-consignations-20261003",
       "local_sha": "96c2a8258fe2f37162c3aa0f6030790da7085842",
@@ -1004,7 +1003,10 @@
         "artifacts/peru-integrated-ci-37123224846"
       ],
       "database_promotion": "artifacts/peru-563-promotion-20261003131306420.json",
-      "merge_sha": "cf8680678f0e065cd439c3fafdea81a23db89670"
+      "merge_sha": "cf8680678f0e065cd439c3fafdea81a23db89670",
+      "main_sha": "cf8680678f0e065cd439c3fafdea81a23db89670",
+      "production_proof": "artifacts/peru-production-verification-after-132-20261003.json",
+      "main_ci": "37125486977"
     },
     {
       "id": "consolidation-controller-rate-unavailable-in-ui",
@@ -1016,11 +1018,9 @@
         }
       ],
       "correction": "Candidato selecciona miembros activos cuya moneda necesita conversión, incluida la controladora.",
-      "status": "corrected_merged_main_deployment_pending",
+      "status": "corrected_merged_main_deployment_verified",
       "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
-      "pending": [
-        "CI main 37125486977 y despliegue exacto"
-      ],
+      "pending": [],
       "candidate_proof": "artifacts/peru-reports-consignations-candidate-20261003",
       "canonical_proof": "artifacts/peru-integrated-local-reports-consignations-20261003",
       "local_sha": "96c2a8258fe2f37162c3aa0f6030790da7085842",
@@ -1029,7 +1029,10 @@
         "artifacts/peru-integrated-ci-37123224846"
       ],
       "database_promotion": "artifacts/peru-563-promotion-20261003131306420.json",
-      "merge_sha": "cf8680678f0e065cd439c3fafdea81a23db89670"
+      "merge_sha": "cf8680678f0e065cd439c3fafdea81a23db89670",
+      "main_sha": "cf8680678f0e065cd439c3fafdea81a23db89670",
+      "production_proof": "artifacts/peru-production-verification-after-132-20261003.json",
+      "main_ci": "37125486977"
     },
     {
       "id": "consignment-ui-new-identical-delivery-replays-old-record",
@@ -1041,11 +1044,9 @@
         }
       ],
       "correction": "Candidato web conserva intención durante fallo y la libera después de éxito para permitir otra entrega idéntica.",
-      "status": "corrected_merged_main_deployment_pending",
+      "status": "corrected_merged_main_deployment_verified",
       "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
-      "pending": [
-        "CI main 37125486977 y despliegue exacto"
-      ],
+      "pending": [],
       "candidate_proof": "artifacts/peru-reports-consignations-candidate-20261003",
       "canonical_proof": "artifacts/peru-integrated-local-reports-consignations-20261003",
       "local_sha": "96c2a8258fe2f37162c3aa0f6030790da7085842",
@@ -1054,7 +1055,10 @@
         "artifacts/peru-integrated-ci-37123224846"
       ],
       "database_promotion": "artifacts/peru-563-promotion-20261003131306420.json",
-      "merge_sha": "cf8680678f0e065cd439c3fafdea81a23db89670"
+      "merge_sha": "cf8680678f0e065cd439c3fafdea81a23db89670",
+      "main_sha": "cf8680678f0e065cd439c3fafdea81a23db89670",
+      "production_proof": "artifacts/peru-production-verification-after-132-20261003.json",
+      "main_ci": "37125486977"
     },
     {
       "id": "gre-pdf-endpoint-delivers-text",
@@ -1065,13 +1069,15 @@
           "endpoint": "/api/gre/guias/:id/pdf"
         }
       ],
-      "correction": "Candidato entrega PDF A4 binario con emisor, estado, transporte y todos los bienes; emisor firmado se obtiene del XML congelado. El cliente debe conservar bytes/extensión PDF al descargar y ofrecer la acción en listado.",
-      "status": "candidate_real_api_restore_passed_ui_canonical_ci_deployment_pending",
+      "correction": "Fuentes canónicas entrega PDF A4 binario con emisor, estado, transporte y todos los bienes; emisor firmado se obtiene del XML congelado. El cliente debe conservar bytes/extensión PDF al descargar y ofrecer la acción en listado.",
+      "status": "canonical_full_local_passed_ci_main_deployment_pending",
       "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
       "candidate_proof": "artifacts/peru-gre-api-candidate-20261003",
       "pending": [
-        "Navegador, variantes PDF histórico/multipágina, fuentes canónicas, CI y despliegue"
-      ]
+        "CI exacto, integración en main y despliegue de GRE"
+      ],
+      "canonical_proof": "artifacts/peru-integrated-local-gre-20261003",
+      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca"
     },
     {
       "id": "gre-idempotency-collision-returns-400",
@@ -1082,13 +1088,15 @@
           "endpoint": "/api/gre/guias"
         }
       ],
-      "correction": "Candidato distingue conflictos de idempotencia con HTTP 409 y conserva estado persistido.",
-      "status": "candidate_real_api_restore_passed_ui_canonical_ci_deployment_pending",
+      "correction": "Fuentes canónicas distingue conflictos de idempotencia con HTTP 409 y conserva estado persistido.",
+      "status": "canonical_full_local_passed_ci_main_deployment_pending",
       "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
       "candidate_proof": "artifacts/peru-gre-api-candidate-20261003",
       "pending": [
-        "Navegador, variantes PDF histórico/multipágina, fuentes canónicas, CI y despliegue"
-      ]
+        "CI exacto, integración en main y despliegue de GRE"
+      ],
+      "canonical_proof": "artifacts/peru-integrated-local-gre-20261003",
+      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca"
     },
     {
       "id": "gre-rpc-infrastructure-failure-returns-400",
@@ -1099,13 +1107,15 @@
           "endpoint": "/api/gre/guias"
         }
       ],
-      "correction": "Candidato distingue indisponibilidad RPC con HTTP 503 y mensaje sin detalles internos; misma clave recupera operación tras restaurar EXECUTE.",
-      "status": "candidate_real_api_restore_passed_ui_canonical_ci_deployment_pending",
+      "correction": "Fuentes canónicas distingue indisponibilidad RPC con HTTP 503 y mensaje sin detalles internos; misma clave recupera operación tras restaurar EXECUTE.",
+      "status": "canonical_full_local_passed_ci_main_deployment_pending",
       "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
       "candidate_proof": "artifacts/peru-gre-api-candidate-20261003",
       "pending": [
-        "Navegador, variantes PDF histórico/multipágina, fuentes canónicas, CI y despliegue"
-      ]
+        "CI exacto, integración en main y despliegue de GRE"
+      ],
+      "canonical_proof": "artifacts/peru-integrated-local-gre-20261003",
+      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca"
     },
     {
       "id": "gre-view-and-print-omit-transported-items",
@@ -1120,12 +1130,14 @@
         }
       ],
       "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-print.json",
-      "correction": "Candidatos renderizan bienes y cantidades; impresión consume el PDF con datos del registro.",
+      "correction": "Fuentes canónicas renderizan bienes y cantidades; impresión consume el PDF con datos del registro.",
       "module": "gre",
-      "status": "real_ui_defect_reproduced_candidate_verification_pending",
+      "status": "canonical_full_local_passed_ci_main_deployment_pending",
       "pending": [
-        "Ensayo UI candidato, integración canónica, CI y despliegue"
-      ]
+        "CI exacto, integración en main y despliegue de GRE"
+      ],
+      "canonical_proof": "artifacts/peru-integrated-local-gre-20261003",
+      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca"
     },
     {
       "id": "gre-manual-weight-html-step-blocks-valid-values",
@@ -1136,12 +1148,14 @@
         }
       ],
       "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
-      "correction": "Candidato alinea step 0.001 con mínimo 0.001 y precisión de tres decimales del DTO.",
+      "correction": "Fuentes canónicas alinea step 0.001 con mínimo 0.001 y precisión de tres decimales del DTO.",
       "module": "gre",
-      "status": "real_ui_defect_reproduced_candidate_verification_pending",
+      "status": "canonical_full_local_passed_ci_main_deployment_pending",
       "pending": [
-        "Ensayo UI candidato, integración canónica, CI y despliegue"
-      ]
+        "CI exacto, integración en main y despliegue de GRE"
+      ],
+      "canonical_proof": "artifacts/peru-integrated-local-gre-20261003",
+      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca"
     },
     {
       "id": "gre-manual-recipient-document-unavailable",
@@ -1156,17 +1170,19 @@
         }
       ],
       "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
-      "correction": "Candidato ofrece tipo/documento del destinatario manual y lo persiste en datosAdicionales para construir UBL firmado.",
+      "correction": "Fuentes canónicas ofrece tipo/documento del destinatario manual y lo persiste en datosAdicionales para construir UBL firmado.",
       "module": "gre",
-      "status": "real_ui_defect_reproduced_candidate_verification_pending",
+      "status": "canonical_full_local_passed_ci_main_deployment_pending",
       "pending": [
-        "Ensayo UI candidato, integración canónica, CI y despliegue"
-      ]
+        "CI exacto, integración en main y despliegue de GRE"
+      ],
+      "canonical_proof": "artifacts/peru-integrated-local-gre-20261003",
+      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca"
     },
     {
       "id": "gre-csv-untrusted-cell-keeps-formula",
       "module": "gre",
-      "status": "real_api_defect_reproduced_canonical_verification_pending",
+      "status": "canonical_full_local_passed_ci_main_deployment_pending",
       "proof": "artifacts/peru-gre-csv-defect-20261003/gre-operations.json",
       "operations": [
         {
@@ -1176,8 +1192,10 @@
       ],
       "correction": "Escape CSV neutraliza prefijos de fórmula, conserva comillas, comas y saltos, conforme al exportador bancario existente.",
       "pending": [
-        "Ensayo canónico integrado, CI y despliegue"
-      ]
+        "CI exacto, integración en main y despliegue de GRE"
+      ],
+      "canonical_proof": "artifacts/peru-integrated-local-gre-20261003",
+      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca"
     }
   ]
 }

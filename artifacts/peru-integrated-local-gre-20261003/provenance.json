@@ -1,0 +1,41 @@
+{
+  "dumps_extracted": false,
+  "local_source": "artifacts/peru-integrated-20261003133905923-24524",
+  "selected_completed_at": "2026-10-03T14:07:54.770Z",
+  "source_sha": "094be1a7fca3ce47192150f85add38e3322b4eca",
+  "source_confirmation": "HEAD comprobado al iniciar y fuentes funcionales sin cambios al cerrar ensayo; sólo cambios generados previos de Next/logs fuera de estas fuentes",
+  "sources": [
+    {
+      "file": "apps/erp-api/src/modules/gre/gre.service.ts",
+      "sha256": "a0001c5a0cc82f055a5b7ebee529b221f984077ca50c4a94f8b6d1ad4b82b8a6"
+    },
+    {
+      "file": "apps/erp-api/src/modules/gre/gre.controller.ts",
+      "sha256": "f574ede02df9b488ae8930b5d911c89b34b50837d4abfc96459a2b350a8195a4"
+    },
+    {
+      "file": "apps/web/components/modals/GreModal.tsx",
+      "sha256": "54cc75a3a15ab713543205cd205631ea2f043d8a65eeec1babacc7fdeabdf699"
+    },
+    {
+      "file": "apps/web/components/modals/GreViewModal.tsx",
+      "sha256": "1b1b8d8268827d7f42602e91b95111b7ee049bd2fe55edebbf1827d3ee5baf97"
+    },
+    {
+      "file": "apps/web/app/dashboard/gre/page.tsx",
+      "sha256": "d30b1fff679e12fe16d3b8a0d593ae6690da4b22c0e9e4a6ea3910471cbddf24"
+    },
+    {
+      "file": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "sha256": "e083d1af9ae2b1e27d55a96bcd94f2f59198b68a6afb92130f31416befe6f9ae"
+    },
+    {
+      "file": "scripts/ci/run-peru-integrated-local.mjs",
+      "sha256": "bd1d7efad4b75ed66787b3202baf06eb6a57966d3dc77839c31633a2010d9040"
+    },
+    {
+      "file": "apps/web/tests/e2e/peru-gre-local.spec.ts",
+      "sha256": "b7ec7ae0d5060ec8a2417749456df1ce9fa068a90b3fc1f4c3385ca64947179a"
+    }
+  ]
+}
