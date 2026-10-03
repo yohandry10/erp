@@ -1671,6 +1671,92 @@
       "pending_checks": [
         "Aplicación/reversa CxC, monedas/tipos de cambio, roles sólo lectura de finanzas, anulaciones y todos los filtros; tasas normativas/depósito externo; CI/despliegue"
       ]
+    },
+    {
+      "id": "monthly-tax-uit-by-exercise",
+      "source": "scripts/ci/test-peru-monthly-period-local.mjs",
+      "required_scenario_prefixes": [
+        "Impuesto mensual: UIT del ejercicio 2024",
+        "Impuesto mensual: UIT del ejercicio 2025",
+        "Impuesto mensual: UIT del ejercicio 2026",
+        "Impuesto mensual: UIT del ejercicio 2027"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/impuestos/mensual"
+        }
+      ],
+      "verified_checks": [
+        "API real selecciona UIT/límite RMT de períodos 2024, 2025 y 2026; rechaza 2027 sin parámetro verificado",
+        "Regresión de cálculo RMT prueba cambio de umbral 2025/2026, separado de evidencia de operación completa"
+      ],
+      "pending_checks": [
+        "Flujo mensual completo: fuentes no vacías, guardado/versiones/constancias/historial y navegador",
+        "Todos los regímenes/variantes/créditos, permisos/aislamiento y recuperación",
+        "Validación externa/PVS/SUNAT; CI/despliegue"
+      ]
+    },
+    {
+      "id": "monthly-tax-credit-read-recovery",
+      "source": "scripts/ci/test-peru-monthly-period-local.mjs",
+      "required_scenario_prefixes": [
+        "Impuesto mensual: fallo real de lectura del saldo previo bloquea cálculo",
+        "Impuesto mensual: fallo de saldo bloquea guardado sin nueva versión",
+        "Impuesto mensual: recupera lectura y arrastra saldo persistido de 125.50"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/impuestos/mensual"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/impuestos/mensual"
+        }
+      ],
+      "verified_checks": [
+        "Borrador anterior guardado por API real y saldo 125.50 persistido",
+        "Error real de permisos SQL se devuelve como 503; cálculo/guardado fallan sin nueva versión; tras restaurar acceso recupera saldo"
+      ],
+      "pending_checks": [
+        "Declaración vigente/fuentes: otras fallas de lectura y recuperación UI",
+        "Versiones/constancia/regímenes, permisos/aislamiento por operación; CI/despliegue"
+      ]
+    },
+    {
+      "id": "company-logo-real-storage-lifecycle",
+      "source": "scripts/ci/test-peru-company-logo-local.mjs",
+      "required_scenario_prefixes": [
+        "Logo: alta real, ruta por tenant, bytes SHA y empresa persistidos",
+        "Logo: mismo intento recupera ID sin otro asset/objeto",
+        "Logo: clave nueva con mismo contenido adopta el objeto activo",
+        "Logo: conflicto, MIME, bytes corruptos, falta de archivo y límite rechazan sin residuos",
+        "Logo: reemplazo limpia objeto anterior y conserva historia",
+        "Logo: lector no carga ni elimina sin mutación",
+        "Logo: RLS impide listar/escribir directamente; URL pública permite sólo lectura del archivo",
+        "Logo: fallo real después de almacenar recupera objeto por SHA y finaliza sin duplicar",
+        "Logo: otra empresa obtiene ruta aislada y no cambia configuración del propietario",
+        "Logo: eliminación y replay limpian empresa/objeto sin afectar el otro tenant"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/configuration/empresa/logo"
+        },
+        {
+          "method": "DELETE",
+          "endpoint": "/api/configuration/empresa/logo"
+        }
+      ],
+      "verified_checks": [
+        "PNG real por multipart, persistencia empresa/asset/objeto/bytes; replay/mismo contenido/reemplazo y limpieza/borrado",
+        "Conflictos/MIME/corrupción/falta/tamaño, lector, segundo tenant, Storage RLS; recuperación de fallo real después de almacenar sin duplicar"
+      ],
+      "pending_checks": [
+        "JPEG/dimensiones/todas las concurrencias y fallas de limpieza, lector/navegador para todas las variantes",
+        "Storage remoto del futuro cliente; CI/despliegue del gate nuevo"
+      ]
     }
   ]
 }

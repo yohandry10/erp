@@ -1,0 +1,11 @@
+{
+  "source": "artifacts/peru-company-storage-20261003100537901-24604",
+  "source_base_sha": "5a23c4c1bc16b58c3bf324c15681ff00f8eb395a",
+  "scope": "10 API, restauración DB y tar privado de blobs; instancia nueva de Storage descarga bytes iguales desde metadata restaurada; sin UI en este ensayo",
+  "private_files_copied": false,
+  "production_business_writes": false,
+  "limits": [
+    "No acredita recuperación del proveedor remoto ni un RTO productivo",
+    "La UI aprobada es otro ensayo, no se atribuye a esta ejecución"
+  ]
+}

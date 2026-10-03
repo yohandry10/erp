@@ -178,9 +178,10 @@ try {
   }
   await run('document-series-lifecycle',process.execPath,['scripts/ci/test-peru-document-series-local.mjs']);
   await run('tax-adjustments-lifecycle',process.execPath,['scripts/ci/test-peru-tax-adjustments-local.mjs']);
+  await run('monthly-period-lifecycle',process.execPath,['scripts/ci/test-peru-monthly-period-local.mjs']);
   if(withBrowser) await run('prepare-wizard',process.execPath,['scripts/ci/prepare-peru-first-client-local.mjs','wizard']);
   const httpEvidence=JSON.parse(readFileSync(path.join(output,'http.json'),'utf8'));
-  for(const file of ['annual-acceptance.json','finance-lifecycle.json','hr-lifecycle.json','hr-financial.json','payroll-plame.json','configuration-admin.json','series-lifecycle.json','tax-adjustments.json']) {
+  for(const file of ['annual-acceptance.json','finance-lifecycle.json','hr-lifecycle.json','hr-financial.json','payroll-plame.json','configuration-admin.json','series-lifecycle.json','tax-adjustments.json','monthly-period.json']) {
     const phase=JSON.parse(readFileSync(path.join(output,file),'utf8'));
     if(phase.success!==true||phase.remoteWrites!==false) throw new Error('Fase funcional incompleta: '+file);
     const offset=httpEvidence.results.length;

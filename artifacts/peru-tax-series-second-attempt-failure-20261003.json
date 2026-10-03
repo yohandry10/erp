@@ -1,0 +1,21 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "source": "artifacts/peru-integrated-20261003090351512-21568",
+  "source_base_sha": "22cf5bb62b8cd4848f815d9175c2243de92e0874",
+  "http_passed": 208,
+  "browser_passed": 22,
+  "static_routes_checked": 99,
+  "static_routes_failed": [
+    {
+      "route": "/dashboard/usuarios/",
+      "status": 200,
+      "errors": [
+        "Invalid or unexpected token"
+      ]
+    }
+  ],
+  "restore_after_browser": false,
+  "record_survey_completed": false,
+  "limitation": "Sintaxis de un script durante Next dev; causa no determinada. CI del SHA final y reproducción con traza pendientes."
+}
