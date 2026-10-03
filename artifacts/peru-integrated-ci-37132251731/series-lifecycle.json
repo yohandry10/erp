@@ -1,0 +1,197 @@
+{
+  "success": true,
+  "local_only": true,
+  "remoteWrites": false,
+  "scope": "Series de documentos; API real, primer ADMIN no demo. Contador existente simulado localmente para probar límite; no emite documentos",
+  "scenarios": [
+    {
+      "scenario": "Series: seis replays concurrentes conservan ID, recibo y auditoría",
+      "passed": true
+    },
+    {
+      "scenario": "Series: edición e inactivación persistidas y replay sin doble auditoría",
+      "passed": true
+    },
+    {
+      "scenario": "Series: consulta operativa omite inactivas; recuperación administrativa requiere usar el código",
+      "passed": true
+    },
+    {
+      "scenario": "series-replay-conflict",
+      "passed": true
+    },
+    {
+      "scenario": "series-zero-maximum",
+      "passed": true
+    },
+    {
+      "scenario": "series-overflow-maximum",
+      "passed": true
+    },
+    {
+      "scenario": "series-invalid-format",
+      "passed": true
+    },
+    {
+      "scenario": "series-negative-maximum",
+      "passed": true
+    },
+    {
+      "scenario": "series-invalid-number",
+      "passed": true
+    },
+    {
+      "scenario": "series-unsupported-type",
+      "passed": true
+    },
+    {
+      "scenario": "series-reader-write-denied",
+      "passed": true
+    },
+    {
+      "scenario": "Series: otro tenant no consulta la serie propia",
+      "passed": true
+    },
+    {
+      "scenario": "Series: mismo código en otro tenant crea fila aislada",
+      "passed": true
+    },
+    {
+      "scenario": "Series: reactivación conserva número y límites",
+      "passed": true
+    },
+    {
+      "scenario": "series-maximum-below-current",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "configuracion/series",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 409
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 400
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 400
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 400
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 400
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 400
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/NO_EXISTE",
+      "status": 400
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 403
+    },
+    {
+      "method": "GET",
+      "endpoint": "configuracion/series",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 400
+    }
+  ],
+  "defects": [],
+  "checkedAt": "2026-10-03T15:18:33.097Z"
+}

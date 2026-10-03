@@ -1070,14 +1070,15 @@
         }
       ],
       "correction": "Fuentes canónicas entrega PDF A4 binario con emisor, estado, transporte y todos los bienes; emisor firmado se obtiene del XML congelado. El cliente debe conservar bytes/extensión PDF al descargar y ofrecer la acción en listado.",
-      "status": "canonical_full_local_passed_ci_main_deployment_pending",
+      "status": "corrected_merged_main_deployment_verified",
       "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
       "candidate_proof": "artifacts/peru-gre-api-candidate-20261003",
-      "pending": [
-        "CI exacto, integración en main y despliegue de GRE"
-      ],
+      "pending": [],
       "canonical_proof": "artifacts/peru-integrated-local-gre-20261003",
-      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca"
+      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca",
+      "main_sha": "19fa239d9ddf0ba7d5ec08fcb3a3ca5dd7ac69f5",
+      "main_ci": "37132251731",
+      "production_proof": "artifacts/peru-production-verification-after-133-20261003.json"
     },
     {
       "id": "gre-idempotency-collision-returns-400",
@@ -1089,14 +1090,15 @@
         }
       ],
       "correction": "Fuentes canónicas distingue conflictos de idempotencia con HTTP 409 y conserva estado persistido.",
-      "status": "canonical_full_local_passed_ci_main_deployment_pending",
+      "status": "corrected_merged_main_deployment_verified",
       "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
       "candidate_proof": "artifacts/peru-gre-api-candidate-20261003",
-      "pending": [
-        "CI exacto, integración en main y despliegue de GRE"
-      ],
+      "pending": [],
       "canonical_proof": "artifacts/peru-integrated-local-gre-20261003",
-      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca"
+      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca",
+      "main_sha": "19fa239d9ddf0ba7d5ec08fcb3a3ca5dd7ac69f5",
+      "main_ci": "37132251731",
+      "production_proof": "artifacts/peru-production-verification-after-133-20261003.json"
     },
     {
       "id": "gre-rpc-infrastructure-failure-returns-400",
@@ -1108,14 +1110,15 @@
         }
       ],
       "correction": "Fuentes canónicas distingue indisponibilidad RPC con HTTP 503 y mensaje sin detalles internos; misma clave recupera operación tras restaurar EXECUTE.",
-      "status": "canonical_full_local_passed_ci_main_deployment_pending",
+      "status": "corrected_merged_main_deployment_verified",
       "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
       "candidate_proof": "artifacts/peru-gre-api-candidate-20261003",
-      "pending": [
-        "CI exacto, integración en main y despliegue de GRE"
-      ],
+      "pending": [],
       "canonical_proof": "artifacts/peru-integrated-local-gre-20261003",
-      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca"
+      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca",
+      "main_sha": "19fa239d9ddf0ba7d5ec08fcb3a3ca5dd7ac69f5",
+      "main_ci": "37132251731",
+      "production_proof": "artifacts/peru-production-verification-after-133-20261003.json"
     },
     {
       "id": "gre-view-and-print-omit-transported-items",
@@ -1132,12 +1135,13 @@
       "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-print.json",
       "correction": "Fuentes canónicas renderizan bienes y cantidades; impresión consume el PDF con datos del registro.",
       "module": "gre",
-      "status": "canonical_full_local_passed_ci_main_deployment_pending",
-      "pending": [
-        "CI exacto, integración en main y despliegue de GRE"
-      ],
+      "status": "corrected_merged_main_deployment_verified",
+      "pending": [],
       "canonical_proof": "artifacts/peru-integrated-local-gre-20261003",
-      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca"
+      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca",
+      "main_sha": "19fa239d9ddf0ba7d5ec08fcb3a3ca5dd7ac69f5",
+      "main_ci": "37132251731",
+      "production_proof": "artifacts/peru-production-verification-after-133-20261003.json"
     },
     {
       "id": "gre-manual-weight-html-step-blocks-valid-values",
@@ -1150,12 +1154,13 @@
       "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
       "correction": "Fuentes canónicas alinea step 0.001 con mínimo 0.001 y precisión de tres decimales del DTO.",
       "module": "gre",
-      "status": "canonical_full_local_passed_ci_main_deployment_pending",
-      "pending": [
-        "CI exacto, integración en main y despliegue de GRE"
-      ],
+      "status": "corrected_merged_main_deployment_verified",
+      "pending": [],
       "canonical_proof": "artifacts/peru-integrated-local-gre-20261003",
-      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca"
+      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca",
+      "main_sha": "19fa239d9ddf0ba7d5ec08fcb3a3ca5dd7ac69f5",
+      "main_ci": "37132251731",
+      "production_proof": "artifacts/peru-production-verification-after-133-20261003.json"
     },
     {
       "id": "gre-manual-recipient-document-unavailable",
@@ -1172,17 +1177,18 @@
       "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
       "correction": "Fuentes canónicas ofrece tipo/documento del destinatario manual y lo persiste en datosAdicionales para construir UBL firmado.",
       "module": "gre",
-      "status": "canonical_full_local_passed_ci_main_deployment_pending",
-      "pending": [
-        "CI exacto, integración en main y despliegue de GRE"
-      ],
+      "status": "corrected_merged_main_deployment_verified",
+      "pending": [],
       "canonical_proof": "artifacts/peru-integrated-local-gre-20261003",
-      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca"
+      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca",
+      "main_sha": "19fa239d9ddf0ba7d5ec08fcb3a3ca5dd7ac69f5",
+      "main_ci": "37132251731",
+      "production_proof": "artifacts/peru-production-verification-after-133-20261003.json"
     },
     {
       "id": "gre-csv-untrusted-cell-keeps-formula",
       "module": "gre",
-      "status": "canonical_full_local_passed_ci_main_deployment_pending",
+      "status": "corrected_merged_main_deployment_verified",
       "proof": "artifacts/peru-gre-csv-defect-20261003/gre-operations.json",
       "operations": [
         {
@@ -1191,11 +1197,159 @@
         }
       ],
       "correction": "Escape CSV neutraliza prefijos de fórmula, conserva comillas, comas y saltos, conforme al exportador bancario existente.",
-      "pending": [
-        "CI exacto, integración en main y despliegue de GRE"
-      ],
+      "pending": [],
       "canonical_proof": "artifacts/peru-integrated-local-gre-20261003",
-      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca"
+      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca",
+      "main_sha": "19fa239d9ddf0ba7d5ec08fcb3a3ca5dd7ac69f5",
+      "main_ci": "37132251731",
+      "production_proof": "artifacts/peru-production-verification-after-133-20261003.json"
+    },
+    {
+      "id": "pos-certificate-direct-writer-and-invalid-http",
+      "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/pos/configurar-certificado"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-pos-api-defects-20261003/pos-operations.json",
+        "observed_error": "{\"success\":false,\"message\":\"permission denied for table empresa_config\"}\n\nfalse !== true\n",
+        "local_only": true
+      },
+      "correction": "Valida PFX/emisor/vigencia, cifra y utiliza writer con permiso/intención 564; inválido 400 sin cambio.",
+      "candidate_proof": "artifacts/peru-pos-first-client-candidate-20261003",
+      "pending": [
+        "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+      ],
+      "limits": [
+        "Reproducción local con ACL canónicas. PROD tenía UPDATE heredado; no se ejecutó escritura allí para confirmar su comportamiento. La nueva frontera no modifica esa ACL."
+      ]
+    },
+    {
+      "id": "pos-first-client-missing-payment-catalog",
+      "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/pos/metodos-pago"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/configuration/complete"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-pos-api-defects-20261003/pos-operations.json",
+        "observed_error": "Catálogo POS vacío después del wizard",
+        "local_only": true
+      },
+      "correction": "564 crea cuatro referencias sólo para configuración nueva PE; sin backfill ni datos comerciales.",
+      "candidate_proof": "artifacts/peru-pos-first-client-candidate-20261003",
+      "pending": [
+        "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+      ]
+    },
+    {
+      "id": "pos-fiscal-status-missing-returns-500",
+      "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/pos/facturacion/:ventaId"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-pos-api-defects-20261003/pos-operations.json",
+        "observed_error": "pos/facturacion/6e702019-8eff-4b3f-bdc2-38b41dfd621d: {\"statusCode\":500,\"message\":\"Venta no encontrada para el tenant activo\",\"error\":\"Error\",\"timestamp\":\"2026-10-03T14:06:05.909Z\",\"path\":\"/api/pos/facturacion/6e702019-8eff-4b3f-bdc2-38b41dfd621d\"}\n\n500 !== 404\n",
+        "local_only": true
+      },
+      "correction": "404 inexistente/ajeno y 503 de infraestructura; UUID validado.",
+      "candidate_proof": "artifacts/peru-pos-first-client-candidate-20261003",
+      "pending": [
+        "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+      ]
+    },
+    {
+      "id": "pos-ticket-exchange-rejection-returns-created",
+      "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/pos/ventas/:ventaId/canjear-ticket"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-pos-api-defects-20261003/pos-operations.json",
+        "observed_error": "pos/ventas/df7df33b-0451-4cd0-a95b-e0d7c107bedf/canjear-ticket: {\"success\":false,\"message\":\"POS_TICKET_SALE_NOT_FOUND\",\"error\":{\"tipo\":\"POS_TICKET_EXCHANGE_ERROR\",\"codigo\":\"P0002\",\"mensaje\":\"POS_TICKET_SALE_NOT_FOUND\"}}\n\n201 !== 404\n; pos/ventas/56d41de8-5518-4e1e-9901-e86624775382/canjear-ticket: {\"success\":false,\"message\":\"POS_TICKET_EXCHANGE_IDEMPOTENCY_MISMATCH\",\"error\":{\"tipo\":\"POS_TICKET_EXCHANGE_ERROR\",\"codigo\":\"23505\",\"mensaje\":\"POS_TICKET_EXCHANGE_IDEMPOTENCY_MISMATCH\"}}\n\n201 !== 409\n",
+        "local_only": true
+      },
+      "correction": "404 inexistente, 409 colisión y 400 de dominio; 503 genérico de infraestructura.",
+      "candidate_proof": "artifacts/peru-pos-first-client-candidate-20261003",
+      "pending": [
+        "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+      ]
+    },
+    {
+      "id": "pos-pure-ticket-retry-returns-created",
+      "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/pos/reintentar-facturacion/:ventaId"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-pos-api-defects-20261003/pos-operations.json",
+        "observed_error": "pos/reintentar-facturacion/56d41de8-5518-4e1e-9901-e86624775382: {\"success\":false,\"message\":\"El ticket interno no tiene una emisión CPE pendiente; use el flujo de canje a factura o boleta\"}\n\n201 !== 409\n",
+        "local_only": true
+      },
+      "correction": "409 sin incrementar contador ni alterar impactos; reserva existente se recupera.",
+      "candidate_proof": "artifacts/peru-pos-first-client-candidate-20261003",
+      "pending": [
+        "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+      ]
+    },
+    {
+      "id": "pos-repeated-stock-sku-blocked-by-pricing",
+      "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/pos/venta"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-pos-api-defects-20261003/pos-operations.json",
+        "observed_error": "pos/venta: {\"statusCode\":500,\"message\":\"COMMERCIAL_PRICE_DUPLICATE_PRODUCT_LINE\",\"error\":{\"tipo\":\"DATABASE_ERROR\",\"mensaje\":\"COMMERCIAL_PRICE_DUPLICATE_PRODUCT_LINE\",\"codigo\":\"22023\"},\"timestamp\":\"2026-10-03T14:06:08.616Z\",\"path\":\"/api/pos/venta\"}\n\n500 !== 201\n",
+        "local_only": true
+      },
+      "correction": "Agrega cantidades e importes de SKU compatible antes del precio comercial; diferencias de precio/descuento 400.",
+      "candidate_proof": "artifacts/peru-pos-first-client-candidate-20261003",
+      "pending": [
+        "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+      ]
+    },
+    {
+      "id": "pos-worker-null-attempts-excludes-exchange",
+      "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/pos/worker/procesar-pendientes"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-pos-worker-null-defect-20261003/pos-operations.json",
+        "observed_error": "procesadas=0, errores=0 con cpe_pendiente=true, cpe_data presente, cpe_id NULL e intentos_facturacion NULL",
+        "local_only": true
+      },
+      "correction": "Incluye NULL como cero y adopta CPE firmado sin repetir pago/stock/CxC/asiento.",
+      "candidate_proof": "artifacts/peru-pos-first-client-candidate-20261003",
+      "pending": [
+        "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+      ]
     }
   ]
 }

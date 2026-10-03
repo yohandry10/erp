@@ -1,0 +1,10 @@
+{
+  "local_only": true,
+  "remoteWrites": false,
+  "pending": {
+    "cpe_id": null,
+    "has_cpe_data": true,
+    "cpe_pendiente": true,
+    "intentos_facturacion": null
+  }
+}

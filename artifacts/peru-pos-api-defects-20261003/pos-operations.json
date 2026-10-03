@@ -1,0 +1,299 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "POS API/DB local no demo; subconjunto sin aceptación SUNAT ni global",
+  "scenarios": [
+    {
+      "scenario": "POS: carga de certificado válido utiliza writer autorizado y confirma persistencia",
+      "passed": false,
+      "message": "{\"success\":false,\"message\":\"permission denied for table empresa_config\"}\n\nfalse !== true\n"
+    },
+    {
+      "scenario": "POS: certificado inválido rechazado sin sobrescribir configuración",
+      "passed": false,
+      "message": "{\"success\":false,\"message\":\"permission denied for table empresa_config\"}\n\n201 !== 400\n"
+    },
+    {
+      "scenario": "POS: estado fiscal ajeno e inexistente devuelve 404 sin fuga ni mutación",
+      "passed": false,
+      "message": "pos/facturacion/6e702019-8eff-4b3f-bdc2-38b41dfd621d: {\"statusCode\":500,\"message\":\"Venta no encontrada para el tenant activo\",\"error\":\"Error\",\"timestamp\":\"2026-10-03T14:06:05.909Z\",\"path\":\"/api/pos/facturacion/6e702019-8eff-4b3f-bdc2-38b41dfd621d\"}\n\n500 !== 404\n"
+    },
+    {
+      "scenario": "POS: canje inexistente devuelve 404 y no reserva comprobante",
+      "passed": false,
+      "message": "pos/ventas/df7df33b-0451-4cd0-a95b-e0d7c107bedf/canjear-ticket: {\"success\":false,\"message\":\"POS_TICKET_SALE_NOT_FOUND\",\"error\":{\"tipo\":\"POS_TICKET_EXCHANGE_ERROR\",\"codigo\":\"P0002\",\"mensaje\":\"POS_TICKET_SALE_NOT_FOUND\"}}\n\n201 !== 404\n"
+    },
+    {
+      "scenario": "POS: configuración pública no expone secretos",
+      "passed": true
+    },
+    {
+      "scenario": "POS: primera empresa configurada dispone de catálogo de medios de pago",
+      "passed": false,
+      "message": "Catálogo POS vacío después del wizard"
+    },
+    {
+      "scenario": "Fixture diagnóstico: catálogo local de pago insertado para continuar variantes; no acredita onboarding",
+      "passed": true,
+      "acceptance": false
+    },
+    {
+      "scenario": "POS: ticket de servicio, replay y nueva intención no duplican impactos ni crean CPE",
+      "passed": true
+    },
+    {
+      "scenario": "POS: rechazo de ticket como reintento fiscal no cambia venta y responde 409",
+      "passed": false,
+      "message": "pos/reintentar-facturacion/56d41de8-5518-4e1e-9901-e86624775382: {\"success\":false,\"message\":\"El ticket interno no tiene una emisión CPE pendiente; use el flujo de canje a factura o boleta\"}\n\n201 !== 409\n"
+    },
+    {
+      "scenario": "POS: aislamiento en catálogos, historial, detalle y canje",
+      "passed": false,
+      "message": "pos/facturacion/56d41de8-5518-4e1e-9901-e86624775382: {\"statusCode\":500,\"message\":\"Venta no encontrada para el tenant activo\",\"error\":\"Error\",\"timestamp\":\"2026-10-03T14:06:08.185Z\",\"path\":\"/api/pos/facturacion/56d41de8-5518-4e1e-9901-e86624775382\"}\n\n500 !== 404\n"
+    },
+    {
+      "scenario": "POS: sólo el efectivo del pago mixto llega a caja",
+      "passed": true
+    },
+    {
+      "scenario": "POS: SKU físico repetido se agrega sin duplicar kardex",
+      "passed": false,
+      "message": "pos/venta: {\"statusCode\":500,\"message\":\"COMMERCIAL_PRICE_DUPLICATE_PRODUCT_LINE\",\"error\":{\"tipo\":\"DATABASE_ERROR\",\"mensaje\":\"COMMERCIAL_PRICE_DUPLICATE_PRODUCT_LINE\",\"codigo\":\"22023\"},\"timestamp\":\"2026-10-03T14:06:08.616Z\",\"path\":\"/api/pos/venta\"}\n\n500 !== 201\n"
+    },
+    {
+      "scenario": "POS: canje boleta conserva cobro/stock/eventos y replay recupera reserva única",
+      "passed": false,
+      "message": "Expected values to be strictly equal:\n+ actual - expected\n\n+ '19426b08524d6c7ae71a84091e84dc52'\n- '9c6badc87811cd8c8e4239fbdbca6b00'\n"
+    },
+    {
+      "scenario": "POS: conflicto de intención de canje responde 409 sin cambiar reserva",
+      "passed": false,
+      "message": "pos/ventas/56d41de8-5518-4e1e-9901-e86624775382/canjear-ticket: {\"success\":false,\"message\":\"POS_TICKET_EXCHANGE_IDEMPOTENCY_MISMATCH\",\"error\":{\"tipo\":\"POS_TICKET_EXCHANGE_ERROR\",\"codigo\":\"23505\",\"mensaje\":\"POS_TICKET_EXCHANGE_IDEMPOTENCY_MISMATCH\"}}\n\n201 !== 409\n"
+    },
+    {
+      "scenario": "POS: lector consulta y no vende, abre/cierra, configura certificado ni canjea",
+      "passed": true
+    },
+    {
+      "scenario": "POS: worker no admite token de usuario ni petición anónima",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/complete",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "pos/configurar-certificado",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "pos/configurar-certificado",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "pos/facturacion/:id",
+      "status": 500
+    },
+    {
+      "method": "POST",
+      "endpoint": "pos/ventas/:id/canjear-ticket",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "pos/empresa-config",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/categorias",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/productos",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/almacenes",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/almacenes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "pos/metodos-pago",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "pos/metodos-pago",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "pos/caja/abrir",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "pos/venta",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "pos/venta",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "pos/venta",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/saldo-esperado/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "pos/reintentar-facturacion/:id",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "pos/ventas-recientes",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "pos/detalles-venta/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "pos/facturacion/:id",
+      "status": 500
+    },
+    {
+      "method": "POST",
+      "endpoint": "pos/venta",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/saldo-esperado/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/productos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "pos/venta",
+      "status": 500
+    },
+    {
+      "method": "POST",
+      "endpoint": "pos/ventas/:id/canjear-ticket",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "pos/ventas/:id/canjear-ticket",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "roles",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "users",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "pos/productos",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "pos/venta",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "pos/caja/abrir",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "pos/caja/cerrar",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "pos/configurar-certificado",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "pos/ventas/:id/canjear-ticket",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "pos/worker/procesar-pendientes",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "pos/worker/procesar-pendientes",
+      "status": 401
+    }
+  ]
+}

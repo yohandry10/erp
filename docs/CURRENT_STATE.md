@@ -79,10 +79,17 @@ stock agregado, canje firmado, cuatro asientos cuadrados y cierre con saldo real
 UI recuperó respuesta perdida sin duplicar, representó ticket y confirmó otra
 venta idéntica. Se conservan artefactos corruptos e intentos del ensayo detenidos
 por selectores/esperas/interpretación de null, separados del producto. Fuentes
-canónicas y migración 564 preparadas; 52 pruebas enfocadas y tipos API/web
+canónicas y migración 564 preparadas; 99 pruebas enfocadas y tipos API/web
 aprobaron. 564 crea catálogo de referencia sólo para futuras empresas PE y
 writer de certificado con permiso, validación e intención durable; sin backfill
-ni cambio de ACL de tablas existentes. Ensayo/CI/promoción/main pendientes.
+ni cambio de ACL de tablas existentes. El respaldo 563 pasó restore, rollback y preservación de 38 tablas, funciones,
+políticas, triggers y ACL (artifacts/erp-peru-564-rehearsal-20261003154511359-19348.json).
+El verificador inicial suponía ausencia de UPDATE heredado y se detuvo; 564
+conserva esas ACL exactamente. Ensayo global local: 316 API y 29 de 30 UI pasaron; el nuevo ensayo de impresión
+intentó leer un iframe retirado después de imprimir y se detuvo antes del restore.
+La repetición enfocada pasó 18 API/un UI con scrypt, evento nativo de impresión y
+restore (artifacts/peru-pos-native-print-local-20261003). El global fallido se
+conserva explícito; CI exacto/promoción/main/despliegue pendientes.
 PROD sigue en 563; no reaplicar 562/563.
 
 El ensayo canónico de #125 (`354989d1`) aprobó 138 escenarios HTTP, 17 recorridos

@@ -1,0 +1,17 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "checks": [
+    {
+      "check": "Vista térmica representa líneas/total y nueva intención idéntica crea otra venta",
+      "passed": true
+    },
+    {
+      "check": "Alta perdida recupera un ticket y mantiene total persistido después de recarga",
+      "passed": true,
+      "venta_id": "a97e13e9-a66e-4f7b-bc43-df47b2a7dcca",
+      "total": 23.6
+    }
+  ],
+  "errors": []
+}

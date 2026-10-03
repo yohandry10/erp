@@ -1,0 +1,30 @@
+{
+  "checked_at": "2026-10-03T15:22:45.466715+00:00",
+  "result": "INVALID_ARTIFACTS_REPEAT_REQUIRED",
+  "cause": "unknown",
+  "remote_writes": false,
+  "files": [
+    {
+      "path": "artifacts/peru-pos-local-20261003143355112-9832/run.json",
+      "bytes": 423,
+      "nul_bytes": 423,
+      "sha256": "2f1411c6a9eed5ac2ccf7eb35456b8601e3c96907765746895325407cc307cc4",
+      "valid_evidence": false
+    },
+    {
+      "path": "artifacts/peru-pos-local-20261003143355112-9832/tax-other-fixture.json",
+      "bytes": 186,
+      "nul_bytes": 186,
+      "sha256": "b57cceac5243ea773def6e4a96db5bd89d900f7a41429431c2719f43d523c83f",
+      "valid_evidence": false
+    },
+    {
+      "path": "artifacts/peru-pos-api-candidate-20261003/run.json",
+      "bytes": 423,
+      "nul_bytes": 423,
+      "sha256": "2f1411c6a9eed5ac2ccf7eb35456b8601e3c96907765746895325407cc307cc4",
+      "valid_evidence": false
+    }
+  ],
+  "note": "Candidate sources contain no NUL. Prior partial results do not replace a complete repeated run. Original files preserved."
+}

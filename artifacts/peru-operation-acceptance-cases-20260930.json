@@ -2430,6 +2430,265 @@
       "pending_checks": [
         "aceptación/acuse SUNAT y reintentos tras rechazo/transitorio externo; acceso autorizado del futuro cliente"
       ]
+    },
+    {
+      "id": "pos-first-client-certificate-intent",
+      "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+      "required_scenario_prefixes": [
+        "POS: carga de certificado válido",
+        "POS: certificado inválido",
+        "POS: configuración pública"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/pos/configurar-certificado"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/pos/empresa-config"
+        }
+      ],
+      "verified_checks": [
+        "PFX desechable válido, replay, colisión y ausencia de clave; inválido no sobrescribe",
+        "configuración pública no expone secretos"
+      ],
+      "pending_checks": [
+        "UI de carga/rotación y variantes de RUC/vigencia/contraseña; credenciales futuras sin pedir cliente inexistente"
+      ]
+    },
+    {
+      "id": "pos-first-client-payment-catalog",
+      "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+      "required_scenario_prefixes": [
+        "POS: primera empresa configurada"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/pos/metodos-pago"
+        }
+      ],
+      "verified_checks": [
+        "catálogo disponible para primer ADMIN no demo después del wizard; efectivo y tarjeta usados realmente"
+      ],
+      "pending_checks": [
+        "otras configuraciones de medios de pago ofrecidas y sus monedas/referencias"
+      ]
+    },
+    {
+      "id": "pos-ticket-sale-recovery",
+      "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+      "required_scenario_prefixes": [
+        "POS: ticket de servicio, replay"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/pos/venta"
+        }
+      ],
+      "verified_checks": [
+        "ticket interno real no consume CPE ni kardex de servicio; replay conserva un ID; nueva intención crea otro",
+        "UI pierde respuesta tras commit, recupera sin duplicar y confirma otra intención idéntica"
+      ],
+      "pending_checks": [
+        "ventas a crédito/parciales, factura inmediata, descuentos/redondeo, divisas y todas las variantes de carrito ofrecidas"
+      ]
+    },
+    {
+      "id": "pos-mixed-payment-cash-isolation",
+      "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+      "required_scenario_prefixes": [
+        "POS: sólo el efectivo"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/pos/venta"
+        }
+      ],
+      "verified_checks": [
+        "pago efectivo/tarjeta totaliza venta; sólo efectivo modifica saldo de caja"
+      ],
+      "pending_checks": [
+        "otros medios/combinaciones, referencias, vuelto y pago parcial/credito"
+      ]
+    },
+    {
+      "id": "pos-stock-repeated-sku",
+      "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+      "required_scenario_prefixes": [
+        "POS: SKU físico repetido"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/pos/venta"
+        }
+      ],
+      "verified_checks": [
+        "cantidades 1+2 descuentan tres de stock y un movimiento; precio incompatible 400 sin impacto en ensayo canónico"
+      ],
+      "pending_checks": [
+        "varios almacenes/sucursales, concurrencia y líneas con descuentos/unidades distintos"
+      ]
+    },
+    {
+      "id": "pos-exchange-reservation-and-intent",
+      "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+      "required_scenario_prefixes": [
+        "POS: canje boleta conserva",
+        "POS: conflicto de intención",
+        "POS: canje inexistente"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/pos/ventas/:ventaId/canjear-ticket"
+        }
+      ],
+      "verified_checks": [
+        "reconstruye boleta desde ticket, no repite cobro/stock/evento contable; replay recupera documento",
+        "inexistente 404, intención distinta 409"
+      ],
+      "pending_checks": [
+        "factura/RUC, umbral/receptor anónimo, ticket a crédito y canje por UI"
+      ]
+    },
+    {
+      "id": "pos-fiscal-read-and-tenant-isolation",
+      "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+      "required_scenario_prefixes": [
+        "POS: estado fiscal ajeno",
+        "POS: aislamiento"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/pos/facturacion/:ventaId"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/pos/ventas-recientes"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/pos/detalles-venta/:id"
+        }
+      ],
+      "verified_checks": [
+        "consulta fiscal inexistente/ajena 404; historial y detalle ajenos vacíos sin mutaciones"
+      ],
+      "pending_checks": [
+        "detalle/historial propio, búsquedas/filtros/paginación y consulta UI de todos los estados"
+      ]
+    },
+    {
+      "id": "pos-reader-and-worker-permissions",
+      "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+      "required_scenario_prefixes": [
+        "POS: lector consulta",
+        "POS: worker no admite"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/pos/productos"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/pos/venta"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/pos/caja/abrir"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/pos/caja/cerrar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/pos/configurar-certificado"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/pos/ventas/:ventaId/canjear-ticket"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/pos/worker/procesar-pendientes"
+        }
+      ],
+      "verified_checks": [
+        "rol lector real consulta pero cinco mutaciones 403; worker rechaza usuario/anónimo"
+      ],
+      "pending_checks": [
+        "otros roles y combinaciones de permiso/sucursal; UI con lector"
+      ]
+    },
+    {
+      "id": "pos-worker-reservation-retry",
+      "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+      "required_scenario_prefixes": [
+        "POS: worker firmado respeta",
+        "POS: rechazo de ticket"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/pos/worker/procesar-pendientes"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/pos/reintentar-facturacion/:ventaId"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/pos/ventas-pendientes-facturacion"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/pos/facturacion/:ventaId"
+        }
+      ],
+      "verified_checks": [
+        "token worker limita tenant, incluye intentos NULL y produce UBL firmado con reserva única",
+        "retry recupera CPE y mantiene impactos; ticket puro 409 sin cambios"
+      ],
+      "pending_checks": [
+        "errores y agotamiento de firma/cola, aceptación SUNAT y reintentos tras fallos externos"
+      ]
+    },
+    {
+      "id": "pos-accounting-and-close",
+      "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+      "required_scenario_prefixes": [
+        "POS: outbox de cada venta",
+        "POS: cierre con saldo real"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/pos/caja/abrir"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/pos/caja/cerrar"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/pos/sesion-caja"
+        }
+      ],
+      "verified_checks": [
+        "cuatro ventas generan cada una un asiento confirmado y cuadrado",
+        "cierre usa saldo real, después de canje y outbox, y sesión queda cerrada"
+      ],
+      "pending_checks": [
+        "cierres con diferencias/supervisor en primera empresa por UI y crédito; se conservan pruebas de cajas separadas"
+      ]
     }
   ]
 }

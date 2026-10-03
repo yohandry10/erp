@@ -1,0 +1,17 @@
+{
+  "local_source": "artifacts/peru-pos-local-20261003160939557-24308",
+  "scope": "POS API18/UI1/restore; native print event observed, no hardware or SUNAT acceptance",
+  "api_sources_equal_canonical_normalized": true,
+  "sql_equal_canonical": true,
+  "source_sha256": {
+    "apps/erp-api/src/modules/pos/pos.service.ts": "c0782e20457c944ae5d23e03aaef0e84788bfe5f34b093bbc7f64d240cea423b",
+    "apps/erp-api/src/modules/pos/pos.controller.ts": "759e51ff7c750325d82ec9d28d457b49370de064a00dd2d608b2606663061e7e",
+    "apps/web/tests/e2e/peru-pos-local.spec.ts": "20493084b38ab7819a6dd84c75d7f6b3d106a791bd160c1f1157b1e16341e4ba",
+    "supabase/migrations/564__pos_first_client_readiness.sql": "1b0cb767c5f7e8d27a8f4d79fc482b9fb2dea103fdac2e1e16bbbc938b64dbd4"
+  },
+  "remote_business_writes": false,
+  "dumps_extracted": false,
+  "limits": [
+    "Partial local run; complete exact CI, promotion, main and deployed runtime still required."
+  ]
+}
