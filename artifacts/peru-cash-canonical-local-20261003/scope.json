@@ -1,0 +1,16 @@
+{
+  "scope": "Cash operations and explicitly recorded variants on restored local snapshot, with canonical corrections",
+  "complete_acceptance": false,
+  "remoteWrites": false,
+  "passed": 23,
+  "failed": 0,
+  "browser": true,
+  "accounting": true,
+  "faults": null,
+  "limits": [
+    "Does not prove fresh migration reconstruction",
+    "Browser and accounting evidence covers only recorded variants",
+    "Does not prove PROD availability or SUNAT acceptance",
+    "Private PDFs, dumps, logs, certificates and raw traces are excluded"
+  ]
+}

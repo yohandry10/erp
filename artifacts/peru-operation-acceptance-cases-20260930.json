@@ -2986,6 +2986,633 @@
       "pending_checks": [
         "Fechas históricas con hora real; otras afectaciones tributarias"
       ]
+    },
+    {
+      "id": "cash-alta-replay-y-edicion",
+      "source": "scripts/ci/test-peru-cash-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Caja: alta, replay y edición persisten una caja; identidad cambiada no duplica"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/cajas/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas"
+        }
+      ],
+      "verified_checks": [
+        "Caja: alta, replay y edición persisten una caja; identidad cambiada no duplica"
+      ],
+      "pending_checks": [
+        "Variantes no registradas de moneda, roles y concurrencia; UI salvo los recorridos registrados"
+      ]
+    },
+    {
+      "id": "cash-PIN-supervisor",
+      "source": "scripts/ci/test-peru-cash-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Caja: PIN supervisor se registra/rota por intención sin exponer código ni hash"
+      ],
+      "operations": [
+        {
+          "method": "PUT",
+          "endpoint": "/api/cajas/supervisores/:supervisorId/pin"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/supervisores-gestion-pin"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/supervisores-autorizados/:sesionId"
+        }
+      ],
+      "verified_checks": [
+        "Caja: PIN supervisor se registra/rota por intención sin exponer código ni hash"
+      ],
+      "pending_checks": [
+        "Variantes no registradas de moneda, roles y concurrencia; UI salvo los recorridos registrados"
+      ]
+    },
+    {
+      "id": "cash-ingreso-gasto-manual",
+      "source": "scripts/ci/test-peru-cash-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Caja: ingreso/gasto manual, ledger y replay conservan un solo movimiento y saldo"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/movimientos/manual/:sesionId"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/opciones-contables"
+        }
+      ],
+      "verified_checks": [
+        "Caja: ingreso/gasto manual, ledger y replay conservan un solo movimiento y saldo"
+      ],
+      "pending_checks": [
+        "Variantes no registradas de moneda, roles y concurrencia; UI salvo los recorridos registrados"
+      ]
+    },
+    {
+      "id": "cash-apertura-y-consultas",
+      "source": "scripts/ci/test-peru-cash-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Caja: apertura y consultas no cambian la sesión; segunda apertura rechaza sin autocierre"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/:id/apertura"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/sesiones"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/movimientos/:sesionId"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/saldo-esperado/:sesionId"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/validar-precierre/:sesionId"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/:id/corte-z"
+        }
+      ],
+      "verified_checks": [
+        "Caja: apertura y consultas no cambian la sesión; segunda apertura rechaza sin autocierre"
+      ],
+      "pending_checks": [
+        "Variantes no registradas de moneda, roles y concurrencia; UI salvo los recorridos registrados"
+      ]
+    },
+    {
+      "id": "cash-deposito-bancario-y-conciliacion-positiva",
+      "source": "scripts/ci/test-peru-cash-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Caja: depósito bancario y conciliación positiva son idempotentes en caja y banco"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/retiros/:retiroId/conciliar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/:id/cierre"
+        }
+      ],
+      "verified_checks": [
+        "Caja: depósito bancario y conciliación positiva son idempotentes en caja y banco"
+      ],
+      "pending_checks": [
+        "Variantes no registradas de moneda, roles y concurrencia; UI salvo los recorridos registrados"
+      ]
+    },
+    {
+      "id": "cash-cierre-basico-admite-el-alias",
+      "source": "scripts/ci/test-peru-cash-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Caja: cierre básico admite el alias monto_contado y sesionId ofrecido por el controlador"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/:id/cierre"
+        }
+      ],
+      "verified_checks": [
+        "Caja: cierre básico admite el alias monto_contado y sesionId ofrecido por el controlador"
+      ],
+      "pending_checks": [
+        "Variantes no registradas de moneda, roles y concurrencia; UI salvo los recorridos registrados"
+      ]
+    },
+    {
+      "id": "cash-corte-filtros-CSV-y-PDF",
+      "source": "scripts/ci/test-peru-cash-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Caja: corte, filtros, CSV y PDF representan sesión cerrada; no producen efectos"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/cortes"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/cortes/:corteId"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/cortes/:corteId/csv"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/cortes/:corteId/pdf"
+        }
+      ],
+      "verified_checks": [
+        "Caja: corte, filtros, CSV y PDF representan sesión cerrada; no producen efectos"
+      ],
+      "pending_checks": [
+        "Variantes no registradas de moneda, roles y concurrencia; UI salvo los recorridos registrados"
+      ]
+    },
+    {
+      "id": "cash-arqueo-inconsistente",
+      "source": "scripts/ci/test-peru-cash-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Caja: arqueo inconsistente y diferencia sin autorización no cierran ni mutan"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/validar-cierre/:sesionId"
+        }
+      ],
+      "verified_checks": [
+        "Caja: arqueo inconsistente y diferencia sin autorización no cierran ni mutan"
+      ],
+      "pending_checks": [
+        "Variantes no registradas de moneda, roles y concurrencia; UI salvo los recorridos registrados"
+      ]
+    },
+    {
+      "id": "cash-cierre-con-supervisor",
+      "source": "scripts/ci/test-peru-cash-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Caja: cierre con supervisor distinto y PIN produce corte durable; replay no duplica"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/cerrar/:sesionId"
+        }
+      ],
+      "verified_checks": [
+        "Caja: cierre con supervisor distinto y PIN produce corte durable; replay no duplica"
+      ],
+      "pending_checks": [
+        "Variantes no registradas de moneda, roles y concurrencia; UI salvo los recorridos registrados"
+      ]
+    },
+    {
+      "id": "cash-retiro-a-boveda",
+      "source": "scripts/ci/test-peru-cash-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Caja: retiro a bóveda/replay conserva saldo; conciliación bancaria inaplicable rechaza sin efectos"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/retiros/:sesionId"
+        }
+      ],
+      "verified_checks": [
+        "Caja: retiro a bóveda/replay conserva saldo; conciliación bancaria inaplicable rechaza sin efectos"
+      ],
+      "pending_checks": [
+        "Variantes no registradas de moneda, roles y concurrencia; UI salvo los recorridos registrados"
+      ]
+    },
+    {
+      "id": "cash-cambio-de-turno-congela",
+      "source": "scripts/ci/test-peru-cash-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Caja: cambio de turno congela; movimiento rechaza y cancelar/replay descongela una vez"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/cambio-turno/iniciar/:sesionId"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/cambio-turno/cancelar/:cambioId"
+        }
+      ],
+      "verified_checks": [
+        "Caja: cambio de turno congela; movimiento rechaza y cancelar/replay descongela una vez"
+      ],
+      "pending_checks": [
+        "Variantes no registradas de moneda, roles y concurrencia; UI salvo los recorridos registrados"
+      ]
+    },
+    {
+      "id": "cash-cambio-completado",
+      "source": "scripts/ci/test-peru-cash-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Caja: cambio completado transfiere responsabilidad, no inventa ingreso y congela confirmaciones como hashes"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/cambio-turno/completar/:cambioId"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/sesiones/:sesionId/cambios-turno"
+        }
+      ],
+      "verified_checks": [
+        "Caja: cambio completado transfiere responsabilidad, no inventa ingreso y congela confirmaciones como hashes"
+      ],
+      "pending_checks": [
+        "Variantes no registradas de moneda, roles y concurrencia; UI salvo los recorridos registrados"
+      ]
+    },
+    {
+      "id": "cash-cierre-administrativo-exige",
+      "source": "scripts/ci/test-peru-cash-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Caja: cierre administrativo exige razón y es durable sin duplicar efectos al reintentar"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/sesiones/:sesionId/cierre-administrativo"
+        }
+      ],
+      "verified_checks": [
+        "Caja: cierre administrativo exige razón y es durable sin duplicar efectos al reintentar"
+      ],
+      "pending_checks": [
+        "Variantes no registradas de moneda, roles y concurrencia; UI salvo los recorridos registrados"
+      ]
+    },
+    {
+      "id": "cash-manual-concurrent-same-intent",
+      "source": "scripts/ci/test-peru-cash-faults-local.mjs",
+      "required_scenario_prefixes": [
+        "Caja: dos ingresos concurrentes de la misma intención"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/movimientos/manual/:sesionId"
+        }
+      ],
+      "verified_checks": [
+        "Dos peticiones simultáneas producen un movimiento/evento; contenido distinto falla sin efectos"
+      ],
+      "pending_checks": [
+        "Otros fallos de infraestructura no inyectados"
+      ]
+    },
+    {
+      "id": "cash-manual-execute-revoked-recovers",
+      "source": "scripts/ci/test-peru-cash-faults-local.mjs",
+      "required_scenario_prefixes": [
+        "Caja: writer manual sin EXECUTE"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/movimientos/manual/:sesionId"
+        }
+      ],
+      "verified_checks": [
+        "Sin EXECUTE responde 503 sin efectos y la misma intención se recupera una vez"
+      ],
+      "pending_checks": [
+        "Otros fallos de infraestructura no inyectados"
+      ]
+    },
+    {
+      "id": "cash-manual-post-insert-failure-rollback",
+      "source": "scripts/ci/test-peru-cash-faults-local.mjs",
+      "required_scenario_prefixes": [
+        "Caja: fallo interno después de INSERT"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/movimientos/manual/:sesionId"
+        }
+      ],
+      "verified_checks": [
+        "Fallo XX000 posterior al INSERT revierte saldo, ledger y outbox; la intención se recupera una vez"
+      ],
+      "pending_checks": [
+        "Otros fallos de infraestructura no inyectados"
+      ]
+    },
+    {
+      "id": "cash-preclose-read-outage-503",
+      "source": "scripts/ci/test-peru-cash-faults-local.mjs",
+      "required_scenario_prefixes": [
+        "Caja: precierre no declara validación exitosa"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/validar-precierre/:sesionId"
+        }
+      ],
+      "verified_checks": [
+        "Sin lectura de ventas, retiros o turnos responde 503, nunca validación positiva"
+      ],
+      "pending_checks": [
+        "Otros fallos de infraestructura no inyectados"
+      ]
+    },
+    {
+      "id": "cash-preview-tolerance-rpc-503",
+      "source": "scripts/ci/test-peru-cash-faults-local.mjs",
+      "required_scenario_prefixes": [
+        "Caja: RPC de tolerancia indisponible"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/validar-cierre/:sesionId"
+        }
+      ],
+      "verified_checks": [
+        "Tolerancia indisponible responde 503 y conserva el arqueo"
+      ],
+      "pending_checks": [
+        "Otros fallos de infraestructura no inyectados"
+      ]
+    },
+    {
+      "id": "cash-preview-ledger-read-503",
+      "source": "scripts/ci/test-peru-cash-faults-local.mjs",
+      "required_scenario_prefixes": [
+        "Caja: preview no sustituye el saldo"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/validar-cierre/:sesionId"
+        }
+      ],
+      "verified_checks": [
+        "Sin lectura de movimientos responde 503; recuperado usa el saldo real"
+      ],
+      "pending_checks": [
+        "Otros fallos de infraestructura no inyectados"
+      ]
+    },
+    {
+      "id": "cash-report-fiscal-payments-503",
+      "source": "scripts/ci/test-peru-cash-faults-local.mjs",
+      "required_scenario_prefixes": [
+        "Caja: reporte fiscal/pagos indisponible"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/:id/corte-z"
+        }
+      ],
+      "verified_checks": [
+        "Sin lectura de ventas o pagos el reporte responde 503"
+      ],
+      "pending_checks": [
+        "Otros fallos de infraestructura no inyectados"
+      ]
+    },
+    {
+      "id": "cash-csv-formula-quotes",
+      "source": "scripts/ci/test-peru-cash-faults-local.mjs",
+      "required_scenario_prefixes": [
+        "Caja: CSV conserva comillas"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/cortes/:corteId/csv"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/cajas/:id"
+        }
+      ],
+      "verified_checks": [
+        "CSV conserva comillas y saltos y neutraliza la fórmula del nombre de caja"
+      ],
+      "pending_checks": [
+        "Otros fallos de infraestructura no inyectados"
+      ]
+    },
+    {
+      "id": "sales-quote-approved-by-other-actor",
+      "source": "scripts/ci/test-peru-integrated-records.mjs",
+      "required_scenario_prefixes": [
+        "cotización de venta creada con líneas y aprobada por otro actor"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/cotizaciones"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/cotizaciones/:id"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/cotizaciones/:id/enviar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/cotizaciones/:id/aprobar"
+        }
+      ],
+      "verified_checks": [
+        "Cotización con línea persistida, enviada y aprobada por un segundo actor"
+      ],
+      "pending_checks": [
+        "Edición, rechazo, eliminación, historial, permisos negativos y aislamiento de cotizaciones; UI"
+      ]
+    },
+    {
+      "id": "sales-quote-convert-once",
+      "source": "scripts/ci/test-peru-integrated-records.mjs",
+      "required_scenario_prefixes": [
+        "conversión conserva total y producto; una segunda solicitud no duplica pedido"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/cotizaciones/:id/convertir-pedido"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/pedidos/:id"
+        }
+      ],
+      "verified_checks": [
+        "El pedido conserva total y producto; una segunda conversión responde 400 sin crear otro pedido"
+      ],
+      "pending_checks": [
+        "Conversión concurrente y respuesta perdida; UI"
+      ]
+    },
+    {
+      "id": "sales-order-confirm-dispatch-once",
+      "source": "scripts/ci/test-peru-integrated-records.mjs",
+      "required_scenario_prefixes": [
+        "pedido preparado y despachado por logística sin duplicar cantidad al reintentar"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/confirmar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/inventario/logistica/:pedidoId/preparar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/inventario/logistica/:pedidoId/marcar-listo"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/inventario/logistica/:pedidoId/confirmar-despacho"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/logistica/ordenes-pendientes"
+        }
+      ],
+      "verified_checks": [
+        "Confirmación, preparación interrumpida retomable y despacho con replay sin duplicar cantidad"
+      ],
+      "pending_checks": [
+        "Despacho parcial en varias entregas, cancelación tras confirmar y GRE ligada; UI"
+      ]
+    },
+    {
+      "id": "sales-order-document-cxc-collection-cash-accounting",
+      "source": "scripts/ci/test-peru-integrated-records.mjs",
+      "required_scenario_prefixes": [
+        "pedido despachado genera CPE/CxC; cobro parcial entra al banco"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/generar-documento"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxc/:id"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/finanzas/cxc/:id/pagos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxc"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/saldo-esperado/:sesionId"
+        }
+      ],
+      "verified_checks": [
+        "CPE/CxC desde pedido despachado; cobro parcial a banco y saldo en efectivo a caja con replay; caja inexistente 400 sin efectos; búsqueda y aislamiento; arqueo y dos asientos únicos"
+      ],
+      "pending_checks": [
+        "Transmisión SUNAT real; moneda extranjera en cobro; UI del documento desde pedido"
+      ]
+    },
+    {
+      "id": "sales-reports-filters-and-currency",
+      "source": "scripts/ci/test-peru-integrated-records.mjs",
+      "required_scenario_prefixes": [
+        "plazo comercial consulta el CPE canónico",
+        "reportes comerciales respetan cliente"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/reportes/lead-time"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/reportes/productos-mas-vendidos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/reportes/ventas-por-cliente"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/reportes/pedidos-por-estado"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/reportes/top-clientes"
+        }
+      ],
+      "verified_checks": [
+        "Lead time por emisión con fechas inválidas/invertidas 400; reportes conservan moneda, código y filtro de cliente"
+      ],
+      "pending_checks": [
+        "Pipeline, fill-rate, aging, KPIs SUNAT y cotizaciones pendientes; exportación e impresión"
+      ]
     }
   ]
 }

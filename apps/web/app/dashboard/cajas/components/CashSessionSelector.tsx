@@ -41,6 +41,7 @@ export function CashSessionSelector({ onSelect, onOpen, className = '' }: CashSe
     const cargarSesiones = useCallback(async () => {
         try {
             setLoading(true);
+            setError(null);
             // Fetch open sessions first, then closed ones
             const response = await get('/cajas/sesiones');
             if (response?.success) {
