@@ -78,6 +78,19 @@ sin datos de clientes.
 
 ## Fiscal
 
+Los parches de dependencias sin versión publicada viven en `patches/` y se
+instalan mediante `pnpm.patchedDependencies` en desarrollo, CI y las tres
+imágenes Docker. Para `node-forge@1.4.0`, el parche reproduce el cambio de
+`digitalbazaar/forge#1152` contra GHSA-86w9-cpqp-85rv. Para `braces@3.0.3`,
+GHSA-vfj7-8cjw-p6xm se corrige limitando a 128 la profundidad del parser y los
+tres recorridos recursivos, incluidos los AST entregados directamente.
+`scripts/ci/audit-dependencies.mjs` conserva los avisos del registro, verifica
+SHA-256 normalizados a LF y regresiones de todas las copias instaladas antes de
+considerar mitigados esos dos identificadores y versiones exactos. Cualquier
+otro aviso alto o crítico falla. Estos parches deben retirarse al adoptar
+versiones oficiales corregidas; no equivalen a un audit del registro con cero
+hallazgos.
+
 - El país operativo se resuelve desde `empresa_config.pais_id`; los catálogos,
   moneda, identificación, tasa y autoridad fiscal nunca se infieren desde la
   ubicación del navegador.

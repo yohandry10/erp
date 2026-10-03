@@ -6,6 +6,7 @@ RUN npm install -g pnpm@9.15.4
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches/ ./patches/
 COPY turbo.json ./
 COPY libs/ ./libs/
 COPY apps/worker/ ./apps/worker/
@@ -22,6 +23,7 @@ RUN npm install -g pnpm@9.15.4
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches/ ./patches/
 COPY --from=base /app/libs/dtos/dist ./libs/dtos/dist
 COPY --from=base /app/libs/dtos/package.json ./libs/dtos/
 COPY --from=base /app/libs/crypto/dist ./libs/crypto/dist

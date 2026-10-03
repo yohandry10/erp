@@ -85,6 +85,10 @@
       "brace-expansion@>=4.0.0 <5.0.12": "5.0.12",
       "js-yaml@<3.15.2": "3.15.2",
       "nanoid@>=3.0.0 <3.3.18": "3.3.18"
+    },
+    "patchedDependencies": {
+      "node-forge@1.4.0": "patches/node-forge@1.4.0.patch",
+      "braces@3.0.3": "patches/braces@3.0.3.patch"
     }
   }
 }

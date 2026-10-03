@@ -651,6 +651,13 @@ Código principal: `apps/erp-api/src/modules/finanzas`,
   silenciosamente el original. La captura sólo comunica un asiento balanceado
   cuando debe y haber tienen importes positivos y su diferencia es menor a un
   céntimo; un formulario 0/0 permanece pendiente.
+- La creación manual acepta `Idempotency-Key`: la misma intención y actor
+  devuelve el mismo asiento; una clave reutilizada con otro contenido se
+  rechaza. El formulario conserva la clave al recuperar una respuesta perdida.
+  El recibo y el asiento se confirman juntos; un replay puede recuperar el
+  resultado aunque el período se haya cerrado después del commit original.
+  La fecha inicial del formulario corresponde al calendario fiscal del país
+  de la empresa, incluso cuando UTC ya cambió de día.
 - Cabecera y detalle de asientos, confirmación, reversión, conciliación,
   distribución analítica, devengos, depreciaciones y bajas usan operaciones
   atómicas; sus barreras de idempotencia también viven en la base.
@@ -662,7 +669,9 @@ Código principal: `apps/erp-api/src/modules/finanzas`,
   evento extranjero sin cotización válida no genera asiento. No se recalcula
   con una cotización actual ni se reescribe un asiento confirmado histórico.
 - Plantillas recurrentes generan una sola instancia por período. Activos fijos
-  conservan cronograma, depreciación, valor residual y baja. Las partidas de
+  conservan cronograma, depreciación, valor residual y baja; la última cuota
+  ejecutada absorbe el pendiente sin depreciar por debajo del residual.
+  Las partidas de
   terceros pueden conciliarse total o parcialmente y deshacerse sin alterar el
   asiento.
 - La distribución analítica reparte una línea por varios ejes independientes.

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { ArrowLeft, FileText, Loader2, RefreshCw } from 'lucide-react'
@@ -44,6 +44,7 @@ export default function NuevoAsientoPage() {
   const [loadingData, setLoadingData] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [comoBorrador, setComoBorrador] = useState(false)
+  const operationKeys = useRef<Record<string, string>>({})
 
   const loadInitialData = useCallback(async () => {
     try {
@@ -72,12 +73,16 @@ export default function NuevoAsientoPage() {
       setLoading(true)
       setError(null)
 
-      const response = await post('/api/contabilidad/asiento-contable', {
+      const payload = {
         ...data,
         estado: comoBorrador ? 'BORRADOR' : 'CONFIRMADO',
-      })
+      }
+      const signature = JSON.stringify(payload)
+      const key = operationKeys.current[signature] ??= `asiento-ui:${crypto.randomUUID()}`
+      const response = await post('/api/contabilidad/asiento-contable', payload, { headers: { 'Idempotency-Key': key } })
 
       if (response?.success) {
+        operationKeys.current = {}
         toast({ title: comoBorrador ? 'Borrador guardado' : 'Asiento creado', description: comoBorrador
             ? 'Asiento guardado como borrador. Podra corregirlo antes de confirmarlo.'
             : 'Asiento contable creado exitosamente' })
