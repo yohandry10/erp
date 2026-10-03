@@ -1,0 +1,369 @@
+{
+  "success": true,
+  "local_only": true,
+  "remoteWrites": false,
+  "scope": "Primer ADMIN Perú: planilla y fuentes PLAME/T-Registro locales; códigos del fixture sin validación PVS/SUNAT, sin constancias ficticias",
+  "scenarios": [
+    {
+      "scenario": "Planilla primer ADMIN: alta/replay, cálculo con norma vigente, detalle y boleta del empleado persistidos",
+      "passed": true
+    },
+    {
+      "scenario": "PLAME/T-Registro: ficha/jornada faltantes bloquean fuentes PVS y no permiten presentación sin evidencia",
+      "passed": true
+    },
+    {
+      "scenario": "PLAME/T-Registro: ficha y jornada explícitas con replay habilitan cuatro fuentes con RUC, delimitador y SHA verificados",
+      "passed": true
+    },
+    {
+      "scenario": "PLAME/T-Registro: ZIP real reproduce fuentes; versiones congeladas, una vigente y cero constancias ficticias",
+      "passed": true
+    },
+    {
+      "scenario": "PLAME/T-Registro: ficha ajena rechazada sin mutar, descarga 404 e historial aislado",
+      "passed": true
+    },
+    {
+      "scenario": "Paquete PLAME: misma intención recupera respuesta congelada incluso tras cambiar jornada/corte",
+      "passed": true
+    },
+    {
+      "scenario": "Paquete PLAME: clave incompatible, actor distinto y clave inválida rechazados sin versiones residuales",
+      "passed": true
+    },
+    {
+      "scenario": "Paquete PLAME: seis solicitudes concurrentes crean una versión y conservan una vigente",
+      "passed": true
+    },
+    {
+      "scenario": "Paquete PLAME: rol sin permisos no consulta ni guarda y conserva historial",
+      "passed": true
+    },
+    {
+      "scenario": "Planilla primer ADMIN: aprobación/pago con actores distintos, banco exacto, replay y tres asientos únicos cuadrados",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "roles",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "users",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/empleados",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/contratos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/planillas",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/planillas",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/planillas/:id/calcular",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/planillas/:id/detalle",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/boleta/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/peru/planilla-electronica/:id/preview",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/peru/planilla-electronica/:id/paquetes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/peru/planilla-electronica/paquetes/:id/evidencia",
+      "status": 400
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/peru/planilla-electronica/empleados/:id/ficha",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/peru/planilla-electronica/empleados/:id/ficha",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/peru/planilla-electronica/detalles/:id/jornada",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/peru/planilla-electronica/detalles/:id/jornada",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/peru/planilla-electronica/:id/preview",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/peru/planilla-electronica/:id/paquetes",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/peru/planilla-electronica/paquetes/:id/descargar",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/peru/planilla-electronica/detalles/:id/jornada",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/peru/planilla-electronica/:id/paquetes",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/peru/planilla-electronica/paquetes/historial",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/peru/planilla-electronica/paquetes/:id/evidencia",
+      "status": 400
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/peru/planilla-electronica/empleados/:id/ficha",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/peru/planilla-electronica/paquetes/:id/descargar",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/peru/planilla-electronica/paquetes/historial",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/planillas/:id/aprobar",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/planillas/:id/aprobar",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/plan-cuentas",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/cuentas",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/movimientos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/planillas/:id/pagar",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/planillas/:id/pagar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/planillas/:id/pagar",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/peru/planilla-electronica/:id/paquetes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/peru/planilla-electronica/:id/paquetes",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/peru/planilla-electronica/detalles/:id/jornada",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/peru/planilla-electronica/:id/paquetes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/peru/planilla-electronica/:id/paquetes",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/peru/planilla-electronica/:id/paquetes",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/peru/planilla-electronica/:id/paquetes",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/peru/planilla-electronica/:id/paquetes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/peru/planilla-electronica/:id/paquetes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/peru/planilla-electronica/:id/paquetes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/peru/planilla-electronica/:id/paquetes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/peru/planilla-electronica/:id/paquetes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/peru/planilla-electronica/:id/paquetes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "roles",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "users",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/peru/planilla-electronica/:id/paquetes",
+      "status": 403
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/peru/planilla-electronica/:id/preview",
+      "status": 403
+    }
+  ],
+  "exported_sources": [
+    {
+      "nombre": "RP_20198765482.ide",
+      "sha256": "fc85461d33634d8eb490ee0a2acf5e4ab8e475fedbd98be792199edc5a2bafb2"
+    },
+    {
+      "nombre": "RP_20198765482.tra",
+      "sha256": "cebd126dded019c995db14f584f7eea4b7e6dc0303dc18406cdc30efcbccf0f4"
+    },
+    {
+      "nombre": "RP_20198765482.per",
+      "sha256": "d91691ea88f0914584b6c5a4e9e0670a638c0082ab41e8ab2bd623115c1427bc"
+    },
+    {
+      "nombre": "RP_20198765482.est",
+      "sha256": "30088090d019bbf37815ab0b59d6fd949819601d2083c5f44c7ecef0c847b4a3"
+    }
+  ],
+  "postings": [
+    {
+      "type": "planilla.liquidada",
+      "status": "completed",
+      "entries": 1,
+      "balanced": true
+    },
+    {
+      "type": "banco.movimiento.registrado",
+      "status": "completed",
+      "entries": 1,
+      "balanced": true
+    },
+    {
+      "type": "planilla.pagada",
+      "status": "completed",
+      "entries": 1,
+      "balanced": true
+    }
+  ],
+  "checkedAt": "2026-10-03T06:25:59.017Z"
+}

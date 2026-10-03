@@ -1,0 +1,12 @@
+{
+  "dumps_extracted": false,
+  "github_run_id": 37100299491,
+  "github_artifact_id": 11266802023,
+  "head_sha": "445a4a0359a6f48b7c375a704e8abf63cec8a261",
+  "selected_prefix": "artifacts/peru-integrated-20261003053632180-3368/",
+  "github_run_attempt": 1,
+  "inspected_artifact_ids": [
+    11266802023
+  ],
+  "selected_completed_at": "2026-10-03T06:08:43.689Z"
+}

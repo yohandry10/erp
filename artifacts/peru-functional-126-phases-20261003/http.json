@@ -1,0 +1,5507 @@
+{
+  "date": "2026-10-03T05:38:01.709Z",
+  "success": true,
+  "results": [
+    {
+      "scenario": "login real con sesión persistida",
+      "passed": true,
+      "tenant_id": "0dec6f8f-a533-40dd-ba49-0835ac8e30b9"
+    },
+    {
+      "scenario": "pos/productos",
+      "passed": true
+    },
+    {
+      "scenario": "pos/clientes",
+      "passed": true
+    },
+    {
+      "scenario": "pos/metodos-pago",
+      "passed": true
+    },
+    {
+      "scenario": "pos/sesion-caja",
+      "passed": true
+    },
+    {
+      "scenario": "cajas",
+      "passed": true
+    },
+    {
+      "scenario": "pos/empresa-config",
+      "passed": true
+    },
+    {
+      "scenario": "cierre de sesión inicial con saldo real",
+      "passed": true
+    },
+    {
+      "scenario": "apertura real de caja por HTTP",
+      "passed": true
+    },
+    {
+      "scenario": "venta de ticket interno por HTTP",
+      "passed": true
+    },
+    {
+      "scenario": "reintento sin duplicar venta, stock ni efectivo",
+      "passed": true
+    },
+    {
+      "scenario": "outbox procesado por servicio real y asiento único confirmado y cuadrado",
+      "passed": true,
+      "venta_id": "9c10ac2c-06c8-4bbf-bc4a-831ffe89623f",
+      "accounting_event_id": "7a7c74fc-342e-4119-b02d-28c7ab354a64"
+    },
+    {
+      "scenario": "aislamiento entre dos empresas autenticadas",
+      "passed": true
+    },
+    {
+      "scenario": "cierre posterior a venta con arqueo correcto",
+      "passed": true
+    },
+    {
+      "scenario": "alta y consulta real de proveedor peruano",
+      "passed": true
+    },
+    {
+      "scenario": "orden de compra calculada en PostgreSQL y reintento idempotente",
+      "passed": true,
+      "order_id": "d447b161-1b77-4c6d-a854-7eb37ffb13af"
+    },
+    {
+      "scenario": "aprobación por otro usuario y una sola decisión persistida",
+      "passed": true
+    },
+    {
+      "scenario": "recepción cerrada: stock único, orden recibida y costo sin deuda ni crédito fiscal",
+      "passed": true,
+      "receipt_id": "dd39d03c-4ad5-4bc1-91f9-411191bb9450",
+      "event_id": "ddc7d2fc-a203-4de6-ab8b-ce4274cac96c"
+    },
+    {
+      "scenario": "factura del proveedor genera deuda real en PEN y conserva la recepción",
+      "passed": true,
+      "cxp_id": "740adfd0-1df3-434b-9d34-4bebab82e26a"
+    },
+    {
+      "scenario": "factura y asiento únicos al reintentar el registro",
+      "passed": true
+    },
+    {
+      "scenario": "pago de compra: deuda cancelada, cargo bancario y asiento únicos al reintentar",
+      "passed": true,
+      "payment_id": "827fee7a-ef23-4fa1-b4a1-3aa5af0ea379",
+      "event_id": "e5f6286f-e7a5-4065-8852-e7b3ce961fe3"
+    },
+    {
+      "scenario": "orden, recepción y factura de compra invisibles desde otra empresa",
+      "passed": true
+    },
+    {
+      "scenario": "factura conserva destino del crédito fiscal, código SPOT y tipo de cambio de origen",
+      "passed": true
+    },
+    {
+      "scenario": "devolución incompatible con factura pagada revierte stock y outbox; borrador anulable",
+      "passed": true
+    },
+    {
+      "scenario": "alta idempotente de servicio sin control de stock en el catálogo",
+      "passed": true
+    },
+    {
+      "scenario": "recepción parcial mixta: servicios cumplen la orden; rechazo no ingresa stock y exceso no crea cabecera",
+      "passed": true
+    },
+    {
+      "scenario": "recepciones parciales contabilizadas: mercadería y servicio separados, sin duplicados ni crédito fiscal",
+      "passed": true
+    },
+    {
+      "scenario": "devolución previa a factura revierte mercadería y servicio sin deuda ni IGV; rechazo original no es devolvible",
+      "passed": true
+    },
+    {
+      "scenario": "devolución de compra pendiente ajusta saldo, inventario y asiento una sola vez",
+      "passed": true
+    },
+    {
+      "scenario": "factura USD conserva deuda documental y contabiliza en soles con su cotización de origen",
+      "passed": true
+    },
+    {
+      "scenario": "auditor sin administración de usuarios consulta sólo identidades de su empresa",
+      "passed": true
+    },
+    {
+      "scenario": "auditoría unificada real sin fuentes omitidas y aislada por empresa",
+      "passed": true
+    },
+    {
+      "scenario": "recepción cerrada conserva actor, resultado y recurso consultable",
+      "passed": true
+    },
+    {
+      "scenario": "paginación de auditoría e integraciones y rechazo de filtros inválidos",
+      "passed": true
+    },
+    {
+      "scenario": "auditoría rechaza acceso anónimo y sin permiso; no expone recursos ni actores de otra empresa",
+      "passed": true
+    },
+    {
+      "scenario": "cambio de empresa crea sesión válida, preserva destino al validar/renovar y audita una vez",
+      "passed": true
+    },
+    {
+      "scenario": "revocar privilegio de superadministrador invalida inmediatamente el contexto cruzado",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa rrhh/configuracion-laboral",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa rrhh/empleados",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa rrhh/departamentos",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa rrhh/candidatos",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa rrhh/vacantes",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa rrhh/asistencias?fecha=2026-09-06",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa contabilidad/activos-fijos",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa contabilidad/centros-costo",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa contabilidad/registro-consignaciones",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa contabilidad/consolidacion/grupos",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa contabilidad/reportes-configurables",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa contabilidad/diferidos",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa contabilidad/plantillas-asientos",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa contabilidad/presupuestos",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa contabilidad/tipos-cambio",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa contabilidad/eventos/estadisticas",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa contabilidad/eventos/fallidos",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa contabilidad/eventos/dead-letter",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa ventas/cotizaciones",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa documentos/lista",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa cpe/baja/lotes?tipo=RA",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa cpe/baja/lotes?tipo=RC",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa finanzas/conciliacion",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa finanzas/cxp/detracciones/tasas",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa inventario/logistica/listo-despacho",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa inventario/logistica/ordenes-pendientes",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa inventario/recepciones",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa ventas/pedidos",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa ventas/pedidos/aprobaciones/pendientes",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa ventas/comercial/catalogos",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa ventas/rma",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa ventas/rma/saldos-favor",
+      "passed": true
+    },
+    {
+      "scenario": "lectura operativa ventas/rma/candidatos",
+      "passed": true
+    },
+    {
+      "scenario": "planilla sin normativa bloqueada antes de persistir cálculo",
+      "passed": true
+    },
+    {
+      "scenario": "planilla peruana calculada con normativa efectiva y contratos locales",
+      "passed": true
+    },
+    {
+      "scenario": "planilla aprobada por otro actor y devengo contable único al reintentar",
+      "passed": true
+    },
+    {
+      "scenario": "pago de planilla, cargo bancario y asiento únicos al reintentar",
+      "passed": true
+    },
+    {
+      "scenario": "cotización de compra creada, consultada y reintentada sin duplicar",
+      "passed": true
+    },
+    {
+      "scenario": "conciliación creada y consultada con reintento idempotente",
+      "passed": true
+    },
+    {
+      "scenario": "cotización de venta creada con líneas y aprobada por otro actor",
+      "passed": true
+    },
+    {
+      "scenario": "conversión conserva total y producto; una segunda solicitud no duplica pedido",
+      "passed": true
+    },
+    {
+      "scenario": "pedido preparado y despachado por logística sin duplicar cantidad al reintentar",
+      "passed": true
+    },
+    {
+      "scenario": "RMA de pedido despachado creada y consultada sin duplicar al reintentar",
+      "passed": true
+    },
+    {
+      "scenario": "RMA rechaza recepción anticipada y autoaprobación; otro actor aprueba sin duplicar",
+      "passed": true
+    },
+    {
+      "scenario": "recepción RMA restaura una sola unidad física al reintentar",
+      "passed": true
+    },
+    {
+      "scenario": "nota de crédito RMA cierra devolución y CxC sin duplicar documento ni CPE",
+      "passed": true
+    },
+    {
+      "scenario": "nota RMA contabilizada una vez sin duplicar retorno físico",
+      "passed": true
+    },
+    {
+      "scenario": "plazo comercial consulta el CPE canónico, genera tendencia y filtra por emisión",
+      "passed": true
+    },
+    {
+      "scenario": "reportes comerciales respetan cliente y muestran el código real del producto",
+      "passed": true
+    },
+    {
+      "scenario": "pedido despachado genera CPE/CxC; cobro parcial entra al banco, saldo en efectivo entra a caja, arqueo cierra y ambos crean asientos únicos al reintentar",
+      "passed": true,
+      "pedido_id": "545caf76-b881-4f57-aceb-7827f8b0c131",
+      "cxc_id": "14c56929-02eb-4eb1-adb1-83b06a18b35d"
+    },
+    {
+      "scenario": "RMA pagada: recepción parcial bloquea nota, reversa restaura stock y dos recepciones/replays completan una unidad",
+      "passed": true
+    },
+    {
+      "scenario": "RMA pagada: lector no reembolsa ni revierte; saldo ajeno oculta lectura/escritura y conserva crédito, banco y stock",
+      "passed": true
+    },
+    {
+      "scenario": "RMA pagada: nota genera saldo a favor completo; reembolso bancario parcial/reversa/replays conservan crédito y banco, exceso no muta",
+      "passed": true
+    },
+    {
+      "scenario": "RMA pagada: reembolso en caja y reversa/replays producen salida/entrada únicas, saldo esperado correcto y cierre",
+      "passed": true
+    },
+    {
+      "scenario": "RMA pagada: saldo se aplica parcialmente a CxC futura sin fabricar cobro; nota, reembolsos, reversas y aplicación generan asientos únicos/cuadrados",
+      "passed": true,
+      "rma_id": "6755398b-dc3a-47b0-8ff7-6df0d2b20f27",
+      "rma_number": "RMA-2026-00002",
+      "saldo_favor_id": "afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9",
+      "saldo_disponible": 16.6,
+      "banco_id": "20d0690e-b0b4-4933-8cc5-4e8e1a0784b5",
+      "cxc_futura_id": "a4739d1b-9c46-457d-a35e-8456ed30b6d1"
+    },
+    {
+      "scenario": "SIRE REGISTRO_VENTAS: instantánea local, hash, reintento, lista, aislamiento y envío demo bloqueado",
+      "passed": true,
+      "report_id": "4798b301-d9e0-4aa8-b907-5dd471b03b51"
+    },
+    {
+      "scenario": "SIRE REGISTRO_COMPRAS: instantánea local, hash, reintento, lista, aislamiento y envío demo bloqueado",
+      "passed": true,
+      "report_id": "f7b16248-0527-4a58-93e2-d973822de09f"
+    },
+    {
+      "scenario": "SIRE estadísticas y período inválido",
+      "passed": true
+    },
+    {
+      "scenario": "PLE: cinco libros exportados, Diario cuadrado, aislamiento y período inválido",
+      "passed": true
+    },
+    {
+      "scenario": "alta no demo y primer administrador por API, reintento sin duplicados y login del cliente",
+      "passed": true,
+      "client_email": "primer-cliente-d72bbfba-960f-40e5-8a88-a0e15c42a153@example.test"
+    },
+    {
+      "scenario": "PFX del cliente valida el RUC en edición; contraseña incorrecta y otro titular se rechazan sin escribir",
+      "passed": true
+    },
+    {
+      "scenario": "cliente completa configuración y recarga certificado y credenciales cifrados, sin filtrarlos ni duplicar el cierre",
+      "passed": true
+    },
+    {
+      "scenario": "clientes: previsualización, dry-run, importación parcial, bitácora, reintento y aislamiento",
+      "passed": true,
+      "run_id": "994c1d27-61cb-4181-9cd5-20415c87adb4"
+    },
+    {
+      "scenario": "clientes: edición validada y persistida, búsqueda por nombre nuevo y lectura/escritura ajenas rechazadas",
+      "passed": true,
+      "master_id": "de6c158b-b262-446f-87a3-2008758e7ca9"
+    },
+    {
+      "scenario": "proveedores: previsualización, dry-run, importación parcial, bitácora, reintento y aislamiento",
+      "passed": true,
+      "run_id": "ef63710b-1e93-4201-bf76-9c90f2a64881"
+    },
+    {
+      "scenario": "proveedores: edición validada y persistida, búsqueda por nombre nuevo y lectura/escritura ajenas rechazadas",
+      "passed": true,
+      "master_id": "f5d6bc1a-c029-4601-9fcb-c35c09307488"
+    },
+    {
+      "scenario": "cxc_abiertas: dry-run detecta referencia ajena, saldo parcial persiste, bitácora y reintento aislados",
+      "passed": true,
+      "run_id": "90469173-b209-429f-8897-63a74921ca9b",
+      "cuenta_id": "ad594032-3afd-4e78-9f78-25872acc9481"
+    },
+    {
+      "scenario": "cxp_abiertas: dry-run detecta referencia ajena, saldo parcial persiste, bitácora y reintento aislados",
+      "passed": true,
+      "run_id": "d97f73c1-4e8b-4623-970e-f4935c134610",
+      "cuenta_id": "375f306a-ef6e-43e2-a5f3-ed1db58074af"
+    },
+    {
+      "scenario": "primer cliente crea caja vinculada a su almacén y sucursal",
+      "passed": true,
+      "caja_id": "ed27907b-1a2e-4ac3-bd88-7220493af57b"
+    },
+    {
+      "scenario": "stock inicial acepta código del producto creado por UI/API, dry-run detecta ajeno y reintento no duplica",
+      "passed": true,
+      "run_id": "68d6331d-5fe6-4cc4-98c8-78461b3dfd66"
+    },
+    {
+      "scenario": "balance de apertura valida cuadre, persiste asiento cuadrado y reintenta sin duplicar",
+      "passed": true,
+      "run_id": "2eb3d1f5-ec43-42ff-bf88-73d5c2c057c4"
+    },
+    {
+      "scenario": "CPE histórico local valida cliente, persiste sólo lectura sin SUNAT/outbox y reintenta aislado",
+      "passed": true,
+      "run_id": "8764e60e-85ad-469a-a171-522d336aedf1"
+    },
+    {
+      "scenario": "importación rechaza base64 inválido antes de crear registros",
+      "passed": true
+    },
+    {
+      "scenario": "primer ADMIN crea, reintenta, edita y busca usuario/rol de lectura; login real e identidades ajenas ocultas",
+      "passed": true,
+      "reader_email": "lector-maestros-db423721@example.test",
+      "user_id": "b905661d-c6cf-404b-9e3f-11ea60486472",
+      "role_id": "a0b29143-70ad-4b8c-8b4c-a052bde001f0"
+    },
+    {
+      "scenario": "clientes: rol de lectura consulta pero no crea/edita/desactiva; baja ajena devuelve 404 sin mutación",
+      "passed": true
+    },
+    {
+      "scenario": "clientes: alta individual repetida conserva ID; alta/edición con identidad duplicada rechazan sin cambiar maestro",
+      "passed": true
+    },
+    {
+      "scenario": "clientes: baja lógica con/sin deuda y reintento conservan trazabilidad, un solo registro de auditoría y saldo intacto",
+      "passed": true
+    },
+    {
+      "scenario": "proveedores: rol de lectura consulta pero no crea/edita/desactiva; baja ajena devuelve 404 sin mutación",
+      "passed": true
+    },
+    {
+      "scenario": "proveedores: alta individual repetida conserva ID; alta/edición con identidad duplicada rechazan sin cambiar maestro",
+      "passed": true
+    },
+    {
+      "scenario": "proveedores: baja lógica con/sin deuda y reintento conservan trazabilidad, un solo registro de auditoría y saldo intacto",
+      "passed": true
+    },
+    {
+      "scenario": "rol único de usuario activo no puede desactivarse; baja de usuario revoca sesión y permite baja lógica del rol",
+      "passed": true
+    },
+    {
+      "scenario": "inventario: altas repetidas conservan ID; producto editado y categoría renombrada persisten y filtran por tenant",
+      "passed": true,
+      "producto_id": "c3835cea-4116-4998-ad72-cfa69bc3f5e1",
+      "almacen_origen_id": "8888fa04-7acc-415d-8312-b63fbd18b8d7",
+      "almacen_destino_id": "ba603535-488c-4300-9580-3292abb10931"
+    },
+    {
+      "scenario": "inventario: ajuste decimal y transferencia real/replay conservan saldo, ledger y kardex; insuficiencia y clave reutilizada no mutan",
+      "passed": true
+    },
+    {
+      "scenario": "inventario: bajas con saldo/dependencias rechazan; producto vacío se desactiva con replay y almacén/ubicación permiten baja y reactivación",
+      "passed": true
+    },
+    {
+      "scenario": "inventario: rol de lectura no ajusta/transfiere/edita/desactiva; referencias ajenas rechazan sin mutar existencias",
+      "passed": true
+    },
+    {
+      "scenario": "inventario: ajuste publica un evento y consume contabilidad real con un asiento cuadrado; reprocesar no duplica",
+      "passed": true
+    },
+    {
+      "scenario": "inventario: faltante físico y replay conservan stock; cuenta 68 contra 20 produce un único asiento cuadrado",
+      "passed": true
+    },
+    {
+      "scenario": "contabilidad primer cliente: asiento manual validado, replay sin duplicar, borrador editado, confirmado inmutable y reversado una vez",
+      "passed": true
+    },
+    {
+      "scenario": "contabilidad primer cliente: activo editado, cronograma con residuo, tres depreciaciones/replays y baja producen saldos y asientos cuadrados",
+      "passed": true,
+      "activo_id": "d2f963c6-4c24-4cf0-8af0-f2d886098226"
+    },
+    {
+      "scenario": "contabilidad primer cliente: diferido con residuo se devenga en tres períodos sin duplicar; cancelación/replay y aislamiento conservan el ledger",
+      "passed": true,
+      "diferido_id": "0ed25ddb-52b3-4213-8584-642a4050f71b"
+    },
+    {
+      "scenario": "contabilidad primer cliente: borradores anulados/eliminados; cierre, bloqueo y reapertura por API, replays, permisos y tenant preservan períodos y libro",
+      "passed": true
+    },
+    {
+      "scenario": "Cierre anual con utilidad, replay y balance sin duplicar resultado",
+      "passed": true
+    },
+    {
+      "scenario": "Reapertura administrativa anual anula sólo el cierre y recierre crea secuencia nueva",
+      "passed": true
+    },
+    {
+      "scenario": "Pérdida anual, resultado nuevo independiente y rechazo de reapertura con período posterior cerrado",
+      "passed": true
+    },
+    {
+      "scenario": "Bancos: altas con cuenta contable, replay, edición y rechazo de saldo inventado",
+      "passed": true
+    },
+    {
+      "scenario": "Bancos: abono, cargo y transferencia inseparable; replay, colisión y saldo insuficiente",
+      "passed": true
+    },
+    {
+      "scenario": "CxP y tesorería: factura, dos pagos parciales, replay y exceso rechazado sin duplicar deuda ni banco",
+      "passed": true
+    },
+    {
+      "scenario": "Conciliación: CSV atómico, match automático/manual, ajuste explícito, cierre/replay, inmutabilidad y consultas ajenas",
+      "passed": true
+    },
+    {
+      "scenario": "Finanzas: reporte de diferencias, CSV con filtros, exportación ajena oculta y once mutaciones rechazadas para lector",
+      "passed": true
+    },
+    {
+      "scenario": "Contabilidad: un asiento confirmado y cuadrado por evento bancario/factura/pago",
+      "passed": true
+    },
+    {
+      "scenario": "CSV bancario: fecha fiscal, columnas correctas y fórmulas neutralizadas",
+      "passed": true
+    },
+    {
+      "scenario": "Empleado: replay retorna el mismo empleado sin duplicación",
+      "passed": true
+    },
+    {
+      "scenario": "Empleado: alta validada, documento duplicado rechazado y edición de puesto persistida",
+      "passed": true
+    },
+    {
+      "scenario": "Empleado: edición explícita sin hijos retira asignación familiar",
+      "passed": true
+    },
+    {
+      "scenario": "Empleado: documento duplicado en edición rechazado, replay y huella incompatible conservan datos y asignación",
+      "passed": true
+    },
+    {
+      "scenario": "RRHH: rol sin acceso no consulta ni crea/edita/desactiva empleados",
+      "passed": true
+    },
+    {
+      "scenario": "Contrato: remuneración/régimen inválidos rechazados, alta/replay, consulta y PDF reales",
+      "passed": true
+    },
+    {
+      "scenario": "Asistencia: entrada/salida en fecha fiscal, replay, orden horario y consulta persistida",
+      "passed": true
+    },
+    {
+      "scenario": "RRHH: edición de empleado y PDF de contrato ajenos ocultos sin mutación",
+      "passed": true
+    },
+    {
+      "scenario": "Contrato: renovación y finalización con replay conservan el historial",
+      "passed": true
+    },
+    {
+      "scenario": "Empleado: baja lógica conserva empleado e historial",
+      "passed": true
+    }
+  ],
+  "request_traces": [
+    {
+      "method": "POST",
+      "pathname": "/api/auth/login",
+      "status": 201,
+      "scenario_index_hint": 0
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/productos",
+      "status": 200,
+      "scenario_index_hint": 1
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/clientes",
+      "status": 200,
+      "scenario_index_hint": 2
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/metodos-pago",
+      "status": 200,
+      "scenario_index_hint": 3
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/sesion-caja",
+      "status": 200,
+      "scenario_index_hint": 4
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/cajas",
+      "status": 200,
+      "scenario_index_hint": 5
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/empresa-config",
+      "status": 200,
+      "scenario_index_hint": 6
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/cajas/saldo-esperado/f07ab017-7ea3-4022-8441-626d5635b2b6",
+      "status": 200,
+      "scenario_index_hint": 7
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/pos/caja/cerrar",
+      "status": 201,
+      "scenario_index_hint": 7
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/pos/caja/abrir",
+      "status": 201,
+      "scenario_index_hint": 8
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/sesion-caja",
+      "status": 200,
+      "scenario_index_hint": 8
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/pos/venta",
+      "status": 201,
+      "scenario_index_hint": 9
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/pos/venta",
+      "status": 201,
+      "scenario_index_hint": 10
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/productos",
+      "status": 200,
+      "scenario_index_hint": 10
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/cajas/saldo-esperado/d7c73160-81ec-4dc3-9bec-41075ae061cd",
+      "status": 200,
+      "scenario_index_hint": 10
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/detalles-venta/9c10ac2c-06c8-4bbf-bc4a-831ffe89623f",
+      "status": 200,
+      "scenario_index_hint": 10
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/login",
+      "status": 201,
+      "scenario_index_hint": 12
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/detalles-venta/9c10ac2c-06c8-4bbf-bc4a-831ffe89623f",
+      "status": 200,
+      "scenario_index_hint": 12
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/productos",
+      "status": 200,
+      "scenario_index_hint": 12
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/pos/caja/cerrar",
+      "status": 201,
+      "scenario_index_hint": 13
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/sesion-caja",
+      "status": 200,
+      "scenario_index_hint": 13
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/proveedores",
+      "status": 201,
+      "scenario_index_hint": 14
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/compras/proveedores/e1f0719a-aeba-4f72-9aee-ddbb4391949f",
+      "status": 200,
+      "scenario_index_hint": 14
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/productos",
+      "status": 200,
+      "scenario_index_hint": 15
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/ordenes",
+      "status": 201,
+      "scenario_index_hint": 15
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/ordenes",
+      "status": 201,
+      "scenario_index_hint": 15
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/compras/ordenes/d447b161-1b77-4c6d-a854-7eb37ffb13af",
+      "status": 200,
+      "scenario_index_hint": 15
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/ordenes/d447b161-1b77-4c6d-a854-7eb37ffb13af/aprobar",
+      "status": 400,
+      "scenario_index_hint": 16
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/login",
+      "status": 201,
+      "scenario_index_hint": 16
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/ordenes/d447b161-1b77-4c6d-a854-7eb37ffb13af/aprobar",
+      "status": 200,
+      "scenario_index_hint": 16
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/ordenes/d447b161-1b77-4c6d-a854-7eb37ffb13af/aprobar",
+      "status": 200,
+      "scenario_index_hint": 16
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/compras/ordenes/d447b161-1b77-4c6d-a854-7eb37ffb13af/aprobaciones",
+      "status": 200,
+      "scenario_index_hint": 16
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/recepciones/ordenes/d447b161-1b77-4c6d-a854-7eb37ffb13af",
+      "status": 201,
+      "scenario_index_hint": 17
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/recepciones/ordenes/d447b161-1b77-4c6d-a854-7eb37ffb13af",
+      "status": 201,
+      "scenario_index_hint": 17
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/recepciones/dd39d03c-4ad5-4bc1-91f9-411191bb9450/cerrar",
+      "status": 200,
+      "scenario_index_hint": 17
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/recepciones/dd39d03c-4ad5-4bc1-91f9-411191bb9450/cerrar",
+      "status": 200,
+      "scenario_index_hint": 17
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/compras/ordenes/d447b161-1b77-4c6d-a854-7eb37ffb13af",
+      "status": 200,
+      "scenario_index_hint": 17
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/productos",
+      "status": 200,
+      "scenario_index_hint": 17
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/compras/ordenes/d447b161-1b77-4c6d-a854-7eb37ffb13af/recepciones",
+      "status": 200,
+      "scenario_index_hint": 17
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/cxp",
+      "status": 201,
+      "scenario_index_hint": 18
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxp/740adfd0-1df3-434b-9d34-4bebab82e26a",
+      "status": 200,
+      "scenario_index_hint": 18
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/cxp",
+      "status": 201,
+      "scenario_index_hint": 19
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/cxp",
+      "status": 409,
+      "scenario_index_hint": 19
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas",
+      "status": 200,
+      "scenario_index_hint": 20
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/cxp/740adfd0-1df3-434b-9d34-4bebab82e26a/aplicar-pago",
+      "status": 201,
+      "scenario_index_hint": 20
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/cxp/740adfd0-1df3-434b-9d34-4bebab82e26a/aplicar-pago",
+      "status": 201,
+      "scenario_index_hint": 20
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas/20d0690e-b0b4-4933-8cc5-4e8e1a0784b5",
+      "status": 200,
+      "scenario_index_hint": 20
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/login",
+      "status": 201,
+      "scenario_index_hint": 21
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/compras/ordenes/d447b161-1b77-4c6d-a854-7eb37ffb13af",
+      "status": 404,
+      "scenario_index_hint": 21
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/compras/recepciones/dd39d03c-4ad5-4bc1-91f9-411191bb9450",
+      "status": 404,
+      "scenario_index_hint": 21
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxp/740adfd0-1df3-434b-9d34-4bebab82e26a",
+      "status": 404,
+      "scenario_index_hint": 21
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/cxp",
+      "status": 201,
+      "scenario_index_hint": 22
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxp/98fefa7c-7bf6-45c7-90a4-0b4aea766bf6",
+      "status": 200,
+      "scenario_index_hint": 22
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/cxp",
+      "status": 201,
+      "scenario_index_hint": 22
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/cxp",
+      "status": 409,
+      "scenario_index_hint": 22
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/productos",
+      "status": 200,
+      "scenario_index_hint": 23
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/devoluciones",
+      "status": 201,
+      "scenario_index_hint": 23
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/devoluciones",
+      "status": 201,
+      "scenario_index_hint": 23
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/devoluciones/6153e116-b008-40a6-8667-fcd63bd18b3e/emitir",
+      "status": 400,
+      "scenario_index_hint": 23
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/productos",
+      "status": 200,
+      "scenario_index_hint": 23
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxp/740adfd0-1df3-434b-9d34-4bebab82e26a",
+      "status": 200,
+      "scenario_index_hint": 23
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/compras/devoluciones/6153e116-b008-40a6-8667-fcd63bd18b3e",
+      "status": 200,
+      "scenario_index_hint": 23
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/devoluciones/6153e116-b008-40a6-8667-fcd63bd18b3e/anular",
+      "status": 200,
+      "scenario_index_hint": 23
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/devoluciones/6153e116-b008-40a6-8667-fcd63bd18b3e/anular",
+      "status": 200,
+      "scenario_index_hint": 23
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/productos",
+      "status": 200,
+      "scenario_index_hint": 23
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/categorias",
+      "status": 201,
+      "scenario_index_hint": 24
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/categorias",
+      "status": 201,
+      "scenario_index_hint": 24
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/inventario/categorias",
+      "status": 200,
+      "scenario_index_hint": 24
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/productos",
+      "status": 201,
+      "scenario_index_hint": 24
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/inventario/productos/ec987210-7336-4fb5-baae-2dde8677d4eb",
+      "status": 200,
+      "scenario_index_hint": 24
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/productos",
+      "status": 201,
+      "scenario_index_hint": 24
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/productos",
+      "status": 200,
+      "scenario_index_hint": 25
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/ordenes",
+      "status": 201,
+      "scenario_index_hint": 25
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/compras/ordenes/6a997ec0-ff44-4415-8b5a-8f403a24e391",
+      "status": 200,
+      "scenario_index_hint": 25
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/ordenes/6a997ec0-ff44-4415-8b5a-8f403a24e391/aprobar",
+      "status": 200,
+      "scenario_index_hint": 25
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/recepciones/ordenes/6a997ec0-ff44-4415-8b5a-8f403a24e391",
+      "status": 201,
+      "scenario_index_hint": 25
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/recepciones/1295c04e-db48-4661-9aa6-1d76587c2fb8/cerrar",
+      "status": 200,
+      "scenario_index_hint": 25
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/recepciones/1295c04e-db48-4661-9aa6-1d76587c2fb8/cerrar",
+      "status": 200,
+      "scenario_index_hint": 25
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/compras/ordenes/6a997ec0-ff44-4415-8b5a-8f403a24e391",
+      "status": 200,
+      "scenario_index_hint": 25
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/productos",
+      "status": 200,
+      "scenario_index_hint": 25
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/recepciones/ordenes/6a997ec0-ff44-4415-8b5a-8f403a24e391",
+      "status": 201,
+      "scenario_index_hint": 25
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/recepciones/afead4da-ef72-42e1-aabe-49f89e37931f/cerrar",
+      "status": 200,
+      "scenario_index_hint": 25
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/recepciones/afead4da-ef72-42e1-aabe-49f89e37931f/cerrar",
+      "status": 200,
+      "scenario_index_hint": 25
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/compras/ordenes/6a997ec0-ff44-4415-8b5a-8f403a24e391",
+      "status": 200,
+      "scenario_index_hint": 25
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/productos",
+      "status": 200,
+      "scenario_index_hint": 25
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/recepciones/ordenes/6a997ec0-ff44-4415-8b5a-8f403a24e391",
+      "status": 400,
+      "scenario_index_hint": 25
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/recepciones/ordenes/6a997ec0-ff44-4415-8b5a-8f403a24e391",
+      "status": 201,
+      "scenario_index_hint": 25
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/recepciones/2002ed42-3d6f-42b3-a5ed-afa1b00481cc/cerrar",
+      "status": 200,
+      "scenario_index_hint": 25
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/recepciones/2002ed42-3d6f-42b3-a5ed-afa1b00481cc/cerrar",
+      "status": 200,
+      "scenario_index_hint": 25
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/compras/ordenes/6a997ec0-ff44-4415-8b5a-8f403a24e391",
+      "status": 200,
+      "scenario_index_hint": 25
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/productos",
+      "status": 200,
+      "scenario_index_hint": 25
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/devoluciones",
+      "status": 201,
+      "scenario_index_hint": 27
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/productos",
+      "status": 200,
+      "scenario_index_hint": 27
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/devoluciones/1d4260ee-7ff5-422a-ae4c-8429b0e1f592/emitir",
+      "status": 200,
+      "scenario_index_hint": 27
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/devoluciones/1d4260ee-7ff5-422a-ae4c-8429b0e1f592/emitir",
+      "status": 200,
+      "scenario_index_hint": 27
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/productos",
+      "status": 200,
+      "scenario_index_hint": 27
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/devoluciones",
+      "status": 400,
+      "scenario_index_hint": 27
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/cxp",
+      "status": 201,
+      "scenario_index_hint": 28
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/devoluciones",
+      "status": 201,
+      "scenario_index_hint": 28
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/devoluciones/bbe2af93-042b-47ba-a620-1356b2fa670a/emitir",
+      "status": 200,
+      "scenario_index_hint": 28
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/devoluciones/bbe2af93-042b-47ba-a620-1356b2fa670a/emitir",
+      "status": 200,
+      "scenario_index_hint": 28
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/productos",
+      "status": 200,
+      "scenario_index_hint": 28
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxp/056a9be8-cfde-4add-9f92-fc60d9a85b5b",
+      "status": 200,
+      "scenario_index_hint": 28
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/cxp",
+      "status": 201,
+      "scenario_index_hint": 29
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/cxp",
+      "status": 409,
+      "scenario_index_hint": 29
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxp/a96f4214-6e88-4beb-a482-c3570850bf93",
+      "status": 200,
+      "scenario_index_hint": 29
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/audit-logs",
+      "status": 403,
+      "scenario_index_hint": 30
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/login",
+      "status": 201,
+      "scenario_index_hint": 30
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/audit-logs/actors",
+      "status": 200,
+      "scenario_index_hint": 30
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/audit-logs",
+      "status": 200,
+      "scenario_index_hint": 31
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/audit-logs",
+      "status": 200,
+      "scenario_index_hint": 32
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/audit-logs/resource/recepciones/2002ed42-3d6f-42b3-a5ed-afa1b00481cc",
+      "status": 200,
+      "scenario_index_hint": 32
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/audit-logs",
+      "status": 200,
+      "scenario_index_hint": 33
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/audit-logs",
+      "status": 200,
+      "scenario_index_hint": 33
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/audit-logs",
+      "status": 400,
+      "scenario_index_hint": 33
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/audit-logs/integrations",
+      "status": 400,
+      "scenario_index_hint": 33
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/audit-logs/integrations",
+      "status": 400,
+      "scenario_index_hint": 33
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/audit-logs/integrations",
+      "status": 200,
+      "scenario_index_hint": 33
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/login",
+      "status": 201,
+      "scenario_index_hint": 34
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/audit-logs/actors",
+      "status": 200,
+      "scenario_index_hint": 34
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/audit-logs/resource/recepciones/2002ed42-3d6f-42b3-a5ed-afa1b00481cc",
+      "status": 200,
+      "scenario_index_hint": 34
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/audit-logs",
+      "status": 200,
+      "scenario_index_hint": 34
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/audit-logs",
+      "status": 401,
+      "scenario_index_hint": 34
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/login",
+      "status": 201,
+      "scenario_index_hint": 34
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/audit-logs",
+      "status": 403,
+      "scenario_index_hint": 34
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/audit-logs/resource/recepciones/2002ed42-3d6f-42b3-a5ed-afa1b00481cc",
+      "status": 403,
+      "scenario_index_hint": 34
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/audit-logs/integrations",
+      "status": 403,
+      "scenario_index_hint": 34
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/audit-logs/actors",
+      "status": 403,
+      "scenario_index_hint": 34
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/login",
+      "status": 201,
+      "scenario_index_hint": 35
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/demo/conversiones-pendientes",
+      "status": 200,
+      "scenario_index_hint": 35
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/switch-tenant",
+      "status": 400,
+      "scenario_index_hint": 35
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/switch-tenant",
+      "status": 201,
+      "scenario_index_hint": 35
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/auth/profile",
+      "status": 200,
+      "scenario_index_hint": 35
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/validate",
+      "status": 201,
+      "scenario_index_hint": 35
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/refresh",
+      "status": 201,
+      "scenario_index_hint": 35
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/auth/profile",
+      "status": 200,
+      "scenario_index_hint": 35
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/auth/profile",
+      "status": 401,
+      "scenario_index_hint": 36
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/demo/conversiones-pendientes",
+      "status": 403,
+      "scenario_index_hint": 36
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/rrhh/configuracion-laboral",
+      "status": 200,
+      "scenario_index_hint": 37
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/rrhh/empleados",
+      "status": 200,
+      "scenario_index_hint": 38
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/rrhh/departamentos",
+      "status": 200,
+      "scenario_index_hint": 39
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/rrhh/candidatos",
+      "status": 200,
+      "scenario_index_hint": 40
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/rrhh/vacantes",
+      "status": 200,
+      "scenario_index_hint": 41
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/rrhh/asistencias",
+      "status": 200,
+      "scenario_index_hint": 42
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/activos-fijos",
+      "status": 200,
+      "scenario_index_hint": 43
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/centros-costo",
+      "status": 200,
+      "scenario_index_hint": 44
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/registro-consignaciones",
+      "status": 200,
+      "scenario_index_hint": 45
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/consolidacion/grupos",
+      "status": 200,
+      "scenario_index_hint": 46
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/reportes-configurables",
+      "status": 200,
+      "scenario_index_hint": 47
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/diferidos",
+      "status": 200,
+      "scenario_index_hint": 48
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/plantillas-asientos",
+      "status": 200,
+      "scenario_index_hint": 49
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/presupuestos",
+      "status": 200,
+      "scenario_index_hint": 50
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/tipos-cambio",
+      "status": 200,
+      "scenario_index_hint": 51
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/eventos/estadisticas",
+      "status": 200,
+      "scenario_index_hint": 52
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/eventos/fallidos",
+      "status": 200,
+      "scenario_index_hint": 53
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/eventos/dead-letter",
+      "status": 200,
+      "scenario_index_hint": 54
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/cotizaciones",
+      "status": 200,
+      "scenario_index_hint": 55
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/documentos/lista",
+      "status": 200,
+      "scenario_index_hint": 56
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/cpe/baja/lotes",
+      "status": 200,
+      "scenario_index_hint": 57
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/cpe/baja/lotes",
+      "status": 200,
+      "scenario_index_hint": 58
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/conciliacion",
+      "status": 200,
+      "scenario_index_hint": 59
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxp/detracciones/tasas",
+      "status": 200,
+      "scenario_index_hint": 60
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/inventario/logistica/listo-despacho",
+      "status": 200,
+      "scenario_index_hint": 61
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/inventario/logistica/ordenes-pendientes",
+      "status": 200,
+      "scenario_index_hint": 62
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/inventario/recepciones",
+      "status": 200,
+      "scenario_index_hint": 63
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/pedidos",
+      "status": 200,
+      "scenario_index_hint": 64
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/pedidos/aprobaciones/pendientes",
+      "status": 200,
+      "scenario_index_hint": 65
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/comercial/catalogos",
+      "status": 200,
+      "scenario_index_hint": 66
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/rma",
+      "status": 200,
+      "scenario_index_hint": 67
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/rma/saldos-favor",
+      "status": 200,
+      "scenario_index_hint": 68
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/rma/candidatos",
+      "status": 200,
+      "scenario_index_hint": 69
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/planillas",
+      "status": 201,
+      "scenario_index_hint": 70
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/planillas/9e625ae5-a1c4-40f2-a838-9fc3a45b67d9/calcular",
+      "status": 400,
+      "scenario_index_hint": 70
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/planillas",
+      "status": 201,
+      "scenario_index_hint": 71
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/planillas/3ee740f3-c702-4cbb-90a1-550e82291b31/calcular",
+      "status": 201,
+      "scenario_index_hint": 71
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/planillas/3ee740f3-c702-4cbb-90a1-550e82291b31/aprobar",
+      "status": 403,
+      "scenario_index_hint": 72
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/planillas/3ee740f3-c702-4cbb-90a1-550e82291b31/aprobar",
+      "status": 201,
+      "scenario_index_hint": 72
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/planillas/3ee740f3-c702-4cbb-90a1-550e82291b31/aprobar",
+      "status": 201,
+      "scenario_index_hint": 72
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas",
+      "status": 200,
+      "scenario_index_hint": 73
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/planillas/3ee740f3-c702-4cbb-90a1-550e82291b31/pagar",
+      "status": 201,
+      "scenario_index_hint": 73
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/planillas/3ee740f3-c702-4cbb-90a1-550e82291b31/pagar",
+      "status": 201,
+      "scenario_index_hint": 73
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas/20d0690e-b0b4-4933-8cc5-4e8e1a0784b5",
+      "status": 200,
+      "scenario_index_hint": 73
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/productos",
+      "status": 200,
+      "scenario_index_hint": 74
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/compras/proveedores",
+      "status": 200,
+      "scenario_index_hint": 74
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/cotizaciones",
+      "status": 201,
+      "scenario_index_hint": 74
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/cotizaciones",
+      "status": 201,
+      "scenario_index_hint": 74
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/compras/cotizaciones/3d858761-d479-49ae-b2b6-411521db9494",
+      "status": 200,
+      "scenario_index_hint": 74
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas",
+      "status": 200,
+      "scenario_index_hint": 75
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/conciliacion",
+      "status": 201,
+      "scenario_index_hint": 75
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/conciliacion/2d41ddbb-2e50-4458-8bd3-f8c00cdafb1f",
+      "status": 200,
+      "scenario_index_hint": 75
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/conciliacion",
+      "status": 201,
+      "scenario_index_hint": 75
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/clientes",
+      "status": 200,
+      "scenario_index_hint": 76
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/cotizaciones",
+      "status": 201,
+      "scenario_index_hint": 76
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/cotizaciones/6a660fa0-d0b3-4334-ac59-bb343136f6f1",
+      "status": 200,
+      "scenario_index_hint": 76
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/cotizaciones/6a660fa0-d0b3-4334-ac59-bb343136f6f1/enviar",
+      "status": 201,
+      "scenario_index_hint": 76
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/cotizaciones/6a660fa0-d0b3-4334-ac59-bb343136f6f1/aprobar",
+      "status": 201,
+      "scenario_index_hint": 76
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/cotizaciones/6a660fa0-d0b3-4334-ac59-bb343136f6f1/convertir-pedido",
+      "status": 201,
+      "scenario_index_hint": 77
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/pedidos/092b2ecc-dd7d-4f5b-befd-39741ecfe508",
+      "status": 200,
+      "scenario_index_hint": 77
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/cotizaciones/6a660fa0-d0b3-4334-ac59-bb343136f6f1",
+      "status": 200,
+      "scenario_index_hint": 77
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/cotizaciones/6a660fa0-d0b3-4334-ac59-bb343136f6f1/convertir-pedido",
+      "status": 400,
+      "scenario_index_hint": 77
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/pedidos/092b2ecc-dd7d-4f5b-befd-39741ecfe508/confirmar",
+      "status": 201,
+      "scenario_index_hint": 78
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/logistica/092b2ecc-dd7d-4f5b-befd-39741ecfe508/preparar",
+      "status": 200,
+      "scenario_index_hint": 78
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/logistica/092b2ecc-dd7d-4f5b-befd-39741ecfe508/preparar",
+      "status": 200,
+      "scenario_index_hint": 78
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/inventario/logistica/ordenes-pendientes",
+      "status": 200,
+      "scenario_index_hint": 78
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/logistica/092b2ecc-dd7d-4f5b-befd-39741ecfe508/marcar-listo",
+      "status": 200,
+      "scenario_index_hint": 78
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/logistica/092b2ecc-dd7d-4f5b-befd-39741ecfe508/confirmar-despacho",
+      "status": 200,
+      "scenario_index_hint": 78
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/logistica/092b2ecc-dd7d-4f5b-befd-39741ecfe508/confirmar-despacho",
+      "status": 200,
+      "scenario_index_hint": 78
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/pedidos/092b2ecc-dd7d-4f5b-befd-39741ecfe508/generar-documento",
+      "status": 201,
+      "scenario_index_hint": 79
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma",
+      "status": 201,
+      "scenario_index_hint": 79
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma",
+      "status": 201,
+      "scenario_index_hint": 79
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/rma/0f427128-1b27-419f-88fa-6c49ce5e49c5",
+      "status": 200,
+      "scenario_index_hint": 79
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/0f427128-1b27-419f-88fa-6c49ce5e49c5/recepcionar",
+      "status": 400,
+      "scenario_index_hint": 80
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/0f427128-1b27-419f-88fa-6c49ce5e49c5/aprobar",
+      "status": 403,
+      "scenario_index_hint": 80
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/0f427128-1b27-419f-88fa-6c49ce5e49c5/aprobar",
+      "status": 201,
+      "scenario_index_hint": 80
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/0f427128-1b27-419f-88fa-6c49ce5e49c5/aprobar",
+      "status": 201,
+      "scenario_index_hint": 80
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/0f427128-1b27-419f-88fa-6c49ce5e49c5/recepcionar",
+      "status": 201,
+      "scenario_index_hint": 81
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/0f427128-1b27-419f-88fa-6c49ce5e49c5/recepcionar",
+      "status": 201,
+      "scenario_index_hint": 81
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/0f427128-1b27-419f-88fa-6c49ce5e49c5/nota-credito",
+      "status": 201,
+      "scenario_index_hint": 82
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/0f427128-1b27-419f-88fa-6c49ce5e49c5/nota-credito",
+      "status": 201,
+      "scenario_index_hint": 82
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/rma/0f427128-1b27-419f-88fa-6c49ce5e49c5",
+      "status": 200,
+      "scenario_index_hint": 82
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/reportes/lead-time",
+      "status": 200,
+      "scenario_index_hint": 84
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/reportes/lead-time",
+      "status": 200,
+      "scenario_index_hint": 84
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/reportes/lead-time",
+      "status": 400,
+      "scenario_index_hint": 84
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/reportes/lead-time",
+      "status": 400,
+      "scenario_index_hint": 84
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/reportes/productos-mas-vendidos",
+      "status": 200,
+      "scenario_index_hint": 85
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/reportes/ventas-por-cliente",
+      "status": 200,
+      "scenario_index_hint": 85
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/reportes/pedidos-por-estado",
+      "status": 200,
+      "scenario_index_hint": 85
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/reportes/top-clientes",
+      "status": 200,
+      "scenario_index_hint": 85
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/reportes/pedidos-por-estado",
+      "status": 200,
+      "scenario_index_hint": 85
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/reportes/productos-mas-vendidos",
+      "status": 200,
+      "scenario_index_hint": 85
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/cotizaciones",
+      "status": 201,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/cotizaciones/2ceb6b6e-d33b-4c2c-a80e-4536a5f10a47/enviar",
+      "status": 201,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/cotizaciones/2ceb6b6e-d33b-4c2c-a80e-4536a5f10a47/aprobar",
+      "status": 201,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/cotizaciones/2ceb6b6e-d33b-4c2c-a80e-4536a5f10a47/convertir-pedido",
+      "status": 201,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/pedidos/545caf76-b881-4f57-aceb-7827f8b0c131",
+      "status": 200,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/pedidos/545caf76-b881-4f57-aceb-7827f8b0c131/confirmar",
+      "status": 201,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/logistica/545caf76-b881-4f57-aceb-7827f8b0c131/preparar",
+      "status": 200,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/logistica/545caf76-b881-4f57-aceb-7827f8b0c131/marcar-listo",
+      "status": 200,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/logistica/545caf76-b881-4f57-aceb-7827f8b0c131/confirmar-despacho",
+      "status": 200,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/pedidos/545caf76-b881-4f57-aceb-7827f8b0c131/generar-documento",
+      "status": 201,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxc/14c56929-02eb-4eb1-adb1-83b06a18b35d",
+      "status": 200,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas",
+      "status": 200,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/cxc/14c56929-02eb-4eb1-adb1-83b06a18b35d/pagos",
+      "status": 201,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/cxc/14c56929-02eb-4eb1-adb1-83b06a18b35d/pagos",
+      "status": 201,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxc/14c56929-02eb-4eb1-adb1-83b06a18b35d",
+      "status": 200,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/cxc/14c56929-02eb-4eb1-adb1-83b06a18b35d/pagos",
+      "status": 400,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxc/14c56929-02eb-4eb1-adb1-83b06a18b35d",
+      "status": 200,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/cajas",
+      "status": 200,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/pos/caja/abrir",
+      "status": 201,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/cxc/14c56929-02eb-4eb1-adb1-83b06a18b35d/pagos",
+      "status": 201,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/cxc/14c56929-02eb-4eb1-adb1-83b06a18b35d/pagos",
+      "status": 201,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxc/14c56929-02eb-4eb1-adb1-83b06a18b35d",
+      "status": 200,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxc",
+      "status": 200,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxc",
+      "status": 200,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxc",
+      "status": 200,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxc",
+      "status": 401,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxc",
+      "status": 200,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas/20d0690e-b0b4-4933-8cc5-4e8e1a0784b5",
+      "status": 200,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/cajas/saldo-esperado/085f9cb8-7245-4255-93e9-6c23a5a744d9",
+      "status": 200,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/pos/caja/cerrar",
+      "status": 201,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/pos/sesion-caja",
+      "status": 200,
+      "scenario_index_hint": 86
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/cotizaciones",
+      "status": 201,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/cotizaciones/26ad721c-d6b7-4c8f-be6c-4edbe49774f0/enviar",
+      "status": 201,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/cotizaciones/26ad721c-d6b7-4c8f-be6c-4edbe49774f0/aprobar",
+      "status": 201,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/cotizaciones/26ad721c-d6b7-4c8f-be6c-4edbe49774f0/convertir-pedido",
+      "status": 201,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/pedidos/f2830a3f-d930-450f-becc-0889cb8f9567",
+      "status": 200,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/pedidos/f2830a3f-d930-450f-becc-0889cb8f9567/confirmar",
+      "status": 201,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/logistica/f2830a3f-d930-450f-becc-0889cb8f9567/preparar",
+      "status": 200,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/logistica/f2830a3f-d930-450f-becc-0889cb8f9567/marcar-listo",
+      "status": 200,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/logistica/f2830a3f-d930-450f-becc-0889cb8f9567/confirmar-despacho",
+      "status": 200,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/pedidos/f2830a3f-d930-450f-becc-0889cb8f9567/generar-documento",
+      "status": 201,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxc/254b4170-1c7f-4a16-bdb6-76ab62fdbd48",
+      "status": 200,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas",
+      "status": 200,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/cxc/254b4170-1c7f-4a16-bdb6-76ab62fdbd48/pagos",
+      "status": 201,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/cxc/254b4170-1c7f-4a16-bdb6-76ab62fdbd48/pagos",
+      "status": 201,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxc/254b4170-1c7f-4a16-bdb6-76ab62fdbd48",
+      "status": 200,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma",
+      "status": 201,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma",
+      "status": 201,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/6755398b-dc3a-47b0-8ff7-6df0d2b20f27/aprobar",
+      "status": 201,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/rma/6755398b-dc3a-47b0-8ff7-6df0d2b20f27",
+      "status": 200,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/6755398b-dc3a-47b0-8ff7-6df0d2b20f27/recepcionar",
+      "status": 201,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/6755398b-dc3a-47b0-8ff7-6df0d2b20f27/recepcionar",
+      "status": 201,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/rma/6755398b-dc3a-47b0-8ff7-6df0d2b20f27",
+      "status": 200,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/6755398b-dc3a-47b0-8ff7-6df0d2b20f27/nota-credito",
+      "status": 400,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/6755398b-dc3a-47b0-8ff7-6df0d2b20f27/revertir-recepcion",
+      "status": 201,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/6755398b-dc3a-47b0-8ff7-6df0d2b20f27/revertir-recepcion",
+      "status": 201,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/6755398b-dc3a-47b0-8ff7-6df0d2b20f27/recepcionar",
+      "status": 201,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/6755398b-dc3a-47b0-8ff7-6df0d2b20f27/recepcionar",
+      "status": 201,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/6755398b-dc3a-47b0-8ff7-6df0d2b20f27/recepcionar",
+      "status": 201,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/6755398b-dc3a-47b0-8ff7-6df0d2b20f27/recepcionar",
+      "status": 201,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/rma/6755398b-dc3a-47b0-8ff7-6df0d2b20f27",
+      "status": 200,
+      "scenario_index_hint": 87
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/6755398b-dc3a-47b0-8ff7-6df0d2b20f27/nota-credito",
+      "status": 201,
+      "scenario_index_hint": 88
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/6755398b-dc3a-47b0-8ff7-6df0d2b20f27/nota-credito",
+      "status": 201,
+      "scenario_index_hint": 88
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/rma/saldos-favor/afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9",
+      "status": 200,
+      "scenario_index_hint": 88
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/rma/saldos-favor/afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9",
+      "status": 404,
+      "scenario_index_hint": 88
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/6755398b-dc3a-47b0-8ff7-6df0d2b20f27/revertir-recepcion",
+      "status": 400,
+      "scenario_index_hint": 88
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas/20d0690e-b0b4-4933-8cc5-4e8e1a0784b5",
+      "status": 200,
+      "scenario_index_hint": 88
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/roles",
+      "status": 201,
+      "scenario_index_hint": 88
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/users",
+      "status": 201,
+      "scenario_index_hint": 88
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/login",
+      "status": 201,
+      "scenario_index_hint": 88
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/rma/saldos-favor/afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9",
+      "status": 200,
+      "scenario_index_hint": 88
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/saldos-favor/afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9/reembolsar",
+      "status": 403,
+      "scenario_index_hint": 88
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/6755398b-dc3a-47b0-8ff7-6df0d2b20f27/revertir-recepcion",
+      "status": 403,
+      "scenario_index_hint": 88
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/saldos-favor/afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9/reembolsar",
+      "status": 400,
+      "scenario_index_hint": 88
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/saldos-favor/ca42a781-9f05-46a5-82ce-a71b6afbc9d2/reembolsar",
+      "status": 400,
+      "scenario_index_hint": 88
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/rma/saldos-favor/afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9",
+      "status": 200,
+      "scenario_index_hint": 88
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas/20d0690e-b0b4-4933-8cc5-4e8e1a0784b5",
+      "status": 200,
+      "scenario_index_hint": 88
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/saldos-favor/afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9/reembolsar",
+      "status": 400,
+      "scenario_index_hint": 89
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas/20d0690e-b0b4-4933-8cc5-4e8e1a0784b5",
+      "status": 200,
+      "scenario_index_hint": 89
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/saldos-favor/afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9/reembolsar",
+      "status": 201,
+      "scenario_index_hint": 89
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/saldos-favor/afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9/reembolsar",
+      "status": 201,
+      "scenario_index_hint": 89
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas/20d0690e-b0b4-4933-8cc5-4e8e1a0784b5",
+      "status": 200,
+      "scenario_index_hint": 89
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/rma/saldos-favor/afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9",
+      "status": 200,
+      "scenario_index_hint": 89
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/saldos-favor/afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9/reembolsos/2bc7a63b-bcee-402a-bf5f-bc3ff7964e1e/revertir",
+      "status": 201,
+      "scenario_index_hint": 89
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/saldos-favor/afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9/reembolsos/2bc7a63b-bcee-402a-bf5f-bc3ff7964e1e/revertir",
+      "status": 201,
+      "scenario_index_hint": 89
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas/20d0690e-b0b4-4933-8cc5-4e8e1a0784b5",
+      "status": 200,
+      "scenario_index_hint": 89
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/rma/saldos-favor/afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9",
+      "status": 200,
+      "scenario_index_hint": 89
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/cajas",
+      "status": 200,
+      "scenario_index_hint": 90
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/pos/caja/abrir",
+      "status": 201,
+      "scenario_index_hint": 90
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/saldos-favor/afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9/reembolsar",
+      "status": 201,
+      "scenario_index_hint": 90
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/saldos-favor/afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9/reembolsar",
+      "status": 201,
+      "scenario_index_hint": 90
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/cajas/saldo-esperado/e37df2c6-ff73-48c3-9338-50df9a8b33c0",
+      "status": 200,
+      "scenario_index_hint": 90
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/saldos-favor/afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9/reembolsos/7d31b7f7-e482-4af8-af7f-2df5694c0a80/revertir",
+      "status": 201,
+      "scenario_index_hint": 90
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/saldos-favor/afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9/reembolsos/7d31b7f7-e482-4af8-af7f-2df5694c0a80/revertir",
+      "status": 201,
+      "scenario_index_hint": 90
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/cajas/saldo-esperado/e37df2c6-ff73-48c3-9338-50df9a8b33c0",
+      "status": 200,
+      "scenario_index_hint": 90
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/rma/saldos-favor/afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9",
+      "status": 200,
+      "scenario_index_hint": 90
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/pos/caja/cerrar",
+      "status": 201,
+      "scenario_index_hint": 90
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/cotizaciones",
+      "status": 201,
+      "scenario_index_hint": 91
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/cotizaciones/00e212b3-3dfb-4b80-bb41-e25ed0bcdbc0/enviar",
+      "status": 201,
+      "scenario_index_hint": 91
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/cotizaciones/00e212b3-3dfb-4b80-bb41-e25ed0bcdbc0/aprobar",
+      "status": 201,
+      "scenario_index_hint": 91
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/cotizaciones/00e212b3-3dfb-4b80-bb41-e25ed0bcdbc0/convertir-pedido",
+      "status": 201,
+      "scenario_index_hint": 91
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/pedidos/1456f663-3d9c-4725-a794-78617dbc565a",
+      "status": 200,
+      "scenario_index_hint": 91
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/pedidos/1456f663-3d9c-4725-a794-78617dbc565a/confirmar",
+      "status": 201,
+      "scenario_index_hint": 91
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/logistica/1456f663-3d9c-4725-a794-78617dbc565a/preparar",
+      "status": 200,
+      "scenario_index_hint": 91
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/logistica/1456f663-3d9c-4725-a794-78617dbc565a/marcar-listo",
+      "status": 200,
+      "scenario_index_hint": 91
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/logistica/1456f663-3d9c-4725-a794-78617dbc565a/confirmar-despacho",
+      "status": 200,
+      "scenario_index_hint": 91
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/pedidos/1456f663-3d9c-4725-a794-78617dbc565a/generar-documento",
+      "status": 201,
+      "scenario_index_hint": 91
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxc/a4739d1b-9c46-457d-a35e-8456ed30b6d1",
+      "status": 200,
+      "scenario_index_hint": 91
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/saldos-favor/afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9/aplicar",
+      "status": 403,
+      "scenario_index_hint": 91
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxc/a4739d1b-9c46-457d-a35e-8456ed30b6d1",
+      "status": 200,
+      "scenario_index_hint": 91
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/saldos-favor/afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9/aplicar",
+      "status": 201,
+      "scenario_index_hint": 91
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/rma/saldos-favor/afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9/aplicar",
+      "status": 201,
+      "scenario_index_hint": 91
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxc/a4739d1b-9c46-457d-a35e-8456ed30b6d1",
+      "status": 200,
+      "scenario_index_hint": 91
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/rma/saldos-favor/afc8cc3c-4fd9-4c99-88e5-147ba66ae2c9",
+      "status": 200,
+      "scenario_index_hint": 91
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas/20d0690e-b0b4-4933-8cc5-4e8e1a0784b5",
+      "status": 200,
+      "scenario_index_hint": 91
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/sire/generar-reporte",
+      "status": 201,
+      "scenario_index_hint": 92
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/sire/generar-reporte",
+      "status": 201,
+      "scenario_index_hint": 92
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/sire/reportes/4798b301-d9e0-4aa8-b907-5dd471b03b51/download",
+      "status": 200,
+      "scenario_index_hint": 92
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/sire/reportes",
+      "status": 200,
+      "scenario_index_hint": 92
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/sire/reportes/4798b301-d9e0-4aa8-b907-5dd471b03b51/download",
+      "status": 404,
+      "scenario_index_hint": 92
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/sire/reportes/4798b301-d9e0-4aa8-b907-5dd471b03b51/enviar-sunat",
+      "status": 400,
+      "scenario_index_hint": 92
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/sire/generar-reporte",
+      "status": 201,
+      "scenario_index_hint": 93
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/sire/generar-reporte",
+      "status": 201,
+      "scenario_index_hint": 93
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/sire/reportes/f7b16248-0527-4a58-93e2-d973822de09f/download",
+      "status": 200,
+      "scenario_index_hint": 93
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/sire/reportes",
+      "status": 200,
+      "scenario_index_hint": 93
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/sire/reportes/f7b16248-0527-4a58-93e2-d973822de09f/download",
+      "status": 404,
+      "scenario_index_hint": 93
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/sire/reportes/f7b16248-0527-4a58-93e2-d973822de09f/enviar-sunat",
+      "status": 400,
+      "scenario_index_hint": 93
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/sire/stats",
+      "status": 200,
+      "scenario_index_hint": 94
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/sire/generar-reporte",
+      "status": 400,
+      "scenario_index_hint": 94
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/ple/todos",
+      "status": 200,
+      "scenario_index_hint": 95
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/ple/registro-ventas",
+      "status": 200,
+      "scenario_index_hint": 95
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/ple/registro-compras",
+      "status": 200,
+      "scenario_index_hint": 95
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/ple/libro-diario",
+      "status": 200,
+      "scenario_index_hint": 95
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/ple/libro-mayor",
+      "status": 200,
+      "scenario_index_hint": 95
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/ple/balance-comprobacion",
+      "status": 200,
+      "scenario_index_hint": 95
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/ple/libro-diario",
+      "status": 200,
+      "scenario_index_hint": 95
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/ple/libro-diario",
+      "status": 200,
+      "scenario_index_hint": 95
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/login",
+      "status": 201,
+      "scenario_index_hint": 96
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/tenants",
+      "status": 201,
+      "scenario_index_hint": 96
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/tenants",
+      "status": 201,
+      "scenario_index_hint": 96
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/login",
+      "status": 201,
+      "scenario_index_hint": 96
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/tenants",
+      "status": 403,
+      "scenario_index_hint": 96
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/configuration/wizard/validate-certificate",
+      "status": 400,
+      "scenario_index_hint": 97
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/configuration/wizard/validate-certificate",
+      "status": 400,
+      "scenario_index_hint": 97
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/configuration/wizard/validate-certificate",
+      "status": 201,
+      "scenario_index_hint": 97
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/configuration/wizard/step",
+      "status": 201,
+      "scenario_index_hint": 98
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/configuration/wizard/progress",
+      "status": 200,
+      "scenario_index_hint": 98
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/configuration/complete",
+      "status": 201,
+      "scenario_index_hint": 98
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/configuration/complete",
+      "status": 201,
+      "scenario_index_hint": 98
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/configuration/empresa",
+      "status": 200,
+      "scenario_index_hint": 98
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/preview",
+      "status": 201,
+      "scenario_index_hint": 99
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/clientes/import",
+      "status": 201,
+      "scenario_index_hint": 99
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/clientes/import",
+      "status": 201,
+      "scenario_index_hint": 99
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/migration/runs/994c1d27-61cb-4181-9cd5-20415c87adb4",
+      "status": 200,
+      "scenario_index_hint": 99
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/migration/runs",
+      "status": 200,
+      "scenario_index_hint": 99
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/clientes/import",
+      "status": 201,
+      "scenario_index_hint": 99
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/clientes/de6c158b-b262-446f-87a3-2008758e7ca9",
+      "status": 200,
+      "scenario_index_hint": 99
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/ventas/clientes/de6c158b-b262-446f-87a3-2008758e7ca9",
+      "status": 400,
+      "scenario_index_hint": 99
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/ventas/clientes/de6c158b-b262-446f-87a3-2008758e7ca9",
+      "status": 200,
+      "scenario_index_hint": 99
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/clientes",
+      "status": 200,
+      "scenario_index_hint": 99
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/clientes/de6c158b-b262-446f-87a3-2008758e7ca9",
+      "status": 404,
+      "scenario_index_hint": 99
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/ventas/clientes/de6c158b-b262-446f-87a3-2008758e7ca9",
+      "status": 404,
+      "scenario_index_hint": 99
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/migration/runs/994c1d27-61cb-4181-9cd5-20415c87adb4",
+      "status": 404,
+      "scenario_index_hint": 99
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/preview",
+      "status": 201,
+      "scenario_index_hint": 101
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/proveedores/import",
+      "status": 201,
+      "scenario_index_hint": 101
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/proveedores/import",
+      "status": 201,
+      "scenario_index_hint": 101
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/migration/runs/ef63710b-1e93-4201-bf76-9c90f2a64881",
+      "status": 200,
+      "scenario_index_hint": 101
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/migration/runs",
+      "status": 200,
+      "scenario_index_hint": 101
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/proveedores/import",
+      "status": 201,
+      "scenario_index_hint": 101
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/compras/proveedores/f5d6bc1a-c029-4601-9fcb-c35c09307488",
+      "status": 200,
+      "scenario_index_hint": 101
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/compras/proveedores/f5d6bc1a-c029-4601-9fcb-c35c09307488",
+      "status": 400,
+      "scenario_index_hint": 101
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/compras/proveedores/f5d6bc1a-c029-4601-9fcb-c35c09307488",
+      "status": 200,
+      "scenario_index_hint": 101
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/compras/proveedores",
+      "status": 200,
+      "scenario_index_hint": 101
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/compras/proveedores/f5d6bc1a-c029-4601-9fcb-c35c09307488",
+      "status": 404,
+      "scenario_index_hint": 101
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/compras/proveedores/f5d6bc1a-c029-4601-9fcb-c35c09307488",
+      "status": 404,
+      "scenario_index_hint": 101
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/migration/runs/ef63710b-1e93-4201-bf76-9c90f2a64881",
+      "status": 404,
+      "scenario_index_hint": 101
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/cxc/import",
+      "status": 201,
+      "scenario_index_hint": 103
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/cxc/import",
+      "status": 201,
+      "scenario_index_hint": 103
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/migration/runs/90469173-b209-429f-8897-63a74921ca9b",
+      "status": 200,
+      "scenario_index_hint": 103
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/cxc/import",
+      "status": 201,
+      "scenario_index_hint": 103
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/cxc/import",
+      "status": 201,
+      "scenario_index_hint": 103
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/migration/runs/90469173-b209-429f-8897-63a74921ca9b",
+      "status": 404,
+      "scenario_index_hint": 103
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/cxp/import",
+      "status": 201,
+      "scenario_index_hint": 104
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/cxp/import",
+      "status": 201,
+      "scenario_index_hint": 104
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/migration/runs/d97f73c1-4e8b-4623-970e-f4935c134610",
+      "status": 200,
+      "scenario_index_hint": 104
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/cxp/import",
+      "status": 201,
+      "scenario_index_hint": 104
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/cxp/import",
+      "status": 201,
+      "scenario_index_hint": 104
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/migration/runs/d97f73c1-4e8b-4623-970e-f4935c134610",
+      "status": 404,
+      "scenario_index_hint": 104
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/sucursales",
+      "status": 201,
+      "scenario_index_hint": 105
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/almacenes",
+      "status": 201,
+      "scenario_index_hint": 105
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/cajas",
+      "status": 201,
+      "scenario_index_hint": 105
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/categorias",
+      "status": 201,
+      "scenario_index_hint": 106
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/productos",
+      "status": 201,
+      "scenario_index_hint": 106
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/stock-inicial/import",
+      "status": 201,
+      "scenario_index_hint": 106
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/stock-inicial/import",
+      "status": 201,
+      "scenario_index_hint": 106
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/stock-inicial/import",
+      "status": 201,
+      "scenario_index_hint": 106
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/migration/runs/68d6331d-5fe6-4cc4-98c8-78461b3dfd66",
+      "status": 404,
+      "scenario_index_hint": 106
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/balance-apertura/import",
+      "status": 201,
+      "scenario_index_hint": 107
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/balance-apertura/import",
+      "status": 201,
+      "scenario_index_hint": 107
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/balance-apertura/import",
+      "status": 201,
+      "scenario_index_hint": 107
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/balance-apertura/import",
+      "status": 201,
+      "scenario_index_hint": 107
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/migration/validar-apertura",
+      "status": 200,
+      "scenario_index_hint": 107
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/migration/runs/2eb3d1f5-ec43-42ff-bf88-73d5c2c057c4",
+      "status": 404,
+      "scenario_index_hint": 107
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/comprobantes/import",
+      "status": 201,
+      "scenario_index_hint": 108
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/comprobantes/import",
+      "status": 201,
+      "scenario_index_hint": 108
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/comprobantes/import",
+      "status": 201,
+      "scenario_index_hint": 108
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/migration/runs/8764e60e-85ad-469a-a171-522d336aedf1",
+      "status": 404,
+      "scenario_index_hint": 108
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/migration/preview",
+      "status": 400,
+      "scenario_index_hint": 109
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/roles",
+      "status": 201,
+      "scenario_index_hint": 110
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/roles",
+      "status": 201,
+      "scenario_index_hint": 110
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/roles/a0b29143-70ad-4b8c-8b4c-a052bde001f0",
+      "status": 200,
+      "scenario_index_hint": 110
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/roles/a0b29143-70ad-4b8c-8b4c-a052bde001f0",
+      "status": 200,
+      "scenario_index_hint": 110
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/roles/a0b29143-70ad-4b8c-8b4c-a052bde001f0",
+      "status": 404,
+      "scenario_index_hint": 110
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/users",
+      "status": 201,
+      "scenario_index_hint": 110
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/users",
+      "status": 201,
+      "scenario_index_hint": 110
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/users/b905661d-c6cf-404b-9e3f-11ea60486472",
+      "status": 200,
+      "scenario_index_hint": 110
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/users/b905661d-c6cf-404b-9e3f-11ea60486472",
+      "status": 200,
+      "scenario_index_hint": 110
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/users",
+      "status": 200,
+      "scenario_index_hint": 110
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/users",
+      "status": 200,
+      "scenario_index_hint": 110
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/users",
+      "status": 200,
+      "scenario_index_hint": 110
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/users/b905661d-c6cf-404b-9e3f-11ea60486472",
+      "status": 404,
+      "scenario_index_hint": 110
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/login",
+      "status": 201,
+      "scenario_index_hint": 110
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/roles",
+      "status": 403,
+      "scenario_index_hint": 110
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/clientes/de6c158b-b262-446f-87a3-2008758e7ca9",
+      "status": 200,
+      "scenario_index_hint": 111
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/ventas/clientes/de6c158b-b262-446f-87a3-2008758e7ca9",
+      "status": 403,
+      "scenario_index_hint": 111
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/ventas/clientes/de6c158b-b262-446f-87a3-2008758e7ca9",
+      "status": 403,
+      "scenario_index_hint": 111
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/clientes",
+      "status": 403,
+      "scenario_index_hint": 111
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/ventas/clientes/de6c158b-b262-446f-87a3-2008758e7ca9",
+      "status": 404,
+      "scenario_index_hint": 111
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/clientes",
+      "status": 201,
+      "scenario_index_hint": 112
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/clientes",
+      "status": 201,
+      "scenario_index_hint": 112
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/ventas/clientes",
+      "status": 409,
+      "scenario_index_hint": 112
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/ventas/clientes/48b9c260-a525-485e-92d3-236dc2056dfe",
+      "status": 409,
+      "scenario_index_hint": 112
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/ventas/clientes/48b9c260-a525-485e-92d3-236dc2056dfe",
+      "status": 204,
+      "scenario_index_hint": 113
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/ventas/clientes/48b9c260-a525-485e-92d3-236dc2056dfe",
+      "status": 204,
+      "scenario_index_hint": 113
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/clientes/48b9c260-a525-485e-92d3-236dc2056dfe",
+      "status": 200,
+      "scenario_index_hint": 113
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/ventas/clientes/de6c158b-b262-446f-87a3-2008758e7ca9",
+      "status": 204,
+      "scenario_index_hint": 113
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/ventas/clientes/de6c158b-b262-446f-87a3-2008758e7ca9",
+      "status": 204,
+      "scenario_index_hint": 113
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/ventas/clientes/de6c158b-b262-446f-87a3-2008758e7ca9",
+      "status": 200,
+      "scenario_index_hint": 113
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/compras/proveedores/f5d6bc1a-c029-4601-9fcb-c35c09307488",
+      "status": 200,
+      "scenario_index_hint": 114
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/compras/proveedores/f5d6bc1a-c029-4601-9fcb-c35c09307488",
+      "status": 403,
+      "scenario_index_hint": 114
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/compras/proveedores/f5d6bc1a-c029-4601-9fcb-c35c09307488",
+      "status": 403,
+      "scenario_index_hint": 114
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/proveedores",
+      "status": 403,
+      "scenario_index_hint": 114
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/compras/proveedores/f5d6bc1a-c029-4601-9fcb-c35c09307488",
+      "status": 404,
+      "scenario_index_hint": 114
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/proveedores",
+      "status": 201,
+      "scenario_index_hint": 115
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/proveedores",
+      "status": 201,
+      "scenario_index_hint": 115
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/proveedores",
+      "status": 409,
+      "scenario_index_hint": 115
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/compras/proveedores/e42aa79b-c3bb-487a-86ca-2f4c9e09e119",
+      "status": 409,
+      "scenario_index_hint": 115
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/compras/proveedores/e42aa79b-c3bb-487a-86ca-2f4c9e09e119",
+      "status": 200,
+      "scenario_index_hint": 116
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/compras/proveedores/e42aa79b-c3bb-487a-86ca-2f4c9e09e119",
+      "status": 200,
+      "scenario_index_hint": 116
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/compras/proveedores/e42aa79b-c3bb-487a-86ca-2f4c9e09e119",
+      "status": 200,
+      "scenario_index_hint": 116
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/compras/proveedores/f5d6bc1a-c029-4601-9fcb-c35c09307488",
+      "status": 200,
+      "scenario_index_hint": 116
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/compras/proveedores/f5d6bc1a-c029-4601-9fcb-c35c09307488",
+      "status": 200,
+      "scenario_index_hint": 116
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/compras/proveedores/f5d6bc1a-c029-4601-9fcb-c35c09307488",
+      "status": 200,
+      "scenario_index_hint": 116
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/compras/proveedores",
+      "status": 200,
+      "scenario_index_hint": 116
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/roles/a0b29143-70ad-4b8c-8b4c-a052bde001f0",
+      "status": 400,
+      "scenario_index_hint": 117
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/users/b905661d-c6cf-404b-9e3f-11ea60486472",
+      "status": 200,
+      "scenario_index_hint": 117
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/auth/profile",
+      "status": 401,
+      "scenario_index_hint": 117
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/roles/a0b29143-70ad-4b8c-8b4c-a052bde001f0",
+      "status": 200,
+      "scenario_index_hint": 117
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/roles/a0b29143-70ad-4b8c-8b4c-a052bde001f0",
+      "status": 404,
+      "scenario_index_hint": 117
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/categorias",
+      "status": 201,
+      "scenario_index_hint": 118
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/categorias",
+      "status": 201,
+      "scenario_index_hint": 118
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/almacenes",
+      "status": 201,
+      "scenario_index_hint": 118
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/almacenes",
+      "status": 201,
+      "scenario_index_hint": 118
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/almacenes",
+      "status": 201,
+      "scenario_index_hint": 118
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/almacenes",
+      "status": 201,
+      "scenario_index_hint": 118
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/productos",
+      "status": 201,
+      "scenario_index_hint": 118
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/productos",
+      "status": 201,
+      "scenario_index_hint": 118
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/productos",
+      "status": 400,
+      "scenario_index_hint": 118
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/inventario/productos/c3835cea-4116-4998-ad72-cfa69bc3f5e1",
+      "status": 400,
+      "scenario_index_hint": 118
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/inventario/productos/c3835cea-4116-4998-ad72-cfa69bc3f5e1",
+      "status": 200,
+      "scenario_index_hint": 118
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/inventario/productos/c3835cea-4116-4998-ad72-cfa69bc3f5e1",
+      "status": 200,
+      "scenario_index_hint": 118
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/inventario/categorias/cd772376-7cf6-4585-aefa-82d2f45012e3",
+      "status": 200,
+      "scenario_index_hint": 118
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/inventario/productos/c3835cea-4116-4998-ad72-cfa69bc3f5e1",
+      "status": 200,
+      "scenario_index_hint": 118
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/inventario/productos",
+      "status": 200,
+      "scenario_index_hint": 118
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/movimientos",
+      "status": 400,
+      "scenario_index_hint": 119
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/movimientos",
+      "status": 400,
+      "scenario_index_hint": 119
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/movimientos",
+      "status": 201,
+      "scenario_index_hint": 119
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/movimientos",
+      "status": 201,
+      "scenario_index_hint": 119
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/movimientos",
+      "status": 400,
+      "scenario_index_hint": 119
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/transferencias",
+      "status": 400,
+      "scenario_index_hint": 119
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/transferencias",
+      "status": 400,
+      "scenario_index_hint": 119
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/transferencias",
+      "status": 201,
+      "scenario_index_hint": 119
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/transferencias",
+      "status": 201,
+      "scenario_index_hint": 119
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/transferencias",
+      "status": 400,
+      "scenario_index_hint": 119
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/inventario/kardex",
+      "status": 200,
+      "scenario_index_hint": 119
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/inventario/kardex",
+      "status": 200,
+      "scenario_index_hint": 119
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/inventario/kardex",
+      "status": 200,
+      "scenario_index_hint": 119
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/inventario/productos/c3835cea-4116-4998-ad72-cfa69bc3f5e1",
+      "status": 400,
+      "scenario_index_hint": 120
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/inventario/categorias/cd772376-7cf6-4585-aefa-82d2f45012e3",
+      "status": 400,
+      "scenario_index_hint": 120
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/inventario/almacenes/8888fa04-7acc-415d-8312-b63fbd18b8d7",
+      "status": 400,
+      "scenario_index_hint": 120
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/inventario/almacenes/ba603535-488c-4300-9580-3292abb10931",
+      "status": 400,
+      "scenario_index_hint": 120
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/productos",
+      "status": 201,
+      "scenario_index_hint": 120
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/productos",
+      "status": 201,
+      "scenario_index_hint": 120
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/inventario/productos/061703f9-dc1e-4f26-926e-7a481786a66d",
+      "status": 200,
+      "scenario_index_hint": 120
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/inventario/productos/061703f9-dc1e-4f26-926e-7a481786a66d",
+      "status": 200,
+      "scenario_index_hint": 120
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/inventario/productos/061703f9-dc1e-4f26-926e-7a481786a66d",
+      "status": 200,
+      "scenario_index_hint": 120
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/inventario/productos",
+      "status": 200,
+      "scenario_index_hint": 120
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/almacenes",
+      "status": 201,
+      "scenario_index_hint": 120
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/almacenes",
+      "status": 201,
+      "scenario_index_hint": 120
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/almacenes/7ae6f454-8cf2-44e8-ad8b-f0065dfca39d/ubicaciones",
+      "status": 201,
+      "scenario_index_hint": 120
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/almacenes/7ae6f454-8cf2-44e8-ad8b-f0065dfca39d/ubicaciones",
+      "status": 201,
+      "scenario_index_hint": 120
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/inventario/almacenes/7ae6f454-8cf2-44e8-ad8b-f0065dfca39d",
+      "status": 400,
+      "scenario_index_hint": 120
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/inventario/almacenes/7ae6f454-8cf2-44e8-ad8b-f0065dfca39d/ubicaciones/54028dff-2fa6-40f4-b554-a6424d2b051a",
+      "status": 200,
+      "scenario_index_hint": 120
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/inventario/almacenes/7ae6f454-8cf2-44e8-ad8b-f0065dfca39d",
+      "status": 200,
+      "scenario_index_hint": 120
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/inventario/almacenes/7ae6f454-8cf2-44e8-ad8b-f0065dfca39d",
+      "status": 200,
+      "scenario_index_hint": 120
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/inventario/almacenes",
+      "status": 200,
+      "scenario_index_hint": 120
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/roles",
+      "status": 201,
+      "scenario_index_hint": 121
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/users",
+      "status": 201,
+      "scenario_index_hint": 121
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/login",
+      "status": 201,
+      "scenario_index_hint": 121
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/inventario/productos/c3835cea-4116-4998-ad72-cfa69bc3f5e1",
+      "status": 200,
+      "scenario_index_hint": 121
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/movimientos",
+      "status": 403,
+      "scenario_index_hint": 121
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/transferencias",
+      "status": 403,
+      "scenario_index_hint": 121
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/inventario/productos/c3835cea-4116-4998-ad72-cfa69bc3f5e1",
+      "status": 403,
+      "scenario_index_hint": 121
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/inventario/productos/c3835cea-4116-4998-ad72-cfa69bc3f5e1",
+      "status": 403,
+      "scenario_index_hint": 121
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/inventario/productos/c3835cea-4116-4998-ad72-cfa69bc3f5e1",
+      "status": 404,
+      "scenario_index_hint": 121
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/transferencias",
+      "status": 400,
+      "scenario_index_hint": 121
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/productos",
+      "status": 201,
+      "scenario_index_hint": 122
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/productos",
+      "status": 201,
+      "scenario_index_hint": 122
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/movimientos",
+      "status": 201,
+      "scenario_index_hint": 122
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/inventario/movimientos",
+      "status": 201,
+      "scenario_index_hint": 122
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/roles",
+      "status": 201,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/users",
+      "status": 201,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/login",
+      "status": 201,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/periodos",
+      "status": 200,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos",
+      "status": 201,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos",
+      "status": 201,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos",
+      "status": 201,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos",
+      "status": 201,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asiento-contable",
+      "status": 400,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asiento-contable",
+      "status": 400,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asiento-contable",
+      "status": 400,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asiento-contable",
+      "status": 403,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asiento-contable",
+      "status": 201,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asiento-contable",
+      "status": 201,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asiento-contable",
+      "status": 400,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/asientos/9a9ec202-bd69-4baa-8ff4-0ed63d74ab1b",
+      "status": 200,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/contabilidad/asientos/9a9ec202-bd69-4baa-8ff4-0ed63d74ab1b",
+      "status": 403,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asientos/9a9ec202-bd69-4baa-8ff4-0ed63d74ab1b/confirmar",
+      "status": 403,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asientos/9a9ec202-bd69-4baa-8ff4-0ed63d74ab1b/anular",
+      "status": 403,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asientos/9a9ec202-bd69-4baa-8ff4-0ed63d74ab1b/reversar",
+      "status": 403,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/contabilidad/asientos/9a9ec202-bd69-4baa-8ff4-0ed63d74ab1b",
+      "status": 403,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/contabilidad/asientos/9a9ec202-bd69-4baa-8ff4-0ed63d74ab1b",
+      "status": 200,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/asientos/9a9ec202-bd69-4baa-8ff4-0ed63d74ab1b",
+      "status": 200,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asientos/9a9ec202-bd69-4baa-8ff4-0ed63d74ab1b/confirmar",
+      "status": 201,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/contabilidad/asientos/9a9ec202-bd69-4baa-8ff4-0ed63d74ab1b",
+      "status": 400,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asientos/9a9ec202-bd69-4baa-8ff4-0ed63d74ab1b/anular",
+      "status": 400,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/contabilidad/asientos/9a9ec202-bd69-4baa-8ff4-0ed63d74ab1b",
+      "status": 400,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asientos/9a9ec202-bd69-4baa-8ff4-0ed63d74ab1b/reversar",
+      "status": 201,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asientos/9a9ec202-bd69-4baa-8ff4-0ed63d74ab1b/reversar",
+      "status": 400,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/asientos/9a9ec202-bd69-4baa-8ff4-0ed63d74ab1b",
+      "status": 404,
+      "scenario_index_hint": 124
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/activos-fijos",
+      "status": 201,
+      "scenario_index_hint": 125
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/activos-fijos",
+      "status": 201,
+      "scenario_index_hint": 125
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asiento-contable",
+      "status": 201,
+      "scenario_index_hint": 125
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/activos-fijos",
+      "status": 400,
+      "scenario_index_hint": 125
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/activos-fijos",
+      "status": 403,
+      "scenario_index_hint": 125
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/activos-fijos/d2f963c6-4c24-4cf0-8af0-f2d886098226",
+      "status": 200,
+      "scenario_index_hint": 125
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/contabilidad/activos-fijos/d2f963c6-4c24-4cf0-8af0-f2d886098226",
+      "status": 403,
+      "scenario_index_hint": 125
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/contabilidad/activos-fijos/d2f963c6-4c24-4cf0-8af0-f2d886098226",
+      "status": 200,
+      "scenario_index_hint": 125
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/activos-fijos/d2f963c6-4c24-4cf0-8af0-f2d886098226",
+      "status": 200,
+      "scenario_index_hint": 125
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/activos-fijos/d2f963c6-4c24-4cf0-8af0-f2d886098226/cronograma",
+      "status": 200,
+      "scenario_index_hint": 125
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/activos-fijos/depreciar",
+      "status": 201,
+      "scenario_index_hint": 125
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/activos-fijos/depreciar",
+      "status": 201,
+      "scenario_index_hint": 125
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/activos-fijos/depreciar",
+      "status": 201,
+      "scenario_index_hint": 125
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/activos-fijos/depreciar",
+      "status": 201,
+      "scenario_index_hint": 125
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/activos-fijos/depreciar",
+      "status": 201,
+      "scenario_index_hint": 125
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/activos-fijos/depreciar",
+      "status": 201,
+      "scenario_index_hint": 125
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/activos-fijos/d2f963c6-4c24-4cf0-8af0-f2d886098226",
+      "status": 200,
+      "scenario_index_hint": 125
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/activos-fijos/d2f963c6-4c24-4cf0-8af0-f2d886098226/baja",
+      "status": 201,
+      "scenario_index_hint": 125
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/activos-fijos/d2f963c6-4c24-4cf0-8af0-f2d886098226/baja",
+      "status": 400,
+      "scenario_index_hint": 125
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/activos-fijos/d2f963c6-4c24-4cf0-8af0-f2d886098226",
+      "status": 404,
+      "scenario_index_hint": 125
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/diferidos",
+      "status": 201,
+      "scenario_index_hint": 126
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/diferidos",
+      "status": 201,
+      "scenario_index_hint": 126
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asiento-contable",
+      "status": 201,
+      "scenario_index_hint": 126
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/diferidos",
+      "status": 400,
+      "scenario_index_hint": 126
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/diferidos",
+      "status": 400,
+      "scenario_index_hint": 126
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/diferidos",
+      "status": 403,
+      "scenario_index_hint": 126
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/diferidos/0ed25ddb-52b3-4213-8584-642a4050f71b",
+      "status": 200,
+      "scenario_index_hint": 126
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/contabilidad/diferidos/0ed25ddb-52b3-4213-8584-642a4050f71b",
+      "status": 403,
+      "scenario_index_hint": 126
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/diferidos/0ed25ddb-52b3-4213-8584-642a4050f71b",
+      "status": 200,
+      "scenario_index_hint": 126
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/diferidos/devengar",
+      "status": 201,
+      "scenario_index_hint": 126
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/diferidos/devengar",
+      "status": 400,
+      "scenario_index_hint": 126
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/diferidos/devengar",
+      "status": 201,
+      "scenario_index_hint": 126
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/diferidos/devengar",
+      "status": 400,
+      "scenario_index_hint": 126
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/diferidos/devengar",
+      "status": 201,
+      "scenario_index_hint": 126
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/diferidos/devengar",
+      "status": 201,
+      "scenario_index_hint": 126
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/diferidos/0ed25ddb-52b3-4213-8584-642a4050f71b",
+      "status": 200,
+      "scenario_index_hint": 126
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/diferidos",
+      "status": 201,
+      "scenario_index_hint": 126
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/contabilidad/diferidos/9b84e8d2-d3a1-4af5-994c-a71dba4c5302",
+      "status": 200,
+      "scenario_index_hint": 126
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/contabilidad/diferidos/9b84e8d2-d3a1-4af5-994c-a71dba4c5302",
+      "status": 200,
+      "scenario_index_hint": 126
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/diferidos/0ed25ddb-52b3-4213-8584-642a4050f71b",
+      "status": 404,
+      "scenario_index_hint": 126
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/periodos",
+      "status": 200,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/periodos/8ad95ea5-bacf-448b-bee8-49eb5afb54d1",
+      "status": 200,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/periodos/8ad95ea5-bacf-448b-bee8-49eb5afb54d1",
+      "status": 404,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/periodos/8ad95ea5-bacf-448b-bee8-49eb5afb54d1/validar-cierre",
+      "status": 404,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/8ad95ea5-bacf-448b-bee8-49eb5afb54d1/cerrar",
+      "status": 404,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/8ad95ea5-bacf-448b-bee8-49eb5afb54d1/bloquear",
+      "status": 404,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos",
+      "status": 400,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/8ad95ea5-bacf-448b-bee8-49eb5afb54d1/cerrar",
+      "status": 403,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/8ad95ea5-bacf-448b-bee8-49eb5afb54d1/bloquear",
+      "status": 403,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/8ad95ea5-bacf-448b-bee8-49eb5afb54d1/reabrir",
+      "status": 403,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asiento-contable",
+      "status": 201,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/8ad95ea5-bacf-448b-bee8-49eb5afb54d1/cerrar",
+      "status": 400,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/periodos/8ad95ea5-bacf-448b-bee8-49eb5afb54d1",
+      "status": 200,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asientos/ab9f21e7-5eec-473b-a8e2-e4ccc73e0788/anular",
+      "status": 201,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/asientos/ab9f21e7-5eec-473b-a8e2-e4ccc73e0788",
+      "status": 200,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asientos/ab9f21e7-5eec-473b-a8e2-e4ccc73e0788/confirmar",
+      "status": 400,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asiento-contable",
+      "status": 201,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/contabilidad/asientos/b069c6fb-7467-4a0f-848d-e1e8814b1660",
+      "status": 200,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/asientos/b069c6fb-7467-4a0f-848d-e1e8814b1660",
+      "status": 404,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/periodos/8ad95ea5-bacf-448b-bee8-49eb5afb54d1/validar-cierre",
+      "status": 200,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/8ad95ea5-bacf-448b-bee8-49eb5afb54d1/cerrar",
+      "status": 201,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/8ad95ea5-bacf-448b-bee8-49eb5afb54d1/cerrar",
+      "status": 201,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asiento-contable",
+      "status": 400,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/8ad95ea5-bacf-448b-bee8-49eb5afb54d1/reabrir",
+      "status": 403,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/periodos/8ad95ea5-bacf-448b-bee8-49eb5afb54d1",
+      "status": 200,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/switch-tenant",
+      "status": 201,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/53ae3867-82be-4e83-a4fa-388694ba4102/reabrir",
+      "status": 404,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/8ad95ea5-bacf-448b-bee8-49eb5afb54d1/reabrir",
+      "status": 201,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/8ad95ea5-bacf-448b-bee8-49eb5afb54d1/reabrir",
+      "status": 201,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/8ad95ea5-bacf-448b-bee8-49eb5afb54d1/cerrar",
+      "status": 201,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/8ad95ea5-bacf-448b-bee8-49eb5afb54d1/bloquear",
+      "status": 400,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/periodos",
+      "status": 200,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/df58cb37-ca2d-4dda-a99c-8c7c24ec9523/bloquear",
+      "status": 201,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/df58cb37-ca2d-4dda-a99c-8c7c24ec9523/bloquear",
+      "status": 201,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asiento-contable",
+      "status": 400,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/df58cb37-ca2d-4dda-a99c-8c7c24ec9523/reabrir",
+      "status": 201,
+      "scenario_index_hint": 127
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/login",
+      "status": 201,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/login",
+      "status": 201,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/switch-tenant",
+      "status": 201,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos",
+      "status": 201,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/plan-cuentas",
+      "status": 200,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asiento-contable",
+      "status": 201,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asiento-contable",
+      "status": 201,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/estados/balance-general",
+      "status": 200,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/:id/cerrar",
+      "status": 201,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/:id/cerrar",
+      "status": 201,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/estados/balance-general",
+      "status": 200,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/estados/estado-resultados",
+      "status": 200,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/:id/reabrir",
+      "status": 403,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/:id/reabrir",
+      "status": 201,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/:id/reabrir",
+      "status": 201,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/estados/balance-general",
+      "status": 200,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/:id/cerrar",
+      "status": 201,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/:id/reabrir",
+      "status": 201,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asiento-contable",
+      "status": 201,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/:id/cerrar",
+      "status": 201,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/estados/balance-general",
+      "status": 200,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos",
+      "status": 201,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/asiento-contable",
+      "status": 201,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/estados/balance-general",
+      "status": 200,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/estados/estado-resultados",
+      "status": 200,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/:id/cerrar",
+      "status": 201,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/contabilidad/periodos/:id/reabrir",
+      "status": 400,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/periodos/:id",
+      "status": 200,
+      "scenario_index_hint": 128,
+      "evidence_file": "annual-acceptance.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/login",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/login",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/contabilidad/plan-cuentas",
+      "status": 200,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/bancos/cuentas",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/bancos/cuentas",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/bancos/cuentas",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/bancos/cuentas",
+      "status": 400,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/finanzas/bancos/cuentas/:id",
+      "status": 200,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas/:id",
+      "status": 200,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/bancos/movimientos",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/bancos/movimientos",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/bancos/movimientos",
+      "status": 400,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/bancos/movimientos",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/bancos/transferencias",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/bancos/transferencias",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas/:id",
+      "status": 200,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas/:id",
+      "status": 200,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/bancos/transferencias",
+      "status": 400,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/compras/proveedores",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/cxp",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/tesoreria/pagos",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/tesoreria/pagos",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxp/:id",
+      "status": 200,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/tesoreria/pagos",
+      "status": 400,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/tesoreria/pagos",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/tesoreria/pagos",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxp/:id",
+      "status": 200,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas/:id",
+      "status": 200,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/conciliacion",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/conciliacion/:id/importar-csv",
+      "status": 400,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/conciliacion/:id/importar-csv",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/conciliacion/:id/importar-csv",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/conciliacion/:id/match-automatico",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/conciliacion/:id/match-automatico",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/conciliacion/:id/cerrar",
+      "status": 400,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/bancos/movimientos",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/conciliacion/:id/marcar-item",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/conciliacion/:id/marcar-item",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/conciliacion/:id/cerrar",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/conciliacion/:id/cerrar",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas/:id",
+      "status": 200,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/bancos/movimientos",
+      "status": 400,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/conciliacion/:id/diferencias",
+      "status": 200,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas/:id/movimientos/exportar",
+      "status": 200,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas/:id/movimientos/exportar",
+      "status": 404,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/roles",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/users",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/login",
+      "status": 201,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas/:id",
+      "status": 200,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxp/:id",
+      "status": 200,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/conciliacion/:id",
+      "status": 200,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/bancos/cuentas",
+      "status": 403,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/finanzas/bancos/cuentas/:id",
+      "status": 403,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/bancos/movimientos",
+      "status": 403,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/bancos/transferencias",
+      "status": 403,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/cxp",
+      "status": 403,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/tesoreria/pagos",
+      "status": 403,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/conciliacion",
+      "status": 403,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/conciliacion/:id/importar-csv",
+      "status": 403,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/conciliacion/:id/match-automatico",
+      "status": 403,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/conciliacion/:id/marcar-item",
+      "status": 403,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/finanzas/conciliacion/:id/cerrar",
+      "status": 403,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/bancos/cuentas/:id",
+      "status": 404,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/cxp/:id",
+      "status": 404,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/finanzas/conciliacion/:id",
+      "status": 404,
+      "scenario_index_hint": 131,
+      "evidence_file": "finance-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/login",
+      "status": 201,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/login",
+      "status": 201,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/departamentos",
+      "status": 201,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/empleados",
+      "status": 400,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/empleados",
+      "status": 400,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/empleados",
+      "status": 201,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/empleados",
+      "status": 201,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/empleados",
+      "status": 409,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/rrhh/empleados/:id",
+      "status": 200,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/rrhh/empleados",
+      "status": 200,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/empleados",
+      "status": 201,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/rrhh/empleados/:id",
+      "status": 409,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/rrhh/empleados/:id",
+      "status": 200,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/rrhh/empleados/:id",
+      "status": 200,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/rrhh/empleados/:id",
+      "status": 409,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/roles",
+      "status": 201,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/users",
+      "status": 201,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/auth/login",
+      "status": 201,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/rrhh/empleados",
+      "status": 403,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/empleados",
+      "status": 403,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/rrhh/empleados/:id",
+      "status": 403,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/rrhh/empleados/:id",
+      "status": 403,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/contratos",
+      "status": 400,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/contratos",
+      "status": 400,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/contratos",
+      "status": 201,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/contratos",
+      "status": 201,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/rrhh/contratos",
+      "status": 200,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/rrhh/contratos/:id/generar",
+      "status": 200,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/asistencias/marcar",
+      "status": 201,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/asistencias/marcar",
+      "status": 201,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/asistencias/marcar",
+      "status": 400,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/asistencias/marcar",
+      "status": 201,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/rrhh/asistencias",
+      "status": 200,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/rrhh/empleados/:id",
+      "status": 404,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "GET",
+      "pathname": "/api/rrhh/contratos/:id/generar",
+      "status": 404,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/contratos/:id/renovar",
+      "status": 201,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "POST",
+      "pathname": "/api/rrhh/contratos/:id/renovar",
+      "status": 201,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/rrhh/contratos/:id/finalizar",
+      "status": 200,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "PUT",
+      "pathname": "/api/rrhh/contratos/:id/finalizar",
+      "status": 200,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/api/rrhh/empleados/:id",
+      "status": 200,
+      "scenario_index_hint": 138,
+      "evidence_file": "hr-lifecycle.json"
+    }
+  ]
+}
