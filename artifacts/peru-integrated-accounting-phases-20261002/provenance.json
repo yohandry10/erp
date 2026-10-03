@@ -1,0 +1,14 @@
+{
+  "local_source": "artifacts/peru-integrated-20261003020511191-22508",
+  "dumps_extracted": false,
+  "global_success": false,
+  "accepted_phases": [
+    "HTTP",
+    "recorridos funcionales de navegador",
+    "SQL",
+    "restore local"
+  ],
+  "failed_phase": "Barrido estático: Next dev reinició por umbral de memoria al abrir /dashboard/ventas/",
+  "record_survey_executed": false,
+  "additional_probe": "artifacts/peru-period-reopen-isolation-20261002.json"
+}

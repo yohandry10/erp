@@ -361,7 +361,7 @@ export class PeriodosService {
     usuarioId: string,
   ): Promise<PeriodoContable> {
     const { data, error } = await this.supabaseService.getClient().rpc(
-      'reabrir_periodo_contable_tx',
+      'reabrir_periodo_contable_admin_tx',
       {
         p_tenant_id: tenantId,
         p_anio: anio,

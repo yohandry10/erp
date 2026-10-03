@@ -1,6 +1,27 @@
 # Estado actual del ERP
 
-Actualizado: 2026-09-30.
+Actualizado: 2026-10-02.
+
+La ampliación contable local corrigió duplicación del asiento manual al
+reintentar, residuos finales de depreciación/devengo, respuestas 200/500 para
+períodos ajenos, una frontera de fecha Lima en la propuesta manual, reapertura
+del superadministrador tras cambiar de empresa y fecha inicial UTC del
+formulario. La propuesta 557 registra intención y asiento en una transacción,
+restaura la zona de sesión y añade una reapertura administrativa dedicada.
+El respaldo nuevo de 556 y su ensayo sin red pasaron restauración, rollback
+inyectado, preservación de datos/funciones/RLS/ACL y contratos SQL
+(`artifacts/peru-prod-backup-20261003015903259.json`,
+`artifacts/erp-peru-557-rehearsal-20261003020438386-17216.json`).
+La 557 aún no está promovida. Pasaron 128 escenarios HTTP y quince recorridos
+UI. La ejecución global falló en una de 99 pantallas estáticas: el log demuestra
+un reinicio de Next dev por umbral de memoria al abrir Ventas. Se conserva el
+fallo y las fases aprobadas por separado
+(`artifacts/peru-integrated-accounting-phases-20261002`); CI debe repetir todo
+con recuperación específica del reinicio y barrido de registros. El asiento UI recupera
+respuesta perdida, edita, confirma, descarga PDF y reversa; su fecha coincide
+con `app.hoy_tenant`. Activo y diferido procesan tres cuotas con residuo final y
+asientos únicos/cuadrados. Cierre/bloqueo/reapertura mensual, lector y tenant
+ajeno pasaron por API. No acreditan contabilidad completa ni habilitan lanzamiento.
 
 La ampliación local de RMA sobre factura pagada pasó 124 escenarios HTTP,
 catorce recorridos UI, 22 pantallas, contratos SQL y restauración
@@ -11,7 +32,13 @@ La UI recupera un fallo agotado del catálogo y una respuesta perdida tras el
 commit sin duplicar reembolso ni asiento. Se corrigió el error de catálogo
 sin captura y se bloquea confirmar mientras falten opciones verificadas.
 Los controles visibles de las 22 pantallas se conservan como inventario,
-sin convertir exposición en aceptación. CI y despliegue de este cambio pendientes.
+sin convertir exposición en aceptación. El PR #123 se integró como `d96aee30`:
+CI 36789420677, E2E 36789420661 y Security Scan 36789420709 de `main`
+pasaron. La evidencia del CI repitió 124 HTTP, catorce UI y 22 pantallas
+(`artifacts/peru-integrated-main-36789420677`). Render sirve el SHA exacto
+con DB/Redis listos y esquema 556; Vercel Production 6772147032, login 200 y
+CORS 204 pasaron con preflight y sólo lectura
+(`artifacts/peru-production-verification-after-123-20260930.json`).
 
 El PR #122 se integró como `5d98b214`. PROD avanzó transaccionalmente de 555
 a 556 tras CI completo, respaldo privado, restauración sin red, rollback

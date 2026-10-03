@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-09-30T22:47:14.930Z",
-  "commit": "5d98b2140b7dc7bc0251aaa082d9ca038db282ee",
+  "generated_at": "2026-10-03T02:31:22.041Z",
+  "commit": "d96aee30b771524bbad90ee95457574902ebac0a",
   "excluded": [
     "Analytics"
   ],
@@ -3390,7 +3390,7 @@
       "endpoint": "/api/contabilidad/asiento-contable",
       "summary": "Crear nuevo asiento contable manual",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts",
-      "line": 33,
+      "line": 35,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.crear\")"
@@ -3413,7 +3413,7 @@
       "endpoint": "/api/contabilidad/asientos-contables",
       "summary": "Obtener listado de asientos contables con filtros",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts",
-      "line": 76,
+      "line": 80,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.read\")"
@@ -3436,7 +3436,7 @@
       "endpoint": "/api/contabilidad/asientos-contables/:id",
       "summary": "Obtener un asiento contable específico por ID",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts",
-      "line": 128,
+      "line": 132,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.read\")"
@@ -3459,7 +3459,7 @@
       "endpoint": "/api/contabilidad/asientos",
       "summary": "Listar asientos contables con filtros opcionales",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts",
-      "line": 164,
+      "line": 168,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.read\")"
@@ -3482,7 +3482,7 @@
       "endpoint": "/api/contabilidad/asientos/estadisticas/por-tipo",
       "summary": "Obtener estadísticas de asientos generados por tipo de evento",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts",
-      "line": 228,
+      "line": 232,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.read\")"
@@ -3505,7 +3505,7 @@
       "endpoint": "/api/contabilidad/asientos/:id",
       "summary": "Obtener un asiento contable específico por ID con sus detalles",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts",
-      "line": 278,
+      "line": 282,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.read\")"
@@ -3528,7 +3528,7 @@
       "endpoint": "/api/contabilidad/asientos/:id",
       "summary": "Actualizar un asiento en BORRADOR",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts",
-      "line": 317,
+      "line": 321,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.actualizar\")"
@@ -3551,7 +3551,7 @@
       "endpoint": "/api/contabilidad/asientos/:id",
       "summary": "Eliminar un asiento en BORRADOR",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts",
-      "line": 351,
+      "line": 355,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.eliminar\")"
@@ -3574,7 +3574,7 @@
       "endpoint": "/api/contabilidad/asientos/:id/confirmar",
       "summary": "Confirmar un asiento en BORRADOR",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts",
-      "line": 372,
+      "line": 376,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.confirmar\")"
@@ -3597,7 +3597,7 @@
       "endpoint": "/api/contabilidad/asientos/:id/anular",
       "summary": "Anular un asiento en BORRADOR",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts",
-      "line": 403,
+      "line": 407,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.anular\")"
@@ -3620,7 +3620,7 @@
       "endpoint": "/api/contabilidad/asientos/:id/reversar",
       "summary": "Reversar un asiento CONFIRMADO",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts",
-      "line": 433,
+      "line": 437,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.reversar\")"
@@ -5068,7 +5068,7 @@
       "endpoint": "/api/contabilidad/periodos",
       "summary": "Crear nuevo período contable",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts",
-      "line": 33,
+      "line": 34,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.periodos.crear\")"
@@ -5091,7 +5091,7 @@
       "endpoint": "/api/contabilidad/periodos",
       "summary": "Obtener todos los períodos contables del tenant",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts",
-      "line": 75,
+      "line": 76,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.periodos.read\")"
@@ -5114,7 +5114,7 @@
       "endpoint": "/api/contabilidad/periodos/:id",
       "summary": "Obtener un período contable específico por ID",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts",
-      "line": 103,
+      "line": 104,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.periodos.read\")"
@@ -5137,7 +5137,7 @@
       "endpoint": "/api/contabilidad/periodos/:id/validar-cierre",
       "summary": "Validar si un período puede ser cerrado",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts",
-      "line": 150,
+      "line": 151,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.periodos.validar\")"
@@ -5160,7 +5160,7 @@
       "endpoint": "/api/contabilidad/periodos/:id/cerrar",
       "summary": "Cerrar un período contable",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts",
-      "line": 216,
+      "line": 220,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.periodos.cerrar\")"
@@ -5183,7 +5183,7 @@
       "endpoint": "/api/contabilidad/periodos/:periodo/provision-cobranza-dudosa",
       "summary": "Estimacion de cuentas de cobranza dudosa del periodo",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts",
-      "line": 276,
+      "line": 283,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.crear\")"
@@ -5206,7 +5206,7 @@
       "endpoint": "/api/contabilidad/periodos/:id/reabrir",
       "summary": "Reabrir un período contable cerrado (solo superadmin)",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts",
-      "line": 305,
+      "line": 312,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.periodos.reabrir\")",
@@ -5230,7 +5230,7 @@
       "endpoint": "/api/contabilidad/periodos/:id/bloquear",
       "summary": "Bloquear un período contable",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts",
-      "line": 372,
+      "line": 382,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.periodos.bloquear\")"
@@ -5253,7 +5253,7 @@
       "endpoint": "/api/contabilidad/cierre-contable",
       "summary": "Realizar cierre contable del período",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts",
-      "line": 431,
+      "line": 444,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.cierre.ejecutar\")"

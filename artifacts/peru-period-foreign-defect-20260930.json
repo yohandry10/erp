@@ -1,0 +1,51 @@
+{
+  "localOnly": true,
+  "remoteWrites": false,
+  "results": [
+    {
+      "operation": "detail",
+      "method": "GET",
+      "status": 200,
+      "body": {
+        "success": false,
+        "data": null
+      }
+    },
+    {
+      "operation": "/validar-cierre",
+      "method": "GET",
+      "status": 500,
+      "body": {
+        "statusCode": 500,
+        "message": "Período no encontrado",
+        "error": "Error",
+        "timestamp": "2026-09-30T23:26:36.759Z",
+        "path": "/api/contabilidad/periodos/330497ec-4a2c-4b0d-9ecd-b618f41ff41e/validar-cierre"
+      }
+    },
+    {
+      "operation": "/cerrar",
+      "method": "POST",
+      "status": 500,
+      "body": {
+        "statusCode": 500,
+        "message": "Período no encontrado",
+        "error": "Error",
+        "timestamp": "2026-09-30T23:26:36.810Z",
+        "path": "/api/contabilidad/periodos/330497ec-4a2c-4b0d-9ecd-b618f41ff41e/cerrar"
+      }
+    },
+    {
+      "operation": "/bloquear",
+      "method": "POST",
+      "status": 500,
+      "body": {
+        "statusCode": 500,
+        "message": "Período no encontrado",
+        "error": "Error",
+        "timestamp": "2026-09-30T23:26:36.860Z",
+        "path": "/api/contabilidad/periodos/330497ec-4a2c-4b0d-9ecd-b618f41ff41e/bloquear"
+      }
+    }
+  ]
+}

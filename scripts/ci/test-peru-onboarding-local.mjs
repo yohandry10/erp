@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { testMigrationImport } from './test-peru-integrated-import.mjs';
+import { testPeruAccountingLifecycle } from './test-peru-accounting-lifecycle.mjs';
 
 export async function testPeruOnboarding({ request, sql, uuid, results, setToken, primaryToken, processAccounting }) {
   assert.equal(process.env.E2E_EPHEMERAL_LOCAL_DB, '1');
@@ -63,6 +64,8 @@ export async function testPeruOnboarding({ request, sql, uuid, results, setToken
     assert.equal(sql(`SELECT count(*) FROM outbox_events WHERE tenant_id=${uuid(tenantId)} AND event_type='configuracion.wizard.completado';`), '1');
     results.push({ scenario: 'cliente completa configuración y recarga certificado y credenciales cifrados, sin filtrarlos ni duplicar el cierre', passed: true });
     await testMigrationImport({ request, sql, uuid, results, tenantId, otherTenantToken: primaryToken, processAccounting });
+    await testPeruAccountingLifecycle({ request, sql, uuid, results, tenantId,
+      otherTenantToken: primaryToken, platformAdminToken: admin.access_token, processAccounting });
   } finally {
     sql(`UPDATE usuarios_sistema SET is_super_admin=false WHERE id=${uuid(actor)};`);
     setToken(primaryToken);
