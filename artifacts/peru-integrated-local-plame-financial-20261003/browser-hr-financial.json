@@ -1,0 +1,9 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "Transferencia perdida y replay, reversa por actor distinto, banco y asientos; sin pago efectivo",
+  "same_retry_intent": true,
+  "original_balance_cents": 912500,
+  "final_balance_cents": 912500,
+  "scriptErrors": []
+}

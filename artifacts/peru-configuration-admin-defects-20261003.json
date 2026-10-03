@@ -1,0 +1,259 @@
+{
+  "success": false,
+  "local_only": true,
+  "remoteWrites": false,
+  "scope": "Configuración y sucursales, primer ADMIN no demo; API real sobre DB efímera, no aceptación fiscal externa",
+  "scenarios": [
+    {
+      "scenario": "Parámetros: escritura y replay conservan precisión 0; falsos persistidos, precisión 7 rechazada y tenant ajeno aislado",
+      "passed": true
+    },
+    {
+      "scenario": "Series: alta/consulta por tenant y replay conservan mismo identificador",
+      "passed": true
+    },
+    {
+      "scenario": "Sucursales: alta, edición/consulta, código anexo inmutable, matriz protegida y otro tenant rechazado",
+      "passed": true
+    },
+    {
+      "scenario": "Lector: listado/resumen restringidos y alta sin permiso 403",
+      "passed": true
+    },
+    {
+      "scenario": "Anexo: desactivación y reactivación directas persistidas; datos conservados",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/parametros-facturacion",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/parametros-facturacion",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "configuracion/parametros-facturacion",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/parametros-facturacion",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "configuracion/parametros-facturacion",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "configuracion/series",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales",
+      "status": 200
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "sucursales/:id",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales/:id",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/:id",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales/:id",
+      "status": 404
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/:id",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "roles",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "users",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/usuarios/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales/resumen",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 403
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales/:id",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/usuarios/:id",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales/usuarios/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/usuarios/:id",
+      "status": 200
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "sucursales/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales?incluir_inactivas=true",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales",
+      "status": 200
+    }
+  ],
+  "defects": [
+    {
+      "id": "billing-zero-precision-read",
+      "expected": 0,
+      "stored": 0,
+      "observed": 2
+    },
+    {
+      "id": "branch-create-retry-duplicate",
+      "same_intent": true,
+      "rows_created": 2,
+      "codes": [
+        "0003",
+        "0004"
+      ]
+    },
+    {
+      "id": "branch-assigned-reader-detail-bypass",
+      "list_count": 1,
+      "hidden_detail_status": 200,
+      "hidden_branch_code": "0002"
+    },
+    {
+      "id": "branch-assignment-failure-removes-scope",
+      "insert_rejected": true,
+      "previous_assignment_lost": true,
+      "visible_before": 1,
+      "visible_after": 5
+    },
+    {
+      "id": "branch-inactive-list-filter-ineffective",
+      "inactive_stored": true,
+      "include_inactive_requested": true,
+      "absent": true
+    }
+  ],
+  "checkedAt": "2026-10-03T06:56:39.236Z",
+  "source": "artifacts/peru-integrated-20261003065537797-23052",
+  "privateDumpsExported": false
+}

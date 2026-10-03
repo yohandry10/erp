@@ -876,7 +876,7 @@ si ese período carece de normativa aplicable.
   escrituras convergen en las mismas fronteras SQL: empresa, parámetros, GRE,
   wizard, series y preferencia de país exigen actor y llave idempotente, toman
   locks por tenant y dejan auditoría. Crear o editar una serie usa el mismo
-  contrato, sin recuperar el upsert directo anterior.
+  contrato, sin recuperar el upsert directo anterior. La lectura de parámetros respeta cero decimales y los booleanos false; el valor por defecto sólo sustituye campos ausentes.
 - Las mutaciones de autenticación/configuración, conversión demo y material
   fiscal sensible no son offline-capable. En Colombia, numeración, emisión,
   notas, firma, consulta y transmisión DIAN requieren backend en línea y se
@@ -958,7 +958,7 @@ si ese período carece de normativa aplicable.
 - Un usuario sin asignacion de sucursales las alcanza todas --es la oficina
   central--; asignarle una o varias lo restringe a esas. Dar de alta o asignar
   establecimientos es cosa de administracion; el resto de roles operativos solo
-  los lee.
+  los lee. El listado administrativo puede incluir anexos inactivos para reactivarlos, manteniendo el mismo alcance del usuario; la consulta por identificador no permite saltar su asignación. Alta, edición, desactivación y asignación se confirman con actor/permiso vigente, intención y auditoría dentro de una transacción. El reemplazo de asignación conserva la anterior si falla; una lista vacía válida restituye el alcance total. La UI conserva campos e intención tras una respuesta perdida y sólo cierra el editor después del éxito.
 - **La operacion no declara su establecimiento: lo hereda.** Una venta de POS lo
   toma de la caja de su sesion, una sesion de su caja, un movimiento de
   inventario de su almacen y un comprobante de su serie. El valor se guarda para
