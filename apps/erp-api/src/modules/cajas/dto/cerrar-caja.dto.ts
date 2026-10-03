@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Matches } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Matches, ValidateIf } from 'class-validator';
 
 export class CerrarCajaDto {
   /**
@@ -19,6 +19,7 @@ export class CerrarCajaDto {
   @Matches(/^[0-9]{6}$/, { message: 'El código de supervisor debe tener 6 dígitos' })
   codigo_supervisor?: string;
 
+  @ValidateIf((value: CerrarCajaDto) => value.monto_cierre !== undefined || value.monto_contado === undefined)
   @IsNumber()
   @IsNotEmpty()
   monto_cierre: number;

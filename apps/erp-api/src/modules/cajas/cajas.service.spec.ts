@@ -201,4 +201,52 @@ describe('CajasService', () => {
       p_idempotency_key: 'local-cash-movement-1',
     });
   });
+  describe('cierre administrativo', () => {
+    const build = (ledger: { data: any; error: any }) => {
+      const orders: string[] = [];
+      const sesionChain: any = {
+        select: jest.fn(() => sesionChain),
+        eq: jest.fn(() => sesionChain),
+        single: jest.fn(async () => ({
+          data: { id: 'sesion-1', tenant_id: 'tenant-1', estado: 'ABIERTA', monto_esperado: 100, monto_inicio: 100, cajas: { nombre: 'Caja' } },
+          error: null,
+        })),
+      };
+      const ledgerChain: any = {
+        select: jest.fn(() => ledgerChain),
+        eq: jest.fn(() => ledgerChain),
+        order: jest.fn((column: string) => { orders.push(column); return ledgerChain; }),
+        limit: jest.fn(() => ledgerChain),
+        maybeSingle: jest.fn(async () => ledger),
+      };
+      const rpc = jest.fn(async () => ({ data: { estado: 'CERRADA' }, error: null }));
+      const supabase: any = { getClient: () => ({ from: (table: string) => (table === 'sesiones_caja' ? sesionChain : ledgerChain), rpc }) };
+      const service = new CajasService(supabase, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any);
+      return { service, rpc, orders };
+    };
+
+    it('usa el saldo del ledger por secuencia y no la columna monto_esperado de apertura', async () => {
+      const { service, rpc, orders } = build({ data: { saldo_nuevo: 104.01 }, error: null });
+      await service.cerrarSesionAdministrativa('tenant-1', 'sesion-1', 'Fin de turno sin cajero presente', 'admin-1');
+      expect(orders).toEqual(['secuencia']);
+      expect(rpc).toHaveBeenCalledWith('cerrar_caja_tx', expect.objectContaining({
+        p_payload: expect.objectContaining({ monto_contado: 104.01, cierre_administrativo: true }),
+      }));
+    });
+
+    it('conserva un saldo real de cero', async () => {
+      const { service, rpc } = build({ data: { saldo_nuevo: 0 }, error: null });
+      await service.cerrarSesionAdministrativa('tenant-1', 'sesion-1', 'Fin de turno sin cajero presente', 'admin-1');
+      expect(rpc).toHaveBeenCalledWith('cerrar_caja_tx', expect.objectContaining({
+        p_payload: expect.objectContaining({ monto_contado: 0 }),
+      }));
+    });
+
+    it('no cierra con el fondo inicial cuando no puede leer el ledger', async () => {
+      const { service, rpc } = build({ data: null, error: { code: '42501', message: 'permission denied' } });
+      await expect(service.cerrarSesionAdministrativa('tenant-1', 'sesion-1', 'Fin de turno sin cajero presente', 'admin-1'))
+        .rejects.toMatchObject({ status: 503 });
+      expect(rpc).not.toHaveBeenCalled();
+    });
+  });
 });

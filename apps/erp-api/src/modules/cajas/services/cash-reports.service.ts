@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, ServiceUnavailableException, NotFoundException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CashMovementsService, TipoMovimiento } from './cash-movements.service';
 import { CashReconciliationService } from './cash-reconciliation.service';
@@ -113,7 +113,8 @@ export class CashReportsService {
             .eq('tenant_id', tenantId)
             .single();
 
-        if (sesionError || !sesion) {
+        if (sesionError && sesionError.code !== 'PGRST116' && sesionError.code !== '22P02') throw new ServiceUnavailableException('No se pudo consultar la sesión para el reporte; reintente');
+        if (!sesion) {
             throw new NotFoundException('Sesión no encontrada');
         }
 
@@ -121,20 +122,24 @@ export class CashReportsService {
         const movimientos = await this.movementsService.obtenerMovimientos(sesionId, tenantId);
 
         // Obtener retiros
-        const { data: retiros } = await this.supabase
+        const { data: retiros, error: retirosError } = await this.supabase
             .getClient()
             .from('retiros_caja')
             .select('*')
             .eq('sesion_caja_id', sesionId)
             .eq('tenant_id', tenantId);
 
+        if (retirosError) throw new ServiceUnavailableException('No se pudieron consultar los retiros para el reporte; reintente');
+
         // Obtener cambios de turno
-        const { data: cambiosTurno } = await this.supabase
+        const { data: cambiosTurno, error: cambiosError } = await this.supabase
             .getClient()
             .from('cambios_turno')
             .select('*')
             .eq('sesion_caja_id', sesionId)
             .eq('tenant_id', tenantId);
+
+        if (cambiosError) throw new ServiceUnavailableException('No se pudieron consultar los turnos para el reporte; reintente');
 
         // Calcular resumen fiscal
         const resumenFiscal = await this.calcularResumenFiscal(sesionId, tenantId);
@@ -175,7 +180,7 @@ export class CashReportsService {
 
         if (error) {
             this.logger.error(`Error obteniendo ventas para resumen fiscal: ${error.message}`);
-            throw new BadRequestException('Error calculando resumen fiscal');
+            throw new ServiceUnavailableException('Error calculando resumen fiscal; reintente');
         }
 
         const ventasArray = ventas || [];
@@ -235,7 +240,7 @@ export class CashReportsService {
 
         if (error) {
             this.logger.error(`Error obteniendo pagos por método: ${error.message}`);
-            throw new BadRequestException('Error calculando resumen por método de pago');
+            throw new ServiceUnavailableException('Error calculando resumen por método de pago; reintente');
         }
 
         const pagosArray = pagos || [];
@@ -569,15 +574,15 @@ export class CashReportsService {
                 // ========== ENCABEZADO ==========
                 doc.fontSize(20)
                     .fillColor(colorPrimario)
-                    .text('REPORTE DE CIERRE DE CAJA', { align: 'center' });
+                    .text('REPORTE DE CIERRE DE CAJA', { width: doc.page.width - 100, align: 'center' });
 
                 doc.moveDown(0.5);
                 doc.fontSize(10)
                     .fillColor(colorSecundario)
-                    .text(`Caja: ${datos.sesion.cajas?.nombre || 'N/A'} | Código: ${datos.sesion.cajas?.codigo || 'N/A'}`, { align: 'center' });
+                    .text(`Caja: ${datos.sesion.cajas?.nombre || 'N/A'} | Código: ${datos.sesion.cajas?.codigo || 'N/A'}`, { width: doc.page.width - 100, align: 'center' });
 
                 doc.moveDown(0.3);
-                doc.text(`Sesión ID: ${sesionId.substring(0, 8)}...`, { align: 'center' });
+                doc.text(`Sesión ID: ${sesionId.substring(0, 8)}...`, { width: doc.page.width - 100, align: 'center' });
 
                 // Línea separadora
                 doc.moveDown(0.5);
@@ -591,15 +596,18 @@ export class CashReportsService {
                 const infoY = doc.y;
                 doc.fontSize(10).fillColor(colorSecundario);
 
-                // Columna izquierda
-                doc.text(`Apertura: ${new Date(datos.sesion.hora_apertura).toLocaleString(fiscal.locale)}`, 50, infoY);
-                doc.text(`Cajero apertura: ${datos.sesion.abierto_por || 'N/A'}`, 50);
-                doc.text(`Monto inicial: ${fiscal.currency} ${datos.sesion.monto_inicio?.toFixed(2) || '0.00'}`, 50);
-
-                // Columna derecha
-                doc.text(`Cierre: ${datos.sesion.hora_cierre ? new Date(datos.sesion.hora_cierre).toLocaleString(fiscal.locale) : 'En curso'}`, 300, infoY);
-                doc.text(`Cajero cierre: ${datos.sesion.cerrado_por || 'N/A'}`, 300);
-                doc.text(`Dispositivo: ${datos.sesion.dispositivo || 'N/A'}`, 300);
+                // Ambas columnas tienen ancho fijo y comparten la altura final.
+                const columnWidth = (doc.page.width - 100 - 20) / 2;
+                doc.text(`Apertura: ${new Date(datos.sesion.hora_apertura).toLocaleString(fiscal.locale)}`, 50, infoY, { width: columnWidth });
+                doc.text(`Cajero apertura: ${datos.sesion.abierto_por || 'N/A'}`, 50, doc.y, { width: columnWidth });
+                doc.text(`Monto inicial: ${fiscal.currency} ${datos.sesion.monto_inicio?.toFixed(2) || '0.00'}`, 50, doc.y, { width: columnWidth });
+                const leftBottom = doc.y;
+                const rightX = 50 + columnWidth + 20;
+                doc.text(`Cierre: ${datos.sesion.hora_cierre ? new Date(datos.sesion.hora_cierre).toLocaleString(fiscal.locale) : 'En curso'}`, rightX, infoY, { width: columnWidth });
+                doc.text(`Cajero cierre: ${datos.sesion.cerrado_por || 'N/A'}`, rightX, doc.y, { width: columnWidth });
+                doc.text(`Dispositivo: ${datos.sesion.dispositivo || 'N/A'}`, rightX, doc.y, { width: columnWidth });
+                doc.y = Math.max(leftBottom, doc.y);
+                doc.x = 50;
 
                 // ========== MOVIMIENTOS DEL TURNO ==========
                 doc.moveDown(2);
@@ -616,7 +624,7 @@ export class CashReportsService {
                         colorAccento
                     );
                 } else {
-                    doc.fontSize(10).fillColor('#666').text('Sin movimientos registrados', { align: 'center' });
+                    doc.fontSize(10).fillColor('#666').text('Sin movimientos registrados', { width: doc.page.width - 100, align: 'center' });
                 }
 
                 // ========== VENTAS POR MÉTODO DE PAGO ==========
@@ -686,14 +694,13 @@ export class CashReportsService {
                 doc.moveDown(2);
                 doc.strokeColor('#ccc').lineWidth(1);
 
-                // Línea firma cajero
-                doc.moveTo(50, doc.y + 30).lineTo(200, doc.y + 30).stroke();
-                doc.fontSize(9).fillColor('#666')
-                    .text('Firma del Cajero', 50, doc.y + 35, { width: 150, align: 'center' });
-
-                // Línea firma supervisor
-                doc.moveTo(350, doc.y - 5).lineTo(500, doc.y - 5).stroke();
-                doc.text('Firma del Supervisor', 350, doc.y, { width: 150, align: 'center' });
+                if (doc.y + 90 > doc.page.height - 50) doc.addPage();
+                const signatureY = doc.y + 30;
+                doc.moveTo(50, signatureY).lineTo(200, signatureY).stroke();
+                doc.moveTo(350, signatureY).lineTo(500, signatureY).stroke();
+                doc.fontSize(9).fillColor('#666').text('Firma del Cajero', 50, signatureY+5, { width: 150, align: 'center' });
+                doc.text('Firma del Supervisor', 350, signatureY+5, { width: 150, align: 'center' });
+                doc.x = 50; doc.y = signatureY + 20;
 
                 // ========== PIE DE PÁGINA ==========
                 doc.moveDown(2);
@@ -705,15 +712,15 @@ export class CashReportsService {
 
                 // Hash de integridad
                 if (datos.sesion.hash_integridad) {
-                    doc.text(`Hash de integridad: ${datos.sesion.hash_integridad}`, { align: 'center' });
+                    doc.text(`Hash de integridad: ${datos.sesion.hash_integridad}`, { width: doc.page.width - 100, align: 'center' });
                 }
 
                 // QR de verificación (representado como texto por ahora)
                 const qrData = this.generarDatosQR(datos);
-                doc.text(`Código de verificación: ${qrData.substring(0, 32)}...`, { align: 'center' });
+                doc.text(`Código de verificación: ${qrData.substring(0, 32)}...`, { width: doc.page.width - 100, align: 'center' });
 
                 doc.moveDown(0.5);
-                doc.text(`Generado: ${new Date().toLocaleString('es-PE')} | ERP Suite v1.0`, { align: 'center' });
+                doc.text(`Generado: ${new Date().toLocaleString('es-PE')} | ERP Suite v1.0`, { width: doc.page.width - 100, align: 'center' });
 
                 doc.end();
             } catch (error) {
@@ -973,7 +980,7 @@ export class CashReportsService {
     private addSectionTitle(doc: PDFKit.PDFDocument, title: string, color: string): void {
         doc.fontSize(12)
             .fillColor(color)
-            .text(title, { underline: true });
+            .text(title, 50, doc.y, { width: doc.page.width - 100, underline: true });
         doc.moveDown(0.5);
     }
 
@@ -991,7 +998,10 @@ export class CashReportsService {
 
         push(['SECCION', 'CAMPO', 'VALOR']);
         push(['SESION', 'ID', datos.sesion.id]);
-        push(['SESION', 'CAJA', datos.sesion.cajas?.nombre || '']);
+        const cajaNombre = String(datos.sesion.cajas?.nombre || '');
+        // El nombre es texto libre; los importes conservan su formato numérico.
+        const cajaTexto = /^\s*[=+\-@]/.test(cajaNombre) || /^[\t\r\n]/.test(cajaNombre) ? "'" + cajaNombre : cajaNombre;
+        push(['SESION', 'CAJA', cajaTexto]);
         push(['SESION', 'APERTURA', datos.sesion.hora_apertura]);
         push(['SESION', 'CIERRE', datos.sesion.hora_cierre || 'EN CURSO']);
         push(['SESION', 'MONEDA', datos.sesion.moneda || 'PEN']);
@@ -1024,7 +1034,8 @@ export class CashReportsService {
             .eq('tenant_id', tenantId)
             .eq('id', corteId)
             .single();
-        if (error || !data) {
+        if (error && error.code !== 'PGRST116' && error.code !== '22P02') throw new ServiceUnavailableException('No se pudo consultar el corte de caja; reintente');
+        if (!data) {
             throw new NotFoundException('Corte no encontrado');
         }
         return data;
@@ -1040,28 +1051,29 @@ export class CashReportsService {
         headerColor: string,
     ): void {
         const startX = 50;
-        const colWidth = 160;
-        let y = doc.y;
-
-        // Headers
-        doc.fontSize(10).fillColor(headerColor);
-        headers.forEach((header, i) => {
-            doc.text(header, startX + (i * colWidth), y, { width: colWidth - 10 });
-        });
-
-        y = doc.y + 5;
-        doc.strokeColor('#ddd').lineWidth(0.5)
-            .moveTo(startX, y).lineTo(startX + (headers.length * colWidth), y).stroke();
-
-        // Rows
-        doc.fillColor('#333');
-        rows.forEach((row) => {
-            y = doc.y + 3;
-            row.forEach((cell, i) => {
-                doc.text(cell, startX + (i * colWidth), y, { width: colWidth - 10 });
-            });
-        });
-
+        const width = doc.page.width - 100;
+        const colWidth = width / headers.length;
+        doc.fontSize(10);
+        const heights = (cells: string[]) => cells.map(cell => doc.heightOfString(String(cell ?? ''), { width: colWidth - 10 }));
+        const drawHeader = () => {
+            const y = doc.y, height = Math.max(...heights(headers));
+            doc.fillColor(headerColor);
+            headers.forEach((header, i) => doc.text(header, startX+i*colWidth, y, { width: colWidth-10 }));
+            doc.y = y+height+5;
+            doc.strokeColor('#ddd').lineWidth(0.5).moveTo(startX,doc.y).lineTo(startX+width,doc.y).stroke();
+            doc.y += 4;
+        };
+        if (doc.y+45 > doc.page.height-50) doc.addPage();
+        drawHeader();
+        for (const row of rows) {
+            const height = Math.max(...heights(row));
+            if (doc.y+height+8 > doc.page.height-50) { doc.addPage(); drawHeader(); }
+            const y = doc.y;
+            doc.fillColor('#333');
+            row.forEach((cell,i) => doc.text(String(cell ?? ''),startX+i*colWidth,y,{width:colWidth-10}));
+            doc.y = y+height+5;
+        }
+        doc.x = startX;
         doc.moveDown(0.5);
     }
 

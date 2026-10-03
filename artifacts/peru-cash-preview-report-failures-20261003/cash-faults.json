@@ -1,0 +1,188 @@
+{
+  "success": false,
+  "scenarios": [
+    {
+      "scenario": "Caja: dos ingresos concurrentes de la misma intención producen un único movimiento/evento",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: writer manual sin EXECUTE devuelve 503 y recupera la intención tras restituir permiso",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: fallo interno después de INSERT revierte saldo/ledger/outbox y la intención se recupera una vez",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: precierre no declara validación exitosa cuando no puede leer ventas_pos",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: precierre no declara validación exitosa cuando no puede leer retiros_caja",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: precierre no declara validación exitosa cuando no puede leer cambios_turno",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: RPC de tolerancia indisponible bloquea el preview con 503 y conserva el arqueo",
+      "passed": false,
+      "message": "cajas/validar-cierre/4c41b550-7677-4868-99bd-40ce36376fd0: {\"statusCode\":400,\"message\":\"No se pudo resolver la configuración vigente de cierre de caja\",\"error\":\"Bad Request\",\"timestamp\":\"2026-10-03T20:35:29.981Z\",\"path\":\"/api/cajas/validar-cierre/4c41b550-7677-4868-99bd-40ce36376fd0\"}\n\n400 !== 503\n"
+    },
+    {
+      "scenario": "Caja: preview no sustituye el saldo por el fondo inicial cuando no puede leer movimientos",
+      "passed": false,
+      "message": "cajas/validar-cierre/4c41b550-7677-4868-99bd-40ce36376fd0: {\"valido\":true,\"saldo_teorico\":100,\"saldo_real\":100,\"diferencia\":0,\"tipo_diferencia\":\"CUADRADO\",\"requiere_supervisor\":false,\"requiere_justificacion\":false,\"redondeo_efectivo_legal\":false,\"redondeo_efectivo_documentado\":0,\"redondeo_efectivo_cantidad\":0,\"tolerancia\":0}\n\n201 !== 503\n"
+    },
+    {
+      "scenario": "Caja: reporte fiscal/pagos indisponible responde 503 para ventas_pos",
+      "passed": false,
+      "message": "cajas/3889c014-ecb5-420e-9ccf-05862d78bfd7/corte-z?sesionId=f0984ee7-4b78-46fe-9693-39b1f0ceaece: {\"statusCode\":400,\"message\":\"Error calculando resumen fiscal\",\"error\":\"Bad Request\",\"timestamp\":\"2026-10-03T20:35:30.648Z\",\"path\":\"/api/cajas/3889c014-ecb5-420e-9ccf-05862d78bfd7/corte-z?sesionId=f0984ee7-4b78-46fe-9693-39b1f0ceaece\"}\n\n400 !== 503\n"
+    },
+    {
+      "scenario": "Caja: reporte fiscal/pagos indisponible responde 503 para ventas_pos_pagos",
+      "passed": false,
+      "message": "cajas/3889c014-ecb5-420e-9ccf-05862d78bfd7/corte-z?sesionId=f0984ee7-4b78-46fe-9693-39b1f0ceaece: {\"statusCode\":400,\"message\":\"Error calculando resumen por método de pago\",\"error\":\"Bad Request\",\"timestamp\":\"2026-10-03T20:35:30.935Z\",\"path\":\"/api/cajas/3889c014-ecb5-420e-9ccf-05862d78bfd7/corte-z?sesionId=f0984ee7-4b78-46fe-9693-39b1f0ceaece\"}\n\n400 !== 503\n"
+    },
+    {
+      "scenario": "Caja: CSV conserva comillas/salto de línea y neutraliza fórmula del nombre de caja",
+      "passed": false,
+      "message": "La celda debe representar el nombre completo y desactivar la fórmula"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/:id/apertura",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/saldo-esperado/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/validar-precierre/:id",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/validar-precierre/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/validar-precierre/:id",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/validar-precierre/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/validar-precierre/:id",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/validar-precierre/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/validar-cierre/:id",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/validar-cierre/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/validar-cierre/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/validar-cierre/:id",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/:id/corte-z?sesionId=:id",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/:id/corte-z?sesionId=:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/:id/corte-z?sesionId=:id",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/:id/corte-z?sesionId=:id",
+      "status": 200
+    }
+  ],
+  "remoteWrites": false,
+  "complete_acceptance": false
+}

@@ -1,0 +1,23 @@
+{
+  "success": true,
+  "completedAt": "2026-10-03T21:06:05.917Z",
+  "remoteWrites": false,
+  "database": "PostgreSQL 16 local efímero",
+  "tables": 258,
+  "rows": 10464,
+  "archiveBytes": 8036228,
+  "archiveSha256": "0fc3eb401e1cb3b5cd711a8c4441fc255d55405929388fc7c41fad7633ca5291",
+  "elapsedMs": 9253,
+  "restoreMs": 7844,
+  "checks": [
+    "mismo snapshot para dump y huellas",
+    "contenido íntegro de todas las tablas",
+    "restore atómico sin errores",
+    "ACL y RLS conservados"
+  ],
+  "limits": [
+    "No acredita backup de PROD",
+    "No incluye archivos externos de Storage ni disponibilidad del proveedor",
+    "Duración local no equivale a RTO productivo"
+  ]
+}

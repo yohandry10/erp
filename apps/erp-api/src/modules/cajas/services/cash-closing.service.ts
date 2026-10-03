@@ -1,6 +1,7 @@
 import {
     Injectable,
     BadRequestException,
+    ServiceUnavailableException,
     ForbiddenException,
     NotFoundException,
     Logger,
@@ -135,7 +136,8 @@ export class CashClosingService {
             .eq('tenant_id', tenantId)
             .single();
 
-        if (sesionError || !sesion) {
+        if (sesionError && sesionError.code !== 'PGRST116' && sesionError.code !== '22P02') throw new ServiceUnavailableException('No se pudo consultar la sesión para precierre; reintente');
+        if (!sesion) {
             errores.push('Sesión de caja no encontrada');
             return { valido: false, errores, warnings };
         }
@@ -173,7 +175,8 @@ export class CashClosingService {
             .neq('estado', 'ANULADA')
             .limit(5);
 
-        if (!ventasError && ventasPendientes && ventasPendientes.length > 0) {
+        if (ventasError) throw new ServiceUnavailableException('No se pudieron consultar las ventas pendientes de caja; reintente');
+        if (ventasPendientes && ventasPendientes.length > 0) {
             // CRÍTICO: Bloquear cierre si hay ventas pendientes de facturación
             errores.push(
                 `Hay ${ventasPendientes.length} ventas pendientes de facturación electrónica. ` +
@@ -199,7 +202,8 @@ export class CashClosingService {
             .or('accounting_event_id.is.null,atomic_result.is.null,documento_id.is.null')
             .limit(10);
 
-        if (!ventasIncompletasError && ventasIncompletas && ventasIncompletas.length > 0) {
+        if (ventasIncompletasError) throw new ServiceUnavailableException('No se pudo verificar la integridad de ventas de caja; reintente');
+        if (ventasIncompletas && ventasIncompletas.length > 0) {
             errores.push(
                 `Hay ${ventasIncompletas.length} ventas POS incompletas (sin efecto contable, resultado atómico o documento). ` +
                 `Tickets: ${ventasIncompletas.slice(0, 5).map(v => v.numero_ticket).join(', ')}${ventasIncompletas.length > 5 ? '...' : ''}. ` +
@@ -214,7 +218,7 @@ export class CashClosingService {
         }
 
         // Validación 4: No hay cambios de turno sin completar
-        const { data: cambiosPendientes } = await this.supabase
+        const { data: cambiosPendientes, error: cambiosError } = await this.supabase
             .getClient()
             .from('cambios_turno')
             .select('id')
@@ -223,12 +227,13 @@ export class CashClosingService {
             .eq('estado', 'EN_PROCESO')
             .maybeSingle();
 
+        if (cambiosError) throw new ServiceUnavailableException('No se pudieron consultar los cambios de turno pendientes; reintente');
         if (cambiosPendientes) {
             errores.push('Hay un cambio de turno en proceso. Debe completarse o cancelarse antes del cierre.');
         }
 
         // Validación 5: No hay retiros pendientes de conciliación
-        const { data: retirosPendientes } = await this.supabase
+        const { data: retirosPendientes, error: retirosError } = await this.supabase
             .getClient()
             .from('retiros_caja')
             .select('id, monto')
@@ -236,6 +241,7 @@ export class CashClosingService {
             .eq('sesion_caja_id', sesionId)
             .eq('estado_conciliacion', 'PENDIENTE');
 
+        if (retirosError) throw new ServiceUnavailableException('No se pudieron consultar los retiros pendientes; reintente');
         if (retirosPendientes && retirosPendientes.length > 0) {
             const totalPendiente = retirosPendientes.reduce((sum, r) => sum + r.monto, 0);
             warnings.push(

@@ -1,0 +1,13 @@
+{
+  "scope": "Cash API/DB subset on restored local snapshot, with candidate corrections",
+  "complete_acceptance": false,
+  "remoteWrites": false,
+  "passed": 20,
+  "failed": 3,
+  "limits": [
+    "Does not prove fresh migration reconstruction",
+    "Does not prove browser operations or complete accounting consumption",
+    "Does not prove PROD availability or SUNAT acceptance",
+    "Private PDFs, dumps, logs, certificates and raw traces are excluded"
+  ]
+}

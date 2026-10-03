@@ -189,6 +189,24 @@ Apertura -> Venta -> Pago -> Ticket/CPE -> Movimiento de caja -> Cierre
 - El cambio de turno congela la sesión, exige confirmación de ambos usuarios y
   contabiliza sólo la diferencia entre saldo del sistema y conteo. Cancelarlo
   debe quedar confirmado por el servidor antes de descongelar la caja.
+- Una empresa que configura país PE recibe la cuenta operativa `10111` (566);
+  una cuenta existente, personalizada o inactiva no se reescribe, no hay
+  backfill y otros países no cambian. El backend lee `cambios_turno` y
+  `retiros_caja` sólo con SELECT de `service_role`.
+- No poder leer sesiones, movimientos, cortes, ventas, retiros, turnos, la
+  tolerancia o los pagos del reporte responde 503; nunca validación positiva,
+  saldo igual al fondo inicial, 400, 404 ni 500. Un identificador inexistente
+  sigue siendo 404. El writer manual distingue dominio (400), permiso (403) e
+  infraestructura (503 recuperable con la misma intención).
+- Los filtros `fecha_desde/fecha_hasta` exigen `YYYY-MM-DD` real, rechazan
+  rangos invertidos y cubren el día local completo del tenant. El cierre
+  admite el alias `monto_contado`; repetir un cierre administrativo ya
+  confirmado devuelve su resultado aunque la sesión esté cerrada. El cierre
+  administrativo cuenta el saldo del ledger por secuencia, como el preview; no
+  usa `monto_esperado` de apertura ni sustituye un error de lectura por el fondo.
+- El PDF de cierre conserva columnas dentro de A4 y pagina tablas; el CSV
+  neutraliza fórmulas en el nombre de caja. Sesiones y cortes limpian el error
+  al reintentar una lectura recuperada.
 
 Código principal: `apps/erp-api/src/modules/pos`,
 `apps/erp-api/src/modules/cajas`, `apps/web/app/dashboard/pos`.

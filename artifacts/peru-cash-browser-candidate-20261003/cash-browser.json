@@ -1,0 +1,24 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "scope": "Real cash browser/HTTP/PostgreSQL on restored local snapshot",
+  "checks": [
+    {
+      "operation": "Open from denomination form",
+      "passed": true
+    },
+    {
+      "operation": "Manual income with selected posting account",
+      "passed": true
+    },
+    {
+      "operation": "Count, preview and advanced close persist amount/cut",
+      "passed": true
+    },
+    {
+      "operation": "Reload durable closed state",
+      "passed": true
+    }
+  ]
+}

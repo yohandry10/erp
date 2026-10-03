@@ -1757,6 +1757,453 @@
         "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
       ],
       "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003"
+    },
+    {
+      "id": "cash-close-amount-alias-rejected",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/:id/cierre"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cash-close-failures-20261003",
+        "observed_error": "monto_contado es un alias documentado en el controlador, pero el DTO lo rechaza antes de normalizar.",
+        "local_only": true
+      },
+      "correction": "Validación condicional exige uno de los campos de monto.",
+      "pending": [
+        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-administrative-close-replay-not-found",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/sesiones/:sesionId/cierre-administrativo"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cash-close-failures-20261003",
+        "observed_error": "El primer cierre confirma; el mismo reintento devuelve 404 antes de llegar al writer idempotente.",
+        "local_only": true
+      },
+      "correction": "Consulta sin excluir sesiones cerradas y deja que SQL valide actor/huella/replay.",
+      "pending": [
+        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-first-client-account-missing",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/opciones-contables"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/movimientos/manual/:sesionId"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/retiros/:sesionId"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cash-local-20261003190124613-17344",
+        "observed_error": "Un primer cliente PE configurado con certificado propio no dispone de 10111.",
+        "local_only": true
+      },
+      "correction": "566 crea la referencia sólo al configurar PE; sin backfill.",
+      "pending": [
+        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-shift-history-read-privilege",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/sesiones/:sesionId/cambios-turno"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cash-local-20261003190536775-24348",
+        "observed_error": "El historial devuelve 400 por SELECT ausente aunque el cambio se confirmó.",
+        "local_only": true
+      },
+      "correction": "566 concede SELECT exclusivamente al backend.",
+      "pending": [
+        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-withdrawals-report-read-privilege",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/:id/corte-z"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/cortes/:corteId/pdf"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cash-expanded-failures-20261003",
+        "observed_error": "Un retiro durable desaparece del reporte (cero de uno).",
+        "local_only": true
+      },
+      "correction": "566 concede SELECT de retiros al backend; reporte falla explícitamente si no puede leer.",
+      "pending": [
+        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-invalid-date-500",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/sesiones"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/cortes"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cash-local-20261003191130521-900",
+        "observed_error": "2026-02-31 alcanza PostgreSQL y responde 500.",
+        "local_only": true
+      },
+      "correction": "Valida calendario y rango antes de consultar.",
+      "pending": [
+        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-day-filter-midnight",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/sesiones"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/cortes"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cash-read-failures-20261003",
+        "observed_error": "El día actual queda excluido por fecha_hasta a medianoche.",
+        "local_only": true
+      },
+      "correction": "Rango desde inicio local, hasta inicio del siguiente día exclusivo.",
+      "pending": [
+        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-session-read-unavailability-masked",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/sesiones"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/validar-precierre/:sesionId"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/:id/corte-z"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cash-expanded-failures-20261003",
+        "observed_error": "REVOKE SELECT produce 500, 200 y 404 respectivamente.",
+        "local_only": true
+      },
+      "correction": "503 en indisponibilidad; ausencia conserva semántica de validación o 404.",
+      "pending": [
+        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-movement-read-unavailability-400",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/movimientos/:sesionId"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/saldo-esperado/:sesionId"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cash-expanded-failures-20261003",
+        "observed_error": "REVOKE SELECT devuelve 400 en las dos consultas.",
+        "local_only": true
+      },
+      "correction": "503 explícito y recuperación con saldo inalterado.",
+      "pending": [
+        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-cut-read-unavailability-masked",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/cortes"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/cortes/:corteId"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/cortes/:corteId/pdf"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cash-expanded-failures-20261003",
+        "observed_error": "REVOKE SELECT produce 500 y falsos 404.",
+        "local_only": true
+      },
+      "correction": "503 para infraestructura; 404 sólo para inexistente/ajeno/ID no válido.",
+      "pending": [
+        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-cut-pdf-layout",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/cortes/:corteId/pdf"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cash-first-candidate-20261003",
+        "observed_error": "Identificadores superpuestos, títulos desplazados y tablas de cuatro columnas fuera de ancho A4.",
+        "local_only": true
+      },
+      "correction": "Columnas acotadas, títulos y pie con ancho completo, filas con altura y salto de página.",
+      "pending": [
+        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-manual-infrastructure-400",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/movimientos/manual/:sesionId"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cash-faults-baseline-20261003",
+        "observed_error": "EXECUTE revocado y fallo XX000 posterior al INSERT responden 400 pese a ser fallos recuperables.",
+        "local_only": true
+      },
+      "correction": "503 en infraestructura; rollback y misma intención recuperada una vez.",
+      "pending": [
+        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-preclose-read-validation-false-positive",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/validar-precierre/:sesionId"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cash-faults-baseline-20261003",
+        "observed_error": "Sin SELECT en ventas, retiros o cambios de turno, precierre responde válido=true.",
+        "local_only": true
+      },
+      "correction": "Toda lectura requerida falla con 503 y permite recuperación explícita.",
+      "pending": [
+        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-close-preview-infrastructure-400",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/validar-cierre/:sesionId"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cash-preview-report-failures-20261003",
+        "observed_error": "Sin EXECUTE de tolerancia, el preview responde 400.",
+        "local_only": true
+      },
+      "correction": "503 en configuración, moneda o evidencia inaccesible; conserva arqueo.",
+      "pending": [
+        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-close-preview-false-zero",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/validar-cierre/:sesionId"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cash-preview-report-failures-20261003",
+        "observed_error": "Sin SELECT de movimientos, preview usa fondo inicial y declara caja cuadrada en lugar del saldo durable 104,01.",
+        "local_only": true
+      },
+      "correction": "La indisponibilidad del ledger bloquea el preview con 503.",
+      "pending": [
+        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-fiscal-payment-report-infrastructure-400",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/:id/corte-z"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/cortes/:corteId/pdf"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/cortes/:corteId/csv"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cash-preview-report-failures-20261003",
+        "observed_error": "Sin SELECT en ventas o pagos, los reportes responden 400.",
+        "local_only": true
+      },
+      "correction": "503 explícito y recuperación de reportes sin efectos financieros.",
+      "pending": [
+        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-csv-free-text-formula",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/cortes/:corteId/csv"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cash-preview-report-failures-20261003",
+        "observed_error": "El CSV conserva una fórmula activa en el nombre libre de la caja.",
+        "local_only": true
+      },
+      "correction": "Neutraliza texto libre y conserva comillas/salto de línea e importes numéricos.",
+      "pending": [
+        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-ui-session-error-sticky",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/sesiones"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cash-ui-recovery-defect-20261003",
+        "observed_error": "CashSessionSelector conservaba el estado de error después de un reintento exitoso: con SELECT de sesiones_caja restituido, Reintentar obtuvo HTTP 200 y la pantalla siguió mostrando el error sin datos.",
+        "local_only": true
+      },
+      "correction": "La carga limpia el error antes de consultar.",
+      "pending": [
+        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-ui-cuts-error-sticky",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/cortes"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cash-ui-recovery-defect-20261003",
+        "observed_error": "CortesList conservaba el estado de error después de un reintento exitoso: con SELECT de cortes_caja restituido, Reintentar obtuvo HTTP 200 y la pantalla siguió mostrando el error sin datos.",
+        "local_only": true
+      },
+      "correction": "La carga limpia el error antes de consultar.",
+      "pending": [
+        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-administrative-close-stale-expected-amount",
+      "status": "canonical_correction_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/sesiones/:sesionId/cierre-administrativo"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-pr136-ci-second-failures-20261003.json",
+        "observed_error": "Con ingresos de 4,01 sobre un fondo de 100, el cierre administrativo envió 100 como monto contado: usaba sesiones_caja.monto_esperado (valor de apertura), ordenaba por created_at, convertía un error de lectura en el fondo inicial y trataba un saldo 0 como ausencia. Resultado: CASH_CLOSE_SUPERVISOR_REQUIRED diferencia=-4.01.",
+        "local_only": true
+      },
+      "correction": "Saldo teórico del ledger por secuencia, igual que el preview y cerrar_caja_tx; lectura fallida 503 sin cerrar; saldo 0 se conserva.",
+      "pending": [
+        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+      ]
     }
   ]
 }

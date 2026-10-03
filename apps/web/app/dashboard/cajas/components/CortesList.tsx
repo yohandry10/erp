@@ -48,6 +48,7 @@ export function CortesList({ className = '', id }: Props) {
   const cargarCortes = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const resp = await get('/cajas/cortes');
       if ((resp as any)?.success) {
         setCortes((resp as any).data || []);

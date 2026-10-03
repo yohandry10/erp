@@ -1,4 +1,5 @@
-import { Injectable, BadRequestException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, ServiceUnavailableException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
+import { rangoDelDiaDelTenant } from '../../shared/utils/fecha-tenant.util';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { CreateCajaDto } from './dto/create-caja.dto';
 import { UpdateCajaDto } from './dto/update-caja.dto';
@@ -43,7 +44,7 @@ export class CajasService {
       .select('*')
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false });
-    if (error) throw error;
+    if (error) throw new ServiceUnavailableException('No se pudo consultar la información de caja; reintente');
     return data || [];
   }
 
@@ -449,12 +450,12 @@ export class CajasService {
       .select('*, cajas(nombre)')
       .eq('tenant_id', tenantId)
       .eq('id', sesionId)
-      .eq('estado', 'ABIERTA')
       .single();
 
-    if (findError || !sesion) {
+    if (findError && findError.code !== 'PGRST116' && findError.code !== '22P02') throw new ServiceUnavailableException('No se pudo consultar la sesión para cierre administrativo; reintente');
+    if (!sesion) {
       throw new NotFoundException(
-        'Sesión de caja no encontrada o ya está cerrada',
+        'Sesión de caja no encontrada',
       );
     }
 
@@ -568,33 +569,39 @@ export class CajasService {
   }
 
   private async resolveMontoEsperadoCierre(tenantId: string, sesion: any): Promise<number> {
-    const montoEsperado = Number(sesion.monto_esperado ?? 0);
-    if (montoEsperado > 0) {
-      return montoEsperado;
-    }
-
+    // Mismo saldo teórico que el preview y cerrar_caja_tx: último movimiento por
+    // secuencia y fondo inicial sólo si aún no hay movimientos. La columna
+    // monto_esperado se escribe al abrir y nadie la actualiza; un saldo 0 es real.
     const { data: ultimoMovimiento, error } = await this.supabase.getClient()
       .from('movimientos_caja')
       .select('saldo_nuevo')
       .eq('tenant_id', tenantId)
       .eq('sesion_caja_id', sesion.id)
-      .order('created_at', { ascending: false })
+      .order('secuencia', { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (error) {
-      this.logger.warn(`No se pudo calcular monto esperado desde movimientos de caja: ${error.message}`);
+      throw new ServiceUnavailableException('No se pudo consultar el saldo de caja para el cierre administrativo; reintente');
     }
 
-    const saldoNuevo = Number(ultimoMovimiento?.saldo_nuevo ?? 0);
-    if (saldoNuevo > 0) {
-      return saldoNuevo;
-    }
+    return Number(ultimoMovimiento?.saldo_nuevo ?? sesion.monto_inicio ?? sesion.monto_inicial ?? 0);
+  }
 
-    return Number(sesion.monto_inicial ?? sesion.monto_inicio ?? 0);
+  private validateDateFilters(filters: { fecha_desde?: string; fecha_hasta?: string }) {
+    for (const key of ['fecha_desde','fecha_hasta'] as const) {
+      const value=filters[key];
+      if(!value) continue;
+      // Fecha de calendario exacta: rechaza 2026-02-30 sin depender de la zona del proceso.
+      const [year, month, day] = value.split('-').map(Number);
+      const calendar = new Date(Date.UTC(year, month - 1, day));
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(value) || calendar.getUTCFullYear()!==year || calendar.getUTCMonth()!==month-1 || calendar.getUTCDate()!==day) throw new BadRequestException(key+' debe ser una fecha válida YYYY-MM-DD');
+    }
+    if(filters.fecha_desde && filters.fecha_hasta && filters.fecha_desde>filters.fecha_hasta) throw new BadRequestException('El rango de fechas está invertido');
   }
 
   async listarSesiones(tenantId: string, filters: { fecha_desde?: string; fecha_hasta?: string; estado?: string; cajero_id?: string }) {
+    this.validateDateFilters(filters);
     let query = this.supabase.getClient()
       .from('sesiones_caja')
       // Embebe el cajero y la caja para que la UI muestre "Por:" y el nombre de
@@ -609,29 +616,30 @@ export class CajasService {
       query = query.eq('cajero_id', filters.cajero_id);
     }
     if (filters.fecha_desde) {
-      query = query.gte('fecha_apertura', filters.fecha_desde);
+      query = query.gte('fecha_apertura', (await rangoDelDiaDelTenant(this.supabase.getClient(), tenantId, new Date(filters.fecha_desde+'T12:00:00Z'))).desde);
     }
     if (filters.fecha_hasta) {
-      query = query.lte('fecha_apertura', filters.fecha_hasta);
+      query = query.lt('fecha_apertura', (await rangoDelDiaDelTenant(this.supabase.getClient(), tenantId, new Date(filters.fecha_hasta+'T12:00:00Z'))).hasta);
     }
 
     const { data, error } = await query.order('fecha_apertura', { ascending: false });
-    if (error) throw error;
+    if (error) throw new ServiceUnavailableException('No se pudo consultar la información de caja; reintente');
     return data || [];
   }
 
   async listarCortes(tenantId: string, filtros: { fecha_desde?: string; fecha_hasta?: string; caja_id?: string }) {
+    this.validateDateFilters(filtros);
     let query = this.supabase.getClient()
       .from('cortes_caja')
       .select('*')
       .eq('tenant_id', tenantId);
 
     if (filtros.caja_id) query = query.eq('caja_id', filtros.caja_id);
-    if (filtros.fecha_desde) query = query.gte('fecha_corte', filtros.fecha_desde);
-    if (filtros.fecha_hasta) query = query.lte('fecha_corte', filtros.fecha_hasta);
+    if (filtros.fecha_desde) query = query.gte('fecha_corte', (await rangoDelDiaDelTenant(this.supabase.getClient(), tenantId, new Date(filtros.fecha_desde+'T12:00:00Z'))).desde);
+    if (filtros.fecha_hasta) query = query.lt('fecha_corte', (await rangoDelDiaDelTenant(this.supabase.getClient(), tenantId, new Date(filtros.fecha_hasta+'T12:00:00Z'))).hasta);
 
     const { data, error } = await query.order('fecha_corte', { ascending: false });
-    if (error) throw error;
+    if (error) throw new ServiceUnavailableException('No se pudo consultar la información de caja; reintente');
     return data || [];
   }
 
@@ -874,6 +882,10 @@ export class CajasService {
       },
     );
     if (error) {
+      if (!['22023','23514','23505','55000','P0002','P0001','22P02'].includes(error.code ?? '')) {
+        if (error.code === '42501' && !String(error.message).includes('permission denied')) throw new ForbiddenException('No tiene permiso para registrar el movimiento de caja');
+        throw new ServiceUnavailableException('No se pudo registrar el movimiento de caja; reintente con la misma intención');
+      }
       throw new BadRequestException(error.message || 'No se pudo registrar el movimiento manual');
     }
     return (data as any)?.movimiento ?? data;

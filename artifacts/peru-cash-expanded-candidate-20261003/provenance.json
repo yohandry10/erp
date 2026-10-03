@@ -1,0 +1,20 @@
+{
+  "capturedAt": "2026-10-03T19:37:51.764Z",
+  "capture": "Before launch",
+  "source_hashes": {
+    "artifacts/peru-cash-operations-probe-20261003.mjs": "dca343c8a5065b50a779b9784b1f66b4ce0f6fb9381296f92240c0be3952752c",
+    "artifacts/peru-cash-operations-runner-20261003.mjs": "c58264bcd5f3c64ed234adf97c99e55bc4cf336a5fe32244157f3ca650649b8c",
+    "apps/erp-api/src/modules/cajas/cajas.service.ts": "2c8457304cbfd900e0a3c20d6d9a5902c3330885f701813e36828d73d8beb313",
+    "apps/erp-api/src/modules/cajas/services/cash-movements.service.ts": "fb5470afb0d349e20f98fe3fafa350c91501556bc1cd6f54c5331f3560ad7b86",
+    "apps/erp-api/src/modules/cajas/services/cash-closing.service.ts": "a24444438c3b4e0fd9b4fc42dfd7cc1167b7638f09ccd79d15f6115b09288911",
+    "apps/erp-api/src/modules/cajas/services/cash-reports.service.ts": "e03df657a628482fe5f36e895766922f70e0543b466db38ef395f2e05f89a67b",
+    "artifacts/566__peru_cash_first_client_account.candidate.sql": "f9be0cb34993894bd4026f84ab4278adcdc168b2c3afc7adc3c0dd11b12bbb78",
+    "artifacts/peru-cajas.service.candidate.ts": "3d322917415140c05ce9bcbb8272fe29e7149c9da42d287261693707fe1b0b70",
+    "artifacts/peru-cash-api-overlay.cjs": "050c6011fcfcb16ee6a2041088793c0606eaa8f0886b3c524dfb70c1249c76ce",
+    "artifacts/peru-cash-movements.service.candidate.ts": "6e7911bbe63f863c754453bbfa24f69aa6bf22d6df3df78ac3b9d675da752154",
+    "artifacts/peru-cash-closing.service.candidate.ts": "04f6b4f7c636e573b5f33c464229050f9164533cee6684a15982c9246561a5c7",
+    "artifacts/peru-cash-reports.service.candidate.ts": "79e20d88006d684ced3309e3c07b47e50723e2134ed0562be25614ddd1a87d7d"
+  },
+  "complete_acceptance": false,
+  "remoteWrites": false
+}

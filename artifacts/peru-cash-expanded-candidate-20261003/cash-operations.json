@@ -1,0 +1,630 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Caja API/DB real local; sin aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Caja: alta, replay y edición persisten una caja; identidad cambiada no duplica",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: apertura y consultas no cambian la sesión; segunda apertura rechaza sin autocierre",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: ingreso/gasto manual, ledger y replay conservan un solo movimiento y saldo",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: contrapartida ausente, monto cero y clave ausente rechazan sin movimiento",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: retiro a bóveda/replay conserva saldo; conciliación bancaria inaplicable rechaza sin efectos",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: cambio de turno congela; movimiento rechaza y cancelar/replay descongela una vez",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: cambio completado transfiere responsabilidad, no inventa ingreso y congela confirmaciones como hashes",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: PIN supervisor se registra/rota por intención sin exponer código ni hash",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: arqueo inconsistente y diferencia sin autorización no cierran ni mutan",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: cierre con supervisor distinto y PIN produce corte durable; replay no duplica",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: corte, filtros, CSV y PDF representan sesión cerrada; no producen efectos",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: lector consulta pero alta/edición/manual/PIN/cierre requieren permisos",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: empresa ajena no lista cajas/sesiones/cortes ni obtiene movimientos o reporte",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: ID inexistente/mal formado y fecha inválida no aparentan datos ni causan 500",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: filtros desde/hasta incluyen el día local completo para sesiones y cortes",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: reporte de cierre incluye todos los retiros durables y sus turnos",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: lectura indisponible de sesiones_caja devuelve 503 y se recupera sin mutación",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: lectura indisponible de movimientos_caja devuelve 503 y se recupera sin mutación",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: lectura indisponible de cortes_caja devuelve 503 y se recupera sin mutación",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: depósito bancario y conciliación positiva son idempotentes en caja y banco",
+      "passed": false,
+      "message": "cajas/retiros/4b34d117-9958-4331-b152-934ca079b27e: {\"statusCode\":400,\"message\":\"CASH_WITHDRAWAL_VIOLATES_MINIMUM_BALANCE\",\"error\":\"Bad Request\",\"timestamp\":\"2026-10-03T19:38:50.929Z\",\"path\":\"/api/cajas/retiros/4b34d117-9958-4331-b152-934ca079b27e\"}\n\n400 !== 201\n"
+    },
+    {
+      "scenario": "Caja: cierre básico admite el alias monto_contado y sesionId ofrecido por el controlador",
+      "passed": false,
+      "message": "cajas/035e1915-d50f-4397-85ea-d07db20f8d3b/apertura: {\"statusCode\":400,\"message\":\"Ya tiene una caja abierta: \\\"Caja depósito\\\" (4b34d117-9958-4331-b152-934ca079b27e). Ciérrela explícitamente antes de abrir otra.\",\"error\":\"Bad Request\",\"timestamp\":\"2026-10-03T19:38:51.042Z\",\"path\":\"/api/cajas/035e1915-d50f-4397-85ea-d07db20f8d3b/apertura\"}\n\n400 !== 201\n"
+    },
+    {
+      "scenario": "Caja: cierre administrativo exige razón y es durable sin duplicar efectos al reintentar",
+      "passed": false,
+      "message": "cajas/6077fe6f-b986-48a1-be40-84e65b60bc24/apertura: {\"statusCode\":400,\"message\":\"Ya tiene una caja abierta: \\\"Caja depósito\\\" (4b34d117-9958-4331-b152-934ca079b27e). Ciérrela explícitamente antes de abrir otra.\",\"error\":\"Bad Request\",\"timestamp\":\"2026-10-03T19:38:51.153Z\",\"path\":\"/api/cajas/6077fe6f-b986-48a1-be40-84e65b60bc24/apertura\"}\n\n400 !== 201\n"
+    },
+    {
+      "scenario": "Caja: worker real registra asientos balanceados y el segundo consumo no los duplica",
+      "passed": false,
+      "message": "Expected values to be strictly equal:\n\n0 !== 1\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/complete",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/almacenes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "roles",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "users",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "users",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas",
+      "status": 400
+    },
+    {
+      "method": "PUT",
+      "endpoint": "cajas/:id",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "cajas/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/opciones-contables",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/:id/apertura",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/saldo-esperado/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/:id/apertura",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/sesiones",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/movimientos/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/validar-precierre/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/:id/corte-z",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/saldo-esperado/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/retiros/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/retiros/:id",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/saldo-esperado/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/retiros/:id/conciliar",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/saldo-esperado/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/cambio-turno/iniciar/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/cambio-turno/iniciar/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/cambio-turno/cancelar/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/cambio-turno/cancelar/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/cambio-turno/iniciar/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/cambio-turno/completar/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/cambio-turno/completar/:id",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/saldo-esperado/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/sesiones/:id/cambios-turno",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "cajas/supervisores/:id/pin",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "cajas/supervisores/:id/pin",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "cajas/supervisores/:id/pin",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/supervisores-gestion-pin",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/supervisores-autorizados/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/validar-cierre/:id",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/cerrar/:id",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/cerrar/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/cerrar/:id",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/cortes",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/cortes/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/cortes/:id/csv",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/cortes/:id/pdf",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "roles",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "users",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas",
+      "status": 403
+    },
+    {
+      "method": "PUT",
+      "endpoint": "cajas/:id",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 403
+    },
+    {
+      "method": "PUT",
+      "endpoint": "cajas/supervisores/:id/pin",
+      "status": 403
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/sesiones",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/cortes",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/validar-precierre/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/cortes/:id",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/cortes/no-es-uuid",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/sesiones",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/cortes",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/sesiones",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/cortes",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/cortes",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/cortes",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/:id/corte-z",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/sesiones",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/validar-precierre/:id",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/:id/corte-z",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/sesiones",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/validar-precierre/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/:id/corte-z",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/movimientos/:id",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/saldo-esperado/:id",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/movimientos/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/saldo-esperado/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/cortes",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/cortes/:id",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/cortes/:id/pdf",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/cortes",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/cortes/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/cortes/:id/pdf",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/plan-cuentas",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/cuentas",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/:id/apertura",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/retiros/:id",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/:id/apertura",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/:id/apertura",
+      "status": 400
+    }
+  ]
+}

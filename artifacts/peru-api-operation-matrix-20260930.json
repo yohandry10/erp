@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-10-03T18:46:38.972Z",
+  "generated_at": "2026-10-03T21:25:29.688Z",
   "inventory": "artifacts/peru-api-operation-inventory-20260930.json",
-  "evidence": "artifacts/peru-integrated-ci-37139151230",
+  "evidence": "artifacts/peru-integrated-main-37152767852",
   "additional_evidence": [
     {
-      "evidence": "artifacts/peru-storage-ci-37139151230",
+      "evidence": "artifacts/peru-storage-ci-37150593171",
       "scope": "company_logo_real_storage_subset",
       "phase_success": true,
       "complete_erp_acceptance": false,
@@ -951,23 +951,35 @@
           "status": 201
         },
         {
-          "trace_index": 1309,
+          "trace_index": 1307,
           "status": 201
         },
         {
-          "trace_index": 1323,
+          "trace_index": 1367,
           "status": 201
         },
         {
-          "trace_index": 1327,
+          "trace_index": 1594,
           "status": 201
         },
         {
-          "trace_index": 1328,
+          "trace_index": 1597,
           "status": 201
         },
         {
-          "trace_index": 1388,
+          "trace_index": 1611,
+          "status": 201
+        },
+        {
+          "trace_index": 1615,
+          "status": 201
+        },
+        {
+          "trace_index": 1616,
+          "status": 201
+        },
+        {
+          "trace_index": 1676,
           "status": 201
         }
       ],
@@ -1325,7 +1337,21 @@
       "endpoint": "/api/cajas/opciones-contables",
       "source": "apps/erp-api/src/modules/cajas/cajas.controller.ts:107",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "cash-first-client-account-missing",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-local-20261003190124613-17344",
+            "observed_error": "Un primer cliente PE configurado con certificado propio no dispone de 10111.",
+            "local_only": true
+          },
+          "correction": "566 crea la referencia sólo al configurar PE; sin backfill.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -1361,7 +1387,21 @@
       "endpoint": "/api/cajas/:id/cierre",
       "source": "apps/erp-api/src/modules/cajas/cajas.controller.ts:131",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "cash-close-amount-alias-rejected",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-close-failures-20261003",
+            "observed_error": "monto_contado es un alias documentado en el controlador, pero el DTO lo rechaza antes de normalizar.",
+            "local_only": true
+          },
+          "correction": "Validación condicional exige uno de los campos de monto.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -1379,7 +1419,60 @@
       "endpoint": "/api/cajas/sesiones",
       "source": "apps/erp-api/src/modules/cajas/cajas.controller.ts:148",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "cash-invalid-date-500",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-local-20261003191130521-900",
+            "observed_error": "2026-02-31 alcanza PostgreSQL y responde 500.",
+            "local_only": true
+          },
+          "correction": "Valida calendario y rango antes de consultar.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cash-day-filter-midnight",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-read-failures-20261003",
+            "observed_error": "El día actual queda excluido por fecha_hasta a medianoche.",
+            "local_only": true
+          },
+          "correction": "Rango desde inicio local, hasta inicio del siguiente día exclusivo.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cash-session-read-unavailability-masked",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-expanded-failures-20261003",
+            "observed_error": "REVOKE SELECT produce 500, 200 y 404 respectivamente.",
+            "local_only": true
+          },
+          "correction": "503 en indisponibilidad; ausencia conserva semántica de validación o 404.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cash-ui-session-error-sticky",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-ui-recovery-defect-20261003",
+            "observed_error": "CashSessionSelector conservaba el estado de error después de un reintento exitoso: con SELECT de sesiones_caja restituido, Reintentar obtuvo HTTP 200 y la pantalla siguió mostrando el error sin datos.",
+            "local_only": true
+          },
+          "correction": "La carga limpia el error antes de consultar.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -1397,7 +1490,60 @@
       "endpoint": "/api/cajas/cortes",
       "source": "apps/erp-api/src/modules/cajas/cajas.controller.ts:161",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "cash-invalid-date-500",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-local-20261003191130521-900",
+            "observed_error": "2026-02-31 alcanza PostgreSQL y responde 500.",
+            "local_only": true
+          },
+          "correction": "Valida calendario y rango antes de consultar.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cash-day-filter-midnight",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-read-failures-20261003",
+            "observed_error": "El día actual queda excluido por fecha_hasta a medianoche.",
+            "local_only": true
+          },
+          "correction": "Rango desde inicio local, hasta inicio del siguiente día exclusivo.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cash-cut-read-unavailability-masked",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-expanded-failures-20261003",
+            "observed_error": "REVOKE SELECT produce 500 y falsos 404.",
+            "local_only": true
+          },
+          "correction": "503 para infraestructura; 404 sólo para inexistente/ajeno/ID no válido.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cash-ui-cuts-error-sticky",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-ui-recovery-defect-20261003",
+            "observed_error": "CortesList conservaba el estado de error después de un reintento exitoso: con SELECT de cortes_caja restituido, Reintentar obtuvo HTTP 200 y la pantalla siguió mostrando el error sin datos.",
+            "local_only": true
+          },
+          "correction": "La carga limpia el error antes de consultar.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -1415,7 +1561,21 @@
       "endpoint": "/api/cajas/cortes/:corteId",
       "source": "apps/erp-api/src/modules/cajas/cajas.controller.ts:173",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "cash-cut-read-unavailability-masked",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-expanded-failures-20261003",
+            "observed_error": "REVOKE SELECT produce 500 y falsos 404.",
+            "local_only": true
+          },
+          "correction": "503 para infraestructura; 404 sólo para inexistente/ajeno/ID no válido.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -1433,7 +1593,60 @@
       "endpoint": "/api/cajas/cortes/:corteId/pdf",
       "source": "apps/erp-api/src/modules/cajas/cajas.controller.ts:183",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "cash-withdrawals-report-read-privilege",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-expanded-failures-20261003",
+            "observed_error": "Un retiro durable desaparece del reporte (cero de uno).",
+            "local_only": true
+          },
+          "correction": "566 concede SELECT de retiros al backend; reporte falla explícitamente si no puede leer.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cash-cut-read-unavailability-masked",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-expanded-failures-20261003",
+            "observed_error": "REVOKE SELECT produce 500 y falsos 404.",
+            "local_only": true
+          },
+          "correction": "503 para infraestructura; 404 sólo para inexistente/ajeno/ID no válido.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cash-cut-pdf-layout",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-first-candidate-20261003",
+            "observed_error": "Identificadores superpuestos, títulos desplazados y tablas de cuatro columnas fuera de ancho A4.",
+            "local_only": true
+          },
+          "correction": "Columnas acotadas, títulos y pie con ancho completo, filas con altura y salto de página.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cash-fiscal-payment-report-infrastructure-400",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-preview-report-failures-20261003",
+            "observed_error": "Sin SELECT en ventas o pagos, los reportes responden 400.",
+            "local_only": true
+          },
+          "correction": "503 explícito y recuperación de reportes sin efectos financieros.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -1451,7 +1664,34 @@
       "endpoint": "/api/cajas/cortes/:corteId/csv",
       "source": "apps/erp-api/src/modules/cajas/cajas.controller.ts:196",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "cash-fiscal-payment-report-infrastructure-400",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-preview-report-failures-20261003",
+            "observed_error": "Sin SELECT en ventas o pagos, los reportes responden 400.",
+            "local_only": true
+          },
+          "correction": "503 explícito y recuperación de reportes sin efectos financieros.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cash-csv-free-text-formula",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-preview-report-failures-20261003",
+            "observed_error": "El CSV conserva una fórmula activa en el nombre libre de la caja.",
+            "local_only": true
+          },
+          "correction": "Neutraliza texto libre y conserva comillas/salto de línea e importes numéricos.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -1469,7 +1709,34 @@
       "endpoint": "/api/cajas/validar-precierre/:sesionId",
       "source": "apps/erp-api/src/modules/cajas/cajas.controller.ts:209",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "cash-session-read-unavailability-masked",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-expanded-failures-20261003",
+            "observed_error": "REVOKE SELECT produce 500, 200 y 404 respectivamente.",
+            "local_only": true
+          },
+          "correction": "503 en indisponibilidad; ausencia conserva semántica de validación o 404.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cash-preclose-read-validation-false-positive",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-faults-baseline-20261003",
+            "observed_error": "Sin SELECT en ventas, retiros o cambios de turno, precierre responde válido=true.",
+            "local_only": true
+          },
+          "correction": "Toda lectura requerida falla con 503 y permite recuperación explícita.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -1520,7 +1787,21 @@
           "status": 200
         }
       ],
-      "defects": [],
+      "defects": [
+        {
+          "id": "cash-movement-read-unavailability-400",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-expanded-failures-20261003",
+            "observed_error": "REVOKE SELECT devuelve 400 en las dos consultas.",
+            "local_only": true
+          },
+          "correction": "503 explícito y recuperación con saldo inalterado.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
@@ -1538,7 +1819,21 @@
       "endpoint": "/api/cajas/movimientos/:sesionId",
       "source": "apps/erp-api/src/modules/cajas/cajas.controller.ts:236",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "cash-movement-read-unavailability-400",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-expanded-failures-20261003",
+            "observed_error": "REVOKE SELECT devuelve 400 en las dos consultas.",
+            "local_only": true
+          },
+          "correction": "503 explícito y recuperación con saldo inalterado.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -1556,7 +1851,34 @@
       "endpoint": "/api/cajas/validar-cierre/:sesionId",
       "source": "apps/erp-api/src/modules/cajas/cajas.controller.ts:251",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "cash-close-preview-infrastructure-400",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-preview-report-failures-20261003",
+            "observed_error": "Sin EXECUTE de tolerancia, el preview responde 400.",
+            "local_only": true
+          },
+          "correction": "503 en configuración, moneda o evidencia inaccesible; conserva arqueo.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cash-close-preview-false-zero",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-preview-report-failures-20261003",
+            "observed_error": "Sin SELECT de movimientos, preview usa fondo inicial y declara caja cuadrada en lugar del saldo durable 104,01.",
+            "local_only": true
+          },
+          "correction": "La indisponibilidad del ledger bloquea el preview con 503.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -1628,7 +1950,21 @@
       "endpoint": "/api/cajas/retiros/:sesionId",
       "source": "apps/erp-api/src/modules/cajas/cajas.controller.ts:325",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "cash-first-client-account-missing",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-local-20261003190124613-17344",
+            "observed_error": "Un primer cliente PE configurado con certificado propio no dispone de 10111.",
+            "local_only": true
+          },
+          "correction": "566 crea la referencia sólo al configurar PE; sin backfill.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -1718,7 +2054,21 @@
       "endpoint": "/api/cajas/sesiones/:sesionId/cambios-turno",
       "source": "apps/erp-api/src/modules/cajas/cajas.controller.ts:420",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "cash-shift-history-read-privilege",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-local-20261003190536775-24348",
+            "observed_error": "El historial devuelve 400 por SELECT ausente aunque el cambio se confirmó.",
+            "local_only": true
+          },
+          "correction": "566 concede SELECT exclusivamente al backend.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -1736,7 +2086,34 @@
       "endpoint": "/api/cajas/movimientos/manual/:sesionId",
       "source": "apps/erp-api/src/modules/cajas/cajas.controller.ts:430",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "cash-first-client-account-missing",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-local-20261003190124613-17344",
+            "observed_error": "Un primer cliente PE configurado con certificado propio no dispone de 10111.",
+            "local_only": true
+          },
+          "correction": "566 crea la referencia sólo al configurar PE; sin backfill.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cash-manual-infrastructure-400",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-faults-baseline-20261003",
+            "observed_error": "EXECUTE revocado y fallo XX000 posterior al INSERT responden 400 pese a ser fallos recuperables.",
+            "local_only": true
+          },
+          "correction": "503 en infraestructura; rollback y misma intención recuperada una vez.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -1754,7 +2131,21 @@
       "endpoint": "/api/cajas/sesiones/:sesionId/cierre-administrativo",
       "source": "apps/erp-api/src/modules/cajas/cajas.controller.ts:457",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "cash-administrative-close-replay-not-found",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-close-failures-20261003",
+            "observed_error": "El primer cierre confirma; el mismo reintento devuelve 404 antes de llegar al writer idempotente.",
+            "local_only": true
+          },
+          "correction": "Consulta sin excluir sesiones cerradas y deja que SQL valide actor/huella/replay.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -1772,7 +2163,47 @@
       "endpoint": "/api/cajas/:id/corte-z",
       "source": "apps/erp-api/src/modules/cajas/cajas.controller.ts:483",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "cash-withdrawals-report-read-privilege",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-expanded-failures-20261003",
+            "observed_error": "Un retiro durable desaparece del reporte (cero de uno).",
+            "local_only": true
+          },
+          "correction": "566 concede SELECT de retiros al backend; reporte falla explícitamente si no puede leer.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cash-session-read-unavailability-masked",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-expanded-failures-20261003",
+            "observed_error": "REVOKE SELECT produce 500, 200 y 404 respectivamente.",
+            "local_only": true
+          },
+          "correction": "503 en indisponibilidad; ausencia conserva semántica de validación o 404.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cash-fiscal-payment-report-infrastructure-400",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cash-preview-report-failures-20261003",
+            "observed_error": "Sin SELECT en ventas o pagos, los reportes responden 400.",
+            "local_only": true
+          },
+          "correction": "503 explícito y recuperación de reportes sin efectos financieros.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -3628,7 +4059,11 @@
           "status": 201
         },
         {
-          "trace_index": 1329,
+          "trace_index": 1308,
+          "status": 201
+        },
+        {
+          "trace_index": 1617,
           "status": 201
         }
       ],
@@ -3744,55 +4179,55 @@
       "source": "apps/erp-api/src/modules/configuracion/configuration.controller.ts:795",
       "existing_evidence": [
         {
-          "trace_index": 1310,
+          "trace_index": 1598,
           "status": 201
         },
         {
-          "trace_index": 1311,
+          "trace_index": 1599,
           "status": 201
         },
         {
-          "trace_index": 1312,
+          "trace_index": 1600,
           "status": 201
         },
         {
-          "trace_index": 1313,
+          "trace_index": 1601,
           "status": 409
         },
         {
-          "trace_index": 1314,
+          "trace_index": 1602,
           "status": 400
         },
         {
-          "trace_index": 1315,
+          "trace_index": 1603,
           "status": 400
         },
         {
-          "trace_index": 1316,
+          "trace_index": 1604,
           "status": 400
         },
         {
-          "trace_index": 1317,
+          "trace_index": 1605,
           "status": 413
         },
         {
-          "trace_index": 1318,
+          "trace_index": 1606,
           "status": 201
         },
         {
-          "trace_index": 1319,
+          "trace_index": 1607,
           "status": 403
         },
         {
-          "trace_index": 1321,
+          "trace_index": 1609,
           "status": 400
         },
         {
-          "trace_index": 1322,
+          "trace_index": 1610,
           "status": 201
         },
         {
-          "trace_index": 1324,
+          "trace_index": 1612,
           "status": 201
         }
       ],
@@ -3821,15 +4256,15 @@
       "source": "apps/erp-api/src/modules/configuracion/configuration.controller.ts:837",
       "existing_evidence": [
         {
-          "trace_index": 1320,
+          "trace_index": 1608,
           "status": 403
         },
         {
-          "trace_index": 1325,
+          "trace_index": 1613,
           "status": 200
         },
         {
-          "trace_index": 1326,
+          "trace_index": 1614,
           "status": 200
         }
       ],
@@ -8011,7 +8446,11 @@
       "source": "apps/erp-api/src/modules/cpe/comunicacion-baja.controller.ts:22",
       "existing_evidence": [
         {
-          "trace_index": 1377,
+          "trace_index": 1356,
+          "status": 200
+        },
+        {
+          "trace_index": 1665,
           "status": 200
         }
       ],
@@ -8047,7 +8486,11 @@
           "status": 200
         },
         {
-          "trace_index": 1378,
+          "trace_index": 1357,
+          "status": 200
+        },
+        {
+          "trace_index": 1666,
           "status": 200
         }
       ],
@@ -8291,7 +8734,11 @@
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:150",
       "existing_evidence": [
         {
-          "trace_index": 1376,
+          "trace_index": 1355,
+          "status": 200
+        },
+        {
+          "trace_index": 1664,
           "status": 200
         }
       ],
@@ -8319,7 +8766,11 @@
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:161",
       "existing_evidence": [
         {
-          "trace_index": 1361,
+          "trace_index": 1340,
+          "status": 400
+        },
+        {
+          "trace_index": 1649,
           "status": 400
         }
       ],
@@ -8365,7 +8816,11 @@
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:191",
       "existing_evidence": [
         {
-          "trace_index": 1384,
+          "trace_index": 1363,
+          "status": 503
+        },
+        {
+          "trace_index": 1672,
           "status": 503
         }
       ],
@@ -8406,72 +8861,148 @@
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:199",
       "existing_evidence": [
         {
-          "trace_index": 1331,
+          "trace_index": 1310,
           "status": 201
         },
         {
-          "trace_index": 1332,
+          "trace_index": 1311,
           "status": 201
         },
         {
-          "trace_index": 1333,
+          "trace_index": 1312,
           "status": 201
         },
         {
-          "trace_index": 1334,
+          "trace_index": 1313,
           "status": 409
         },
         {
-          "trace_index": 1357,
+          "trace_index": 1336,
           "status": 201
         },
         {
-          "trace_index": 1358,
+          "trace_index": 1337,
           "status": 400
         },
         {
-          "trace_index": 1359,
+          "trace_index": 1338,
           "status": 400
         },
         {
-          "trace_index": 1360,
+          "trace_index": 1339,
           "status": 400
         },
         {
-          "trace_index": 1362,
+          "trace_index": 1341,
           "status": 201
         },
         {
-          "trace_index": 1366,
+          "trace_index": 1345,
+          "status": 201
+        },
+        {
+          "trace_index": 1347,
           "status": 201
         },
         {
           "trace_index": 1368,
+          "status": 403
+        },
+        {
+          "trace_index": 1372,
           "status": 201
         },
         {
-          "trace_index": 1389,
+          "trace_index": 1377,
           "status": 403
+        },
+        {
+          "trace_index": 1379,
+          "status": 400
+        },
+        {
+          "trace_index": 1380,
+          "status": 400
+        },
+        {
+          "trace_index": 1381,
+          "status": 503
+        },
+        {
+          "trace_index": 1382,
+          "status": 201
+        },
+        {
+          "trace_index": 1383,
+          "status": 201
+        },
+        {
+          "trace_index": 1384,
+          "status": 503
+        },
+        {
+          "trace_index": 1385,
+          "status": 201
+        },
+        {
+          "trace_index": 1386,
+          "status": 201
+        },
+        {
+          "trace_index": 1387,
+          "status": 201
+        },
+        {
+          "trace_index": 1390,
+          "status": 201
+        },
+        {
+          "trace_index": 1391,
+          "status": 201
+        },
+        {
+          "trace_index": 1392,
+          "status": 201
         },
         {
           "trace_index": 1393,
           "status": 201
         },
         {
+          "trace_index": 1394,
+          "status": 201
+        },
+        {
+          "trace_index": 1395,
+          "status": 201
+        },
+        {
+          "trace_index": 1396,
+          "status": 201
+        },
+        {
+          "trace_index": 1397,
+          "status": 201
+        },
+        {
           "trace_index": 1398,
-          "status": 403
+          "status": 201
+        },
+        {
+          "trace_index": 1399,
+          "status": 201
         },
         {
           "trace_index": 1400,
-          "status": 400
+          "status": 201
         },
         {
           "trace_index": 1401,
-          "status": 400
+          "status": 201
         },
         {
           "trace_index": 1402,
-          "status": 503
+          "status": 201
         },
         {
           "trace_index": 1403,
@@ -8483,7 +9014,7 @@
         },
         {
           "trace_index": 1405,
-          "status": 503
+          "status": 201
         },
         {
           "trace_index": 1406,
@@ -8495,6 +9026,14 @@
         },
         {
           "trace_index": 1408,
+          "status": 201
+        },
+        {
+          "trace_index": 1409,
+          "status": 201
+        },
+        {
+          "trace_index": 1410,
           "status": 201
         },
         {
@@ -8703,7 +9242,7 @@
         },
         {
           "trace_index": 1462,
-          "status": 201
+          "status": 429
         },
         {
           "trace_index": 1463,
@@ -8787,7 +9326,7 @@
         },
         {
           "trace_index": 1483,
-          "status": 429
+          "status": 201
         },
         {
           "trace_index": 1484,
@@ -9107,7 +9646,7 @@
         },
         {
           "trace_index": 1563,
-          "status": 201
+          "status": 429
         },
         {
           "trace_index": 1564,
@@ -9191,7 +9730,7 @@
         },
         {
           "trace_index": 1584,
-          "status": 429
+          "status": 201
         },
         {
           "trace_index": 1585,
@@ -9226,87 +9765,907 @@
           "status": 201
         },
         {
-          "trace_index": 1593,
+          "trace_index": 1619,
           "status": 201
         },
         {
-          "trace_index": 1594,
+          "trace_index": 1620,
           "status": 201
         },
         {
-          "trace_index": 1595,
+          "trace_index": 1621,
           "status": 201
         },
         {
-          "trace_index": 1596,
+          "trace_index": 1622,
+          "status": 409
+        },
+        {
+          "trace_index": 1645,
           "status": 201
         },
         {
-          "trace_index": 1597,
+          "trace_index": 1646,
+          "status": 400
+        },
+        {
+          "trace_index": 1647,
+          "status": 400
+        },
+        {
+          "trace_index": 1648,
+          "status": 400
+        },
+        {
+          "trace_index": 1650,
           "status": 201
         },
         {
-          "trace_index": 1598,
+          "trace_index": 1654,
           "status": 201
         },
         {
-          "trace_index": 1599,
+          "trace_index": 1656,
           "status": 201
         },
         {
-          "trace_index": 1600,
+          "trace_index": 1677,
+          "status": 403
+        },
+        {
+          "trace_index": 1681,
           "status": 201
         },
         {
-          "trace_index": 1601,
+          "trace_index": 1686,
+          "status": 403
+        },
+        {
+          "trace_index": 1688,
+          "status": 400
+        },
+        {
+          "trace_index": 1689,
+          "status": 400
+        },
+        {
+          "trace_index": 1690,
+          "status": 503
+        },
+        {
+          "trace_index": 1691,
           "status": 201
         },
         {
-          "trace_index": 1602,
+          "trace_index": 1692,
           "status": 201
         },
         {
-          "trace_index": 1603,
+          "trace_index": 1693,
+          "status": 503
+        },
+        {
+          "trace_index": 1694,
           "status": 201
         },
         {
-          "trace_index": 1604,
+          "trace_index": 1695,
           "status": 201
         },
         {
-          "trace_index": 1605,
+          "trace_index": 1696,
           "status": 201
         },
         {
-          "trace_index": 1606,
+          "trace_index": 1699,
           "status": 201
         },
         {
-          "trace_index": 1607,
+          "trace_index": 1700,
           "status": 201
         },
         {
-          "trace_index": 1608,
+          "trace_index": 1701,
           "status": 201
         },
         {
-          "trace_index": 1609,
+          "trace_index": 1702,
           "status": 201
         },
         {
-          "trace_index": 1610,
+          "trace_index": 1703,
           "status": 201
         },
         {
-          "trace_index": 1611,
+          "trace_index": 1704,
           "status": 201
         },
         {
-          "trace_index": 1612,
+          "trace_index": 1705,
           "status": 201
         },
         {
-          "trace_index": 1613,
+          "trace_index": 1706,
+          "status": 201
+        },
+        {
+          "trace_index": 1707,
+          "status": 201
+        },
+        {
+          "trace_index": 1708,
+          "status": 201
+        },
+        {
+          "trace_index": 1709,
+          "status": 201
+        },
+        {
+          "trace_index": 1710,
+          "status": 201
+        },
+        {
+          "trace_index": 1711,
+          "status": 201
+        },
+        {
+          "trace_index": 1712,
+          "status": 201
+        },
+        {
+          "trace_index": 1713,
+          "status": 201
+        },
+        {
+          "trace_index": 1714,
+          "status": 201
+        },
+        {
+          "trace_index": 1715,
+          "status": 201
+        },
+        {
+          "trace_index": 1716,
+          "status": 201
+        },
+        {
+          "trace_index": 1717,
+          "status": 201
+        },
+        {
+          "trace_index": 1718,
+          "status": 201
+        },
+        {
+          "trace_index": 1719,
+          "status": 201
+        },
+        {
+          "trace_index": 1720,
+          "status": 201
+        },
+        {
+          "trace_index": 1721,
+          "status": 201
+        },
+        {
+          "trace_index": 1722,
+          "status": 201
+        },
+        {
+          "trace_index": 1723,
+          "status": 201
+        },
+        {
+          "trace_index": 1724,
+          "status": 201
+        },
+        {
+          "trace_index": 1725,
+          "status": 201
+        },
+        {
+          "trace_index": 1726,
+          "status": 201
+        },
+        {
+          "trace_index": 1727,
+          "status": 201
+        },
+        {
+          "trace_index": 1728,
+          "status": 201
+        },
+        {
+          "trace_index": 1729,
+          "status": 201
+        },
+        {
+          "trace_index": 1730,
+          "status": 201
+        },
+        {
+          "trace_index": 1731,
+          "status": 201
+        },
+        {
+          "trace_index": 1732,
+          "status": 201
+        },
+        {
+          "trace_index": 1733,
+          "status": 201
+        },
+        {
+          "trace_index": 1734,
+          "status": 201
+        },
+        {
+          "trace_index": 1735,
+          "status": 201
+        },
+        {
+          "trace_index": 1736,
+          "status": 201
+        },
+        {
+          "trace_index": 1737,
+          "status": 201
+        },
+        {
+          "trace_index": 1738,
+          "status": 201
+        },
+        {
+          "trace_index": 1739,
+          "status": 201
+        },
+        {
+          "trace_index": 1740,
+          "status": 201
+        },
+        {
+          "trace_index": 1741,
+          "status": 201
+        },
+        {
+          "trace_index": 1742,
+          "status": 201
+        },
+        {
+          "trace_index": 1743,
+          "status": 201
+        },
+        {
+          "trace_index": 1744,
+          "status": 201
+        },
+        {
+          "trace_index": 1745,
+          "status": 201
+        },
+        {
+          "trace_index": 1746,
+          "status": 201
+        },
+        {
+          "trace_index": 1747,
+          "status": 201
+        },
+        {
+          "trace_index": 1748,
+          "status": 201
+        },
+        {
+          "trace_index": 1749,
+          "status": 201
+        },
+        {
+          "trace_index": 1750,
+          "status": 201
+        },
+        {
+          "trace_index": 1751,
+          "status": 201
+        },
+        {
+          "trace_index": 1752,
+          "status": 201
+        },
+        {
+          "trace_index": 1753,
+          "status": 201
+        },
+        {
+          "trace_index": 1754,
+          "status": 201
+        },
+        {
+          "trace_index": 1755,
+          "status": 201
+        },
+        {
+          "trace_index": 1756,
+          "status": 201
+        },
+        {
+          "trace_index": 1757,
+          "status": 201
+        },
+        {
+          "trace_index": 1758,
+          "status": 201
+        },
+        {
+          "trace_index": 1759,
+          "status": 201
+        },
+        {
+          "trace_index": 1760,
+          "status": 201
+        },
+        {
+          "trace_index": 1761,
+          "status": 201
+        },
+        {
+          "trace_index": 1762,
+          "status": 201
+        },
+        {
+          "trace_index": 1763,
+          "status": 201
+        },
+        {
+          "trace_index": 1764,
+          "status": 201
+        },
+        {
+          "trace_index": 1765,
+          "status": 201
+        },
+        {
+          "trace_index": 1766,
+          "status": 201
+        },
+        {
+          "trace_index": 1767,
+          "status": 201
+        },
+        {
+          "trace_index": 1768,
+          "status": 201
+        },
+        {
+          "trace_index": 1769,
+          "status": 201
+        },
+        {
+          "trace_index": 1770,
+          "status": 201
+        },
+        {
+          "trace_index": 1771,
+          "status": 429
+        },
+        {
+          "trace_index": 1772,
+          "status": 201
+        },
+        {
+          "trace_index": 1773,
+          "status": 201
+        },
+        {
+          "trace_index": 1774,
+          "status": 201
+        },
+        {
+          "trace_index": 1775,
+          "status": 201
+        },
+        {
+          "trace_index": 1776,
+          "status": 201
+        },
+        {
+          "trace_index": 1777,
+          "status": 201
+        },
+        {
+          "trace_index": 1778,
+          "status": 201
+        },
+        {
+          "trace_index": 1779,
+          "status": 201
+        },
+        {
+          "trace_index": 1780,
+          "status": 201
+        },
+        {
+          "trace_index": 1781,
+          "status": 201
+        },
+        {
+          "trace_index": 1782,
+          "status": 201
+        },
+        {
+          "trace_index": 1783,
+          "status": 201
+        },
+        {
+          "trace_index": 1784,
+          "status": 201
+        },
+        {
+          "trace_index": 1785,
+          "status": 201
+        },
+        {
+          "trace_index": 1786,
+          "status": 201
+        },
+        {
+          "trace_index": 1787,
+          "status": 201
+        },
+        {
+          "trace_index": 1788,
+          "status": 201
+        },
+        {
+          "trace_index": 1789,
+          "status": 201
+        },
+        {
+          "trace_index": 1790,
+          "status": 201
+        },
+        {
+          "trace_index": 1791,
+          "status": 201
+        },
+        {
+          "trace_index": 1792,
+          "status": 201
+        },
+        {
+          "trace_index": 1793,
+          "status": 201
+        },
+        {
+          "trace_index": 1794,
+          "status": 201
+        },
+        {
+          "trace_index": 1795,
+          "status": 201
+        },
+        {
+          "trace_index": 1796,
+          "status": 201
+        },
+        {
+          "trace_index": 1797,
+          "status": 201
+        },
+        {
+          "trace_index": 1798,
+          "status": 201
+        },
+        {
+          "trace_index": 1799,
+          "status": 201
+        },
+        {
+          "trace_index": 1800,
+          "status": 201
+        },
+        {
+          "trace_index": 1801,
+          "status": 201
+        },
+        {
+          "trace_index": 1802,
+          "status": 201
+        },
+        {
+          "trace_index": 1803,
+          "status": 201
+        },
+        {
+          "trace_index": 1804,
+          "status": 201
+        },
+        {
+          "trace_index": 1805,
+          "status": 201
+        },
+        {
+          "trace_index": 1806,
+          "status": 201
+        },
+        {
+          "trace_index": 1807,
+          "status": 201
+        },
+        {
+          "trace_index": 1808,
+          "status": 201
+        },
+        {
+          "trace_index": 1809,
+          "status": 201
+        },
+        {
+          "trace_index": 1810,
+          "status": 201
+        },
+        {
+          "trace_index": 1811,
+          "status": 201
+        },
+        {
+          "trace_index": 1812,
+          "status": 201
+        },
+        {
+          "trace_index": 1813,
+          "status": 201
+        },
+        {
+          "trace_index": 1814,
+          "status": 201
+        },
+        {
+          "trace_index": 1815,
+          "status": 201
+        },
+        {
+          "trace_index": 1816,
+          "status": 201
+        },
+        {
+          "trace_index": 1817,
+          "status": 201
+        },
+        {
+          "trace_index": 1818,
+          "status": 201
+        },
+        {
+          "trace_index": 1819,
+          "status": 201
+        },
+        {
+          "trace_index": 1820,
+          "status": 201
+        },
+        {
+          "trace_index": 1821,
+          "status": 201
+        },
+        {
+          "trace_index": 1822,
+          "status": 201
+        },
+        {
+          "trace_index": 1823,
+          "status": 201
+        },
+        {
+          "trace_index": 1824,
+          "status": 201
+        },
+        {
+          "trace_index": 1825,
+          "status": 201
+        },
+        {
+          "trace_index": 1826,
+          "status": 201
+        },
+        {
+          "trace_index": 1827,
+          "status": 201
+        },
+        {
+          "trace_index": 1828,
+          "status": 201
+        },
+        {
+          "trace_index": 1829,
+          "status": 201
+        },
+        {
+          "trace_index": 1830,
+          "status": 201
+        },
+        {
+          "trace_index": 1831,
+          "status": 201
+        },
+        {
+          "trace_index": 1832,
+          "status": 201
+        },
+        {
+          "trace_index": 1833,
+          "status": 201
+        },
+        {
+          "trace_index": 1834,
+          "status": 201
+        },
+        {
+          "trace_index": 1835,
+          "status": 201
+        },
+        {
+          "trace_index": 1836,
+          "status": 201
+        },
+        {
+          "trace_index": 1837,
+          "status": 201
+        },
+        {
+          "trace_index": 1838,
+          "status": 201
+        },
+        {
+          "trace_index": 1839,
+          "status": 201
+        },
+        {
+          "trace_index": 1840,
+          "status": 201
+        },
+        {
+          "trace_index": 1841,
+          "status": 201
+        },
+        {
+          "trace_index": 1842,
+          "status": 201
+        },
+        {
+          "trace_index": 1843,
+          "status": 201
+        },
+        {
+          "trace_index": 1844,
+          "status": 201
+        },
+        {
+          "trace_index": 1845,
+          "status": 201
+        },
+        {
+          "trace_index": 1846,
+          "status": 201
+        },
+        {
+          "trace_index": 1847,
+          "status": 201
+        },
+        {
+          "trace_index": 1848,
+          "status": 201
+        },
+        {
+          "trace_index": 1849,
+          "status": 201
+        },
+        {
+          "trace_index": 1850,
+          "status": 201
+        },
+        {
+          "trace_index": 1851,
+          "status": 201
+        },
+        {
+          "trace_index": 1852,
+          "status": 201
+        },
+        {
+          "trace_index": 1853,
+          "status": 201
+        },
+        {
+          "trace_index": 1854,
+          "status": 201
+        },
+        {
+          "trace_index": 1855,
+          "status": 201
+        },
+        {
+          "trace_index": 1856,
+          "status": 201
+        },
+        {
+          "trace_index": 1857,
+          "status": 201
+        },
+        {
+          "trace_index": 1858,
+          "status": 201
+        },
+        {
+          "trace_index": 1859,
+          "status": 201
+        },
+        {
+          "trace_index": 1860,
+          "status": 201
+        },
+        {
+          "trace_index": 1861,
+          "status": 201
+        },
+        {
+          "trace_index": 1862,
+          "status": 201
+        },
+        {
+          "trace_index": 1863,
+          "status": 201
+        },
+        {
+          "trace_index": 1864,
+          "status": 201
+        },
+        {
+          "trace_index": 1865,
+          "status": 201
+        },
+        {
+          "trace_index": 1866,
+          "status": 201
+        },
+        {
+          "trace_index": 1867,
+          "status": 201
+        },
+        {
+          "trace_index": 1868,
+          "status": 201
+        },
+        {
+          "trace_index": 1869,
+          "status": 201
+        },
+        {
+          "trace_index": 1870,
+          "status": 201
+        },
+        {
+          "trace_index": 1871,
+          "status": 201
+        },
+        {
+          "trace_index": 1872,
+          "status": 429
+        },
+        {
+          "trace_index": 1873,
+          "status": 201
+        },
+        {
+          "trace_index": 1874,
+          "status": 201
+        },
+        {
+          "trace_index": 1875,
+          "status": 201
+        },
+        {
+          "trace_index": 1876,
+          "status": 201
+        },
+        {
+          "trace_index": 1877,
+          "status": 201
+        },
+        {
+          "trace_index": 1878,
+          "status": 201
+        },
+        {
+          "trace_index": 1879,
+          "status": 201
+        },
+        {
+          "trace_index": 1880,
+          "status": 201
+        },
+        {
+          "trace_index": 1881,
+          "status": 201
+        },
+        {
+          "trace_index": 1882,
+          "status": 201
+        },
+        {
+          "trace_index": 1883,
+          "status": 201
+        },
+        {
+          "trace_index": 1884,
+          "status": 201
+        },
+        {
+          "trace_index": 1885,
+          "status": 201
+        },
+        {
+          "trace_index": 1886,
+          "status": 201
+        },
+        {
+          "trace_index": 1887,
+          "status": 201
+        },
+        {
+          "trace_index": 1888,
+          "status": 201
+        },
+        {
+          "trace_index": 1889,
+          "status": 201
+        },
+        {
+          "trace_index": 1890,
+          "status": 201
+        },
+        {
+          "trace_index": 1891,
+          "status": 201
+        },
+        {
+          "trace_index": 1892,
+          "status": 201
+        },
+        {
+          "trace_index": 1893,
+          "status": 201
+        },
+        {
+          "trace_index": 1894,
+          "status": 201
+        },
+        {
+          "trace_index": 1895,
+          "status": 201
+        },
+        {
+          "trace_index": 1896,
+          "status": 201
+        },
+        {
+          "trace_index": 1897,
+          "status": 201
+        },
+        {
+          "trace_index": 1898,
+          "status": 201
+        },
+        {
+          "trace_index": 1899,
+          "status": 201
+        },
+        {
+          "trace_index": 1900,
+          "status": 201
+        },
+        {
+          "trace_index": 1901,
           "status": 201
         }
       ],
@@ -9498,35 +10857,67 @@
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:252",
       "existing_evidence": [
         {
-          "trace_index": 1351,
+          "trace_index": 1330,
           "status": 200
         },
         {
-          "trace_index": 1352,
+          "trace_index": 1331,
           "status": 200
         },
         {
-          "trace_index": 1353,
+          "trace_index": 1332,
           "status": 200
         },
         {
-          "trace_index": 1354,
+          "trace_index": 1333,
           "status": 400
         },
         {
-          "trace_index": 1355,
+          "trace_index": 1334,
           "status": 400
         },
         {
-          "trace_index": 1356,
+          "trace_index": 1335,
           "status": 400
         },
         {
-          "trace_index": 1379,
+          "trace_index": 1358,
           "status": 503
         },
         {
-          "trace_index": 1409,
+          "trace_index": 1388,
+          "status": 200
+        },
+        {
+          "trace_index": 1639,
+          "status": 200
+        },
+        {
+          "trace_index": 1640,
+          "status": 200
+        },
+        {
+          "trace_index": 1641,
+          "status": 200
+        },
+        {
+          "trace_index": 1642,
+          "status": 400
+        },
+        {
+          "trace_index": 1643,
+          "status": 400
+        },
+        {
+          "trace_index": 1644,
+          "status": 400
+        },
+        {
+          "trace_index": 1667,
+          "status": 503
+        },
+        {
+          "trace_index": 1697,
           "status": 200
         }
       ],
@@ -9624,19 +11015,35 @@
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:263",
       "existing_evidence": [
         {
-          "trace_index": 1363,
+          "trace_index": 1342,
           "status": 200
         },
         {
-          "trace_index": 1364,
+          "trace_index": 1343,
           "status": 200
         },
         {
-          "trace_index": 1365,
+          "trace_index": 1344,
           "status": 200
         },
         {
-          "trace_index": 1614,
+          "trace_index": 1593,
+          "status": 200
+        },
+        {
+          "trace_index": 1651,
+          "status": 200
+        },
+        {
+          "trace_index": 1652,
+          "status": 200
+        },
+        {
+          "trace_index": 1653,
+          "status": 200
+        },
+        {
+          "trace_index": 1902,
           "status": 200
         }
       ],
@@ -9704,35 +11111,67 @@
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:280",
       "existing_evidence": [
         {
-          "trace_index": 1335,
+          "trace_index": 1314,
           "status": 200
         },
         {
-          "trace_index": 1339,
+          "trace_index": 1318,
           "status": 404
         },
         {
-          "trace_index": 1343,
+          "trace_index": 1322,
           "status": 404
         },
         {
-          "trace_index": 1347,
+          "trace_index": 1326,
           "status": 400
         },
         {
-          "trace_index": 1367,
+          "trace_index": 1346,
           "status": 200
         },
         {
-          "trace_index": 1369,
+          "trace_index": 1348,
           "status": 200
         },
         {
-          "trace_index": 1380,
+          "trace_index": 1359,
           "status": 503
         },
         {
-          "trace_index": 1392,
+          "trace_index": 1371,
+          "status": 200
+        },
+        {
+          "trace_index": 1623,
+          "status": 200
+        },
+        {
+          "trace_index": 1627,
+          "status": 404
+        },
+        {
+          "trace_index": 1631,
+          "status": 404
+        },
+        {
+          "trace_index": 1635,
+          "status": 400
+        },
+        {
+          "trace_index": 1655,
+          "status": 200
+        },
+        {
+          "trace_index": 1657,
+          "status": 200
+        },
+        {
+          "trace_index": 1668,
+          "status": 503
+        },
+        {
+          "trace_index": 1680,
           "status": 200
         }
       ],
@@ -9825,31 +11264,59 @@
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:291",
       "existing_evidence": [
         {
-          "trace_index": 1338,
+          "trace_index": 1317,
           "status": 200
         },
         {
-          "trace_index": 1340,
+          "trace_index": 1319,
           "status": 404
         },
         {
-          "trace_index": 1344,
+          "trace_index": 1323,
           "status": 404
         },
         {
-          "trace_index": 1350,
+          "trace_index": 1329,
           "status": 400
         },
         {
-          "trace_index": 1370,
+          "trace_index": 1349,
           "status": 200
         },
         {
-          "trace_index": 1383,
+          "trace_index": 1362,
           "status": 503
         },
         {
-          "trace_index": 1391,
+          "trace_index": 1370,
+          "status": 403
+        },
+        {
+          "trace_index": 1626,
+          "status": 200
+        },
+        {
+          "trace_index": 1628,
+          "status": 404
+        },
+        {
+          "trace_index": 1632,
+          "status": 404
+        },
+        {
+          "trace_index": 1638,
+          "status": 400
+        },
+        {
+          "trace_index": 1658,
+          "status": 200
+        },
+        {
+          "trace_index": 1671,
+          "status": 503
+        },
+        {
+          "trace_index": 1679,
           "status": 403
         }
       ],
@@ -10140,27 +11607,51 @@
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:526",
       "existing_evidence": [
         {
-          "trace_index": 1336,
+          "trace_index": 1315,
           "status": 200
         },
         {
-          "trace_index": 1341,
+          "trace_index": 1320,
           "status": 404
         },
         {
-          "trace_index": 1345,
+          "trace_index": 1324,
           "status": 404
         },
         {
-          "trace_index": 1348,
+          "trace_index": 1327,
           "status": 400
         },
         {
-          "trace_index": 1381,
+          "trace_index": 1360,
           "status": 503
         },
         {
-          "trace_index": 1385,
+          "trace_index": 1364,
+          "status": 200
+        },
+        {
+          "trace_index": 1624,
+          "status": 200
+        },
+        {
+          "trace_index": 1629,
+          "status": 404
+        },
+        {
+          "trace_index": 1633,
+          "status": 404
+        },
+        {
+          "trace_index": 1636,
+          "status": 400
+        },
+        {
+          "trace_index": 1669,
+          "status": 503
+        },
+        {
+          "trace_index": 1673,
           "status": 200
         }
       ],
@@ -10236,43 +11727,83 @@
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:537",
       "existing_evidence": [
         {
-          "trace_index": 1337,
+          "trace_index": 1316,
           "status": 200
         },
         {
-          "trace_index": 1342,
+          "trace_index": 1321,
           "status": 404
         },
         {
-          "trace_index": 1346,
+          "trace_index": 1325,
           "status": 404
         },
         {
-          "trace_index": 1349,
+          "trace_index": 1328,
           "status": 400
         },
         {
-          "trace_index": 1371,
+          "trace_index": 1350,
           "status": 200
         },
         {
-          "trace_index": 1373,
+          "trace_index": 1352,
           "status": 200
         },
         {
-          "trace_index": 1375,
+          "trace_index": 1354,
           "status": 200
         },
         {
-          "trace_index": 1382,
+          "trace_index": 1361,
           "status": 503
         },
         {
-          "trace_index": 1390,
+          "trace_index": 1369,
           "status": 403
         },
         {
-          "trace_index": 1410,
+          "trace_index": 1389,
+          "status": 200
+        },
+        {
+          "trace_index": 1625,
+          "status": 200
+        },
+        {
+          "trace_index": 1630,
+          "status": 404
+        },
+        {
+          "trace_index": 1634,
+          "status": 404
+        },
+        {
+          "trace_index": 1637,
+          "status": 400
+        },
+        {
+          "trace_index": 1659,
+          "status": 200
+        },
+        {
+          "trace_index": 1661,
+          "status": 200
+        },
+        {
+          "trace_index": 1663,
+          "status": 200
+        },
+        {
+          "trace_index": 1670,
+          "status": 503
+        },
+        {
+          "trace_index": 1678,
+          "status": 403
+        },
+        {
+          "trace_index": 1698,
           "status": 200
         }
       ],
@@ -10379,7 +11910,15 @@
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:556",
       "existing_evidence": [
         {
-          "trace_index": 1372,
+          "trace_index": 1351,
+          "status": 503
+        },
+        {
+          "trace_index": 1353,
+          "status": 503
+        },
+        {
+          "trace_index": 1373,
           "status": 503
         },
         {
@@ -10387,19 +11926,35 @@
           "status": 503
         },
         {
-          "trace_index": 1394,
-          "status": 503
-        },
-        {
-          "trace_index": 1395,
-          "status": 503
-        },
-        {
-          "trace_index": 1396,
+          "trace_index": 1375,
           "status": 409
         },
         {
-          "trace_index": 1397,
+          "trace_index": 1376,
+          "status": 404
+        },
+        {
+          "trace_index": 1660,
+          "status": 503
+        },
+        {
+          "trace_index": 1662,
+          "status": 503
+        },
+        {
+          "trace_index": 1682,
+          "status": 503
+        },
+        {
+          "trace_index": 1683,
+          "status": 503
+        },
+        {
+          "trace_index": 1684,
+          "status": 409
+        },
+        {
+          "trace_index": 1685,
           "status": 404
         }
       ],
@@ -15740,11 +17295,15 @@
           "status": 201
         },
         {
-          "trace_index": 1307,
+          "trace_index": 1365,
           "status": 201
         },
         {
-          "trace_index": 1386,
+          "trace_index": 1595,
+          "status": 201
+        },
+        {
+          "trace_index": 1674,
           "status": 201
         }
       ],
@@ -20738,11 +22297,15 @@
           "status": 201
         },
         {
-          "trace_index": 1308,
+          "trace_index": 1366,
           "status": 201
         },
         {
-          "trace_index": 1387,
+          "trace_index": 1596,
+          "status": 201
+        },
+        {
+          "trace_index": 1675,
           "status": 201
         }
       ],
@@ -21141,11 +22704,19 @@
           "status": 201
         },
         {
-          "trace_index": 1330,
+          "trace_index": 1309,
           "status": 201
         },
         {
-          "trace_index": 1399,
+          "trace_index": 1378,
+          "status": 201
+        },
+        {
+          "trace_index": 1618,
+          "status": 201
+        },
+        {
+          "trace_index": 1687,
           "status": 201
         }
       ],
