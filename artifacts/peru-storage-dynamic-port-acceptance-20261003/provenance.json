@@ -1,0 +1,9 @@
+{
+  "dumps_extracted": false,
+  "local_source": "artifacts/peru-company-storage-20261003200535343-9120",
+  "selected_completed_at": "2026-10-03T20:08:12.325Z",
+  "scope": "company_logo_real_storage_subset",
+  "limits": [
+    "Storage local real; no acredita proveedor remoto ni todas las variantes del logo"
+  ]
+}
