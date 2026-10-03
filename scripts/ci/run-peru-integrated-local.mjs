@@ -171,6 +171,7 @@ try {
   await waitReady('PostgREST', () => httpReady(env.LOCAL_POSTGREST_URL));
   const api = launch('api', process.execPath, [apiRequire.resolve('ts-node/dist/bin.js'), '--transpile-only', 'tests/e2e/helpers/local-api-harness.ts'], apiDirectory);
   await waitReady('API', () => readFileSync(path.join(output, 'api.log'), 'utf8').includes('LOCAL_INTEGRATED_API_READY') && httpReady(`${apiUrl}/api/auth/profile`), api);
+  await run('login-office',process.execPath,['scripts/ci/test-peru-login-office-local.mjs']);
   await run('http', process.execPath, ['scripts/ci/test-peru-integrated-local.mjs']);
   for (const kind of ['annual','finance','hr','hr-financial','payroll-plame','configuration-admin']) {
     await run('prepare-' + kind, process.execPath, ['scripts/ci/prepare-peru-first-client-local.mjs',kind]);
@@ -183,7 +184,7 @@ try {
   await run('tax-intents-lifecycle',process.execPath,['scripts/ci/test-peru-tax-intents-local.mjs']);
   if(withBrowser) await run('prepare-wizard',process.execPath,['scripts/ci/prepare-peru-first-client-local.mjs','wizard']);
   const httpEvidence=JSON.parse(readFileSync(path.join(output,'http.json'),'utf8'));
-  for(const file of ['annual-acceptance.json','finance-lifecycle.json','hr-lifecycle.json','hr-financial.json','payroll-plame.json','configuration-admin.json','series-lifecycle.json','tax-adjustments.json','monthly-period.json','tax-intents.json']) {
+  for(const file of ['annual-acceptance.json','finance-lifecycle.json','hr-lifecycle.json','hr-financial.json','payroll-plame.json','configuration-admin.json','series-lifecycle.json','tax-adjustments.json','monthly-period.json','tax-intents.json','login-office.json']) {
     const phase=JSON.parse(readFileSync(path.join(output,file),'utf8'));
     if(phase.success!==true||phase.remoteWrites!==false) throw new Error('Fase funcional incompleta: '+file);
     const offset=httpEvidence.results.length;

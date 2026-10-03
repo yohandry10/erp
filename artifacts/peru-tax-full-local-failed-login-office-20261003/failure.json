@@ -1,0 +1,9 @@
+{
+  "phase": "prepare-wizard",
+  "global_success": false,
+  "observed": "Login 429 no pasó validación Retry-After. Luego Node afirmó UV_HANDLE_CLOSING al salir en Windows.",
+  "tax_api_cases": 24,
+  "ui_verified": false,
+  "restore_verified": false,
+  "remoteWrites": false
+}

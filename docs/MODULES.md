@@ -857,6 +857,9 @@ normativa del período consultado; no muestra configuración laboral completa
 si ese período carece de normativa aplicable.
 
 - Tenants, usuarios, roles y permisos determinan acceso.
+- Login limita por cuenta/IP y por IP de oficina. Ambos bloqueos publican
+  `Retry-After` estándar; el agregado conserva también `Retry-After-Office`.
+  Respetar ese plazo permite reintentar sin desactivar las defensas.
 - En demo, `ADMIN_DEMO` puede crear usuarios y roles operativos del propio
   tenant para probar segregación y permisos. No puede delegar `users.manage`,
   conceder permisos globales ni crear otro `ADMIN_DEMO` mediante un writer

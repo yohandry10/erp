@@ -53,6 +53,7 @@ export class AuthRateLimitGuard extends ThrottlerGuard {
     );
 
     if (record.isBlocked) {
+      res.header('Retry-After', record.timeToBlockExpire);
       res.header('Retry-After-Office', record.timeToBlockExpire);
       await this.throwThrottlingException(context, {
         limit: OFFICE_LOGIN_LIMIT,
