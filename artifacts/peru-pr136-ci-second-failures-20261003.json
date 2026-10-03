@@ -1,0 +1,16 @@
+{
+  "sha": "2913ad94bb594d20817877060af1c1cbee7db9ba",
+  "runs": [37159297060],
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "passed_jobs": ["Tests", "Type-check", "Lint", "PostgreSQL 16 fresh schema + SQL contracts", "Peru company logo with real local Storage", "DIAN FEV 1.9 official XML contract"],
+  "failure": {
+    "job": "Peru API, browser and backup recovery",
+    "phase": "cash-faults-lifecycle",
+    "passed_scenarios": 11,
+    "failed_scenario": "Caja: la sesión de la fase de fallos queda cerrada con su saldo esperado",
+    "observed": "POST cierre-administrativo respondió 400 CASH_CLOSE_SUPERVISOR_REQUIRED: diferencia=-4.01 tolerancia=0 sobre una sesión con fondo 100 e ingresos 4,01",
+    "classification": "defecto de producto: el cierre administrativo calculaba el monto esperado con la columna monto_esperado de apertura",
+    "fix": "cajas.service.ts usa el saldo del ledger por secuencia, 503 si no puede leerlo y conserva saldo 0; tres pruebas unitarias nuevas; suite API 300 suites/2907 pruebas"
+  }
+}

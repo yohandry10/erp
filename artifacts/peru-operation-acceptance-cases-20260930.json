@@ -3453,6 +3453,166 @@
       "pending_checks": [
         "Otros fallos de infraestructura no inyectados"
       ]
+    },
+    {
+      "id": "sales-quote-approved-by-other-actor",
+      "source": "scripts/ci/test-peru-integrated-records.mjs",
+      "required_scenario_prefixes": [
+        "cotización de venta creada con líneas y aprobada por otro actor"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/cotizaciones"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/cotizaciones/:id"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/cotizaciones/:id/enviar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/cotizaciones/:id/aprobar"
+        }
+      ],
+      "verified_checks": [
+        "Cotización con línea persistida, enviada y aprobada por un segundo actor"
+      ],
+      "pending_checks": [
+        "Edición, rechazo, eliminación, historial, permisos negativos y aislamiento de cotizaciones; UI"
+      ]
+    },
+    {
+      "id": "sales-quote-convert-once",
+      "source": "scripts/ci/test-peru-integrated-records.mjs",
+      "required_scenario_prefixes": [
+        "conversión conserva total y producto; una segunda solicitud no duplica pedido"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/cotizaciones/:id/convertir-pedido"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/pedidos/:id"
+        }
+      ],
+      "verified_checks": [
+        "El pedido conserva total y producto; una segunda conversión responde 400 sin crear otro pedido"
+      ],
+      "pending_checks": [
+        "Conversión concurrente y respuesta perdida; UI"
+      ]
+    },
+    {
+      "id": "sales-order-confirm-dispatch-once",
+      "source": "scripts/ci/test-peru-integrated-records.mjs",
+      "required_scenario_prefixes": [
+        "pedido preparado y despachado por logística sin duplicar cantidad al reintentar"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/confirmar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/inventario/logistica/:pedidoId/preparar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/inventario/logistica/:pedidoId/marcar-listo"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/inventario/logistica/:pedidoId/confirmar-despacho"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/logistica/ordenes-pendientes"
+        }
+      ],
+      "verified_checks": [
+        "Confirmación, preparación interrumpida retomable y despacho con replay sin duplicar cantidad"
+      ],
+      "pending_checks": [
+        "Despacho parcial en varias entregas, cancelación tras confirmar y GRE ligada; UI"
+      ]
+    },
+    {
+      "id": "sales-order-document-cxc-collection-cash-accounting",
+      "source": "scripts/ci/test-peru-integrated-records.mjs",
+      "required_scenario_prefixes": [
+        "pedido despachado genera CPE/CxC; cobro parcial entra al banco"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/generar-documento"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxc/:id"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/finanzas/cxc/:id/pagos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxc"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas/saldo-esperado/:sesionId"
+        }
+      ],
+      "verified_checks": [
+        "CPE/CxC desde pedido despachado; cobro parcial a banco y saldo en efectivo a caja con replay; caja inexistente 400 sin efectos; búsqueda y aislamiento; arqueo y dos asientos únicos"
+      ],
+      "pending_checks": [
+        "Transmisión SUNAT real; moneda extranjera en cobro; UI del documento desde pedido"
+      ]
+    },
+    {
+      "id": "sales-reports-filters-and-currency",
+      "source": "scripts/ci/test-peru-integrated-records.mjs",
+      "required_scenario_prefixes": [
+        "plazo comercial consulta el CPE canónico",
+        "reportes comerciales respetan cliente"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/reportes/lead-time"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/reportes/productos-mas-vendidos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/reportes/ventas-por-cliente"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/reportes/pedidos-por-estado"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/reportes/top-clientes"
+        }
+      ],
+      "verified_checks": [
+        "Lead time por emisión con fechas inválidas/invertidas 400; reportes conservan moneda, código y filtro de cliente"
+      ],
+      "pending_checks": [
+        "Pipeline, fill-rate, aging, KPIs SUNAT y cotizaciones pendientes; exportación e impresión"
+      ]
     }
   ]
 }
