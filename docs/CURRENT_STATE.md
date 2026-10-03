@@ -39,7 +39,7 @@ y preservación de 37 tablas/funciones/seguridad
 cf868067; main 37125486977, E2E y seguridad aprobaron. El despliegue exacto
 cf868067/esquema 563 pasó preflight, API/web/DB/Redis/CORS
 (artifacts/peru-production-verification-after-132-20261003.json). Se conserva
-el primer timeout de lectura de 20 segundos. Es el último runtime comprobado.
+el primer timeout de lectura de 20 segundos. Ese corte comprobó el runtime de #132.
 PROD actual: 563;
 NO reaplicar 562 ni 563. La matriz registra 288 contratos HTTP observados de 717,
 77 casos funcionales y 1298 controles visibles; ninguna cifra acredita todas
@@ -63,7 +63,27 @@ canónico 094be1a7 aprobó 298 API/29 UI sin reintentos, 99 pantallas, 22 vistas
 con registros, contratos SQL y restore
 (artifacts/peru-integrated-local-gre-20261003). Incluye 22 casos API y tres
 recorridos UI de GRE; sus once casos funcionales conservan variantes pendientes.
-CI, integración en main y despliegue de GRE pendientes; no hay aceptación integral.
+Ambos CI de 4fc2009f aprobaron 298 API/29 UI sin reintentos y 28 checks.
+#133 se integró como 19fa239d; main 37132251731, E2E y seguridad aprobaron.
+El runtime exacto 19fa239d/esquema 563 pasó preflight y lectura API/web/DB/Redis/
+CORS (artifacts/peru-production-verification-after-133-20261003.json). Se conserva
+el primer timeout de 20 segundos. Es el último runtime verificado; sin aceptación
+integral ni confirmación administrativa del plan o continuidad de Render.
+
+POS reprodujo siete defectos locales: certificado sin writer autorizado,
+catálogo vacío para una empresa nueva, errores HTTP de consulta/canje/reintento,
+SKU repetido rechazado y canje pendiente con contador NULL omitido por worker.
+El candidato pasó 18 API/un UI y restore, sin emisión externa
+(artifacts/peru-pos-first-client-candidate-20261003). Incluye ticket, pago mixto,
+stock agregado, canje firmado, cuatro asientos cuadrados y cierre con saldo real.
+UI recuperó respuesta perdida sin duplicar, representó ticket y confirmó otra
+venta idéntica. Se conservan artefactos corruptos e intentos del ensayo detenidos
+por selectores/esperas/interpretación de null, separados del producto. Fuentes
+canónicas y migración 564 preparadas; 52 pruebas enfocadas y tipos API/web
+aprobaron. 564 crea catálogo de referencia sólo para futuras empresas PE y
+writer de certificado con permiso, validación e intención durable; sin backfill
+ni cambio de ACL de tablas existentes. Ensayo/CI/promoción/main pendientes.
+PROD sigue en 563; no reaplicar 562/563.
 
 El ensayo canónico de #125 (`354989d1`) aprobó 138 escenarios HTTP, 17 recorridos
 UI, 99 pantallas, 22 vistas con registros, SQL y restauración
