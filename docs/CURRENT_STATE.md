@@ -10,8 +10,14 @@ copias instaladas; el gate conserva los dos hallazgos y sólo los considera
 mitigados tras verificar los parches. La auditoría local pasó y 26 pruebas de
 firma/certificado conservaron el comportamiento válido
 (`artifacts/peru-security-backports-20261002.json`,
-`artifacts/peru-security-baseline-20261002.json`). La nueva revisión de #124
-debe completar CI antes de promover 557; todavía no hay lanzamiento aprobado.
+`artifacts/peru-security-baseline-20261002.json`). La revisión `82000ee9`
+aprobó CI de PR 37092538107, seguridad, builds y 128 HTTP/quince UI/99 pantallas/
+22 pantallas con registros (`artifacts/peru-integrated-ci-37092538107`). La
+ejecución duplicada de rama 37092535897 agotó 35 minutos en el último barrido;
+su segundo intento pasó completo. La exportación segura distingue los dos
+artefactos y conserva el fallo anterior. El PR #124 se integró como `f53d84dc`;
+CI main 37096505168 sigue en curso; E2E y seguridad de main aprobaron.
+Todavía no hay lanzamiento aprobado.
 
 La ampliación contable local corrigió duplicación del asiento manual al
 reintentar, residuos finales de depreciación/devengo, respuestas 200/500 para
@@ -23,7 +29,10 @@ El respaldo nuevo de 556 y su ensayo sin red pasaron restauración, rollback
 inyectado, preservación de datos/funciones/RLS/ACL y contratos SQL
 (`artifacts/peru-prod-backup-20261003015903259.json`,
 `artifacts/erp-peru-557-rehearsal-20261003020438386-17216.json`).
-La 557 aún no está promovida. Pasaron 128 escenarios HTTP y quince recorridos
+La 557 se promovió transaccionalmente el 02/10 después de CI y ensayo
+(`artifacts/peru-557-promotion-20261003042433425.json`), conservando datos,
+funciones previas, RLS y permisos. Su despliegue exacto se verifica al terminar
+CI main. Pasaron 128 escenarios HTTP y quince recorridos
 UI. La ejecución global falló en una de 99 pantallas estáticas: el log demuestra
 un reinicio de Next dev por umbral de memoria al abrir Ventas. Se conserva el
 fallo y las fases aprobadas por separado
@@ -40,6 +49,36 @@ gasto 5 en el ejercicio anterior llegan al cierre, que devuelve
 y no aparecen asientos parciales. Las cuentas 89/59 no nacen con la empresa;
 la corrección y el recorrido anual siguen pendientes
 (`artifacts/peru-year-close-missing-accounts-20261002.json`).
+
+El candidato local que agrega 89/59 permitió cerrar utilidad y reabrir/recerrar.
+La pérdida reprodujo otro defecto: `balance_general_live` descarta saldos
+deudores de resultados acumulados, reporta patrimonio cero y descuadra 7 con
+asientos confirmados que sí cuadran. El candidato 558 conserva el signo y
+pasó contratos SQL, restauración y el recorrido anual real por API: utilidad
+25, pérdida -7, reapertura/recierre sin duplicar, resultado independiente 8
+del ejercicio siguiente y rechazo de reapertura con período posterior cerrado
+(`artifacts/peru-year-close-acceptance-20261002.json`). Es evidencia local;
+la integración canónica agrega el verificador 558 y el recorrido anual al runner.
+El respaldo nuevo de 557 y su ensayo sin red pasaron restauración, rollback
+inyectado y controles negativos de conservación: completa 164 cuentas ausentes
+sin alterar las 3.427 existentes, funciones previas, datos, RLS o ACL
+(`artifacts/peru-prod-backup-20261003043115676.json`,
+`artifacts/erp-peru-558-rehearsal-20261003044021269-18344.json`). La 558 no está
+promovida; CI y despliegue siguen pendientes.
+
+Las correcciones del asistente distinguen identidad preparada de progreso
+finalizado y bloquean avanzar cuando falla la recuperación del progreso.
+El ensayo de navegador local completó RUC, parámetros, PFX desechable y SOL,
+rechazó clave PFX incorrecta y recuperó respuestas perdidas sin duplicar
+(`artifacts/peru-first-client-wizard-acceptance-20261002.json`). El recorrido
+se incorpora a Playwright integrado. No hubo transmisión externa.
+
+Un cliente financiero local nuevo pasó banco, transferencia, CxP con dos pagos,
+conciliación CSV/match/ajuste/cierre y siete asientos únicos/cuadrados, incluidos
+lector y consultas ajenas (`artifacts/peru-finance-lifecycle-20261002.json`).
+El CSV reprodujo fecha desplazada, columna adicional y fórmula sin neutralizar;
+su corrección pasó parser independiente y se incorpora al runner. Estas pruebas
+amplían casos concretos; no acreditan todas las operaciones financieras.
 
 La ampliación local de RMA sobre factura pagada pasó 124 escenarios HTTP,
 catorce recorridos UI, 22 pantallas, contratos SQL y restauración

@@ -1,0 +1,22 @@
+{
+  "checkedAt": "2026-10-03T04:16:32.539Z",
+  "local_only": true,
+  "remoteWrites": false,
+  "source": "apps/erp-api/src/modules/finanzas/bancos/bancos.service.ts",
+  "expected_date": "02/10/2026",
+  "observed_dates": [
+    "01/10/2026"
+  ],
+  "header_columns": 9,
+  "row_columns": [
+    10,
+    10,
+    10,
+    10,
+    10,
+    10
+  ],
+  "unprotected_formula_cells": [
+    "=1+1"
+  ]
+}

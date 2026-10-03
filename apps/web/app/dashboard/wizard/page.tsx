@@ -20,7 +20,7 @@ function WizardContent() {
   const { state } = useWizardContext()
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
-  const { isDemoTenant, loading: demoLoading } = useDemoStatus()
+  const { isDemoTenant, loading: demoLoading, status: demoStatus, error: demoError, refetch } = useDemoStatus()
 
   useEffect(() => {
     // Solo los super-admins de plataforma se saltan el wizard (no necesitan
@@ -29,18 +29,31 @@ function WizardContent() {
     // nada en el código actual escribe localStorage.user, así que el check
     // anterior era código muerto y, si quedaba basura legacy, podía mandar
     // a /dashboard a usuarios demo que sí necesitan el wizard.
-    if (authLoading || demoLoading) return
+    if (authLoading) return
+    if (user?.is_super_admin === true) { router.replace('/dashboard'); return }
+    if (demoLoading || demoError || !demoStatus) return
     // Una demo ya nace totalmente configurada. El wizard pide certificado y
     // credenciales fiscales reales, que solo corresponden al convertir la
     // cuenta; nunca deben quedar expuestos como tarea de una demo.
-    if (user?.is_super_admin === true || isDemoTenant) {
+    if (isDemoTenant) {
       router.replace('/dashboard')
     }
-  }, [authLoading, demoLoading, isDemoTenant, user, router])
+  }, [authLoading, demoLoading, demoError, demoStatus, isDemoTenant, user, router])
 
-  if (authLoading || demoLoading || user?.is_super_admin === true || isDemoTenant) {
+  if (authLoading || user?.is_super_admin === true) {
     return null
   }
+
+  if (demoLoading || (!demoStatus && !demoError)) {
+    return <div role="status" className="p-6">Verificando empresa...</div>
+  }
+  if (demoError || !demoStatus) {
+    return <div role="alert" className="p-6 space-y-3">
+      <p>No se pudo verificar el estado de la empresa.</p>
+      <button type="button" onClick={refetch} className="rounded border px-4 py-2">Reintentar</button>
+    </div>
+  }
+  if (isDemoTenant) return null
 
   const renderStep = () => {
     const currentStep = state.steps[state.currentStep]

@@ -1,0 +1,26 @@
+{
+  "checkedAt": "2026-10-03T04:49:44.894Z",
+  "source": "artifacts/peru-integrated-20261003044132976-14880",
+  "remoteWrites": false,
+  "globalSuccess": false,
+  "scope": "onboarding_inventory_accounting_subset",
+  "sqlVerifiers": 68,
+  "apiPhases": [
+    "artifacts/peru-year-close-canonical-20261002.json",
+    "artifacts/peru-finance-canonical-20261002.json"
+  ],
+  "wizardUi": "artifacts/peru-wizard-canonical-20261002.json",
+  "browser": {
+    "passed": 6,
+    "failed": 1,
+    "failedCase": "banco CSV/conciliación",
+    "cause": "Prueba omitió abrir el panel Filtros antes de buscar su control"
+  },
+  "typeChecks": [
+    "API",
+    "web"
+  ],
+  "relevantUnitTests": 37,
+  "next": "Ensayo completo canónico y CI antes de promover 558; no acepta todos los módulos",
+  "privateDumpsExported": false
+}

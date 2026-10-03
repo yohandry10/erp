@@ -1,0 +1,54 @@
+{
+  "commit": "82000ee927426134dea7bef69d8c54e6695f8dca",
+  "prNumber": 124,
+  "project": "wypnbcptofqdmoynlonq",
+  "backupSha256": "00fb0e51e55d7aff2ee42049daa816a40dd1472d7ad63419987b3cd496b15036",
+  "migrationSha256": "447d72f71376c6960d5f31c1b11bc83ae084a959d7f2d00f40f8d0ec50beb797",
+  "bundleSha256": "6ce583b9ee168f80f7426e21b45e58cb8f8bbeeda74490ed93f7d30ae7d9bbef",
+  "success": true,
+  "remoteWrites": true,
+  "before": {
+    "project": "wypnbcptofqdmoynlonq",
+    "environment": "PROD",
+    "schema": 556,
+    "ready": true,
+    "manualPrivilegesValid": false,
+    "adminPrivilegesValid": false,
+    "comparedData": [
+      "accounts",
+      "details",
+      "entries",
+      "intents",
+      "periods",
+      "permissions",
+      "rolePermissions"
+    ],
+    "functions557": []
+  },
+  "after": {
+    "project": "wypnbcptofqdmoynlonq",
+    "environment": "PROD",
+    "schema": 557,
+    "ready": true,
+    "manualPrivilegesValid": true,
+    "adminPrivilegesValid": true,
+    "comparedData": [
+      "accounts",
+      "details",
+      "entries",
+      "intents",
+      "periods",
+      "permissions",
+      "rolePermissions"
+    ],
+    "functions557": [
+      "app.crear_asiento_manual_tx_557",
+      "public.crear_asiento_manual_tx",
+      "public.reabrir_periodo_contable_admin_tx"
+    ]
+  },
+  "existingDataPreserved": true,
+  "existingFunctionsPreserved": true,
+  "tableSecurityPreserved": true,
+  "completedAt": "2026-10-03T04:24:46.747Z"
+}
