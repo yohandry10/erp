@@ -1,0 +1,17 @@
+{
+  "global_success": false,
+  "http_success": true,
+  "http_cases": 148,
+  "browser_passed": 17,
+  "browser_failed": 1,
+  "failure": "Compra UI: locator #recepcionwizard-almacen ausente, cantidad final 0 y paso 1",
+  "isolated_repeat": {
+    "source": "artifacts/peru-integrated-20261003054731015-18680",
+    "success": true,
+    "browser_passed": 1
+  },
+  "cause": "not_determined",
+  "product_fix_claimed": false,
+  "full_repeat_pending": true,
+  "backup_phase_completed": false
+}

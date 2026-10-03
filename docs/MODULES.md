@@ -801,6 +801,11 @@ Código principal: `apps/erp-api/src/modules/contabilidad`.
   `RP_<RUC>.ide`, `.tra`, `.per` y `.est` para las estructuras 04, 05, 11 y 17,
   con delimitador final y huella SHA-256. El ZIP del ERP no es el ZIP de carga:
   PVS valida las fuentes y produce el ZIP que el usuario carga en SOL.
+- Congelar un paquete conserva una intención por tenant, actor, planilla y notas.
+  Reintentar con la misma clave devuelve la respuesta original aunque cambien la
+  jornada o el corte; una intención nueva crea otra versión. La clave no puede
+  reutilizarse con otro actor o notas. El actor debe seguir activo y autorizado
+  en cada reintento; el writer interno sólo se invoca desde el wrapper autorizado.
 - Los papeles de trabajo incluyen quinta categoría y recibos por honorarios de
   cuarta categoría. La jornada ordinaria procede de asistencia real o de una
   corrección manual explícita y auditable; si falta, el paquete queda bloqueado.

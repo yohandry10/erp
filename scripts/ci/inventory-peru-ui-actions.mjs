@@ -42,6 +42,19 @@ function sourceCalls(file, visited = new Set()) {
   const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const calls = [];
   const imports = [];
+  const apiBindings = new Map();
+  function bindApi(node) {
+    if (ts.isVariableDeclaration(node) && ts.isObjectBindingPattern(node.name)
+      && node.initializer && ts.isCallExpression(node.initializer)
+      && ts.isIdentifier(node.initializer.expression) && node.initializer.expression.text === 'useApi') {
+      for (const element of node.name.elements) {
+        const method = element.propertyName?.getText(source) || element.name.getText(source);
+        if (methods[method]) apiBindings.set(element.name.getText(source), methods[method]);
+      }
+    }
+    ts.forEachChild(node, bindApi);
+  }
+  bindApi(source);
   function visit(node) {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
       const dependency = resolveImport(file, node.moduleSpecifier.text);
@@ -51,9 +64,10 @@ function sourceCalls(file, visited = new Set()) {
       const verb = ts.isIdentifier(node.expression) ? node.expression.text
         : ts.isPropertyAccessExpression(node.expression) ? node.expression.name.text : '';
       let endpoint = node.arguments[0] && template(node.arguments[0]);
-      if (methods[verb] && endpoint?.includes('/api/')) {
-        endpoint = endpoint.slice(endpoint.indexOf('/api/')).split('?')[0].replace(/\/$/, '');
-        let method = methods[verb];
+      const relativeApi = (apiBindings.has(verb) || verb === 'fetchApi') && endpoint?.startsWith('/') && !endpoint.startsWith('/api/');
+      if ((methods[verb] || apiBindings.has(verb)) && (endpoint?.includes('/api/') || relativeApi)) {
+        endpoint = (relativeApi ? '/api' + endpoint : endpoint.slice(endpoint.indexOf('/api/'))).split('?')[0].replace(/\/$/, '');
+        let method = apiBindings.get(verb) || methods[verb];
         if (['fetch', 'fetchApi'].includes(verb) && node.arguments[1] && ts.isObjectLiteralExpression(node.arguments[1])) {
           const property = node.arguments[1].properties.find(item => ts.isPropertyAssignment(item) && (ts.isIdentifier(item.name) || ts.isStringLiteralLike(item.name)) && item.name.text === 'method');
           method = property ? template(property.initializer)?.toUpperCase() || 'UNRESOLVED' : 'GET';
@@ -78,7 +92,7 @@ const result = {
   operational_accounting_tax_reports_included: true, navigation,
   limitations: [
     'Los controles visibles no se marcan como ejecutados. La evidencia de API relacionada no acepta la acción UI.',
-    'Se siguen imports locales de páginas, componentes, hooks, lib y contextos; incluye fetchApi y métodos explícitos. Endpoints/métodos calculados, efectos de soporte y menús/modales cerrados requieren inspección funcional.',
+    'Se siguen imports locales de páginas, componentes, hooks, lib y contextos; incluye fetchApi, métodos explícitos y rutas relativas de bindings useApi, incluidos alias. Endpoints/métodos calculados, efectos de soporte y menús/modales cerrados requieren inspección funcional.',
     'Las pantallas con registro usan los actores indicados por el ensayo; no se atribuyen al primer ADMIN.',
     'La disponibilidad depende del estado del registro, rol y configuración. Los contratos API sin vínculo a una página no se declaran ofrecidos por esta matriz.',
   ],

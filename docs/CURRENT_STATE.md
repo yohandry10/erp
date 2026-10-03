@@ -10,8 +10,11 @@ conciliación. Se conserva el fallo anterior de prueba UI de Filtros. CI PR
 37097869477 y rama 37097855546 aprobaron los mismos recorridos, builds y gates.
 La 558 se promovió el 03/10 con respaldo/ensayo, preservando datos, funciones,
 RLS y ACL (`artifacts/peru-558-promotion-20261003052409868.json`). #125 se integró
-como `b359c311`; main y despliegue siguen en verificación. No hay aceptación
-global del producto.
+como `b359c311`; main 37099744790, E2E y seguridad aprobaron. Render/Vercel y
+esquema 558 pasaron verificación de sólo lectura con preflight
+(`artifacts/peru-production-verification-after-125-20261003.json`). El primer
+intento agotó 20 segundos en Render y la repetición pasó. No acredita
+disponibilidad continua ni plan efectivo. No hay aceptación global del producto.
 
 Dos defectos de RRHH reproducidos por API bloqueaban recuperar el alta repetida
 de empleado y retirar asignación familiar al guardar sin hijos. El candidato
@@ -22,8 +25,34 @@ un tercer defecto: el modal vaciaba campos tras guardar, antes de recibir éxito
 (`artifacts/peru-hr-ui-defect-20261003.json`). La corrección canónica pasó diez
 casos API, un recorrido Playwright de alta perdida/replay/edición/recarga y
 restauración posterior (`artifacts/peru-hr-canonical-subset-20261003`). Tipos API
-y web pasaron. El runner incorpora estos casos; faltan repetición completa,
-CI y despliegue. No acredita RRHH ni planilla completos.
+y web pasaron. La repetición completa pasó 148 casos HTTP, 18 recorridos UI,
+99 pantallas, 22 vistas con registros, SQL y restauración posterior
+(`artifacts/peru-integrated-local-hr-20261003`). El fallo previo de compra UI
+se conserva; la causa no está determinada y la repetición aislada/completa pasó.
+CI PR 37100302015 y rama 37100299491 aprobaron esos contratos y todos los gates.
+#126 se integró como `3612a2d9`; main 37102349608 y despliegue están pendientes.
+No acredita RRHH ni planilla completos.
+
+PLAME reprodujo una duplicación: el mismo cuerpo/Idempotency-Key creó versiones
+4 y 5 (`artifacts/peru-plame-retry-defect-20261003.json`). La propuesta 559
+registra intención y versión en una transacción, conserva la respuesta congelada
+y valida actor/permiso en cada replay. El subconjunto canónico pasó 17 casos API
+y dos recorridos UI sobre copia local 558 más 559: CTS, liquidación, pago de
+planilla y fuentes/ZIP PLAME, respuestas perdidas, concurrencia, segregación,
+aislamiento, banco y asientos únicos/cuadrados, con restauración después de UI
+(`artifacts/peru-plame-financial-canonical-subset-20261003`). El primer intento
+UI agotó la espera de navegación tras login; el segundo pasó con el plazo usado
+por la suite existente. No acredita PVS/SOL ni todos los cálculos normativos.
+La reconstrucción limpia con los recorridos ampliados está en curso. La copia
+del respaldo PROD 558 detectó EXECUTE heredado de service_role sobre el writer
+interno PLAME; 559 cierra sólo esa vía, que la API no usa, y conserva su cuerpo.
+El respaldo 558 del 03/10 y el ensayo aislado sin red pasaron restauración,
+rollback negativo, preservación de 23 tablas, funciones restantes, RLS/ACL y
+contratos SQL (`artifacts/erp-peru-559-rehearsal-20261003063550149-15392.json`). La única ACL retirada es EXECUTE del writer
+interno PLAME para service_role; el wrapper conserva sus permisos. El primer
+ensayo completo ampliado se detuvo por login 429; se conserva la evidencia y
+se repite respetando Retry-After, sin alterar el limitador. Faltan CI,
+promoción y despliegue. PROD sigue en 558.
 
 Los dos jobs integrados de #124, CI 37090225590 y 37090197674, aprobaron API,
 navegador y recuperación. Sus auditorías fallaron por dos avisos recién

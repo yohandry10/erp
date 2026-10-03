@@ -353,10 +353,11 @@ export class RrhhController {
   async guardarPaquetePlanillaElectronicaPeru(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Param('planillaId') planillaId: string,
     @Body() payload: GenerarPaquetePlanillaElectronicaDto,
   ) {
-    return { success: true, data: await this.planillaElectronicaPeru.guardarPaquete(tenantId, userId, planillaId, payload?.notas) };
+    return { success: true, data: await this.planillaElectronicaPeru.guardarPaquete(tenantId, userId, planillaId, payload?.notas, idempotencyKey) };
   }
 
   @Get('peru/planilla-electronica/paquetes/historial')

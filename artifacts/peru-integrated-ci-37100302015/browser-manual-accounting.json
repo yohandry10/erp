@@ -1,0 +1,14 @@
+{
+  "asiento_id": "1dca4fd1-4f39-4bac-b8ed-b19b91fa79d3",
+  "reversa_id": "7d9f7691-d90f-41ba-9cdb-18c1f09115c8",
+  "first_response_status": 503,
+  "same_intent_replayed": true,
+  "initial_amount": 17,
+  "corrected_amount": 20,
+  "confirmed_original_preserved": true,
+  "pdf_downloaded": true,
+  "pdf_amount_verified": 20,
+  "default_date_matches_tenant_calendar": "2026-10-03",
+  "local_only": true,
+  "external_browser_requests_blocked": true
+}

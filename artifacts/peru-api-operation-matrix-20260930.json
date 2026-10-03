@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-10-03T05:33:10.994Z",
+  "generated_at": "2026-10-03T06:37:12.721Z",
   "inventory": "artifacts/peru-api-operation-inventory-20260930.json",
-  "evidence": "artifacts/peru-integrated-ci-37097869477",
+  "evidence": "artifacts/peru-integrated-ci-37100302015",
   "evidence_scope": "full",
   "evidence_global_success": true,
   "evidence_phase": "ensayo global aprobado",
@@ -535,6 +535,18 @@
         },
         {
           "trace_index": 731,
+          "status": 201
+        },
+        {
+          "trace_index": 749,
+          "status": 201
+        },
+        {
+          "trace_index": 750,
+          "status": 201
+        },
+        {
+          "trace_index": 766,
           "status": 201
         }
       ],
@@ -2774,7 +2786,7 @@
       "defects": [
         {
           "id": "wizard-summary-without-completed-progress",
-          "status": "corrected_ci_merged_deployment_pending",
+          "status": "corrected_verified_deployed",
           "proof": {
             "source": "apps/web/app/dashboard/wizard/useWizard.ts",
             "commit": "82000ee927426134dea7bef69d8c54e6695f8dca",
@@ -2782,9 +2794,7 @@
             "observed": "La condición inicial de resumen sólo requiere identidad preparada del ERP y no comprueba completado del asistente; el alta ya proporciona RUC, razón social y dirección"
           },
           "correction": "Candidato exige cierre persistido del asistente para mostrar resumen; preparación del ERP y habilitación fiscal permanecen separadas",
-          "pending": [
-            "CI main y despliegue exacto"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [],
@@ -2853,7 +2863,7 @@
       "defects": [
         {
           "id": "wizard-summary-without-completed-progress",
-          "status": "corrected_ci_merged_deployment_pending",
+          "status": "corrected_verified_deployed",
           "proof": {
             "source": "apps/web/app/dashboard/wizard/useWizard.ts",
             "commit": "82000ee927426134dea7bef69d8c54e6695f8dca",
@@ -2861,9 +2871,7 @@
             "observed": "La condición inicial de resumen sólo requiere identidad preparada del ERP y no comprueba completado del asistente; el alta ya proporciona RUC, razón social y dirección"
           },
           "correction": "Candidato exige cierre persistido del asistente para mostrar resumen; preparación del ERP y habilitación fiscal permanecen separadas",
-          "pending": [
-            "CI main y despliegue exacto"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -4570,16 +4578,14 @@
       "defects": [
         {
           "id": "annual-loss-balance-sign",
-          "status": "corrected_ci_merged_deployment_pending",
+          "status": "corrected_verified_deployed",
           "proof": {
             "source": "artifacts/peru-year-loss-balance-defect-20261002.json",
             "observed": "Pérdida confirmada 7, asientos balanceados, patrimonio reportado 0 en vez de -7; balance descuadrado -7",
             "local_only": true
           },
           "correction": "Candidato 558 conserva el signo acreedor/deudor de resultados acumulados en balance_general_live",
-          "pending": [
-            "CI main y despliegue exacto"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -4648,16 +4654,14 @@
       "defects": [
         {
           "id": "annual-loss-balance-sign",
-          "status": "corrected_ci_merged_deployment_pending",
+          "status": "corrected_verified_deployed",
           "proof": {
             "source": "artifacts/peru-year-loss-balance-defect-20261002.json",
             "observed": "Pérdida confirmada 7, asientos balanceados, patrimonio reportado 0 en vez de -7; balance descuadrado -7",
             "local_only": true
           },
           "correction": "Candidato 558 conserva el signo acreedor/deudor de resultados acumulados en balance_general_live",
-          "pending": [
-            "CI main y despliegue exacto"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [],
@@ -5675,16 +5679,14 @@
         },
         {
           "id": "first-customer-annual-close-accounts",
-          "status": "corrected_ci_merged_deployment_pending",
+          "status": "corrected_verified_deployed",
           "proof": {
             "source": "artifacts/peru-year-close-missing-accounts-20261002.json",
             "observed_error": "ACCOUNTING_YEAR_CLOSE_ACCOUNTS_89_59_REQUIRED",
             "local_only": true
           },
           "correction": "Candidato 558 inserta sólo 59/89 ausentes en empresas PE; conserva cuentas personalizadas/inactivas y permisos",
-          "pending": [
-            "CI main y despliegue exacto"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -7302,7 +7304,7 @@
       "defects": [
         {
           "id": "wizard-status-coupled-to-demo-api",
-          "status": "corrected_ci_merged_deployment_pending",
+          "status": "corrected_verified_deployed",
           "proof": {
             "source": "artifacts/peru-integrated-20261003032954428-15196/wizard-browser.json",
             "local_only": true,
@@ -7310,9 +7312,7 @@
             "scope": "Configuración con demo API deshabilitada; la bandera efectiva de PROD no se afirma"
           },
           "correction": "Candidato permite estado autenticado de sólo lectura sin habilitar mutaciones demo; la UI espera el estado confirmado y permite reintentar errores",
-          "pending": [
-            "CI main y despliegue exacto"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [],
@@ -8223,16 +8223,14 @@
       "defects": [
         {
           "id": "bank-csv-date-columns-formulas",
-          "status": "corrected_ci_merged_deployment_pending",
+          "status": "corrected_verified_deployed",
           "proof": {
             "source": "artifacts/peru-bank-csv-defect-20261002.json",
             "local_only": true,
             "observed": "Fecha 01/10 en vez de 02/10; diez columnas frente a nueve y celda =1+1 sin neutralizar"
           },
           "correction": "Candidato conserva calendario fiscal, presenta instantes en zona del tenant, escapa todas las columnas y neutraliza fórmulas",
-          "pending": [
-            "CI main y despliegue exacto"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -11760,6 +11758,10 @@
         {
           "trace_index": 729,
           "status": 201
+        },
+        {
+          "trace_index": 764,
+          "status": 201
         }
       ],
       "defects": [],
@@ -12453,17 +12455,37 @@
         {
           "trace_index": 139,
           "status": 200
+        },
+        {
+          "trace_index": 758,
+          "status": 200
+        },
+        {
+          "trace_index": 767,
+          "status": 403
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "hr-first-admin-employees-recovery",
+          "source": "scripts/ci/test-peru-hr-lifecycle-local.mjs",
+          "verified_checks": [
+            "Alta, edición, consulta y baja lógica persistidas",
+            "Replay y huella incompatible sin duplicar",
+            "Documento duplicado rechazado por writer/índice",
+            "Sin hijos retira asignación; edición parcial conserva",
+            "Rol sin acceso no consulta ni muta",
+            "Edición ajena 404 sin mutar"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Permisos/aislamiento de alta, baja y consulta por cada variante",
+        "Foto, expediente y ficha SUNAT",
+        "Validaciones de todas las identidades",
+        "UI de baja"
       ]
     },
     {
@@ -12572,11 +12594,40 @@
       "method": "POST",
       "endpoint": "/api/rrhh/empleados",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:94",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 752,
+          "status": 400
+        },
+        {
+          "trace_index": 753,
+          "status": 400
+        },
+        {
+          "trace_index": 754,
+          "status": 201
+        },
+        {
+          "trace_index": 755,
+          "status": 201
+        },
+        {
+          "trace_index": 756,
+          "status": 409
+        },
+        {
+          "trace_index": 759,
+          "status": 201
+        },
+        {
+          "trace_index": 768,
+          "status": 403
+        }
+      ],
       "defects": [
         {
           "id": "employee-create-replay-prevalidation",
-          "status": "canonical_local_api_ui_passed_ci_deployment_pending",
+          "status": "corrected_ci_merged_deployment_pending",
           "proof": {
             "source": "artifacts/peru-hr-lifecycle-defects-20261003.json",
             "local_only": true,
@@ -12591,32 +12642,42 @@
             }
           },
           "pending": [
-            "suite completa",
-            "CI y despliegue"
+            "CI main y despliegue exacto"
           ]
         },
         {
           "id": "employee-modal-clears-before-response",
-          "status": "canonical_local_api_ui_passed_ci_deployment_pending",
+          "status": "corrected_ci_merged_deployment_pending",
           "proof": {
             "source": "artifacts/peru-hr-ui-defect-20261003.json",
             "local_only": true,
             "observed": "Alta confirma en DB, respuesta perdida 503, formulario vacía campos antes de confirmar y bloquea reintento"
           },
           "pending": [
-            "suite completa",
-            "CI y despliegue"
+            "CI main y despliegue exacto"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "hr-first-admin-employees-recovery",
+          "source": "scripts/ci/test-peru-hr-lifecycle-local.mjs",
+          "verified_checks": [
+            "Alta, edición, consulta y baja lógica persistidas",
+            "Replay y huella incompatible sin duplicar",
+            "Documento duplicado rechazado por writer/índice",
+            "Sin hijos retira asignación; edición parcial conserva",
+            "Rol sin acceso no consulta ni muta",
+            "Edición ajena 404 sin mutar"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Permisos/aislamiento de alta, baja y consulta por cada variante",
+        "Foto, expediente y ficha SUNAT",
+        "Validaciones de todas las identidades",
+        "UI de baja"
       ]
     },
     {
@@ -12625,11 +12686,40 @@
       "method": "PUT",
       "endpoint": "/api/rrhh/empleados/:id",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:105",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 757,
+          "status": 200
+        },
+        {
+          "trace_index": 760,
+          "status": 409
+        },
+        {
+          "trace_index": 761,
+          "status": 200
+        },
+        {
+          "trace_index": 762,
+          "status": 200
+        },
+        {
+          "trace_index": 763,
+          "status": 409
+        },
+        {
+          "trace_index": 769,
+          "status": 403
+        },
+        {
+          "trace_index": 782,
+          "status": 404
+        }
+      ],
       "defects": [
         {
           "id": "employee-family-allowance-not-cleared",
-          "status": "canonical_local_api_ui_passed_ci_deployment_pending",
+          "status": "corrected_ci_merged_deployment_pending",
           "proof": {
             "source": "artifacts/peru-hr-lifecycle-defects-20261003.json",
             "local_only": true,
@@ -12646,19 +12736,30 @@
             }
           },
           "pending": [
-            "suite completa",
-            "CI y despliegue"
+            "CI main y despliegue exacto"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "hr-first-admin-employees-recovery",
+          "source": "scripts/ci/test-peru-hr-lifecycle-local.mjs",
+          "verified_checks": [
+            "Alta, edición, consulta y baja lógica persistidas",
+            "Replay y huella incompatible sin duplicar",
+            "Documento duplicado rechazado por writer/índice",
+            "Sin hijos retira asignación; edición parcial conserva",
+            "Rol sin acceso no consulta ni muta",
+            "Edición ajena 404 sin mutar"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Permisos/aislamiento de alta, baja y consulta por cada variante",
+        "Foto, expediente y ficha SUNAT",
+        "Validaciones de todas las identidades",
+        "UI de baja"
       ]
     },
     {
@@ -12667,16 +12768,37 @@
       "method": "DELETE",
       "endpoint": "/api/rrhh/empleados/:id",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:117",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 770,
+          "status": 403
+        },
+        {
+          "trace_index": 788,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "hr-first-admin-employees-recovery",
+          "source": "scripts/ci/test-peru-hr-lifecycle-local.mjs",
+          "verified_checks": [
+            "Alta, edición, consulta y baja lógica persistidas",
+            "Replay y huella incompatible sin duplicar",
+            "Documento duplicado rechazado por writer/índice",
+            "Sin hijos retira asignación; edición parcial conserva",
+            "Rol sin acceso no consulta ni muta",
+            "Edición ajena 404 sin mutar"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Permisos/aislamiento de alta, baja y consulta por cada variante",
+        "Foto, expediente y ficha SUNAT",
+        "Validaciones de todas las identidades",
+        "UI de baja"
       ]
     },
     {
@@ -12685,10 +12807,15 @@
       "method": "POST",
       "endpoint": "/api/rrhh/departamentos",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:128",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 751,
+          "status": 201
+        }
+      ],
       "defects": [],
       "verified_cases": [],
-      "result": "pending_functional_execution",
+      "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
         "persistencia y resultado funcional",
         "permisos",
@@ -13086,7 +13213,21 @@
       "endpoint": "/api/rrhh/peru/planilla-electronica/:planillaId/paquetes",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:351",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "plame-package-duplicates-on-retry",
+          "status": "canonical_local_api_ui_passed_ci_promotion_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-plame-retry-defect-20261003.json",
+            "local_only": true,
+            "observed": "Dos POST con mismo Idempotency-Key/cuerpo generan versiones 4 y 5"
+          },
+          "pending": [
+            "Reconstrucción limpia y CI",
+            "Ensayo de permisos heredados, promoción 559 y despliegue"
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -13102,7 +13243,7 @@
       "operation": "historialPlanillaElectronicaPeru",
       "method": "GET",
       "endpoint": "/api/rrhh/peru/planilla-electronica/paquetes/historial",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:362",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:363",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13120,7 +13261,7 @@
       "operation": "registrarEvidenciaPlanillaElectronicaPeru",
       "method": "POST",
       "endpoint": "/api/rrhh/peru/planilla-electronica/paquetes/:id/evidencia",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:371",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:372",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13138,7 +13279,7 @@
       "operation": "descargarPaquetePlanillaElectronicaPeru",
       "method": "GET",
       "endpoint": "/api/rrhh/peru/planilla-electronica/paquetes/:id/descargar",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:382",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:383",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13156,7 +13297,7 @@
       "operation": "getHistorialPagos",
       "method": "GET",
       "endpoint": "/api/rrhh/planillas/:id/historial-pagos",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:395",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:396",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13174,7 +13315,7 @@
       "operation": "generarComprobante",
       "method": "GET",
       "endpoint": "/api/rrhh/pagos/:id/comprobante",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:404",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:405",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13192,7 +13333,7 @@
       "operation": "generarBoletaPago",
       "method": "GET",
       "endpoint": "/api/rrhh/empleados/:id/boleta-pago/:mes",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:417",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:418",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13210,17 +13351,32 @@
       "operation": "getContratos",
       "method": "GET",
       "endpoint": "/api/rrhh/contratos",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:428",
-      "existing_evidence": [],
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:429",
+      "existing_evidence": [
+        {
+          "trace_index": 775,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "hr-first-admin-contracts",
+          "source": "scripts/ci/test-peru-hr-lifecycle-local.mjs",
+          "verified_checks": [
+            "Alta temporal ONP, replay y consulta",
+            "Régimen ausente y remuneración inválida rechazados",
+            "PDF real del registro, visual independiente",
+            "PDF ajeno oculto",
+            "Renovación/finalización con replay conservan registro"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "Permisos/aislamiento de cada escritura",
+        "AFP, adendas, períodos superpuestos y otras modalidades"
       ]
     },
     {
@@ -13228,17 +13384,44 @@
       "operation": "createContrato",
       "method": "POST",
       "endpoint": "/api/rrhh/contratos",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:437",
-      "existing_evidence": [],
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:438",
+      "existing_evidence": [
+        {
+          "trace_index": 771,
+          "status": 400
+        },
+        {
+          "trace_index": 772,
+          "status": 400
+        },
+        {
+          "trace_index": 773,
+          "status": 201
+        },
+        {
+          "trace_index": 774,
+          "status": 201
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "hr-first-admin-contracts",
+          "source": "scripts/ci/test-peru-hr-lifecycle-local.mjs",
+          "verified_checks": [
+            "Alta temporal ONP, replay y consulta",
+            "Régimen ausente y remuneración inválida rechazados",
+            "PDF real del registro, visual independiente",
+            "PDF ajeno oculto",
+            "Renovación/finalización con replay conservan registro"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "Permisos/aislamiento de cada escritura",
+        "AFP, adendas, períodos superpuestos y otras modalidades"
       ]
     },
     {
@@ -13246,17 +13429,36 @@
       "operation": "renovarContrato",
       "method": "POST",
       "endpoint": "/api/rrhh/contratos/:id/renovar",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:448",
-      "existing_evidence": [],
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:449",
+      "existing_evidence": [
+        {
+          "trace_index": 784,
+          "status": 201
+        },
+        {
+          "trace_index": 785,
+          "status": 201
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "hr-first-admin-contracts",
+          "source": "scripts/ci/test-peru-hr-lifecycle-local.mjs",
+          "verified_checks": [
+            "Alta temporal ONP, replay y consulta",
+            "Régimen ausente y remuneración inválida rechazados",
+            "PDF real del registro, visual independiente",
+            "PDF ajeno oculto",
+            "Renovación/finalización con replay conservan registro"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "Permisos/aislamiento de cada escritura",
+        "AFP, adendas, períodos superpuestos y otras modalidades"
       ]
     },
     {
@@ -13264,17 +13466,36 @@
       "operation": "finalizarContrato",
       "method": "PUT",
       "endpoint": "/api/rrhh/contratos/:id/finalizar",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:462",
-      "existing_evidence": [],
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:463",
+      "existing_evidence": [
+        {
+          "trace_index": 786,
+          "status": 200
+        },
+        {
+          "trace_index": 787,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "hr-first-admin-contracts",
+          "source": "scripts/ci/test-peru-hr-lifecycle-local.mjs",
+          "verified_checks": [
+            "Alta temporal ONP, replay y consulta",
+            "Régimen ausente y remuneración inválida rechazados",
+            "PDF real del registro, visual independiente",
+            "PDF ajeno oculto",
+            "Renovación/finalización con replay conservan registro"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "Permisos/aislamiento de cada escritura",
+        "AFP, adendas, períodos superpuestos y otras modalidades"
       ]
     },
     {
@@ -13282,17 +13503,36 @@
       "operation": "generarContrato",
       "method": "GET",
       "endpoint": "/api/rrhh/contratos/:id/generar",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:477",
-      "existing_evidence": [],
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:478",
+      "existing_evidence": [
+        {
+          "trace_index": 776,
+          "status": 200
+        },
+        {
+          "trace_index": 783,
+          "status": 404
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "hr-first-admin-contracts",
+          "source": "scripts/ci/test-peru-hr-lifecycle-local.mjs",
+          "verified_checks": [
+            "Alta temporal ONP, replay y consulta",
+            "Régimen ausente y remuneración inválida rechazados",
+            "PDF real del registro, visual independiente",
+            "PDF ajeno oculto",
+            "Renovación/finalización con replay conservan registro"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "Permisos/aislamiento de cada escritura",
+        "AFP, adendas, períodos superpuestos y otras modalidades"
       ]
     },
     {
@@ -13300,22 +13540,35 @@
       "operation": "getAsistenciasPorFecha",
       "method": "GET",
       "endpoint": "/api/rrhh/asistencias",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:491",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:492",
       "existing_evidence": [
         {
           "trace_index": 143,
           "status": 200
+        },
+        {
+          "trace_index": 781,
+          "status": 200
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "hr-first-admin-attendance",
+          "source": "scripts/ci/test-peru-hr-lifecycle-local.mjs",
+          "verified_checks": [
+            "Entrada 08:00 y salida 17:00 persistidas",
+            "Replay conserva una fila",
+            "Salida anterior a entrada rechazada",
+            "Consulta en fecha fiscal del tenant"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "Permisos/aislamiento",
+        "Importación, ausencias, turnos nocturnos y horas extra"
       ]
     },
     {
@@ -13323,17 +13576,43 @@
       "operation": "marcarAsistencia",
       "method": "POST",
       "endpoint": "/api/rrhh/asistencias/marcar",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:500",
-      "existing_evidence": [],
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:501",
+      "existing_evidence": [
+        {
+          "trace_index": 777,
+          "status": 201
+        },
+        {
+          "trace_index": 778,
+          "status": 201
+        },
+        {
+          "trace_index": 779,
+          "status": 400
+        },
+        {
+          "trace_index": 780,
+          "status": 201
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "hr-first-admin-attendance",
+          "source": "scripts/ci/test-peru-hr-lifecycle-local.mjs",
+          "verified_checks": [
+            "Entrada 08:00 y salida 17:00 persistidas",
+            "Replay conserva una fila",
+            "Salida anterior a entrada rechazada",
+            "Consulta en fecha fiscal del tenant"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "Permisos/aislamiento",
+        "Importación, ausencias, turnos nocturnos y horas extra"
       ]
     },
     {
@@ -13341,7 +13620,7 @@
       "operation": "getVacantes",
       "method": "GET",
       "endpoint": "/api/rrhh/vacantes",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:514",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:515",
       "existing_evidence": [
         {
           "trace_index": 142,
@@ -13364,7 +13643,7 @@
       "operation": "createVacante",
       "method": "POST",
       "endpoint": "/api/rrhh/vacantes",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:520",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:521",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13382,7 +13661,7 @@
       "operation": "getCandidatos",
       "method": "GET",
       "endpoint": "/api/rrhh/candidatos",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:531",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:532",
       "existing_evidence": [
         {
           "trace_index": 141,
@@ -13405,7 +13684,7 @@
       "operation": "createCandidato",
       "method": "POST",
       "endpoint": "/api/rrhh/candidatos",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:540",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:541",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13423,7 +13702,7 @@
       "operation": "updateCandidato",
       "method": "PUT",
       "endpoint": "/api/rrhh/candidatos/:id",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:551",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:552",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13441,7 +13720,7 @@
       "operation": "updateEstadoCandidato",
       "method": "PUT",
       "endpoint": "/api/rrhh/candidatos/:id/estado",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:564",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:565",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13459,7 +13738,7 @@
       "operation": "registrarEntrada",
       "method": "POST",
       "endpoint": "/api/rrhh/asistencia/entrada/:empleadoId",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:579",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:580",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13477,7 +13756,7 @@
       "operation": "registrarSalida",
       "method": "POST",
       "endpoint": "/api/rrhh/asistencia/salida/:empleadoId",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:592",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:593",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13495,7 +13774,7 @@
       "operation": "getAsistencia",
       "method": "GET",
       "endpoint": "/api/rrhh/asistencia",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:605",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:606",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13513,7 +13792,7 @@
       "operation": "getSolicitudes",
       "method": "GET",
       "endpoint": "/api/rrhh/solicitudes",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:617",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:618",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13531,7 +13810,7 @@
       "operation": "createSolicitud",
       "method": "POST",
       "endpoint": "/api/rrhh/solicitudes",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:627",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:628",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13549,7 +13828,7 @@
       "operation": "aprobarSolicitud",
       "method": "PUT",
       "endpoint": "/api/rrhh/solicitudes/:id/aprobar",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:638",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:639",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13567,7 +13846,7 @@
       "operation": "rechazarSolicitud",
       "method": "PUT",
       "endpoint": "/api/rrhh/solicitudes/:id/rechazar",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:652",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:653",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13585,7 +13864,7 @@
       "operation": "getBeneficios",
       "method": "GET",
       "endpoint": "/api/rrhh/beneficios",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:667",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:668",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13603,7 +13882,7 @@
       "operation": "getBeneficiosEmpleado",
       "method": "GET",
       "endpoint": "/api/rrhh/empleados/:id/beneficios",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:673",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:674",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13621,7 +13900,7 @@
       "operation": "asignarBeneficio",
       "method": "POST",
       "endpoint": "/api/rrhh/empleados/:id/beneficios",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:682",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:683",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13639,7 +13918,7 @@
       "operation": "getEvaluaciones",
       "method": "GET",
       "endpoint": "/api/rrhh/evaluaciones",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:697",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:698",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13657,7 +13936,7 @@
       "operation": "createEvaluacion",
       "method": "POST",
       "endpoint": "/api/rrhh/evaluaciones",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:706",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:707",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13675,7 +13954,7 @@
       "operation": "updateEvaluacion",
       "method": "PUT",
       "endpoint": "/api/rrhh/evaluaciones/:id",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:719",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:720",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13693,7 +13972,7 @@
       "operation": "getCapacitaciones",
       "method": "GET",
       "endpoint": "/api/rrhh/capacitaciones",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:734",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:735",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13711,7 +13990,7 @@
       "operation": "getCapacitacionesEmpleado",
       "method": "GET",
       "endpoint": "/api/rrhh/empleados/:id/capacitaciones",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:740",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:741",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13729,7 +14008,7 @@
       "operation": "inscribirCapacitacion",
       "method": "POST",
       "endpoint": "/api/rrhh/empleados/:id/capacitaciones",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:749",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:750",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13747,7 +14026,7 @@
       "operation": "getLiquidaciones",
       "method": "GET",
       "endpoint": "/api/rrhh/liquidaciones",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:764",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:765",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13765,7 +14044,7 @@
       "operation": "calcularLiquidacion",
       "method": "POST",
       "endpoint": "/api/rrhh/empleados/:id/liquidacion",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:770",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:771",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13783,7 +14062,7 @@
       "operation": "confirmarLiquidacion",
       "method": "POST",
       "endpoint": "/api/rrhh/liquidaciones/:id/confirmar",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:788",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:789",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13801,7 +14080,7 @@
       "operation": "pagarLiquidacion",
       "method": "POST",
       "endpoint": "/api/rrhh/liquidaciones/:id/pagar",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:799",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:800",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13819,7 +14098,7 @@
       "operation": "revertirPagoLiquidacion",
       "method": "POST",
       "endpoint": "/api/rrhh/liquidaciones/:id/pago/revertir",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:810",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:811",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13837,7 +14116,7 @@
       "operation": "getDepositosCts",
       "method": "GET",
       "endpoint": "/api/rrhh/cts/depositos",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:828",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:829",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13855,7 +14134,7 @@
       "operation": "calcularDepositosCts",
       "method": "POST",
       "endpoint": "/api/rrhh/cts/depositos",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:837",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:838",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13873,7 +14152,7 @@
       "operation": "depositarCts",
       "method": "POST",
       "endpoint": "/api/rrhh/cts/depositos/:id/depositar",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:848",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:849",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13891,7 +14170,7 @@
       "operation": "getHorarios",
       "method": "GET",
       "endpoint": "/api/rrhh/horarios",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:860",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:861",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13909,7 +14188,7 @@
       "operation": "asignarHorario",
       "method": "POST",
       "endpoint": "/api/rrhh/empleados/:id/horario",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:866",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:867",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13927,7 +14206,7 @@
       "operation": "getExpediente",
       "method": "GET",
       "endpoint": "/api/rrhh/empleados/:id/expediente",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:881",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:882",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13945,7 +14224,7 @@
       "operation": "subirDocumento",
       "method": "POST",
       "endpoint": "/api/rrhh/empleados/:id/expediente",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:890",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:891",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13963,7 +14242,7 @@
       "operation": "getDashboardRrhh",
       "method": "GET",
       "endpoint": "/api/rrhh/dashboard",
-      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:912",
+      "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:913",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -15168,6 +15447,10 @@
         },
         {
           "trace_index": 730,
+          "status": 201
+        },
+        {
+          "trace_index": 765,
           "status": 201
         }
       ],
