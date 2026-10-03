@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, CalendarCheck2, FileCheck2, Loader2, RefreshCw } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 import { Button } from '@/components/ui/button'
@@ -42,6 +42,8 @@ export default function RentaAnualPage() {
   const [mensaje, setMensaje] = useState<string | null>(null)
   const [constancia, setConstancia] = useState('')
   const [fechaPresentacion, setFechaPresentacion] = useState('')
+  const saveIntent = useRef<{ signature: string; key: string } | null>(null)
+  const receiptIntent = useRef<{ signature: string; key: string } | null>(null)
   const [ajustes, setAjustes] = useState({
     adiciones_tributarias: '0', deducciones_tributarias: '0', perdidas_compensables: '0',
     pagos_cuenta_renta: '', credito_itan_renta: '0', otros_creditos_renta: '0',
@@ -99,9 +101,15 @@ export default function RentaAnualPage() {
   const ejecutar = async (guardar: boolean) => {
     setProcesando(true); setError(null); setMensaje(null)
     try {
-      const response = await post(guardar ? '/api/contabilidad/impuestos/anual' : '/api/contabilidad/impuestos/anual/calcular', payload)
+      const signature = JSON.stringify(payload)
+      if (guardar && saveIntent.current?.signature !== signature) {
+        saveIntent.current = { signature, key: crypto.randomUUID() }
+      }
+      const response = await post(guardar ? '/api/contabilidad/impuestos/anual' : '/api/contabilidad/impuestos/anual/calcular', payload,
+        guardar ? { headers: { 'Idempotency-Key': saveIntent.current!.key } } : undefined)
       if (!response?.success) throw new Error(response?.message || 'No se pudo procesar el borrador anual')
       if (guardar) {
+        saveIntent.current = null
         setMensaje('Nueva versión guardada. Presente FV 710 e ITAN en SUNAT antes de registrar la constancia.')
         await cargar()
       } else {
@@ -117,11 +125,19 @@ export default function RentaAnualPage() {
     if (!vigente?.id || !constancia.trim()) { setError('Guarda el borrador e ingresa la constancia obtenida en SUNAT.'); return }
     setProcesando(true); setError(null); setMensaje(null)
     try {
-      const response = await post(`/api/contabilidad/impuestos/anuales/${vigente.id}/constancia`, {
+      const receipt = {
         constancia: constancia.trim(),
         ...(fechaPresentacion ? { fecha_presentacion: new Date(fechaPresentacion).toISOString() } : {}),
+      }
+      const signature = JSON.stringify({ id: vigente.id, ...receipt })
+      if (receiptIntent.current?.signature !== signature) {
+        receiptIntent.current = { signature, key: crypto.randomUUID() }
+      }
+      const response = await post(`/api/contabilidad/impuestos/anuales/${vigente.id}/constancia`, receipt, {
+        headers: { 'Idempotency-Key': receiptIntent.current.key },
       })
       if (!response?.success) throw new Error(response?.message || 'No se pudo registrar la constancia')
+      receiptIntent.current = null
       setMensaje('Constancia anual externa registrada y versión anterior rectificada, si correspondía.')
       await cargar()
     } catch (err: any) { setError(err?.message || 'No se pudo registrar la constancia') }

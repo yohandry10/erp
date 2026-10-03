@@ -7,6 +7,7 @@ import {
 } from './documento-fiscal.rules';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { uitPeruPorEjercicio } from './uit-peru';
+import { mutarTributo, TributoIntent } from './tributos-intent';
 
 export type RegimenTributarioPeru = 'NRUS' | 'RER' | 'MYPE' | 'GENERAL';
 
@@ -443,7 +444,10 @@ export class TributosMensualesService {
     return { periodo, ...calculo, source_snapshot: snapshot, declaracion_vigente: declaracion || null };
   }
 
-  async guardar(tenantId: string, userId: string, periodo: string, ajustes: AjustesTributariosMensuales = {}) {
+  async guardar(tenantId: string, userId: string, periodo: string, ajustes: AjustesTributariosMensuales = {}, idempotencyKey?: string) {
+    const intent: TributoIntent = { tenantId, actorId: userId, key: idempotencyKey, operation: 'MONTHLY_SAVE', request: { periodo, ...ajustes, notas: ajustes.notas?.trim() || null } };
+    const replay = await mutarTributo(this.supabase, intent);
+    if (replay.pending !== true) return replay;
     const calculo = await this.calcular(tenantId, periodo, ajustes);
     const payload = {
       ...calculo,
@@ -455,13 +459,7 @@ export class TributosMensualesService {
     delete (payload as any).formulario;
     delete (payload as any).uit;
     delete (payload as any).limite_rmt_300_uit;
-    const { data, error } = await this.supabase.getClient().rpc('guardar_tributo_mensual_tx', {
-      p_tenant_id: tenantId,
-      p_user_id: userId,
-      p_payload: payload,
-    });
-    if (error) throw new Error(`No se pudo guardar el borrador tributario: ${error.message}`);
-    return data;
+    return mutarTributo(this.supabase, intent, payload);
   }
 
   async listar(tenantId: string, limite = 24) {
@@ -480,7 +478,11 @@ export class TributosMensualesService {
     declaracionId: string,
     constancia: string,
     fechaPresentacion?: string,
+    idempotencyKey?: string,
   ) {
+    const intent: TributoIntent = { tenantId, actorId: userId, key: idempotencyKey, operation: 'MONTHLY_RECEIPT', recordId: declaracionId, request: { constancia: constancia.trim(), fecha_presentacion: fechaPresentacion ? new Date(fechaPresentacion).toISOString() : null } };
+    const replay = await mutarTributo(this.supabase, intent);
+    if (replay.pending !== true) return replay;
     const { data: existente, error: findError } = await this.supabase.getClient()
       .from('tributos_declaraciones_mensuales')
       .select('id, warnings').eq('tenant_id', tenantId).eq('id', declaracionId).maybeSingle();
@@ -491,14 +493,6 @@ export class TributosMensualesService {
     if (bloqueada) {
       throw new BadRequestException('El borrador tiene observaciones que bloquean registrar la presentación.');
     }
-    const { data, error } = await this.supabase.getClient().rpc('registrar_constancia_tributo_mensual_tx', {
-      p_tenant_id: tenantId,
-      p_user_id: userId,
-      p_declaracion_id: declaracionId,
-      p_constancia: constancia,
-      p_fecha_presentacion: fechaPresentacion || null,
-    });
-    if (error) throw new Error(`No se pudo registrar la constancia SUNAT: ${error.message}`);
-    return data;
+    return mutarTributo(this.supabase, intent, {});
   }
 }

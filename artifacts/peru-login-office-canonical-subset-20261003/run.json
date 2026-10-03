@@ -1,0 +1,10 @@
+{
+  "completedAt": "2026-10-03T11:15:42.957Z",
+  "success": true,
+  "withBrowser": false,
+  "withSurvey": false,
+  "withRecords": false,
+  "scope": "login_office_subset",
+  "database": "PostgreSQL 16 efímero",
+  "remoteWrites": false
+}

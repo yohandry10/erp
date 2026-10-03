@@ -60,7 +60,11 @@ Series y ajustes fiscales: #129 se integró como `5a23c4c1`. Los 26 checks del S
 99 pantallas, 22 con registros, SQL y restore. Los dos intentos locales fallidos
 se conservan: espera de edición y error JS intermitente en usuarios. La causa
 de ese último error sigue pendiente; el barrido añade traza de script sin
-reintentar errores JS. Faltan CI main y comprobación del despliegue exacto.
+reintentar errores JS. Main 37114135464, E2E y seguridad aprobaron 208 API/22 UI
+sin reintentos, barridos y restore. Render/Vercel y esquema 560 pasaron sólo
+lectura con preflight (`artifacts/peru-production-verification-after-129-20261003.json`).
+Se conservan la lectura detenida por CI pendiente y el primer timeout de 20
+segundos; la repetición aprobada no acredita continuidad ni plan efectivo.
 No hay migración nueva ni aceptación global. La UIT mensual estaba fija en
 2026 incluso al consultar 2024/2025 y aceptaba 2027 sin parámetro. La corrección
 canónica usa el ejercicio y pasó 35 pruebas enfocadas, cuatro comprobaciones
@@ -76,7 +80,34 @@ pasó 10 casos API y un UI con Storage file oficial local; una ejecución separa
 restauró DB y archivos en un servidor nuevo y comparó bytes/SHA. El gate nuevo
 de CI combina API/UI/DB/blobs y publica sólo JSON seleccionados. Quedan formatos,
 concurrencias/limpieza adicionales y proveedor remoto; no se extrapola aceptación
-completa ni disponibilidad. La repetición global de estas fuentes está en curso.
+completa ni disponibilidad. La repetición local aprobó 215 API/22 UI sin reintentos, barridos y restore.
+Los 28 checks de `0b7d8f43` aprobaron; CI PR 37115734724 pasó 22 UI sin
+reintentos y rama 37115729735 pasó 21 sin reintento y uno con reintento. Ambos
+gates Storage combinaron API10/UI1/DB/blobs. #130 se integró como `c9629374`;
+main 37118191630, E2E/seguridad y despliegue exacto siguen pendientes. No hay
+migración nueva en #130; PROD 560 continúa vigente.
+
+El API real reprodujo duplicación de borradores mensual/anual y error 500 al
+repetir la constancia mensual (`artifacts/peru-tax-version-retry-baseline-20261003`).
+El candidato pasó 24 API/dos UI y restore; incluye concurrencia, colisión,
+rectificaciones, retiro de permiso, aislamiento, rollback real y constancia
+anual con cierre contable local. Las referencias fueron simuladas sólo en la
+base efímera; no hay presentación/aceptación SUNAT. La migración nueva 562
+añade intención/versión/constancia atómicas y respuesta congelada; conserva
+puentes anteriores y datos, sin backfill. El prefijo 0561 ya corresponde a un
+verificador histórico, preservado; no se crea una migración 561. Se conservaron
+el primer fallo de mapeo RPC y los dos fallos del gate SQL (prefijo duplicado,
+política privada faltante). La reconstrucción canónica pasó 558 migraciones
+hasta 562/71 verificadores y está completando API/UI/barridos/restore. CI, ensayo
+de respaldo 560, promoción única 562 y despliegue siguen pendientes.
+El ensayo del respaldo 560 del 03/10 aprobó restore, rollback negativo y
+preservación de 29 tablas, funciones, RLS y ACL existentes; el verificador
+562 revirtió sus fixtures (`artifacts/erp-peru-562-rehearsal-20261003110902737-23172.json`).
+El primer global completó los casos API pero falló al preparar wizard porque
+el 429 del límite agregado de login omitía Retry-After estándar; el proceso
+Node después también afirmó un handle de Windows al cerrar. Ese intento se
+conserva; no acredita UI/restore. Se añade Retry-After sin modificar los límites
+de cuenta/IP y oficina, con prueba de contrato y recuperación HTTP real local.
 
 Los dos jobs integrados de #124, CI 37090225590 y 37090197674, aprobaron API,
 navegador y recuperación. Sus auditorías fallaron por dos avisos recién

@@ -29,7 +29,7 @@ const contextFor = (email: string, ip = '10.20.30.40'): ExecutionContext => {
     route: { path: '/auth/login' },
     url: '/auth/login',
   };
-  const response = { header: (name: string, value: number) => { headers[name] = value; } };
+  const response = { headers, header: (name: string, value: number) => { headers[name] = value; } };
   const handler = () => undefined;
   class AuthControllerForTest {}
   UseGuards(AuthRateLimitGuard)(AuthControllerForTest);
@@ -100,7 +100,10 @@ describe('AuthRateLimitGuard', () => {
     for (let attempt = 0; attempt < 20; attempt += 1) {
       await expect(guard.canActivate(contextFor(`spray-${attempt}@example.com`))).resolves.toBe(true);
     }
-    await expect(guard.canActivate(contextFor('spray-21@example.com')))
-      .rejects.toBeInstanceOf(ThrottlerException);
+    const blocked = contextFor('spray-21@example.com');
+    await expect(guard.canActivate(blocked)).rejects.toBeInstanceOf(ThrottlerException);
+    const response = blocked.switchToHttp().getResponse();
+    expect(response.headers['Retry-After']).toBe(60);
+    expect(response.headers['Retry-After-Office']).toBe(60);
   });
 });

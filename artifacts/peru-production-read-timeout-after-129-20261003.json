@@ -1,0 +1,18 @@
+{
+  "success": false,
+  "checkedAt": "2026-10-03T10:15:57.360009+00:00",
+  "merge_sha": "5a23c4c1bc16b58c3bf324c15681ff00f8eb395a",
+  "required_schema": 560,
+  "scope": "Sólo lectura; preflight ejecutado; lecturas paralelas Render agotaron límite 20 segundos",
+  "remoteWrites": false,
+  "synthetic_prod_writes": false,
+  "main_ci": {
+    "run_id": 37114135464,
+    "conclusion": "success",
+    "api_scenarios": 208,
+    "ui_passed": 22,
+    "flaky": 0
+  },
+  "launch_accepted": false,
+  "render_plan_verified": false
+}
