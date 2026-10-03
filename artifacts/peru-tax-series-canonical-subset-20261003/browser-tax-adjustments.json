@@ -1,0 +1,114 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "UI real de ajustes fiscales: anticipo proveedor, detracción y depósito con respuesta perdida; no depósito bancario externo",
+  "checks": [
+    {
+      "check": "Anticipo: 503 conserva campos y retry recupera ID sin segundo cargo",
+      "passed": true
+    },
+    {
+      "check": "Detracción: respuesta perdida y retry mantienen una reducción de deuda",
+      "passed": true
+    },
+    {
+      "check": "Depósito: retry conserva cargo único y retira pendiente",
+      "passed": true
+    },
+    {
+      "check": "Recarga conserva historial y no hubo rechazo de promesa sin manejar",
+      "passed": true
+    },
+    {
+      "check": "Contabilidad posterior a UI: cada evento produjo un asiento confirmado y cuadrado",
+      "passed": true
+    }
+  ],
+  "unexpected_errors": [],
+  "postings": [
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "banco.movimiento.registrado"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "factura.proveedor.registrada"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "banco.movimiento.registrado"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "banco.movimiento.registrado"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "cxp.ajuste.registrado"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "cxp.ajuste.registrado"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "cxp.ajuste.registrado"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "cxp.ajuste.registrado"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "banco.movimiento.registrado"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "pago.proveedor.registrado"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "factura.proveedor.registrada"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "banco.movimiento.registrado"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "cxp.ajuste.registrado"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "banco.movimiento.registrado"
+    }
+  ]
+}

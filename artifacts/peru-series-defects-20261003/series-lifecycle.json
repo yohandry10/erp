@@ -1,0 +1,296 @@
+{
+  "success": false,
+  "local_only": true,
+  "remoteWrites": false,
+  "scope": "Series de documentos; API real, primer ADMIN no demo. Contador existente simulado localmente para probar límite; no emite documentos",
+  "results": [
+    {
+      "scenario": "Series: seis replays concurrentes conservan ID, recibo y auditoría",
+      "passed": true
+    },
+    {
+      "scenario": "Series: edición e inactivación persistidas y replay sin doble auditoría",
+      "passed": true
+    },
+    {
+      "scenario": "Series: consulta operativa omite inactivas; recuperación administrativa requiere usar el código",
+      "passed": true
+    },
+    {
+      "scenario": "series-replay-conflict",
+      "passed": false
+    },
+    {
+      "scenario": "series-zero-maximum",
+      "passed": false
+    },
+    {
+      "scenario": "series-overflow-maximum",
+      "passed": false
+    },
+    {
+      "scenario": "series-invalid-format",
+      "passed": false
+    },
+    {
+      "scenario": "series-negative-maximum",
+      "passed": true
+    },
+    {
+      "scenario": "series-invalid-number",
+      "passed": true
+    },
+    {
+      "scenario": "series-unsupported-type",
+      "passed": false
+    },
+    {
+      "scenario": "series-reader-write-denied",
+      "passed": true
+    },
+    {
+      "scenario": "Series: otro tenant no consulta la serie propia",
+      "passed": true
+    },
+    {
+      "scenario": "Series: mismo código en otro tenant crea fila aislada",
+      "passed": true
+    },
+    {
+      "scenario": "Series: reactivación conserva número y límites",
+      "passed": true
+    },
+    {
+      "scenario": "series-maximum-below-current",
+      "passed": false
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "configuracion/series",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 500
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 500
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 500
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 500
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 400
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 400
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/NO_EXISTE",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 403
+    },
+    {
+      "method": "GET",
+      "endpoint": "configuracion/series",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 500
+    }
+  ],
+  "defects": [
+    {
+      "id": "series-replay-conflict",
+      "expected_status": 409,
+      "actual_status": 500,
+      "response": {
+        "statusCode": 500,
+        "message": "Internal server error",
+        "error": "INTERNAL_SERVER_ERROR",
+        "timestamp": "2026-10-03T07:55:31.764Z",
+        "path": "/api/configuracion/series/FACTURA"
+      },
+      "unchanged": true
+    },
+    {
+      "id": "series-zero-maximum",
+      "expected_status": 400,
+      "actual_status": 500,
+      "response": {
+        "statusCode": 500,
+        "message": "Internal server error",
+        "error": "INTERNAL_SERVER_ERROR",
+        "timestamp": "2026-10-03T07:55:31.912Z",
+        "path": "/api/configuracion/series/FACTURA"
+      },
+      "unchanged": true
+    },
+    {
+      "id": "series-overflow-maximum",
+      "expected_status": 400,
+      "actual_status": 500,
+      "response": {
+        "statusCode": 500,
+        "message": "Internal server error",
+        "error": "INTERNAL_SERVER_ERROR",
+        "timestamp": "2026-10-03T07:55:32.064Z",
+        "path": "/api/configuracion/series/FACTURA"
+      },
+      "unchanged": true
+    },
+    {
+      "id": "series-invalid-format",
+      "expected_status": 400,
+      "actual_status": 500,
+      "response": {
+        "statusCode": 500,
+        "message": "Internal server error",
+        "error": "INTERNAL_SERVER_ERROR",
+        "timestamp": "2026-10-03T07:55:32.219Z",
+        "path": "/api/configuracion/series/FACTURA"
+      },
+      "unchanged": true
+    },
+    {
+      "id": "series-unsupported-type",
+      "expected_status": 400,
+      "actual_status": 200,
+      "response": {
+        "id": "c6751fba-575f-4bf4-909d-3e9e9a416a72",
+        "serie": "X901",
+        "activo": true,
+        "codigo": "NO_EXISTE-X901",
+        "estado": "ACTIVO",
+        "nombre": null,
+        "metadata": {
+          "source": "configuration.series.atomic",
+          "atomic_rpc": "actualizar_serie_documento_tx",
+          "created_by": "7c7ffb1c-5e6c-49ad-96ae-e14d256089de",
+          "schema_version": 464
+        },
+        "tenant_id": "793f5fe4-99bc-4787-9b5c-3a285b955a0d",
+        "created_at": "2026-10-03T07:55:32.662761+00:00",
+        "onconflict": null,
+        "updated_at": "2026-10-03T07:55:32.662761+00:00",
+        "sucursal_id": "7c9e051e-61fb-4a12-8000-e2d7a63ebde9",
+        "periodo_actual": null,
+        "tipo_documento": "NO_EXISTE",
+        "idempotency_key": "config-464:c69afbcc-3411-4046-8fae-755c84b5b471",
+        "correlativo_actual": 0,
+        "correlativo_maximo": 99999999,
+        "intent_fingerprint": "f1fbc30a60544a1b1b673134da87b9293cd8b009c16e0c976cfcd9802a7a4d48",
+        "longitud_correlativo": 8,
+        "reiniciar_por_periodo": false
+      },
+      "unchanged": false
+    },
+    {
+      "id": "series-maximum-below-current",
+      "expected_status": 400,
+      "actual_status": 500,
+      "response": {
+        "statusCode": 500,
+        "message": "Internal server error",
+        "error": "INTERNAL_SERVER_ERROR",
+        "timestamp": "2026-10-03T07:55:33.375Z",
+        "path": "/api/configuracion/series/FACTURA"
+      },
+      "unchanged": true
+    }
+  ],
+  "checkedAt": "2026-10-03T07:55:33.425Z"
+}

@@ -1,0 +1,272 @@
+{
+  "success": true,
+  "local_only": true,
+  "remoteWrites": false,
+  "scope": "RRHH financiero Perú, primer ADMIN: CTS/liquidación, segregación, banco y asientos locales; no aceptación normativa externa",
+  "scenarios": [
+    {
+      "scenario": "CTS: semestre inválido rechazado, dos cálculos 875 persistidos y recálculo sin duplicar",
+      "passed": true
+    },
+    {
+      "scenario": "CTS: depositante distinto, banco debitado, replay y recálculo rechazado conservan depósito realizado",
+      "passed": true
+    },
+    {
+      "scenario": "Liquidación: cálculo/replay sin cese; confirmación distinta termina contrato y consume CTS pendiente una sola vez",
+      "passed": true
+    },
+    {
+      "scenario": "Liquidación: pagador distinto, efectivo bloqueado, transferencia completa y replay conservan banco/pago únicos",
+      "passed": true
+    },
+    {
+      "scenario": "Liquidación: reversor distinto recupera obligación y banco exactos, preserva pago original y replay sin duplicar",
+      "passed": true
+    },
+    {
+      "scenario": "RRHH financiero: confirmación, pago, reversa y depósito ajenos 404 sin mutar; consulta aislada",
+      "passed": true
+    },
+    {
+      "scenario": "RRHH financiero: fondo, CTS, devengo, pago y reversa con un asiento confirmado cuadrado por evento",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "roles",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "users",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/plan-cuentas",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/cuentas",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/movimientos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/empleados",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/contratos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/empleados",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/contratos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/cts/depositos",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/cts/depositos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/cts/depositos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/cts/depositos/:id/depositar",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/cts/depositos/:id/depositar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/cts/depositos/:id/depositar",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/cts/depositos",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/empleados/:id/liquidacion",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/empleados/:id/liquidacion",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/liquidaciones/:id/confirmar",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/liquidaciones/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/liquidaciones/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/cts/depositos/:id/depositar",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/liquidaciones/:id/pagar",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/liquidaciones/:id/pagar",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/liquidaciones/:id/pagar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/liquidaciones/:id/pagar",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/liquidaciones/:id/pago/revertir",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/liquidaciones/:id/pago/revertir",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/liquidaciones/:id/pago/revertir",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/liquidaciones/:id/confirmar",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/liquidaciones/:id/pagar",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/liquidaciones/:id/pago/revertir",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/cts/depositos/:id/depositar",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/liquidaciones",
+      "status": 200
+    }
+  ],
+  "postings": [
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "banco.movimiento.registrado"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "cts.depositado"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "liquidacion.aprobada"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "liquidacion.pagada"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "liquidacion.pago.revertido"
+    }
+  ],
+  "liquidation_total_cents": 351514,
+  "checkedAt": "2026-10-03T07:37:16.855Z"
+}

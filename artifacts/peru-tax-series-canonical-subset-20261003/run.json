@@ -1,0 +1,11 @@
+{
+  "completedAt": "2026-10-03T08:40:30.788Z",
+  "success": true,
+  "withBrowser": true,
+  "withSurvey": false,
+  "withRecords": false,
+  "scope": "document_series_tax_adjustments_canonical_subset",
+  "database": "PostgreSQL 16 efímero",
+  "output": "C:\\Users\\PC\\Desktop\\erp-peru-production\\artifacts\\peru-integrated-20261003083835192-9052",
+  "remoteWrites": false
+}

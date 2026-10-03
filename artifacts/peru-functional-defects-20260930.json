@@ -420,7 +420,7 @@
     },
     {
       "id": "plame-package-duplicates-on-retry",
-      "status": "corrected_ci_promoted_merged_main_deployment_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -436,13 +436,15 @@
         "source": "artifacts/peru-plame-financial-canonical-subset-20261003",
         "scope": "17 casos API y dos recorridos UI; copia local 558 más 559, sin reconstrucción completa"
       },
-      "pending": [
-        "CI main 37106520278 y verificación de despliegue exacto c034639f"
+      "pending": [],
+      "release_evidence": [
+        "artifacts/peru-integrated-main-37106520278",
+        "artifacts/peru-production-verification-after-127-20261003.json"
       ]
     },
     {
       "id": "plame-private-writer-prod-acl-bypass",
-      "status": "corrected_ci_promoted_merged_main_deployment_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -459,13 +461,15 @@
         "cause": "EXECUTE heredado permitía al backend llamar el writer interno sin la autorización del wrapper"
       },
       "correction": "559 revoca únicamente EXECUTE interno de service_role/PUBLIC/anon/authenticated; wrapper público y cuerpo interno conservados",
-      "pending": [
-        "CI main 37106520278 y verificación de despliegue exacto c034639f"
+      "pending": [],
+      "release_evidence": [
+        "artifacts/peru-integrated-main-37106520278",
+        "artifacts/peru-production-verification-after-127-20261003.json"
       ]
     },
     {
       "id": "billing-zero-precision-read",
-      "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_pending",
       "operations": [
         {
           "method": "GET",
@@ -484,19 +488,25 @@
       },
       "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
       "pending": [
-        "Reconstrucción completa y CI",
-        "Promoción 560 después de gates y despliegue exacto"
+        "CI main 37110032921 y verificación de despliegue exacto/schema 560"
       ],
       "local_followup": {
         "source": "artifacts/peru-configuration-admin-canonical-subset-20261003",
         "api_scenarios": 16,
         "browser_passed": 1,
         "rehearsal": "artifacts/erp-peru-560-rehearsal-20261003073532952-15440.json"
-      }
+      },
+      "full_local_evidence": "artifacts/peru-integrated-local-configuration-admin-20261003",
+      "ci_proofs": [
+        "artifacts/peru-integrated-ci-37107576646",
+        "artifacts/peru-integrated-ci-37107579263"
+      ],
+      "promotion_proof": "artifacts/peru-560-promotion-20261003083056001.json",
+      "merge_sha": "8417ff234bde20636d865ebf2d096c8a1bd9359b"
     },
     {
       "id": "branch-create-retry-duplicate",
-      "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_pending",
       "operations": [
         {
           "method": "POST",
@@ -518,19 +528,25 @@
       },
       "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
       "pending": [
-        "Reconstrucción completa y CI",
-        "Promoción 560 después de gates y despliegue exacto"
+        "CI main 37110032921 y verificación de despliegue exacto/schema 560"
       ],
       "local_followup": {
         "source": "artifacts/peru-configuration-admin-canonical-subset-20261003",
         "api_scenarios": 16,
         "browser_passed": 1,
         "rehearsal": "artifacts/erp-peru-560-rehearsal-20261003073532952-15440.json"
-      }
+      },
+      "full_local_evidence": "artifacts/peru-integrated-local-configuration-admin-20261003",
+      "ci_proofs": [
+        "artifacts/peru-integrated-ci-37107576646",
+        "artifacts/peru-integrated-ci-37107579263"
+      ],
+      "promotion_proof": "artifacts/peru-560-promotion-20261003083056001.json",
+      "merge_sha": "8417ff234bde20636d865ebf2d096c8a1bd9359b"
     },
     {
       "id": "branch-assigned-reader-detail-bypass",
-      "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_pending",
       "operations": [
         {
           "method": "GET",
@@ -549,19 +565,25 @@
       },
       "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
       "pending": [
-        "Reconstrucción completa y CI",
-        "Promoción 560 después de gates y despliegue exacto"
+        "CI main 37110032921 y verificación de despliegue exacto/schema 560"
       ],
       "local_followup": {
         "source": "artifacts/peru-configuration-admin-canonical-subset-20261003",
         "api_scenarios": 16,
         "browser_passed": 1,
         "rehearsal": "artifacts/erp-peru-560-rehearsal-20261003073532952-15440.json"
-      }
+      },
+      "full_local_evidence": "artifacts/peru-integrated-local-configuration-admin-20261003",
+      "ci_proofs": [
+        "artifacts/peru-integrated-ci-37107576646",
+        "artifacts/peru-integrated-ci-37107579263"
+      ],
+      "promotion_proof": "artifacts/peru-560-promotion-20261003083056001.json",
+      "merge_sha": "8417ff234bde20636d865ebf2d096c8a1bd9359b"
     },
     {
       "id": "branch-assignment-failure-removes-scope",
-      "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_pending",
       "operations": [
         {
           "method": "PUT",
@@ -581,19 +603,25 @@
       },
       "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
       "pending": [
-        "Reconstrucción completa y CI",
-        "Promoción 560 después de gates y despliegue exacto"
+        "CI main 37110032921 y verificación de despliegue exacto/schema 560"
       ],
       "local_followup": {
         "source": "artifacts/peru-configuration-admin-canonical-subset-20261003",
         "api_scenarios": 16,
         "browser_passed": 1,
         "rehearsal": "artifacts/erp-peru-560-rehearsal-20261003073532952-15440.json"
-      }
+      },
+      "full_local_evidence": "artifacts/peru-integrated-local-configuration-admin-20261003",
+      "ci_proofs": [
+        "artifacts/peru-integrated-ci-37107576646",
+        "artifacts/peru-integrated-ci-37107579263"
+      ],
+      "promotion_proof": "artifacts/peru-560-promotion-20261003083056001.json",
+      "merge_sha": "8417ff234bde20636d865ebf2d096c8a1bd9359b"
     },
     {
       "id": "branch-inactive-list-filter-ineffective",
-      "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_pending",
       "operations": [
         {
           "method": "GET",
@@ -612,19 +640,25 @@
       },
       "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
       "pending": [
-        "Reconstrucción completa y CI",
-        "Promoción 560 después de gates y despliegue exacto"
+        "CI main 37110032921 y verificación de despliegue exacto/schema 560"
       ],
       "local_followup": {
         "source": "artifacts/peru-configuration-admin-canonical-subset-20261003",
         "api_scenarios": 16,
         "browser_passed": 1,
         "rehearsal": "artifacts/erp-peru-560-rehearsal-20261003073532952-15440.json"
-      }
+      },
+      "full_local_evidence": "artifacts/peru-integrated-local-configuration-admin-20261003",
+      "ci_proofs": [
+        "artifacts/peru-integrated-ci-37107576646",
+        "artifacts/peru-integrated-ci-37107579263"
+      ],
+      "promotion_proof": "artifacts/peru-560-promotion-20261003083056001.json",
+      "merge_sha": "8417ff234bde20636d865ebf2d096c8a1bd9359b"
     },
     {
       "id": "branch-editor-clears-after-failed-response",
-      "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_pending",
       "operations": [
         {
           "method": "POST",
@@ -648,15 +682,87 @@
       },
       "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
       "pending": [
-        "Reconstrucción completa y CI",
-        "Promoción 560 después de gates y despliegue exacto"
+        "CI main 37110032921 y verificación de despliegue exacto/schema 560"
       ],
       "local_followup": {
         "source": "artifacts/peru-configuration-admin-canonical-subset-20261003",
         "api_scenarios": 16,
         "browser_passed": 1,
         "rehearsal": "artifacts/erp-peru-560-rehearsal-20261003073532952-15440.json"
-      }
+      },
+      "full_local_evidence": "artifacts/peru-integrated-local-configuration-admin-20261003",
+      "ci_proofs": [
+        "artifacts/peru-integrated-ci-37107576646",
+        "artifacts/peru-integrated-ci-37107579263"
+      ],
+      "promotion_proof": "artifacts/peru-560-promotion-20261003083056001.json",
+      "merge_sha": "8417ff234bde20636d865ebf2d096c8a1bd9359b"
+    },
+    {
+      "id": "document-series-validation-conflict-generic-500",
+      "module": "configuracion/series",
+      "operations": [
+        {
+          "method": "PUT",
+          "endpoint": "/api/configuracion/series/:tipo"
+        }
+      ],
+      "status": "canonical_subset_passed_full_ci_deployment_pending",
+      "proof": "artifacts/peru-series-defects-20261003/series-lifecycle.json",
+      "correction": "Candidato: SQL 23505 devuelve 409; 22023/23514 devuelven 400; estados previos conservados",
+      "pending": [
+        "Reconstrucción completa con todos los módulos; CI y despliegue exacto"
+      ],
+      "cases": [
+        "conflicto de replay",
+        "máximo cero",
+        "máximo fuera de rango",
+        "formato inválido",
+        "máximo menor al actual"
+      ],
+      "canonical_proof": "artifacts/peru-tax-series-canonical-subset-20261003"
+    },
+    {
+      "id": "document-series-unsupported-type-persisted",
+      "module": "configuracion/series",
+      "operations": [
+        {
+          "method": "PUT",
+          "endpoint": "/api/configuracion/series/:tipo"
+        }
+      ],
+      "status": "canonical_subset_passed_full_ci_deployment_pending",
+      "proof": "artifacts/peru-series-defects-20261003/series-lifecycle.json",
+      "correction": "API canónica valida tipos de DTOs operativos/fiscales y los tipos internos vigentes antes de llamar el writer; NO_EXISTE ahora 400 sin filas/intención/auditoría",
+      "pending": [
+        "Reconstrucción completa con todos los módulos; CI y despliegue exacto"
+      ],
+      "canonical_proof": "artifacts/peru-tax-series-canonical-subset-20261003"
+    },
+    {
+      "id": "tax-adjustments-unhandled-ui-rejection",
+      "module": "finanzas/ajustes-fiscales",
+      "status": "canonical_subset_passed_full_ci_deployment_pending",
+      "proof": "artifacts/peru-tax-adjustments-ui-defect-20261003.json",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/retenciones/anticipos"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/retenciones/ajustes"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/retenciones/:id/depositar-detraccion"
+        }
+      ],
+      "correction": "UI canónica captura el rechazo ya mostrado por useApi, conserva campos y llave; evita pageerror sin esconder fallo ni limpiar datos",
+      "pending": [
+        "Reconstrucción completa con todos los módulos; CI y despliegue exacto"
+      ],
+      "canonical_proof": "artifacts/peru-tax-series-canonical-subset-20261003"
     }
   ]
 }

@@ -223,6 +223,8 @@ export default function AjustesFiscalesPage() {
       setTasa('')
       setReferencia('')
       await load()
+    } catch {
+      // El hook muestra el error; conserva los campos y la intención para reintentar.
     } finally {
       setSaving(false)
     }
@@ -240,6 +242,8 @@ export default function AjustesFiscalesPage() {
       await post(`/api/retenciones/${operacion.id}/depositar-detraccion`, attempt.body)
       pendingIdempotencyKeys.current.delete(attempt.semanticKey)
       await load()
+    } catch {
+      // El hook muestra el error; conserva los campos y la intención para reintentar.
     } finally {
       setDepositando(null)
     }

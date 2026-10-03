@@ -1,5 +1,7 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { TipoDocumento } from '@erp-suite/dtos';
+import { TipoDocumentoManual } from '../documentos/dto/documentos.dto';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { ValidationService } from '../validations/validation.service';
 import {
@@ -705,6 +707,12 @@ export class ConfigurationService {
       activo?: boolean;
     },
   ): Promise<any> {
+    const tipoDocumento = String(input.tipoDocumento ?? '').trim().toUpperCase();
+    const supportedTypes = new Set<string>([
+      ...Object.values(TipoDocumento), ...Object.keys(TipoDocumento),
+      ...Object.values(TipoDocumentoManual), 'TICKET', 'GUIA_REMISION', '09',
+    ]);
+    if (!supportedTypes.has(tipoDocumento)) throw new BadRequestException('El tipo de documento no está soportado para una serie.');
     const atomic = this.requireAtomicContext(actorId, idempotencyKey);
     const { data, error } = await this.supabaseService.getClient().rpc(
       'actualizar_serie_documento_tx',
@@ -712,13 +720,18 @@ export class ConfigurationService {
         p_tenant_id: tenantId,
         p_actor_id: atomic.actorId,
         p_idempotency_key: atomic.idempotencyKey,
-        p_tipo_documento: input.tipoDocumento,
+        p_tipo_documento: tipoDocumento,
         p_serie: input.serie,
         p_correlativo_maximo: input.correlativoMaximo ?? 99999999,
         p_activo: input.activo !== false,
       },
     );
-    if (error) throw error;
+    if (error) {
+      if (error.code === '23505') throw new ConflictException('La intención de configuración ya fue usada con otros datos.');
+      if (error.code === '22023') throw new BadRequestException('Revise el tipo de documento, la serie y el límite del correlativo.');
+      if (error.code === '23514') throw new BadRequestException('El límite no puede ser menor al correlativo actual.');
+      throw error;
+    }
     return (data as any)?.serie;
   }
 

@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-10-03T07:38:00.407Z",
+  "generated_at": "2026-10-03T08:54:36.409Z",
   "inventory": "artifacts/peru-api-operation-inventory-20260930.json",
-  "evidence": "artifacts/peru-integrated-ci-37104147139",
+  "evidence": "artifacts/peru-integrated-20261003074712858-7500",
   "evidence_scope": "full",
   "evidence_global_success": true,
   "evidence_phase": "ensayo global aprobado",
@@ -201,7 +201,17 @@
       "endpoint": "/api/retenciones/anticipos",
       "source": "apps/erp-api/src/controllers/retenciones.controller.ts:53",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "tax-adjustments-unhandled-ui-rejection",
+          "status": "canonical_subset_passed_full_ci_deployment_pending",
+          "proof": "artifacts/peru-tax-adjustments-ui-defect-20261003.json",
+          "correction": "UI canónica captura el rechazo ya mostrado por useApi, conserva campos y llave; evita pageerror sin esconder fallo ni limpiar datos",
+          "pending": [
+            "Reconstrucción completa con todos los módulos; CI y despliegue exacto"
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -219,7 +229,17 @@
       "endpoint": "/api/retenciones/ajustes",
       "source": "apps/erp-api/src/controllers/retenciones.controller.ts:65",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "tax-adjustments-unhandled-ui-rejection",
+          "status": "canonical_subset_passed_full_ci_deployment_pending",
+          "proof": "artifacts/peru-tax-adjustments-ui-defect-20261003.json",
+          "correction": "UI canónica captura el rechazo ya mostrado por useApi, conserva campos y llave; evita pageerror sin esconder fallo ni limpiar datos",
+          "pending": [
+            "Reconstrucción completa con todos los módulos; CI y despliegue exacto"
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -237,7 +257,17 @@
       "endpoint": "/api/retenciones/:id/depositar-detraccion",
       "source": "apps/erp-api/src/controllers/retenciones.controller.ts:77",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "tax-adjustments-unhandled-ui-rejection",
+          "status": "canonical_subset_passed_full_ci_deployment_pending",
+          "proof": "artifacts/peru-tax-adjustments-ui-defect-20261003.json",
+          "correction": "UI canónica captura el rechazo ya mostrado por useApi, conserva campos y llave; evita pageerror sin esconder fallo ni limpiar datos",
+          "pending": [
+            "Reconstrucción completa con todos los módulos; CI y despliegue exacto"
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -575,6 +605,18 @@
         },
         {
           "trace_index": 882,
+          "status": 201
+        },
+        {
+          "trace_index": 885,
+          "status": 201
+        },
+        {
+          "trace_index": 886,
+          "status": 201
+        },
+        {
+          "trace_index": 909,
           "status": 201
         }
       ],
@@ -2576,16 +2618,25 @@
       "method": "GET",
       "endpoint": "/api/configuracion/series",
       "source": "apps/erp-api/src/modules/configuracion.controller.ts:283",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 894,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "document-series-first-admin-replay",
+          "source": "scripts/ci/test-peru-configuration-admin-local.mjs",
+          "verified_checks": [
+            "Primer ADMIN crea F901, consulta y recupera ID en replay"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI y consumo del correlativo por cada documento; variantes completas de tipos y roles"
       ]
     },
     {
@@ -2594,16 +2645,48 @@
       "method": "PUT",
       "endpoint": "/api/configuracion/series/:tipo",
       "source": "apps/erp-api/src/modules/configuracion.controller.ts:289",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "existing_evidence": [
+        {
+          "trace_index": 892,
+          "status": 200
+        },
+        {
+          "trace_index": 893,
+          "status": 200
+        }
+      ],
+      "defects": [
+        {
+          "id": "document-series-validation-conflict-generic-500",
+          "status": "canonical_subset_passed_full_ci_deployment_pending",
+          "proof": "artifacts/peru-series-defects-20261003/series-lifecycle.json",
+          "correction": "Candidato: SQL 23505 devuelve 409; 22023/23514 devuelven 400; estados previos conservados",
+          "pending": [
+            "Reconstrucción completa con todos los módulos; CI y despliegue exacto"
+          ]
+        },
+        {
+          "id": "document-series-unsupported-type-persisted",
+          "status": "canonical_subset_passed_full_ci_deployment_pending",
+          "proof": "artifacts/peru-series-defects-20261003/series-lifecycle.json",
+          "correction": "API canónica valida tipos de DTOs operativos/fiscales y los tipos internos vigentes antes de llamar el writer; NO_EXISTE ahora 400 sin filas/intención/auditoría",
+          "pending": [
+            "Reconstrucción completa con todos los módulos; CI y despliegue exacto"
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "document-series-first-admin-replay",
+          "source": "scripts/ci/test-peru-configuration-admin-local.mjs",
+          "verified_checks": [
+            "Primer ADMIN crea F901, consulta y recupera ID en replay"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI y consumo del correlativo por cada documento; variantes completas de tipos y roles"
       ]
     },
     {
@@ -2612,11 +2695,20 @@
       "method": "GET",
       "endpoint": "/api/configuracion/parametros-facturacion",
       "source": "apps/erp-api/src/modules/configuracion.controller.ts:323",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 889,
+          "status": 200
+        },
+        {
+          "trace_index": 891,
+          "status": 200
+        }
+      ],
       "defects": [
         {
           "id": "billing-zero-precision-read",
-          "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_pending",
           "proof": {
             "source": "artifacts/peru-configuration-admin-defects-20261003.json",
             "observed": {
@@ -2629,19 +2721,23 @@
           },
           "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
           "pending": [
-            "Reconstrucción completa y CI",
-            "Promoción 560 después de gates y despliegue exacto"
+            "CI main 37110032921 y verificación de despliegue exacto/schema 560"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "billing-parameters-zero-replay",
+          "source": "scripts/ci/test-peru-configuration-admin-local.mjs",
+          "verified_checks": [
+            "Precisión 0/booleanos false persistidos y lectura fiel",
+            "Replay, validación 7 rechazada, consulta ajena y lector sin escritura"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Otras variantes de parámetros y permisos; edición desde UI donde se ofrezca"
       ]
     },
     {
@@ -2650,16 +2746,38 @@
       "method": "PUT",
       "endpoint": "/api/configuracion/parametros-facturacion",
       "source": "apps/erp-api/src/modules/configuracion.controller.ts:371",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 887,
+          "status": 200
+        },
+        {
+          "trace_index": 888,
+          "status": 200
+        },
+        {
+          "trace_index": 890,
+          "status": 400
+        },
+        {
+          "trace_index": 929,
+          "status": 403
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "billing-parameters-zero-replay",
+          "source": "scripts/ci/test-peru-configuration-admin-local.mjs",
+          "verified_checks": [
+            "Precisión 0/booleanos false persistidos y lectura fiel",
+            "Replay, validación 7 rechazada, consulta ajena y lector sin escritura"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Otras variantes de parámetros y permisos; edición desde UI donde se ofrezca"
       ]
     },
     {
@@ -11862,6 +11980,10 @@
         {
           "trace_index": 880,
           "status": 201
+        },
+        {
+          "trace_index": 906,
+          "status": 201
         }
       ],
       "defects": [],
@@ -13547,19 +13669,17 @@
       "defects": [
         {
           "id": "plame-package-duplicates-on-retry",
-          "status": "corrected_ci_promoted_merged_main_deployment_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-plame-retry-defect-20261003.json",
             "local_only": true,
             "observed": "Dos POST con mismo Idempotency-Key/cuerpo generan versiones 4 y 5"
           },
-          "pending": [
-            "CI main 37106520278 y verificación de despliegue exacto c034639f"
-          ]
+          "pending": []
         },
         {
           "id": "plame-private-writer-prod-acl-bypass",
-          "status": "corrected_ci_promoted_merged_main_deployment_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/erp-peru-559-rehearsal-20261003063550149-15392.json",
             "scope": "Copia aislada sin red del respaldo PROD 558; no se invocó el writer en PROD",
@@ -13570,9 +13690,7 @@
             "cause": "EXECUTE heredado permitía al backend llamar el writer interno sin la autorización del wrapper"
           },
           "correction": "559 revoca únicamente EXECUTE interno de service_role/PUBLIC/anon/authenticated; wrapper público y cuerpo interno conservados",
-          "pending": [
-            "CI main 37106520278 y verificación de despliegue exacto c034639f"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -15206,11 +15324,44 @@
       "method": "GET",
       "endpoint": "/api/sucursales",
       "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:32",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 895,
+          "status": 200
+        },
+        {
+          "trace_index": 910,
+          "status": 200
+        },
+        {
+          "trace_index": 916,
+          "status": 200
+        },
+        {
+          "trace_index": 919,
+          "status": 200
+        },
+        {
+          "trace_index": 920,
+          "status": 200
+        },
+        {
+          "trace_index": 922,
+          "status": 200
+        },
+        {
+          "trace_index": 930,
+          "status": 200
+        },
+        {
+          "trace_index": 950,
+          "status": 200
+        }
+      ],
       "defects": [
         {
           "id": "branch-inactive-list-filter-ineffective",
-          "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_pending",
           "proof": {
             "source": "artifacts/peru-configuration-admin-defects-20261003.json",
             "observed": {
@@ -15223,19 +15374,24 @@
           },
           "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
           "pending": [
-            "Reconstrucción completa y CI",
-            "Promoción 560 después de gates y despliegue exacto"
+            "CI main 37110032921 y verificación de despliegue exacto/schema 560"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "branch-update-deactivate-scope",
+          "source": "scripts/ci/test-peru-configuration-admin-local.mjs",
+          "verified_checks": [
+            "Edición/baja/reactivación persistidas, matriz protegida y código inmutable",
+            "Detalle asignado, ocultación ajena y listado de inactivos dentro del alcance",
+            "Lector sin mutación"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Sucursal con dependencias históricas y todas las variantes de roles; CI y despliegue"
       ]
     },
     {
@@ -15244,10 +15400,15 @@
       "method": "GET",
       "endpoint": "/api/sucursales/resumen",
       "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:51",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 911,
+          "status": 200
+        }
+      ],
       "defects": [],
       "verified_cases": [],
-      "result": "pending_functional_execution",
+      "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
         "persistencia y resultado funcional",
         "permisos",
@@ -15262,11 +15423,24 @@
       "method": "GET",
       "endpoint": "/api/sucursales/:id",
       "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:63",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 900,
+          "status": 200
+        },
+        {
+          "trace_index": 902,
+          "status": 404
+        },
+        {
+          "trace_index": 913,
+          "status": 404
+        }
+      ],
       "defects": [
         {
           "id": "branch-assigned-reader-detail-bypass",
-          "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_pending",
           "proof": {
             "source": "artifacts/peru-configuration-admin-defects-20261003.json",
             "observed": {
@@ -15279,19 +15453,24 @@
           },
           "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
           "pending": [
-            "Reconstrucción completa y CI",
-            "Promoción 560 después de gates y despliegue exacto"
+            "CI main 37110032921 y verificación de despliegue exacto/schema 560"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "branch-update-deactivate-scope",
+          "source": "scripts/ci/test-peru-configuration-admin-local.mjs",
+          "verified_checks": [
+            "Edición/baja/reactivación persistidas, matriz protegida y código inmutable",
+            "Detalle asignado, ocultación ajena y listado de inactivos dentro del alcance",
+            "Lector sin mutación"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Sucursal con dependencias históricas y todas las variantes de roles; CI y despliegue"
       ]
     },
     {
@@ -15304,12 +15483,84 @@
         {
           "trace_index": 418,
           "status": 201
+        },
+        {
+          "trace_index": 897,
+          "status": 201
+        },
+        {
+          "trace_index": 898,
+          "status": 201
+        },
+        {
+          "trace_index": 904,
+          "status": 201
+        },
+        {
+          "trace_index": 905,
+          "status": 201
+        },
+        {
+          "trace_index": 912,
+          "status": 403
+        },
+        {
+          "trace_index": 923,
+          "status": 409
+        },
+        {
+          "trace_index": 924,
+          "status": 400
+        },
+        {
+          "trace_index": 925,
+          "status": 400
+        },
+        {
+          "trace_index": 934,
+          "status": 201
+        },
+        {
+          "trace_index": 935,
+          "status": 201
+        },
+        {
+          "trace_index": 936,
+          "status": 201
+        },
+        {
+          "trace_index": 937,
+          "status": 201
+        },
+        {
+          "trace_index": 938,
+          "status": 201
+        },
+        {
+          "trace_index": 939,
+          "status": 201
+        },
+        {
+          "trace_index": 940,
+          "status": 201
+        },
+        {
+          "trace_index": 941,
+          "status": 201
+        },
+        {
+          "trace_index": 942,
+          "status": 201
+        },
+        {
+          "trace_index": 943,
+          "status": 201
         }
       ],
       "defects": [
         {
           "id": "branch-create-retry-duplicate",
-          "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_pending",
           "proof": {
             "source": "artifacts/peru-configuration-admin-defects-20261003.json",
             "observed": {
@@ -15325,13 +15576,12 @@
           },
           "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
           "pending": [
-            "Reconstrucción completa y CI",
-            "Promoción 560 después de gates y despliegue exacto"
+            "CI main 37110032921 y verificación de despliegue exacto/schema 560"
           ]
         },
         {
           "id": "branch-editor-clears-after-failed-response",
-          "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_pending",
           "proof": {
             "source": "artifacts/peru-configuration-admin-ui-defect-20261003.json",
             "observed": {
@@ -15345,19 +15595,24 @@
           },
           "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
           "pending": [
-            "Reconstrucción completa y CI",
-            "Promoción 560 después de gates y despliegue exacto"
+            "CI main 37110032921 y verificación de despliegue exacto/schema 560"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "branch-create-concurrency-recovery",
+          "source": "scripts/ci/test-peru-configuration-admin-local.mjs",
+          "verified_checks": [
+            "Alta/replay e intención incompatible sin residuos",
+            "Misma clave concurrente crea una fila; cuatro claves distintas obtienen cuatro códigos",
+            "Lector 403 y centro ajeno/inexistente rechazado"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Variantes de dirección/centro costo y límites de anexos; CI y despliegue"
       ]
     },
     {
@@ -15366,11 +15621,32 @@
       "method": "PUT",
       "endpoint": "/api/sucursales/:id",
       "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:91",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 899,
+          "status": 200
+        },
+        {
+          "trace_index": 901,
+          "status": 400
+        },
+        {
+          "trace_index": 903,
+          "status": 404
+        },
+        {
+          "trace_index": 921,
+          "status": 200
+        },
+        {
+          "trace_index": 926,
+          "status": 403
+        }
+      ],
       "defects": [
         {
           "id": "branch-editor-clears-after-failed-response",
-          "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_pending",
           "proof": {
             "source": "artifacts/peru-configuration-admin-ui-defect-20261003.json",
             "observed": {
@@ -15384,19 +15660,24 @@
           },
           "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
           "pending": [
-            "Reconstrucción completa y CI",
-            "Promoción 560 después de gates y despliegue exacto"
+            "CI main 37110032921 y verificación de despliegue exacto/schema 560"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "branch-update-deactivate-scope",
+          "source": "scripts/ci/test-peru-configuration-admin-local.mjs",
+          "verified_checks": [
+            "Edición/baja/reactivación persistidas, matriz protegida y código inmutable",
+            "Detalle asignado, ocultación ajena y listado de inactivos dentro del alcance",
+            "Lector sin mutación"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Sucursal con dependencias históricas y todas las variantes de roles; CI y despliegue"
       ]
     },
     {
@@ -15405,16 +15686,39 @@
       "method": "DELETE",
       "endpoint": "/api/sucursales/:id",
       "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:110",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 896,
+          "status": 400
+        },
+        {
+          "trace_index": 918,
+          "status": 200
+        },
+        {
+          "trace_index": 927,
+          "status": 403
+        },
+        {
+          "trace_index": 933,
+          "status": 404
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "branch-update-deactivate-scope",
+          "source": "scripts/ci/test-peru-configuration-admin-local.mjs",
+          "verified_checks": [
+            "Edición/baja/reactivación persistidas, matriz protegida y código inmutable",
+            "Detalle asignado, ocultación ajena y listado de inactivos dentro del alcance",
+            "Lector sin mutación"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Sucursal con dependencias históricas y todas las variantes de roles; CI y despliegue"
       ]
     },
     {
@@ -15423,16 +15727,31 @@
       "method": "GET",
       "endpoint": "/api/sucursales/usuarios/:usuarioId",
       "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:127",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 915,
+          "status": 200
+        },
+        {
+          "trace_index": 949,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "branch-assignment-atomic-recovery",
+          "source": "scripts/ci/test-peru-configuration-admin-local.mjs",
+          "verified_checks": [
+            "Fallo real de INSERT conserva alcance, recibos y auditoría",
+            "Tenant ajeno, permiso insuficiente, replay ordenado y conflicto sin residuos",
+            "Dos reemplazos concurrentes terminan con una lista completa"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Consulta de asignación de identificador inexistente; todas las variantes de roles; CI y despliegue"
       ]
     },
     {
@@ -15441,11 +15760,60 @@
       "method": "PUT",
       "endpoint": "/api/sucursales/usuarios/:usuarioId",
       "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:137",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 908,
+          "status": 200
+        },
+        {
+          "trace_index": 914,
+          "status": 400
+        },
+        {
+          "trace_index": 917,
+          "status": 200
+        },
+        {
+          "trace_index": 928,
+          "status": 403
+        },
+        {
+          "trace_index": 931,
+          "status": 400
+        },
+        {
+          "trace_index": 932,
+          "status": 404
+        },
+        {
+          "trace_index": 944,
+          "status": 200
+        },
+        {
+          "trace_index": 945,
+          "status": 200
+        },
+        {
+          "trace_index": 946,
+          "status": 409
+        },
+        {
+          "trace_index": 947,
+          "status": 200
+        },
+        {
+          "trace_index": 948,
+          "status": 200
+        },
+        {
+          "trace_index": 951,
+          "status": 200
+        }
+      ],
       "defects": [
         {
           "id": "branch-assignment-failure-removes-scope",
-          "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_pending",
           "proof": {
             "source": "artifacts/peru-configuration-admin-defects-20261003.json",
             "observed": {
@@ -15459,19 +15827,24 @@
           },
           "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
           "pending": [
-            "Reconstrucción completa y CI",
-            "Promoción 560 después de gates y despliegue exacto"
+            "CI main 37110032921 y verificación de despliegue exacto/schema 560"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "branch-assignment-atomic-recovery",
+          "source": "scripts/ci/test-peru-configuration-admin-local.mjs",
+          "verified_checks": [
+            "Fallo real de INSERT conserva alcance, recibos y auditoría",
+            "Tenant ajeno, permiso insuficiente, replay ordenado y conflicto sin residuos",
+            "Dos reemplazos concurrentes terminan con una lista completa"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Consulta de asignación de identificador inexistente; todas las variantes de roles; CI y despliegue"
       ]
     },
     {
@@ -16184,6 +16557,10 @@
         },
         {
           "trace_index": 881,
+          "status": 201
+        },
+        {
+          "trace_index": 907,
           "status": 201
         }
       ],
