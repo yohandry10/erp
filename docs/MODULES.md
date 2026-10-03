@@ -702,10 +702,15 @@ Código principal: `apps/erp-api/src/modules/finanzas`,
 - `Contabilidad > Impuestos Perú` prepara el borrador mensual de IGV y renta
   para NRUS, RER, RMT y Régimen General. Ventas salen de CPE, compras de CxP y
   los créditos manuales quedan en una versión con corte y conteos de origen.
+  Si falla la lectura del saldo previo o la declaración vigente, devuelve
+  indisponibilidad y bloquea guardar un borrador basado en información incompleta.
+  Recuperar el acceso conserva el crédito persistido del período anterior.
 - El cálculo aplica IGV, saldos, retenciones y percepciones; NRUS categoriza las
   cuotas S/ 20 y S/ 50, RER calcula 1,5 %, RMT usa 1 % hasta 300 UIT y luego el
   mayor entre coeficiente y 1,5 %, y General usa el mayor entre coeficiente y
-  1,5 %. El parámetro 2026 usa UIT S/ 5.500.
+  1,5 %. La UIT corresponde al ejercicio del período: S/ 5.150 para 2024,
+  S/ 5.350 para 2025 y S/ 5.500 para 2026. Los ejercicios sin UIT verificada
+  se rechazan; una rectificación histórica conserva su parámetro.
 - Este espacio no presenta FV 621 ni FV 1611. El contador contrasta contra
   RVIE/RCE, presenta en SUNAT y registra la constancia externa; cada corrección
   crea otra versión y conserva el historial.

@@ -259,6 +259,45 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+  peru-company-storage:
+    name: Peru company logo with real local Storage
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [install]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-16
+      - name: Install Chromium
+        run: pnpm --filter @erp-suite/web exec playwright install --with-deps chromium
+      - name: Verify company logo API, browser and Storage
+        run: node scripts/ci/run-peru-company-storage-local.mjs --browser
+      - name: Preserve selected local evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: peru-company-storage-local
+          path: |
+            artifacts/peru-company-storage-*/run.json
+            artifacts/peru-company-storage-*/company-logo.json
+            artifacts/peru-company-storage-*/browser-company-logo.json
+            artifacts/peru-company-storage-*/backup/restore.json
+            artifacts/peru-company-storage-*/storage-restore.json
+          retention-days: 14
+          if-no-files-found: error
+
   dian-official-contract:
     name: DIAN FEV 1.9 official XML contract
     runs-on: ubuntu-latest
@@ -301,7 +340,7 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    needs: [test, database-contracts, dian-official-contract, peru-integrated]
+    needs: [test, database-contracts, dian-official-contract, peru-integrated, peru-company-storage]
     steps:
       - name: Checkout
         uses: actions/checkout@v4

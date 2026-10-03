@@ -1,6 +1,7 @@
 """Exporta una lista explícita de evidencia funcional; nunca copia respaldos."""
 import argparse
 import io
+import sys
 import json
 import re
 import subprocess
@@ -18,8 +19,10 @@ source = parser.add_mutually_exclusive_group(required=True)
 source.add_argument("--local", type=Path)
 source.add_argument("--run-id", type=int)
 parser.add_argument("--sha")
+parser.add_argument("--artifact", choices=["peru-integrated-local", "peru-company-storage-local"], default="peru-integrated-local")
 parser.add_argument("--output", required=True, type=Path)
 args = parser.parse_args()
+expected_scope = "company_logo_real_storage_subset" if args.artifact == "peru-company-storage-local" else "full"
 root = Path(__file__).resolve().parents[2]
 output = args.output.resolve()
 if not output.is_relative_to(root / "artifacts"):
@@ -39,7 +42,7 @@ else:
     if run_meta["head_sha"] != args.sha or run_meta["conclusion"] != "success":
         raise RuntimeError("El CI debe haber terminado con éxito para ese SHA")
     artifacts = json.loads(github(f"repos/yohandry10/erp/actions/runs/{args.run_id}/artifacts"))["artifacts"]
-    matching = [item for item in artifacts if item["name"] == "peru-integrated-local" and not item["expired"]]
+    matching = [item for item in artifacts if item["name"] == args.artifact and not item["expired"]]
     if not matching:
         raise RuntimeError("No existe un artefacto funcional vigente")
     candidates = []
@@ -51,7 +54,7 @@ else:
         for name in source_archive.namelist():
             if name.endswith("/run.json"):
                 value = json.loads(source_archive.read(name))
-                if value.get("success") is True and value.get("scope", "full") == "full" and value.get("remoteWrites") is False and value.get("withBrowser") is True:
+                if value.get("success") is True and value.get("scope", "full") == expected_scope and value.get("remoteWrites") is False and value.get("withBrowser") is True:
                     when = datetime.fromisoformat(value["completedAt"].replace("Z", "+00:00"))
                     if when >= start:
                         candidates.append((when, item["id"], name.removesuffix("run.json"), item, source_archive))
@@ -64,11 +67,33 @@ else:
                       github_run_attempt=run_meta["run_attempt"], inspected_artifact_ids=[item["id"] for item in matching])
 
 run = json.loads(read("run.json"))
+if expected_scope == "company_logo_real_storage_subset":
+    selected = {"run.json": run, "company-logo.json": json.loads(read("company-logo.json")),
+                "browser-company-logo.json": json.loads(read("browser-company-logo.json")),
+                "restore.json": json.loads(read("backup/restore.json")),
+                "storage-restore.json": json.loads(read("storage-restore.json"))}
+    if any(value.get("success") is not True or value.get("remoteWrites") is not False for value in selected.values()):
+        raise RuntimeError("Storage exige API, UI, DB y blobs restaurados aprobados sin escritura remota")
+    provenance.update(selected_completed_at=run["completedAt"], scope=expected_scope,
+                      limits=["Storage local real; no acredita proveedor remoto ni todas las variantes del logo"])
+    selected["provenance.json"] = provenance
+    safe = {}
+    for name, value in selected.items():
+        content = json.dumps(value, ensure_ascii=False, indent=2) + "\n"
+        if re.search(r"eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|-----BEGIN (?:RSA |EC |ENCRYPTED )?PRIVATE KEY-----", content):
+            raise RuntimeError(f"Material sensible en {name}")
+        safe[name] = content
+    output.mkdir(parents=True, exist_ok=True)
+    for name, content in safe.items():
+        with (output / name).open("w", encoding="utf-8", newline="") as file:
+            file.write(content)
+    print(json.dumps({"output": output.relative_to(root).as_posix(), "scope": expected_scope, "files": list(selected), "dumps_extracted": False}))
+    sys.exit(0)
 http = json.loads(read("http.json"))
 if run.get("success") is not True or run.get("remoteWrites") is not False or run.get("scope", "full") != "full" or http.get("success") is not True:
     raise RuntimeError("Sólo se exportan ensayos completos aprobados sin escritura remota")
 selected = {"run.json": run, "http.json": http, "restore.json": json.loads(read("backup/restore.json"))}
-for name in ["browser-cxc-collection.json", "browser-inventory.json", "browser-rma-refund.json", "browser-manual-accounting.json", "browser-first-client-wizard.json", "browser-bank-finance.json", "browser-hr-lifecycle.json", "annual-acceptance.json", "finance-lifecycle.json", "hr-lifecycle.json", "hr-financial.json", "payroll-plame.json", "browser-hr-financial.json", "browser-payroll-plame.json", "configuration-admin.json", "browser-configuration-admin.json", "series-lifecycle.json", "tax-adjustments.json", "browser-tax-adjustments.json", "peru-navigation-admin.json"]:
+for name in ["browser-cxc-collection.json", "browser-inventory.json", "browser-rma-refund.json", "browser-manual-accounting.json", "browser-first-client-wizard.json", "browser-bank-finance.json", "browser-hr-lifecycle.json", "annual-acceptance.json", "finance-lifecycle.json", "hr-lifecycle.json", "hr-financial.json", "payroll-plame.json", "browser-hr-financial.json", "browser-payroll-plame.json", "configuration-admin.json", "browser-configuration-admin.json", "series-lifecycle.json", "tax-adjustments.json", "browser-tax-adjustments.json", "monthly-period.json", "peru-navigation-admin.json"]:
     try:
         selected[name] = json.loads(read(name))
     except (FileNotFoundError, KeyError):
@@ -103,6 +128,7 @@ for name, value in selected.items():
     safe_contents[name] = content
 output.mkdir(parents=True, exist_ok=True)
 for name, content in safe_contents.items():
-    (output / name).write_text(content, encoding="utf-8")
+    with (output / name).open("w", encoding="utf-8", newline="") as file:
+        file.write(content)
 print(json.dumps({"output": output.relative_to(root).as_posix(), "http_cases": len(http["results"]),
                   "browser_passed": selected["browser-result.json"]["passed"], "files": list(selected), "dumps_extracted": False}))

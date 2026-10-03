@@ -1,7 +1,21 @@
 {
-  "generated_at": "2026-10-03T08:54:36.409Z",
+  "generated_at": "2026-10-03T10:10:57.173Z",
   "inventory": "artifacts/peru-api-operation-inventory-20260930.json",
-  "evidence": "artifacts/peru-integrated-20261003074712858-7500",
+  "evidence": "artifacts/peru-integrated-ci-37111841817",
+  "additional_evidence": [
+    {
+      "evidence": "artifacts/peru-company-logo-canonical-storage-subset-20261003",
+      "scope": "company_logo_real_storage_subset",
+      "global_success": true,
+      "ui_included": true
+    },
+    {
+      "evidence": "artifacts/peru-monthly-recovery-canonical-subset-20261003",
+      "scope": "monthly_period_diagnostic_subset",
+      "global_success": true,
+      "ui_included": false
+    }
+  ],
   "evidence_scope": "full",
   "evidence_global_success": true,
   "evidence_phase": "ensayo global aprobado",
@@ -146,16 +160,47 @@
       "method": "POST",
       "endpoint": "/api/retenciones/calcular",
       "source": "apps/erp-api/src/controllers/retenciones.controller.ts:26",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 984,
+          "status": 201
+        },
+        {
+          "trace_index": 985,
+          "status": 201
+        },
+        {
+          "trace_index": 986,
+          "status": 201
+        },
+        {
+          "trace_index": 987,
+          "status": 201
+        },
+        {
+          "trace_index": 988,
+          "status": 400
+        },
+        {
+          "trace_index": 989,
+          "status": 400
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "tax-advance-cxp-bank-accounting-lifecycle",
+          "source": "scripts/ci/test-peru-tax-adjustments-local.mjs",
+          "verified_checks": [
+            "Anticipos proveedor/cliente, aplicación parcial a CxP, retención/percepción/detracción y depósito contable local",
+            "Pago neto, replays sin doble movimiento, permisos/tenant/rechazos sin residuos y asientos reales únicos/cuadrados",
+            "UI conserva tres intenciones/campos ante respuestas perdidas y recupera sin pageerror; recarga persistida"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Aplicación/reversa CxC, monedas/tipos de cambio, roles sólo lectura de finanzas, anulaciones y todos los filtros; tasas normativas/depósito externo; CI/despliegue"
       ]
     },
     {
@@ -164,16 +209,31 @@
       "method": "GET",
       "endpoint": "/api/retenciones",
       "source": "apps/erp-api/src/controllers/retenciones.controller.ts:33",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1016,
+          "status": 200
+        },
+        {
+          "trace_index": 1019,
+          "status": 403
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "tax-advance-cxp-bank-accounting-lifecycle",
+          "source": "scripts/ci/test-peru-tax-adjustments-local.mjs",
+          "verified_checks": [
+            "Anticipos proveedor/cliente, aplicación parcial a CxP, retención/percepción/detracción y depósito contable local",
+            "Pago neto, replays sin doble movimiento, permisos/tenant/rechazos sin residuos y asientos reales únicos/cuadrados",
+            "UI conserva tres intenciones/campos ante respuestas perdidas y recupera sin pageerror; recarga persistida"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Aplicación/reversa CxC, monedas/tipos de cambio, roles sólo lectura de finanzas, anulaciones y todos los filtros; tasas normativas/depósito externo; CI/despliegue"
       ]
     },
     {
@@ -182,16 +242,27 @@
       "method": "GET",
       "endpoint": "/api/retenciones/anticipos",
       "source": "apps/erp-api/src/controllers/retenciones.controller.ts:43",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1017,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "tax-advance-cxp-bank-accounting-lifecycle",
+          "source": "scripts/ci/test-peru-tax-adjustments-local.mjs",
+          "verified_checks": [
+            "Anticipos proveedor/cliente, aplicación parcial a CxP, retención/percepción/detracción y depósito contable local",
+            "Pago neto, replays sin doble movimiento, permisos/tenant/rechazos sin residuos y asientos reales únicos/cuadrados",
+            "UI conserva tres intenciones/campos ante respuestas perdidas y recupera sin pageerror; recarga persistida"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Aplicación/reversa CxC, monedas/tipos de cambio, roles sólo lectura de finanzas, anulaciones y todos los filtros; tasas normativas/depósito externo; CI/despliegue"
       ]
     },
     {
@@ -200,26 +271,49 @@
       "method": "POST",
       "endpoint": "/api/retenciones/anticipos",
       "source": "apps/erp-api/src/controllers/retenciones.controller.ts:53",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 991,
+          "status": 201
+        },
+        {
+          "trace_index": 992,
+          "status": 201
+        },
+        {
+          "trace_index": 994,
+          "status": 201
+        },
+        {
+          "trace_index": 995,
+          "status": 201
+        }
+      ],
       "defects": [
         {
           "id": "tax-adjustments-unhandled-ui-rejection",
-          "status": "canonical_subset_passed_full_ci_deployment_pending",
+          "status": "merged_pr_ci_passed_main_deployment_pending",
           "proof": "artifacts/peru-tax-adjustments-ui-defect-20261003.json",
           "correction": "UI canónica captura el rechazo ya mostrado por useApi, conserva campos y llave; evita pageerror sin esconder fallo ni limpiar datos",
           "pending": [
-            "Reconstrucción completa con todos los módulos; CI y despliegue exacto"
+            "CI main y verificación del despliegue exacto de #129"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "tax-advance-cxp-bank-accounting-lifecycle",
+          "source": "scripts/ci/test-peru-tax-adjustments-local.mjs",
+          "verified_checks": [
+            "Anticipos proveedor/cliente, aplicación parcial a CxP, retención/percepción/detracción y depósito contable local",
+            "Pago neto, replays sin doble movimiento, permisos/tenant/rechazos sin residuos y asientos reales únicos/cuadrados",
+            "UI conserva tres intenciones/campos ante respuestas perdidas y recupera sin pageerror; recarga persistida"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Aplicación/reversa CxC, monedas/tipos de cambio, roles sólo lectura de finanzas, anulaciones y todos los filtros; tasas normativas/depósito externo; CI/despliegue"
       ]
     },
     {
@@ -228,26 +322,77 @@
       "method": "POST",
       "endpoint": "/api/retenciones/ajustes",
       "source": "apps/erp-api/src/controllers/retenciones.controller.ts:65",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 997,
+          "status": 201
+        },
+        {
+          "trace_index": 998,
+          "status": 201
+        },
+        {
+          "trace_index": 1000,
+          "status": 201
+        },
+        {
+          "trace_index": 1001,
+          "status": 201
+        },
+        {
+          "trace_index": 1002,
+          "status": 201
+        },
+        {
+          "trace_index": 1003,
+          "status": 201
+        },
+        {
+          "trace_index": 1006,
+          "status": 400
+        },
+        {
+          "trace_index": 1007,
+          "status": 400
+        },
+        {
+          "trace_index": 1008,
+          "status": 400
+        },
+        {
+          "trace_index": 1009,
+          "status": 400
+        },
+        {
+          "trace_index": 1020,
+          "status": 403
+        }
+      ],
       "defects": [
         {
           "id": "tax-adjustments-unhandled-ui-rejection",
-          "status": "canonical_subset_passed_full_ci_deployment_pending",
+          "status": "merged_pr_ci_passed_main_deployment_pending",
           "proof": "artifacts/peru-tax-adjustments-ui-defect-20261003.json",
           "correction": "UI canónica captura el rechazo ya mostrado por useApi, conserva campos y llave; evita pageerror sin esconder fallo ni limpiar datos",
           "pending": [
-            "Reconstrucción completa con todos los módulos; CI y despliegue exacto"
+            "CI main y verificación del despliegue exacto de #129"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "tax-advance-cxp-bank-accounting-lifecycle",
+          "source": "scripts/ci/test-peru-tax-adjustments-local.mjs",
+          "verified_checks": [
+            "Anticipos proveedor/cliente, aplicación parcial a CxP, retención/percepción/detracción y depósito contable local",
+            "Pago neto, replays sin doble movimiento, permisos/tenant/rechazos sin residuos y asientos reales únicos/cuadrados",
+            "UI conserva tres intenciones/campos ante respuestas perdidas y recupera sin pageerror; recarga persistida"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Aplicación/reversa CxC, monedas/tipos de cambio, roles sólo lectura de finanzas, anulaciones y todos los filtros; tasas normativas/depósito externo; CI/despliegue"
       ]
     },
     {
@@ -256,26 +401,45 @@
       "method": "POST",
       "endpoint": "/api/retenciones/:id/depositar-detraccion",
       "source": "apps/erp-api/src/controllers/retenciones.controller.ts:77",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1011,
+          "status": 400
+        },
+        {
+          "trace_index": 1012,
+          "status": 201
+        },
+        {
+          "trace_index": 1013,
+          "status": 201
+        }
+      ],
       "defects": [
         {
           "id": "tax-adjustments-unhandled-ui-rejection",
-          "status": "canonical_subset_passed_full_ci_deployment_pending",
+          "status": "merged_pr_ci_passed_main_deployment_pending",
           "proof": "artifacts/peru-tax-adjustments-ui-defect-20261003.json",
           "correction": "UI canónica captura el rechazo ya mostrado por useApi, conserva campos y llave; evita pageerror sin esconder fallo ni limpiar datos",
           "pending": [
-            "Reconstrucción completa con todos los módulos; CI y despliegue exacto"
+            "CI main y verificación del despliegue exacto de #129"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "tax-advance-cxp-bank-accounting-lifecycle",
+          "source": "scripts/ci/test-peru-tax-adjustments-local.mjs",
+          "verified_checks": [
+            "Anticipos proveedor/cliente, aplicación parcial a CxP, retención/percepción/detracción y depósito contable local",
+            "Pago neto, replays sin doble movimiento, permisos/tenant/rechazos sin residuos y asientos reales únicos/cuadrados",
+            "UI conserva tres intenciones/campos ante respuestas perdidas y recupera sin pageerror; recarga persistida"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Aplicación/reversa CxC, monedas/tipos de cambio, roles sólo lectura de finanzas, anulaciones y todos los filtros; tasas normativas/depósito externo; CI/despliegue"
       ]
     },
     {
@@ -302,16 +466,27 @@
       "method": "GET",
       "endpoint": "/api/retenciones/:id",
       "source": "apps/erp-api/src/controllers/retenciones.controller.ts:101",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1010,
+          "status": 404
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "tax-advance-cxp-bank-accounting-lifecycle",
+          "source": "scripts/ci/test-peru-tax-adjustments-local.mjs",
+          "verified_checks": [
+            "Anticipos proveedor/cliente, aplicación parcial a CxP, retención/percepción/detracción y depósito contable local",
+            "Pago neto, replays sin doble movimiento, permisos/tenant/rechazos sin residuos y asientos reales únicos/cuadrados",
+            "UI conserva tres intenciones/campos ante respuestas perdidas y recupera sin pageerror; recarga persistida"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Aplicación/reversa CxC, monedas/tipos de cambio, roles sólo lectura de finanzas, anulaciones y todos los filtros; tasas normativas/depósito externo; CI/despliegue"
       ]
     },
     {
@@ -617,6 +792,42 @@
         },
         {
           "trace_index": 909,
+          "status": 201
+        },
+        {
+          "trace_index": 952,
+          "status": 201
+        },
+        {
+          "trace_index": 953,
+          "status": 201
+        },
+        {
+          "trace_index": 954,
+          "status": 201
+        },
+        {
+          "trace_index": 977,
+          "status": 201
+        },
+        {
+          "trace_index": 978,
+          "status": 201
+        },
+        {
+          "trace_index": 1018,
+          "status": 201
+        },
+        {
+          "trace_index": 1026,
+          "status": 201
+        },
+        {
+          "trace_index": 1029,
+          "status": 201
+        },
+        {
+          "trace_index": 1043,
           "status": 201
         }
       ],
@@ -2143,6 +2354,10 @@
         {
           "trace_index": 702,
           "status": 201
+        },
+        {
+          "trace_index": 982,
+          "status": 201
         }
       ],
       "defects": [],
@@ -2622,6 +2837,14 @@
         {
           "trace_index": 894,
           "status": 200
+        },
+        {
+          "trace_index": 964,
+          "status": 200
+        },
+        {
+          "trace_index": 973,
+          "status": 200
         }
       ],
       "defects": [],
@@ -2632,11 +2855,20 @@
           "verified_checks": [
             "Primer ADMIN crea F901, consulta y recupera ID en replay"
           ]
+        },
+        {
+          "id": "document-series-lifecycle-validation-isolation",
+          "source": "scripts/ci/test-peru-document-series-local.mjs",
+          "verified_checks": [
+            "Alta/edición/inactivación/reactivación, concurrencia de seis replays y auditoría única",
+            "400/409 para formato/tipo/límites/conflicto sin residuos, lector 403 y tenant aislado"
+          ]
         }
       ],
       "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "UI y consumo del correlativo por cada documento; variantes completas de tipos y roles"
+        "UI y consumo del correlativo por cada documento; variantes completas de tipos y roles",
+        "UI de edición de series, uso completo del correlativo por cada documento y todos los tipos vigentes; CI/despliegue"
       ]
     },
     {
@@ -2653,25 +2885,105 @@
         {
           "trace_index": 893,
           "status": 200
+        },
+        {
+          "trace_index": 955,
+          "status": 200
+        },
+        {
+          "trace_index": 956,
+          "status": 200
+        },
+        {
+          "trace_index": 957,
+          "status": 200
+        },
+        {
+          "trace_index": 958,
+          "status": 200
+        },
+        {
+          "trace_index": 959,
+          "status": 200
+        },
+        {
+          "trace_index": 960,
+          "status": 200
+        },
+        {
+          "trace_index": 961,
+          "status": 200
+        },
+        {
+          "trace_index": 962,
+          "status": 200
+        },
+        {
+          "trace_index": 963,
+          "status": 200
+        },
+        {
+          "trace_index": 965,
+          "status": 409
+        },
+        {
+          "trace_index": 966,
+          "status": 400
+        },
+        {
+          "trace_index": 967,
+          "status": 400
+        },
+        {
+          "trace_index": 968,
+          "status": 400
+        },
+        {
+          "trace_index": 969,
+          "status": 400
+        },
+        {
+          "trace_index": 970,
+          "status": 400
+        },
+        {
+          "trace_index": 971,
+          "status": 400
+        },
+        {
+          "trace_index": 972,
+          "status": 403
+        },
+        {
+          "trace_index": 974,
+          "status": 200
+        },
+        {
+          "trace_index": 975,
+          "status": 200
+        },
+        {
+          "trace_index": 976,
+          "status": 400
         }
       ],
       "defects": [
         {
           "id": "document-series-validation-conflict-generic-500",
-          "status": "canonical_subset_passed_full_ci_deployment_pending",
+          "status": "merged_pr_ci_passed_main_deployment_pending",
           "proof": "artifacts/peru-series-defects-20261003/series-lifecycle.json",
           "correction": "Candidato: SQL 23505 devuelve 409; 22023/23514 devuelven 400; estados previos conservados",
           "pending": [
-            "Reconstrucción completa con todos los módulos; CI y despliegue exacto"
+            "CI main y verificación del despliegue exacto de #129"
           ]
         },
         {
           "id": "document-series-unsupported-type-persisted",
-          "status": "canonical_subset_passed_full_ci_deployment_pending",
+          "status": "merged_pr_ci_passed_main_deployment_pending",
           "proof": "artifacts/peru-series-defects-20261003/series-lifecycle.json",
           "correction": "API canónica valida tipos de DTOs operativos/fiscales y los tipos internos vigentes antes de llamar el writer; NO_EXISTE ahora 400 sin filas/intención/auditoría",
           "pending": [
-            "Reconstrucción completa con todos los módulos; CI y despliegue exacto"
+            "CI main y verificación del despliegue exacto de #129"
           ]
         }
       ],
@@ -2682,11 +2994,20 @@
           "verified_checks": [
             "Primer ADMIN crea F901, consulta y recupera ID en replay"
           ]
+        },
+        {
+          "id": "document-series-lifecycle-validation-isolation",
+          "source": "scripts/ci/test-peru-document-series-local.mjs",
+          "verified_checks": [
+            "Alta/edición/inactivación/reactivación, concurrencia de seis replays y auditoría única",
+            "400/409 para formato/tipo/límites/conflicto sin residuos, lector 403 y tenant aislado"
+          ]
         }
       ],
       "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "UI y consumo del correlativo por cada documento; variantes completas de tipos y roles"
+        "UI y consumo del correlativo por cada documento; variantes completas de tipos y roles",
+        "UI de edición de series, uso completo del correlativo por cada documento y todos los tipos vigentes; CI/despliegue"
       ]
     },
     {
@@ -2708,7 +3029,7 @@
       "defects": [
         {
           "id": "billing-zero-precision-read",
-          "status": "corrected_ci_promoted_merged_main_deployment_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-configuration-admin-defects-20261003.json",
             "observed": {
@@ -2720,9 +3041,7 @@
             "local_only": true
           },
           "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
-          "pending": [
-            "CI main 37110032921 y verificación de despliegue exacto/schema 560"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -3223,16 +3542,75 @@
       "method": "POST",
       "endpoint": "/api/configuration/empresa/logo",
       "source": "apps/erp-api/src/modules/configuracion/configuration.controller.ts:795",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1030,
+          "status": 201
+        },
+        {
+          "trace_index": 1031,
+          "status": 201
+        },
+        {
+          "trace_index": 1032,
+          "status": 201
+        },
+        {
+          "trace_index": 1033,
+          "status": 409
+        },
+        {
+          "trace_index": 1034,
+          "status": 400
+        },
+        {
+          "trace_index": 1035,
+          "status": 400
+        },
+        {
+          "trace_index": 1036,
+          "status": 400
+        },
+        {
+          "trace_index": 1037,
+          "status": 413
+        },
+        {
+          "trace_index": 1038,
+          "status": 201
+        },
+        {
+          "trace_index": 1039,
+          "status": 403
+        },
+        {
+          "trace_index": 1041,
+          "status": 400
+        },
+        {
+          "trace_index": 1042,
+          "status": 201
+        },
+        {
+          "trace_index": 1044,
+          "status": 201
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "company-logo-real-storage-lifecycle",
+          "source": "scripts/ci/test-peru-company-logo-local.mjs",
+          "verified_checks": [
+            "PNG real por multipart, persistencia empresa/asset/objeto/bytes; replay/mismo contenido/reemplazo y limpieza/borrado",
+            "Conflictos/MIME/corrupción/falta/tamaño, lector, segundo tenant, Storage RLS; recuperación de fallo real después de almacenar sin duplicar"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "JPEG/dimensiones/todas las concurrencias y fallas de limpieza, lector/navegador para todas las variantes",
+        "Storage remoto del futuro cliente; CI/despliegue del gate nuevo"
       ]
     },
     {
@@ -3241,16 +3619,35 @@
       "method": "DELETE",
       "endpoint": "/api/configuration/empresa/logo",
       "source": "apps/erp-api/src/modules/configuracion/configuration.controller.ts:837",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1040,
+          "status": 403
+        },
+        {
+          "trace_index": 1045,
+          "status": 200
+        },
+        {
+          "trace_index": 1046,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "company-logo-real-storage-lifecycle",
+          "source": "scripts/ci/test-peru-company-logo-local.mjs",
+          "verified_checks": [
+            "PNG real por multipart, persistencia empresa/asset/objeto/bytes; replay/mismo contenido/reemplazo y limpieza/borrado",
+            "Conflictos/MIME/corrupción/falta/tamaño, lector, segundo tenant, Storage RLS; recuperación de fallo real después de almacenar sin duplicar"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "JPEG/dimensiones/todas las concurrencias y fallas de limpieza, lector/navegador para todas las variantes",
+        "Storage remoto del futuro cliente; CI/despliegue del gate nuevo"
       ]
     },
     {
@@ -4916,6 +5313,10 @@
         {
           "trace_index": 860,
           "status": 200
+        },
+        {
+          "trace_index": 979,
+          "status": 200
         }
       ],
       "defects": [],
@@ -6439,16 +6840,78 @@
       "method": "GET",
       "endpoint": "/api/contabilidad/impuestos/mensual",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-tributos.controller.ts:68",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "existing_evidence": [
+        {
+          "trace_index": 1047,
+          "status": 200
+        },
+        {
+          "trace_index": 1048,
+          "status": 200
+        },
+        {
+          "trace_index": 1049,
+          "status": 200
+        },
+        {
+          "trace_index": 1050,
+          "status": 400
+        },
+        {
+          "trace_index": 1052,
+          "status": 503
+        },
+        {
+          "trace_index": 1054,
+          "status": 200
+        }
+      ],
+      "defects": [
+        {
+          "id": "monthly-tax-uses-2026-uit-for-other-exercises",
+          "status": "canonical_subset_passed_full_ci_deployment_pending",
+          "proof": "artifacts/peru-monthly-period-baseline-20261003/monthly-period.json",
+          "correction": "UIT compartida mensual/anual por ejercicio verificado: 2024 5150, 2025 5350, 2026 5500; límite RMT depende del período, ejercicio no verificado rechazado. Regresión con acumulado 1620000 calcula pago 150 en 2025 y 100 en 2026.",
+          "pending": [
+            "Flujo mensual completo API/UI, fuentes no vacías, versiones/constancias/permisos/aislamiento/recuperación",
+            "Reconstrucción global, CI y despliegue exacto"
+          ]
+        },
+        {
+          "id": "monthly-tax-read-error-becomes-zero-credit",
+          "status": "canonical_subset_passed_full_ci_deployment_pending",
+          "proof": "artifacts/peru-monthly-recovery-baseline-20261003/monthly-period.json",
+          "correction": "Lecturas fallidas de saldo previo y declaración vigente devuelven 503; no producen cálculo exitoso con crédito cero ni un borrador basado en lectura incompleta. Recuperación conserva saldo persistido 125.50.",
+          "pending": [
+            "CI/global y despliegue exacto; variantes de error de declaración vigente, fuentes y UI"
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "monthly-tax-uit-by-exercise",
+          "source": "scripts/ci/test-peru-monthly-period-local.mjs",
+          "verified_checks": [
+            "API real selecciona UIT/límite RMT de períodos 2024, 2025 y 2026; rechaza 2027 sin parámetro verificado",
+            "Regresión de cálculo RMT prueba cambio de umbral 2025/2026, separado de evidencia de operación completa"
+          ]
+        },
+        {
+          "id": "monthly-tax-credit-read-recovery",
+          "source": "scripts/ci/test-peru-monthly-period-local.mjs",
+          "verified_checks": [
+            "Borrador anterior guardado por API real y saldo 125.50 persistido",
+            "Error real de permisos SQL se devuelve como 503; cálculo/guardado fallan sin nueva versión; tras restaurar acceso recupera saldo"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Flujo mensual completo: fuentes no vacías, guardado/versiones/constancias/historial y navegador",
+        "Todos los regímenes/variantes/créditos, permisos/aislamiento y recuperación",
+        "Validación externa/PVS/SUNAT; CI/despliegue",
+        "Declaración vigente/fuentes: otras fallas de lectura y recuperación UI",
+        "Versiones/constancia/regímenes, permisos/aislamiento por operación; CI/despliegue"
       ]
     },
     {
@@ -6458,7 +6921,27 @@
       "endpoint": "/api/contabilidad/impuestos/mensual/calcular",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-tributos.controller.ts:78",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "monthly-tax-uses-2026-uit-for-other-exercises",
+          "status": "canonical_subset_passed_full_ci_deployment_pending",
+          "proof": "artifacts/peru-monthly-period-baseline-20261003/monthly-period.json",
+          "correction": "UIT compartida mensual/anual por ejercicio verificado: 2024 5150, 2025 5350, 2026 5500; límite RMT depende del período, ejercicio no verificado rechazado. Regresión con acumulado 1620000 calcula pago 150 en 2025 y 100 en 2026.",
+          "pending": [
+            "Flujo mensual completo API/UI, fuentes no vacías, versiones/constancias/permisos/aislamiento/recuperación",
+            "Reconstrucción global, CI y despliegue exacto"
+          ]
+        },
+        {
+          "id": "monthly-tax-read-error-becomes-zero-credit",
+          "status": "canonical_subset_passed_full_ci_deployment_pending",
+          "proof": "artifacts/peru-monthly-recovery-baseline-20261003/monthly-period.json",
+          "correction": "Lecturas fallidas de saldo previo y declaración vigente devuelven 503; no producen cálculo exitoso con crédito cero ni un borrador basado en lectura incompleta. Recuperación conserva saldo persistido 125.50.",
+          "pending": [
+            "CI/global y despliegue exacto; variantes de error de declaración vigente, fuentes y UI"
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -6475,16 +6958,51 @@
       "method": "POST",
       "endpoint": "/api/contabilidad/impuestos/mensual",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-tributos.controller.ts:89",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "existing_evidence": [
+        {
+          "trace_index": 1051,
+          "status": 201
+        },
+        {
+          "trace_index": 1053,
+          "status": 503
+        }
+      ],
+      "defects": [
+        {
+          "id": "monthly-tax-uses-2026-uit-for-other-exercises",
+          "status": "canonical_subset_passed_full_ci_deployment_pending",
+          "proof": "artifacts/peru-monthly-period-baseline-20261003/monthly-period.json",
+          "correction": "UIT compartida mensual/anual por ejercicio verificado: 2024 5150, 2025 5350, 2026 5500; límite RMT depende del período, ejercicio no verificado rechazado. Regresión con acumulado 1620000 calcula pago 150 en 2025 y 100 en 2026.",
+          "pending": [
+            "Flujo mensual completo API/UI, fuentes no vacías, versiones/constancias/permisos/aislamiento/recuperación",
+            "Reconstrucción global, CI y despliegue exacto"
+          ]
+        },
+        {
+          "id": "monthly-tax-read-error-becomes-zero-credit",
+          "status": "canonical_subset_passed_full_ci_deployment_pending",
+          "proof": "artifacts/peru-monthly-recovery-baseline-20261003/monthly-period.json",
+          "correction": "Lecturas fallidas de saldo previo y declaración vigente devuelven 503; no producen cálculo exitoso con crédito cero ni un borrador basado en lectura incompleta. Recuperación conserva saldo persistido 125.50.",
+          "pending": [
+            "CI/global y despliegue exacto; variantes de error de declaración vigente, fuentes y UI"
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "monthly-tax-credit-read-recovery",
+          "source": "scripts/ci/test-peru-monthly-period-local.mjs",
+          "verified_checks": [
+            "Borrador anterior guardado por API real y saldo 125.50 persistido",
+            "Error real de permisos SQL se devuelve como 503; cálculo/guardado fallan sin nueva versión; tras restaurar acceso recupera saldo"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Declaración vigente/fuentes: otras fallas de lectura y recuperación UI",
+        "Versiones/constancia/regímenes, permisos/aislamiento por operación; CI/despliegue"
       ]
     },
     {
@@ -8142,6 +8660,26 @@
         {
           "trace_index": 866,
           "status": 200
+        },
+        {
+          "trace_index": 993,
+          "status": 200
+        },
+        {
+          "trace_index": 996,
+          "status": 200
+        },
+        {
+          "trace_index": 1005,
+          "status": 200
+        },
+        {
+          "trace_index": 1014,
+          "status": 200
+        },
+        {
+          "trace_index": 1024,
+          "status": 200
         }
       ],
       "defects": [],
@@ -8199,6 +8737,10 @@
         },
         {
           "trace_index": 861,
+          "status": 201
+        },
+        {
+          "trace_index": 980,
           "status": 201
         }
       ],
@@ -8321,6 +8863,10 @@
         },
         {
           "trace_index": 862,
+          "status": 201
+        },
+        {
+          "trace_index": 981,
           "status": 201
         }
       ],
@@ -9195,6 +9741,22 @@
         {
           "trace_index": 747,
           "status": 404
+        },
+        {
+          "trace_index": 999,
+          "status": 200
+        },
+        {
+          "trace_index": 1004,
+          "status": 200
+        },
+        {
+          "trace_index": 1015,
+          "status": 200
+        },
+        {
+          "trace_index": 1023,
+          "status": 200
         }
       ],
       "defects": [],
@@ -9270,6 +9832,14 @@
         {
           "trace_index": 739,
           "status": 403
+        },
+        {
+          "trace_index": 990,
+          "status": 201
+        },
+        {
+          "trace_index": 1025,
+          "status": 201
         }
       ],
       "defects": [],
@@ -9406,6 +9976,14 @@
         {
           "trace_index": 740,
           "status": 403
+        },
+        {
+          "trace_index": 1021,
+          "status": 201
+        },
+        {
+          "trace_index": 1022,
+          "status": 201
         }
       ],
       "defects": [],
@@ -11983,6 +12561,10 @@
         },
         {
           "trace_index": 906,
+          "status": 201
+        },
+        {
+          "trace_index": 1027,
           "status": 201
         }
       ],
@@ -15361,7 +15943,7 @@
       "defects": [
         {
           "id": "branch-inactive-list-filter-ineffective",
-          "status": "corrected_ci_promoted_merged_main_deployment_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-configuration-admin-defects-20261003.json",
             "observed": {
@@ -15373,9 +15955,7 @@
             "local_only": true
           },
           "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
-          "pending": [
-            "CI main 37110032921 y verificación de despliegue exacto/schema 560"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -15440,7 +16020,7 @@
       "defects": [
         {
           "id": "branch-assigned-reader-detail-bypass",
-          "status": "corrected_ci_promoted_merged_main_deployment_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-configuration-admin-defects-20261003.json",
             "observed": {
@@ -15452,9 +16032,7 @@
             "local_only": true
           },
           "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
-          "pending": [
-            "CI main 37110032921 y verificación de despliegue exacto/schema 560"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -15560,7 +16138,7 @@
       "defects": [
         {
           "id": "branch-create-retry-duplicate",
-          "status": "corrected_ci_promoted_merged_main_deployment_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-configuration-admin-defects-20261003.json",
             "observed": {
@@ -15575,13 +16153,11 @@
             "local_only": true
           },
           "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
-          "pending": [
-            "CI main 37110032921 y verificación de despliegue exacto/schema 560"
-          ]
+          "pending": []
         },
         {
           "id": "branch-editor-clears-after-failed-response",
-          "status": "corrected_ci_promoted_merged_main_deployment_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-configuration-admin-ui-defect-20261003.json",
             "observed": {
@@ -15594,9 +16170,7 @@
             "local_only": true
           },
           "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
-          "pending": [
-            "CI main 37110032921 y verificación de despliegue exacto/schema 560"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -15646,7 +16220,7 @@
       "defects": [
         {
           "id": "branch-editor-clears-after-failed-response",
-          "status": "corrected_ci_promoted_merged_main_deployment_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-configuration-admin-ui-defect-20261003.json",
             "observed": {
@@ -15659,9 +16233,7 @@
             "local_only": true
           },
           "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
-          "pending": [
-            "CI main 37110032921 y verificación de despliegue exacto/schema 560"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -15813,7 +16385,7 @@
       "defects": [
         {
           "id": "branch-assignment-failure-removes-scope",
-          "status": "corrected_ci_promoted_merged_main_deployment_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-configuration-admin-defects-20261003.json",
             "observed": {
@@ -15826,9 +16398,7 @@
             "local_only": true
           },
           "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
-          "pending": [
-            "CI main 37110032921 y verificación de despliegue exacto/schema 560"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -16562,6 +17132,10 @@
         {
           "trace_index": 907,
           "status": 201
+        },
+        {
+          "trace_index": 1028,
+          "status": 201
         }
       ],
       "defects": [],
@@ -16949,6 +17523,10 @@
         {
           "trace_index": 460,
           "status": 409
+        },
+        {
+          "trace_index": 983,
+          "status": 201
         }
       ],
       "defects": [],
