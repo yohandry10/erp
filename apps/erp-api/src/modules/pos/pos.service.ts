@@ -1742,8 +1742,15 @@ export class PosService {
         throw error instanceof HttpException ? error : new BadRequestException('Certificado o contraseña inválidos');
       }
       const buffer = Buffer.from(certificadoBase64.replace(/\s+/g, ''), 'base64');
-      const fingerprint = crypto.createHmac('sha256', this.getCertKey())
-        .update(JSON.stringify({ certificate: crypto.createHash('sha256').update(buffer).digest('hex'), password })).digest('hex');
+      // Huella de intención, nunca credencial de autenticación. El KDF evita
+      // conservar una derivación rápida de una contraseña elegida por el usuario.
+      const fingerprint = await new Promise<string>((resolve, reject) => {
+        crypto.scrypt(
+          JSON.stringify({ certificate: crypto.createHash('sha256').update(buffer).digest('hex'), password }),
+          this.getCertKey(), 32, { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 },
+          (error, derived) => error ? reject(error) : resolve(derived.toString('hex')),
+        );
+      });
       const { data, error } = await this.supabase.getClient().rpc('configurar_certificado_pos_tx', {
         p_tenant_id: user.tenant_id, p_actor_id: user.id, p_idempotency_key: idempotencyKey.trim(),
         p_intent_fingerprint: fingerprint, p_certificado: toPostgresBytea(this.encryptBuffer(buffer)),
