@@ -1,0 +1,11 @@
+{
+  "local_source": "artifacts/peru-integrated-20261003121611455-21300",
+  "source_sha": "33695fdbfb254656066a08edd58459351a15bdfc",
+  "success": false,
+  "remoteWrites": false,
+  "dumps_extracted": false,
+  "browser_executed": false,
+  "restore_completed": false,
+  "failure": "El runner invocó dos veces la fase de reportes. La segunda preparación choca con el código del reporte local; no es un defecto de negocio ni acredita aceptación global.",
+  "correction": "Una única invocación; se repite el ensayo completo con fuentes canónicas."
+}
