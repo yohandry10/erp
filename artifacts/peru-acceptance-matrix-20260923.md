@@ -67,7 +67,7 @@ con códigos de fixture no acreditan validación oficial PVS ni presentación SO
 
 Configuración/sucursales cerró los seis defectos de precisión, alta repetida, alcance, atomicidad de asignaciones, inactivos y recuperación del editor. #128 está integrado, 560 promovida y main/despliegue exacto verificados. Evidencia: `artifacts/peru-integrated-main-37110032921` y `artifacts/peru-production-verification-after-128-20261003.json`. Esto acredita el ciclo probado de sucursales y precisión; otros parámetros conservan sus pendientes.
 
-#129 se integró como `5a23c4c1` tras 26 checks aprobados. Los dos CI del SHA `22cf5bb6` pasaron 208 API/22 UI sin reintentos, 99 pantallas, 22 con registros y restore. `artifacts/peru-integrated-ci-37111843415` y `artifacts/peru-integrated-ci-37111841817` conservan exportaciones seleccionadas. CI main y despliegue exacto siguen pendientes. Los dos fallos locales permanecen registrados; no se declara resuelto el error JS intermitente.
+#129 se integró como `5a23c4c1` tras 26 checks aprobados. Los dos CI del SHA `22cf5bb6` pasaron 208 API/22 UI sin reintentos, 99 pantallas, 22 con registros y restore. `artifacts/peru-integrated-ci-37111843415` y `artifacts/peru-integrated-ci-37111841817` conservan exportaciones seleccionadas. Main 37114135464, E2E y seguridad pasaron 208 API/22 UI sin reintentos, barridos y restore. Render/Vercel y esquema 560 quedaron verificados sólo en lectura con preflight; lectura previa con CI pendiente y timeout conservados. Los dos fallos locales permanecen registrados; no se declara resuelto el error JS intermitente.
 
 La UIT mensual por período reprodujo valores incorrectos en 2024/2025 y aceptación de 2027 sin parámetro. La corrección pasó cuatro casos API y restauración, más la regresión RMT enfocada. No acredita guardado/versiones/constancias ni el módulo tributario completo; esos flujos se siguen ensayando.
 
@@ -206,10 +206,37 @@ DB/Redis, login y CORS verificados sólo en lectura con preflight
 
 ## Corte adicional 03/10
 
-#127 cerró CI main, E2E, seguridad y despliegue exacto c034639f/schema 559 en sólo lectura. #128 aprobó reconstrucción y CI con 181 API/21 UI sin reintentos/99 pantallas/22 con registros y restore; 560 quedó promovida e integrada como 8417ff23. CI main 37110032921, E2E/seguridad y despliegue exacto 8417ff23/schema560 cerrados en sólo lectura con preflight. La matriz observa 256 de 717 contratos declarados al combinar CI #129 con los subconjuntos locales de logo e impuestos, identificados como evidencia adicional; no acepta todas sus variantes. UI conserva 121 rutas estáticas, 35 enlaces renderizados y 1136 controles en este corte de #129, cuya presencia no acredita ejecución.
+#128 (8417ff23), #129 (5a23c4c1) y #130 (c9629374) cerraron CI main, E2E,
+seguridad y despliegue exacto en sólo lectura con preflight. #130 pasó
+215 API/22 UI sin reintentos en main; su CI de rama conservó un reintento.
+Storage pasó API10/UI1/DB/blobs; proveedor remoto pendiente. Los timeouts
+de 20s de Render y sus repeticiones no acreditan continuidad ni plan efectivo.
 
-Series y ajustes fiscales tienen evidencia canónica de subconjunto (43 API/un UI y restore) en `artifacts/peru-tax-series-canonical-subset-20261003`, incluidos validaciones/conflictos, tipos, aislamiento, reintentos de tres mutaciones, deuda/banco y asientos. Los casos nuevos quedan incorporados al runner completo/CI; el primer intento falló en una espera de cinco segundos de edición del asiento, después de 208 API/21 UI. Se conserva ese intento y se repite con espera de URL/encabezado en 25 segundos; restore posterior aún pendiente. CxC/reversa, monedas, roles sólo lectura, UI de series y consumo de cada tipo siguen pendientes. Sólo Analytics excluido; reportes incluidos. No hay aceptación global de lanzamiento.
+#131 (3088474d) pasó 28 checks; ambos CI exactos aprobaron 241 API/24 UI
+sin reintentos, SQL, barridos y restauración. La 562 se promovió una vez con
+preflight/respaldo/ensayo y preservación de 29 tablas, funciones y seguridad.
+Se integró como eb5312f4; main 37121705807 y despliegue exacto pendientes.
+Los casos añadidos acreditan intención tributaria mensual/anual, constancia
+local simulada, concurrencia, rectificación, aislamiento, rollback/recuperación
+y Retry-After de oficina. No hubo datos sintéticos ni presentación SUNAT en PROD.
 
-El fallo de lectura del saldo tributario anterior devolvía 200 con crédito cero. La corrección canónica pasó guardado real de 125.50, denegación real de SELECT, cálculo/guardado 503 sin nueva versión y recuperación del saldo después de restituir acceso, con restore posterior (`artifacts/peru-monthly-recovery-baseline-20261003`, `artifacts/peru-monthly-recovery-canonical-subset-20261003`). No acredita el ciclo mensual completo.
+La matriz observa 261 de 717 contratos API en el ensayo de #131 más Storage.
+Tiene 57 casos funcionales específicos. UI conserva 121 rutas, 35 enlaces
+ADMIN PE y 1171 controles en CI PR #131 (1298 en el corte local previo);
+presencia no equivale a ejecución.
+Los 11 contratos específicos de Argentina/Colombia se conservan como variantes
+de país; los otros 706 incluyen infraestructura y no equivalen automáticamente
+a módulos ofrecidos Perú. artifacts/peru-module-acceptance-20261003.json
+agrega la evidencia y los pendientes por dominio de código.
 
-Logo empresarial: 10 casos API y un recorrido UI aprobados contra PostgreSQL/PostgREST/Storage reales locales, con carga/reemplazo/borrado, replays, validaciones, lector/tenant y respuesta perdida. El transporte conserva el origen contractual pero conecta sólo al gateway local. `artifacts/peru-company-logo-canonical-storage-subset-20261003` y `artifacts/peru-company-storage-files-recovery-20261003` separan UI y restauración DB+archivos con bytes iguales. Formatos/concurrencias/limpieza restantes y proveedor remoto no se aceptan por inferencia.
+Consolidación y consignaciones: cuatro defectos reproducidos y candidatos
+aprobados con 27 API/dos UI/restauración. La evidencia distingue el error
+original de SELECT, los rechazos HTTP 500 y los dos defectos UI:
+artifacts/peru-reports-consignations-defects-20261003 y
+artifacts/peru-reports-consignations-candidate-20261003.
+Fuentes canónicas 563 integradas; reconstrucción, CI, ensayo de preservación
+y despliegue pendientes. Las pruebas con mocks sólo apoyan regresión y no
+reemplazan estos recorridos reales.
+
+No hay aceptación global. Cada operación conserva comprobaciones restantes.
+Sólo Analytics está excluido; reportes operativos, contables y tributarios incluidos.

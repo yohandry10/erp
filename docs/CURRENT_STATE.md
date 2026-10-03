@@ -2,6 +2,32 @@
 
 Actualizado: 2026-10-03.
 
+Corte técnico 131/132: PROD registra 562, promovida una sola vez con preflight,
+respaldo 560, rollback local y preservación de 29 tablas/funciones/seguridad
+(artifacts/peru-562-promotion-20261003120329303.json). #131 se integró como
+eb5312f4 después de 28 checks aprobados; ambos CI exactos de 3088474d
+pasaron 241 API/24 UI sin reintentos, SQL, barridos y restore, además de
+Storage API/UI/DB/blobs. Main 37121705807 y despliegue exacto siguen pendientes.
+El último runtime completamente comprobado es #130, c9629374. No hay aceptación
+global ni confirmación del plan efectivo o continuidad de Render.
+
+Consolidación/consignaciones reprodujo cuatro defectos: falta de SELECT en
+fuentes de consolidación, rechazos de dominio convertidos en 500, omisión de
+tasa de controladora en UI y nueva entrega idéntica que recuperaba la anterior.
+Los candidatos pasaron 27 API/dos UI y restauración posterior sobre
+PostgreSQL/PostgREST locales (artifacts/peru-reports-consignations-candidate-20261003).
+Se conservan los fallos anteriores del ensayo por navegación y espera de
+respuesta, separados de los defectos de producto. La migración canónica 563
+concede únicamente SELECT a service_role en tres fuentes; no cambia datos,
+funciones, políticas ni permisos de escritura. Fuentes canónicas integradas;
+45 pruebas enfocadas y tipos API/web pasaron. El ensayo del respaldo 562
+aprobó restore, rollback real y preservación de 37 tablas, todas las funciones,
+RLS, políticas, triggers y ACL existentes (artifacts/erp-peru-563-rehearsal-20261003122331200-2388.json).
+El primer gate asumió ausencia de permisos SELECT previos de anon/authenticated
+y se detuvo; la verificación conserva exactamente esas ACL bajo RLS forzado,
+sin añadirles permisos. Ensayo global/CI y promoción/despliegue de 563 pendientes.
+
+
 El ensayo canónico de #125 (`354989d1`) aprobó 138 escenarios HTTP, 17 recorridos
 UI, 99 pantallas, 22 vistas con registros, SQL y restauración
 (`artifacts/peru-integrated-local-year-wizard-finance-20261003`). Incluye cierre
@@ -84,8 +110,12 @@ completa ni disponibilidad. La repetición local aprobó 215 API/22 UI sin reint
 Los 28 checks de `0b7d8f43` aprobaron; CI PR 37115734724 pasó 22 UI sin
 reintentos y rama 37115729735 pasó 21 sin reintento y uno con reintento. Ambos
 gates Storage combinaron API10/UI1/DB/blobs. #130 se integró como `c9629374`;
-main 37118191630, E2E/seguridad y despliegue exacto siguen pendientes. No hay
-migración nueva en #130; PROD 560 continúa vigente.
+main 37118191630, E2E/seguridad y despliegue exacto Render/Vercel con
+preflight aprobaron (`artifacts/peru-production-verification-after-130-20261003.json`).
+Main pasó 215 API/22 UI sin reintentos, barridos y restore; Storage pasó su
+API/UI/DB/blobs. Se conserva el primer timeout de 20s; la repetición aprobada
+no acredita continuidad ni plan efectivo. No hay migración nueva en #130; PROD
+560 continúa vigente.
 
 El API real reprodujo duplicación de borradores mensual/anual y error 500 al
 repetir la constancia mensual (`artifacts/peru-tax-version-retry-baseline-20261003`).
@@ -98,8 +128,8 @@ puentes anteriores y datos, sin backfill. El prefijo 0561 ya corresponde a un
 verificador histórico, preservado; no se crea una migración 561. Se conservaron
 el primer fallo de mapeo RPC y los dos fallos del gate SQL (prefijo duplicado,
 política privada faltante). La reconstrucción canónica pasó 558 migraciones
-hasta 562/71 verificadores y está completando API/UI/barridos/restore. CI, ensayo
-de respaldo 560, promoción única 562 y despliegue siguen pendientes.
+hasta 562/71 verificadores y completó 241 API/24 UI/barridos/restore. Ambos CI
+exactos aprobaron y 562 quedó promovida; main/despliegue de #131 pendientes.
 El ensayo del respaldo 560 del 03/10 aprobó restore, rollback negativo y
 preservación de 29 tablas, funciones, RLS y ACL existentes; el verificador
 562 revirtió sus fixtures (`artifacts/erp-peru-562-rehearsal-20261003110902737-23172.json`).
@@ -2655,6 +2685,6 @@ tenants donde tiene los 256 permisos, así que ninguno perdió acceso.
 4. Evidencia técnica versionada en `artifacts/`.
 5. Historial de Git.
 
-#128 (`3e9c0585`) cerró 26 checks: CI PR 37107579263 y rama 37107576646 aprobaron 181 API/21 UI, SQL, barridos y restore. La 560 se promovió una vez con preflight/respaldo/ensayo, preservando 27 tablas, funciones existentes, RLS/ACL y triggers (`artifacts/peru-560-promotion-20261003083056001.json`). Se integró como `8417ff23`; main 37110032921, E2E y seguridad aprobaron. Render/Vercel sirven ese SHA exacto; DB/Redis, esquema 560, login y CORS pasaron sólo lectura con preflight (`artifacts/peru-production-verification-after-128-20261003.json`). El primer timeout de 20 segundos se conserva; no acredita continuidad ni plan efectivo. PROD está en 560; NO reaplicar.
+#128 (`3e9c0585`) cerró 26 checks: CI PR 37107579263 y rama 37107576646 aprobaron 181 API/21 UI, SQL, barridos y restore. La 560 se promovió una vez con preflight/respaldo/ensayo, preservando 27 tablas, funciones existentes, RLS/ACL y triggers (`artifacts/peru-560-promotion-20261003083056001.json`). Se integró como `8417ff23`; main 37110032921, E2E y seguridad aprobaron. Render/Vercel sirven ese SHA exacto; DB/Redis, esquema 560, login y CORS pasaron sólo lectura con preflight (`artifacts/peru-production-verification-after-128-20261003.json`). El primer timeout de 20 segundos se conserva; no acredita continuidad ni plan efectivo. Ese cierre dejó PROD en 560; el corte 131/132 registra 562. NO reaplicar.
 
 Series y ajustes fiscales ya tienen correcciones canónicas: el subconjunto local aprobó 43 casos API (16 configuración, 15 series, 12 ajustes), un recorrido UI y restauración posterior (`artifacts/peru-tax-series-canonical-subset-20261003`), con tipos API/web aprobados. Series rechaza cinco variantes de validación/conflicto como 400/409 y tipos sin contrato sin residuos. Ajustes recupera tres respuestas perdidas conservando campos/llave, sin doble banco/deuda ni promesas sin manejar; el pago neto y los asientos reales únicos/cuadrados pasaron. Se conserva el defecto UI previo y los fallos de instrumentación sin presentarlos como aceptación. La primera reconstrucción aprobó 208 API y 21 UI; falló en esperar cinco segundos al editor de asiento manual. La ruta respondió 200 en 4294ms y el snapshot posterior contiene el formulario; se conserva `artifacts/peru-tax-series-full-attempt-failure-20261003.json` sin acreditar restore posterior. La repetición espera URL/encabezado en el plazo existente de 25 segundos y conserva el concepto esperado. #129 está en borrador con CI; reconstrucción, CI/despliegue y variantes CxC/monedas/roles permanecen pendientes. No acredita tasas normativas ni depósito externo.

@@ -1,0 +1,11 @@
+{
+  "run_id": 37118697448,
+  "head_sha": "ce459c07684b701ac7afb9a7c3b813b02d1226d0",
+  "workflow_conclusion": "failure",
+  "global_success": false,
+  "failed_phase": "prepare-wizard",
+  "failure_classification": "Retry-After ausente/no acotado",
+  "remoteWrites": false,
+  "private_files_extracted": false,
+  "ui_restore_verified": false
+}

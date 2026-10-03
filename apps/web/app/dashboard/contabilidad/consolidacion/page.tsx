@@ -285,7 +285,7 @@ export default function ConsolidacionPage() {
                     <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-[minmax(0,2fr)_minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,1fr)_auto] [&>*]:min-w-0">
                       <select aria-label="Tenant miembro" className={campo} value={tasa.tenant_miembro_id} onChange={(e) => setTasa({ ...tasa, tenant_miembro_id: e.target.value })}>
                         <option value="">Empresa miembro</option>
-                        {grupo?.miembros.filter((m) => m.estado === 'ACTIVO' && !m.es_controladora).map((m) => <option key={m.tenant_id} value={m.tenant_id}>{m.empresa?.razon_social || m.tenant_id}</option>)}
+                        {grupo?.miembros.filter((m) => m.estado === 'ACTIVO' && m.empresa?.moneda_defecto !== grupo.moneda_presentacion).map((m) => <option key={m.tenant_id} value={m.tenant_id}>{m.empresa?.razon_social || m.tenant_id}</option>)}
                       </select>
                       <Input aria-label="Fecha" type="date" value={tasa.fecha} onChange={(e) => setTasa({ ...tasa, fecha: e.target.value })} />
                       <select aria-label="Tipo" className={campo} value={tasa.tipo} onChange={(e) => setTasa({ ...tasa, tipo: e.target.value })}><option>CIERRE</option><option>PROMEDIO</option><option>HISTORICA</option></select>

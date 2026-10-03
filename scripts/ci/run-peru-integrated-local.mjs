@@ -182,9 +182,11 @@ try {
   await run('monthly-period-lifecycle',process.execPath,['scripts/ci/test-peru-monthly-period-local.mjs']);
   for(const kind of ['tax-intents','tax-other']) await run('prepare-'+kind,process.execPath,['scripts/ci/prepare-peru-first-client-local.mjs',kind]);
   await run('tax-intents-lifecycle',process.execPath,['scripts/ci/test-peru-tax-intents-local.mjs']);
+  await run('reports-consolidation-lifecycle',process.execPath,['scripts/ci/test-peru-reports-consolidation-local.mjs']);
+  await run('reports-consolidation-lifecycle',process.execPath,['scripts/ci/test-peru-reports-consolidation-local.mjs']);
   if(withBrowser) await run('prepare-wizard',process.execPath,['scripts/ci/prepare-peru-first-client-local.mjs','wizard']);
   const httpEvidence=JSON.parse(readFileSync(path.join(output,'http.json'),'utf8'));
-  for(const file of ['annual-acceptance.json','finance-lifecycle.json','hr-lifecycle.json','hr-financial.json','payroll-plame.json','configuration-admin.json','series-lifecycle.json','tax-adjustments.json','monthly-period.json','tax-intents.json','login-office.json']) {
+  for(const file of ['annual-acceptance.json','finance-lifecycle.json','hr-lifecycle.json','hr-financial.json','payroll-plame.json','configuration-admin.json','series-lifecycle.json','tax-adjustments.json','monthly-period.json','tax-intents.json','login-office.json','reports-consolidation-expanded.json']) {
     const phase=JSON.parse(readFileSync(path.join(output,file),'utf8'));
     if(phase.success!==true||phase.remoteWrites!==false) throw new Error('Fase funcional incompleta: '+file);
     const offset=httpEvidence.results.length;
@@ -195,7 +197,7 @@ try {
   if (withBrowser) {
     const web = launch('web', process.execPath, [webRequire.resolve('next/dist/bin/next'), 'dev', '-p', webPort, '--hostname', '127.0.0.1'], webDirectory);
     await waitReady('Web', () => readFileSync(path.join(output, 'web.log'), 'utf8').includes('Ready in') && httpReady(`${webUrl}/login/`), web);
-    if (!recordsOnly) await run('browser', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-integrated-local.spec.ts', 'tests/e2e/peru-rrhh-financial-local.spec.ts', 'tests/e2e/peru-configuration-admin-local.spec.ts', 'tests/e2e/peru-tax-adjustments-local.spec.ts', 'tests/e2e/peru-tax-intents-local.spec.ts', '--reporter=list',
+    if (!recordsOnly) await run('browser', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-integrated-local.spec.ts', 'tests/e2e/peru-rrhh-financial-local.spec.ts', 'tests/e2e/peru-configuration-admin-local.spec.ts', 'tests/e2e/peru-tax-adjustments-local.spec.ts', 'tests/e2e/peru-tax-intents-local.spec.ts', 'tests/e2e/peru-reports-consignations-local.spec.ts', '--reporter=list',
       ...(focusOnboarding ? ['--grep', 'primer administrador|ajuste con respuesta perdida'] : [])], webDirectory);
     if (withSurvey) await run('module-survey', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-module-survey-local.spec.ts', '--reporter=list'], webDirectory);
     if (withRecords) await run('record-survey', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-record-survey-local.spec.ts', '--reporter=list'], webDirectory);

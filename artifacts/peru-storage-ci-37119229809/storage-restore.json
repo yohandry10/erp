@@ -1,0 +1,15 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "Restore DB verificado más archivos Storage file en servidor nuevo; lectura HTTP y SHA iguales. No acredita respaldo Storage remoto ni RTO productivo",
+  "objects": [
+    {
+      "path_sha256": "21f67e957b3da64dc21d82d87ab14be708614165854d534be6a48aaa60ece36a",
+      "bytes": 70,
+      "content_sha256": "4ff6ab670a58c14270e034e2090d9a432caa263a14e0a25785386b0c12f880b5"
+    }
+  ],
+  "archive_bytes": 8704,
+  "archive_sha256": "82c4c6684a5d622bd68429e4f7c26f06bb62a9c8a94578a40920bb8ab0a492d0",
+  "checkedAt": "2026-10-03T11:22:48.941Z"
+}

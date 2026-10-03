@@ -48,7 +48,7 @@ describe('AppController runtime contract', () => {
       }),
     }));
     expect(rpc).toHaveBeenCalledWith('outbox_runtime_health_492', expect.objectContaining({
-      p_required_schema_version: 562,
+      p_required_schema_version: 563,
     }));
     expect(rpc).not.toHaveBeenCalledWith('pgrst_reload_schema', expect.anything());
     expect(cache.getRuntimeHealth).toHaveBeenCalledTimes(1);
@@ -68,7 +68,7 @@ describe('AppController runtime contract', () => {
     await controller.getReadyHealth();
 
     expect(rpc).toHaveBeenCalledWith('outbox_runtime_health_492', expect.objectContaining({
-      p_required_schema_version: 562,
+      p_required_schema_version: 563,
     }));
   });
 

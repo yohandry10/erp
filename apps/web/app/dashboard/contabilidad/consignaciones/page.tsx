@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertCircle, Boxes, Loader2, Plus, RefreshCw } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 import { useCountryContext } from '@/hooks/use-country-context'
@@ -39,6 +39,8 @@ export default function ConsignacionesPage() {
   const [saving, setSaving] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const createIntent = useRef<{ signature: string; key: string } | null>(null)
+  const transitionIntent = useRef<{ signature: string; key: string } | null>(null)
   const [form, setForm] = useState({
     numero: '',
     fecha_registro: todayLocal(),
@@ -81,7 +83,7 @@ export default function ConsignacionesPage() {
     setSaving(true)
     setError(null)
     try {
-      const response = await post('/api/contabilidad/registro-consignaciones', {
+      const payload = {
         ...(form.numero.trim() ? { numero: form.numero.trim() } : {}),
         fecha_registro: form.fecha_registro,
         fecha_entrega: form.fecha_entrega,
@@ -90,8 +92,16 @@ export default function ConsignacionesPage() {
         cantidad: Number(form.cantidad),
         valor_unitario: Number(form.valor_unitario),
         moneda: country.moneda || 'PEN',
+      }
+      const signature = JSON.stringify(payload)
+      if (createIntent.current?.signature !== signature) {
+        createIntent.current = { signature, key: crypto.randomUUID() }
+      }
+      const response = await post('/api/contabilidad/registro-consignaciones', payload, {
+        headers: { 'Idempotency-Key': createIntent.current.key },
       })
       if (!response?.success) throw new Error(response?.message || 'No se pudo registrar la consignación')
+      createIntent.current = null
       setShowForm(false)
       setForm((current) => ({ ...current, numero: '', producto_id: '', consignatario_nombre: '', cantidad: '1', valor_unitario: '0' }))
       await loadData()
@@ -106,8 +116,15 @@ export default function ConsignacionesPage() {
     setSaving(true)
     setError(null)
     try {
-      const response = await post(`/api/contabilidad/registro-consignaciones/${item.id}/estado`, { estado: nextStatus })
+      const signature = JSON.stringify({ id: item.id, estado: nextStatus })
+      if (transitionIntent.current?.signature !== signature) {
+        transitionIntent.current = { signature, key: crypto.randomUUID() }
+      }
+      const response = await post(`/api/contabilidad/registro-consignaciones/${item.id}/estado`, { estado: nextStatus }, {
+        headers: { 'Idempotency-Key': transitionIntent.current.key },
+      })
       if (!response?.success) throw new Error(response?.message || 'No se pudo actualizar el estado')
+      transitionIntent.current = null
       await loadData()
     } catch (err: any) {
       setError(err?.message || 'Error al actualizar la consignación')
