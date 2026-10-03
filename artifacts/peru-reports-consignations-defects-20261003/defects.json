@@ -1,0 +1,74 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "defects": [
+    {
+      "id": "consolidation-domain-rejections-return-500",
+      "observed": [
+        {
+          "operation": "contabilidad/reportes-configurables",
+          "status": 500,
+          "expected": 403,
+          "message": "Error guardando reporte configurable: Reporte no existe o no pertenece a la empresa"
+        },
+        {
+          "operation": "contabilidad/consolidacion/grupos/:id/invitaciones",
+          "status": 500,
+          "expected": 400,
+          "message": "Error invitando empresa al grupo: La empresa controladora ya pertenece al grupo"
+        },
+        {
+          "operation": "contabilidad/consolidacion/grupos/:id/tasas",
+          "status": 500,
+          "expected": 409,
+          "message": "Error registrando tasa de consolidación: CONSOLIDATION_IDEMPOTENCY_CONFLICT"
+        },
+        {
+          "operation": "contabilidad/consolidacion/grupos/:id/tasas",
+          "status": 500,
+          "expected": 403,
+          "message": "Error registrando tasa de consolidación: CONSOLIDATION_CONTROLLER_REQUIRED"
+        },
+        {
+          "operation": "contabilidad/consolidacion/grupos/:id/tasas",
+          "status": 500,
+          "expected": 400,
+          "message": "Error registrando tasa de consolidación: CONSOLIDATION_ACTIVE_MEMBER_REQUIRED"
+        },
+        {
+          "operation": "contabilidad/consolidacion/grupos/:id/tasas",
+          "status": 500,
+          "expected": 400,
+          "message": "Error registrando tasa de consolidación: CONSOLIDATION_RATE_NOT_REQUIRED"
+        },
+        {
+          "operation": "contabilidad/consolidacion/grupos/:id/ajustes",
+          "status": 500,
+          "expected": 409,
+          "message": "Error creando ajuste de consolidación: CONSOLIDATION_IDEMPOTENCY_CONFLICT"
+        },
+        {
+          "operation": "contabilidad/consolidacion/grupos/:id/ajustes",
+          "status": 500,
+          "expected": 400,
+          "message": "Error creando ajuste de consolidación: CONSOLIDATION_ADJUSTMENT_INVALID"
+        }
+      ],
+      "proof": "reports-consolidation-expanded.json"
+    },
+    {
+      "id": "consolidation-controller-rate-unavailable-in-ui",
+      "operation": "Registrar tasa de controladora con moneda de presentación distinta",
+      "expected": "Controladora seleccionable porque necesita conversión",
+      "actual": "La UI omite controladora; cero opciones con su ID",
+      "proof": "browser-consolidation.json"
+    },
+    {
+      "id": "consignment-ui-new-identical-delivery-replays-old-record",
+      "operation": "Nueva consignación idéntica después de alta/retry confirmados",
+      "expected": "Nuevo ID y segundo registro",
+      "actual": "HTTP 201 devuelve el mismo ID; la aserción de nueva entrega falla",
+      "proof": "browser-consignations.json"
+    }
+  ]
+}

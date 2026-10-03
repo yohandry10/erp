@@ -1,0 +1,12 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Navegador/API/PostgreSQL reales locales de consolidación",
+  "checks": [
+    {
+      "check": "Grupo e invitación creados en UI; otra empresa acepta por su sesión",
+      "passed": true
+    }
+  ],
+  "unexpected_errors": []
+}

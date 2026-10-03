@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-10-03T10:10:56.335Z",
-  "commit": "5a23c4c1bc16b58c3bf324c15681ff00f8eb395a",
+  "generated_at": "2026-10-03T12:28:48.038Z",
+  "commit": "eb5312f4e87fcd3a8e6e2630926ee31d927885d3",
   "excluded": [
     "Analytics"
   ],
@@ -5736,7 +5736,7 @@
       "endpoint": "/api/contabilidad/impuestos/declaraciones",
       "summary": "Listar versiones de borradores y constancias tributarias",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-tributos.controller.ts",
-      "line": 105,
+      "line": 106,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('contabilidad.reportes.read')"
@@ -5759,7 +5759,7 @@
       "endpoint": "/api/contabilidad/impuestos/declaraciones/:id/constancia",
       "summary": "Registrar la constancia obtenida externamente en SUNAT",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-tributos.controller.ts",
-      "line": 115,
+      "line": 116,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('contabilidad.reportes.actualizar')"
@@ -5782,7 +5782,7 @@
       "endpoint": "/api/contabilidad/impuestos/anual",
       "summary": "Calcular borrador FV 710 e ITAN desde estados contables; no presenta a SUNAT",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-tributos.controller.ts",
-      "line": 137,
+      "line": 140,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('contabilidad.reportes.read')"
@@ -5805,7 +5805,7 @@
       "endpoint": "/api/contabilidad/impuestos/anual/calcular",
       "summary": null,
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-tributos.controller.ts",
-      "line": 147,
+      "line": 150,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('contabilidad.reportes.read')"
@@ -5828,7 +5828,7 @@
       "endpoint": "/api/contabilidad/impuestos/anual",
       "summary": null,
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-tributos.controller.ts",
-      "line": 157,
+      "line": 160,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('contabilidad.reportes.actualizar')"
@@ -5851,7 +5851,7 @@
       "endpoint": "/api/contabilidad/impuestos/anuales",
       "summary": null,
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-tributos.controller.ts",
-      "line": 172,
+      "line": 176,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('contabilidad.reportes.read')"
@@ -5874,7 +5874,7 @@
       "endpoint": "/api/contabilidad/impuestos/anuales/:id/constancia",
       "summary": null,
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-tributos.controller.ts",
-      "line": 178,
+      "line": 182,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('contabilidad.reportes.actualizar')"
