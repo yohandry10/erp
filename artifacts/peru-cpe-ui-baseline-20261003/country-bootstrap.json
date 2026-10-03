@@ -1,0 +1,44 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "Dos cargas locales aisladas; no acredita barrido de99 ni disponibilidad PROD",
+  "checks": [
+    {
+      "reload": false,
+      "passed": true,
+      "elapsed_ms": 2240
+    },
+    {
+      "reload": true,
+      "passed": true,
+      "elapsed_ms": 1714
+    }
+  ],
+  "failures": [
+    {
+      "path": "/dashboard/",
+      "started": 1791049803375,
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "path": "/_next/static/webpack/webpack.0358c5e68bcfeb69.hot-update.js",
+      "started": 1791049808787,
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "path": "/backend/api/auth/profile/",
+      "started": 1791049810416,
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "path": "/_next/static/chunks/_app-pages-browser_node_modules_pnpm_next_15_5_24__opentelemetry_api_1_9_0__playwright_test_1-c5ecbd.js",
+      "started": 1791049810415,
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "path": "/backend/api/configuration/context/country/",
+      "started": 1791049810419,
+      "error": "net::ERR_ABORTED"
+    }
+  ]
+}

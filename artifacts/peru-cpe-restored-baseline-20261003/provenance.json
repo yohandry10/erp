@@ -1,0 +1,12 @@
+{
+  "source": "artifacts/peru-cpe-restored-local-20261003172648068-11912",
+  "global_acceptance": false,
+  "remoteWrites": false,
+  "dumps_extracted": false,
+  "candidate_hashes": null,
+  "limits": [
+    "Snapshot local restaurado, no migración fresca",
+    "No acredita aceptación SUNAT ni disponibilidad PROD",
+    "PFX, PDF, dumps, logs y trazas completos permanecen privados"
+  ]
+}

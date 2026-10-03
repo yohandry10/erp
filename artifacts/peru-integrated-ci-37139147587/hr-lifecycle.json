@@ -1,0 +1,252 @@
+{
+  "success": true,
+  "local_only": true,
+  "remoteWrites": false,
+  "scope": "RRHH primer ADMIN no demo: empleados, contrato, asistencia y recuperación; no acepta planilla completa",
+  "scenarios": [
+    {
+      "scenario": "Empleado: replay retorna el mismo empleado sin duplicación",
+      "passed": true
+    },
+    {
+      "scenario": "Empleado: alta validada, documento duplicado rechazado y edición de puesto persistida",
+      "passed": true
+    },
+    {
+      "scenario": "Empleado: edición explícita sin hijos retira asignación familiar",
+      "passed": true
+    },
+    {
+      "scenario": "Empleado: documento duplicado en edición rechazado, replay y huella incompatible conservan datos y asignación",
+      "passed": true
+    },
+    {
+      "scenario": "RRHH: rol sin acceso no consulta ni crea/edita/desactiva empleados",
+      "passed": true
+    },
+    {
+      "scenario": "Contrato: remuneración/régimen inválidos rechazados, alta/replay, consulta y PDF reales",
+      "passed": true
+    },
+    {
+      "scenario": "Asistencia: entrada/salida en fecha fiscal, replay, orden horario y consulta persistida",
+      "passed": true
+    },
+    {
+      "scenario": "RRHH: edición de empleado y PDF de contrato ajenos ocultos sin mutación",
+      "passed": true
+    },
+    {
+      "scenario": "Contrato: renovación y finalización con replay conservan el historial",
+      "passed": true
+    },
+    {
+      "scenario": "Empleado: baja lógica conserva empleado e historial",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/departamentos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/empleados",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/empleados",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/empleados",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/empleados",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/empleados",
+      "status": 409
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/empleados/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/empleados",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/empleados",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/empleados/:id",
+      "status": 409
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/empleados/:id",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/empleados/:id",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/empleados/:id",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "roles",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "users",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/empleados",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/empleados",
+      "status": 403
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/empleados/:id",
+      "status": 403
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "rrhh/empleados/:id",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/contratos",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/contratos",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/contratos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/contratos",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/contratos?empleado_id=:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/contratos/:id/generar",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/asistencias/marcar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/asistencias/marcar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/asistencias/marcar",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/asistencias/marcar",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/asistencias?fecha=2026-10-03",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/empleados/:id",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/contratos/:id/generar",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/contratos/:id/renovar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/contratos/:id/renovar",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/contratos/:id/finalizar",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/contratos/:id/finalizar",
+      "status": 200
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "rrhh/empleados/:id",
+      "status": 200
+    }
+  ],
+  "defects": [],
+  "checkedAt": "2026-10-03T17:12:27.081Z"
+}

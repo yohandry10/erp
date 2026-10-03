@@ -1,0 +1,20 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "API contra snapshot efímero de facturas previamente creadas por API; exportación sin transmisión",
+  "stored": 201,
+  "exported": 201,
+  "scenarios": [
+    {
+      "scenario": "CPE: CSV incluye todas las 201 coincidencias persistidas",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "endpoint": "cpe/comprobantes/export",
+      "status": 200
+    }
+  ]
+}

@@ -504,7 +504,9 @@ async resolveNumeroCpe(
         item?.precio_venta ?? item?.precioVenta ?? (cantidad > 0 ? total / cantidad : 0),
         6,
       );
-      const precioUnitario = this.roundMoney(item?.precio_unitario ?? item?.precioUnitario ?? valorUnitario, 6);
+      // El formulario declara valorUnitario neto y precioUnitario con IGV.
+      // El PriceAmount canónico conserva el valor neto; precio_venta es bruto.
+      const precioUnitario = valorUnitario;
 
       if (cantidad <= 0) {
         throw new BadRequestException(`El item ${index + 1} debe tener cantidad > 0`);

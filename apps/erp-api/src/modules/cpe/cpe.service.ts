@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, ForbiddenException, HttpException, ServiceUnavailableException } from '@nestjs/common';
 import { createHash, randomUUID } from 'crypto';
 import { DOMParser } from '@xmldom/xmldom';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
@@ -1554,6 +1554,7 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       // Sólo lo establece la integración interna de pedidos después de crear
       // el lifecycle DIAN 531. Nunca se deriva del DTO público.
       pedidoFiscalOwnerId?: string;
+      directPeruRequestFingerprint?: string;
     },
   ): Promise<FacturaDto> {
     try {
@@ -1765,6 +1766,9 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
           issueTime = reservedPosIssueTime;
         }
       }
+      const directPeruRequestFingerprint = paisCodigo === 'PE' && eligibleDirectRetry
+        ? options?.directPeruRequestFingerprint ?? this.buildDirectPeruRequestFingerprint(createFacturaDto, tenantId, true)
+        : null;
       const usaEmisionAtomica = !finalizaDocumentoPosReservado && ['01', '03'].includes(
         String(createFacturaDto.tipo_documento ?? '').trim(),
       );
@@ -2113,20 +2117,27 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
         };
         const rpcName = pedidoId
           ? 'facturar_pedido_venta_tx'
-          : 'emitir_factura_cliente_tx';
+          : directPeruRequestFingerprint ? 'emitir_cpe_directo_peru_tx' : 'emitir_factura_cliente_tx';
         const rpcArgs = pedidoId
           ? {
               p_pedido_id: pedidoId,
               p_actor_id: userId,
               ...atomicArgs,
             }
-          : atomicArgs;
+          : directPeruRequestFingerprint
+            ? { ...atomicArgs, p_actor_id: userId, p_intent_fingerprint: directPeruRequestFingerprint }
+            : atomicArgs;
         const { data: atomicResult, error: atomicError } = await supabaseClient.rpc(
           rpcName,
           rpcArgs,
         );
 
         if (atomicError) {
+          if (directPeruRequestFingerprint) {
+            if (atomicError.code === '23505') throw new ConflictException('La intención CPE ya pertenece a otro contenido o actor');
+            if (atomicError.code === '42501' && String(atomicError.message).includes('PE_DIRECT_CPE_PERMISSION_REQUIRED')) throw new ForbiddenException('No tiene permiso para emitir este CPE');
+            if (!['22023', '23503', '23514', '22P02'].includes(atomicError.code)) throw new ServiceUnavailableException('No se pudo confirmar el CPE; conserve la misma intención y reintente');
+          }
           this.logger.error(
             `No se pudo emitir la factura atómica ${idempotencyKey}: ${atomicError.message}`,
             atomicError,
@@ -2192,10 +2203,10 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       return this.mapToDto({ ...finalized.cpe, documento_id: finalized.documento_id });
     } catch (error) {
       console.error('Error in CpeService.create:', error);
-      if (error instanceof BadRequestException) {
+      if (error instanceof HttpException) {
         throw error;
       }
-      throw new BadRequestException('Error creating CPE');
+      throw new ServiceUnavailableException('No se pudo crear el CPE; reintente con la misma intención');
     }
   }
 
@@ -2386,7 +2397,7 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       numero,
       ruc_emisor: emisor.ruc,
       razon_social_emisor: emisor.razonSocial,
-      cliente_id: clienteMaestro?.id,
+      cliente_id: clienteMaestro?.id ?? (emisor.pais === 'PE' ? payload?.cliente_id : undefined),
       tipo_documento_receptor: tipoDocumentoReceptor,
       documento_receptor: documentoReceptor,
       razon_social_receptor: razonSocialReceptor,
@@ -2440,7 +2451,18 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       }
     }
 
-    return this.create(dto, tenantId, userId);
+    if (emisor.pais !== 'PE') return this.create(dto, tenantId, userId);
+    return this.create(dto, tenantId, userId, {
+      directPeruRequestFingerprint: this.buildDirectPeruRequestFingerprint(dto, tenantId, false, payload?.numero ?? payload?.correlativo),
+    });
+  }
+
+  private buildDirectPeruRequestFingerprint(dto: CreateFacturaDto, tenantId: string, includeNumber: boolean, requestedNumber?: unknown): string {
+    return createHash('sha256').update(JSON.stringify({
+      version: 565, serie: String(dto.serie ?? '').trim().toUpperCase(),
+      requestedNumber: includeNumber ? Number(dto.numero) : requestedNumber == null ? null : Number(requestedNumber),
+      request: this.buildDirectDianRequestFingerprint(dto, tenantId),
+    }), 'utf8').digest('hex');
   }
 
   private async reserveDianUiNumber(
