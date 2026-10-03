@@ -2,7 +2,7 @@
 
 No hay aceptación integral de lanzamiento. Los casos se vinculan a operaciones concretas en la matriz API; navegación y controles visibles describen la oferta y no demuestran ejecución. Sólo Analytics excluido; reportes operativos, contables y tributarios incluidos.
 
-Último runtime comprobado: `c9629374`. PROD DB registra 562 con preflight/preservación; PR #131 pasó ambos CI exactos con 241 API/24 UI sin reintentos, SQL y restauración. Main/despliegue exacto pendientes. Render: plan efectivo y continuidad sin confirmar. No hubo datos sintéticos de negocio en PROD.
+Último runtime comprobado: `eb5312f4`, esquema 562 en esa lectura. DB actual 563 con preflight/preservación de 37 tablas, funciones y seguridad. PR #132 aprobó ambos CI exactos con 276 API/26 UI y se integró como `cf868067`; main y despliegue pendientes. El cierre #131 tiene main/despliegue aprobados y conserva el primer timeout HTTP de 20 segundos. Render: plan efectivo y continuidad sin confirmar. No hubo datos sintéticos de negocio en PROD.
 
 | Dominio de código | Contratos declarados | HTTP observado | Operaciones con casos funcionales | Aceptación completa |
 |---|---:|---:|---:|---|
@@ -13,7 +13,7 @@ No hay aceptación integral de lanzamiento. Los casos se vinculan a operaciones 
 | configuracion | 13 | 4 | 4 | Pendiente |
 | configuracion-fiscal | 1 | 0 | 0 | Pendiente |
 | configuration | 16 | 7 | 7 | Pendiente |
-| contabilidad | 124 | 47 | 29 | Pendiente |
+| contabilidad | 124 | 57 | 41 | Pendiente |
 | cpe | 43 | 1 | 0 | Pendiente |
 | dashboard | 3 | 0 | 0 | Pendiente |
 | demo | 8 | 1 | 0 | Pendiente |
@@ -55,7 +55,7 @@ Los 11 contratos específicos de Argentina/Colombia identificados en el artefact
 
 ## Evidencia
 
-- `peru-integrated-local-tax-intents-20261003`: ensayo real API/UI/DB y restore.
+- `peru-integrated-local-reports-consignations-20261003`: ensayo real API/UI/DB y restore.
 - `peru-storage-main-37118191630`: API/UI/DB/blobs locales; proveedor remoto sin aceptación por inferencia.
 - `peru-operation-acceptance-cases-20260930.json`: qué se probó y variantes pendientes.
 - `peru-functional-defects-20260930.json`: reproducción, corrección y estado de cada defecto.

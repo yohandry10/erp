@@ -234,7 +234,7 @@ export class GreController {
     @Res() res: any,
   ) {
     const documento = await this.greService.generarRepresentacionGre(id, tenantId);
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${documento.filename}"`);
     return res.send(documento.content);
   }

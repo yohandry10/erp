@@ -1,0 +1,29 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Creación manual por UI/API/DB con certificado desechable del primer cliente local",
+  "checks": [
+    {
+      "check": "Peso de 2 kg válido para el DTO también permite enviar el formulario",
+      "passed": false,
+      "validity": {
+        "valid": false,
+        "stepMismatch": true,
+        "step": "0.01",
+        "min": "0.001",
+        "value": "2"
+      }
+    },
+    {
+      "check": "Formulario ofrece documento del destinatario requerido para firmar",
+      "passed": false
+    },
+    {
+      "check": "Guía creada y firmada con certificado configurado; sin transmisión fiscal",
+      "passed": false,
+      "estado": "BORRADOR",
+      "error": "No se puede generar GRE: faltan datos del destinatario (documento, razón social o dirección)"
+    }
+  ],
+  "unexpected_errors": []
+}

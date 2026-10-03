@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-10-03T12:28:48.828Z",
+  "generated_at": "2026-10-03T13:01:09.850Z",
   "inventory": "artifacts/peru-api-operation-inventory-20260930.json",
-  "evidence": "artifacts/peru-integrated-ci-37119229809",
+  "evidence": "artifacts/peru-integrated-local-reports-consignations-20261003",
   "additional_evidence": [
     {
-      "evidence": "artifacts/peru-storage-ci-37119229809",
+      "evidence": "artifacts/peru-storage-ci-37121705807",
       "scope": "company_logo_real_storage_subset",
       "global_success": true,
       "ui_included": true
@@ -907,23 +907,33 @@
           "status": 201
         },
         {
-          "trace_index": 1098,
+          "trace_index": 1096,
           "status": 201
         },
         {
-          "trace_index": 1112,
+          "trace_index": 1155,
+          "status": 201
+        },
+        {
+          "trace_index": 1176,
+          "status": 201
+        },
+        {
+          "trace_index": 1179,
+          "status": 201
+        },
+        {
+          "trace_index": 1193,
           "status": 201
         }
       ],
       "defects": [
         {
           "id": "auth-office-throttle-missing-standard-retry-after",
-          "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
+          "status": "corrected_merged_main_deployment_verified",
           "proof": "artifacts/peru-tax-full-local-failed-login-office-20261003/failure.json",
           "correction": "Límite agregado publica Retry-After estándar además de Retry-After-Office; conserva 5/cuenta-IP y 20/IP por minuto. API real verifica 429/60s y recuperación 201 sin modificar limitador.",
-          "pending": [
-            "CI exacto, promoción DB-first 562, main y despliegue"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -3640,55 +3650,55 @@
       "source": "apps/erp-api/src/modules/configuracion/configuration.controller.ts:795",
       "existing_evidence": [
         {
-          "trace_index": 1099,
+          "trace_index": 1180,
           "status": 201
         },
         {
-          "trace_index": 1100,
+          "trace_index": 1181,
           "status": 201
         },
         {
-          "trace_index": 1101,
+          "trace_index": 1182,
           "status": 201
         },
         {
-          "trace_index": 1102,
+          "trace_index": 1183,
           "status": 409
         },
         {
-          "trace_index": 1103,
+          "trace_index": 1184,
           "status": 400
         },
         {
-          "trace_index": 1104,
+          "trace_index": 1185,
           "status": 400
         },
         {
-          "trace_index": 1105,
+          "trace_index": 1186,
           "status": 400
         },
         {
-          "trace_index": 1106,
+          "trace_index": 1187,
           "status": 413
         },
         {
-          "trace_index": 1107,
+          "trace_index": 1188,
           "status": 201
         },
         {
-          "trace_index": 1108,
+          "trace_index": 1189,
           "status": 403
         },
         {
-          "trace_index": 1110,
+          "trace_index": 1191,
           "status": 400
         },
         {
-          "trace_index": 1111,
+          "trace_index": 1192,
           "status": 201
         },
         {
-          "trace_index": 1113,
+          "trace_index": 1194,
           "status": 201
         }
       ],
@@ -3717,15 +3727,15 @@
       "source": "apps/erp-api/src/modules/configuracion/configuration.controller.ts:837",
       "existing_evidence": [
         {
-          "trace_index": 1109,
+          "trace_index": 1190,
           "status": 403
         },
         {
-          "trace_index": 1114,
+          "trace_index": 1195,
           "status": 200
         },
         {
-          "trace_index": 1115,
+          "trace_index": 1196,
           "status": 200
         }
       ],
@@ -4410,6 +4420,26 @@
         {
           "trace_index": 678,
           "status": 201
+        },
+        {
+          "trace_index": 1103,
+          "status": 201
+        },
+        {
+          "trace_index": 1104,
+          "status": 201
+        },
+        {
+          "trace_index": 1105,
+          "status": 201
+        },
+        {
+          "trace_index": 1106,
+          "status": 201
+        },
+        {
+          "trace_index": 1107,
+          "status": 201
         }
       ],
       "defects": [
@@ -4981,17 +5011,26 @@
         {
           "trace_index": 147,
           "status": 200
+        },
+        {
+          "trace_index": 1121,
+          "status": 200
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "consolidation-membership-real-balances",
+          "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+          "verified_checks": [
+            "grupo real, invitación pendiente, rechazo y aceptación en dos empresas",
+            "UI crea grupo, invita y segunda sesión acepta; balances 100+200 compartidos sólo tras aceptar"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "otras participaciones y salida/cambio de miembro si existen"
       ]
     },
     {
@@ -5000,16 +5039,30 @@
       "method": "POST",
       "endpoint": "/api/contabilidad/consolidacion/grupos",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-consolidacion.controller.ts:32",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1117,
+          "status": 201
+        },
+        {
+          "trace_index": 1127,
+          "status": 201
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "consolidation-membership-real-balances",
+          "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+          "verified_checks": [
+            "grupo real, invitación pendiente, rechazo y aceptación en dos empresas",
+            "UI crea grupo, invita y segunda sesión acepta; balances 100+200 compartidos sólo tras aceptar"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "otras participaciones y salida/cambio de miembro si existen"
       ]
     },
     {
@@ -5018,26 +5071,48 @@
       "method": "POST",
       "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/invitaciones",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-consolidacion.controller.ts:47",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1118,
+          "status": 201
+        },
+        {
+          "trace_index": 1123,
+          "status": 201
+        },
+        {
+          "trace_index": 1126,
+          "status": 400
+        },
+        {
+          "trace_index": 1128,
+          "status": 201
+        }
+      ],
       "defects": [
         {
           "id": "consolidation-domain-rejections-return-500",
-          "status": "candidate_api_ui_restore_passed_canonical_ci_deployment_pending",
+          "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
           "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
           "correction": "Candidato distingue colisión 409, pertenencia 403, estado/datos 400 y fallo de infraestructura 503; no cambia escrituras ni límites.",
           "pending": [
-            "Fuentes/migración/verificador canónicos, CI, ensayo de preservación y despliegue"
+            "CI exacto, promoción DB-first 563, main y despliegue"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "consolidation-membership-real-balances",
+          "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+          "verified_checks": [
+            "grupo real, invitación pendiente, rechazo y aceptación en dos empresas",
+            "UI crea grupo, invita y segunda sesión acepta; balances 100+200 compartidos sólo tras aceptar"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "otras participaciones y salida/cambio de miembro si existen"
       ]
     },
     {
@@ -5046,16 +5121,34 @@
       "method": "POST",
       "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/respuesta",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-consolidacion.controller.ts:63",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1120,
+          "status": 201
+        },
+        {
+          "trace_index": 1124,
+          "status": 201
+        },
+        {
+          "trace_index": 1129,
+          "status": 201
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "consolidation-membership-real-balances",
+          "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+          "verified_checks": [
+            "grupo real, invitación pendiente, rechazo y aceptación en dos empresas",
+            "UI crea grupo, invita y segunda sesión acepta; balances 100+200 compartidos sólo tras aceptar"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "otras participaciones y salida/cambio de miembro si existen"
       ]
     },
     {
@@ -5064,35 +5157,73 @@
       "method": "POST",
       "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/tasas",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-consolidacion.controller.ts:79",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1131,
+          "status": 201
+        },
+        {
+          "trace_index": 1132,
+          "status": 201
+        },
+        {
+          "trace_index": 1133,
+          "status": 201
+        },
+        {
+          "trace_index": 1135,
+          "status": 201
+        },
+        {
+          "trace_index": 1137,
+          "status": 409
+        },
+        {
+          "trace_index": 1139,
+          "status": 403
+        },
+        {
+          "trace_index": 1140,
+          "status": 400
+        },
+        {
+          "trace_index": 1141,
+          "status": 400
+        }
+      ],
       "defects": [
         {
           "id": "consolidation-domain-rejections-return-500",
-          "status": "candidate_api_ui_restore_passed_canonical_ci_deployment_pending",
+          "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
           "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
           "correction": "Candidato distingue colisión 409, pertenencia 403, estado/datos 400 y fallo de infraestructura 503; no cambia escrituras ni límites.",
           "pending": [
-            "Fuentes/migración/verificador canónicos, CI, ensayo de preservación y despliegue"
+            "CI exacto, promoción DB-first 563, main y despliegue"
           ]
         },
         {
           "id": "consolidation-controller-rate-unavailable-in-ui",
-          "status": "candidate_api_ui_restore_passed_canonical_ci_deployment_pending",
+          "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
           "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
           "correction": "Candidato selecciona miembros activos cuya moneda necesita conversión, incluida la controladora.",
           "pending": [
-            "Fuentes/migración/verificador canónicos, CI, ensayo de preservación y despliegue"
+            "CI exacto, promoción DB-first 563, main y despliegue"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "consolidation-presentation-currency",
+          "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+          "verified_checks": [
+            "PEN a USD de controladora y miembro, corte, falta de tasa, replay/conflicto y permiso",
+            "UI registra ambas tasas y obtiene 125 con fuentes reales"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "tipos cierre/histórica y monedas/fechas restantes"
       ]
     },
     {
@@ -5101,16 +5232,34 @@
       "method": "POST",
       "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/mapeos-cuentas",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-consolidacion.controller.ts:96",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1142,
+          "status": 201
+        },
+        {
+          "trace_index": 1143,
+          "status": 201
+        },
+        {
+          "trace_index": 1145,
+          "status": 404
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "consolidation-account-mapping",
+          "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+          "verified_checks": [
+            "mapeo 70→20 persistido y replay sin duplicar",
+            "cuenta ausente rechazada y cálculo de grupo refleja el mapeo"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "otros mapeos y variantes de edición/retiro disponibles"
       ]
     },
     {
@@ -5119,26 +5268,56 @@
       "method": "POST",
       "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/ajustes",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-consolidacion.controller.ts:113",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1146,
+          "status": 201
+        },
+        {
+          "trace_index": 1147,
+          "status": 201
+        },
+        {
+          "trace_index": 1149,
+          "status": 409
+        },
+        {
+          "trace_index": 1151,
+          "status": 400
+        },
+        {
+          "trace_index": 1152,
+          "status": 400
+        },
+        {
+          "trace_index": 1157,
+          "status": 403
+        }
+      ],
       "defects": [
         {
           "id": "consolidation-domain-rejections-return-500",
-          "status": "candidate_api_ui_restore_passed_canonical_ci_deployment_pending",
+          "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
           "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
           "correction": "Candidato distingue colisión 409, pertenencia 403, estado/datos 400 y fallo de infraestructura 503; no cambia escrituras ni límites.",
           "pending": [
-            "Fuentes/migración/verificador canónicos, CI, ensayo de preservación y despliegue"
+            "CI exacto, promoción DB-first 563, main y despliegue"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "consolidation-adjustment-keeps-legal-books",
+          "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+          "verified_checks": [
+            "eliminación con replay/conflicto, cuenta inválida y debe/haber inválido",
+            "sólo cambia reporte, conserva huella de libros legales; lector no ajusta"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "otros tipos y períodos de ajustes; UI de ajustes"
       ]
     },
     {
@@ -5170,26 +5349,60 @@
       "method": "POST",
       "endpoint": "/api/contabilidad/reportes-configurables",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-consolidacion.controller.ts:137",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1108,
+          "status": 201
+        },
+        {
+          "trace_index": 1110,
+          "status": 409
+        },
+        {
+          "trace_index": 1111,
+          "status": 400
+        },
+        {
+          "trace_index": 1112,
+          "status": 400
+        },
+        {
+          "trace_index": 1113,
+          "status": 400
+        },
+        {
+          "trace_index": 1114,
+          "status": 403
+        },
+        {
+          "trace_index": 1158,
+          "status": 403
+        }
+      ],
       "defects": [
         {
           "id": "consolidation-domain-rejections-return-500",
-          "status": "candidate_api_ui_restore_passed_canonical_ci_deployment_pending",
+          "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
           "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
           "correction": "Candidato distingue colisión 409, pertenencia 403, estado/datos 400 y fallo de infraestructura 503; no cambia escrituras ni límites.",
           "pending": [
-            "Fuentes/migración/verificador canónicos, CI, ensayo de preservación y despliegue"
+            "CI exacto, promoción DB-first 563, main y despliegue"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "configurable-report-definition-validation",
+          "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+          "verified_checks": [
+            "alta y reemplazo con validación de código, fórmula, referencias y orden",
+            "rechazos conservan líneas vigentes y no permiten edición ajena"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "otros tipos de línea, eliminación y modificaciones permitidas por el producto"
       ]
     },
     {
@@ -5198,26 +5411,115 @@
       "method": "GET",
       "endpoint": "/api/contabilidad/reportes-configurables/:reporteId/generar",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-consolidacion.controller.ts:152",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1109,
+          "status": 200
+        },
+        {
+          "trace_index": 1115,
+          "status": 404
+        },
+        {
+          "trace_index": 1116,
+          "status": 400
+        },
+        {
+          "trace_index": 1119,
+          "status": 200
+        },
+        {
+          "trace_index": 1122,
+          "status": 200
+        },
+        {
+          "trace_index": 1125,
+          "status": 200
+        },
+        {
+          "trace_index": 1130,
+          "status": 400
+        },
+        {
+          "trace_index": 1134,
+          "status": 200
+        },
+        {
+          "trace_index": 1136,
+          "status": 200
+        },
+        {
+          "trace_index": 1138,
+          "status": 200
+        },
+        {
+          "trace_index": 1144,
+          "status": 200
+        },
+        {
+          "trace_index": 1148,
+          "status": 200
+        },
+        {
+          "trace_index": 1150,
+          "status": 200
+        },
+        {
+          "trace_index": 1156,
+          "status": 200
+        }
+      ],
       "defects": [
         {
           "id": "consolidation-report-missing-service-select",
-          "status": "candidate_api_ui_restore_passed_canonical_ci_deployment_pending",
+          "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
           "proof": "artifacts/peru-reports-consolidation-read-baseline-20261003/reports-consignations.json",
           "correction": "Candidato local concede únicamente SELECT de los tres orígenes de consolidación a service_role; preserva escrituras RPC y no concede lectura a anon/authenticated.",
           "pending": [
-            "Fuentes/migración/verificador canónicos, CI, ensayo de preservación y despliegue"
+            "CI exacto, promoción DB-first 563, main y despliegue"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "configurable-report-real-sources",
+          "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+          "verified_checks": [
+            "saldo por período, acumulado, fórmula y aislamiento",
+            "excluye borrador y fechas fuera del corte; lector permitido y escrituras rechazadas"
+          ]
+        },
+        {
+          "id": "consolidation-presentation-currency",
+          "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+          "verified_checks": [
+            "PEN a USD de controladora y miembro, corte, falta de tasa, replay/conflicto y permiso",
+            "UI registra ambas tasas y obtiene 125 con fuentes reales"
+          ]
+        },
+        {
+          "id": "consolidation-account-mapping",
+          "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+          "verified_checks": [
+            "mapeo 70→20 persistido y replay sin duplicar",
+            "cuenta ausente rechazada y cálculo de grupo refleja el mapeo"
+          ]
+        },
+        {
+          "id": "consolidation-adjustment-keeps-legal-books",
+          "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+          "verified_checks": [
+            "eliminación con replay/conflicto, cuenta inválida y debe/haber inválido",
+            "sólo cambia reporte, conserva huella de libros legales; lector no ajusta"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "otras cuentas, naturalezas, fórmulas y presentación/exportación/impresión donde existan",
+        "tipos cierre/histórica y monedas/fechas restantes",
+        "otros mapeos y variantes de edición/retiro disponibles",
+        "otros tipos y períodos de ajustes; UI de ajustes"
       ]
     },
     {
@@ -5471,6 +5773,14 @@
         },
         {
           "trace_index": 979,
+          "status": 200
+        },
+        {
+          "trace_index": 1097,
+          "status": 200
+        },
+        {
+          "trace_index": 1098,
           "status": 200
         }
       ],
@@ -5852,17 +6162,25 @@
         {
           "trace_index": 146,
           "status": 200
+        },
+        {
+          "trace_index": 1173,
+          "status": 200
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "consignment-reader-and-ledger-boundary",
+          "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+          "verified_checks": [
+            "lector consulta y no crea ni cambia estados; registros no alteran libros legales"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "filtros, exportación e impresión que existan y otros permisos"
       ]
     },
     {
@@ -5871,26 +6189,69 @@
       "method": "POST",
       "endpoint": "/api/contabilidad/registro-consignaciones",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:630",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1159,
+          "status": 201
+        },
+        {
+          "trace_index": 1160,
+          "status": 201
+        },
+        {
+          "trace_index": 1161,
+          "status": 201
+        },
+        {
+          "trace_index": 1166,
+          "status": 201
+        },
+        {
+          "trace_index": 1171,
+          "status": 400
+        },
+        {
+          "trace_index": 1172,
+          "status": 400
+        },
+        {
+          "trace_index": 1174,
+          "status": 403
+        }
+      ],
       "defects": [
         {
           "id": "consignment-ui-new-identical-delivery-replays-old-record",
-          "status": "candidate_api_ui_restore_passed_canonical_ci_deployment_pending",
+          "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
           "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
           "correction": "Candidato web conserva intención durante fallo y la libera después de éxito para permitir otra entrega idéntica.",
           "pending": [
-            "Fuentes/migración/verificador canónicos, CI, ensayo de preservación y despliegue"
+            "CI exacto, promoción DB-first 563, main y despliegue"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "consignment-delivery-intents",
+          "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+          "verified_checks": [
+            "dos intenciones idénticas crean dos IDs; replay recupera el primero",
+            "cantidad/precio inválidos no insertan; total 24.68 calculado por servidor",
+            "UI commit con respuesta perdida conserva campos, recupera entrega y permite otra idéntica; reload muestra dos"
+          ]
+        },
+        {
+          "id": "consignment-reader-and-ledger-boundary",
+          "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+          "verified_checks": [
+            "lector consulta y no crea ni cambia estados; registros no alteran libros legales"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "otras monedas, bienes/orígenes y formulario restaurado antes de confirmar tras cerrar navegador",
+        "filtros, exportación e impresión que existan y otros permisos"
       ]
     },
     {
@@ -5899,16 +6260,66 @@
       "method": "POST",
       "endpoint": "/api/contabilidad/registro-consignaciones/:id/estado",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:659",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1162,
+          "status": 201
+        },
+        {
+          "trace_index": 1163,
+          "status": 201
+        },
+        {
+          "trace_index": 1164,
+          "status": 201
+        },
+        {
+          "trace_index": 1165,
+          "status": 201
+        },
+        {
+          "trace_index": 1167,
+          "status": 201
+        },
+        {
+          "trace_index": 1168,
+          "status": 400
+        },
+        {
+          "trace_index": 1169,
+          "status": 400
+        },
+        {
+          "trace_index": 1170,
+          "status": 400
+        },
+        {
+          "trace_index": 1175,
+          "status": 403
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "consignment-delivery-state-lifecycle",
+          "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+          "verified_checks": [
+            "venta y cierre, devolución/anulación de pendiente y replay persistidos",
+            "estado terminal y mutación ajena/inexistente rechazados sin cambiar entrega"
+          ]
+        },
+        {
+          "id": "consignment-reader-and-ledger-boundary",
+          "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+          "verified_checks": [
+            "lector consulta y no crea ni cambia estados; registros no alteran libros legales"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "cambios de estado desde navegador y variantes comerciales restantes",
+        "filtros, exportación e impresión que existan y otros permisos"
       ]
     },
     {
@@ -6166,6 +6577,22 @@
         },
         {
           "trace_index": 1051,
+          "status": 201
+        },
+        {
+          "trace_index": 1099,
+          "status": 201
+        },
+        {
+          "trace_index": 1100,
+          "status": 201
+        },
+        {
+          "trace_index": 1101,
+          "status": 201
+        },
+        {
+          "trace_index": 1102,
           "status": 201
         }
       ],
@@ -7208,12 +7635,10 @@
         },
         {
           "id": "monthly-tax-save-retry-duplicates-version",
-          "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
+          "status": "corrected_merged_main_deployment_verified",
           "proof": "artifacts/peru-tax-version-retry-baseline-20261003/tax-version-retry.json",
           "correction": "Intención durable, conflicto de cuerpo y respuesta congelada; transacción única y web retiene clave durante fallo",
-          "pending": [
-            "CI exacto, promoción DB-first 562, main y despliegue"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -7303,12 +7728,10 @@
       "defects": [
         {
           "id": "monthly-tax-receipt-retry-500",
-          "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
+          "status": "corrected_merged_main_deployment_verified",
           "proof": "artifacts/peru-tax-version-retry-baseline-20261003/tax-version-retry.json",
           "correction": "Constancia e intención atómicas; replay confirmado se recupera antes de exigir estado BORRADOR",
-          "pending": [
-            "CI exacto, promoción DB-first 562, main y despliegue"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -7408,12 +7831,10 @@
       "defects": [
         {
           "id": "annual-tax-save-retry-duplicates-version",
-          "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
+          "status": "corrected_merged_main_deployment_verified",
           "proof": "artifacts/peru-tax-version-retry-baseline-20261003/tax-version-retry.json",
           "correction": "Intención anual durable y replay del corte congelado antes de recalcular fuentes",
-          "pending": [
-            "CI exacto, promoción DB-first 562, main y despliegue"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -12930,7 +13351,11 @@
           "status": 201
         },
         {
-          "trace_index": 1096,
+          "trace_index": 1153,
+          "status": 201
+        },
+        {
+          "trace_index": 1177,
           "status": 201
         }
       ],
@@ -17500,7 +17925,11 @@
           "status": 201
         },
         {
-          "trace_index": 1097,
+          "trace_index": 1154,
+          "status": 201
+        },
+        {
+          "trace_index": 1178,
           "status": 201
         }
       ],

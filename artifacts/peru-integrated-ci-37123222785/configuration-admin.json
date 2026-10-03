@@ -1,0 +1,411 @@
+{
+  "success": true,
+  "local_only": true,
+  "remoteWrites": false,
+  "scope": "Configuración y sucursales, primer ADMIN no demo; API real sobre DB efímera, no aceptación fiscal externa",
+  "scenarios": [
+    {
+      "scenario": "Parámetros: lectura conserva precisión cero persistida",
+      "passed": true
+    },
+    {
+      "scenario": "Parámetros: escritura y replay conservan precisión 0; falsos persistidos, precisión 7 rechazada y tenant ajeno aislado",
+      "passed": true
+    },
+    {
+      "scenario": "Series: alta/consulta por tenant y replay conservan mismo identificador",
+      "passed": true
+    },
+    {
+      "scenario": "Sucursales: alta, edición/consulta, código anexo inmutable, matriz protegida y otro tenant rechazado",
+      "passed": true
+    },
+    {
+      "scenario": "Sucursal: retry de alta recupera mismo ID y código",
+      "passed": true
+    },
+    {
+      "scenario": "Sucursal: detalle fuera de asignación se oculta con 404",
+      "passed": true
+    },
+    {
+      "scenario": "Lector: listado/resumen restringidos y alta sin permiso 403",
+      "passed": true
+    },
+    {
+      "scenario": "Asignación: fallo INSERT conserva filas, alcance, recibos y auditoría",
+      "passed": true
+    },
+    {
+      "scenario": "Sucursal: listado con inactivas permite recuperar anexo desactivado",
+      "passed": true
+    },
+    {
+      "scenario": "Anexo: desactivación y reactivación directas persistidas; datos conservados",
+      "passed": true
+    },
+    {
+      "scenario": "Sucursal: intención incompatible, clave inválida y centro no perteneciente rechazados sin residuos",
+      "passed": true
+    },
+    {
+      "scenario": "Lector: edición, baja, asignación y parámetros denegados sin mutación",
+      "passed": true
+    },
+    {
+      "scenario": "Asignación y baja: usuario/sucursal ajenos no alteran alcance ni dejan recibos",
+      "passed": true
+    },
+    {
+      "scenario": "Sucursal: seis altas concurrentes de la misma intención crean un anexo",
+      "passed": true
+    },
+    {
+      "scenario": "Sucursal: cuatro intenciones concurrentes obtienen cuatro códigos automáticos distintos",
+      "passed": true
+    },
+    {
+      "scenario": "Asignación: orden normalizado/replay/conflicto y claves simultáneas conservan reemplazos completos",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/parametros-facturacion",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/parametros-facturacion",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "configuracion/parametros-facturacion",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/parametros-facturacion",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "configuracion/parametros-facturacion",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/series/FACTURA",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "configuracion/series",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales",
+      "status": 200
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "sucursales/:id",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales/:id",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/:id",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales/:id",
+      "status": 404
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/:id",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "roles",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "users",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/usuarios/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales/resumen",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 403
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales/:id",
+      "status": 404
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/usuarios/:id",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales/usuarios/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/usuarios/:id",
+      "status": 200
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "sucursales/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales?incluir_inactivas=true",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 400
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/:id",
+      "status": 403
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "sucursales/:id",
+      "status": 403
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/usuarios/:id",
+      "status": 403
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuracion/parametros-facturacion",
+      "status": 403
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/usuarios/:id",
+      "status": 400
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/usuarios/:id",
+      "status": 404
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "sucursales/:id",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "sucursales",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/usuarios/:id",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/usuarios/:id",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/usuarios/:id",
+      "status": 409
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/usuarios/:id",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/usuarios/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales/usuarios/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "sucursales/usuarios/:id",
+      "status": 200
+    }
+  ],
+  "defects": [],
+  "checkedAt": "2026-10-03T12:43:03.045Z"
+}

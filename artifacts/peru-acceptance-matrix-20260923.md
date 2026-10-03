@@ -215,28 +215,36 @@ de 20s de Render y sus repeticiones no acreditan continuidad ni plan efectivo.
 #131 (3088474d) pasó 28 checks; ambos CI exactos aprobaron 241 API/24 UI
 sin reintentos, SQL, barridos y restauración. La 562 se promovió una vez con
 preflight/respaldo/ensayo y preservación de 29 tablas, funciones y seguridad.
-Se integró como eb5312f4; main 37121705807 y despliegue exacto pendientes.
+Se integró como eb5312f4; main 37121705807 y despliegue exacto/esquema 562
+aprobaron. Se conserva el primer timeout HTTP de 20 segundos.
 Los casos añadidos acreditan intención tributaria mensual/anual, constancia
 local simulada, concurrencia, rectificación, aislamiento, rollback/recuperación
 y Retry-After de oficina. No hubo datos sintéticos ni presentación SUNAT en PROD.
 
-La matriz observa 261 de 717 contratos API en el ensayo de #131 más Storage.
-Tiene 57 casos funcionales específicos. UI conserva 121 rutas, 35 enlaces
-ADMIN PE y 1171 controles en CI PR #131 (1298 en el corte local previo);
+La matriz observa 271 de 717 contratos API en el ensayo canónico de #132 más
+Storage. Tiene 66 casos funcionales específicos. UI conserva 121 rutas,
+35 enlaces ADMIN PE y 1298 controles en ese corte local;
 presencia no equivale a ejecución.
 Los 11 contratos específicos de Argentina/Colombia se conservan como variantes
 de país; los otros 706 incluyen infraestructura y no equivalen automáticamente
 a módulos ofrecidos Perú. artifacts/peru-module-acceptance-20261003.json
 agrega la evidencia y los pendientes por dominio de código.
 
-Consolidación y consignaciones: cuatro defectos reproducidos y candidatos
-aprobados con 27 API/dos UI/restauración. La evidencia distingue el error
-original de SELECT, los rechazos HTTP 500 y los dos defectos UI:
-artifacts/peru-reports-consignations-defects-20261003 y
-artifacts/peru-reports-consignations-candidate-20261003.
-Fuentes canónicas 563 integradas; reconstrucción, CI, ensayo de preservación
-y despliegue pendientes. Las pruebas con mocks sólo apoyan regresión y no
-reemplazan estos recorridos reales.
+Consolidación y consignaciones: cuatro defectos corregidos. Local y ambos CI
+exactos aprobaron 276 API/26 UI sin reintentos, SQL, barridos y restore. 563
+promovida una sola vez con preflight y preservación de 37 tablas, funciones,
+RLS, políticas, triggers y ACL. Merge cf868067; main 37125486977 y despliegue
+exacto pendientes. Se conserva el fallo anterior de fase duplicada del ensayo.
+
+GRE reprodujo siete defectos de PDF, clasificación HTTP, vista/impresión,
+formulario de peso, documento de destinatario y escape CSV. Candidatos API
+pasaron 21 casos, firma UBL real con PFX desechable configurado por API,
+PDF histórico/multipágina y restore; tres recorridos UI pasaron creación,
+descarga/ventana de impresión y pérdida de respuesta/replay/nueva intención.
+El último ensayo quedó sin aprobación global por el caso CSV; el escape ya
+está corregido en fuente canónica. Tipos API/web y 25 pruebas enfocadas pasan.
+Ensayo canónico completo y CI/despliegue de GRE pendientes. Las pruebas con
+mocks sólo apoyan regresión y no sustituyen estas operaciones reales.
 
 No hay aceptación global. Cada operación conserva comprobaciones restantes.
 Sólo Analytics está excluido; reportes operativos, contables y tributarios incluidos.

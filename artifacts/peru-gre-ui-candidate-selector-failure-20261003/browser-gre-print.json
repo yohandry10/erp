@@ -1,0 +1,12 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Navegador, API, DB reales GRE; impresión a ventana, sin impresora física",
+  "checks": [
+    {
+      "check": "Detalle visible incluye descripción y cantidad de bienes",
+      "passed": true
+    }
+  ],
+  "unexpected_errors": []
+}

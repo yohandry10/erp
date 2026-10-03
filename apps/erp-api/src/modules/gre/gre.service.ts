@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger, NotFoundException, ConflictException, ForbiddenException, HttpException, ServiceUnavailableException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import {
@@ -344,7 +344,11 @@ export class GreService {
       g.sunat_status || '',
       g.numero_sunat || '',
     ]);
-    const escapeCsv = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const escapeCsv = (value: unknown) => {
+      const text = String(value ?? '');
+      const safe = /^\s*[=+\-@]|^[\t\r\n]/.test(text) ? "'" + text : text;
+      return '"' + safe.replace(/"/g, '""') + '"';
+    };
     return [headers, ...rows].map(row => row.map(escapeCsv).join(',')).join('\n');
   }
 
@@ -585,7 +589,7 @@ export class GreService {
     );
   }
 
-  private toGreException(error: any, fallback: string): BadRequestException | NotFoundException {
+  private toGreException(error: any, fallback: string): HttpException {
     const message = String(error?.message || fallback);
     if (message.includes('GRE_NOT_FOUND')) return new NotFoundException('Guía de remisión no encontrada');
     const labels: Record<string, string> = {
@@ -598,7 +602,16 @@ export class GreService {
       GRE_CANCEL_REQUIRES_FISCAL_FLOW: 'Una GRE ya transmitida requiere el flujo fiscal de baja, no anulación interna',
     };
     const code = Object.keys(labels).find(key => message.includes(key));
-    return new BadRequestException({ code: code || 'GRE_OPERATION_FAILED', message: code ? labels[code] : message });
+    if (error?.code === '23505' || /GRE_.*(?:COLLISION|ACTIVE_EXISTS)/.test(message)) {
+      return new ConflictException({ code: code || 'GRE_IDEMPOTENCY_COLLISION', message: code ? labels[code] : 'La intención GRE entra en conflicto con un documento existente' });
+    }
+    if (message.includes('FISCAL_ACTOR_INVALID') || message.includes('FISCAL_TENANT_INVALID')) {
+      return new ForbiddenException('El actor no está autorizado para operar la GRE');
+    }
+    if (code || ['22023','22P02','22007','22003','23503','23514','23502','55000'].includes(error?.code)) {
+      return new BadRequestException({ code: code || 'GRE_OPERATION_FAILED', message: code ? labels[code] : message });
+    }
+    return new ServiceUnavailableException('La operación GRE no está disponible; conserve la clave y reintente');
   }
 
   private extractGreError(error: any): { code: string; message: string } {
@@ -1464,24 +1477,65 @@ ${lines}
   async generarRepresentacionGre(
     greId: string,
     tenantId: string,
-  ): Promise<{ filename: string; content: string }> {
+  ): Promise<{ filename: string; content: Buffer }> {
     const gre = await this.findGuiaById(greId, tenantId);
-    const lines = [
-      `GUÍA DE REMISIÓN ELECTRÓNICA ${gre.numero}`,
-      `Estado: ${gre.estado}`,
-      `Destinatario: ${gre.destinatario}`,
-      `Destino: ${gre.direccionDestino}`,
-      `Fecha de traslado: ${gre.fechaTraslado}`,
-      `Motivo: ${gre.motivo}`,
-      `Modalidad: ${gre.modalidad}`,
-      `Peso total: ${gre.pesoTotal} kg`,
-      '',
-      ...(gre.items || []).map((item, index) => (
-        `${index + 1}. ${item.descripcion} — ${item.cantidad} ${item.unidadMedida || 'NIU'}`
-      )),
-    ];
-    return { filename: `${gre.numero}.txt`, content: lines.join('\n') };
+    const client = this.supabaseService.getClient();
+    const { data: source, error: sourceError } = await client.from('gre_guias')
+      .select('xml_ubl').eq('id', greId).eq('tenant_id', tenantId).maybeSingle();
+    if (sourceError) throw new ServiceUnavailableException('No se pudo leer la fuente de impresión GRE');
+    let issuer: { ruc: string; name: string };
+    if (source?.xml_ubl) {
+      const { XMLParser } = await import('fast-xml-parser');
+      const parsed = new XMLParser({ removeNSPrefix: true, parseTagValue: false, processEntities: true }).parse(source.xml_ubl);
+      const party = parsed?.DespatchAdvice?.DespatchSupplierParty?.Party;
+      issuer = { ruc: String(party?.PartyIdentification?.ID || ''), name: String(party?.PartyLegalEntity?.RegistrationName || '') };
+      if (!issuer.ruc || !issuer.name) throw new ServiceUnavailableException('El XML persistido no contiene el emisor GRE');
+    } else {
+      const { data: config, error } = await client.from('empresa_config').select('ruc,razon_social')
+        .eq('tenant_id', tenantId).maybeSingle();
+      if (error || !config?.ruc || !config?.razon_social) throw new ServiceUnavailableException('No se pudo leer el emisor de la GRE en borrador');
+      issuer = { ruc: config.ruc, name: config.razon_social };
+    }
+    const { default: PDFDocument } = await import('pdfkit');
+    const content = await new Promise<Buffer>((resolve, reject) => {
+      const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true, info: { Title: 'Guía de remisión ' + gre.numero, Creator: 'ERP GRE' } });
+      const chunks: Buffer[] = [];
+      doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+      doc.font('Helvetica-Bold').fontSize(17).text('GUÍA DE REMISIÓN ELECTRÓNICA');
+      doc.fontSize(14).text(gre.numero).moveDown();
+      doc.font('Helvetica').fontSize(11).text(issuer.name).text('RUC: ' + issuer.ruc);
+      doc.moveDown().font('Helvetica-Bold').text('Estado: ' + gre.estado);
+      doc.font('Helvetica').fontSize(10).text('Emisión: ' + String(gre.fechaCreacion).slice(0, 10));
+      doc.text('Fecha de traslado: ' + String(gre.fechaTraslado).slice(0, 10)).moveDown();
+      doc.text('Destinatario: ' + gre.destinatario).text('Destino: ' + gre.direccionDestino);
+      if (gre.ubigeoDestino) doc.text('Ubigeo destino: ' + gre.ubigeoDestino);
+      doc.text('Motivo: ' + gre.motivo).text('Modalidad: ' + gre.modalidad);
+      doc.text('Peso total: ' + gre.pesoTotal + ' kg');
+      if (gre.transportista) doc.text('Transportista: ' + gre.transportista);
+      if (gre.transportistaDocumento) doc.text('RUC transportista: ' + gre.transportistaDocumento);
+      if (gre.placaVehiculo) doc.text('Placa: ' + gre.placaVehiculo);
+      if (gre.licenciaConducir) doc.text('Licencia: ' + gre.licenciaConducir);
+      if (gre.conductorDocumentoNumero) doc.text('Conductor: ' + [gre.conductorNombres, gre.conductorApellidos].filter(Boolean).join(' ') + ' — ' + gre.conductorDocumentoNumero);
+      doc.moveDown().font('Helvetica-Bold').text('BIENES TRASLADADOS').moveDown(0.5);
+      doc.font('Helvetica');
+      for (const [index, item] of (gre.items || []).entries()) {
+        doc.text((index + 1) + '. ' + item.descripcion);
+        doc.text('Cantidad: ' + item.cantidad + ' ' + (item.unidadMedida || 'NIU') + (item.peso == null ? '' : ' · Peso: ' + item.peso + ' kg')).moveDown(0.5);
+      }
+      if (gre.observaciones) doc.moveDown().text('Observaciones: ' + gre.observaciones);
+      doc.moveDown().fontSize(9).text('Representación del registro persistido. Estado fiscal: ' + (gre.sunatStatus || 'NOT_SENT') + '.');
+      const pages = doc.bufferedPageRange();
+      for (let index = pages.start; index < pages.start + pages.count; index++) {
+        doc.switchToPage(index);
+        doc.fontSize(8).fillColor('#555555').text(gre.numero + ' · Página ' + (index + 1) + ' de ' + pages.count, 48, 810, { lineBreak: false });
+      }
+      doc.end();
+    });
+    return { filename: gre.numero + '.pdf', content };
   }
+
 
   async updateAutoConfig(
     tenantId: string,

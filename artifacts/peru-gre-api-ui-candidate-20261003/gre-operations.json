@@ -1,0 +1,444 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "GRE con API, PostgreSQL y PostgREST reales locales; sin aceptación SUNAT ni aceptación global",
+  "scenarios": [
+    {
+      "scenario": "GRE: alta interna sin certificado conserva borrador y líneas en primera empresa no demo",
+      "passed": true
+    },
+    {
+      "scenario": "GRE: replay y concurrencia recuperan mismo ID sin otra cabecera ni líneas",
+      "passed": true
+    },
+    {
+      "scenario": "GRE: colisión de clave devuelve 409 y no altera el documento",
+      "passed": true
+    },
+    {
+      "scenario": "GRE: detalle, búsqueda y filtros consultan la cabecera y líneas persistidas",
+      "passed": true
+    },
+    {
+      "scenario": "GRE: consulta, firma, XML, representación y anulación ajenas reciben 404 sin revelar datos",
+      "passed": true
+    },
+    {
+      "scenario": "GRE: DTO inválido, producto ajeno e ítems ausentes no insertan cabeceras",
+      "passed": true
+    },
+    {
+      "scenario": "GRE: firma sin certificado falla cerrado y deja error persistido sin XML ni aceptación",
+      "passed": true
+    },
+    {
+      "scenario": "GRE: enviar, reenviar y consultar borrador no fabrican ticket, CDR ni aceptación",
+      "passed": true
+    },
+    {
+      "scenario": "GRE: representación /pdf es un PDF descargable con cabecera y detalle",
+      "passed": true
+    },
+    {
+      "scenario": "GRE: reporte CSV contiene documento y líneas escapadas, excluye otra empresa y período ajeno",
+      "passed": true
+    },
+    {
+      "scenario": "GRE: estadísticas cuentan borrador únicamente en su empresa",
+      "passed": true
+    },
+    {
+      "scenario": "GRE: configuración y replay persisten umbral; evaluación respeta umbral y habilitación",
+      "passed": true
+    },
+    {
+      "scenario": "GRE: mutación sin clave y motivo corto rechazada sin anular",
+      "passed": true
+    },
+    {
+      "scenario": "GRE: anulación y replay conservan un estado terminal; firma posterior rechazada",
+      "passed": true
+    },
+    {
+      "scenario": "GRE: usuario lector consulta pero no crea, anula ni configura",
+      "passed": true
+    },
+    {
+      "scenario": "GRE: recuperación de infraestructura RPC devuelve 503 sin insertar y luego permite reintento",
+      "passed": true
+    },
+    {
+      "scenario": "GRE: XML descargado firmado corresponde al emisor local y detalle persistido",
+      "passed": true
+    },
+    {
+      "scenario": "GRE: cliente configura su certificado desechable por API y firma UBL real sin transmisión",
+      "passed": true
+    },
+    {
+      "scenario": "GRE: PDF firmado conserva emisor del XML tras editar razón social por API",
+      "passed": true
+    },
+    {
+      "scenario": "GRE: PDF multipágina incluye 80 bienes y no cambia estado fiscal",
+      "passed": true
+    },
+    {
+      "scenario": "GRE: transmisión y consulta sin credenciales externas fallan cerrado sin aceptar ni generar CDR",
+      "passed": true
+    }
+  ],
+  "defects": [],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias",
+      "status": 409
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias/:id",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias/:id/xml",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias/:id/pdf",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias/:id/firmar",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias/:id/anular",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias/:id/firmar",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias/:id/xml",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias/:id/enviar-sunat",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias/:id/reenviar",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias/:id/consultar-sunat",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias/:id/estado-sunat",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias/:id/pdf",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/reporte",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/reporte",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/reporte",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/reporte",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/stats",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/stats",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/auto-config",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/auto-config",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/auto-config",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/evaluate-auto-creation",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/evaluate-auto-creation",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/auto-config",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/evaluate-auto-creation",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias/:id/anular",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias/:id/anular",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias/:id/anular",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias/:id/anular",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias/:id/firmar",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "roles",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "users",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias/:id/anular",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/auto-config",
+      "status": 403
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias/:id/xml",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/wizard/validate-certificate",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/complete",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias/:id/xml",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias/:id/pdf",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "configuration/empresa",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias/:id/pdf",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias/:id/pdf",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias/:id/enviar-sunat",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias/:id/reenviar",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "gre/guias/:id/consultar-sunat",
+      "status": 400
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "recorded_at_utc": "2026-10-03T13:35:21.054623+00:00",
+  "base_sha": "cf8680678f0e065cd439c3fafdea81a23db89670",
+  "uncommitted_canonical_sources": true,
+  "api_typecheck": "passed",
+  "web_typecheck": "passed",
+  "focused_gre_suites": 4,
+  "focused_gre_tests": 25,
+  "scope": "Tipos y regresión de unidad; no acreditan operaciones funcionales completas",
+  "source_sha256": {
+    "apps/erp-api/src/modules/gre/gre.service.ts": "a0001c5a0cc82f055a5b7ebee529b221f984077ca50c4a94f8b6d1ad4b82b8a6",
+    "apps/erp-api/src/modules/gre/gre.controller.ts": "f574ede02df9b488ae8930b5d911c89b34b50837d4abfc96459a2b350a8195a4",
+    "apps/web/components/modals/GreModal.tsx": "54cc75a3a15ab713543205cd205631ea2f043d8a65eeec1babacc7fdeabdf699",
+    "apps/web/components/modals/GreViewModal.tsx": "1b1b8d8268827d7f42602e91b95111b7ee049bd2fe55edebbf1827d3ee5baf97",
+    "apps/web/app/dashboard/gre/page.tsx": "d30b1fff679e12fe16d3b8a0d593ae6690da4b22c0e9e4a6ea3910471cbddf24"
+  }
+}
