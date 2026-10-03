@@ -33,9 +33,19 @@ Object.assign(process.env, {
 });
 
 const localHost = (host: string) => ['127.0.0.1', 'localhost', '[::1]', '::1'].includes(host);
+const storageContractOrigin = process.env.LOCAL_STORAGE_PUBLIC_ORIGIN;
+if (storageContractOrigin && storageContractOrigin !== 'https://wypnbcptofqdmoynlonq.supabase.co') {
+  throw new Error('Origen público Storage contractual inválido');
+}
 const nativeFetch = globalThis.fetch;
 globalThis.fetch = async (input, init) => {
   const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
+  // Sólo el ensayo Storage conserva el origen contractual del SQL; antes de
+  // abrir un socket lo adapta al gateway local real, sin relajar runtime/SQL.
+  if (storageContractOrigin && url.origin === storageContractOrigin) {
+    url.protocol = restUrl.protocol; url.hostname = restUrl.hostname; url.port = restUrl.port;
+    input = input instanceof Request ? new Request(url, input) : url;
+  }
   if (!localHost(url.hostname)) throw new Error('Transporte externo bloqueado en prueba integrada local');
   if (url.origin === restUrl.origin && url.pathname.startsWith('/rest/v1/')) {
     url.pathname = url.pathname.slice('/rest/v1'.length);
@@ -79,7 +89,7 @@ async function main() {
       inject: [TenantContextService, ConfigService],
       factory: (context: InstanceType<typeof TenantContextService>, config: InstanceType<typeof ConfigService>) => {
         const localConfig = { get: (key: string, fallback?: unknown) => {
-          if (key === 'SUPABASE_URL') return restUrl.origin;
+          if (key === 'SUPABASE_URL') return storageContractOrigin || restUrl.origin;
           if (key === 'SUPABASE_SERVICE_ROLE_KEY' || key === 'SUPABASE_ANON_KEY') return serviceJwt;
           return config.get(key, fallback);
         } };

@@ -1,0 +1,8 @@
+{
+  "source": "artifacts/peru-integrated-20261003095736687-3208",
+  "source_base_sha": "22cf5bb62b8cd4848f815d9175c2243de92e0874",
+  "scope": "7 casos API: UIT por ejercicio, guardar saldo 125.50, lectura denegada bloquea cálculo/guardado, recuperación; restore posterior",
+  "private_files_copied": false,
+  "production_business_writes": false,
+  "complete_monthly_module_accepted": false
+}

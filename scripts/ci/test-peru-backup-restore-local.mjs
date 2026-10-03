@@ -7,8 +7,9 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 // Sólo acepta contenedores PostgreSQL efímeros del runner integrado. No admite
 // URLs, credenciales ni destinos existentes para restaurar.
-const [source, outputArg] = process.argv.slice(2);
-if (!source || !outputArg || process.argv.length !== 4) throw new Error('Uso: sourceContainer outputDirectory');
+const [source, outputArg, option, restoreNetwork] = process.argv.slice(2);
+const retain = option === '--keep-restored-on-network' && Boolean(restoreNetwork);
+if (!source || !outputArg || !(process.argv.length === 4 || (process.argv.length === 6 && retain))) throw new Error('Uso: sourceContainer outputDirectory');
 const output = path.resolve(outputArg);
 const artifacts = path.resolve('artifacts');
 assert.ok(output.startsWith(artifacts + path.sep), 'La evidencia debe estar en artifacts');
@@ -19,6 +20,12 @@ function docker(args, options = {}) {
 const inspection = JSON.parse(docker(['inspect', source], { encoding: 'utf8' }))[0];
 assert.match(inspection.Name, /^\/erp-peru-integrated-\d+-\d+-pg$/);
 assert.equal(inspection.Config.Image, 'postgres:16');
+if (retain) {
+  assert.match(restoreNetwork, /^erp-peru-integrated-\d+-\d+$/);
+  assert.ok(inspection.NetworkSettings.Networks[restoreNetwork]);
+  const ownedNetwork = JSON.parse(docker(['network', 'inspect', restoreNetwork], { encoding: 'utf8' }))[0];
+  assert.equal(ownedNetwork.Labels['com.erp.local-test'], restoreNetwork.replace('erp-peru-integrated-', ''));
+}
 function sql(container, statement) {
   return docker(['exec', '-i', container, 'psql', '-XqAt', '-U', 'postgres', '-d', 'erp_e2e', '-v', 'ON_ERROR_STOP=1'],
     { input: statement, encoding: 'utf8' }).trim();
@@ -36,6 +43,7 @@ const parseHashes = value => value.split(/\r?\n/).filter(line => line.startsWith
 let target;
 let transaction;
 let successful = false;
+let retained = false;
 const started = Date.now();
 try {
   transaction = spawn('docker', ['exec', '-i', source, 'psql', '-XqAt', '-U', 'postgres', '-d', 'erp_e2e', '-v', 'ON_ERROR_STOP=1'],
@@ -64,7 +72,7 @@ try {
     .replace(/^CREATE ROLE postgres;\r?\n/m, '');
   const restoreStarted = Date.now();
   target = docker(['run', '--rm', '--detach', '--name', `erp-peru-restore-${Date.now()}-${process.pid}`,
-    '--network', 'none', '--env', 'POSTGRES_DB=erp_e2e', '--env', 'POSTGRES_HOST_AUTH_METHOD=trust', 'postgres:16'], { encoding: 'utf8' }).trim();
+    '--network', retain ? restoreNetwork : 'none', '--env', 'POSTGRES_DB=erp_e2e', '--env', 'POSTGRES_HOST_AUTH_METHOD=trust', 'postgres:16'], { encoding: 'utf8' }).trim();
   let ready = false;
   for (let attempt = 0; attempt < 30; attempt++) {
     try {
@@ -89,10 +97,14 @@ try {
     limits: ['No acredita backup de PROD', 'No incluye archivos externos de Storage ni disponibilidad del proveedor', 'Duración local no equivale a RTO productivo'] };
   writeFileSync(path.join(output, 'restore.json'), JSON.stringify(report, null, 2));
   writeFileSync(path.join(output, 'table-fingerprints.json'), JSON.stringify(actual, null, 2));
+  if (retain) {
+    writeFileSync(path.join(output, 'retained-target.json'), JSON.stringify({ id: target, network: restoreNetwork, ephemeral: true }));
+    retained = true;
+  }
   successful = true;
   console.log(`PASS restauración local: ${actual.length} tablas verificadas`);
 } finally {
   if (transaction?.stdin.writable) transaction.stdin.end('ROLLBACK;\n\\q\n');
-  if (target) docker(['stop', '--time', '2', target], { stdio: 'ignore' });
+  if (target && !(successful && retained)) docker(['stop', '--time', '2', target], { stdio: 'ignore' });
   if (!successful) writeFileSync(path.join(output, 'restore-failure.json'), JSON.stringify({ success: false, remoteWrites: false, at: new Date().toISOString() }));
 }

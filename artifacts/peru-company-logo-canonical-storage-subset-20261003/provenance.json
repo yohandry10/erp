@@ -1,0 +1,14 @@
+{
+  "source": "artifacts/peru-company-storage-20261003095736690-21156",
+  "source_base_sha": "5a23c4c1bc16b58c3bf324c15681ff00f8eb395a",
+  "scope": "Logo: 10 API/1 UI y restore de DB; infraestructura oficial Storage file local",
+  "functional_sources": "Harness/runner/pruebas canónicos sin overlays; checkout limpio reconstruye 557 migraciones/70 contratos SQL",
+  "production_business_writes": false,
+  "private_files_copied": false,
+  "storage_image": "supabase/storage-api@sha256:f1546fac6d1c7e345428ac904bfaa7be7cecd50a1f549fe1cf38c628a7b15c85",
+  "limits": [
+    "No acredita Storage remoto, otros formatos/dimensiones/concurrencia y todas las fallas de limpieza",
+    "Restore SQL conserva metadata; los blobs externos requieren comprobación separada",
+    "Marca contractual PROD sólo dentro de DB efímera durante casos; fetch reescribe al gateway loopback antes del socket"
+  ]
+}

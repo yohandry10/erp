@@ -64,6 +64,21 @@ describe('calcularTributoMensualPeru', () => {
     expect(result.pago_cuenta_renta).toBe(200);
   });
 
+  it('usa el ejercicio para el límite RMT: el mismo acumulado supera 2025 y no 2026', () => {
+    const acumulado = fuentes({ ingresos_netos_acumulados: 1_620_000 });
+    const anterior = calcularTributoMensualPeru('MYPE', acumulado, {}, 2025);
+    const vigente = calcularTributoMensualPeru('MYPE', acumulado, {}, 2026);
+    expect(anterior).toMatchObject({ uit: 5350, limite_rmt_300_uit: 1_605_000, pago_cuenta_renta: 150 });
+    expect(vigente).toMatchObject({ uit: 5500, limite_rmt_300_uit: 1_650_000, pago_cuenta_renta: 100 });
+  });
+
+  it('permite rectificar 2024 con su UIT y rechaza ejercicios sin parámetro verificado', () => {
+    expect(calcularTributoMensualPeru('MYPE', fuentes(), {}, 2024)).toMatchObject({
+      uit: 5150, limite_rmt_300_uit: 1_545_000,
+    });
+    expect(() => calcularTributoMensualPeru('MYPE', fuentes(), {}, 2027)).toThrow(BadRequestException);
+  });
+
   it('calcula 1.5% de renta en RER', () => {
     const result = calcularTributoMensualPeru('RER', fuentes());
     expect(result.pago_cuenta_renta).toBe(150);
