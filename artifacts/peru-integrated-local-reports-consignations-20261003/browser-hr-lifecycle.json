@@ -1,0 +1,76 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "RRHH primer ADMIN: alta perdida/replay sin duplicar, edición y recarga; no acepta contratos/asistencia/planilla UI",
+  "same_intent_recovered": true,
+  "scriptErrors": [],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/backend/api/rrhh/departamentos/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/rrhh/empleados/",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/backend/api/rrhh/empleados/",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "path": "/backend/api/rrhh/empleados/",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/rrhh/departamentos/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/rrhh/empleados/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/rrhh/departamentos/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/rrhh/empleados/",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/backend/api/rrhh/empleados/:id/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/rrhh/departamentos/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/rrhh/empleados/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/rrhh/departamentos/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/rrhh/empleados/",
+      "status": 200
+    }
+  ],
+  "lost_committed_response": true,
+  "completedAt": "2026-10-03T12:44:09.943Z"
+}

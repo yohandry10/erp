@@ -1,0 +1,9 @@
+{
+  "base_sha": "96c2a8258fe2f37162c3aa0f6030790da7085842",
+  "candidate_overlay": true,
+  "local_source": "artifacts/peru-integrated-20261003125151866-4388",
+  "remoteWrites": false,
+  "dumps_extracted": false,
+  "browser_included": false,
+  "scope": "GRE API subset with real PostgreSQL/PostgREST and local issuer; no SUNAT interoperability"
+}

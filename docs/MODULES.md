@@ -407,7 +407,18 @@ Código principal: `apps/erp-api/src/modules/pos`,
   intentos. Aceptar exige ticket, código y CDR; `ACEPTADO`/`RECHAZADO` son
   terminales e idempotentes sólo para la misma huella de respuesta. Reintentar
   no crea otro lote ni duplica efectos comerciales o contables.
-- GRE usa transporte configurable y conserva estados asíncronos.
+- GRE usa transporte configurable y conserva estados asíncronos. El formulario
+  manual recoge tipo/documento del destinatario y pesos con tres decimales;
+  un emisor configurado puede crear y firmar UBL sin un desarrollo adicional.
+  El alta interna sin certificado conserva borrador y error recuperable.
+- GRE ofrece PDF binario con emisor, estado, transporte y todos los bienes,
+  descarga desde listado/detalle e impresión de ese PDF. En una GRE firmada,
+  el emisor proviene del XML congelado y no de una razón social editada después.
+  La vista muestra los bienes persistidos; un PDF no acredita aceptación SUNAT.
+- El CSV GRE escapa comillas, comas y saltos y neutraliza prefijos de fórmula.
+  Conflictos GRE responden 409; indisponibilidad RPC responde 503 sin detalles
+  internos, conservando la intención para un reintento. Validaciones siguen 400
+  y consultas ajenas/inexistentes 404.
 - SIRE genera una vista local de comparación por período para RVIE y RCE. La
   aceptación de la propuesta oficial usa la API SUNAT exclusivamente desde el
   backend, exige `sire_activo`, credenciales SOL/API y la referencia física de

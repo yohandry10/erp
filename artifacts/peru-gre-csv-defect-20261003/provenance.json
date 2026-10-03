@@ -1,0 +1,11 @@
+{
+  "base_sha": "cf8680678f0e065cd439c3fafdea81a23db89670",
+  "candidate_api_ui": true,
+  "csv_unchanged_from_canonical": true,
+  "local_source": "artifacts/peru-integrated-20261003132352010-23484",
+  "browser_passed": 3,
+  "api_passed": 21,
+  "api_failed": 1,
+  "remoteWrites": false,
+  "dumps_extracted": false
+}

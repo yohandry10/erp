@@ -2,13 +2,16 @@
 
 Actualizado: 2026-10-03.
 
-Corte técnico 131/132: PROD registra 562, promovida una sola vez con preflight,
+Corte técnico 131/132: el cierre 131 promovió 562 una sola vez con preflight,
 respaldo 560, rollback local y preservación de 29 tablas/funciones/seguridad
 (artifacts/peru-562-promotion-20261003120329303.json). #131 se integró como
 eb5312f4 después de 28 checks aprobados; ambos CI exactos de 3088474d
 pasaron 241 API/24 UI sin reintentos, SQL, barridos y restore, además de
-Storage API/UI/DB/blobs. Main 37121705807 y despliegue exacto siguen pendientes.
-El último runtime completamente comprobado es #130, c9629374. No hay aceptación
+Storage API/UI/DB/blobs. Main 37121705807, E2E y seguridad aprobaron; el
+despliegue eb5312f4/esquema 562 pasó preflight y lectura API/web/DB/Redis/CORS
+(artifacts/peru-production-verification-after-131-20261003.json). Se conserva
+el primer timeout de lectura de 20 segundos. El último runtime comprobado
+es #131, eb5312f4. No hay aceptación
 global ni confirmación del plan efectivo o continuidad de Render.
 
 Consolidación/consignaciones reprodujo cuatro defectos: falta de SELECT en
@@ -25,8 +28,35 @@ aprobó restore, rollback real y preservación de 37 tablas, todas las funciones
 RLS, políticas, triggers y ACL existentes (artifacts/erp-peru-563-rehearsal-20261003122331200-2388.json).
 El primer gate asumió ausencia de permisos SELECT previos de anon/authenticated
 y se detuvo; la verificación conserva exactamente esas ACL bajo RLS forzado,
-sin añadirles permisos. Ensayo global/CI y promoción/despliegue de 563 pendientes.
+sin añadirles permisos. El ensayo global canónico 96c2a825 pasó 276 API/26 UI
+sin reintentos, 99 pantallas, 22 vistas con registros, SQL y restore
+(artifacts/peru-integrated-local-reports-consignations-20261003). Se conserva
+el intento anterior detenido por invocar dos veces una fase; fue corregido en
+el runner y no se registra como fallo de producto. CI y promoción/despliegue
+de 563 pendientes en ese ensayo. Ambos CI de 96c2a825 aprobaron 276 API/26 UI
+sin reintentos y los 28 checks; 563 quedó promovida una sola vez con preflight
+y preservación de 37 tablas/funciones/seguridad
+(artifacts/peru-563-promotion-20261003131306420.json). #132 se integró como
+cf868067; main 37125486977 y despliegue exacto pendientes. PROD actual: 563;
+NO reaplicar 562 ni 563. La matriz registra 271 contratos HTTP observados de 717,
+66 casos funcionales y 1298 controles visibles; ninguna cifra acredita todas
+las operaciones. Reportes operativos, contables y tributarios siguen incluidos.
 
+
+GRE: 16 de 19 escenarios API iniciales pasaron y reprodujeron PDF entregado
+como texto, colisión de clave 400 e indisponibilidad RPC 400. Candidatos API
+pasaron 21 escenarios con emisor no demo, PFX desechable configurado por API,
+firma UBL y restore; PDF histórico conserva emisor tras editar empresa y
+80 bienes se representan en cuatro páginas sin recortes. No hubo transmisión
+ni aceptación SUNAT. Navegador confirmó omisión de bienes en vista/impresión,
+peso válido bloqueado por step y falta del documento del destinatario manual.
+Con certificado válido, el alta manual queda BORRADOR por ese dato ausente
+(artifacts/peru-gre-ui-defects-20261003). Candidatos UI pasaron tres recorridos: creación/recarga, detalle/PDF/ventana
+de impresión y alta con respuesta perdida/replay/nueva intención idéntica.
+Se conserva un intento detenido por selector ambiguo del ensayo. La variante
+CSV reprodujo una fórmula no neutralizada; el escape quedó corregido en fuente
+canónica. Tipos API/web y 25 pruebas enfocadas aprobaron. El ensayo integrado
+y CI/despliegue de GRE siguen pendientes; no tiene aceptación integral.
 
 El ensayo canónico de #125 (`354989d1`) aprobó 138 escenarios HTTP, 17 recorridos
 UI, 99 pantallas, 22 vistas con registros, SQL y restauración

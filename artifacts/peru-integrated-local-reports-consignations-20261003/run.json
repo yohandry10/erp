@@ -1,0 +1,11 @@
+{
+  "completedAt": "2026-10-03T13:00:21.818Z",
+  "success": true,
+  "withBrowser": true,
+  "withSurvey": true,
+  "withRecords": true,
+  "scope": "full",
+  "database": "PostgreSQL 16 efímero",
+  "output": "C:\\Users\\PC\\Desktop\\erp-peru-production\\artifacts\\peru-integrated-20261003123255759-9804",
+  "remoteWrites": false
+}
