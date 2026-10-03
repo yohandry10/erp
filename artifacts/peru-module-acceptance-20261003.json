@@ -1,28 +1,28 @@
 {
-  "generated_at": "2026-10-03T12:30:08.986Z",
+  "generated_at": "2026-10-03T14:10:50.740Z",
   "scope": "Inventario y aceptación por módulo/operación; únicamente Analytics excluido",
   "operational_accounting_tax_reports_included": true,
   "complete_acceptance": false,
   "source_api_matrix": "artifacts/peru-api-operation-matrix-20260930.json",
   "source_ui_matrix": "artifacts/peru-ui-operation-matrix-20261002.json",
   "country_applicability": "artifacts/peru-country-applicability-20261003.json",
-  "evidence": "artifacts/peru-integrated-ci-37119229809",
+  "evidence": "artifacts/peru-integrated-local-gre-20261003",
   "additional_evidence": [
     {
-      "evidence": "artifacts/peru-storage-ci-37119229809",
+      "evidence": "artifacts/peru-storage-ci-37125486977",
       "scope": "company_logo_real_storage_subset",
       "global_success": true,
       "ui_included": true
     }
   ],
   "latest_verified_production": {
-    "sha": "c96293740d910e7ee09c7067a4cebbc4c30df871",
-    "schema_at_last_runtime_read": 560,
-    "proof": "artifacts/peru-production-verification-after-130-20261003.json"
+    "sha": "cf8680678f0e065cd439c3fafdea81a23db89670",
+    "schema_at_last_runtime_read": 563,
+    "proof": "artifacts/peru-production-verification-after-132-20261003.json"
   },
   "current_database_schema": {
-    "version": 562,
-    "proof": "artifacts/peru-562-promotion-20261003120329303.json"
+    "version": 563,
+    "proof": "artifacts/peru-563-promotion-20261003131306420.json"
   },
   "acceptance_rule": "Contrato observado o control visible no implica ejecutar ni aceptar toda una operación. Se conservan variantes de país, infraestructura y pendientes por operación para no ocultar huecos.",
   "navigation": {
@@ -1452,7 +1452,7 @@
     {
       "module": "configuration",
       "declared_contracts": 16,
-      "observed_contracts": 7,
+      "observed_contracts": 8,
       "operations_with_functional_cases": 7,
       "complete_acceptance": false,
       "verified_case_ids": [
@@ -1632,7 +1632,7 @@
         {
           "method": "PUT",
           "endpoint": "/api/configuration/empresa",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -1649,8 +1649,8 @@
     {
       "module": "contabilidad",
       "declared_contracts": 124,
-      "observed_contracts": 47,
-      "operations_with_functional_cases": 29,
+      "observed_contracts": 57,
+      "operations_with_functional_cases": 41,
       "complete_acceptance": false,
       "verified_case_ids": [
         "fixed-asset-crud",
@@ -1664,7 +1664,16 @@
         "manual-annul-delete",
         "manual-confirm",
         "manual-reverse",
+        "consolidation-membership-real-balances",
+        "consolidation-presentation-currency",
+        "consolidation-account-mapping",
+        "consolidation-adjustment-keeps-legal-books",
+        "configurable-report-definition-validation",
+        "configurable-report-real-sources",
         "annual-profit-loss-reopen",
+        "consignment-reader-and-ledger-boundary",
+        "consignment-delivery-intents",
+        "consignment-delivery-state-lifecycle",
         "accounting-period-lifecycle",
         "monthly-tax-uit-by-exercise",
         "monthly-tax-credit-read-recovery",
@@ -2084,85 +2093,57 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/consolidacion/grupos",
-          "result": "http_contract_observed_not_full_acceptance",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "otras participaciones y salida/cambio de miembro si existen"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/contabilidad/consolidacion/grupos",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "otras participaciones y salida/cambio de miembro si existen"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/invitaciones",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "otras participaciones y salida/cambio de miembro si existen"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/respuesta",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "otras participaciones y salida/cambio de miembro si existen"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/tasas",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "tipos cierre/histórica y monedas/fechas restantes"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/mapeos-cuentas",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "otros mapeos y variantes de edición/retiro disponibles"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/ajustes",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "otros tipos y períodos de ajustes; UI de ajustes"
           ]
         },
         {
@@ -2180,25 +2161,20 @@
         {
           "method": "POST",
           "endpoint": "/api/contabilidad/reportes-configurables",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "otros tipos de línea, eliminación y modificaciones permitidas por el producto"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/reportes-configurables/:reporteId/generar",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "otras cuentas, naturalezas, fórmulas y presentación/exportación/impresión donde existan",
+            "tipos cierre/histórica y monedas/fechas restantes",
+            "otros mapeos y variantes de edición/retiro disponibles",
+            "otros tipos y períodos de ajustes; UI de ajustes"
           ]
         },
         {
@@ -2550,37 +2526,27 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/registro-consignaciones",
-          "result": "http_contract_observed_not_full_acceptance",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "filtros, exportación e impresión que existan y otros permisos"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/contabilidad/registro-consignaciones",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "otras monedas, bienes/orígenes y formulario restaurado antes de confirmar tras cerrar navegador",
+            "filtros, exportación e impresión que existan y otros permisos"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/contabilidad/registro-consignaciones/:id/estado",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "cambios de estado desde navegador y variantes comerciales restantes",
+            "filtros, exportación e impresión que existan y otros permisos"
           ]
         },
         {
@@ -4602,201 +4568,164 @@
     {
       "module": "gre",
       "declared_contracts": 17,
-      "observed_contracts": 0,
-      "operations_with_functional_cases": 0,
+      "observed_contracts": 16,
+      "operations_with_functional_cases": 16,
       "complete_acceptance": false,
-      "verified_case_ids": [],
+      "verified_case_ids": [
+        "gre-queries-and-tenant-isolation",
+        "gre-manual-creation-persistence",
+        "gre-pdf-real-document",
+        "gre-reader-permissions",
+        "gre-intent-replay-conflict",
+        "gre-unsigned-and-signed-local-xml",
+        "gre-infrastructure-error-recovery",
+        "gre-annulment-terminal-state",
+        "gre-external-transmission-fails-closed",
+        "gre-csv-real-filtered-safe",
+        "gre-auto-configuration-and-statistics"
+      ],
       "pending_operations": [
         {
           "method": "GET",
           "endpoint": "/api/gre/guias",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "otros filtros, paginación si existe y alcance por sucursal/almacén cuando corresponda"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/gre/guias/:id",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "altas a partir de CPE/pedido y variantes de transporte/origen/bienes ofrecidas",
+            "otros filtros, paginación si existe y alcance por sucursal/almacén cuando corresponda",
+            "otras longitudes y caracteres; impresora física y botón de descarga desde listado",
+            "otros roles, permisos de firma/transmisión y worker firmado"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/gre/guias",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "altas a partir de CPE/pedido y variantes de transporte/origen/bienes ofrecidas",
+            "otras mutaciones concurrentes y recuperación tras cerrar completamente el navegador",
+            "firma explícita de borrador previamente creado; otros motivos/modalidades y firma con proveedor del futuro cliente",
+            "otros roles, permisos de firma/transmisión y worker firmado",
+            "otros fallos de red/Storage/autoridad externa"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/gre/guias/:id/firmar",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "otros filtros, paginación si existe y alcance por sucursal/almacén cuando corresponda",
+            "firma explícita de borrador previamente creado; otros motivos/modalidades y firma con proveedor del futuro cliente",
+            "anulación de otros estados ofrecidos y recorrido de anulación UI"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/gre/guias/:id/enviar-sunat",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "aceptación/acuse SUNAT y reintentos tras rechazo/transitorio externo; acceso autorizado del futuro cliente"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/gre/guias/:id/reenviar",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "aceptación/acuse SUNAT y reintentos tras rechazo/transitorio externo; acceso autorizado del futuro cliente"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/gre/guias/:id/consultar-sunat",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "aceptación/acuse SUNAT y reintentos tras rechazo/transitorio externo; acceso autorizado del futuro cliente"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/gre/guias/:id/anular",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "otros filtros, paginación si existe y alcance por sucursal/almacén cuando corresponda",
+            "anulación de otros estados ofrecidos y recorrido de anulación UI",
+            "otros roles, permisos de firma/transmisión y worker firmado"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/gre/guias/:id/estado-sunat",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "aceptación/acuse SUNAT y reintentos tras rechazo/transitorio externo; acceso autorizado del futuro cliente"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/gre/guias/:id/xml",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "otros filtros, paginación si existe y alcance por sucursal/almacén cuando corresponda",
+            "firma explícita de borrador previamente creado; otros motivos/modalidades y firma con proveedor del futuro cliente",
+            "otros roles, permisos de firma/transmisión y worker firmado"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/gre/guias/:id/pdf",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "otros filtros, paginación si existe y alcance por sucursal/almacén cuando corresponda",
+            "otras longitudes y caracteres; impresora física y botón de descarga desde listado"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/gre/reporte",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "otras variantes de exportación, datos y acceso lector al reporte"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/gre/stats",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "creación automática integrada con ventas/despacho y otras reglas configurables"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/gre/evaluate-auto-creation",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "creación automática integrada con ventas/despacho y otras reglas configurables"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/gre/auto-config",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "creación automática integrada con ventas/despacho y otras reglas configurables"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/gre/auto-config",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "creación automática integrada con ventas/despacho y otras reglas configurables",
+            "otros roles, permisos de firma/transmisión y worker firmado"
           ]
         },
         {
@@ -4812,7 +4741,15 @@
           ]
         }
       ],
-      "defects": []
+      "defects": [
+        "gre-view-and-print-omit-transported-items",
+        "gre-idempotency-collision-returns-400",
+        "gre-rpc-infrastructure-failure-returns-400",
+        "gre-manual-weight-html-step-blocks-valid-values",
+        "gre-manual-recipient-document-unavailable",
+        "gre-pdf-endpoint-delivers-text",
+        "gre-csv-untrusted-cell-keeps-formula"
+      ]
     },
     {
       "module": "help",

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { fetchApi } from '@/lib/api-fetch'
 import { parseDateLocal } from '@/lib/date-utils'
 import { Download, Eye, FileText, Plus, RefreshCw, ShieldCheck, Truck } from 'lucide-react'
 
@@ -22,7 +23,7 @@ interface GreDocument {
   modalidad: 'TRANSPORTE_PUBLICO' | 'TRANSPORTE_PRIVADO'
   motivo: string
   pesoTotal: number
-  estado: 'PENDIENTE' | 'EMITIDO' | 'ACEPTADO' | 'RECHAZADO' | 'ANULADO'
+  estado: 'BORRADOR' | 'FIRMADO' | 'ENVIADO' | 'ACEPTADO' | 'RECHAZADO' | 'ANULADO' | 'ERROR'
   observaciones?: string
   transportista?: string
   placaVehiculo?: string
@@ -141,6 +142,23 @@ export default function GREPage() {
       a.click()
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
+    }
+  }
+
+  const downloadPdf = async (document: GreDocument) => {
+    try {
+      const response = await fetchApi(`/api/gre/guias/${document.id}/pdf/`, { method: 'GET' })
+      if (!response.ok || !response.headers.get('content-type')?.startsWith('application/pdf')) throw new Error('No se pudo descargar el PDF de la guía.')
+      const url = window.URL.createObjectURL(await response.blob())
+      const link = window.document.createElement('a')
+      link.href = url
+      link.download = `GRE-${document.numero}.pdf`
+      window.document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'No se pudo descargar la guía.')
     }
   }
 
@@ -374,9 +392,9 @@ export default function GREPage() {
                             <Button
                               type="button"
                               size="sm"
-                              disabled
-                              title="Representacion PDF GRE no disponible en este entorno"
-                              aria-label="PDF GRE no disponible"
+                              onClick={() => downloadPdf(doc)}
+                              title="Descargar PDF GRE"
+                              aria-label="Descargar PDF GRE"
                               variant="outline"
                               className="gap-1 border-border/20 bg-slate-400/10 px-2 text-muted-foreground"
                             >

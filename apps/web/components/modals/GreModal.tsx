@@ -86,6 +86,7 @@ export default function GreModal({
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [recipient, setRecipient] = useState({ tipo: '6', numero: '' })
   const [manualItems, setManualItems] = useState([{ descripcion: '', cantidad: '1', unidadMedida: 'NIU' }])
   const requestKeyRef = useRef(`gre-create:${crypto.randomUUID()}`)
 
@@ -130,6 +131,10 @@ export default function GreModal({
       const greData = {
         ...formData,
         ...(additionalPayload || {}),
+        datosAdicionales: {
+          ...(additionalPayload?.datosAdicionales || {}),
+          ...(!pedidoContext && !cpeData ? { destinatarioDocumentoTipo: recipient.tipo, destinatarioDocumento: recipient.numero.trim() } : {}),
+        },
         pesoTotal: parseFloat(formData.pesoTotal) || 0,
         pedidoId: pedidoContext?.id,
         pedidoNumero: pedidoContext?.numero,
@@ -180,6 +185,7 @@ export default function GreModal({
           conductorNombres: '',
           conductorApellidos: ''
         })
+        setRecipient({ tipo: '6', numero: '' })
         setManualItems([{ descripcion: '', cantidad: '1', unidadMedida: 'NIU' }])
       } else {
         console.log('❌ Error en la respuesta:', result)
@@ -243,6 +249,22 @@ export default function GreModal({
                 required className="w-[100%] p-3 border rounded-[6px] text-sm"
               />
             </div>
+
+            {!pedidoContext && !cpeData && (
+              <>
+                <div>
+                  <label htmlFor="gre-modal-destinatario-documento-tipo" className="block mb-2 font-semibold text-foreground/85">Tipo Doc. Destinatario *</label>
+                  <select id="gre-modal-destinatario-documento-tipo" aria-label="Tipo Doc. Destinatario *" value={recipient.tipo} onChange={event => setRecipient(current => ({ ...current, tipo: event.target.value }))} className="w-full rounded-md border p-3 text-sm">
+                    <option value="6">RUC</option><option value="1">DNI</option><option value="4">Carné de extranjería</option><option value="7">Pasaporte</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="gre-modal-destinatario-documento" className="block mb-2 font-semibold text-foreground/85">Documento del Destinatario *</label>
+                  <input id="gre-modal-destinatario-documento" aria-label="Documento del Destinatario *" value={recipient.numero} onChange={event => setRecipient(current => ({ ...current, numero: event.target.value }))} required maxLength={recipient.tipo === '6' ? 11 : recipient.tipo === '1' ? 8 : 20} pattern={recipient.tipo === '6' ? '[0-9]{11}' : recipient.tipo === '1' ? '[0-9]{8}' : '[A-Za-z0-9]{5,20}'} className="w-full rounded-md border p-3 text-sm" />
+                </div>
+              </>
+            )}
+
 
             {!pedidoContext && !cpeData && (
               <div className="col-span-full rounded-lg border border-border p-4">
@@ -399,7 +421,7 @@ export default function GreModal({
                 name="pesoTotal"
                 value={formData.pesoTotal}
                 onChange={handleChange}
-                step="0.01"
+                step="0.001"
                 // El DTO exige @Min(0.001): con min="0" el navegador dejaba pasar
                 // un peso cero que el servidor rechazaba despues.
                 min="0.001"

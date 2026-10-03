@@ -1,0 +1,11 @@
+{
+  "completedAt": "2026-10-03T12:09:00.597Z",
+  "success": true,
+  "withBrowser": true,
+  "scope": "company_logo_real_storage_subset",
+  "storage_image": "supabase/storage-api@sha256:f1546fac6d1c7e345428ac904bfaa7be7cecd50a1f549fe1cf38c628a7b15c85",
+  "transport": "Origen contractual exacto reescrito al gateway loopback antes del socket; ningún destino remoto",
+  "database": "PostgreSQL 16 efímero",
+  "output": "/home/runner/work/erp/erp/artifacts/peru-company-storage-20261003120552726-3560",
+  "remoteWrites": false
+}

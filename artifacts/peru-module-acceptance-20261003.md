@@ -2,7 +2,7 @@
 
 No hay aceptación integral de lanzamiento. Los casos se vinculan a operaciones concretas en la matriz API; navegación y controles visibles describen la oferta y no demuestran ejecución. Sólo Analytics excluido; reportes operativos, contables y tributarios incluidos.
 
-Último runtime comprobado: `c9629374`. PROD DB registra 562 con preflight/preservación; PR #131 pasó ambos CI exactos con 241 API/24 UI sin reintentos, SQL y restauración. Main/despliegue exacto pendientes. Render: plan efectivo y continuidad sin confirmar. No hubo datos sintéticos de negocio en PROD.
+Último runtime comprobado: `cf868067`, esquema 563. PR #132 cerró ambos CI exactos, main 37125486977 y despliegue API/web/DB/Redis/CORS con preflight; conserva el timeout HTTP inicial de 20 segundos. DB 563 preservó 37 tablas, funciones y seguridad. GRE canónico `094be1a7` pasó 298 casos API/29 UI sin reintentos, barridos y restore; CI e integración/despliegue de GRE pendientes. Render: plan efectivo y continuidad sin confirmar. No hubo datos sintéticos de negocio en PROD.
 
 | Dominio de código | Contratos declarados | HTTP observado | Operaciones con casos funcionales | Aceptación completa |
 |---|---:|---:|---:|---|
@@ -12,14 +12,14 @@ No hay aceptación integral de lanzamiento. Los casos se vinculan a operaciones 
 | compras | 43 | 18 | 5 | Pendiente |
 | configuracion | 13 | 4 | 4 | Pendiente |
 | configuracion-fiscal | 1 | 0 | 0 | Pendiente |
-| configuration | 16 | 7 | 7 | Pendiente |
-| contabilidad | 124 | 47 | 29 | Pendiente |
+| configuration | 16 | 8 | 7 | Pendiente |
+| contabilidad | 124 | 57 | 41 | Pendiente |
 | cpe | 43 | 1 | 0 | Pendiente |
 | dashboard | 3 | 0 | 0 | Pendiente |
 | demo | 8 | 1 | 0 | Pendiente |
 | documentos | 15 | 1 | 0 | Pendiente |
 | finanzas | 49 | 23 | 16 | Pendiente |
-| gre | 17 | 0 | 0 | Pendiente |
+| gre | 17 | 16 | 16 | Pendiente |
 | help | 2 | 0 | 0 | Pendiente |
 | import-export | 5 | 0 | 0 | Pendiente |
 | infraestructura | 7 | 0 | 0 | Pendiente |
@@ -55,8 +55,8 @@ Los 11 contratos específicos de Argentina/Colombia identificados en el artefact
 
 ## Evidencia
 
-- `peru-integrated-local-tax-intents-20261003`: ensayo real API/UI/DB y restore.
-- `peru-storage-main-37118191630`: API/UI/DB/blobs locales; proveedor remoto sin aceptación por inferencia.
+- `peru-integrated-local-gre-20261003`: ensayo real API/UI/DB y restore; 22 casos API y tres recorridos GRE.
+- `peru-storage-ci-37125486977`: API/UI/DB/blobs locales; proveedor remoto sin aceptación por inferencia.
 - `peru-operation-acceptance-cases-20260930.json`: qué se probó y variantes pendientes.
 - `peru-functional-defects-20260930.json`: reproducción, corrección y estado de cada defecto.
 - `peru-api-operation-matrix-20260930.json` y `peru-ui-operation-matrix-20261002.json`: operaciones y controles trazables.

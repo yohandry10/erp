@@ -33,6 +33,7 @@ interface GreData {
   conductorNombres?: string
   conductorApellidos?: string
   sunatStatus?: string
+  items?: { descripcion: string; cantidad: number; unidadMedida?: string }[]
   errorMessage?: string
 }
 
@@ -97,13 +98,13 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
         method: 'GET',
       })
 
+      if (!response.ok || !response.headers.get('content-type')?.startsWith('application/pdf')) throw new Error('No se pudo descargar el PDF de la guía.')
       if (response.ok) {
-        const textContent = await response.text()
-        const blob = new Blob([textContent], { type: 'text/plain' })
+        const blob = await response.blob()
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `GRE-${greData?.numero}.txt`
+        a.download = `GRE-${greData?.numero}.pdf`
         document.body.appendChild(a)
         a.click()
         window.URL.revokeObjectURL(url)
@@ -115,74 +116,33 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
     }
   }
 
-  const handlePrint = () => {
-    // Generar ticket térmico de 80mm en lugar de imprimir el modal completo
+  const handlePrint = async () => {
     if (!greData) return
-
-    const printWindow = window.open('', '_blank', 'width=350,height=600')
-
+    const printWindow = window.open('', '_blank', 'width=800,height=900')
     if (!printWindow) {
       alert('Por favor permite las ventanas emergentes para imprimir')
       return
     }
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>GRE ${escapeHtml(greData.numero)}</title>
-      </head>
-      <body>
-        <div class="header">
-          <div class="empresa">EMISOR CONFIGURADO EN EL ERP</div>
-          <div class="tipo-doc">GUÍA DE REMISIÓN ELECTRÓNICA</div>
-          <div class="numero">${escapeHtml(greData.numero)}</div>
-          <div class="fecha">Emisión: ${escapeHtml(parseDateLocal(greData.fechaCreacion).toLocaleDateString('es-PE'))}</div>
-        </div>
-
-        <div class="seccion">
-          <div><span class="label">DESTINATARIO:</span></div>
-          <div class="valor">${escapeHtml(greData.destinatario)}</div>
-          <div><span class="label">DIRECCIÓN:</span></div>
-          <div class="valor">${escapeHtml(greData.direccionDestino)}</div>
-        </div>
-
-        <div class="seccion">
-          <div><span class="label">MOTIVO:</span><span class="valor">${escapeHtml(getMotivoText(greData.motivo))}</span></div>
-          <div><span class="label">MODALIDAD:</span><span class="valor">${escapeHtml(getModalidadText(greData.modalidad))}</span></div>
-          <div><span class="label">PESO:</span><span class="valor">${escapeHtml(greData.pesoTotal)} Kg</span></div>
-          <div><span class="label">FECHA TRASLADO:</span><span class="valor">${escapeHtml(parseDateLocal(greData.fechaTraslado).toLocaleDateString('es-PE'))}</span></div>
-        </div>
-
-        ${greData.transportista || greData.placaVehiculo || greData.conductorDocumentoNumero ? `
-        <div class="seccion">
-          ${greData.transportista ? `<div><span class="label">TRANSPORTISTA:</span><span class="valor">${escapeHtml(greData.transportista)}</span></div>` : ''}
-          ${greData.transportistaDocumento ? `<div><span class="label">RUC TRANSPORTISTA:</span><span class="valor">${escapeHtml(greData.transportistaDocumento)}</span></div>` : ''}
-          ${greData.placaVehiculo ? `<div><span class="label">PLACA:</span><span class="valor">${escapeHtml(greData.placaVehiculo)}</span></div>` : ''}
-          ${greData.licenciaConducir ? `<div><span class="label">LICENCIA:</span><span class="valor">${escapeHtml(greData.licenciaConducir)}</span></div>` : ''}
-          ${greData.conductorDocumentoNumero ? `<div><span class="label">CONDUCTOR:</span><span class="valor">${escapeHtml([greData.conductorNombres, greData.conductorApellidos].filter(Boolean).join(' '))}</span></div>` : ''}
-          ${greData.conductorDocumentoNumero ? `<div><span class="label">DOC. CONDUCTOR:</span><span class="valor">${escapeHtml(greData.conductorDocumentoNumero)}</span></div>` : ''}
-        </div>
-        ` : ''}
-
-        <div class="seccion">
-          <div><span class="label">ESTADO:</span><span class="valor">${escapeHtml(greData.estado)}</span></div>
-        </div>
-
-        <div class="footer">
-          <div>Representación impresa de GRE</div>
-          <div>La transmisión fiscal depende de las credenciales configuradas por el cliente.</div>
-        </div>
-      </body>
-      </html>
-    `)
-
-    printWindow.document.close()
-    printWindow.onload = () => {
-      printWindow.focus()
-      printWindow.print()
+    try {
+      const response = await fetchApi(`/api/gre/guias/${documentId}/pdf/`, { method: 'GET' })
+      if (!response.ok || !response.headers.get('content-type')?.startsWith('application/pdf')) {
+        throw new Error('No se pudo cargar el PDF de la guía para imprimir.')
+      }
+      const url = window.URL.createObjectURL(await response.blob())
+      printWindow.document.write(`<!DOCTYPE html><html><head><title>GRE ${escapeHtml(greData.numero)}</title></head><body style="margin:0"><iframe id="gre-print" title="Guía de remisión para imprimir" src="${url}" style="width:100%;height:100vh;border:0"></iframe></body></html>`)
+      const frame = printWindow.document.getElementById('gre-print') as HTMLIFrameElement | null
+      frame?.addEventListener('load', () => {
+        printWindow.focus()
+        printWindow.print()
+      })
+      printWindow.document.close()
+      setTimeout(() => window.URL.revokeObjectURL(url), 60000)
+    } catch (error) {
+      printWindow.close()
+      alert(error instanceof Error ? error.message : 'No se pudo imprimir la guía.')
     }
   }
+
 
   const getModalidadText = (modalidad: string) => {
     return modalidad === 'TRANSPORTE_PUBLICO' ? 'Transporte Público' : 'Transporte Privado'
@@ -452,6 +412,13 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
                     </tr>
                   </tbody>
                 </table>
+              </div>
+
+              <div className="mb-6">
+                <h3 className="font-bold">BIENES TRASLADADOS</h3>
+                <table className="w-full border text-sm"><thead><tr><th className="border p-2 text-left">Descripción</th><th className="border p-2 text-right">Cantidad</th><th className="border p-2 text-left">Unidad</th></tr></thead><tbody>
+                  {(greData.items || []).map((item, index) => <tr key={index}><td className="border p-2">{item.descripcion}</td><td className="border p-2 text-right">{item.cantidad}</td><td className="border p-2">{item.unidadMedida || 'NIU'}</td></tr>)}
+                </tbody></table>
               </div>
 
               {/* OBSERVACIONES */}
