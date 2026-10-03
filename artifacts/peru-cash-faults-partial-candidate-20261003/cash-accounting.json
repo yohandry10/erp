@@ -1,0 +1,70 @@
+{
+  "success": true,
+  "postings": [
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "difference": "0",
+      "event_type": "caja.movimiento_manual.registrado"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "difference": "0",
+      "event_type": "caja.movimiento_manual.registrado"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "difference": "0",
+      "event_type": "caja.retiro.registrado"
+    },
+    {
+      "status": "completed",
+      "entries": 0,
+      "balanced": null,
+      "difference": "0.00",
+      "event_type": "caja.cambio_turno.completado"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "difference": "-1.00",
+      "event_type": "caja.cerrada"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "difference": "0",
+      "event_type": "banco.movimiento.registrado"
+    },
+    {
+      "status": "completed",
+      "entries": 0,
+      "balanced": null,
+      "difference": "0.00",
+      "event_type": "caja.cerrada"
+    },
+    {
+      "status": "completed",
+      "entries": 0,
+      "balanced": null,
+      "difference": "0.00",
+      "event_type": "caja.cerrada"
+    },
+    {
+      "status": "completed",
+      "entries": 0,
+      "balanced": null,
+      "difference": "0.00",
+      "event_type": "caja.cerrada"
+    }
+  ],
+  "remoteWrites": false,
+  "complete_acceptance": false
+}

@@ -1,0 +1,36 @@
+{
+  "scope": "Reconstrucción fresca local de la cadena canónica con 566 y verificadores SQL",
+  "runner": "scripts/ci/verify-database-contracts.mjs",
+  "database": "PostgreSQL 16 efímero en contenedor local, sin red externa operativa",
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "attempts": [
+    {
+      "result": "failed",
+      "failed_verifier": "492__runtime_outbox_single_writer_readiness.sql",
+      "error": "VERIFY_492_TREASURY_LEDGER_NOT_PRESERVED: el resolver devolvió la 10111 creada por 566 y no la 10111 duplicada que insertaba el fixture",
+      "classification": "supuesto del fixture: la empresa PE de prueba ya no carece de 10111"
+    },
+    {
+      "result": "failed",
+      "failed_verifier": "449__rrhh_liquidations_cts_atomic_lifecycle.sql (histórico)",
+      "error": "El repago en efectivo congelaba la 10111 de 566, no la 10111 duplicada del fixture",
+      "classification": "mismo supuesto del fixture"
+    },
+    {
+      "result": "passed",
+      "summary": "OK PostgreSQL 16: 562 migraciones hasta 566, 75 verificadores; 67 verificadores históricos ejecutados y 6 enumerados como obsoletos"
+    }
+  ],
+  "fixture_changes": [
+    "492 y 449 reutilizan la 10111 existente de la empresa PE en lugar de insertar un segundo código 10111; conservan la aserción de que tesorería congela exactamente esa cuenta"
+  ],
+  "product_review": [
+    "Ninguna migración, seed demo, importador ni servicio de API crea 10111 aparte de 566",
+    "plan_cuentas no tiene unicidad (tenant_id, codigo): propiedad previa a 566; ensure_fiscal_account_465 es idempotente por código"
+  ],
+  "limits": [
+    "No sustituye el CI exacto del PR ni la promoción 566",
+    "No acredita datos ni ACL heredadas de PROD; eso lo cubre el ensayo sobre respaldo productivo"
+  ]
+}

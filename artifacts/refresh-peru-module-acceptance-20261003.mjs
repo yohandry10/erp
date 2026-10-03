@@ -1,0 +1,31 @@
+import fs from 'node:fs';
+const read=file=>JSON.parse(fs.readFileSync(file,'utf8'));
+const api=read('artifacts/peru-api-operation-matrix-20260930.json'),ui=read('artifacts/peru-ui-operation-matrix-20261002.json');
+const groups=new Map();
+for(const operation of api.operations){
+ if(!groups.has(operation.module))groups.set(operation.module,{module:operation.module,declared_contracts:0,observed_contracts:0,operations_with_functional_cases:0,complete_acceptance:false,verified_case_ids:[],pending_operations:[],defects:[]});
+ const group=groups.get(operation.module);group.declared_contracts++;
+ if(operation.existing_evidence.length)group.observed_contracts++;
+ if(operation.verified_cases.length)group.operations_with_functional_cases++;
+ group.verified_case_ids.push(...operation.verified_cases.map(c=>typeof c==='string'?c:c.id));
+ group.pending_operations.push({method:operation.method,endpoint:operation.endpoint,result:operation.result,pending_checks:operation.pending_checks});
+ group.defects.push(...operation.defects.map(d=>typeof d==='string'?d:d.id));
+}
+const modules=[...groups.values()].sort((a,b)=>a.module.localeCompare(b.module));
+for(const group of modules){group.verified_case_ids=[...new Set(group.verified_case_ids)];group.defects=[...new Set(group.defects)];}
+const data={generated_at:new Date().toISOString(),scope:'Inventario y aceptación por módulo/operación; únicamente Analytics excluido',operational_accounting_tax_reports_included:true,complete_acceptance:false,
+ source_api_matrix:'artifacts/peru-api-operation-matrix-20260930.json',source_ui_matrix:'artifacts/peru-ui-operation-matrix-20261002.json',country_applicability:'artifacts/peru-country-applicability-20261003.json',
+ evidence:api.evidence,additional_evidence:api.additional_evidence,latest_verified_production:{sha:'8d717bcfb8e038a5d52abf95c124c99438009080',schema_at_last_runtime_read:565,proof:'artifacts/peru-production-verification-after-135-20261003.json',first_attempt:'artifacts/peru-production-verification-after-135-first-timeout-20261003.json',main_ci:'37152767852 success'},superseded_main:{sha:'9e301e2ae9f470b56ffc10d775ab09c4a8d6a76b',main_ci:'37142023714 failed twice (Next dev heap)',proof:'artifacts/peru-main-134-heap-failure-20261003'},current_database_schema:{version:565,proof:'artifacts/peru-565-promotion-20261003204614178.json'},pending_schema:{version:566,state:'canonical in cash branch; fresh rebuild passed locally; not promoted',proof:'artifacts/peru-566-fresh-contracts-local-20261003.json'},
+ acceptance_rule:'Contrato observado o control visible no implica ejecutar ni aceptar toda una operación. Se conservan variantes de país, infraestructura y pendientes por operación para no ocultar huecos.',
+ navigation:ui.navigation,modules};
+fs.writeFileSync('artifacts/peru-module-acceptance-20261003.json',JSON.stringify(data,null,2)+'\n');
+let md='# Aceptación funcional Perú por módulo — 03/10/2026\n\n';
+md+='No hay aceptación integral de lanzamiento. Los casos se vinculan a operaciones concretas en la matriz API; navegación y controles visibles describen la oferta y no demuestran ejecución. Sólo Analytics excluido; reportes operativos, contables y tributarios incluidos.\n\n';
+md+='Último cierre completo: #135, 8d717bcf/esquema 565: 28 checks, CI 342 API/31 UI sin reintentos, SQL fresco, barridos, restore; main 37152767852, E2E y seguridad aprobados; runtime exacto verificado tras un primer timeout de 20 s. #134 (9e301e2a/564) no cerró main: dos OOM de Next dev. Caja: 19 defectos con correcciones canónicas en rama (23 API/10 UI locales, SQL fresco 566 aprobado); 566 sin promover. Histórico: #133, 19fa239d/esquema 563. #134 promovió 564 una vez; sus CI de fuente c0f055eb pasaron 316 API/30 UI y su main no cerró por OOM. La 565 se ensayó con rollback y preservación de 42 tablas antes de su promoción única. Render: plan efectivo y continuidad sin confirmar. No hubo datos sintéticos de negocio en PROD.\n\n';
+md+='| Dominio de código | Contratos declarados | HTTP observado | Operaciones con casos funcionales | Aceptación completa |\n|---|---:|---:|---:|---|\n';
+for(const m of modules)md+=`| ${m.module} | ${m.declared_contracts} | ${m.observed_contracts} | ${m.operations_with_functional_cases} | Pendiente |\n`;
+md+='\nLos 11 contratos específicos de Argentina/Colombia identificados en el artefacto de aplicabilidad se conservan como variantes de país; los otros 706 tampoco equivalen automáticamente a oferta comercial Perú, porque incluyen infraestructura y administración. El JSON conserva los pendientes de las 717 operaciones y los enlaces realmente renderizados para ADMIN Perú.\n\n';
+md+='## Comprobaciones que requieren acceso externo\n\n- Plan contratado de Render: acceso administrativo; no se autoriza contratar servicios.\n- Aceptación/acuse SUNAT y hardware físico: entorno y accesos del futuro cliente. El onboarding técnico se prueba con empresas y certificado desechables locales; no se solicita un emisor real.\n\n## Evidencia\n\n';
+md+='- `peru-integrated-local-gre-20261003`: ensayo real API/UI/DB y restore; 22 casos API y tres recorridos GRE.\n- `peru-storage-ci-37139151230`: API/UI/DB/blobs locales; proveedor remoto sin aceptación por inferencia.\n- `peru-integrated-main-37152767852`: main exacto de #135, 342 HTTP/31 UI y restore.\n- `peru-cash-canonical-local-20261003` y `peru-cash-operation-matrix-20261003.json`: caja canónica local y sus 28 operaciones.\n- `peru-operation-acceptance-cases-20260930.json`: qué se probó y variantes pendientes.\n- `peru-functional-defects-20260930.json`: reproducción, corrección y estado de cada defecto.\n- `peru-api-operation-matrix-20260930.json` y `peru-ui-operation-matrix-20261002.json`: operaciones y controles trazables.\n';
+fs.writeFileSync('artifacts/peru-module-acceptance-20261003.md',md);
+console.log(JSON.stringify({modules:modules.length,contracts:api.operations.length,observed:modules.reduce((n,m)=>n+m.observed_contracts,0),complete_acceptance:false}));

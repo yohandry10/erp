@@ -1,0 +1,15 @@
+{
+  "attempted_at_utc": "2026-10-03T21:22:10Z",
+  "merge_sha": "8d717bcfb8e038a5d52abf95c124c99438009080",
+  "required_schema": 565,
+  "read_only": true,
+  "synthetic_prod_writes": false,
+  "prod_preflight": "passed: authorized project and internal marker",
+  "github_main": "CI 37152767852, E2E 37152767849 y Security Scan 37152767861 completados con success",
+  "result": "failed",
+  "error": "TimeoutError de 20 segundos en una lectura de health de https://erp-api-2p7i.onrender.com antes de escribir el informe",
+  "timeout_seconds": 20,
+  "timeout_changed": false,
+  "verification_passed": false,
+  "note": "Se conserva como intento fallido; una repetición posterior no acredita continuidad ni plan efectivo de Render."
+}

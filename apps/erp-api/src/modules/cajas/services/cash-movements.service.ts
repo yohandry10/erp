@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, ServiceUnavailableException, NotFoundException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 
 export enum TipoMovimiento {
@@ -97,7 +97,7 @@ export class CashMovementsService {
 
         if (error) {
             this.logger.error(`Error obteniendo movimientos: ${error.message}`, error);
-            throw new BadRequestException(`Error al obtener movimientos: ${error.message}`);
+            throw new ServiceUnavailableException('No se pudieron consultar los movimientos de caja; reintente');
         }
 
         return (data || []) as MovimientoCaja[];
@@ -119,7 +119,7 @@ export class CashMovementsService {
 
         if (error) {
             this.logger.error(`Error obteniendo último movimiento: ${error.message}`, error);
-            throw new BadRequestException(`Error al obtener último movimiento: ${error.message}`);
+            throw new ServiceUnavailableException('No se pudieron consultar los movimientos de caja; reintente');
         }
 
         return data as MovimientoCaja | null;
@@ -141,7 +141,8 @@ export class CashMovementsService {
                 .eq('tenant_id', tenantId)
                 .single();
 
-            if (error || !sesion) {
+            if (error && error.code !== 'PGRST116' && error.code !== '22P02') throw new ServiceUnavailableException('No se pudo consultar la sesión de caja; reintente');
+            if (!sesion) {
                 throw new NotFoundException('Sesión de caja no encontrada');
             }
 
@@ -262,7 +263,8 @@ export class CashMovementsService {
             .eq('tenant_id', tenantId)
             .single();
 
-        if (error || !sesion) {
+        if (error && error.code !== 'PGRST116' && error.code !== '22P02') throw new ServiceUnavailableException('No se pudo consultar la sesión de caja; reintente');
+        if (!sesion) {
             throw new NotFoundException('Sesión de caja no encontrada');
         }
 
