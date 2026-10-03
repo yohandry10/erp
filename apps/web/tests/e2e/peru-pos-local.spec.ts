@@ -27,6 +27,18 @@ const saleResponse = (r: Response) => new URL(r.url()).pathname.replace(/\/$/, '
   .endsWith('/pos/venta') && r.request().method() === 'POST';
 
 async function setup(page: Page, context: BrowserContext) {
+  // El iframe se retira en afterprint. Observar beforeprint conserva lo que
+  // recibió el motor de impresión sin sustituir window.print ni congelar UI.
+  await context.addInitScript(() => {
+    window.addEventListener('beforeprint', () => {
+      window.parent.postMessage({ type: 'local-pos-beforeprint', text: document.body.innerText }, '*');
+    });
+    window.addEventListener('message', event => {
+      if (event.data?.type === 'local-pos-beforeprint') {
+        (window as Window & { posPrintedText?: string }).posPrintedText = event.data.text;
+      }
+    });
+  });
   await context.route('**/*', route => ['127.0.0.1', 'localhost', '[::1]']
     .includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort('blockedbyclient'));
   await page.goto('/login/');
@@ -86,9 +98,9 @@ test('POS: primer ADMIN abre, vende y recupera respuesta perdida sin duplicar', 
     const preview = page.locator('[data-pos-print-document]');
     await expect(preview).toContainText('Servicio POS local'); await expect(preview).toContainText('23.60');
     await page.getByRole('button', { name: 'Imprimir', exact: true }).click();
-    const frame = page.frameLocator('iframe[title="Documento listo para imprimir"]');
-    await expect(frame.locator('body')).toContainText('Servicio POS local');
-    await expect(frame.locator('body')).toContainText('23.60');
+    const printedText = () => page.evaluate(() => (window as Window & { posPrintedText?: string }).posPrintedText || '');
+    await expect.poll(printedText).toContain('Servicio POS local');
+    await expect.poll(printedText).toContain('23.60');
     proof.checks.push({ check: 'Vista térmica e iframe de impresión contienen líneas y total reales',
       passed: true, physical_printer_verified: false });
     await page.getByRole('button', { name: 'Cerrar vista previa', exact: true }).click();
