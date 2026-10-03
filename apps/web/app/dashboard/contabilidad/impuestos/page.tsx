@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Calculator, CheckCircle2, FileCheck2, Loader2, RefreshCw } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 import { Button } from '@/components/ui/button'
@@ -71,6 +71,8 @@ export default function ImpuestosMensualesPage() {
   const [error, setError] = useState<string | null>(null)
   const [constancia, setConstancia] = useState('')
   const [fechaPresentacion, setFechaPresentacion] = useState('')
+  const saveIntent = useRef<{ signature: string; key: string } | null>(null)
+  const receiptIntent = useRef<{ signature: string; key: string } | null>(null)
   const [ajustes, setAjustes] = useState({
     saldo_favor_anterior: '0',
     retenciones_igv: '0',
@@ -148,8 +150,15 @@ export default function ImpuestosMensualesPage() {
     setError(null)
     setMensaje(null)
     try {
-      const response = await post('/api/contabilidad/impuestos/mensual', payload)
+      const signature = JSON.stringify(payload)
+      if (saveIntent.current?.signature !== signature) {
+        saveIntent.current = { signature, key: crypto.randomUUID() }
+      }
+      const response = await post('/api/contabilidad/impuestos/mensual', payload, {
+        headers: { 'Idempotency-Key': saveIntent.current.key },
+      })
       if (!response?.success) throw new Error(response?.message || 'No se pudo guardar')
+      saveIntent.current = null
       setMensaje('Borrador versionado. Revísalo contra SIRE y preséntalo en SUNAT antes de registrar la constancia.')
       await cargar()
     } catch (err: any) {
@@ -173,11 +182,19 @@ export default function ImpuestosMensualesPage() {
     setError(null)
     setMensaje(null)
     try {
-      const response = await post(`/api/contabilidad/impuestos/declaraciones/${vigente.id}/constancia`, {
+      const receipt = {
         constancia: constancia.trim(),
         ...(fechaPresentacion ? { fecha_presentacion: new Date(fechaPresentacion).toISOString() } : {}),
+      }
+      const signature = JSON.stringify({ id: vigente.id, ...receipt })
+      if (receiptIntent.current?.signature !== signature) {
+        receiptIntent.current = { signature, key: crypto.randomUUID() }
+      }
+      const response = await post(`/api/contabilidad/impuestos/declaraciones/${vigente.id}/constancia`, receipt, {
+        headers: { 'Idempotency-Key': receiptIntent.current.key },
       })
       if (!response?.success) throw new Error(response?.message || 'No se pudo registrar la constancia')
+      receiptIntent.current = null
       setMensaje('Constancia externa registrada. El ERP conserva la versión y su evidencia.')
       await cargar()
     } catch (err: any) {

@@ -1,0 +1,10 @@
+{
+  "completedAt": "2026-10-03T10:54:59.792Z",
+  "success": true,
+  "withBrowser": true,
+  "withSurvey": false,
+  "withRecords": false,
+  "scope": "tax_intents_local_subset",
+  "database": "PostgreSQL 16 efímero",
+  "remoteWrites": false
+}
