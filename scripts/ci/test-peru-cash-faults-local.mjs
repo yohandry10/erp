@@ -61,4 +61,8 @@ try{
   const before=fingerprint(),response=await fetch(api+'/api/cajas/cortes/'+fixture.first_cut_id+'/csv',{headers:{authorization:'Bearer '+token}});assert.equal(response.status,200);
   const csv=await response.text();assert.ok(csv.includes('"SESION","CAJA","\'=SUM(1,2), ""caja""\nlocal"'),'La celda debe representar el nombre completo y desactivar la fórmula');assert.equal(fingerprint(),before);
  });
+ await check('Caja: la sesión de la fase de fallos queda cerrada con su saldo esperado',async()=>{
+  await call('cajas/sesiones/'+session.id+'/cierre-administrativo',{razon_cierre:'Fin del ensayo local de fallos de caja'});
+  assert.equal(sql(`SELECT estado FROM sesiones_caja WHERE id=${q(session.id)};`),'CERRADA');
+ });
 }finally{fs.writeFileSync(path.join(output,'cash-faults.json'),JSON.stringify({success:scenarios.every(s=>s.passed),scenarios,requests,remoteWrites:false,complete_acceptance:false},null,2));}

@@ -1,0 +1,22 @@
+{
+  "sha": "7842379a666c511de6c9686407c8d5db8ae066f7",
+  "runs": [37155128343, 37155144144],
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "failures": [
+    {
+      "job": "Tests",
+      "cause": "fecha-utc-guard.spec.ts detectó toISOString().slice(0,10) en la validación de fecha_desde/fecha_hasta de cajas.service.ts",
+      "classification": "regla del repositorio incumplida por la corrección de caja",
+      "fix": "10404eb1: validación de calendario con año/mes/día de Date.UTC; suite API local 300 suites/2904 pruebas"
+    },
+    {
+      "job": "Peru API, browser and backup recovery",
+      "phases_passed_before_failure": ["cash-operations-lifecycle", "cash-faults-lifecycle"],
+      "browser": "31 recorridos aprobados; peru-cash-local.spec.ts falló tres veces con apertura 400",
+      "cause": "La fase de fallos dejó abierta la sesión 'Caja fallos local' del mismo administrador; la API respondió 'Ya tiene una caja abierta', regla correcta de una caja abierta por usuario",
+      "classification": "orden de instrumentación del ensayo, no defecto de producto",
+      "fix": "La fase de fallos cierra su sesión mediante cierre administrativo y lo registra como escenario"
+    }
+  ]
+}
