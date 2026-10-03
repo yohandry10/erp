@@ -598,7 +598,11 @@ export class CajasService {
   private validateDateFilters(filters: { fecha_desde?: string; fecha_hasta?: string }) {
     for (const key of ['fecha_desde','fecha_hasta'] as const) {
       const value=filters[key];
-      if(value && (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(Date.parse(value)) || new Date(value).toISOString().slice(0,10)!==value)) throw new BadRequestException(key+' debe ser una fecha válida YYYY-MM-DD');
+      if(!value) continue;
+      // Fecha de calendario exacta: rechaza 2026-02-30 sin depender de la zona del proceso.
+      const [year, month, day] = value.split('-').map(Number);
+      const calendar = new Date(Date.UTC(year, month - 1, day));
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(value) || calendar.getUTCFullYear()!==year || calendar.getUTCMonth()!==month-1 || calendar.getUTCDate()!==day) throw new BadRequestException(key+' debe ser una fecha válida YYYY-MM-DD');
     }
     if(filters.fecha_desde && filters.fecha_hasta && filters.fecha_desde>filters.fecha_hasta) throw new BadRequestException('El rango de fechas está invertido');
   }
