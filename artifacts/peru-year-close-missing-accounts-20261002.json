@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-03T02:52:32.655Z",
+  "result": "expected_failure_reproduced",
+  "local_only": true,
+  "scope": "Probe adicional en PostgreSQL efímero; no acredita cierre anual",
+  "source": "artifacts/peru-year-close-probe-20261002.mjs",
+  "method": "POST",
+  "endpoint": "/api/contabilidad/periodos/:id/cerrar",
+  "year": 2025,
+  "non_demo_first_admin": true,
+  "missing_accounts": [
+    "89",
+    "59"
+  ],
+  "http_status": 400,
+  "message": "ACCOUNTING_YEAR_CLOSE_ACCOUNTS_89_59_REQUIRED",
+  "period_stayed_open": true,
+  "entry_count_unchanged": true,
+  "remote_writes": false
+}

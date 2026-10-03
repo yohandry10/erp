@@ -5,6 +5,7 @@ import {
   Put,
   Delete,
   Body,
+  Headers,
   Query,
   Param,
   UseGuards,
@@ -23,6 +24,7 @@ import {
   ReversarAsientoDto,
 } from "@erp-suite/dtos";
 import { AsientosService } from "../services/asientos.service";
+import { randomUUID } from "crypto";
 
 @ApiTags("contabilidad")
 @Controller("contabilidad")
@@ -50,6 +52,7 @@ export class ContabilidadAsientosController {
     @CurrentTenant() tenantId: string,
     @CurrentUser("id") userId: string,
     @Body() createAsientoDto: CreateAsientoManualDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<{ success: boolean; data: AsientoResponseDto; message: string }> {
     try {
       console.log(
@@ -60,6 +63,7 @@ export class ContabilidadAsientosController {
         tenantId,
         userId,
         createAsientoDto,
+        { idempotencyKey: idempotencyKey ?? randomUUID() },
       );
 
       return {

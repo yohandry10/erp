@@ -186,6 +186,18 @@ describe('ActivosFijosService', () => {
   });
 
   describe('cuotaDelPeriodo', () => {
+    it('las cuotas ejecutadas agotan la base al céntimo y coinciden con el cronograma', () => {
+      const activo = { valor_adquisicion: 1001, valor_residual: 1, vida_util_meses: 3,
+        depreciacion_acumulada: 0, fecha_inicio_depreciacion: '2026-01-01' };
+      const cuotas = [1, 2, 3].map(mes => {
+        const cuota = ActivosFijosService.cuotaDelPeriodo(activo, 2026, mes);
+        activo.depreciacion_acumulada = Math.round((activo.depreciacion_acumulada + cuota) * 100) / 100;
+        return cuota;
+      });
+      expect(cuotas).toEqual([333.33, 333.33, 333.34]);
+      expect(activo.valor_adquisicion - activo.depreciacion_acumulada).toBe(1);
+    });
+
     const activoBase = {
       valor_adquisicion: 12000,
       valor_residual: 0,

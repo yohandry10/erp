@@ -1,11 +1,14 @@
 {
-  "generated_at": "2026-09-30T22:47:15.369Z",
+  "generated_at": "2026-10-03T02:31:22.517Z",
   "inventory": "artifacts/peru-api-operation-inventory-20260930.json",
-  "evidence": "artifacts/peru-integrated-local-rma-20260930",
+  "evidence": "artifacts/peru-integrated-accounting-phases-20261002",
   "evidence_scope": "full",
+  "evidence_global_success": false,
+  "evidence_phase": "HTTP aprobado; el resultado global se conserva por separado",
   "evidence_kind": "HTTP contra Nest/PostgREST/PostgreSQL efímeros; no contiene cuerpos, tokens ni credenciales",
   "acceptance_rule": "HTTP observado no acredita aceptación funcional. verified_cases sólo recoge contratos cuyo escenario funcional pasó; conserva pendientes explícitos y no acepta toda la operación.",
   "acceptance_cases": "artifacts/peru-operation-acceptance-cases-20260930.json",
+  "defect_register": "artifacts/peru-functional-defects-20260930.json",
   "excluded": [
     "Analytics"
   ],
@@ -509,6 +512,10 @@
         {
           "trace_index": 538,
           "status": 201
+        },
+        {
+          "trace_index": 552,
+          "status": 201
         }
       ],
       "defects": [],
@@ -688,6 +695,10 @@
         },
         {
           "trace_index": 131,
+          "status": 201
+        },
+        {
+          "trace_index": 645,
           "status": 201
         }
       ],
@@ -2025,14 +2036,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "proveedores-master-lifecycle",
+          "source": "scripts/ci/test-peru-master-lifecycle.mjs",
+          "verified_checks": [
+            "lector consulta y no crea/edita/desactiva",
+            "baja ajena 404 sin mutación",
+            "identidad repetida conserva ID; duplicada rechaza",
+            "baja lógica con/sin deuda mantiene filas y saldos",
+            "replay produce una auditoría"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "reactivación si se ofrece",
+        "variantes fiscales/tipos documentales",
+        "permisos de todos los roles"
       ]
     },
     {
@@ -2056,14 +2077,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "proveedores-edit-search",
+          "source": "scripts/ci/test-peru-integrated-import.mjs",
+          "verified_checks": [
+            "email inválido rechaza antes de escribir",
+            "nombre/email editados coinciden en API y DB",
+            "búsqueda por nombre nuevo devuelve ID",
+            "lectura/escritura ajenas 404"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "variantes documentales",
+        "combinaciones de filtros/paginación",
+        "búsqueda con caracteres especiales",
+        "permisos adicionales"
       ]
     },
     {
@@ -2117,14 +2148,38 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "proveedores-master-lifecycle",
+          "source": "scripts/ci/test-peru-master-lifecycle.mjs",
+          "verified_checks": [
+            "lector consulta y no crea/edita/desactiva",
+            "baja ajena 404 sin mutación",
+            "identidad repetida conserva ID; duplicada rechaza",
+            "baja lógica con/sin deuda mantiene filas y saldos",
+            "replay produce una auditoría"
+          ]
+        },
+        {
+          "id": "proveedores-edit-search",
+          "source": "scripts/ci/test-peru-integrated-import.mjs",
+          "verified_checks": [
+            "email inválido rechaza antes de escribir",
+            "nombre/email editados coinciden en API y DB",
+            "búsqueda por nombre nuevo devuelve ID",
+            "lectura/escritura ajenas 404"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "reactivación si se ofrece",
+        "variantes fiscales/tipos documentales",
+        "permisos de todos los roles",
+        "variantes documentales",
+        "combinaciones de filtros/paginación",
+        "búsqueda con caracteres especiales",
+        "permisos adicionales"
       ]
     },
     {
@@ -2156,14 +2211,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "proveedores-edit-search",
+          "source": "scripts/ci/test-peru-integrated-import.mjs",
+          "verified_checks": [
+            "email inválido rechaza antes de escribir",
+            "nombre/email editados coinciden en API y DB",
+            "búsqueda por nombre nuevo devuelve ID",
+            "lectura/escritura ajenas 404"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "variantes documentales",
+        "combinaciones de filtros/paginación",
+        "búsqueda con caracteres especiales",
+        "permisos adicionales"
       ]
     },
     {
@@ -2199,14 +2264,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "proveedores-master-lifecycle",
+          "source": "scripts/ci/test-peru-master-lifecycle.mjs",
+          "verified_checks": [
+            "lector consulta y no crea/edita/desactiva",
+            "baja ajena 404 sin mutación",
+            "identidad repetida conserva ID; duplicada rechaza",
+            "baja lógica con/sin deuda mantiene filas y saldos",
+            "replay produce una auditoría"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "reactivación si se ofrece",
+        "variantes fiscales/tipos documentales",
+        "permisos de todos los roles"
       ]
     },
     {
@@ -2700,14 +2775,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "first-customer-fiscal-configuration",
+          "source": "scripts/ci/test-peru-onboarding-local.mjs",
+          "verified_checks": [
+            "titular PFX y contraseña incorrectos rechazan sin escribir",
+            "se recargan parámetros y banderas configuradas",
+            "secretos ausentes de respuesta pública/progreso",
+            "un único evento de finalización tras replay"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "wizard por navegador",
+        "permisos/aislamiento de cada mutación",
+        "renovación y expiración del certificado",
+        "aceptación fiscal externa del futuro cliente"
       ]
     },
     {
@@ -2723,14 +2808,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "first-customer-fiscal-configuration",
+          "source": "scripts/ci/test-peru-onboarding-local.mjs",
+          "verified_checks": [
+            "titular PFX y contraseña incorrectos rechazan sin escribir",
+            "se recargan parámetros y banderas configuradas",
+            "secretos ausentes de respuesta pública/progreso",
+            "un único evento de finalización tras replay"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "wizard por navegador",
+        "permisos/aislamiento de cada mutación",
+        "renovación y expiración del certificado",
+        "aceptación fiscal externa del futuro cliente"
       ]
     },
     {
@@ -2746,14 +2841,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "first-customer-fiscal-configuration",
+          "source": "scripts/ci/test-peru-onboarding-local.mjs",
+          "verified_checks": [
+            "titular PFX y contraseña incorrectos rechazan sin escribir",
+            "se recargan parámetros y banderas configuradas",
+            "secretos ausentes de respuesta pública/progreso",
+            "un único evento de finalización tras replay"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "wizard por navegador",
+        "permisos/aislamiento de cada mutación",
+        "renovación y expiración del certificado",
+        "aceptación fiscal externa del futuro cliente"
       ]
     },
     {
@@ -2791,14 +2896,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "first-customer-fiscal-configuration",
+          "source": "scripts/ci/test-peru-onboarding-local.mjs",
+          "verified_checks": [
+            "titular PFX y contraseña incorrectos rechazan sin escribir",
+            "se recargan parámetros y banderas configuradas",
+            "secretos ausentes de respuesta pública/progreso",
+            "un único evento de finalización tras replay"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "wizard por navegador",
+        "permisos/aislamiento de cada mutación",
+        "renovación y expiración del certificado",
+        "aceptación fiscal externa del futuro cliente"
       ]
     },
     {
@@ -2850,14 +2965,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "first-customer-fiscal-configuration",
+          "source": "scripts/ci/test-peru-onboarding-local.mjs",
+          "verified_checks": [
+            "titular PFX y contraseña incorrectos rechazan sin escribir",
+            "se recargan parámetros y banderas configuradas",
+            "secretos ausentes de respuesta pública/progreso",
+            "un único evento de finalización tras replay"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "wizard por navegador",
+        "permisos/aislamiento de cada mutación",
+        "renovación y expiración del certificado",
+        "aceptación fiscal externa del futuro cliente"
       ]
     },
     {
@@ -2943,16 +3068,45 @@
       "method": "GET",
       "endpoint": "/api/contabilidad/activos-fijos/:id",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-activos.controller.ts:46",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 585,
+          "status": 200
+        },
+        {
+          "trace_index": 588,
+          "status": 200
+        },
+        {
+          "trace_index": 596,
+          "status": 200
+        },
+        {
+          "trace_index": 599,
+          "status": 404
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "fixed-asset-crud",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "alta y replay conservan activo",
+            "residual mayor al costo rechazado",
+            "nombre editado y recargado",
+            "lector consulta y no crea/edita",
+            "GET ajeno 404",
+            "cronograma coincide al céntimo"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "aislamiento de alta/PUT/cronograma",
+        "cambio prospectivo de vida útil/residual",
+        "búsqueda y centros"
       ]
     },
     {
@@ -2961,16 +3115,33 @@
       "method": "GET",
       "endpoint": "/api/contabilidad/activos-fijos/:id/cronograma",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-activos.controller.ts:58",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 589,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "fixed-asset-crud",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "alta y replay conservan activo",
+            "residual mayor al costo rechazado",
+            "nombre editado y recargado",
+            "lector consulta y no crea/edita",
+            "GET ajeno 404",
+            "cronograma coincide al céntimo"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "aislamiento de alta/PUT/cronograma",
+        "cambio prospectivo de vida útil/residual",
+        "búsqueda y centros"
       ]
     },
     {
@@ -2979,16 +3150,45 @@
       "method": "POST",
       "endpoint": "/api/contabilidad/activos-fijos",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-activos.controller.ts:75",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 580,
+          "status": 201
+        },
+        {
+          "trace_index": 581,
+          "status": 201
+        },
+        {
+          "trace_index": 583,
+          "status": 400
+        },
+        {
+          "trace_index": 584,
+          "status": 403
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "fixed-asset-crud",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "alta y replay conservan activo",
+            "residual mayor al costo rechazado",
+            "nombre editado y recargado",
+            "lector consulta y no crea/edita",
+            "GET ajeno 404",
+            "cronograma coincide al céntimo"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "aislamiento de alta/PUT/cronograma",
+        "cambio prospectivo de vida útil/residual",
+        "búsqueda y centros"
       ]
     },
     {
@@ -2997,16 +3197,37 @@
       "method": "PUT",
       "endpoint": "/api/contabilidad/activos-fijos/:id",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-activos.controller.ts:89",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 586,
+          "status": 403
+        },
+        {
+          "trace_index": 587,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "fixed-asset-crud",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "alta y replay conservan activo",
+            "residual mayor al costo rechazado",
+            "nombre editado y recargado",
+            "lector consulta y no crea/edita",
+            "GET ajeno 404",
+            "cronograma coincide al céntimo"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "aislamiento de alta/PUT/cronograma",
+        "cambio prospectivo de vida útil/residual",
+        "búsqueda y centros"
       ]
     },
     {
@@ -3015,16 +3236,66 @@
       "method": "POST",
       "endpoint": "/api/contabilidad/activos-fijos/depreciar",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-activos.controller.ts:109",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "existing_evidence": [
+        {
+          "trace_index": 590,
+          "status": 201
+        },
+        {
+          "trace_index": 591,
+          "status": 201
+        },
+        {
+          "trace_index": 592,
+          "status": 201
+        },
+        {
+          "trace_index": 593,
+          "status": 201
+        },
+        {
+          "trace_index": 594,
+          "status": 201
+        },
+        {
+          "trace_index": 595,
+          "status": 201
+        }
+      ],
+      "defects": [
+        {
+          "id": "depreciation-accrual-final-cent",
+          "status": "corrected_locally_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-integrated-20260930231135744-6004/http.json",
+            "observed_error": "Expected values to be strictly equal:\n\n33333 !== 33334\n",
+            "local_only": true
+          },
+          "correction": "La cuota ejecutada del último período absorbe el saldo pendiente y respeta el residual",
+          "pending": [
+            "CI del cambio",
+            "main y despliegue"
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "fixed-asset-depreciation",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "tres períodos y cuotas 333.33/333.33/333.34",
+            "replay por período no duplica",
+            "acumulado llega a base y residual 1",
+            "consumidor real genera contabilidad"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "permisos e aislamiento de esta operación",
+        "período cerrado",
+        "activos omitidos, concurrencia y moneda"
       ]
     },
     {
@@ -3033,16 +3304,34 @@
       "method": "POST",
       "endpoint": "/api/contabilidad/activos-fijos/:id/baja",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-activos.controller.ts:138",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 597,
+          "status": 201
+        },
+        {
+          "trace_index": 598,
+          "status": 400
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "fixed-asset-disposal",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "activo depreciado retirado",
+            "segunda baja rechazada",
+            "un asiento confirmado y cuadrado"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "permisos e aislamiento de baja",
+        "venta de activo y cobro posterior",
+        "activo con valor neto pendiente"
       ]
     },
     {
@@ -3128,16 +3417,44 @@
       "method": "GET",
       "endpoint": "/api/contabilidad/diferidos/:id",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-analitica.controller.ts:111",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 606,
+          "status": 200
+        },
+        {
+          "trace_index": 608,
+          "status": 200
+        },
+        {
+          "trace_index": 615,
+          "status": 200
+        },
+        {
+          "trace_index": 619,
+          "status": 404
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "deferred-create-read",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "alta y replay conservan diferido",
+            "cuentas iguales o ajenas rechazadas",
+            "lector consulta y no crea",
+            "cronograma 33.33/33.33/33.34",
+            "GET ajeno 404"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "aislamiento de creación",
+        "variante ingreso",
+        "monedas y centros"
       ]
     },
     {
@@ -3146,16 +3463,52 @@
       "method": "POST",
       "endpoint": "/api/contabilidad/diferidos",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-analitica.controller.ts:123",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 600,
+          "status": 201
+        },
+        {
+          "trace_index": 601,
+          "status": 201
+        },
+        {
+          "trace_index": 603,
+          "status": 400
+        },
+        {
+          "trace_index": 604,
+          "status": 400
+        },
+        {
+          "trace_index": 605,
+          "status": 403
+        },
+        {
+          "trace_index": 616,
+          "status": 201
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "deferred-create-read",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "alta y replay conservan diferido",
+            "cuentas iguales o ajenas rechazadas",
+            "lector consulta y no crea",
+            "cronograma 33.33/33.33/33.34",
+            "GET ajeno 404"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "aislamiento de creación",
+        "variante ingreso",
+        "monedas y centros"
       ]
     },
     {
@@ -3164,16 +3517,65 @@
       "method": "POST",
       "endpoint": "/api/contabilidad/diferidos/devengar",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-analitica.controller.ts:137",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "existing_evidence": [
+        {
+          "trace_index": 609,
+          "status": 201
+        },
+        {
+          "trace_index": 610,
+          "status": 400
+        },
+        {
+          "trace_index": 611,
+          "status": 201
+        },
+        {
+          "trace_index": 612,
+          "status": 400
+        },
+        {
+          "trace_index": 613,
+          "status": 201
+        },
+        {
+          "trace_index": 614,
+          "status": 201
+        }
+      ],
+      "defects": [
+        {
+          "id": "depreciation-accrual-final-cent",
+          "status": "corrected_locally_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-integrated-20260930231135744-6004/http.json",
+            "observed_error": "Expected values to be strictly equal:\n\n33333 !== 33334\n",
+            "local_only": true
+          },
+          "correction": "La cuota ejecutada del último período absorbe el saldo pendiente y respeta el residual",
+          "pending": [
+            "CI del cambio",
+            "main y despliegue"
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "deferred-accrual",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "tres devengos agotan monto 100",
+            "repetición de período no duplica",
+            "tres asientos confirmados cuadrados"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "permisos e aislamiento de devengo",
+        "período cerrado",
+        "ingreso, concurrencia y moneda"
       ]
     },
     {
@@ -3182,16 +3584,37 @@
       "method": "DELETE",
       "endpoint": "/api/contabilidad/diferidos/:id",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-analitica.controller.ts:168",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 607,
+          "status": 403
+        },
+        {
+          "trace_index": 617,
+          "status": 200
+        },
+        {
+          "trace_index": 618,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "deferred-cancel",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "cancelación persiste CANCELADO",
+            "misma intención conserva estado",
+            "lector rechazado"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "aislamiento de cancelación",
+        "cancelación después de devengos parciales"
       ]
     },
     {
@@ -3199,17 +3622,125 @@
       "operation": "crearAsientoContable",
       "method": "POST",
       "endpoint": "/api/contabilidad/asiento-contable",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:33",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:35",
+      "existing_evidence": [
+        {
+          "trace_index": 558,
+          "status": 400
+        },
+        {
+          "trace_index": 559,
+          "status": 400
+        },
+        {
+          "trace_index": 560,
+          "status": 400
+        },
+        {
+          "trace_index": 561,
+          "status": 403
+        },
+        {
+          "trace_index": 562,
+          "status": 201
+        },
+        {
+          "trace_index": 563,
+          "status": 201
+        },
+        {
+          "trace_index": 564,
+          "status": 400
+        },
+        {
+          "trace_index": 582,
+          "status": 201
+        },
+        {
+          "trace_index": 602,
+          "status": 201
+        },
+        {
+          "trace_index": 630,
+          "status": 201
+        },
+        {
+          "trace_index": 636,
+          "status": 201
+        },
+        {
+          "trace_index": 642,
+          "status": 400
+        },
+        {
+          "trace_index": 653,
+          "status": 400
+        }
+      ],
+      "defects": [
+        {
+          "id": "manual-accounting-retry-duplicates",
+          "status": "corrected_locally_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-integrated-20260930225329486-9024/http.json",
+            "observed_error": "La misma intención de asiento manual debe devolver el agregado original\n+ actual - expected\n\n+ '58ca04ff-f7ac-4279-9508-77a372767c8c'\n- '46794437-b8ae-46b5-9016-6afff9c9a4da'\n",
+            "local_only": true
+          },
+          "correction": "557 y escritor manual guardan asiento e intención en una transacción; UI conserva clave tras respuesta perdida",
+          "pending": [
+            "CI del cambio",
+            "promoción 557",
+            "main y despliegue"
+          ]
+        },
+        {
+          "id": "manual-accounting-lima-boundary",
+          "status": "corrected_locally_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-integrated-20260930230932944-4760/database-contracts.log",
+            "observed_error": "VERIFY_557_CALENDAR_SHIFTED"
+          },
+          "correction": "La propuesta 557 usa zona coherente con fecha/instante durante la escritura y restaura la zona SQL previa",
+          "pending": [
+            "CI del cambio",
+            "promoción 557",
+            "fronteras de otros escritores contables"
+          ]
+        },
+        {
+          "id": "manual-accounting-default-date-utc",
+          "status": "corrected_locally_final_browser_pending",
+          "proof": {
+            "source": "artifacts/peru-integrated-20261003015814635-23596/manual-asiento-ui.pdf",
+            "observed": "PDF fechado 2026-10-03, generado 2026-10-03T02:04:49Z (2026-10-02 en Lima); AsientoForm usaba fecha UTC por defecto",
+            "local_only": true
+          },
+          "correction": "AsientoForm reutiliza fiscalDateForCountry con país del tenant; navegador contrasta fecha inicial con app.hoy_tenant",
+          "pending": [
+            "ensayo integrado completo",
+            "CI y despliegue",
+            "otras fechas por defecto fuera del formulario de asientos"
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "manual-create-retry",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "0/0 y descuadre rechazados sin asiento",
+            "cuenta ajena rechazada",
+            "lector sin crear rechazado",
+            "misma intención conserva agregado",
+            "clave incompatible rechazada"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "concurrencia de solicitudes",
+        "centro ajeno y otras validaciones de línea",
+        "monedas y fronteras de otros escritores"
       ]
     },
     {
@@ -3217,7 +3748,7 @@
       "operation": "getAsientosContables",
       "method": "GET",
       "endpoint": "/api/contabilidad/asientos-contables",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:76",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:80",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -3235,7 +3766,7 @@
       "operation": "getAsientoContablePorId",
       "method": "GET",
       "endpoint": "/api/contabilidad/asientos-contables/:id",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:128",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:132",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -3253,7 +3784,7 @@
       "operation": "listarAsientos",
       "method": "GET",
       "endpoint": "/api/contabilidad/asientos",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:164",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:168",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -3271,7 +3802,7 @@
       "operation": "obtenerEstadisticasAsientosPorTipo",
       "method": "GET",
       "endpoint": "/api/contabilidad/asientos/estadisticas/por-tipo",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:228",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:232",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -3289,17 +3820,47 @@
       "operation": "obtenerAsientoPorId",
       "method": "GET",
       "endpoint": "/api/contabilidad/asientos/:id",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:278",
-      "existing_evidence": [],
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:282",
+      "existing_evidence": [
+        {
+          "trace_index": 565,
+          "status": 200
+        },
+        {
+          "trace_index": 572,
+          "status": 200
+        },
+        {
+          "trace_index": 579,
+          "status": 404
+        },
+        {
+          "trace_index": 634,
+          "status": 200
+        },
+        {
+          "trace_index": 638,
+          "status": 404
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "manual-read-edit",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "lector consulta y no edita",
+            "borrador editado y persistido",
+            "confirmado inmutable",
+            "GET ajeno 404"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "aislamiento de PUT",
+        "búsqueda y paginación",
+        "edición de fecha y centro de costo"
       ]
     },
     {
@@ -3307,17 +3868,39 @@
       "operation": "actualizarAsiento",
       "method": "PUT",
       "endpoint": "/api/contabilidad/asientos/:id",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:317",
-      "existing_evidence": [],
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:321",
+      "existing_evidence": [
+        {
+          "trace_index": 566,
+          "status": 403
+        },
+        {
+          "trace_index": 571,
+          "status": 200
+        },
+        {
+          "trace_index": 574,
+          "status": 400
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "manual-read-edit",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "lector consulta y no edita",
+            "borrador editado y persistido",
+            "confirmado inmutable",
+            "GET ajeno 404"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "aislamiento de PUT",
+        "búsqueda y paginación",
+        "edición de fecha y centro de costo"
       ]
     },
     {
@@ -3325,17 +3908,40 @@
       "operation": "eliminarAsiento",
       "method": "DELETE",
       "endpoint": "/api/contabilidad/asientos/:id",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:351",
-      "existing_evidence": [],
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:355",
+      "existing_evidence": [
+        {
+          "trace_index": 570,
+          "status": 403
+        },
+        {
+          "trace_index": 576,
+          "status": 400
+        },
+        {
+          "trace_index": 637,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "manual-annul-delete",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "borrador anulado permanece consultable",
+            "anulado no confirma",
+            "borrador eliminado retorna 404",
+            "confirmado no se anula ni elimina",
+            "lector rechazado"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "aislamiento de estas mutaciones",
+        "error de red en UI",
+        "auditoría y concurrencia"
       ]
     },
     {
@@ -3343,17 +3949,38 @@
       "operation": "confirmarAsiento",
       "method": "POST",
       "endpoint": "/api/contabilidad/asientos/:id/confirmar",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:372",
-      "existing_evidence": [],
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:376",
+      "existing_evidence": [
+        {
+          "trace_index": 567,
+          "status": 403
+        },
+        {
+          "trace_index": 573,
+          "status": 201
+        },
+        {
+          "trace_index": 635,
+          "status": 400
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "manual-confirm",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "borrador pasa a confirmado",
+            "lector rechazado",
+            "confirmado no puede modificarse"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "aislamiento de confirmación",
+        "respuesta perdida al confirmar",
+        "cuenta desactivada entre creación y confirmación"
       ]
     },
     {
@@ -3361,17 +3988,40 @@
       "operation": "anularAsiento",
       "method": "POST",
       "endpoint": "/api/contabilidad/asientos/:id/anular",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:403",
-      "existing_evidence": [],
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:407",
+      "existing_evidence": [
+        {
+          "trace_index": 568,
+          "status": 403
+        },
+        {
+          "trace_index": 575,
+          "status": 400
+        },
+        {
+          "trace_index": 633,
+          "status": 201
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "manual-annul-delete",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "borrador anulado permanece consultable",
+            "anulado no confirma",
+            "borrador eliminado retorna 404",
+            "confirmado no se anula ni elimina",
+            "lector rechazado"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "aislamiento de estas mutaciones",
+        "error de red en UI",
+        "auditoría y concurrencia"
       ]
     },
     {
@@ -3379,17 +4029,38 @@
       "operation": "reversarAsiento",
       "method": "POST",
       "endpoint": "/api/contabilidad/asientos/:id/reversar",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:433",
-      "existing_evidence": [],
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:437",
+      "existing_evidence": [
+        {
+          "trace_index": 569,
+          "status": 403
+        },
+        {
+          "trace_index": 577,
+          "status": 201
+        },
+        {
+          "trace_index": 578,
+          "status": 400
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "manual-reverse",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "contra-asiento enlazado único",
+            "repetición rechazada sin segundo asiento",
+            "lector rechazado"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "aislamiento de reversa",
+        "período cerrado de reversa",
+        "monedas"
       ]
     },
     {
@@ -4586,17 +5257,53 @@
       "operation": "crearPeriodo",
       "method": "POST",
       "endpoint": "/api/contabilidad/periodos",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts:33",
-      "existing_evidence": [],
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts:34",
+      "existing_evidence": [
+        {
+          "trace_index": 554,
+          "status": 201
+        },
+        {
+          "trace_index": 555,
+          "status": 201
+        },
+        {
+          "trace_index": 556,
+          "status": 201
+        },
+        {
+          "trace_index": 557,
+          "status": 201
+        },
+        {
+          "trace_index": 626,
+          "status": 400
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "accounting-period-lifecycle",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "creación explícita y replay",
+            "mes inválido rechazado",
+            "lector consulta y no cierra/bloquea",
+            "período ajeno 404 en detalle/validación/cierre/bloqueo",
+            "borrador impide cerrar",
+            "cierre y replay persisten",
+            "cierre/bloqueo impiden nuevo asiento",
+            "ADMIN cliente no reabre",
+            "plataforma cambia contexto y reabre con replay"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "cierre anual y reglas de períodos anteriores",
+        "eventos pendientes y concurrencia",
+        "aislamiento de reapertura de actor autorizado"
       ]
     },
     {
@@ -4604,11 +5311,24 @@
       "operation": "obtenerPeriodos",
       "method": "GET",
       "endpoint": "/api/contabilidad/periodos",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts:75",
-      "existing_evidence": [],
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts:76",
+      "existing_evidence": [
+        {
+          "trace_index": 553,
+          "status": 200
+        },
+        {
+          "trace_index": 620,
+          "status": 200
+        },
+        {
+          "trace_index": 650,
+          "status": 200
+        }
+      ],
       "defects": [],
       "verified_cases": [],
-      "result": "pending_functional_execution",
+      "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
         "persistencia y resultado funcional",
         "permisos",
@@ -4622,17 +5342,63 @@
       "operation": "obtenerPeriodoPorId",
       "method": "GET",
       "endpoint": "/api/contabilidad/periodos/:id",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts:103",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts:104",
+      "existing_evidence": [
+        {
+          "trace_index": 621,
+          "status": 200
+        },
+        {
+          "trace_index": 622,
+          "status": 404
+        },
+        {
+          "trace_index": 632,
+          "status": 200
+        },
+        {
+          "trace_index": 644,
+          "status": 200
+        }
+      ],
+      "defects": [
+        {
+          "id": "foreign-accounting-period-http-errors",
+          "status": "corrected_locally_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-period-foreign-defect-20260930.json",
+            "observed": "Detalle ajeno 200; validar/cerrar/bloquear 500; cuatro operaciones reproducidas localmente"
+          },
+          "correction": "404 para registro inexistente o ajeno; se conservan errores operativos de DB",
+          "pending": [
+            "CI del cambio",
+            "main y despliegue"
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "accounting-period-lifecycle",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "creación explícita y replay",
+            "mes inválido rechazado",
+            "lector consulta y no cierra/bloquea",
+            "período ajeno 404 en detalle/validación/cierre/bloqueo",
+            "borrador impide cerrar",
+            "cierre y replay persisten",
+            "cierre/bloqueo impiden nuevo asiento",
+            "ADMIN cliente no reabre",
+            "plataforma cambia contexto y reabre con replay"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "cierre anual y reglas de períodos anteriores",
+        "eventos pendientes y concurrencia",
+        "aislamiento de reapertura de actor autorizado"
       ]
     },
     {
@@ -4640,17 +5406,55 @@
       "operation": "validarCierrePeriodo",
       "method": "GET",
       "endpoint": "/api/contabilidad/periodos/:id/validar-cierre",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts:150",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts:151",
+      "existing_evidence": [
+        {
+          "trace_index": 623,
+          "status": 404
+        },
+        {
+          "trace_index": 639,
+          "status": 200
+        }
+      ],
+      "defects": [
+        {
+          "id": "foreign-accounting-period-http-errors",
+          "status": "corrected_locally_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-period-foreign-defect-20260930.json",
+            "observed": "Detalle ajeno 200; validar/cerrar/bloquear 500; cuatro operaciones reproducidas localmente"
+          },
+          "correction": "404 para registro inexistente o ajeno; se conservan errores operativos de DB",
+          "pending": [
+            "CI del cambio",
+            "main y despliegue"
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "accounting-period-lifecycle",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "creación explícita y replay",
+            "mes inválido rechazado",
+            "lector consulta y no cierra/bloquea",
+            "período ajeno 404 en detalle/validación/cierre/bloqueo",
+            "borrador impide cerrar",
+            "cierre y replay persisten",
+            "cierre/bloqueo impiden nuevo asiento",
+            "ADMIN cliente no reabre",
+            "plataforma cambia contexto y reabre con replay"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "cierre anual y reglas de períodos anteriores",
+        "eventos pendientes y concurrencia",
+        "aislamiento de reapertura de actor autorizado"
       ]
     },
     {
@@ -4658,17 +5462,71 @@
       "operation": "cerrarPeriodo",
       "method": "POST",
       "endpoint": "/api/contabilidad/periodos/:id/cerrar",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts:216",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts:220",
+      "existing_evidence": [
+        {
+          "trace_index": 624,
+          "status": 404
+        },
+        {
+          "trace_index": 627,
+          "status": 403
+        },
+        {
+          "trace_index": 631,
+          "status": 400
+        },
+        {
+          "trace_index": 640,
+          "status": 201
+        },
+        {
+          "trace_index": 641,
+          "status": 201
+        },
+        {
+          "trace_index": 648,
+          "status": 201
+        }
+      ],
+      "defects": [
+        {
+          "id": "foreign-accounting-period-http-errors",
+          "status": "corrected_locally_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-period-foreign-defect-20260930.json",
+            "observed": "Detalle ajeno 200; validar/cerrar/bloquear 500; cuatro operaciones reproducidas localmente"
+          },
+          "correction": "404 para registro inexistente o ajeno; se conservan errores operativos de DB",
+          "pending": [
+            "CI del cambio",
+            "main y despliegue"
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "accounting-period-lifecycle",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "creación explícita y replay",
+            "mes inválido rechazado",
+            "lector consulta y no cierra/bloquea",
+            "período ajeno 404 en detalle/validación/cierre/bloqueo",
+            "borrador impide cerrar",
+            "cierre y replay persisten",
+            "cierre/bloqueo impiden nuevo asiento",
+            "ADMIN cliente no reabre",
+            "plataforma cambia contexto y reabre con replay"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "cierre anual y reglas de períodos anteriores",
+        "eventos pendientes y concurrencia",
+        "aislamiento de reapertura de actor autorizado"
       ]
     },
     {
@@ -4676,7 +5534,7 @@
       "operation": "provisionarCobranzaDudosa",
       "method": "POST",
       "endpoint": "/api/contabilidad/periodos/:periodo/provision-cobranza-dudosa",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts:276",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts:283",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -4694,17 +5552,81 @@
       "operation": "reabrirPeriodo",
       "method": "POST",
       "endpoint": "/api/contabilidad/periodos/:id/reabrir",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts:305",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts:312",
+      "existing_evidence": [
+        {
+          "trace_index": 629,
+          "status": 403
+        },
+        {
+          "trace_index": 643,
+          "status": 403
+        },
+        {
+          "trace_index": 646,
+          "status": 201
+        },
+        {
+          "trace_index": 647,
+          "status": 201
+        },
+        {
+          "trace_index": 654,
+          "status": 201
+        }
+      ],
+      "defects": [
+        {
+          "id": "foreign-accounting-period-http-errors",
+          "status": "corrected_locally_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-period-foreign-defect-20260930.json",
+            "observed": "Detalle ajeno 200; validar/cerrar/bloquear 500; cuatro operaciones reproducidas localmente"
+          },
+          "correction": "404 para registro inexistente o ajeno; se conservan errores operativos de DB",
+          "pending": [
+            "CI del cambio",
+            "main y despliegue"
+          ]
+        },
+        {
+          "id": "platform-accounting-period-reopen",
+          "status": "corrected_locally_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-integrated-20260930233445013-9812/http.json",
+            "observed_error": "contabilidad/periodos/a5ad056e-4a90-43f1-a4db-0b341d3eeb2d/reabrir: HTTP 400; ACCOUNTING_ACTOR_NOT_ACTIVE_IN_TENANT\n\n400 !== 201\n",
+            "local_only": true
+          },
+          "correction": "557 añade una RPC de reapertura con validación explícita de superadministrador activo, identidad conservada y locks/reglas originales",
+          "pending": [
+            "CI y promoción 557",
+            "main y despliegue"
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "accounting-period-lifecycle",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "creación explícita y replay",
+            "mes inválido rechazado",
+            "lector consulta y no cierra/bloquea",
+            "período ajeno 404 en detalle/validación/cierre/bloqueo",
+            "borrador impide cerrar",
+            "cierre y replay persisten",
+            "cierre/bloqueo impiden nuevo asiento",
+            "ADMIN cliente no reabre",
+            "plataforma cambia contexto y reabre con replay"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "cierre anual y reglas de períodos anteriores",
+        "eventos pendientes y concurrencia",
+        "aislamiento de reapertura de actor autorizado"
       ]
     },
     {
@@ -4712,17 +5634,67 @@
       "operation": "bloquearPeriodo",
       "method": "POST",
       "endpoint": "/api/contabilidad/periodos/:id/bloquear",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts:372",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts:382",
+      "existing_evidence": [
+        {
+          "trace_index": 625,
+          "status": 404
+        },
+        {
+          "trace_index": 628,
+          "status": 403
+        },
+        {
+          "trace_index": 649,
+          "status": 400
+        },
+        {
+          "trace_index": 651,
+          "status": 201
+        },
+        {
+          "trace_index": 652,
+          "status": 201
+        }
+      ],
+      "defects": [
+        {
+          "id": "foreign-accounting-period-http-errors",
+          "status": "corrected_locally_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-period-foreign-defect-20260930.json",
+            "observed": "Detalle ajeno 200; validar/cerrar/bloquear 500; cuatro operaciones reproducidas localmente"
+          },
+          "correction": "404 para registro inexistente o ajeno; se conservan errores operativos de DB",
+          "pending": [
+            "CI del cambio",
+            "main y despliegue"
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "accounting-period-lifecycle",
+          "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+          "verified_checks": [
+            "creación explícita y replay",
+            "mes inválido rechazado",
+            "lector consulta y no cierra/bloquea",
+            "período ajeno 404 en detalle/validación/cierre/bloqueo",
+            "borrador impide cerrar",
+            "cierre y replay persisten",
+            "cierre/bloqueo impiden nuevo asiento",
+            "ADMIN cliente no reabre",
+            "plataforma cambia contexto y reabre con replay"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI",
+        "cierre anual y reglas de períodos anteriores",
+        "eventos pendientes y concurrencia",
+        "aislamiento de reapertura de actor autorizado"
       ]
     },
     {
@@ -4730,7 +5702,7 @@
       "operation": "realizarCierreContable",
       "method": "POST",
       "endpoint": "/api/contabilidad/cierre-contable",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts:431",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-periodos.controller.ts:444",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8136,14 +9108,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "inventory-master-create-edit",
+          "source": "scripts/ci/test-peru-inventory-lifecycle.mjs",
+          "verified_checks": [
+            "altas/replay conservan ID",
+            "precio negativo y código duplicado rechazan",
+            "edición de marca/precio y nombre de categoría persiste",
+            "producto mantiene categoría renombrada y filtro devuelve sólo el tenant"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "CRUD desde UI",
+        "foto y Storage local",
+        "validaciones de todas las unidades/impuestos",
+        "permisos de categoría/almacén"
       ]
     },
     {
@@ -8159,14 +9141,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "inventory-logical-deactivation",
+          "source": "scripts/ci/test-peru-inventory-lifecycle.mjs",
+          "verified_checks": [
+            "bajas con saldo/dependencias rechazan",
+            "producto vacío queda inactivo tras replay",
+            "ubicación y almacén vacíos permiten baja",
+            "almacén se reactiva y vuelve al listado",
+            "lector y escritura de producto ajeno no mutan"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "bajas/reactivación por UI",
+        "reactivación de producto/categoría",
+        "permisos y tenant de cada mutación de ubicación/almacén"
       ]
     },
     {
@@ -8194,14 +9186,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "inventory-logical-deactivation",
+          "source": "scripts/ci/test-peru-inventory-lifecycle.mjs",
+          "verified_checks": [
+            "bajas con saldo/dependencias rechazan",
+            "producto vacío queda inactivo tras replay",
+            "ubicación y almacén vacíos permiten baja",
+            "almacén se reactiva y vuelve al listado",
+            "lector y escritura de producto ajeno no mutan"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "bajas/reactivación por UI",
+        "reactivación de producto/categoría",
+        "permisos y tenant de cada mutación de ubicación/almacén"
       ]
     },
     {
@@ -8239,14 +9241,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "inventory-logical-deactivation",
+          "source": "scripts/ci/test-peru-inventory-lifecycle.mjs",
+          "verified_checks": [
+            "bajas con saldo/dependencias rechazan",
+            "producto vacío queda inactivo tras replay",
+            "ubicación y almacén vacíos permiten baja",
+            "almacén se reactiva y vuelve al listado",
+            "lector y escritura de producto ajeno no mutan"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "bajas/reactivación por UI",
+        "reactivación de producto/categoría",
+        "permisos y tenant de cada mutación de ubicación/almacén"
       ]
     },
     {
@@ -8280,14 +9292,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "inventory-logical-deactivation",
+          "source": "scripts/ci/test-peru-inventory-lifecycle.mjs",
+          "verified_checks": [
+            "bajas con saldo/dependencias rechazan",
+            "producto vacío queda inactivo tras replay",
+            "ubicación y almacén vacíos permiten baja",
+            "almacén se reactiva y vuelve al listado",
+            "lector y escritura de producto ajeno no mutan"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "bajas/reactivación por UI",
+        "reactivación de producto/categoría",
+        "permisos y tenant de cada mutación de ubicación/almacén"
       ]
     },
     {
@@ -8352,14 +9374,25 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "inventory-adjust-transfer-kardex",
+          "source": "scripts/ci/test-peru-inventory-lifecycle.mjs",
+          "verified_checks": [
+            "cantidades decimales y replay mantienen existencias/ledger",
+            "cero, insuficiencia, almacén igual y clave con otro payload rechazan sin mutar",
+            "kardex filtrado por producto/almacén; ajeno vacío",
+            "lector no ajusta ni transfiere; referencias ajenas no mutan",
+            "sobrante/faltante generan asientos únicos/cuadrados; consumo repetido no duplica"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "paginación/exportación de kardex",
+        "transferencia entre sucursales",
+        "concurrencia de varias intenciones",
+        "todas las monedas/costos"
       ]
     },
     {
@@ -8397,14 +9430,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "inventory-master-create-edit",
+          "source": "scripts/ci/test-peru-inventory-lifecycle.mjs",
+          "verified_checks": [
+            "altas/replay conservan ID",
+            "precio negativo y código duplicado rechazan",
+            "edición de marca/precio y nombre de categoría persiste",
+            "producto mantiene categoría renombrada y filtro devuelve sólo el tenant"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "CRUD desde UI",
+        "foto y Storage local",
+        "validaciones de todas las unidades/impuestos",
+        "permisos de categoría/almacén"
       ]
     },
     {
@@ -8456,14 +9499,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "inventory-master-create-edit",
+          "source": "scripts/ci/test-peru-inventory-lifecycle.mjs",
+          "verified_checks": [
+            "altas/replay conservan ID",
+            "precio negativo y código duplicado rechazan",
+            "edición de marca/precio y nombre de categoría persiste",
+            "producto mantiene categoría renombrada y filtro devuelve sólo el tenant"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "CRUD desde UI",
+        "foto y Storage local",
+        "validaciones de todas las unidades/impuestos",
+        "permisos de categoría/almacén"
       ]
     },
     {
@@ -8525,14 +9578,25 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "inventory-adjust-transfer-kardex",
+          "source": "scripts/ci/test-peru-inventory-lifecycle.mjs",
+          "verified_checks": [
+            "cantidades decimales y replay mantienen existencias/ledger",
+            "cero, insuficiencia, almacén igual y clave con otro payload rechazan sin mutar",
+            "kardex filtrado por producto/almacén; ajeno vacío",
+            "lector no ajusta ni transfiere; referencias ajenas no mutan",
+            "sobrante/faltante generan asientos únicos/cuadrados; consumo repetido no duplica"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "paginación/exportación de kardex",
+        "transferencia entre sucursales",
+        "concurrencia de varias intenciones",
+        "todas las monedas/costos"
       ]
     },
     {
@@ -8572,14 +9636,25 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "inventory-adjust-transfer-kardex",
+          "source": "scripts/ci/test-peru-inventory-lifecycle.mjs",
+          "verified_checks": [
+            "cantidades decimales y replay mantienen existencias/ledger",
+            "cero, insuficiencia, almacén igual y clave con otro payload rechazan sin mutar",
+            "kardex filtrado por producto/almacén; ajeno vacío",
+            "lector no ajusta ni transfiere; referencias ajenas no mutan",
+            "sobrante/faltante generan asientos únicos/cuadrados; consumo repetido no duplica"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "paginación/exportación de kardex",
+        "transferencia entre sucursales",
+        "concurrencia de varias intenciones",
+        "todas las monedas/costos"
       ]
     },
     {
@@ -8611,14 +9686,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "inventory-master-create-edit",
+          "source": "scripts/ci/test-peru-inventory-lifecycle.mjs",
+          "verified_checks": [
+            "altas/replay conservan ID",
+            "precio negativo y código duplicado rechazan",
+            "edición de marca/precio y nombre de categoría persiste",
+            "producto mantiene categoría renombrada y filtro devuelve sólo el tenant"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "CRUD desde UI",
+        "foto y Storage local",
+        "validaciones de todas las unidades/impuestos",
+        "permisos de categoría/almacén"
       ]
     },
     {
@@ -8646,14 +9731,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "inventory-logical-deactivation",
+          "source": "scripts/ci/test-peru-inventory-lifecycle.mjs",
+          "verified_checks": [
+            "bajas con saldo/dependencias rechazan",
+            "producto vacío queda inactivo tras replay",
+            "ubicación y almacén vacíos permiten baja",
+            "almacén se reactiva y vuelve al listado",
+            "lector y escritura de producto ajeno no mutan"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "bajas/reactivación por UI",
+        "reactivación de producto/categoría",
+        "permisos y tenant de cada mutación de ubicación/almacén"
       ]
     },
     {
@@ -8681,14 +9776,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "inventory-master-create-edit",
+          "source": "scripts/ci/test-peru-inventory-lifecycle.mjs",
+          "verified_checks": [
+            "altas/replay conservan ID",
+            "precio negativo y código duplicado rechazan",
+            "edición de marca/precio y nombre de categoría persiste",
+            "producto mantiene categoría renombrada y filtro devuelve sólo el tenant"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "CRUD desde UI",
+        "foto y Storage local",
+        "validaciones de todas las unidades/impuestos",
+        "permisos de categoría/almacén"
       ]
     },
     {
@@ -8779,14 +9884,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "inventory-master-create-edit",
+          "source": "scripts/ci/test-peru-inventory-lifecycle.mjs",
+          "verified_checks": [
+            "altas/replay conservan ID",
+            "precio negativo y código duplicado rechazan",
+            "edición de marca/precio y nombre de categoría persiste",
+            "producto mantiene categoría renombrada y filtro devuelve sólo el tenant"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "CRUD desde UI",
+        "foto y Storage local",
+        "validaciones de todas las unidades/impuestos",
+        "permisos de categoría/almacén"
       ]
     },
     {
@@ -8802,14 +9917,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "inventory-master-create-edit",
+          "source": "scripts/ci/test-peru-inventory-lifecycle.mjs",
+          "verified_checks": [
+            "altas/replay conservan ID",
+            "precio negativo y código duplicado rechazan",
+            "edición de marca/precio y nombre de categoría persiste",
+            "producto mantiene categoría renombrada y filtro devuelve sólo el tenant"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "CRUD desde UI",
+        "foto y Storage local",
+        "validaciones de todas las unidades/impuestos",
+        "permisos de categoría/almacén"
       ]
     },
     {
@@ -8825,14 +9950,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "inventory-logical-deactivation",
+          "source": "scripts/ci/test-peru-inventory-lifecycle.mjs",
+          "verified_checks": [
+            "bajas con saldo/dependencias rechazan",
+            "producto vacío queda inactivo tras replay",
+            "ubicación y almacén vacíos permiten baja",
+            "almacén se reactiva y vuelve al listado",
+            "lector y escritura de producto ajeno no mutan"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "bajas/reactivación por UI",
+        "reactivación de producto/categoría",
+        "permisos y tenant de cada mutación de ubicación/almacén"
       ]
     },
     {
@@ -9194,14 +10329,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "clientes-csv-import",
+          "source": "scripts/ci/test-peru-integrated-import.mjs",
+          "verified_checks": [
+            "dry-run no persiste ni crea run",
+            "fila válida persiste y fila inválida queda en bitácora parcial",
+            "replay no duplica maestro",
+            "run ajeno oculto"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "escala de archivos",
+        "todas las columnas opcionales",
+        "permisos negativos de importación",
+        "fallos durante una importación larga"
       ]
     },
     {
@@ -9225,14 +10370,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "proveedores-csv-import",
+          "source": "scripts/ci/test-peru-integrated-import.mjs",
+          "verified_checks": [
+            "dry-run no persiste ni crea run",
+            "fila válida persiste y fila inválida queda en bitácora parcial",
+            "replay no duplica maestro",
+            "run ajeno oculto"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "escala de archivos",
+        "todas las columnas opcionales",
+        "permisos negativos de importación",
+        "fallos durante una importación larga"
       ]
     },
     {
@@ -9419,14 +10574,34 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "clientes-csv-import",
+          "source": "scripts/ci/test-peru-integrated-import.mjs",
+          "verified_checks": [
+            "dry-run no persiste ni crea run",
+            "fila válida persiste y fila inválida queda en bitácora parcial",
+            "replay no duplica maestro",
+            "run ajeno oculto"
+          ]
+        },
+        {
+          "id": "proveedores-csv-import",
+          "source": "scripts/ci/test-peru-integrated-import.mjs",
+          "verified_checks": [
+            "dry-run no persiste ni crea run",
+            "fila válida persiste y fila inválida queda en bitácora parcial",
+            "replay no duplica maestro",
+            "run ajeno oculto"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "escala de archivos",
+        "todas las columnas opcionales",
+        "permisos negativos de importación",
+        "fallos durante una importación larga"
       ]
     },
     {
@@ -9482,14 +10657,34 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "clientes-csv-import",
+          "source": "scripts/ci/test-peru-integrated-import.mjs",
+          "verified_checks": [
+            "dry-run no persiste ni crea run",
+            "fila válida persiste y fila inválida queda en bitácora parcial",
+            "replay no duplica maestro",
+            "run ajeno oculto"
+          ]
+        },
+        {
+          "id": "proveedores-csv-import",
+          "source": "scripts/ci/test-peru-integrated-import.mjs",
+          "verified_checks": [
+            "dry-run no persiste ni crea run",
+            "fila válida persiste y fila inválida queda en bitácora parcial",
+            "replay no duplica maestro",
+            "run ajeno oculto"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "escala de archivos",
+        "todas las columnas opcionales",
+        "permisos negativos de importación",
+        "fallos durante una importación larga"
       ]
     },
     {
@@ -9829,14 +11024,27 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "first-customer-user-role-lifecycle",
+          "source": "scripts/ci/test-peru-master-lifecycle.mjs",
+          "verified_checks": [
+            "altas/replay conservan ID",
+            "edición consultada persistida",
+            "búsqueda por email/dominio y entrada con comillas no filtran otro tenant",
+            "hash de contraseña no expuesto",
+            "identidades ajenas 404",
+            "rol único activo protegido",
+            "baja de usuario revoca sesión antes de baja del rol"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "CRUD UI",
+        "asignaciones y revocaciones individuales de permisos/roles",
+        "reactivación y reset de contraseña",
+        "permisos negativos de cada mutación"
       ]
     },
     {
@@ -9861,17 +11069,34 @@
         {
           "trace_index": 536,
           "status": 201
+        },
+        {
+          "trace_index": 550,
+          "status": 201
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "first-customer-user-role-lifecycle",
+          "source": "scripts/ci/test-peru-master-lifecycle.mjs",
+          "verified_checks": [
+            "altas/replay conservan ID",
+            "edición consultada persistida",
+            "búsqueda por email/dominio y entrada con comillas no filtran otro tenant",
+            "hash de contraseña no expuesto",
+            "identidades ajenas 404",
+            "rol único activo protegido",
+            "baja de usuario revoca sesión antes de baja del rol"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "CRUD UI",
+        "asignaciones y revocaciones individuales de permisos/roles",
+        "reactivación y reset de contraseña",
+        "permisos negativos de cada mutación"
       ]
     },
     {
@@ -9887,14 +11112,27 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "first-customer-user-role-lifecycle",
+          "source": "scripts/ci/test-peru-master-lifecycle.mjs",
+          "verified_checks": [
+            "altas/replay conservan ID",
+            "edición consultada persistida",
+            "búsqueda por email/dominio y entrada con comillas no filtran otro tenant",
+            "hash de contraseña no expuesto",
+            "identidades ajenas 404",
+            "rol único activo protegido",
+            "baja de usuario revoca sesión antes de baja del rol"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "CRUD UI",
+        "asignaciones y revocaciones individuales de permisos/roles",
+        "reactivación y reset de contraseña",
+        "permisos negativos de cada mutación"
       ]
     },
     {
@@ -9914,14 +11152,27 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "first-customer-user-role-lifecycle",
+          "source": "scripts/ci/test-peru-master-lifecycle.mjs",
+          "verified_checks": [
+            "altas/replay conservan ID",
+            "edición consultada persistida",
+            "búsqueda por email/dominio y entrada con comillas no filtran otro tenant",
+            "hash de contraseña no expuesto",
+            "identidades ajenas 404",
+            "rol único activo protegido",
+            "baja de usuario revoca sesión antes de baja del rol"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "CRUD UI",
+        "asignaciones y revocaciones individuales de permisos/roles",
+        "reactivación y reset de contraseña",
+        "permisos negativos de cada mutación"
       ]
     },
     {
@@ -12553,14 +13804,23 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "first-customer-creation",
+          "source": "scripts/ci/test-peru-onboarding-local.mjs",
+          "verified_checks": [
+            "empresa no demo y ADMIN sin privilegio global persistidos",
+            "replay devuelve mismo tenant",
+            "login y catálogo inicial de cuentas/conceptos laborales"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "alta desde UI",
+        "validaciones de todos los campos",
+        "correo externo",
+        "lector y creación cruzada"
       ]
     },
     {
@@ -13070,14 +14330,27 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "first-customer-user-role-lifecycle",
+          "source": "scripts/ci/test-peru-master-lifecycle.mjs",
+          "verified_checks": [
+            "altas/replay conservan ID",
+            "edición consultada persistida",
+            "búsqueda por email/dominio y entrada con comillas no filtran otro tenant",
+            "hash de contraseña no expuesto",
+            "identidades ajenas 404",
+            "rol único activo protegido",
+            "baja de usuario revoca sesión antes de baja del rol"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "CRUD UI",
+        "asignaciones y revocaciones individuales de permisos/roles",
+        "reactivación y reset de contraseña",
+        "permisos negativos de cada mutación"
       ]
     },
     {
@@ -13097,14 +14370,27 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "first-customer-user-role-lifecycle",
+          "source": "scripts/ci/test-peru-master-lifecycle.mjs",
+          "verified_checks": [
+            "altas/replay conservan ID",
+            "edición consultada persistida",
+            "búsqueda por email/dominio y entrada con comillas no filtran otro tenant",
+            "hash de contraseña no expuesto",
+            "identidades ajenas 404",
+            "rol único activo protegido",
+            "baja de usuario revoca sesión antes de baja del rol"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "CRUD UI",
+        "asignaciones y revocaciones individuales de permisos/roles",
+        "reactivación y reset de contraseña",
+        "permisos negativos de cada mutación"
       ]
     },
     {
@@ -13129,17 +14415,34 @@
         {
           "trace_index": 537,
           "status": 201
+        },
+        {
+          "trace_index": 551,
+          "status": 201
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "first-customer-user-role-lifecycle",
+          "source": "scripts/ci/test-peru-master-lifecycle.mjs",
+          "verified_checks": [
+            "altas/replay conservan ID",
+            "edición consultada persistida",
+            "búsqueda por email/dominio y entrada con comillas no filtran otro tenant",
+            "hash de contraseña no expuesto",
+            "identidades ajenas 404",
+            "rol único activo protegido",
+            "baja de usuario revoca sesión antes de baja del rol"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "CRUD UI",
+        "asignaciones y revocaciones individuales de permisos/roles",
+        "reactivación y reset de contraseña",
+        "permisos negativos de cada mutación"
       ]
     },
     {
@@ -13155,14 +14458,27 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "first-customer-user-role-lifecycle",
+          "source": "scripts/ci/test-peru-master-lifecycle.mjs",
+          "verified_checks": [
+            "altas/replay conservan ID",
+            "edición consultada persistida",
+            "búsqueda por email/dominio y entrada con comillas no filtran otro tenant",
+            "hash de contraseña no expuesto",
+            "identidades ajenas 404",
+            "rol único activo protegido",
+            "baja de usuario revoca sesión antes de baja del rol"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "CRUD UI",
+        "asignaciones y revocaciones individuales de permisos/roles",
+        "reactivación y reset de contraseña",
+        "permisos negativos de cada mutación"
       ]
     },
     {
@@ -13178,14 +14494,27 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "first-customer-user-role-lifecycle",
+          "source": "scripts/ci/test-peru-master-lifecycle.mjs",
+          "verified_checks": [
+            "altas/replay conservan ID",
+            "edición consultada persistida",
+            "búsqueda por email/dominio y entrada con comillas no filtran otro tenant",
+            "hash de contraseña no expuesto",
+            "identidades ajenas 404",
+            "rol único activo protegido",
+            "baja de usuario revoca sesión antes de baja del rol"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "CRUD UI",
+        "asignaciones y revocaciones individuales de permisos/roles",
+        "reactivación y reset de contraseña",
+        "permisos negativos de cada mutación"
       ]
     },
     {
@@ -13435,14 +14764,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "clientes-edit-search",
+          "source": "scripts/ci/test-peru-integrated-import.mjs",
+          "verified_checks": [
+            "email inválido rechaza antes de escribir",
+            "nombre/email editados coinciden en API y DB",
+            "búsqueda por nombre nuevo devuelve ID",
+            "lectura/escritura ajenas 404"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "variantes documentales",
+        "combinaciones de filtros/paginación",
+        "búsqueda con caracteres especiales",
+        "permisos adicionales"
       ]
     },
     {
@@ -13470,14 +14809,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "clientes-master-lifecycle",
+          "source": "scripts/ci/test-peru-master-lifecycle.mjs",
+          "verified_checks": [
+            "lector consulta y no crea/edita/desactiva",
+            "baja ajena 404 sin mutación",
+            "identidad repetida conserva ID; duplicada rechaza",
+            "baja lógica con/sin deuda mantiene filas y saldos",
+            "replay produce una auditoría"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "reactivación si se ofrece",
+        "variantes fiscales/tipos documentales",
+        "permisos de todos los roles"
       ]
     },
     {
@@ -13509,14 +14858,38 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "clientes-master-lifecycle",
+          "source": "scripts/ci/test-peru-master-lifecycle.mjs",
+          "verified_checks": [
+            "lector consulta y no crea/edita/desactiva",
+            "baja ajena 404 sin mutación",
+            "identidad repetida conserva ID; duplicada rechaza",
+            "baja lógica con/sin deuda mantiene filas y saldos",
+            "replay produce una auditoría"
+          ]
+        },
+        {
+          "id": "clientes-edit-search",
+          "source": "scripts/ci/test-peru-integrated-import.mjs",
+          "verified_checks": [
+            "email inválido rechaza antes de escribir",
+            "nombre/email editados coinciden en API y DB",
+            "búsqueda por nombre nuevo devuelve ID",
+            "lectura/escritura ajenas 404"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "reactivación si se ofrece",
+        "variantes fiscales/tipos documentales",
+        "permisos de todos los roles",
+        "variantes documentales",
+        "combinaciones de filtros/paginación",
+        "búsqueda con caracteres especiales",
+        "permisos adicionales"
       ]
     },
     {
@@ -13548,14 +14921,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "clientes-edit-search",
+          "source": "scripts/ci/test-peru-integrated-import.mjs",
+          "verified_checks": [
+            "email inválido rechaza antes de escribir",
+            "nombre/email editados coinciden en API y DB",
+            "búsqueda por nombre nuevo devuelve ID",
+            "lectura/escritura ajenas 404"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "variantes documentales",
+        "combinaciones de filtros/paginación",
+        "búsqueda con caracteres especiales",
+        "permisos adicionales"
       ]
     },
     {
@@ -13591,14 +14974,24 @@
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "clientes-master-lifecycle",
+          "source": "scripts/ci/test-peru-master-lifecycle.mjs",
+          "verified_checks": [
+            "lector consulta y no crea/edita/desactiva",
+            "baja ajena 404 sin mutación",
+            "identidad repetida conserva ID; duplicada rechaza",
+            "baja lógica con/sin deuda mantiene filas y saldos",
+            "replay produce una auditoría"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "reactivación si se ofrece",
+        "variantes fiscales/tipos documentales",
+        "permisos de todos los roles"
       ]
     },
     {

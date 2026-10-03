@@ -4,42 +4,935 @@
     {
       "id": "rma-paid-partial-receipt-reversal",
       "source": "scripts/ci/test-peru-paid-rma.mjs",
-      "required_scenario_prefixes": ["RMA pagada: recepción parcial", "RMA pagada: lector no reembolsa"],
-      "operations": [{ "method": "POST", "endpoint": "/api/ventas/rma/:id/revertir-recepcion" }],
-      "verified_checks": ["stock persistido", "reversión previa a NC y replay", "lector rechazado", "reversión posterior a NC bloqueada sin mutar"],
-      "pending_checks": ["UI", "aislamiento de esta mutación", "variantes de servicio y varias líneas"]
+      "required_scenario_prefixes": [
+        "RMA pagada: recepción parcial",
+        "RMA pagada: lector no reembolsa"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/rma/:id/revertir-recepcion"
+        }
+      ],
+      "verified_checks": [
+        "stock persistido",
+        "reversión previa a NC y replay",
+        "lector rechazado",
+        "reversión posterior a NC bloqueada sin mutar"
+      ],
+      "pending_checks": [
+        "UI",
+        "aislamiento de esta mutación",
+        "variantes de servicio y varias líneas"
+      ]
     },
     {
       "id": "rma-paid-credit-note",
       "source": "scripts/ci/test-peru-paid-rma.mjs",
-      "required_scenario_prefixes": ["RMA pagada: recepción parcial", "RMA pagada: saldo se aplica"],
-      "operations": [{ "method": "POST", "endpoint": "/api/ventas/rma/:id/nota-credito" }],
-      "verified_checks": ["recepción parcial bloquea NC", "NC de factura pagada genera crédito", "replay conserva un documento", "cuenta 122 y asiento único cuadrado"],
-      "pending_checks": ["UI", "permisos e aislamiento de emisión", "otras variantes fiscales", "transmisión externa", "impresión/XML"]
+      "required_scenario_prefixes": [
+        "RMA pagada: recepción parcial",
+        "RMA pagada: saldo se aplica"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/rma/:id/nota-credito"
+        }
+      ],
+      "verified_checks": [
+        "recepción parcial bloquea NC",
+        "NC de factura pagada genera crédito",
+        "replay conserva un documento",
+        "cuenta 122 y asiento único cuadrado"
+      ],
+      "pending_checks": [
+        "UI",
+        "permisos e aislamiento de emisión",
+        "otras variantes fiscales",
+        "transmisión externa",
+        "impresión/XML"
+      ]
     },
     {
       "id": "rma-paid-refund-bank-cash",
       "source": "scripts/ci/test-peru-paid-rma.mjs",
-      "required_scenario_prefixes": ["RMA pagada: lector no reembolsa", "RMA pagada: nota genera saldo", "RMA pagada: reembolso en caja", "RMA pagada: saldo se aplica"],
-      "operations": [{ "method": "POST", "endpoint": "/api/ventas/rma/saldos-favor/:id/reembolsar" }],
-      "verified_checks": ["crédito, banco y caja persistidos", "lector rechazado", "tenant ajeno y UUID inexistente devuelven el mismo error sin mutar", "exceso rechazado", "replay conserva movimiento y asiento único cuadrado"],
-      "pending_checks": ["UI de reembolso en caja", "variantes de moneda", "otras validaciones de medios"]
+      "required_scenario_prefixes": [
+        "RMA pagada: lector no reembolsa",
+        "RMA pagada: nota genera saldo",
+        "RMA pagada: reembolso en caja",
+        "RMA pagada: saldo se aplica"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/rma/saldos-favor/:id/reembolsar"
+        }
+      ],
+      "verified_checks": [
+        "crédito, banco y caja persistidos",
+        "lector rechazado",
+        "tenant ajeno y UUID inexistente devuelven el mismo error sin mutar",
+        "exceso rechazado",
+        "replay conserva movimiento y asiento único cuadrado"
+      ],
+      "pending_checks": [
+        "UI de reembolso en caja",
+        "variantes de moneda",
+        "otras validaciones de medios"
+      ]
     },
     {
       "id": "rma-paid-refund-reversal",
       "source": "scripts/ci/test-peru-paid-rma.mjs",
-      "required_scenario_prefixes": ["RMA pagada: nota genera saldo", "RMA pagada: reembolso en caja", "RMA pagada: saldo se aplica"],
-      "operations": [{ "method": "POST", "endpoint": "/api/ventas/rma/saldos-favor/:id/reembolsos/:movimientoId/revertir" }],
-      "verified_checks": ["restauración de crédito, banco y caja", "replay conserva reversa única", "contra-asiento 122 único cuadrado"],
-      "pending_checks": ["UI", "permisos e aislamiento de esta mutación", "validaciones de sesión y período"]
+      "required_scenario_prefixes": [
+        "RMA pagada: nota genera saldo",
+        "RMA pagada: reembolso en caja",
+        "RMA pagada: saldo se aplica"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/rma/saldos-favor/:id/reembolsos/:movimientoId/revertir"
+        }
+      ],
+      "verified_checks": [
+        "restauración de crédito, banco y caja",
+        "replay conserva reversa única",
+        "contra-asiento 122 único cuadrado"
+      ],
+      "pending_checks": [
+        "UI",
+        "permisos e aislamiento de esta mutación",
+        "validaciones de sesión y período"
+      ]
     },
     {
       "id": "rma-paid-apply-future-cxc",
       "source": "scripts/ci/test-peru-paid-rma.mjs",
-      "required_scenario_prefixes": ["RMA pagada: saldo se aplica"],
-      "operations": [{ "method": "POST", "endpoint": "/api/ventas/rma/saldos-favor/:id/aplicar" }],
-      "verified_checks": ["crédito y CxC futura persisten", "lector rechazado", "replay no fabrica cobro ni movimiento bancario", "asiento 122 único cuadrado"],
-      "pending_checks": ["UI", "aislamiento de esta mutación", "cuenta ajena, moneda y exceso"]
+      "required_scenario_prefixes": [
+        "RMA pagada: saldo se aplica"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/rma/saldos-favor/:id/aplicar"
+        }
+      ],
+      "verified_checks": [
+        "crédito y CxC futura persisten",
+        "lector rechazado",
+        "replay no fabrica cobro ni movimiento bancario",
+        "asiento 122 único cuadrado"
+      ],
+      "pending_checks": [
+        "UI",
+        "aislamiento de esta mutación",
+        "cuenta ajena, moneda y exceso"
+      ]
+    },
+    {
+      "id": "manual-create-retry",
+      "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+      "required_scenario_prefixes": [
+        "contabilidad primer cliente: asiento manual validado"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/asiento-contable"
+        }
+      ],
+      "verified_checks": [
+        "0/0 y descuadre rechazados sin asiento",
+        "cuenta ajena rechazada",
+        "lector sin crear rechazado",
+        "misma intención conserva agregado",
+        "clave incompatible rechazada"
+      ],
+      "pending_checks": [
+        "concurrencia de solicitudes",
+        "centro ajeno y otras validaciones de línea",
+        "monedas y fronteras de otros escritores"
+      ]
+    },
+    {
+      "id": "manual-read-edit",
+      "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+      "required_scenario_prefixes": [
+        "contabilidad primer cliente: asiento manual validado"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/asientos/:id"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/contabilidad/asientos/:id"
+        }
+      ],
+      "verified_checks": [
+        "lector consulta y no edita",
+        "borrador editado y persistido",
+        "confirmado inmutable",
+        "GET ajeno 404"
+      ],
+      "pending_checks": [
+        "aislamiento de PUT",
+        "búsqueda y paginación",
+        "edición de fecha y centro de costo"
+      ]
+    },
+    {
+      "id": "manual-confirm",
+      "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+      "required_scenario_prefixes": [
+        "contabilidad primer cliente: asiento manual validado"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/asientos/:id/confirmar"
+        }
+      ],
+      "verified_checks": [
+        "borrador pasa a confirmado",
+        "lector rechazado",
+        "confirmado no puede modificarse"
+      ],
+      "pending_checks": [
+        "aislamiento de confirmación",
+        "respuesta perdida al confirmar",
+        "cuenta desactivada entre creación y confirmación"
+      ]
+    },
+    {
+      "id": "manual-reverse",
+      "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+      "required_scenario_prefixes": [
+        "contabilidad primer cliente: asiento manual validado"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/asientos/:id/reversar"
+        }
+      ],
+      "verified_checks": [
+        "contra-asiento enlazado único",
+        "repetición rechazada sin segundo asiento",
+        "lector rechazado"
+      ],
+      "pending_checks": [
+        "aislamiento de reversa",
+        "período cerrado de reversa",
+        "monedas"
+      ]
+    },
+    {
+      "id": "manual-annul-delete",
+      "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+      "required_scenario_prefixes": [
+        "contabilidad primer cliente: borradores anulados/eliminados"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/asientos/:id/anular"
+        },
+        {
+          "method": "DELETE",
+          "endpoint": "/api/contabilidad/asientos/:id"
+        }
+      ],
+      "verified_checks": [
+        "borrador anulado permanece consultable",
+        "anulado no confirma",
+        "borrador eliminado retorna 404",
+        "confirmado no se anula ni elimina",
+        "lector rechazado"
+      ],
+      "pending_checks": [
+        "aislamiento de estas mutaciones",
+        "error de red en UI",
+        "auditoría y concurrencia"
+      ]
+    },
+    {
+      "id": "fixed-asset-crud",
+      "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+      "required_scenario_prefixes": [
+        "contabilidad primer cliente: activo editado"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/activos-fijos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/activos-fijos/:id"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/contabilidad/activos-fijos/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/activos-fijos/:id/cronograma"
+        }
+      ],
+      "verified_checks": [
+        "alta y replay conservan activo",
+        "residual mayor al costo rechazado",
+        "nombre editado y recargado",
+        "lector consulta y no crea/edita",
+        "GET ajeno 404",
+        "cronograma coincide al céntimo"
+      ],
+      "pending_checks": [
+        "UI",
+        "aislamiento de alta/PUT/cronograma",
+        "cambio prospectivo de vida útil/residual",
+        "búsqueda y centros"
+      ]
+    },
+    {
+      "id": "fixed-asset-depreciation",
+      "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+      "required_scenario_prefixes": [
+        "contabilidad primer cliente: activo editado"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/activos-fijos/depreciar"
+        }
+      ],
+      "verified_checks": [
+        "tres períodos y cuotas 333.33/333.33/333.34",
+        "replay por período no duplica",
+        "acumulado llega a base y residual 1",
+        "consumidor real genera contabilidad"
+      ],
+      "pending_checks": [
+        "UI",
+        "permisos e aislamiento de esta operación",
+        "período cerrado",
+        "activos omitidos, concurrencia y moneda"
+      ]
+    },
+    {
+      "id": "fixed-asset-disposal",
+      "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+      "required_scenario_prefixes": [
+        "contabilidad primer cliente: activo editado"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/activos-fijos/:id/baja"
+        }
+      ],
+      "verified_checks": [
+        "activo depreciado retirado",
+        "segunda baja rechazada",
+        "un asiento confirmado y cuadrado"
+      ],
+      "pending_checks": [
+        "UI",
+        "permisos e aislamiento de baja",
+        "venta de activo y cobro posterior",
+        "activo con valor neto pendiente"
+      ]
+    },
+    {
+      "id": "deferred-create-read",
+      "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+      "required_scenario_prefixes": [
+        "contabilidad primer cliente: diferido con residuo"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/diferidos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/diferidos/:id"
+        }
+      ],
+      "verified_checks": [
+        "alta y replay conservan diferido",
+        "cuentas iguales o ajenas rechazadas",
+        "lector consulta y no crea",
+        "cronograma 33.33/33.33/33.34",
+        "GET ajeno 404"
+      ],
+      "pending_checks": [
+        "UI",
+        "aislamiento de creación",
+        "variante ingreso",
+        "monedas y centros"
+      ]
+    },
+    {
+      "id": "deferred-accrual",
+      "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+      "required_scenario_prefixes": [
+        "contabilidad primer cliente: diferido con residuo"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/diferidos/devengar"
+        }
+      ],
+      "verified_checks": [
+        "tres devengos agotan monto 100",
+        "repetición de período no duplica",
+        "tres asientos confirmados cuadrados"
+      ],
+      "pending_checks": [
+        "UI",
+        "permisos e aislamiento de devengo",
+        "período cerrado",
+        "ingreso, concurrencia y moneda"
+      ]
+    },
+    {
+      "id": "deferred-cancel",
+      "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+      "required_scenario_prefixes": [
+        "contabilidad primer cliente: diferido con residuo"
+      ],
+      "operations": [
+        {
+          "method": "DELETE",
+          "endpoint": "/api/contabilidad/diferidos/:id"
+        }
+      ],
+      "verified_checks": [
+        "cancelación persiste CANCELADO",
+        "misma intención conserva estado",
+        "lector rechazado"
+      ],
+      "pending_checks": [
+        "UI",
+        "aislamiento de cancelación",
+        "cancelación después de devengos parciales"
+      ]
+    },
+    {
+      "id": "accounting-period-lifecycle",
+      "source": "scripts/ci/test-peru-accounting-lifecycle.mjs",
+      "required_scenario_prefixes": [
+        "contabilidad primer cliente: borradores anulados/eliminados"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/periodos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/periodos/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/periodos/:id/validar-cierre"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/periodos/:id/cerrar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/periodos/:id/bloquear"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/periodos/:id/reabrir"
+        }
+      ],
+      "verified_checks": [
+        "creación explícita y replay",
+        "mes inválido rechazado",
+        "lector consulta y no cierra/bloquea",
+        "período ajeno 404 en detalle/validación/cierre/bloqueo",
+        "borrador impide cerrar",
+        "cierre y replay persisten",
+        "cierre/bloqueo impiden nuevo asiento",
+        "ADMIN cliente no reabre",
+        "plataforma cambia contexto y reabre con replay"
+      ],
+      "pending_checks": [
+        "UI",
+        "cierre anual y reglas de períodos anteriores",
+        "eventos pendientes y concurrencia",
+        "aislamiento de reapertura de actor autorizado"
+      ]
+    },
+    {
+      "id": "first-customer-creation",
+      "source": "scripts/ci/test-peru-onboarding-local.mjs",
+      "required_scenario_prefixes": [
+        "alta no demo y primer administrador"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/tenants"
+        }
+      ],
+      "verified_checks": [
+        "empresa no demo y ADMIN sin privilegio global persistidos",
+        "replay devuelve mismo tenant",
+        "login y catálogo inicial de cuentas/conceptos laborales"
+      ],
+      "pending_checks": [
+        "alta desde UI",
+        "validaciones de todos los campos",
+        "correo externo",
+        "lector y creación cruzada"
+      ]
+    },
+    {
+      "id": "first-customer-fiscal-configuration",
+      "source": "scripts/ci/test-peru-onboarding-local.mjs",
+      "required_scenario_prefixes": [
+        "PFX del cliente valida",
+        "cliente completa configuración"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/configuration/wizard/validate-certificate"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/configuration/wizard/step"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/configuration/wizard/progress"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/configuration/complete"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/configuration/empresa"
+        }
+      ],
+      "verified_checks": [
+        "titular PFX y contraseña incorrectos rechazan sin escribir",
+        "se recargan parámetros y banderas configuradas",
+        "secretos ausentes de respuesta pública/progreso",
+        "un único evento de finalización tras replay"
+      ],
+      "pending_checks": [
+        "wizard por navegador",
+        "permisos/aislamiento de cada mutación",
+        "renovación y expiración del certificado",
+        "aceptación fiscal externa del futuro cliente"
+      ]
+    },
+    {
+      "id": "first-customer-user-role-lifecycle",
+      "source": "scripts/ci/test-peru-master-lifecycle.mjs",
+      "required_scenario_prefixes": [
+        "primer ADMIN crea, reintenta",
+        "rol único de usuario activo"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/roles"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/roles/:id"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/roles/:id"
+        },
+        {
+          "method": "DELETE",
+          "endpoint": "/api/roles/:id"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/users"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/users"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/users/:id"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/users/:id"
+        },
+        {
+          "method": "DELETE",
+          "endpoint": "/api/users/:id"
+        }
+      ],
+      "verified_checks": [
+        "altas/replay conservan ID",
+        "edición consultada persistida",
+        "búsqueda por email/dominio y entrada con comillas no filtran otro tenant",
+        "hash de contraseña no expuesto",
+        "identidades ajenas 404",
+        "rol único activo protegido",
+        "baja de usuario revoca sesión antes de baja del rol"
+      ],
+      "pending_checks": [
+        "CRUD UI",
+        "asignaciones y revocaciones individuales de permisos/roles",
+        "reactivación y reset de contraseña",
+        "permisos negativos de cada mutación"
+      ]
+    },
+    {
+      "id": "clientes-master-lifecycle",
+      "source": "scripts/ci/test-peru-master-lifecycle.mjs",
+      "required_scenario_prefixes": [
+        "clientes: rol de lectura",
+        "clientes: alta individual",
+        "clientes: baja lógica"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/clientes"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/clientes/:id"
+        },
+        {
+          "method": "DELETE",
+          "endpoint": "/api/ventas/clientes/:id"
+        }
+      ],
+      "verified_checks": [
+        "lector consulta y no crea/edita/desactiva",
+        "baja ajena 404 sin mutación",
+        "identidad repetida conserva ID; duplicada rechaza",
+        "baja lógica con/sin deuda mantiene filas y saldos",
+        "replay produce una auditoría"
+      ],
+      "pending_checks": [
+        "reactivación si se ofrece",
+        "variantes fiscales/tipos documentales",
+        "permisos de todos los roles"
+      ]
+    },
+    {
+      "id": "clientes-edit-search",
+      "source": "scripts/ci/test-peru-integrated-import.mjs",
+      "required_scenario_prefixes": [
+        "clientes: edición validada"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/clientes"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/clientes/:id"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/ventas/clientes/:id"
+        }
+      ],
+      "verified_checks": [
+        "email inválido rechaza antes de escribir",
+        "nombre/email editados coinciden en API y DB",
+        "búsqueda por nombre nuevo devuelve ID",
+        "lectura/escritura ajenas 404"
+      ],
+      "pending_checks": [
+        "variantes documentales",
+        "combinaciones de filtros/paginación",
+        "búsqueda con caracteres especiales",
+        "permisos adicionales"
+      ]
+    },
+    {
+      "id": "clientes-csv-import",
+      "source": "scripts/ci/test-peru-integrated-import.mjs",
+      "required_scenario_prefixes": [
+        "clientes: previsualización"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/migration/clientes/import"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/migration/runs"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/migration/runs/:id"
+        }
+      ],
+      "verified_checks": [
+        "dry-run no persiste ni crea run",
+        "fila válida persiste y fila inválida queda en bitácora parcial",
+        "replay no duplica maestro",
+        "run ajeno oculto"
+      ],
+      "pending_checks": [
+        "escala de archivos",
+        "todas las columnas opcionales",
+        "permisos negativos de importación",
+        "fallos durante una importación larga"
+      ]
+    },
+    {
+      "id": "proveedores-master-lifecycle",
+      "source": "scripts/ci/test-peru-master-lifecycle.mjs",
+      "required_scenario_prefixes": [
+        "proveedores: rol de lectura",
+        "proveedores: alta individual",
+        "proveedores: baja lógica"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/proveedores"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/proveedores/:id"
+        },
+        {
+          "method": "DELETE",
+          "endpoint": "/api/compras/proveedores/:id"
+        }
+      ],
+      "verified_checks": [
+        "lector consulta y no crea/edita/desactiva",
+        "baja ajena 404 sin mutación",
+        "identidad repetida conserva ID; duplicada rechaza",
+        "baja lógica con/sin deuda mantiene filas y saldos",
+        "replay produce una auditoría"
+      ],
+      "pending_checks": [
+        "reactivación si se ofrece",
+        "variantes fiscales/tipos documentales",
+        "permisos de todos los roles"
+      ]
+    },
+    {
+      "id": "proveedores-edit-search",
+      "source": "scripts/ci/test-peru-integrated-import.mjs",
+      "required_scenario_prefixes": [
+        "proveedores: edición validada"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/proveedores"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/proveedores/:id"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/compras/proveedores/:id"
+        }
+      ],
+      "verified_checks": [
+        "email inválido rechaza antes de escribir",
+        "nombre/email editados coinciden en API y DB",
+        "búsqueda por nombre nuevo devuelve ID",
+        "lectura/escritura ajenas 404"
+      ],
+      "pending_checks": [
+        "variantes documentales",
+        "combinaciones de filtros/paginación",
+        "búsqueda con caracteres especiales",
+        "permisos adicionales"
+      ]
+    },
+    {
+      "id": "proveedores-csv-import",
+      "source": "scripts/ci/test-peru-integrated-import.mjs",
+      "required_scenario_prefixes": [
+        "proveedores: previsualización"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/migration/proveedores/import"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/migration/runs"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/migration/runs/:id"
+        }
+      ],
+      "verified_checks": [
+        "dry-run no persiste ni crea run",
+        "fila válida persiste y fila inválida queda en bitácora parcial",
+        "replay no duplica maestro",
+        "run ajeno oculto"
+      ],
+      "pending_checks": [
+        "escala de archivos",
+        "todas las columnas opcionales",
+        "permisos negativos de importación",
+        "fallos durante una importación larga"
+      ]
+    },
+    {
+      "id": "inventory-master-create-edit",
+      "source": "scripts/ci/test-peru-inventory-lifecycle.mjs",
+      "required_scenario_prefixes": [
+        "inventario: altas repetidas"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/inventario/categorias"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/inventario/categorias/:id"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/inventario/almacenes"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/inventario/productos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/productos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/productos/:id"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/inventario/productos/:id"
+        }
+      ],
+      "verified_checks": [
+        "altas/replay conservan ID",
+        "precio negativo y código duplicado rechazan",
+        "edición de marca/precio y nombre de categoría persiste",
+        "producto mantiene categoría renombrada y filtro devuelve sólo el tenant"
+      ],
+      "pending_checks": [
+        "CRUD desde UI",
+        "foto y Storage local",
+        "validaciones de todas las unidades/impuestos",
+        "permisos de categoría/almacén"
+      ]
+    },
+    {
+      "id": "inventory-adjust-transfer-kardex",
+      "source": "scripts/ci/test-peru-inventory-lifecycle.mjs",
+      "required_scenario_prefixes": [
+        "inventario: ajuste decimal",
+        "inventario: rol de lectura",
+        "inventario: ajuste publica",
+        "inventario: faltante físico"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/inventario/movimientos"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/inventario/transferencias"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/kardex"
+        }
+      ],
+      "verified_checks": [
+        "cantidades decimales y replay mantienen existencias/ledger",
+        "cero, insuficiencia, almacén igual y clave con otro payload rechazan sin mutar",
+        "kardex filtrado por producto/almacén; ajeno vacío",
+        "lector no ajusta ni transfiere; referencias ajenas no mutan",
+        "sobrante/faltante generan asientos únicos/cuadrados; consumo repetido no duplica"
+      ],
+      "pending_checks": [
+        "paginación/exportación de kardex",
+        "transferencia entre sucursales",
+        "concurrencia de varias intenciones",
+        "todas las monedas/costos"
+      ]
+    },
+    {
+      "id": "inventory-logical-deactivation",
+      "source": "scripts/ci/test-peru-inventory-lifecycle.mjs",
+      "required_scenario_prefixes": [
+        "inventario: bajas con saldo",
+        "inventario: rol de lectura"
+      ],
+      "operations": [
+        {
+          "method": "DELETE",
+          "endpoint": "/api/inventario/productos/:id"
+        },
+        {
+          "method": "DELETE",
+          "endpoint": "/api/inventario/categorias/:id"
+        },
+        {
+          "method": "DELETE",
+          "endpoint": "/api/inventario/almacenes/:almacenId"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/inventario/almacenes/:almacenId/ubicaciones"
+        },
+        {
+          "method": "DELETE",
+          "endpoint": "/api/inventario/almacenes/:almacenId/ubicaciones/:ubicacionId"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/inventario/almacenes/:almacenId"
+        }
+      ],
+      "verified_checks": [
+        "bajas con saldo/dependencias rechazan",
+        "producto vacío queda inactivo tras replay",
+        "ubicación y almacén vacíos permiten baja",
+        "almacén se reactiva y vuelve al listado",
+        "lector y escritura de producto ajeno no mutan"
+      ],
+      "pending_checks": [
+        "bajas/reactivación por UI",
+        "reactivación de producto/categoría",
+        "permisos y tenant de cada mutación de ubicación/almacén"
+      ]
     }
   ]
 }

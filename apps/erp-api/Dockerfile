@@ -8,6 +8,7 @@ WORKDIR /app
 
 # Copy workspace files
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches/ ./patches/
 COPY turbo.json ./
 
 # Copy library packages
@@ -56,6 +57,7 @@ WORKDIR /app
 
 # Copy package files
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches/ ./patches/
 
 # Copy built libraries
 COPY --from=base /app/libs/dtos/dist ./libs/dtos/dist

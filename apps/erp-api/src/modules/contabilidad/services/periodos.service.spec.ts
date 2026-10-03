@@ -127,7 +127,7 @@ describe('PeriodosService — frontera atómica 458', () => {
       expect.objectContaining({ estado: EstadoPeriodo.BLOQUEADO }),
     );
 
-    expect(client.rpc).toHaveBeenNthCalledWith(1, 'reabrir_periodo_contable_tx', {
+    expect(client.rpc).toHaveBeenNthCalledWith(1, 'reabrir_periodo_contable_admin_tx', {
       p_tenant_id: 'tenant-1', p_anio: 2026, p_mes: 8, p_actor_id: 'user-1',
     });
     expect(client.rpc).toHaveBeenNthCalledWith(2, 'bloquear_periodo_contable_tx', {

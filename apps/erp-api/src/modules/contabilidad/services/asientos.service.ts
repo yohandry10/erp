@@ -12,6 +12,7 @@ import {
 import { PeriodosService } from './periodos.service';
 
 interface CrearAsientoManualOpciones {
+  idempotencyKey?: string;
   sourceEventId?: string;
   origen?: string;
   tipoAsiento?: string;
@@ -257,6 +258,18 @@ export class AsientosService {
 
       // Validar que el período contable esté abierto
       const fecha = new Date(createAsientoDto.fecha);
+      if (opciones.idempotencyKey !== undefined) {
+        const key = opciones.idempotencyKey.trim();
+        if (key.length < 8 || key.length > 200) throw new BadRequestException('La clave de idempotencia debe tener entre 8 y 200 caracteres');
+        const { data, error } = await this.supabaseService.getClient().rpc('crear_asiento_manual_tx', {
+          p_tenant_id: tenantId, p_actor_id: userId,
+          p_payload: { ...createAsientoDto, fecha: fecha.toISOString() }, p_idempotency_key: key,
+        });
+        if (error) throw new BadRequestException(error.message || 'No se pudo registrar el asiento manual');
+        const result = Array.isArray(data) ? data[0] : data;
+        if (!result?.asiento_id) throw new Error('La transacción manual no retornó un asiento válido');
+        return this.obtenerAsientoPorId(tenantId, result.asiento_id);
+      }
       await this.periodosService.validarPeriodoAbierto(tenantId, fecha);
 
       const { totalDebe, totalHaber } = await this.validarContenidoAsiento(

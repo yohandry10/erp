@@ -120,7 +120,9 @@ export class ActivosFijosService {
       return 0;
     }
 
-    const cuota = Math.round(base / activo.vida_util_meses);
+    const cuota = mesesTranscurridos === activo.vida_util_meses - 1
+      ? pendiente
+      : Math.round(base / activo.vida_util_meses);
     return Math.min(cuota, pendiente) / 100;
   }
 
