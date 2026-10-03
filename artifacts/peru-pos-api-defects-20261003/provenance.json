@@ -1,0 +1,12 @@
+{
+  "local_source": "artifacts/peru-pos-local-20261003140510336-24528",
+  "source_sha": "094be1a7fca3ce47192150f85add38e3322b4eca",
+  "scope": "Diagnóstico POS canónico: seis defectos; algunas expectativas del ensayo fueron corregidas después. Ninguna aprobación global.",
+  "source_files": [
+    "apps/erp-api/src/modules/pos/pos.service.ts",
+    "apps/erp-api/src/modules/pos/pos.controller.ts"
+  ],
+  "catalogue_fixture_after_failure": "Sólo diagnóstico local; el catálogo insertado después de fallar no acredita onboarding",
+  "remote_business_writes": false,
+  "dumps_extracted": false
+}

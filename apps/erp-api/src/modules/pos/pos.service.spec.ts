@@ -1596,15 +1596,9 @@ describe('PosService atomic transaction contract', () => {
       },
     });
 
-    const result = await ctx.service.reintentarFacturacionVenta(
-      '3b135288-622d-42dc-8ff7-5cc3e3700e20',
-      user,
-    );
-
-    expect(result).toEqual(expect.objectContaining({
-      success: false,
-      message: expect.stringContaining('flujo de canje'),
-    }));
+    await expect(ctx.service.reintentarFacturacionVenta(
+      '3b135288-622d-42dc-8ff7-5cc3e3700e20', user,
+    )).rejects.toMatchObject({ status: 409 });
     expect(ctx.cpeService.create).not.toHaveBeenCalled();
     expect(ctx.updates).toHaveLength(0);
   });

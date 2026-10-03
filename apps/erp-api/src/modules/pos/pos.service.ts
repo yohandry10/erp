@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, HttpException, NotFoundException, ConflictException, ServiceUnavailableException, ForbiddenException } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { CpeService } from '../cpe/cpe.service';
 import { ValidationService } from '../validations/validation.service';
@@ -39,6 +39,38 @@ export class PosService {
     private readonly posAuditService: PosAuditService,
     private readonly configService: ConfigService,
   ) { }
+
+  private toPosException(error: any, fallback: string): HttpException {
+    if (error instanceof HttpException) return error;
+    const code = String(error?.code || '');
+    const message = String(error?.message || '');
+    if (code === 'P0002' || code === 'PGRST116') return new NotFoundException('Venta no encontrada para el tenant activo');
+    if (code === '23505') return new ConflictException('La clave de intención ya corresponde a otra operación');
+    if (code === '55000') return new ConflictException('El estado de la venta no permite esta operación');
+    if (code === '42501' && /ACTOR_|PERMISSION_|TENANT_/.test(message)) return new ForbiddenException('Operación POS no autorizada');
+    if (['22023','22P02','23503','23514','23502'].includes(code)) return new BadRequestException('La intención POS no cumple las validaciones de la operación');
+    return new ServiceUnavailableException(fallback);
+  }
+
+  private normalizarItemsRepetidos(items: any[]): any[] {
+    const grouped = new Map<string, any>();
+    for (const item of items) {
+      const previous = grouped.get(item.producto_id);
+      if (!previous) { grouped.set(item.producto_id, { ...item }); continue; }
+      for (const field of ['precio_unitario','precio_original','descuento_porcentaje']) {
+        if (Number(previous[field] || 0) !== Number(item[field] || 0)) {
+          throw new BadRequestException('Un producto repetido debe conservar precio y descuento');
+        }
+      }
+      previous.cantidad = new Decimal(previous.cantidad).plus(item.cantidad).toNumber();
+      for (const field of ['subtotal','descuento_monto']) {
+        if (previous[field] !== undefined || item[field] !== undefined) {
+          previous[field] = new Decimal(previous[field] || 0).plus(item[field] || 0).toNumber();
+        }
+      }
+    }
+    return [...grouped.values()];
+  }
 
   private getCertKey(): Buffer {
     const key = this.configService.get<string>('CERT_ENCRYPTION_KEY') ?? this.configService.get<string>('ENCRYPTION_KEY');
@@ -784,21 +816,13 @@ export class PosService {
         };
       } catch (error) {
         this.logger.error(`Error canjeando ticket POS venta=${ventaId}:`, error);
-        return {
-          success: false,
-          message: error?.message || 'Error al canjear el ticket POS',
-          error: {
-            tipo: 'POS_TICKET_EXCHANGE_ERROR',
-            codigo: error?.code,
-            mensaje: error?.message || 'Error al canjear el ticket POS',
-          },
-        };
+        throw this.toPosException(error, 'El canje POS está temporalmente indisponible');
       }
     });
   }
 
   private async procesarVentaInternal(ventaData: any, user: any) {
-    const items = Array.isArray(ventaData?.items) ? ventaData.items : [];
+    const items = this.normalizarItemsRepetidos(Array.isArray(ventaData?.items) ? ventaData.items : []);
     const emitirCpe = ventaData?.emitir_cpe !== false;
     try {
       this.logger.log(
@@ -1704,51 +1728,40 @@ export class PosService {
     }
   }
 
-  async configurarCertificado(certificadoBase64: string, password: string, user: any) {
-    return this.runWithTenantContext(user, () => this.configurarCertificadoInternal(certificadoBase64, password, user));
-  }
-
-  private async configurarCertificadoInternal(certificadoBase64: string, password: string, user: any) {
-    try {
-      this.logger.log('📄 Configurando certificado para tenant:', user.tenant_id);
-
-      // Convertir base64 a buffer
-      const certificadoBuffer = Buffer.from(certificadoBase64, 'base64');
-
-      // Cifrar certificado y contraseña antes de almacenar
-      const certEncrypted = this.encryptBuffer(certificadoBuffer);
-      const passEncrypted = this.encryptText(password || '');
-
-      // Guardar en empresa_config (almacenamos cifrado en mismas columnas)
-      const { data, error } = await this.supabase.getClient()
-        .from('empresa_config')
-        .update({
-          certificado_pfx: toPostgresBytea(certEncrypted), // bytea: iv|tag|ciphertext
-          certificado_password: passEncrypted,       // base64: iv|tag|ciphertext
-          updated_at: new Date().toISOString()
-        })
-        .eq('tenant_id', user.tenant_id)
-        .select()
-        .single();
-
-      if (error) {
-        this.logger.error('❌ Error guardando certificado:', error);
-        throw error;
+  async configurarCertificado(certificadoBase64: string, password: string, user: any, idempotencyKey?: string) {
+    return this.runWithTenantContext(user, async () => {
+      if (!idempotencyKey || idempotencyKey.trim().length < 8 || idempotencyKey.trim().length > 255) {
+        throw new BadRequestException('Idempotency-Key obligatorio para configurar certificado');
       }
-
-      this.logger.log('✅ Certificado configurado exitosamente');
-
-      return {
-        success: true,
-        message: 'Certificado configurado correctamente'
-      };
-    } catch (error) {
-      this.logger.error('❌ Error configurando certificado:', error);
-      return {
-        success: false,
-        message: error.message || 'Error configurando certificado'
-      };
-    }
+      let validation;
+      try {
+        validation = await this.configurationService.validateCertificatePayload(user.tenant_id, {
+          certificateBase64: certificadoBase64, certificatePassword: password,
+        });
+      } catch (error) {
+        throw error instanceof HttpException ? error : new BadRequestException('Certificado o contraseña inválidos');
+      }
+      const buffer = Buffer.from(certificadoBase64.replace(/\s+/g, ''), 'base64');
+      // Huella de intención, nunca credencial de autenticación. El KDF evita
+      // conservar una derivación rápida de una contraseña elegida por el usuario.
+      const fingerprint = await new Promise<string>((resolve, reject) => {
+        crypto.scrypt(
+          JSON.stringify({ certificate: crypto.createHash('sha256').update(buffer).digest('hex'), password }),
+          this.getCertKey(), 32, { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 },
+          (error, derived) => error ? reject(error) : resolve(derived.toString('hex')),
+        );
+      });
+      const { data, error } = await this.supabase.getClient().rpc('configurar_certificado_pos_tx', {
+        p_tenant_id: user.tenant_id, p_actor_id: user.id, p_idempotency_key: idempotencyKey.trim(),
+        p_intent_fingerprint: fingerprint, p_certificado: toPostgresBytea(this.encryptBuffer(buffer)),
+        p_password: this.encryptText(password), p_expira_en: validation.validTo.toISOString(),
+      });
+      if (error || !data) {
+        this.logger.error('POS certificate writer rejected', { code: error?.code, message: error?.message });
+        throw this.toPosException(error, 'No se pudo guardar el certificado POS');
+      }
+      return data;
+    });
   }
 
   async getConfigurationStatus(user: any) {
@@ -1844,7 +1857,8 @@ export class PosService {
         .single();
 
       if (error || !venta) {
-        throw new Error('Venta no encontrada para el tenant activo');
+        if (!error || error.code === 'PGRST116') throw new NotFoundException('Venta no encontrada para el tenant activo');
+        throw this.toPosException(error, 'La consulta de facturación POS está temporalmente indisponible');
       }
 
       const tipoEmision = venta.tipo_emision || null;
@@ -1877,7 +1891,8 @@ export class PosService {
         .single();
 
       if (ventaError || !venta) {
-        throw new Error('Venta no encontrada para el tenant activo');
+        if (!ventaError || ventaError.code === 'PGRST116') throw new NotFoundException('Venta no encontrada para el tenant activo');
+        throw this.toPosException(ventaError, 'La consulta de facturación POS está temporalmente indisponible');
       }
 
       if (venta.cpe_id) {
@@ -1889,21 +1904,18 @@ export class PosService {
       }
 
       if (venta.tipo_emision === 'TICKET') {
-        return {
-          success: false,
-          message: 'El ticket interno no tiene una emisión CPE pendiente; use el flujo de canje a factura o boleta',
-        };
+        throw new ConflictException('El ticket interno no tiene emisión CPE pendiente; use el canje a factura o boleta');
       }
 
       // Verificar máximo de intentos (5 intentos)
       if (Number(venta.intentos_facturacion || 0) >= 5) {
-        throw new Error('Máximo de reintentos alcanzado (5 intentos). Contacte al administrador.');
+        throw new ConflictException('Máximo de reintentos alcanzado (5 intentos). Contacte al administrador.');
       }
 
       // Obtener datos CPE guardados
       const cpeData = venta.cpe_data || null;
       if (!cpeData) {
-        throw new Error('No se encontraron datos del CPE para reintentar');
+        throw new ConflictException('No se encontraron datos del CPE para reintentar');
       }
 
       // HARDENING: asegurar idempotency_key para dedupe de reintentos (retrocompatible con ventas antiguas)
@@ -1927,6 +1939,7 @@ export class PosService {
         message: 'Facturación completada exitosamente'
       };
     } catch (error) {
+      if (error instanceof NotFoundException || error instanceof ConflictException) throw error;
       this.logger.error(`❌ Error reintentando facturación para venta ${ventaId}:`, error);
 
       await this.registrarFalloCpePos(
@@ -1935,10 +1948,7 @@ export class PosService {
         error.message || 'Error desconocido',
       );
 
-      return {
-        success: false,
-        message: error.message || 'Error al reintentar facturación'
-      };
+      throw this.toPosException(error, 'La facturación POS está temporalmente indisponible');
     }
   }
 
@@ -2001,7 +2011,7 @@ export class PosService {
         .select('*')
         .eq('cpe_pendiente', true)
         .not('cpe_data', 'is', null)
-        .lt('intentos_facturacion', 5)
+        .or('intentos_facturacion.is.null,intentos_facturacion.lt.5')
         .order('ultimo_intento_facturacion', { ascending: true })
         .limit(limit);
 
