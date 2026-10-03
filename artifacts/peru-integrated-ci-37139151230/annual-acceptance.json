@@ -1,0 +1,188 @@
+{
+  "checkedAt": "2026-10-03T17:12:31.578Z",
+  "success": true,
+  "local_only": true,
+  "remoteWrites": false,
+  "scope": "Primer administrador no demo, esquema canónico 558, API real y PostgreSQL efímero",
+  "year": 2025,
+  "scenarios": [
+    {
+      "scenario": "Cierre anual con utilidad, replay y balance sin duplicar resultado",
+      "passed": true
+    },
+    {
+      "scenario": "Reapertura administrativa anual anula sólo el cierre y recierre crea secuencia nueva",
+      "passed": true
+    },
+    {
+      "scenario": "Pérdida anual, resultado nuevo independiente y rechazo de reapertura con período posterior cerrado",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/switch-tenant",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/periodos",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/plan-cuentas",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/asiento-contable",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/asiento-contable",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/estados/balance-general?anio=2025&mes=12",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/periodos/:id/cerrar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/periodos/:id/cerrar",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/estados/balance-general?anio=2025&mes=12",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/estados/estado-resultados?anio=2025&mes=12",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/periodos/:id/reabrir",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/periodos/:id/reabrir",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/periodos/:id/reabrir",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/estados/balance-general?anio=2025&mes=12",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/periodos/:id/cerrar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/periodos/:id/reabrir",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/asiento-contable",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/periodos/:id/cerrar",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/estados/balance-general?anio=2025&mes=12",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/periodos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/asiento-contable",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/estados/balance-general?anio=2026&mes=1",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/estados/estado-resultados?anio=2026&mes=1",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/periodos/:id/cerrar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/periodos/:id/reabrir",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/periodos/:id",
+      "status": 200
+    }
+  ],
+  "annual_entries": [
+    {
+      "id": "af0cdff7-5218-466a-ad08-125fec830093",
+      "estado": "ANULADO",
+      "debe": 25,
+      "haber": 25
+    },
+    {
+      "id": "77fed9b9-e09f-4453-a088-3a99701714ea",
+      "estado": "ANULADO",
+      "debe": 25,
+      "haber": 25
+    },
+    {
+      "id": "2a85fc94-9246-404f-8f8f-c8874f8e09b6",
+      "estado": "CONFIRMADO",
+      "debe": 7,
+      "haber": 7
+    }
+  ],
+  "utility_before_close": 25,
+  "loss_after_correction": -7,
+  "next_year_result": 8,
+  "next_year_assets": 1
+}

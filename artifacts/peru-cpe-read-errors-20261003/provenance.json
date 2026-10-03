@@ -1,0 +1,12 @@
+{
+  "source": "artifacts/peru-cpe-local-20261003170717602-9908",
+  "scope": "Fuente canónica CPE: fallos reales SELECT y de replay; sin aceptación global",
+  "global_acceptance": false,
+  "remoteWrites": false,
+  "dumps_extracted": false,
+  "limits": [
+    "Infraestructura efímera real; no transmite ni acredita aceptación SUNAT",
+    "Certificado desechable local no publicado",
+    "PDFs, PFX, dumps y logs completos permanecen privados"
+  ]
+}

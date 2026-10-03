@@ -1,0 +1,15 @@
+{
+  "completedAt": "2026-10-03T18:25:37.659Z",
+  "success": true,
+  "withBrowser": true,
+  "withSurvey": false,
+  "withRecords": false,
+  "candidateApi": false,
+  "candidateSql": false,
+  "candidateUi": false,
+  "scope": "cpe_canonical_restored_subset",
+  "database": "PostgreSQL 16 efímero",
+  "output": "artifacts/peru-cpe-canonical-local-20261003182132214-23260",
+  "remoteWrites": false,
+  "complete_erp_acceptance": false
+}

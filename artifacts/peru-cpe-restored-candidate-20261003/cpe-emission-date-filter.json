@@ -1,0 +1,9 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Fecha de emisión anterior al alta real; API/DB locales",
+  "emission_date": "2026-10-02",
+  "created_today": true,
+  "http_status": 200,
+  "matched": 0
+}

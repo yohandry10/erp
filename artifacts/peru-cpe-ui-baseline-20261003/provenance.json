@@ -1,0 +1,20 @@
+{
+  "source": "artifacts/peru-cpe-restored-local-20261003174901380-26012",
+  "global_acceptance": false,
+  "remoteWrites": false,
+  "dumps_extracted": false,
+  "candidate_ui_hashes": null,
+  "candidate_hashes": {
+    "cpe.service.ts": "e6394ed7ba0c5b08876456edba8bbb8016de2af2a61f791a07ce9e38b8275af7",
+    "cpe.controller.ts": "8f4b5c3730452f391a6eca760303804ff475a5f861cc0ba0571540304488320e",
+    "cpe-delivery.service.ts": "4577d43bdca58c6b223c6e8dd5bf5b5e57ea971f30c38831fa9a03105a3a05b2",
+    "pdf-generator.service.ts": "a5b9fa04ac616a74092e479e4855799d54d98df20f64b32b28b62e2be839ecd9",
+    "cpe-reporting.service.ts": "346ea4bbd789d7b6bc2732c383f94d196e15f7a502dbacee99549796e281df5b",
+    "cpe-registration.service.ts": "4449c2201058362e885a54b78703e15f3ba2fbb02d4edfe64d8089b70e595099"
+  },
+  "limits": [
+    "Snapshot local restaurado, no migración fresca",
+    "No acredita aceptación SUNAT ni disponibilidad PROD",
+    "PFX, PDF, dumps, logs y trazas completos permanecen privados"
+  ]
+}

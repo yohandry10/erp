@@ -1,0 +1,8 @@
+{
+  "remoteWrites": false,
+  "source": "artifacts/peru-cpe-restored-local-20261003174901380-26012",
+  "operation": "Formulario PE a crédito",
+  "observed": "[name=\"condicionPago\"] no existe en DOM; timeout selectOption, contrastado con condicional isColombia del formulario canónico",
+  "http_status": null,
+  "global_acceptance": false
+}

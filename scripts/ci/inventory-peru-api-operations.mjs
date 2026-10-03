@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -81,14 +82,19 @@ if (process.argv[2]) {
     if(!phaseDirectory.startsWith(path.join(root,'artifacts')+path.sep))throw new Error('Fase adicional debe estar en artifacts');
     const phaseRun=JSON.parse(readFileSync(path.join(phaseDirectory,'run.json'),'utf8'));
     if(phaseRun.success!==true||phaseRun.remoteWrites!==false)throw new Error('Fase adicional debe estar aprobada sin escritura remota');
-    const names={'company_logo_real_storage_subset':'company-logo.json','monthly_period_diagnostic_subset':'monthly-period.json'};
+    const names={'company_logo_real_storage_subset':'company-logo.json','monthly_period_diagnostic_subset':'monthly-period.json','cpe_canonical_restored_subset':'cpe-operations.json'};
     const filename=names[phaseRun.scope];if(!filename)throw new Error('Alcance adicional no reconocido');
     const phase=JSON.parse(readFileSync(path.join(phaseDirectory,filename),'utf8'));
     if(phase.success!==true||phase.remoteWrites!==false)throw new Error('Prueba de fase incompleta');
+    if(phaseRun.scope==='cpe_canonical_restored_subset') {
+      const provenance=JSON.parse(readFileSync(path.join(phaseDirectory,'provenance.json'),'utf8'));
+      if(provenance.remoteWrites!==false||provenance.complete_erp_acceptance!==false||!Object.keys(provenance.canonical_source_hashes||{}).length)throw new Error('CPE exige procedencia canónica y límites explícitos');
+      for(const [file,hash] of Object.entries(provenance.canonical_source_hashes))if(createHash('sha256').update(readFileSync(path.join(root,file))).digest('hex')!==hash)throw new Error('Fuente CPE cambió después del ensayo: '+file);
+    }
     const evidence=path.relative(root,phaseDirectory).replaceAll('\\','/');
     const offset=http.results.length;http.results.push(...phase.scenarios);
     http.request_traces.push(...phase.requests.map(request=>({method:request.method,pathname:new URL('/api/'+request.endpoint.replace(/^\/?api\//,''), 'http://127.0.0.1').pathname,status:request.status,scenario_index_hint:offset,evidence_file:evidence+'/'+filename})));
-    additionalEvidence.push({evidence,scope:phaseRun.scope,global_success:true,ui_included:phaseRun.withBrowser===true});
+    additionalEvidence.push({evidence,scope:phaseRun.scope,phase_success:true,complete_erp_acceptance:false,ui_included:phaseRun.withBrowser===true});
   }
   const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const routePattern = endpoint => new RegExp('^' + endpoint.split('/').map(part => part.startsWith(':') ? '[^/]+' : escape(part)).join('/') + '/?$');

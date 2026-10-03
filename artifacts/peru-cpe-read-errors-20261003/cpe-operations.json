@@ -1,0 +1,318 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "CPE API/DB local no demo; sin transmisión ni aceptación SUNAT",
+  "scenarios": [
+    {
+      "scenario": "CPE: factura manual de contado con PFX propio confirma documento, UBL firmado y outbox sin transmisión",
+      "passed": true
+    },
+    {
+      "scenario": "CPE: replay y dos solicitudes concurrentes recuperan misma factura sin otro efecto",
+      "passed": true
+    },
+    {
+      "scenario": "CPE: conflicto de intención devuelve 409 sin cambiar documento ni efectos",
+      "passed": false,
+      "message": "cpe/comprobantes: {\"id\":\"504f821a-6bd5-492a-832d-a986799d1c0e\",\"documento_id\":\"8030fd2c-3356-4324-8519-9f315fc81abb\",\"documentoId\":\"8030fd2c-3356-4324-8519-9f315fc81abb\",\"tipo_documento\":\"01\",\"serie\":\"F001\",\"numero\":\"00000001\",\"fecha_emision\":\"2026-10-03T00:00:00+00:00\",\"fecha_vencimiento\":\"2026-11-02\",\"fecha_envio\":null,\"ruc_emisor\":\"20987654334\",\"razon_social_emisor\":\"Empresa CPE local configurada\",\"direccion_emisor\":null,\"tipo_documento_receptor\":\"6\",\"documento_receptor\":\"20987654342\",\"razon_social_receptor\":\"Cliente CPE local\",\"direccion_receptor\":\"\",\"moneda\":\"PEN\",\"items\":[{\"codigo\":\"CPE-SERV-LOCAL\",\"descripcion\":\"Servicio CPE local\",\"cantidad\":1,\"unidad\":\"ZZ\",\"precio_unitario\":20,\"precio_venta\":23.6,\"valor_venta\":20,\"total\":23.6,\"total_item\":23.6,\"descuento_unitario\":0,\"igv\":3.6,\"impuesto_isc\":0,\"afectacion_igv\":\"10\",\"tipo_afectacion_igv\":\"10\"}],\"total_gravadas\":20,\"total_exoneradas\":0,\"total_inafectas\":0,\"total_exportacion\":0,\"total_igv\":3.6,\"total_isc\":0,\"total_venta\":23.6,\"total\":23.6,\"estado\":\"FIRMADO\",\"estado_sunat\":\"PENDIENTE\",\"sunat_status\":\"READY\",\"pais\":null,\"simulated_origin\":false,\"hash\":\"9CC9C6EE7898E6D147D4B06523730AB6\",\"documento_referencia_tipo\":null,\"documento_referencia_serie\":null,\"documento_referencia_numero\":null,\"documento_referencia_id\":null,\"tipo_nota_credito\":null,\"tipo_nota_debito\":null,\"motivo_nota\":null,\"numero_comprobante_sunat\":null,\"created_at\":\"2026-10-03T17:08:19.997908+00:00\",\"updated_at\":\"2026-10-03T17:08:20.644952+00:00\"}\n\n201 !== 409\n"
+    },
+    {
+      "scenario": "CPE: detalle, XML autorizado, QR y consulta general representan registro persistido",
+      "passed": true
+    },
+    {
+      "scenario": "CPE: descarga PDF devuelve binario con cabecera y contenido PDF",
+      "passed": true
+    },
+    {
+      "scenario": "CPE: inexistente y ajeno reciben 404 en detalle, PDF, XML y consulta general",
+      "passed": false,
+      "message": "cpe/comprobantes/c77e4a54-ffbe-4b3f-a102-ea0d677c73b3: {\"success\":false,\"message\":\"Error obteniendo datos del CPE\",\"error\":\"Error obteniendo CPE: CPE no encontrado\"}\n\n200 !== 404\n"
+    },
+    {
+      "scenario": "CPE: ID mal formado recibe 400 antes de consultar PostgreSQL",
+      "passed": false,
+      "message": "cpe/comprobantes/no-es-uuid: {\"success\":false,\"message\":\"Error obteniendo datos del CPE\",\"error\":\"Error obteniendo CPE: CPE no encontrado\"}\n\n200 !== 400\n"
+    },
+    {
+      "scenario": "CPE: listado, búsqueda, filtro vacío y aislamiento tienen conteo real",
+      "passed": true
+    },
+    {
+      "scenario": "CPE: página inválida y fecha inválida reciben 400 explícito",
+      "passed": false,
+      "message": "cpe/comprobantes: {\"success\":false,\"data\":[],\"message\":\"Error consultando comprobantes: Requested range not satisfiable\",\"error\":\"Requested range not satisfiable\"}\n\n200 !== 400\n"
+    },
+    {
+      "scenario": "CPE: factura a crédito desde contrato UI conserva cliente y genera CxC única",
+      "passed": false,
+      "message": "cpe/comprobantes: {\"statusCode\":400,\"message\":\"Una venta a crédito requiere cliente_id\",\"error\":\"Bad Request\",\"timestamp\":\"2026-10-03T17:08:21.573Z\",\"path\":\"/api/cpe/comprobantes\"}\n\n400 !== 201\n"
+    },
+    {
+      "scenario": "CPE: totales manipulados, cantidad cero y factura con DNI no dejan efectos",
+      "passed": true
+    },
+    {
+      "scenario": "CPE: nota sin origen aceptado y CDR durable no se crea ni afecta deuda",
+      "passed": true
+    },
+    {
+      "scenario": "CPE: CSV cita comas, comillas y salto de línea del receptor y neutraliza fórmulas",
+      "passed": false,
+      "message": "tipoComprobante,serie,numero,fechaEmision,cliente,clienteRuc,moneda,total,estado,estadoSunat\nFactura,F001,00000004,2026-10-03,=SUM(1,2) \"Cliente\"\nCPE local,20987654342,PEN,23.6,FIRMADO,PENDIENTE"
+    },
+    {
+      "scenario": "CPE: exportación básica filtrada entrega archivo CSV",
+      "passed": true
+    },
+    {
+      "scenario": "CPE: exportación y listado ajenos no revelan receptor de otra empresa",
+      "passed": true
+    },
+    {
+      "scenario": "CPE: boleta DNI y factura multipágina firman UBL y representan sus líneas",
+      "passed": true
+    },
+    {
+      "scenario": "CPE: envío sin credenciales falla explícito y retry conserva CPE, XML y efectos",
+      "passed": false,
+      "message": "El replay técnico devolvió HTTP201, success=true, reason=RETRY_LATER y resultKind=TECHNICAL_ERROR, con XML en el CPE; el fallo completo permanece en artefactos locales privados"
+    },
+    {
+      "scenario": "CPE: origen rechazado, consulta de bajas y lotes mantienen ausencia de aceptación externa",
+      "passed": true
+    },
+    {
+      "scenario": "CPE: caída real de SELECT devuelve 503 en listado, detalle, XML, PDF y estadísticas y luego recupera",
+      "passed": false,
+      "message": "[{\"endpoint\":\"cpe/comprobantes\",\"status\":200,\"expected\":503},{\"endpoint\":\"cpe/comprobantes/:id\",\"status\":200,\"expected\":503},{\"endpoint\":\"cpe/:id\",\"status\":404,\"expected\":503},{\"endpoint\":\"cpe/:id/xml\",\"status\":404,\"expected\":503},{\"endpoint\":\"cpe/comprobantes/:id/pdf\",\"status\":500,\"expected\":503},{\"endpoint\":\"cpe/stats\",\"status\":200,\"expected\":503}]"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/complete",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/clientes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/comprobantes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/comprobantes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/comprobantes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/comprobantes",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/comprobantes/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/:id/xml",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/comprobantes/:id/pdf",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/comprobantes/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/comprobantes/no-es-uuid",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/comprobantes",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/comprobantes",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/comprobantes",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/comprobantes",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/comprobantes",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/comprobantes",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/comprobantes",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/comprobantes",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/notas-referenciadas",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/comprobantes",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/comprobantes/export",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/comprobantes/export",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/comprobantes/export",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/comprobantes",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/comprobantes/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/comprobantes",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/comprobantes/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/comprobantes/:id/pdf",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/:id/xml",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/:id/resend",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/:id/xml",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/:id/resend",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/notas-referenciadas/origenes",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/baja/elegibles",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/baja/lotes",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/comprobantes",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/comprobantes/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/:id",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/:id/xml",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/comprobantes/:id/pdf",
+      "status": 500
+    },
+    {
+      "method": "GET",
+      "endpoint": "cpe/stats",
+      "status": 200
+    }
+  ]
+}

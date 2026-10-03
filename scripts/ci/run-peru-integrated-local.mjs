@@ -91,6 +91,19 @@ async function httpReady(url) {
   await response.body?.cancel();
   return response.status < 500;
 }
+async function stopWebForNextPhase(child) {
+  if (!child.pid || child.exitCode !== null || child.signalCode !== null) throw new Error('Web terminó inesperadamente antes de completar su fase');
+  if (process.platform === 'win32') execFileSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+  else child.kill('SIGTERM');
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    try { await httpReady(`${webUrl}/login/`); } catch {
+      if (child.exitCode !== null || child.signalCode !== null) return;
+    }
+    await delay(250);
+  }
+  throw new Error('Web no liberó el puerto antes de la siguiente fase');
+}
 function rememberContainer(args) {
   const id = docker(['run', '--rm', '--detach', ...args]);
   if (!/^[0-9a-f]{64}$/.test(id)) throw new Error('Docker no devolvió un ID de contenedor');
@@ -186,9 +199,13 @@ try {
   await run('reports-consolidation-lifecycle',process.execPath,['scripts/ci/test-peru-reports-consolidation-local.mjs']);
   await run('gre-lifecycle',process.execPath,['scripts/ci/test-peru-gre-operations-local.mjs']);
   await run('pos-first-client-lifecycle',process.execPath,['scripts/ci/test-peru-pos-first-client-local.mjs']);
+  for(const kind of ['cpe-first','cpe-other'])await run('prepare-'+kind,process.execPath,['scripts/ci/prepare-peru-first-client-local.mjs',kind]);
+  env.CPE_VOLUME='1';
+  await run('cpe-operations-lifecycle',process.execPath,['scripts/ci/test-peru-cpe-operations-local.mjs']);
+  delete env.CPE_VOLUME;
   if(withBrowser) await run('prepare-wizard',process.execPath,['scripts/ci/prepare-peru-first-client-local.mjs','wizard']);
   const httpEvidence=JSON.parse(readFileSync(path.join(output,'http.json'),'utf8'));
-  for(const file of ['annual-acceptance.json','finance-lifecycle.json','hr-lifecycle.json','hr-financial.json','payroll-plame.json','configuration-admin.json','series-lifecycle.json','tax-adjustments.json','monthly-period.json','tax-intents.json','login-office.json','reports-consolidation-expanded.json','gre-operations.json','pos-operations.json']) {
+  for(const file of ['annual-acceptance.json','finance-lifecycle.json','hr-lifecycle.json','hr-financial.json','payroll-plame.json','configuration-admin.json','series-lifecycle.json','tax-adjustments.json','monthly-period.json','tax-intents.json','login-office.json','reports-consolidation-expanded.json','gre-operations.json','pos-operations.json','cpe-operations.json']) {
     const phase=JSON.parse(readFileSync(path.join(output,file),'utf8'));
     if(phase.success!==true||phase.remoteWrites!==false) throw new Error('Fase funcional incompleta: '+file);
     const offset=httpEvidence.results.length;
@@ -197,12 +214,24 @@ try {
   }
   writeFileSync(path.join(output,'http.json'),JSON.stringify(httpEvidence,null,2));
   if (withBrowser) {
-    const web = launch('web', process.execPath, [webRequire.resolve('next/dist/bin/next'), 'dev', '-p', webPort, '--hostname', '127.0.0.1'], webDirectory);
-    await waitReady('Web', () => readFileSync(path.join(output, 'web.log'), 'utf8').includes('Ready in') && httpReady(`${webUrl}/login/`), web);
-    if (!recordsOnly) await run('browser', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-integrated-local.spec.ts', 'tests/e2e/peru-rrhh-financial-local.spec.ts', 'tests/e2e/peru-configuration-admin-local.spec.ts', 'tests/e2e/peru-tax-adjustments-local.spec.ts', 'tests/e2e/peru-tax-intents-local.spec.ts', 'tests/e2e/peru-reports-consignations-local.spec.ts', 'tests/e2e/peru-gre-local.spec.ts', 'tests/e2e/peru-pos-local.spec.ts', '--reporter=list',
+    const startWeb = async label => {
+      const child = launch(label, process.execPath, [webRequire.resolve('next/dist/bin/next'), 'dev', '-p', webPort, '--hostname', '127.0.0.1'], webDirectory);
+      await waitReady('Web', () => readFileSync(path.join(output, `${label}.log`), 'utf8').includes('Ready in') && httpReady(`${webUrl}/login/`), child);
+      return child;
+    };
+    let web = await startWeb('web');
+    if (!recordsOnly) await run('browser', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-integrated-local.spec.ts', 'tests/e2e/peru-rrhh-financial-local.spec.ts', 'tests/e2e/peru-configuration-admin-local.spec.ts', 'tests/e2e/peru-tax-adjustments-local.spec.ts', 'tests/e2e/peru-tax-intents-local.spec.ts', 'tests/e2e/peru-reports-consignations-local.spec.ts', 'tests/e2e/peru-gre-local.spec.ts', 'tests/e2e/peru-pos-local.spec.ts', 'tests/e2e/peru-cpe-local.spec.ts', '--reporter=list',
       ...(focusOnboarding ? ['--grep', 'primer administrador|ajuste con respuesta perdida'] : [])], webDirectory);
-    if (withSurvey) await run('module-survey', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-module-survey-local.spec.ts', '--reporter=list'], webDirectory);
-    if (withRecords) await run('record-survey', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-record-survey-local.spec.ts', '--reporter=list'], webDirectory);
+    // Next dev conserva compilaciones en memoria. Cada barrido comienza con
+    // un proceso nuevo; un fallo de su fase sigue deteniendo el ensayo.
+    if (withSurvey) {
+      await stopWebForNextPhase(web); web = await startWeb('web-module-survey');
+      await run('module-survey', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-module-survey-local.spec.ts', '--reporter=list'], webDirectory);
+    }
+    if (withRecords) {
+      await stopWebForNextPhase(web); web = await startWeb('web-record-survey');
+      await run('record-survey', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-record-survey-local.spec.ts', '--reporter=list'], webDirectory);
+    }
   }
   await run('backup-restore', process.execPath, ['scripts/ci/test-peru-backup-restore-local.mjs', pg, path.join(output, 'backup')]);
   success = true;

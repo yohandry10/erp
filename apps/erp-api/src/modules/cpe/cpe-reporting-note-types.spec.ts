@@ -50,6 +50,7 @@ describe('CpeReportingService · nombres fiscales de notas', () => {
         isDemoRepresentation: true,
       }],
       message: 'ok',
+      meta: { total: 1, page: 1, pageSize: 200 },
     } as any);
 
     const result = await service.exportComprobantesCsv({}, 'tenant-demo-co');

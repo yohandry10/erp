@@ -1,0 +1,36 @@
+{
+  "remoteWrites": false,
+  "local_only": true,
+  "statuses": [
+    {
+      "endpoint": "cpe/comprobantes",
+      "status": 200,
+      "expected": 503
+    },
+    {
+      "endpoint": "cpe/comprobantes/:id",
+      "status": 200,
+      "expected": 503
+    },
+    {
+      "endpoint": "cpe/:id",
+      "status": 404,
+      "expected": 503
+    },
+    {
+      "endpoint": "cpe/:id/xml",
+      "status": 404,
+      "expected": 503
+    },
+    {
+      "endpoint": "cpe/comprobantes/:id/pdf",
+      "status": 500,
+      "expected": 503
+    },
+    {
+      "endpoint": "cpe/stats",
+      "status": 200,
+      "expected": 503
+    }
+  ]
+}

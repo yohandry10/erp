@@ -155,11 +155,13 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
       )
       return
     }
-    if ((isArgentina || isColombia) && !formData.clienteId) {
+    if ((isArgentina || isColombia || formData.condicionPago === 'CREDITO') && !formData.clienteId) {
       setSubmitError(
         isArgentina
           ? 'Selecciona un cliente maestro con condición IVA antes de emitir.'
-          : 'Selecciona un cliente maestro con perfil tributario DIAN antes de emitir.',
+          : isColombia
+            ? 'Selecciona un cliente maestro con perfil tributario DIAN antes de emitir.'
+            : 'Selecciona el cliente maestro para registrar la cuenta por cobrar.',
       )
       return
     }
@@ -212,7 +214,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
             clienteDireccion,
           }
         : {}),
-      cliente_id: isArgentina || isColombia ? formData.clienteId : undefined,
+      cliente_id: formData.clienteId || undefined,
       ...(isArgentina
         ? {
             arca_concepto: arcaConcepto,
@@ -318,6 +320,10 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
       ...prev,
       [name]: normalizedValue
     }))
+    if (!isArgentina && !isColombia && ['clienteTipoDocumento', 'clienteRuc', 'clienteRazonSocial'].includes(name)) {
+      setSelectedFiscalClient(null)
+      setFormData(prev => ({ ...prev, clienteId: '' }))
+    }
 
     // Auto-update serie based on tipo comprobante
     if (name === 'tipoComprobante') {
@@ -402,7 +408,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
       return {
         ...current,
         clienteId,
-        clienteTipoDocumento: cliente?.documento_tipo ?? (isArgentina ? 'CUIT' : 'NIT'),
+        clienteTipoDocumento: cliente?.documento_tipo ?? (isArgentina ? 'CUIT' : isColombia ? 'NIT' : 'RUC'),
         clienteRuc: String(cliente?.documento_numero ?? cliente?.numero_documento ?? cliente?.ruc ?? ''),
         clienteRazonSocial: cliente?.razon_social ?? '',
         clienteDireccion: cliente?.direccion ?? '',
@@ -747,7 +753,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                 </>
               )}
 
-              {isColombia && (
+              {(isColombia || country.paisCodigo === 'PE') && (
                 <>
                   <div>
                     <label htmlFor="cpe-modal-condicion-pago" className="block mb-2 font-semibold text-foreground/85">
@@ -765,7 +771,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                       <option value="CREDITO">Crédito</option>
                     </select>
                   </div>
-                  <div>
+                  {isColombia && <div>
                     <label htmlFor="cpe-modal-medio-pago" className="block mb-2 font-semibold text-foreground/85">
                       Medio de pago DIAN *
                     </label>
@@ -783,7 +789,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                       <option value="48">48 - Tarjeta de crédito</option>
                       <option value="49">49 - Tarjeta débito</option>
                     </select>
-                  </div>
+                  </div>}
                   {formData.condicionPago === 'CREDITO' && (
                     <>
                       <div>
@@ -829,21 +835,23 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
             <h3 className="text-xl font-semibold mb-4 text-foreground/85">
               Datos del Cliente
             </h3>
-            {(isArgentina || isColombia) && (
+            {(isArgentina || isColombia || formData.condicionPago === 'CREDITO') && (
               <div className="mb-4">
                 <label className="block mb-2 font-semibold text-foreground/85">
-                  {isArgentina ? 'Cliente maestro con condición IVA' : 'Cliente maestro con perfil DIAN'} *
+                  {isArgentina ? 'Cliente maestro con condición IVA' : isColombia ? 'Cliente maestro con perfil DIAN' : 'Cliente maestro para crédito'} *
                 </label>
                 <ClienteSelector
                   value={formData.clienteId}
                   onChange={seleccionarClienteFiscal}
-                  baseEndpoint="/api/cpe/receptores"
+                  baseEndpoint={isArgentina || isColombia ? '/api/cpe/receptores' : '/api/ventas/clientes'}
                   error={submitError && !formData.clienteId ? submitError : undefined}
                 />
                 <p className="mt-2 text-sm text-muted-foreground">
                   {isArgentina
                     ? 'El documento, nombre y condición IVA se tomarán del maestro para resolver la clase A/B/C.'
-                    : 'El NIT, nombre y perfil tributario se tomarán del maestro para evitar inconsistencias ante DIAN.'}
+                    : isColombia
+                      ? 'El NIT, nombre y perfil tributario se tomarán del maestro para evitar inconsistencias ante DIAN.'
+                      : 'Selecciona el cliente al que se registrará la cuenta por cobrar.'}
                 </p>
                 {isArgentina && selectedFiscalClient?.arca_condicion_iva && (
                   <p className="mt-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">

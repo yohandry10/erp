@@ -406,8 +406,10 @@ describe('CpeService', () => {
 
             expect(result.id).toBe('cpe-credit');
             expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
-                'emitir_factura_cliente_tx',
+                'emitir_cpe_directo_peru_tx',
                 expect.objectContaining({
+                    p_actor_id: mockUserId,
+                    p_intent_fingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
                     p_cxc: expect.objectContaining({
                         cliente_id: dto.cliente_id,
                         monto_total: 118,
@@ -488,8 +490,11 @@ describe('CpeService', () => {
             expect(result.id).toBe('existing-1');
             expect((result as any).documento_id).toBe('doc-repaired');
             expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
-                'emitir_factura_cliente_tx',
-                expect.any(Object),
+                'emitir_cpe_directo_peru_tx',
+                expect.objectContaining({
+                    p_actor_id: mockUserId,
+                    p_intent_fingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+                }),
             );
             expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
             expect(completedDirectRetrySpy).not.toHaveBeenCalled();

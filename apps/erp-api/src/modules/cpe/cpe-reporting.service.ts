@@ -1,3 +1,4 @@
+import { BadRequestException, HttpException, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { CpeXmlBuilder } from './cpe-xml.builder';
 import { paisDelTenant, rangoDelDiaDelTenant } from '../../shared/utils/fecha-tenant.util';
@@ -11,6 +12,18 @@ export class CpeReportingService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
 async getComprobantesFromDatabase(filters: any = {}, tenantId?: string) {
+    const page = filters.page == null || filters.page === '' ? 1 : Number(filters.page);
+    const pageSize = filters.pageSize == null || filters.pageSize === '' ? 50 : Number(filters.pageSize);
+    if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 200) {
+      throw new BadRequestException('page debe ser un entero positivo y pageSize debe estar entre 1 y 200');
+    }
+    for (const key of ['fechaDesde','fechaHasta']) {
+      const value = filters[key];
+      if (value && (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(Date.parse(value)) || new Date(value).toISOString().slice(0,10) !== value)) {
+        throw new BadRequestException(key + ' debe ser una fecha válida YYYY-MM-DD');
+      }
+    }
+    if (filters.fechaDesde && filters.fechaHasta && filters.fechaDesde > filters.fechaHasta) throw new BadRequestException('El rango de fechas está invertido');
     try {
       console.log('📄 Consultando tabla CPE en Supabase...', filters, 'tenantId:', tenantId);
 
@@ -25,8 +38,9 @@ async getComprobantesFromDatabase(filters: any = {}, tenantId?: string) {
       }
 
       // Paginación y rango
-      const page = Number(filters.page || 1);
-      const pageSize = Math.min(Number(filters.pageSize || 50), 200);
+      const paisTenant = await paisDelTenant(client, tenantId);
+      const dateColumn = paisTenant === 'PE' ? 'fecha_emision' : 'created_at';
+
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
 
@@ -35,6 +49,7 @@ async getComprobantesFromDatabase(filters: any = {}, tenantId?: string) {
         .from('cpe')
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
         .range(from, to);
 
       // Filtrar por tenant_id si se proporciona
@@ -60,11 +75,11 @@ async getComprobantesFromDatabase(filters: any = {}, tenantId?: string) {
       }
 
       if (filters.fechaDesde) {
-        query = query.gte('created_at', `${filters.fechaDesde}T00:00:00`);
+        query = query.gte(dateColumn, `${filters.fechaDesde}T00:00:00${paisTenant === 'PE' ? '+00:00' : ''}`);
       }
 
       if (filters.fechaHasta) {
-        query = query.lte('created_at', `${filters.fechaHasta}T23:59:59`);
+        query = query.lte(dateColumn, `${filters.fechaHasta}T23:59:59${paisTenant === 'PE' ? '.999999+00:00' : ''}`);
       }
 
       if (filters.cliente) {
@@ -96,7 +111,6 @@ async getComprobantesFromDatabase(filters: any = {}, tenantId?: string) {
       // como se guarda `fecha_emision`: el listado mostraba 2026-08-27 para una
       // boleta cuyo XML declaraba 2026-08-28. `fechaDeDocumentoEnPais` sólo
       // convierte lo que lleva hora.
-      const paisTenant = await paisDelTenant(client, tenantId);
       const zonaTenant = zonaHorariaDePais(paisTenant);
       const fechaLocal = (valor: unknown): string =>
         fechaDeDocumentoEnPais(valor, zonaTenant);
@@ -142,24 +156,22 @@ async getComprobantesFromDatabase(filters: any = {}, tenantId?: string) {
       };
 
     } catch (error) {
-      console.error('❌ Error general en getComprobantesFromDatabase:', error);
-      return {
-        success: false,
-        data: [],
-        message: `Error consultando comprobantes: ${error.message}`,
-        error: error.message
-      };
+      if (error instanceof HttpException) throw error;
+      throw new ServiceUnavailableException('No se pudieron consultar los comprobantes; reintente');
     }
   }
 
 async exportComprobantesCsv(filters: any = {}, tenantId?: string) {
-    const response = await this.getComprobantesFromDatabase(
-      { ...filters, page: 1, pageSize: 5000 },
-      tenantId,
-    );
-    if (!response.success) {
-      return { success: false, content: '', filename: '', message: response.message };
-    }
+    const data: any[] = [];
+    let page = 1;
+    let total = 0;
+    do {
+      const response = await this.getComprobantesFromDatabase({ ...filters, page, pageSize: 200 }, tenantId);
+      total = response.meta.total;
+      data.push(...response.data);
+      if (!response.data.length && data.length < total) throw new ServiceUnavailableException('La exportación cambió durante la consulta; reintente');
+      page += 1;
+    } while (data.length < total);
 
     const headers = [
       'tipoComprobante',
@@ -174,7 +186,7 @@ async exportComprobantesCsv(filters: any = {}, tenantId?: string) {
       'estadoSunat',
     ];
 
-    const rows = (response.data || []).map((c: any) => [
+    const rows = data.map((c: any) => [
       c.tipoComprobante,
       c.serie,
       c.numero,
@@ -187,7 +199,13 @@ async exportComprobantesCsv(filters: any = {}, tenantId?: string) {
       c.estadoSunat,
     ]);
 
-    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const cell = (value: unknown) => {
+      let text = String(value ?? '');
+      const firstVisible = [...text].find(character => character.charCodeAt(0) > 32);
+      if (typeof value === 'string' && firstVisible && '=+@-'.includes(firstVisible)) text = "'" + text;
+      return /[",\r\n]/.test(text) ? '"' + text.replace(/"/g,'""') + '"' : text;
+    };
+    const csvContent = [headers.join(','), ...rows.map(row => row.map(cell).join(','))].join('\r\n');
     const filename = `comprobantes_${new Date().toISOString().slice(0, 10)}.csv`;
 
     return { success: true, content: csvContent, filename };
@@ -239,7 +257,8 @@ async getStatsFromDatabase(tenantId?: string) {
         queryHoy = queryHoy.eq('tenant_id', tenantId);
       }
 
-      const { count: cpeHoy } = await queryHoy;
+      const { count: cpeHoy, error: errorHoy } = await queryHoy;
+      if (errorHoy) throw errorHoy;
 
       // CPE del mes
       let queryMes = client
@@ -251,7 +270,8 @@ async getStatsFromDatabase(tenantId?: string) {
         queryMes = queryMes.eq('tenant_id', tenantId);
       }
 
-      const { count: cpeMes } = await queryMes;
+      const { count: cpeMes, error: errorMes } = await queryMes;
+      if (errorMes) throw errorMes;
 
       // Monto facturado del mes
       let queryMonto = client
@@ -263,7 +283,8 @@ async getStatsFromDatabase(tenantId?: string) {
         queryMonto = queryMonto.eq('tenant_id', tenantId);
       }
 
-      const { data: montoData } = await queryMonto;
+      const { data: montoData, error: errorMonto } = await queryMonto;
+      if (errorMonto) throw errorMonto;
 
       const montoFacturado = (montoData || []).reduce((sum, cpe) => 
         sum + parseFloat(cpe.total_venta || 0), 0
@@ -279,7 +300,8 @@ async getStatsFromDatabase(tenantId?: string) {
         queryRechazados = queryRechazados.eq('tenant_id', tenantId);
       }
 
-      const { count: rechazados } = await queryRechazados;
+      const { count: rechazados, error: errorRechazados } = await queryRechazados;
+      if (errorRechazados) throw errorRechazados;
 
       const stats = {
         cpeEmitidosHoy: cpeHoy || 0,
@@ -296,17 +318,7 @@ async getStatsFromDatabase(tenantId?: string) {
       };
 
     } catch (error) {
-      console.error('❌ Error calculando estadísticas:', error);
-      return {
-        success: false,
-        data: {
-          cpeEmitidosHoy: 0,
-          cpeDelMes: 0,
-          montoFacturado: 0,
-          rechazados: 0
-        },
-        error: error.message
-      };
+      throw new ServiceUnavailableException('No se pudieron consultar las estadísticas CPE; reintente');
     }
   }
 

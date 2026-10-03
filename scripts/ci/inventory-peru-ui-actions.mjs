@@ -115,6 +115,28 @@ const result = {
   }),
 };
 const output = path.join(root, 'artifacts/peru-ui-operation-matrix-20261002.json');
+if (process.argv[3]) {
+  const phaseDirectory = path.resolve(root, process.argv[3]);
+  assert.ok(phaseDirectory.startsWith(path.join(root, 'artifacts') + path.sep));
+  const phaseRun = JSON.parse(fs.readFileSync(path.join(phaseDirectory, 'run.json'), 'utf8'));
+  const phase = JSON.parse(fs.readFileSync(path.join(phaseDirectory, 'cpe-browser.json'), 'utf8'));
+  assert.equal(phaseRun.scope, 'cpe_canonical_restored_subset');
+  assert.equal(phaseRun.success, true); assert.equal(phaseRun.remoteWrites, false);
+  assert.equal(phase.success, true); assert.equal(phase.remoteWrites, false);
+  const cpe = result.routes.find(route => normal(route.route) === '/dashboard/cpe');
+  const evidence = relative(path.join(phaseDirectory, 'cpe-browser.json'));
+  cpe.functional_evidence = { country: 'PE', evidence, checks: phase.checks, complete_acceptance: false };
+  cpe.result = 'functional_cases_verified_with_remaining_checks';
+  for (const control of cpe.controls) if (['Nuevo CPE', 'Exportar CSV', 'Vista A4', 'Descargar A4'].includes(control.label)) {
+    control.executed = true; control.evidence = evidence;
+  }
+  cpe.additional_controls = [
+    { label: 'Anterior', source: cpe.source, declared_in_current_code: true, executed: false },
+    { label: 'Siguiente', source: cpe.source, declared_in_current_code: true, executed: true, evidence },
+    { label: 'Reintentar', source: cpe.source, declared_in_current_code: true, executed: false },
+  ];
+  result.limitations[0] = 'Un control se marca ejecutado sólo cuando tiene evidencia funcional específica; una variante probada no acepta toda la acción UI.';
+}
 fs.writeFileSync(output, JSON.stringify(result, null, 2) + '\n');
 console.log(JSON.stringify({ routes: result.routes.length, navigation_links: navigation.links.length,
   visible_controls: result.routes.reduce((total, route) => total + route.controls.length, 0), output: relative(output), full_acceptance: false }));

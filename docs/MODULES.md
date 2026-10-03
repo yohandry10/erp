@@ -197,6 +197,20 @@ Código principal: `apps/erp-api/src/modules/pos`,
 
 - CPE construye UBL, firma, envía, consulta, almacena CDR y produce
   representación impresa.
+- Factura/boleta directa PE reserva una intención por empresa, contenido y
+  actor mediante `emitir_cpe_directo_peru_tx` (565). Un replay idéntico recupera
+  el mismo CPE; contenido distinto devuelve 409. Las claves históricas sin la
+  huella PE fallan cerrado. Pedido y POS conservan sus writers propios.
+  Crédito PE exige cliente maestro y conserva su `cliente_id` en la CxC;
+  `precio_unitario` es el valor neto y `precio_venta` el unitario con impuesto.
+- La bandeja CPE pagina y muestra el total; exporta todas las coincidencias a
+  CSV con campos escapados y fórmulas de texto neutralizadas. Para PE, las
+  fechas filtran por emisión. Ausencia/empresa ajena devuelve 404, parámetros
+  inválidos 400 y fallo de infraestructura 503. Los errores son visibles y
+  permiten reintentar sin sustituirlos por estadísticas cero o listas vacías.
+  Un fallo técnico fiscal conserva 503 también al recuperar el intento;
+  reenvío con otra clave en conflicto devuelve 409. Una firma o estado READY
+  local no representa aceptación SUNAT: ésta exige la respuesta y CDR reales.
 - El PDF A4 es la salida física elegida por el ERP: mide 210 × 297 mm y debe
   imprimirse en papel A4, escala 100 % y sin «ajustar a página». SUNAT no impone
   un único tamaño de papel; lo exigible es que la representación impresa sea
