@@ -1,0 +1,12 @@
+{
+  "success": true,
+  "local_only": true,
+  "pages": 1,
+  "verified": [
+    "cabecera, estado BORRADOR y detalle persistido",
+    "caracteres dentro de página A4"
+  ],
+  "representation_only": true,
+  "fiscal_acceptance": false,
+  "render_image": "artifacts/peru-gre-pdf-visual-20261003.png"
+}

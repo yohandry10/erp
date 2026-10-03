@@ -1,0 +1,12 @@
+{
+  "completedAt": "2026-10-03T13:20:26.545Z",
+  "success": true,
+  "withBrowser": true,
+  "withSurvey": false,
+  "withRecords": false,
+  "candidateApi": true,
+  "candidateUi": true,
+  "scope": "gre_diagnostic_api_subset",
+  "database": "PostgreSQL 16 efímero",
+  "remoteWrites": false
+}

@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-10-03T12:28:49.109Z",
-  "evidence": "artifacts/peru-integrated-ci-37119229809",
+  "generated_at": "2026-10-03T14:08:31.299Z",
+  "evidence": "artifacts/peru-integrated-local-gre-20261003",
   "excluded": [
     "Analytics"
   ],
@@ -226,7 +226,7 @@
         },
         {
           "element": "select",
-          "label": "UsuarioTodos los usuariosCliente (primer-cliente-e63ad5ed-f0b3-44d2-a010-7019c086987d@example.test)Lector contable local (lector-contable-533d6eb5@example.test)Lector de inventario",
+          "label": "UsuarioTodos los usuariosLector local (lector-maestros-dd5b9a40@example.test)Cliente (primer-cliente-76f8bdf3-6a4d-435b-8426-35f3a1d22261@example.test)Lector de inventario local (l",
           "type": null,
           "disabled": false,
           "path": null,
@@ -2212,7 +2212,7 @@
         },
         {
           "element": "select",
-          "label": "ProveedorTodos los proveedoresAlta proveedor 5e5028fbIMPORT UI LOCAL PROVEEDORES fe6379bb EDITADOMAESTRO LOCAL PROVEEDORES c55ead1a EDITADO",
+          "label": "ProveedorTodos los proveedoresAlta proveedor dd5b9a40IMPORT UI LOCAL PROVEEDORES d69dbff6 EDITADOMAESTRO LOCAL PROVEEDORES 24f20fda EDITADO",
           "type": null,
           "disabled": false,
           "path": null,
@@ -2244,7 +2244,7 @@
         },
         {
           "element": "button",
-          "label": "Alta proveedor 5e5028fbRUC: 20823116757Activoproveedor-5e5028fb@example.test",
+          "label": "Alta proveedor dd5b9a40RUC: 20137680000Activoproveedor-dd5b9a40@example.test",
           "type": "button",
           "disabled": false,
           "path": null,
@@ -2252,7 +2252,7 @@
         },
         {
           "element": "button",
-          "label": "IMPORT UI LOCAL PROVEEDORES fe6379bb EDITADORUC: 20679320913Activoui-local@example.test",
+          "label": "IMPORT UI LOCAL PROVEEDORES d69dbff6 EDITADORUC: 20006625186Activoui-local@example.test",
           "type": "button",
           "disabled": false,
           "path": null,
@@ -2260,7 +2260,7 @@
         },
         {
           "element": "button",
-          "label": "MAESTRO LOCAL PROVEEDORES c55ead1a EDITADORUC: 20123456786Activoeditado-c55ead1a@example.test",
+          "label": "MAESTRO LOCAL PROVEEDORES 24f20fda EDITADORUC: 20123456786Activoeditado-24f20fda@example.test",
           "type": "button",
           "disabled": false,
           "path": null,
@@ -9044,8 +9044,89 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "pending_browser_evidence",
-      "controls": [],
+      "result": "visible_controls_pending_functional_execution",
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Actualizar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Resumen",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/configuracion/",
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Empresa",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/configuracion/empresa/",
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Ventas",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/configuracion/ventas/",
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "RRHH",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/configuracion/rrhh/",
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Editar en asistente",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/wizard/",
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Establecimientos anexos",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/configuracion/sucursales/",
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Revisar RRHH Perú",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/configuracion/rrhh/",
+          "executed": false
+        }
+      ],
       "declared_api_calls": [
         {
           "method": "POST",
@@ -10216,7 +10297,7 @@
         },
         {
           "element": "button",
-          "label": "Editar establecimiento Sucursal apertura c55ead1a",
+          "label": "Editar establecimiento Sucursal apertura 24f20fda",
           "type": null,
           "disabled": false,
           "path": null,
@@ -10224,7 +10305,7 @@
         },
         {
           "element": "button",
-          "label": "Desactivar establecimiento Sucursal apertura c55ead1a",
+          "label": "Desactivar establecimiento Sucursal apertura 24f20fda",
           "type": null,
           "disabled": false,
           "path": null,
@@ -10232,7 +10313,7 @@
         },
         {
           "element": "button",
-          "label": "Asignar Casa matriz a lector-contable-533d6eb5@example.test",
+          "label": "Asignar Casa matriz a lector-contable-c861bd9e@example.test",
           "type": null,
           "disabled": false,
           "path": null,
@@ -10240,7 +10321,7 @@
         },
         {
           "element": "button",
-          "label": "Asignar Sucursal apertura c55ead1a a lector-contable-533d6eb5@example.test",
+          "label": "Asignar Sucursal apertura 24f20fda a lector-contable-c861bd9e@example.test",
           "type": null,
           "disabled": false,
           "path": null,
@@ -10248,7 +10329,7 @@
         },
         {
           "element": "button",
-          "label": "Asignar Casa matriz a lector-inventario-386a643f@example.test",
+          "label": "Asignar Casa matriz a lector-inventario-f58e7e51@example.test",
           "type": null,
           "disabled": false,
           "path": null,
@@ -10256,7 +10337,7 @@
         },
         {
           "element": "button",
-          "label": "Asignar Sucursal apertura c55ead1a a lector-inventario-386a643f@example.test",
+          "label": "Asignar Sucursal apertura 24f20fda a lector-inventario-f58e7e51@example.test",
           "type": null,
           "disabled": false,
           "path": null,
@@ -10264,7 +10345,7 @@
         },
         {
           "element": "button",
-          "label": "Asignar Casa matriz a primer-cliente-e63ad5ed-f0b3-44d2-a010-7019c086987d@example.test",
+          "label": "Asignar Casa matriz a primer-cliente-76f8bdf3-6a4d-435b-8426-35f3a1d22261@example.test",
           "type": null,
           "disabled": false,
           "path": null,
@@ -10272,7 +10353,7 @@
         },
         {
           "element": "button",
-          "label": "Asignar Sucursal apertura c55ead1a a primer-cliente-e63ad5ed-f0b3-44d2-a010-7019c086987d@example.test",
+          "label": "Asignar Sucursal apertura 24f20fda a primer-cliente-76f8bdf3-6a4d-435b-8426-35f3a1d22261@example.test",
           "type": null,
           "disabled": false,
           "path": null,
@@ -11983,7 +12064,7 @@
         },
         {
           "element": "button",
-          "label": "Ver cronograma AF-533D6EB5",
+          "label": "Ver cronograma AF-C861BD9E",
           "type": "button",
           "disabled": false,
           "path": null,
@@ -14779,6 +14860,78 @@
           "disabled": false,
           "path": null,
           "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Código *",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Nombre *",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "textarea",
+          "label": "Descripción",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Centro de costo activo",
+          "type": "checkbox",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cancelar",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Guardar Cambios",
+          "type": "submit",
+          "disabled": false,
+          "path": null,
+          "executed": false
         }
       ],
       "declared_api_calls": [
@@ -15386,24 +15539,36 @@
             {
               "method": "POST",
               "endpoint": "/api/contabilidad/registro-consignaciones",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "consignment-delivery-intents",
+                  "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+                  "verified_checks": [
+                    "dos intenciones idénticas crean dos IDs; replay recupera el primero",
+                    "cantidad/precio inválidos no insertan; total 24.68 calculado por servidor",
+                    "UI commit con respuesta perdida conserva campos, recupera entrega y permite otra idéntica; reload muestra dos"
+                  ]
+                },
+                {
+                  "id": "consignment-reader-and-ledger-boundary",
+                  "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+                  "verified_checks": [
+                    "lector consulta y no crea ni cambia estados; registros no alteran libros legales"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "otras monedas, bienes/orígenes y formulario restaurado antes de confirmar tras cerrar navegador",
+                "filtros, exportación e impresión que existan y otros permisos"
               ],
               "defects": [
                 {
                   "id": "consignment-ui-new-identical-delivery-replays-old-record",
-                  "status": "candidate_api_ui_restore_passed_canonical_ci_deployment_pending",
+                  "status": "corrected_merged_main_deployment_verified",
                   "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
                   "correction": "Candidato web conserva intención durante fallo y la libera después de éxito para permitir otra entrega idéntica.",
-                  "pending": [
-                    "Fuentes/migración/verificador canónicos, CI, ensayo de preservación y despliegue"
-                  ]
+                  "pending": []
                 }
               ]
             }
@@ -15417,14 +15582,27 @@
             {
               "method": "POST",
               "endpoint": "/api/contabilidad/registro-consignaciones/:id/estado",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "consignment-delivery-state-lifecycle",
+                  "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+                  "verified_checks": [
+                    "venta y cierre, devolución/anulación de pendiente y replay persistidos",
+                    "estado terminal y mutación ajena/inexistente rechazados sin cambiar entrega"
+                  ]
+                },
+                {
+                  "id": "consignment-reader-and-ledger-boundary",
+                  "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+                  "verified_checks": [
+                    "lector consulta y no crea ni cambia estados; registros no alteran libros legales"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "cambios de estado desde navegador y variantes comerciales restantes",
+                "filtros, exportación e impresión que existan y otros permisos"
               ],
               "defects": []
             }
@@ -16103,14 +16281,19 @@
             {
               "method": "GET",
               "endpoint": "/api/contabilidad/consolidacion/grupos",
-              "result": "http_contract_observed_not_full_acceptance",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "consolidation-membership-real-balances",
+                  "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+                  "verified_checks": [
+                    "grupo real, invitación pendiente, rechazo y aceptación en dos empresas",
+                    "UI crea grupo, invita y segunda sesión acepta; balances 100+200 compartidos sólo tras aceptar"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "otras participaciones y salida/cambio de miembro si existen"
               ],
               "defects": []
             }
@@ -16145,14 +16328,19 @@
             {
               "method": "POST",
               "endpoint": "/api/contabilidad/consolidacion/grupos",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "consolidation-membership-real-balances",
+                  "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+                  "verified_checks": [
+                    "grupo real, invitación pendiente, rechazo y aceptación en dos empresas",
+                    "UI crea grupo, invita y segunda sesión acepta; balances 100+200 compartidos sólo tras aceptar"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "otras participaciones y salida/cambio de miembro si existen"
               ],
               "defects": []
             }
@@ -16166,24 +16354,27 @@
             {
               "method": "POST",
               "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/invitaciones",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "consolidation-membership-real-balances",
+                  "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+                  "verified_checks": [
+                    "grupo real, invitación pendiente, rechazo y aceptación en dos empresas",
+                    "UI crea grupo, invita y segunda sesión acepta; balances 100+200 compartidos sólo tras aceptar"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "otras participaciones y salida/cambio de miembro si existen"
               ],
               "defects": [
                 {
                   "id": "consolidation-domain-rejections-return-500",
-                  "status": "candidate_api_ui_restore_passed_canonical_ci_deployment_pending",
+                  "status": "corrected_merged_main_deployment_verified",
                   "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
                   "correction": "Candidato distingue colisión 409, pertenencia 403, estado/datos 400 y fallo de infraestructura 503; no cambia escrituras ni límites.",
-                  "pending": [
-                    "Fuentes/migración/verificador canónicos, CI, ensayo de preservación y despliegue"
-                  ]
+                  "pending": []
                 }
               ]
             }
@@ -16197,14 +16388,19 @@
             {
               "method": "POST",
               "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/respuesta",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "consolidation-membership-real-balances",
+                  "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+                  "verified_checks": [
+                    "grupo real, invitación pendiente, rechazo y aceptación en dos empresas",
+                    "UI crea grupo, invita y segunda sesión acepta; balances 100+200 compartidos sólo tras aceptar"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "otras participaciones y salida/cambio de miembro si existen"
               ],
               "defects": []
             }
@@ -16218,33 +16414,34 @@
             {
               "method": "POST",
               "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/tasas",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "consolidation-presentation-currency",
+                  "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+                  "verified_checks": [
+                    "PEN a USD de controladora y miembro, corte, falta de tasa, replay/conflicto y permiso",
+                    "UI registra ambas tasas y obtiene 125 con fuentes reales"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "tipos cierre/histórica y monedas/fechas restantes"
               ],
               "defects": [
                 {
                   "id": "consolidation-domain-rejections-return-500",
-                  "status": "candidate_api_ui_restore_passed_canonical_ci_deployment_pending",
+                  "status": "corrected_merged_main_deployment_verified",
                   "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
                   "correction": "Candidato distingue colisión 409, pertenencia 403, estado/datos 400 y fallo de infraestructura 503; no cambia escrituras ni límites.",
-                  "pending": [
-                    "Fuentes/migración/verificador canónicos, CI, ensayo de preservación y despliegue"
-                  ]
+                  "pending": []
                 },
                 {
                   "id": "consolidation-controller-rate-unavailable-in-ui",
-                  "status": "candidate_api_ui_restore_passed_canonical_ci_deployment_pending",
+                  "status": "corrected_merged_main_deployment_verified",
                   "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
                   "correction": "Candidato selecciona miembros activos cuya moneda necesita conversión, incluida la controladora.",
-                  "pending": [
-                    "Fuentes/migración/verificador canónicos, CI, ensayo de preservación y despliegue"
-                  ]
+                  "pending": []
                 }
               ]
             }
@@ -16258,14 +16455,19 @@
             {
               "method": "POST",
               "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/mapeos-cuentas",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "consolidation-account-mapping",
+                  "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+                  "verified_checks": [
+                    "mapeo 70→20 persistido y replay sin duplicar",
+                    "cuenta ausente rechazada y cálculo de grupo refleja el mapeo"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "otros mapeos y variantes de edición/retiro disponibles"
               ],
               "defects": []
             }
@@ -16279,24 +16481,27 @@
             {
               "method": "POST",
               "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/ajustes",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "consolidation-adjustment-keeps-legal-books",
+                  "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+                  "verified_checks": [
+                    "eliminación con replay/conflicto, cuenta inválida y debe/haber inválido",
+                    "sólo cambia reporte, conserva huella de libros legales; lector no ajusta"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "otros tipos y períodos de ajustes; UI de ajustes"
               ],
               "defects": [
                 {
                   "id": "consolidation-domain-rejections-return-500",
-                  "status": "candidate_api_ui_restore_passed_canonical_ci_deployment_pending",
+                  "status": "corrected_merged_main_deployment_verified",
                   "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
                   "correction": "Candidato distingue colisión 409, pertenencia 403, estado/datos 400 y fallo de infraestructura 503; no cambia escrituras ni límites.",
-                  "pending": [
-                    "Fuentes/migración/verificador canónicos, CI, ensayo de preservación y despliegue"
-                  ]
+                  "pending": []
                 }
               ]
             }
@@ -16310,24 +16515,27 @@
             {
               "method": "POST",
               "endpoint": "/api/contabilidad/reportes-configurables",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "configurable-report-definition-validation",
+                  "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+                  "verified_checks": [
+                    "alta y reemplazo con validación de código, fórmula, referencias y orden",
+                    "rechazos conservan líneas vigentes y no permiten edición ajena"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "otros tipos de línea, eliminación y modificaciones permitidas por el producto"
               ],
               "defects": [
                 {
                   "id": "consolidation-domain-rejections-return-500",
-                  "status": "candidate_api_ui_restore_passed_canonical_ci_deployment_pending",
+                  "status": "corrected_merged_main_deployment_verified",
                   "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
                   "correction": "Candidato distingue colisión 409, pertenencia 403, estado/datos 400 y fallo de infraestructura 503; no cambia escrituras ni límites.",
-                  "pending": [
-                    "Fuentes/migración/verificador canónicos, CI, ensayo de preservación y despliegue"
-                  ]
+                  "pending": []
                 }
               ]
             }
@@ -16341,24 +16549,54 @@
             {
               "method": "GET",
               "endpoint": "/api/contabilidad/reportes-configurables/:reporteId/generar",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "configurable-report-real-sources",
+                  "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+                  "verified_checks": [
+                    "saldo por período, acumulado, fórmula y aislamiento",
+                    "excluye borrador y fechas fuera del corte; lector permitido y escrituras rechazadas"
+                  ]
+                },
+                {
+                  "id": "consolidation-presentation-currency",
+                  "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+                  "verified_checks": [
+                    "PEN a USD de controladora y miembro, corte, falta de tasa, replay/conflicto y permiso",
+                    "UI registra ambas tasas y obtiene 125 con fuentes reales"
+                  ]
+                },
+                {
+                  "id": "consolidation-account-mapping",
+                  "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+                  "verified_checks": [
+                    "mapeo 70→20 persistido y replay sin duplicar",
+                    "cuenta ausente rechazada y cálculo de grupo refleja el mapeo"
+                  ]
+                },
+                {
+                  "id": "consolidation-adjustment-keeps-legal-books",
+                  "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+                  "verified_checks": [
+                    "eliminación con replay/conflicto, cuenta inválida y debe/haber inválido",
+                    "sólo cambia reporte, conserva huella de libros legales; lector no ajusta"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "otras cuentas, naturalezas, fórmulas y presentación/exportación/impresión donde existan",
+                "tipos cierre/histórica y monedas/fechas restantes",
+                "otros mapeos y variantes de edición/retiro disponibles",
+                "otros tipos y períodos de ajustes; UI de ajustes"
               ],
               "defects": [
                 {
                   "id": "consolidation-report-missing-service-select",
-                  "status": "candidate_api_ui_restore_passed_canonical_ci_deployment_pending",
+                  "status": "corrected_merged_main_deployment_verified",
                   "proof": "artifacts/peru-reports-consolidation-read-baseline-20261003/reports-consignations.json",
                   "correction": "Candidato local concede únicamente SELECT de los tres orígenes de consolidación a service_role; preserva escrituras RPC y no concede lectura a anon/authenticated.",
-                  "pending": [
-                    "Fuentes/migración/verificador canónicos, CI, ensayo de preservación y despliegue"
-                  ]
+                  "pending": []
                 }
               ]
             }
@@ -17815,12 +18053,10 @@
                 },
                 {
                   "id": "monthly-tax-save-retry-duplicates-version",
-                  "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
+                  "status": "corrected_merged_main_deployment_verified",
                   "proof": "artifacts/peru-tax-version-retry-baseline-20261003/tax-version-retry.json",
                   "correction": "Intención durable, conflicto de cuerpo y respuesta congelada; transacción única y web retiene clave durante fallo",
-                  "pending": [
-                    "CI exacto, promoción DB-first 562, main y despliegue"
-                  ]
+                  "pending": []
                 }
               ]
             }
@@ -17853,12 +18089,10 @@
               "defects": [
                 {
                   "id": "monthly-tax-receipt-retry-500",
-                  "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
+                  "status": "corrected_merged_main_deployment_verified",
                   "proof": "artifacts/peru-tax-version-retry-baseline-20261003/tax-version-retry.json",
                   "correction": "Constancia e intención atómicas; replay confirmado se recupera antes de exigir estado BORRADOR",
-                  "pending": [
-                    "CI exacto, promoción DB-first 562, main y despliegue"
-                  ]
+                  "pending": []
                 }
               ]
             }
@@ -21216,8 +21450,89 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "pending_browser_evidence",
-      "controls": [],
+      "result": "visible_controls_pending_functional_execution",
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Actualizar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Nuevo Presupuesto",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Buscar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Centro de costo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Periodo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Estado",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Alerta",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Crear primer presupuesto",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -23222,21 +23537,97 @@
         {
           "method": "POST",
           "endpoint": "/api/gre/guias",
-          "source": "apps/web/components/modals/GreModal.tsx:151",
+          "source": "apps/web/components/modals/GreModal.tsx:156",
           "contracts": [
             {
               "method": "POST",
               "endpoint": "/api/gre/guias",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
-              "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-manual-creation-persistence",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "primera empresa no demo crea borrador y líneas reales; inválidos no insertan",
+                    "UI acepta peso 2 kg y documento manual; con certificado desechable firma y persiste tras recarga"
+                  ]
+                },
+                {
+                  "id": "gre-intent-replay-conflict",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "replay y concurrencia recuperan un ID y un detalle; conflicto 409 conserva documento",
+                    "UI recupera respuesta perdida sin otra fila; nueva intención idéntica crea otro ID"
+                  ]
+                },
+                {
+                  "id": "gre-unsigned-and-signed-local-xml",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "sin PFX falla cerrado con error durable sin XML",
+                    "PFX desechable configurado por wizard; UBL real firmado con emisor y bienes persistidos"
+                  ]
+                },
+                {
+                  "id": "gre-reader-permissions",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "lector real consulta y no crea, anula, configura ni descarga XML"
+                  ]
+                },
+                {
+                  "id": "gre-infrastructure-error-recovery",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "REVOKE EXECUTE local produce 503 genérico sin insertar; regrant y misma clave recuperan operación"
+                  ]
+                }
               ],
-              "defects": []
+              "pending_checks": [
+                "altas a partir de CPE/pedido y variantes de transporte/origen/bienes ofrecidas",
+                "otras mutaciones concurrentes y recuperación tras cerrar completamente el navegador",
+                "firma explícita de borrador previamente creado; otros motivos/modalidades y firma con proveedor del futuro cliente",
+                "otros roles, permisos de firma/transmisión y worker firmado",
+                "otros fallos de red/Storage/autoridad externa"
+              ],
+              "defects": [
+                {
+                  "id": "gre-idempotency-collision-returns-400",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
+                  "correction": "Fuentes canónicas distingue conflictos de idempotencia con HTTP 409 y conserva estado persistido.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-rpc-infrastructure-failure-returns-400",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
+                  "correction": "Fuentes canónicas distingue indisponibilidad RPC con HTTP 503 y mensaje sin detalles internos; misma clave recupera operación tras restaurar EXECUTE.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-manual-weight-html-step-blocks-valid-values",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
+                  "correction": "Fuentes canónicas alinea step 0.001 con mínimo 0.001 y precisión de tres decimales del DTO.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-manual-recipient-document-unavailable",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
+                  "correction": "Fuentes canónicas ofrece tipo/documento del destinatario manual y lo persiste en datosAdicionales para construir UBL firmado.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -25414,8 +25805,49 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "pending_browser_evidence",
-      "controls": [],
+      "result": "visible_controls_pending_functional_execution",
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Actualizar",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Nueva cuenta",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Nueva cuenta bancaria",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -26187,6 +26619,102 @@
           "element": "button",
           "label": "Cambiar a tema claro",
           "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Volver",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Nombre de la Cuenta *",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Banco *",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Número de Cuenta *",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "select",
+          "label": "Tipo de Cuenta *",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "select",
+          "label": "Cuenta contable bancaria *",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Permite SobregiroPermite que el saldo de la cuenta sea negativo",
+          "type": "checkbox",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Cuenta ActivaSolo las cuentas activas pueden recibir movimientos",
+          "type": "checkbox",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cancelar",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Guardar Cambios",
+          "type": "submit",
           "disabled": false,
           "path": null,
           "executed": false
@@ -27911,7 +28439,7 @@
         },
         {
           "element": "select",
-          "label": "ClienteTodosIMPORT UI LOCAL CLIENTES fe6379bb EDITADOAlta cliente 5e5028fbMAESTRO LOCAL CLIENTES c55ead1a EDITADO",
+          "label": "ClienteTodosIMPORT UI LOCAL CLIENTES d69dbff6 EDITADOAlta cliente dd5b9a40MAESTRO LOCAL CLIENTES 24f20fda EDITADO",
           "type": null,
           "disabled": false,
           "path": null,
@@ -28677,8 +29205,49 @@
           "errors": []
         }
       ],
-      "result": "pending_browser_evidence",
-      "controls": [],
+      "result": "visible_controls_pending_functional_execution",
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -30278,8 +30847,49 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "pending_browser_evidence",
-      "controls": [],
+      "result": "visible_controls_pending_functional_execution",
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Volver a tesorería",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Actualizar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Días de proyección",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -31161,25 +31771,111 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "pending_browser_evidence",
-      "controls": [],
+      "result": "visible_controls_pending_functional_execution",
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Generar reporte",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Nueva GRE",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "select",
+          "label": "Modalidad",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "select",
+          "label": "Estado",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Fecha desde",
+          "type": "date",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Fecha hasta",
+          "type": "date",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Actualizar",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Crear primera GRE",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ],
       "declared_api_calls": [
         {
           "method": "GET",
           "endpoint": "/api/gre/guias",
-          "source": "apps/web/app/dashboard/gre/page.tsx:88",
+          "source": "apps/web/app/dashboard/gre/page.tsx:89",
           "contracts": [
             {
               "method": "GET",
               "endpoint": "/api/gre/guias",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-queries-and-tenant-isolation",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "consulta, búsqueda, filtros y detalle usan cabecera/líneas reales",
+                    "operaciones ajenas 404 sin cambios ni fuga; listado de otra empresa vacío"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "otros filtros, paginación si existe y alcance por sucursal/almacén cuando corresponda"
               ],
               "defects": []
             }
@@ -31188,42 +31884,188 @@
         {
           "method": "GET",
           "endpoint": "/api/gre/reporte",
-          "source": "apps/web/app/dashboard/gre/page.tsx:133",
+          "source": "apps/web/app/dashboard/gre/page.tsx:134",
           "contracts": [
             {
               "method": "GET",
               "endpoint": "/api/gre/reporte",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
-              "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-csv-real-filtered-safe",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "CSV de registros reales excluye empresa y período ajenos",
+                    "neutraliza =1+1 y conserva comillas, comas y saltos"
+                  ]
+                }
               ],
-              "defects": []
+              "pending_checks": [
+                "otras variantes de exportación, datos y acceso lector al reporte"
+              ],
+              "defects": [
+                {
+                  "id": "gre-csv-untrusted-cell-keeps-formula",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-csv-defect-20261003/gre-operations.json",
+                  "correction": "Escape CSV neutraliza prefijos de fórmula, conserva comillas, comas y saltos, conforme al exportador bancario existente.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:dynamic/pdf",
+          "source": "apps/web/app/dashboard/gre/page.tsx:150",
+          "contracts": [
+            {
+              "method": "GET",
+              "endpoint": "/api/gre/guias/:id/pdf",
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-queries-and-tenant-isolation",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "consulta, búsqueda, filtros y detalle usan cabecera/líneas reales",
+                    "operaciones ajenas 404 sin cambios ni fuga; listado de otra empresa vacío"
+                  ]
+                },
+                {
+                  "id": "gre-pdf-real-document",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "PDF binario con cabecera y bienes; emisor firmado permanece congelado tras editar empresa",
+                    "80 bienes en cuatro páginas; revisión visual de primera y última sin recortes",
+                    "UI muestra bienes, descarga PDF y entrega el mismo tipo de documento al iframe de impresión"
+                  ]
+                }
+              ],
+              "pending_checks": [
+                "otros filtros, paginación si existe y alcance por sucursal/almacén cuando corresponda",
+                "otras longitudes y caracteres; impresora física y botón de descarga desde listado"
+              ],
+              "defects": [
+                {
+                  "id": "gre-pdf-endpoint-delivers-text",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
+                  "correction": "Fuentes canónicas entrega PDF A4 binario con emisor, estado, transporte y todos los bienes; emisor firmado se obtiene del XML congelado. El cliente debe conservar bytes/extensión PDF al descargar y ofrecer la acción en listado.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-view-and-print-omit-transported-items",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-print.json",
+                  "correction": "Fuentes canónicas renderizan bienes y cantidades; impresión consume el PDF con datos del registro.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                }
+              ]
             }
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/gre/guias",
-          "source": "apps/web/components/modals/GreModal.tsx:151",
+          "source": "apps/web/components/modals/GreModal.tsx:156",
           "contracts": [
             {
               "method": "POST",
               "endpoint": "/api/gre/guias",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
-              "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-manual-creation-persistence",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "primera empresa no demo crea borrador y líneas reales; inválidos no insertan",
+                    "UI acepta peso 2 kg y documento manual; con certificado desechable firma y persiste tras recarga"
+                  ]
+                },
+                {
+                  "id": "gre-intent-replay-conflict",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "replay y concurrencia recuperan un ID y un detalle; conflicto 409 conserva documento",
+                    "UI recupera respuesta perdida sin otra fila; nueva intención idéntica crea otro ID"
+                  ]
+                },
+                {
+                  "id": "gre-unsigned-and-signed-local-xml",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "sin PFX falla cerrado con error durable sin XML",
+                    "PFX desechable configurado por wizard; UBL real firmado con emisor y bienes persistidos"
+                  ]
+                },
+                {
+                  "id": "gre-reader-permissions",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "lector real consulta y no crea, anula, configura ni descarga XML"
+                  ]
+                },
+                {
+                  "id": "gre-infrastructure-error-recovery",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "REVOKE EXECUTE local produce 503 genérico sin insertar; regrant y misma clave recuperan operación"
+                  ]
+                }
               ],
-              "defects": []
+              "pending_checks": [
+                "altas a partir de CPE/pedido y variantes de transporte/origen/bienes ofrecidas",
+                "otras mutaciones concurrentes y recuperación tras cerrar completamente el navegador",
+                "firma explícita de borrador previamente creado; otros motivos/modalidades y firma con proveedor del futuro cliente",
+                "otros roles, permisos de firma/transmisión y worker firmado",
+                "otros fallos de red/Storage/autoridad externa"
+              ],
+              "defects": [
+                {
+                  "id": "gre-idempotency-collision-returns-400",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
+                  "correction": "Fuentes canónicas distingue conflictos de idempotencia con HTTP 409 y conserva estado persistido.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-rpc-infrastructure-failure-returns-400",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
+                  "correction": "Fuentes canónicas distingue indisponibilidad RPC con HTTP 503 y mensaje sin detalles internos; misma clave recupera operación tras restaurar EXECUTE.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-manual-weight-html-step-blocks-valid-values",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
+                  "correction": "Fuentes canónicas alinea step 0.001 con mínimo 0.001 y precisión de tres decimales del DTO.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-manual-recipient-document-unavailable",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
+                  "correction": "Fuentes canónicas ofrece tipo/documento del destinatario manual y lo persiste en datosAdicionales para construir UBL firmado.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -31403,75 +32245,143 @@
         {
           "method": "POST",
           "endpoint": "/api/gre/guias/:dynamic/:dynamic",
-          "source": "apps/web/components/modals/GreViewModal.tsx:60",
+          "source": "apps/web/components/modals/GreViewModal.tsx:61",
           "contracts": [
             {
               "method": "POST",
               "endpoint": "/api/gre/guias/:id/firmar",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
-              "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-queries-and-tenant-isolation",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "consulta, búsqueda, filtros y detalle usan cabecera/líneas reales",
+                    "operaciones ajenas 404 sin cambios ni fuga; listado de otra empresa vacío"
+                  ]
+                },
+                {
+                  "id": "gre-unsigned-and-signed-local-xml",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "sin PFX falla cerrado con error durable sin XML",
+                    "PFX desechable configurado por wizard; UBL real firmado con emisor y bienes persistidos"
+                  ]
+                },
+                {
+                  "id": "gre-annulment-terminal-state",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "clave/motivo inválidos rechazados; anulación y replay terminales; firma posterior rechazada"
+                  ]
+                }
               ],
-              "defects": []
+              "pending_checks": [
+                "otros filtros, paginación si existe y alcance por sucursal/almacén cuando corresponda",
+                "firma explícita de borrador previamente creado; otros motivos/modalidades y firma con proveedor del futuro cliente",
+                "anulación de otros estados ofrecidos y recorrido de anulación UI"
+              ],
+              "defects": [
+                {
+                  "id": "gre-manual-recipient-document-unavailable",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
+                  "correction": "Fuentes canónicas ofrece tipo/documento del destinatario manual y lo persiste en datosAdicionales para construir UBL firmado.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                }
+              ]
             },
             {
               "method": "POST",
               "endpoint": "/api/gre/guias/:id/enviar-sunat",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-external-transmission-fails-closed",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "borrador y firmado sin credenciales externas no fabrican ticket, CDR ni aceptación",
+                    "consulta del último estado no transmite"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "aceptación/acuse SUNAT y reintentos tras rechazo/transitorio externo; acceso autorizado del futuro cliente"
               ],
               "defects": []
             },
             {
               "method": "POST",
               "endpoint": "/api/gre/guias/:id/reenviar",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-external-transmission-fails-closed",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "borrador y firmado sin credenciales externas no fabrican ticket, CDR ni aceptación",
+                    "consulta del último estado no transmite"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "aceptación/acuse SUNAT y reintentos tras rechazo/transitorio externo; acceso autorizado del futuro cliente"
               ],
               "defects": []
             },
             {
               "method": "POST",
               "endpoint": "/api/gre/guias/:id/consultar-sunat",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-external-transmission-fails-closed",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "borrador y firmado sin credenciales externas no fabrican ticket, CDR ni aceptación",
+                    "consulta del último estado no transmite"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "aceptación/acuse SUNAT y reintentos tras rechazo/transitorio externo; acceso autorizado del futuro cliente"
               ],
               "defects": []
             },
             {
               "method": "POST",
               "endpoint": "/api/gre/guias/:id/anular",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-queries-and-tenant-isolation",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "consulta, búsqueda, filtros y detalle usan cabecera/líneas reales",
+                    "operaciones ajenas 404 sin cambios ni fuga; listado de otra empresa vacío"
+                  ]
+                },
+                {
+                  "id": "gre-annulment-terminal-state",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "clave/motivo inválidos rechazados; anulación y replay terminales; firma posterior rechazada"
+                  ]
+                },
+                {
+                  "id": "gre-reader-permissions",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "lector real consulta y no crea, anula, configura ni descarga XML"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "otros filtros, paginación si existe y alcance por sucursal/almacén cuando corresponda",
+                "anulación de otros estados ofrecidos y recorrido de anulación UI",
+                "otros roles, permisos de firma/transmisión y worker firmado"
               ],
               "defects": []
             }
@@ -31480,42 +32390,173 @@
         {
           "method": "GET",
           "endpoint": "/api/gre/guias/:dynamic",
-          "source": "apps/web/components/modals/GreViewModal.tsx:76",
+          "source": "apps/web/components/modals/GreViewModal.tsx:77",
           "contracts": [
             {
               "method": "GET",
               "endpoint": "/api/gre/guias/:id",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
-              "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-manual-creation-persistence",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "primera empresa no demo crea borrador y líneas reales; inválidos no insertan",
+                    "UI acepta peso 2 kg y documento manual; con certificado desechable firma y persiste tras recarga"
+                  ]
+                },
+                {
+                  "id": "gre-queries-and-tenant-isolation",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "consulta, búsqueda, filtros y detalle usan cabecera/líneas reales",
+                    "operaciones ajenas 404 sin cambios ni fuga; listado de otra empresa vacío"
+                  ]
+                },
+                {
+                  "id": "gre-pdf-real-document",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "PDF binario con cabecera y bienes; emisor firmado permanece congelado tras editar empresa",
+                    "80 bienes en cuatro páginas; revisión visual de primera y última sin recortes",
+                    "UI muestra bienes, descarga PDF y entrega el mismo tipo de documento al iframe de impresión"
+                  ]
+                },
+                {
+                  "id": "gre-reader-permissions",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "lector real consulta y no crea, anula, configura ni descarga XML"
+                  ]
+                }
               ],
-              "defects": []
+              "pending_checks": [
+                "altas a partir de CPE/pedido y variantes de transporte/origen/bienes ofrecidas",
+                "otros filtros, paginación si existe y alcance por sucursal/almacén cuando corresponda",
+                "otras longitudes y caracteres; impresora física y botón de descarga desde listado",
+                "otros roles, permisos de firma/transmisión y worker firmado"
+              ],
+              "defects": [
+                {
+                  "id": "gre-view-and-print-omit-transported-items",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-print.json",
+                  "correction": "Fuentes canónicas renderizan bienes y cantidades; impresión consume el PDF con datos del registro.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                }
+              ]
             }
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/gre/guias/:dynamic/pdf",
-          "source": "apps/web/components/modals/GreViewModal.tsx:96",
+          "source": "apps/web/components/modals/GreViewModal.tsx:97",
           "contracts": [
             {
               "method": "GET",
               "endpoint": "/api/gre/guias/:id/pdf",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
-              "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-queries-and-tenant-isolation",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "consulta, búsqueda, filtros y detalle usan cabecera/líneas reales",
+                    "operaciones ajenas 404 sin cambios ni fuga; listado de otra empresa vacío"
+                  ]
+                },
+                {
+                  "id": "gre-pdf-real-document",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "PDF binario con cabecera y bienes; emisor firmado permanece congelado tras editar empresa",
+                    "80 bienes en cuatro páginas; revisión visual de primera y última sin recortes",
+                    "UI muestra bienes, descarga PDF y entrega el mismo tipo de documento al iframe de impresión"
+                  ]
+                }
               ],
-              "defects": []
+              "pending_checks": [
+                "otros filtros, paginación si existe y alcance por sucursal/almacén cuando corresponda",
+                "otras longitudes y caracteres; impresora física y botón de descarga desde listado"
+              ],
+              "defects": [
+                {
+                  "id": "gre-pdf-endpoint-delivers-text",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
+                  "correction": "Fuentes canónicas entrega PDF A4 binario con emisor, estado, transporte y todos los bienes; emisor firmado se obtiene del XML congelado. El cliente debe conservar bytes/extensión PDF al descargar y ofrecer la acción en listado.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-view-and-print-omit-transported-items",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-print.json",
+                  "correction": "Fuentes canónicas renderizan bienes y cantidades; impresión consume el PDF con datos del registro.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:dynamic/pdf",
+          "source": "apps/web/components/modals/GreViewModal.tsx:127",
+          "contracts": [
+            {
+              "method": "GET",
+              "endpoint": "/api/gre/guias/:id/pdf",
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-queries-and-tenant-isolation",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "consulta, búsqueda, filtros y detalle usan cabecera/líneas reales",
+                    "operaciones ajenas 404 sin cambios ni fuga; listado de otra empresa vacío"
+                  ]
+                },
+                {
+                  "id": "gre-pdf-real-document",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "PDF binario con cabecera y bienes; emisor firmado permanece congelado tras editar empresa",
+                    "80 bienes en cuatro páginas; revisión visual de primera y última sin recortes",
+                    "UI muestra bienes, descarga PDF y entrega el mismo tipo de documento al iframe de impresión"
+                  ]
+                }
+              ],
+              "pending_checks": [
+                "otros filtros, paginación si existe y alcance por sucursal/almacén cuando corresponda",
+                "otras longitudes y caracteres; impresora física y botón de descarga desde listado"
+              ],
+              "defects": [
+                {
+                  "id": "gre-pdf-endpoint-delivers-text",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
+                  "correction": "Fuentes canónicas entrega PDF A4 binario con emisor, estado, transporte y todos los bienes; emisor firmado se obtiene del XML congelado. El cliente debe conservar bytes/extensión PDF al descargar y ofrecer la acción en listado.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-view-and-print-omit-transported-items",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-print.json",
+                  "correction": "Fuentes canónicas renderizan bienes y cantidades; impresión consume el PDF con datos del registro.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -31619,21 +32660,97 @@
         {
           "method": "POST",
           "endpoint": "/api/gre/guias",
-          "source": "apps/web/components/modals/GreModal.tsx:151",
+          "source": "apps/web/components/modals/GreModal.tsx:156",
           "contracts": [
             {
               "method": "POST",
               "endpoint": "/api/gre/guias",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
-              "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-manual-creation-persistence",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "primera empresa no demo crea borrador y líneas reales; inválidos no insertan",
+                    "UI acepta peso 2 kg y documento manual; con certificado desechable firma y persiste tras recarga"
+                  ]
+                },
+                {
+                  "id": "gre-intent-replay-conflict",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "replay y concurrencia recuperan un ID y un detalle; conflicto 409 conserva documento",
+                    "UI recupera respuesta perdida sin otra fila; nueva intención idéntica crea otro ID"
+                  ]
+                },
+                {
+                  "id": "gre-unsigned-and-signed-local-xml",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "sin PFX falla cerrado con error durable sin XML",
+                    "PFX desechable configurado por wizard; UBL real firmado con emisor y bienes persistidos"
+                  ]
+                },
+                {
+                  "id": "gre-reader-permissions",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "lector real consulta y no crea, anula, configura ni descarga XML"
+                  ]
+                },
+                {
+                  "id": "gre-infrastructure-error-recovery",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "REVOKE EXECUTE local produce 503 genérico sin insertar; regrant y misma clave recuperan operación"
+                  ]
+                }
               ],
-              "defects": []
+              "pending_checks": [
+                "altas a partir de CPE/pedido y variantes de transporte/origen/bienes ofrecidas",
+                "otras mutaciones concurrentes y recuperación tras cerrar completamente el navegador",
+                "firma explícita de borrador previamente creado; otros motivos/modalidades y firma con proveedor del futuro cliente",
+                "otros roles, permisos de firma/transmisión y worker firmado",
+                "otros fallos de red/Storage/autoridad externa"
+              ],
+              "defects": [
+                {
+                  "id": "gre-idempotency-collision-returns-400",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
+                  "correction": "Fuentes canónicas distingue conflictos de idempotencia con HTTP 409 y conserva estado persistido.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-rpc-infrastructure-failure-returns-400",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
+                  "correction": "Fuentes canónicas distingue indisponibilidad RPC con HTTP 503 y mensaje sin detalles internos; misma clave recupera operación tras restaurar EXECUTE.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-manual-weight-html-step-blocks-valid-values",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
+                  "correction": "Fuentes canónicas alinea step 0.001 con mínimo 0.001 y precisión de tres decimales del DTO.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-manual-recipient-document-unavailable",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
+                  "correction": "Fuentes canónicas ofrece tipo/documento del destinatario manual y lo persiste en datosAdicionales para construir UBL firmado.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -32183,8 +33300,129 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "pending_browser_evidence",
-      "controls": [],
+      "result": "visible_controls_pending_functional_execution",
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Nuevo almacén",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ver ubicaciones",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Editar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Desactivar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ver ubicaciones",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Editar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Desactivar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ver ubicaciones",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Editar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Desactivar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ver ubicaciones",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Editar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Desactivar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -32648,8 +33886,65 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "pending_browser_evidence",
-      "controls": [],
+      "result": "visible_controls_pending_functional_execution",
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Nueva categoría",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Editar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Eliminar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Editar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Eliminar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -33592,7 +34887,7 @@
             {
               "method": "PUT",
               "endpoint": "/api/configuration/empresa",
-              "result": "pending_functional_execution",
+              "result": "http_contract_observed_not_full_acceptance",
               "verified_cases": [],
               "pending_checks": [
                 "persistencia y resultado funcional",
@@ -33645,8 +34940,33 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "pending_browser_evidence",
-      "controls": [],
+      "result": "visible_controls_pending_functional_execution",
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Activar flujo logístico",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -33934,7 +35254,7 @@
             {
               "method": "PUT",
               "endpoint": "/api/configuration/empresa",
-              "result": "pending_functional_execution",
+              "result": "http_contract_observed_not_full_acceptance",
               "verified_cases": [],
               "pending_checks": [
                 "persistencia y resultado funcional",
@@ -35210,8 +36530,161 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "pending_browser_evidence",
-      "controls": [],
+      "result": "visible_controls_pending_functional_execution",
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Volver a Productos",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Código *",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Código de Barras",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Nombre *",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Marca",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "select",
+          "label": "Unidad de medida",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "textarea",
+          "label": "Descripción",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "select",
+          "label": "Categoría *",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Elegir imagen",
+          "type": "file",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Precio de Compra (PEN)",
+          "type": "number",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Precio de Venta (PEN) *",
+          "type": "number",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "select",
+          "label": "Afectación IGV",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "select",
+          "label": "Almacén",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Stock Inicial",
+          "type": "number",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Stock Mínimo",
+          "type": "number",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cancelar",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Crear Producto",
+          "type": "submit",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -35497,7 +36970,11 @@
         "actor": "Primer ADMIN Perú no demo, sin privilegio global",
         "status": 200,
         "errors": [],
-        "expectedRestriction": false
+        "expectedRestriction": false,
+        "recovery": {
+          "reason": "page.goto: net::ERR_CONNECTION_RESET at http://127.0.0.1:3125/dashboard/inventario/recepciones/",
+          "evidence": "Server is approaching the used memory threshold, restarting..."
+        }
       },
       "result": "visible_controls_pending_functional_execution",
       "controls": [
@@ -38801,8 +40278,49 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "pending_browser_evidence",
-      "controls": [],
+      "result": "visible_controls_pending_functional_execution",
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Actualizar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Filtrar pagos por estado",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Filtrar pagos por período",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -39597,8 +41115,41 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "pending_browser_evidence",
-      "controls": [],
+      "result": "visible_controls_pending_functional_execution",
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Crear Nueva Planilla",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Crear primera planilla",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -43440,7 +44991,7 @@
         },
         {
           "element": "select",
-          "label": "Selecciona productoFAL-386A643F · Faltante local 386a643fAPERTURA-C55EAD1A · Producto apertura c55ead1aIC-386A643F · Producto ciclo 386a643f",
+          "label": "Selecciona productoFAL-F58E7E51 · Faltante local f58e7e51APERTURA-24F20FDA · Producto apertura 24f20fdaIC-F58E7E51 · Producto ciclo f58e7e51",
           "type": null,
           "disabled": false,
           "path": null,
@@ -45183,8 +46734,73 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "pending_browser_evidence",
-      "controls": [],
+      "result": "visible_controls_pending_functional_execution",
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Dashboard",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/",
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Ventas",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/ventas/",
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Nuevo Pedido",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Buscar",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Filtros",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Actualizar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ],
       "declared_api_calls": [
         {
           "method": "GET",

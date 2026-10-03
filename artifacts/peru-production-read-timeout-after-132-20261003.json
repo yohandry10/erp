@@ -1,0 +1,9 @@
+{
+  "success": false,
+  "readOnly": true,
+  "remoteBusinessWrites": false,
+  "expected_sha": "cf8680678f0e065cd439c3fafdea81a23db89670",
+  "expected_schema": 563,
+  "recorded_at": "2026-10-03T13:56:01.170Z",
+  "failure": "Timeout de lectura HTTP de 20 segundos; se conserva el intento y no acredita continuidad."
+}

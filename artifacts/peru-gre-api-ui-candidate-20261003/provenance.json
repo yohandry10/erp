@@ -1,0 +1,19 @@
+{
+  "base_sha": "cf8680678f0e065cd439c3fafdea81a23db89670",
+  "local_source": "artifacts/peru-integrated-20261003131849048-8720",
+  "candidate_api_ui": true,
+  "remoteWrites": false,
+  "dumps_extracted": false,
+  "api_cases": 21,
+  "browser_passed": 2,
+  "browser_failed": 0,
+  "scope": "GRE candidate subset, no SUNAT interoperability or global acceptance",
+  "failure_origin": null,
+  "candidate_sha256": {
+    "peru-gre.service.candidate.ts": "f963f7923319093be3616b25667f08435dc2ecd132bfc62dabb109ab091ce7c8",
+    "peru-gre.controller.candidate.ts": "f574ede02df9b488ae8930b5d911c89b34b50837d4abfc96459a2b350a8195a4",
+    "peru-GreModal.candidate.tsx": "54cc75a3a15ab713543205cd205631ea2f043d8a65eeec1babacc7fdeabdf699",
+    "peru-GreViewModal.candidate.tsx": "6b89af50e987ba607d1a2b3f71f6eac6d570cd3a343b737e6ddc624416edd63e",
+    "peru-gre-page.candidate.tsx": "0367f1cdd1cf0eb945a49a90ebb867bfe708ee4fc1599e9c14e075cb79683a10"
+  }
+}

@@ -870,15 +870,17 @@
           "endpoint": "/api/contabilidad/impuestos/mensual"
         }
       ],
-      "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
+      "status": "corrected_merged_main_deployment_verified",
       "proof": "artifacts/peru-tax-version-retry-baseline-20261003/tax-version-retry.json",
       "correction": "Intención durable, conflicto de cuerpo y respuesta congelada; transacción única y web retiene clave durante fallo",
       "candidate_proof": "artifacts/peru-tax-intents-candidate-subset-20261003",
-      "pending": [
-        "CI exacto, promoción DB-first 562, main y despliegue"
-      ],
+      "pending": [],
       "canonical_proof": "artifacts/peru-integrated-local-tax-intents-20261003",
-      "local_sha": "3088474df0f78e0bee026580c203a9f23243887b"
+      "local_sha": "3088474df0f78e0bee026580c203a9f23243887b",
+      "main_sha": "eb5312f4e87fcd3a8e6e2630926ee31d927885d3",
+      "main_ci": "artifacts/peru-integrated-ci-37121705807",
+      "deployment_proof": "artifacts/peru-production-verification-after-131-20261003.json",
+      "database_promotion": "artifacts/peru-562-promotion-20261003120329303.json"
     },
     {
       "id": "annual-tax-save-retry-duplicates-version",
@@ -889,15 +891,17 @@
           "endpoint": "/api/contabilidad/impuestos/anual"
         }
       ],
-      "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
+      "status": "corrected_merged_main_deployment_verified",
       "proof": "artifacts/peru-tax-version-retry-baseline-20261003/tax-version-retry.json",
       "correction": "Intención anual durable y replay del corte congelado antes de recalcular fuentes",
       "candidate_proof": "artifacts/peru-tax-intents-candidate-subset-20261003",
-      "pending": [
-        "CI exacto, promoción DB-first 562, main y despliegue"
-      ],
+      "pending": [],
       "canonical_proof": "artifacts/peru-integrated-local-tax-intents-20261003",
-      "local_sha": "3088474df0f78e0bee026580c203a9f23243887b"
+      "local_sha": "3088474df0f78e0bee026580c203a9f23243887b",
+      "main_sha": "eb5312f4e87fcd3a8e6e2630926ee31d927885d3",
+      "main_ci": "artifacts/peru-integrated-ci-37121705807",
+      "deployment_proof": "artifacts/peru-production-verification-after-131-20261003.json",
+      "database_promotion": "artifacts/peru-562-promotion-20261003120329303.json"
     },
     {
       "id": "monthly-tax-receipt-retry-500",
@@ -908,15 +912,17 @@
           "endpoint": "/api/contabilidad/impuestos/declaraciones/:id/constancia"
         }
       ],
-      "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
+      "status": "corrected_merged_main_deployment_verified",
       "proof": "artifacts/peru-tax-version-retry-baseline-20261003/tax-version-retry.json",
       "correction": "Constancia e intención atómicas; replay confirmado se recupera antes de exigir estado BORRADOR",
       "candidate_proof": "artifacts/peru-tax-intents-candidate-subset-20261003",
-      "pending": [
-        "CI exacto, promoción DB-first 562, main y despliegue"
-      ],
+      "pending": [],
       "canonical_proof": "artifacts/peru-integrated-local-tax-intents-20261003",
-      "local_sha": "3088474df0f78e0bee026580c203a9f23243887b"
+      "local_sha": "3088474df0f78e0bee026580c203a9f23243887b",
+      "main_sha": "eb5312f4e87fcd3a8e6e2630926ee31d927885d3",
+      "main_ci": "artifacts/peru-integrated-ci-37121705807",
+      "deployment_proof": "artifacts/peru-production-verification-after-131-20261003.json",
+      "database_promotion": "artifacts/peru-562-promotion-20261003120329303.json"
     },
     {
       "id": "auth-office-throttle-missing-standard-retry-after",
@@ -927,19 +933,21 @@
           "endpoint": "/api/auth/login"
         }
       ],
-      "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
+      "status": "corrected_merged_main_deployment_verified",
       "proof": "artifacts/peru-tax-full-local-failed-login-office-20261003/failure.json",
       "correction": "Límite agregado publica Retry-After estándar además de Retry-After-Office; conserva 5/cuenta-IP y 20/IP por minuto. API real verifica 429/60s y recuperación 201 sin modificar limitador.",
       "canonical_proof": "artifacts/peru-integrated-local-tax-intents-20261003",
-      "pending": [
-        "CI exacto, promoción DB-first 562, main y despliegue"
-      ],
-      "local_sha": "3088474df0f78e0bee026580c203a9f23243887b"
+      "pending": [],
+      "local_sha": "3088474df0f78e0bee026580c203a9f23243887b",
+      "main_sha": "eb5312f4e87fcd3a8e6e2630926ee31d927885d3",
+      "main_ci": "artifacts/peru-integrated-ci-37121705807",
+      "deployment_proof": "artifacts/peru-production-verification-after-131-20261003.json",
+      "database_promotion": "artifacts/peru-562-promotion-20261003120329303.json"
     },
     {
       "id": "consolidation-report-missing-service-select",
       "module": "contabilidad/consolidacion",
-      "status": "candidate_api_ui_restore_passed_canonical_ci_deployment_pending",
+      "status": "corrected_merged_main_deployment_verified",
       "proof": "artifacts/peru-reports-consolidation-read-baseline-20261003/reports-consignations.json",
       "operations": [
         {
@@ -949,9 +957,18 @@
       ],
       "correction": "Candidato local concede únicamente SELECT de los tres orígenes de consolidación a service_role; preserva escrituras RPC y no concede lectura a anon/authenticated.",
       "candidate_proof": "artifacts/peru-reports-consignations-candidate-20261003",
-      "pending": [
-        "Fuentes/migración/verificador canónicos, CI, ensayo de preservación y despliegue"
-      ]
+      "pending": [],
+      "canonical_proof": "artifacts/peru-integrated-local-reports-consignations-20261003",
+      "local_sha": "96c2a8258fe2f37162c3aa0f6030790da7085842",
+      "candidate_ci": [
+        "artifacts/peru-integrated-ci-37123222785",
+        "artifacts/peru-integrated-ci-37123224846"
+      ],
+      "database_promotion": "artifacts/peru-563-promotion-20261003131306420.json",
+      "merge_sha": "cf8680678f0e065cd439c3fafdea81a23db89670",
+      "main_sha": "cf8680678f0e065cd439c3fafdea81a23db89670",
+      "production_proof": "artifacts/peru-production-verification-after-132-20261003.json",
+      "main_ci": "37125486977"
     },
     {
       "id": "consolidation-domain-rejections-return-500",
@@ -975,12 +992,21 @@
         }
       ],
       "correction": "Candidato distingue colisión 409, pertenencia 403, estado/datos 400 y fallo de infraestructura 503; no cambia escrituras ni límites.",
-      "status": "candidate_api_ui_restore_passed_canonical_ci_deployment_pending",
+      "status": "corrected_merged_main_deployment_verified",
       "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
-      "pending": [
-        "Fuentes/migración/verificador canónicos, CI, ensayo de preservación y despliegue"
+      "pending": [],
+      "candidate_proof": "artifacts/peru-reports-consignations-candidate-20261003",
+      "canonical_proof": "artifacts/peru-integrated-local-reports-consignations-20261003",
+      "local_sha": "96c2a8258fe2f37162c3aa0f6030790da7085842",
+      "candidate_ci": [
+        "artifacts/peru-integrated-ci-37123222785",
+        "artifacts/peru-integrated-ci-37123224846"
       ],
-      "candidate_proof": "artifacts/peru-reports-consignations-candidate-20261003"
+      "database_promotion": "artifacts/peru-563-promotion-20261003131306420.json",
+      "merge_sha": "cf8680678f0e065cd439c3fafdea81a23db89670",
+      "main_sha": "cf8680678f0e065cd439c3fafdea81a23db89670",
+      "production_proof": "artifacts/peru-production-verification-after-132-20261003.json",
+      "main_ci": "37125486977"
     },
     {
       "id": "consolidation-controller-rate-unavailable-in-ui",
@@ -992,12 +1018,21 @@
         }
       ],
       "correction": "Candidato selecciona miembros activos cuya moneda necesita conversión, incluida la controladora.",
-      "status": "candidate_api_ui_restore_passed_canonical_ci_deployment_pending",
+      "status": "corrected_merged_main_deployment_verified",
       "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
-      "pending": [
-        "Fuentes/migración/verificador canónicos, CI, ensayo de preservación y despliegue"
+      "pending": [],
+      "candidate_proof": "artifacts/peru-reports-consignations-candidate-20261003",
+      "canonical_proof": "artifacts/peru-integrated-local-reports-consignations-20261003",
+      "local_sha": "96c2a8258fe2f37162c3aa0f6030790da7085842",
+      "candidate_ci": [
+        "artifacts/peru-integrated-ci-37123222785",
+        "artifacts/peru-integrated-ci-37123224846"
       ],
-      "candidate_proof": "artifacts/peru-reports-consignations-candidate-20261003"
+      "database_promotion": "artifacts/peru-563-promotion-20261003131306420.json",
+      "merge_sha": "cf8680678f0e065cd439c3fafdea81a23db89670",
+      "main_sha": "cf8680678f0e065cd439c3fafdea81a23db89670",
+      "production_proof": "artifacts/peru-production-verification-after-132-20261003.json",
+      "main_ci": "37125486977"
     },
     {
       "id": "consignment-ui-new-identical-delivery-replays-old-record",
@@ -1009,12 +1044,158 @@
         }
       ],
       "correction": "Candidato web conserva intención durante fallo y la libera después de éxito para permitir otra entrega idéntica.",
-      "status": "candidate_api_ui_restore_passed_canonical_ci_deployment_pending",
+      "status": "corrected_merged_main_deployment_verified",
       "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
-      "pending": [
-        "Fuentes/migración/verificador canónicos, CI, ensayo de preservación y despliegue"
+      "pending": [],
+      "candidate_proof": "artifacts/peru-reports-consignations-candidate-20261003",
+      "canonical_proof": "artifacts/peru-integrated-local-reports-consignations-20261003",
+      "local_sha": "96c2a8258fe2f37162c3aa0f6030790da7085842",
+      "candidate_ci": [
+        "artifacts/peru-integrated-ci-37123222785",
+        "artifacts/peru-integrated-ci-37123224846"
       ],
-      "candidate_proof": "artifacts/peru-reports-consignations-candidate-20261003"
+      "database_promotion": "artifacts/peru-563-promotion-20261003131306420.json",
+      "merge_sha": "cf8680678f0e065cd439c3fafdea81a23db89670",
+      "main_sha": "cf8680678f0e065cd439c3fafdea81a23db89670",
+      "production_proof": "artifacts/peru-production-verification-after-132-20261003.json",
+      "main_ci": "37125486977"
+    },
+    {
+      "id": "gre-pdf-endpoint-delivers-text",
+      "module": "gre",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id/pdf"
+        }
+      ],
+      "correction": "Fuentes canónicas entrega PDF A4 binario con emisor, estado, transporte y todos los bienes; emisor firmado se obtiene del XML congelado. El cliente debe conservar bytes/extensión PDF al descargar y ofrecer la acción en listado.",
+      "status": "canonical_full_local_passed_ci_main_deployment_pending",
+      "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
+      "candidate_proof": "artifacts/peru-gre-api-candidate-20261003",
+      "pending": [
+        "CI exacto, integración en main y despliegue de GRE"
+      ],
+      "canonical_proof": "artifacts/peru-integrated-local-gre-20261003",
+      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca"
+    },
+    {
+      "id": "gre-idempotency-collision-returns-400",
+      "module": "gre",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias"
+        }
+      ],
+      "correction": "Fuentes canónicas distingue conflictos de idempotencia con HTTP 409 y conserva estado persistido.",
+      "status": "canonical_full_local_passed_ci_main_deployment_pending",
+      "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
+      "candidate_proof": "artifacts/peru-gre-api-candidate-20261003",
+      "pending": [
+        "CI exacto, integración en main y despliegue de GRE"
+      ],
+      "canonical_proof": "artifacts/peru-integrated-local-gre-20261003",
+      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca"
+    },
+    {
+      "id": "gre-rpc-infrastructure-failure-returns-400",
+      "module": "gre",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias"
+        }
+      ],
+      "correction": "Fuentes canónicas distingue indisponibilidad RPC con HTTP 503 y mensaje sin detalles internos; misma clave recupera operación tras restaurar EXECUTE.",
+      "status": "canonical_full_local_passed_ci_main_deployment_pending",
+      "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
+      "candidate_proof": "artifacts/peru-gre-api-candidate-20261003",
+      "pending": [
+        "CI exacto, integración en main y despliegue de GRE"
+      ],
+      "canonical_proof": "artifacts/peru-integrated-local-gre-20261003",
+      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca"
+    },
+    {
+      "id": "gre-view-and-print-omit-transported-items",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id/pdf"
+        }
+      ],
+      "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-print.json",
+      "correction": "Fuentes canónicas renderizan bienes y cantidades; impresión consume el PDF con datos del registro.",
+      "module": "gre",
+      "status": "canonical_full_local_passed_ci_main_deployment_pending",
+      "pending": [
+        "CI exacto, integración en main y despliegue de GRE"
+      ],
+      "canonical_proof": "artifacts/peru-integrated-local-gre-20261003",
+      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca"
+    },
+    {
+      "id": "gre-manual-weight-html-step-blocks-valid-values",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias"
+        }
+      ],
+      "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
+      "correction": "Fuentes canónicas alinea step 0.001 con mínimo 0.001 y precisión de tres decimales del DTO.",
+      "module": "gre",
+      "status": "canonical_full_local_passed_ci_main_deployment_pending",
+      "pending": [
+        "CI exacto, integración en main y despliegue de GRE"
+      ],
+      "canonical_proof": "artifacts/peru-integrated-local-gre-20261003",
+      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca"
+    },
+    {
+      "id": "gre-manual-recipient-document-unavailable",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias/:id/firmar"
+        }
+      ],
+      "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
+      "correction": "Fuentes canónicas ofrece tipo/documento del destinatario manual y lo persiste en datosAdicionales para construir UBL firmado.",
+      "module": "gre",
+      "status": "canonical_full_local_passed_ci_main_deployment_pending",
+      "pending": [
+        "CI exacto, integración en main y despliegue de GRE"
+      ],
+      "canonical_proof": "artifacts/peru-integrated-local-gre-20261003",
+      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca"
+    },
+    {
+      "id": "gre-csv-untrusted-cell-keeps-formula",
+      "module": "gre",
+      "status": "canonical_full_local_passed_ci_main_deployment_pending",
+      "proof": "artifacts/peru-gre-csv-defect-20261003/gre-operations.json",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/reporte"
+        }
+      ],
+      "correction": "Escape CSV neutraliza prefijos de fórmula, conserva comillas, comas y saltos, conforme al exportador bancario existente.",
+      "pending": [
+        "CI exacto, integración en main y despliegue de GRE"
+      ],
+      "canonical_proof": "artifacts/peru-integrated-local-gre-20261003",
+      "local_sha": "094be1a7fca3ce47192150f85add38e3322b4eca"
     }
   ]
 }

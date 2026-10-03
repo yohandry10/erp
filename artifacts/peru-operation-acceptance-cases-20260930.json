@@ -1884,6 +1884,552 @@
         "otras políticas de sesión y recuperación",
         "límite agregado desde UI"
       ]
+    },
+    {
+      "id": "configurable-report-definition-validation",
+      "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+      "required_scenario_prefixes": [
+        "Reportes: código duplicado",
+        "Reportes: ciclo rechazada",
+        "Reportes: referencia ausente",
+        "Reportes: orden repetido",
+        "Reportes: otra empresa no reemplaza"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/reportes-configurables"
+        }
+      ],
+      "verified_checks": [
+        "alta y reemplazo con validación de código, fórmula, referencias y orden",
+        "rechazos conservan líneas vigentes y no permiten edición ajena"
+      ],
+      "pending_checks": [
+        "otros tipos de línea, eliminación y modificaciones permitidas por el producto"
+      ]
+    },
+    {
+      "id": "configurable-report-real-sources",
+      "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+      "required_scenario_prefixes": [
+        "Reportes: período/acumulado",
+        "Reportes: consulta ajena",
+        "Permisos: lector genera"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/reportes-configurables/:reporteId/generar"
+        }
+      ],
+      "verified_checks": [
+        "saldo por período, acumulado, fórmula y aislamiento",
+        "excluye borrador y fechas fuera del corte; lector permitido y escrituras rechazadas"
+      ],
+      "pending_checks": [
+        "otras cuentas, naturalezas, fórmulas y presentación/exportación/impresión donde existan"
+      ]
+    },
+    {
+      "id": "consolidation-membership-real-balances",
+      "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+      "required_scenario_prefixes": [
+        "Consolidación: invitación pendiente",
+        "Consolidación: rechazo retira",
+        "Consolidación: aceptación incorpora",
+        "Consolidación: no permite invitar"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/consolidacion/grupos"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/consolidacion/grupos"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/invitaciones"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/respuesta"
+        }
+      ],
+      "verified_checks": [
+        "grupo real, invitación pendiente, rechazo y aceptación en dos empresas",
+        "UI crea grupo, invita y segunda sesión acepta; balances 100+200 compartidos sólo tras aceptar"
+      ],
+      "pending_checks": [
+        "otras participaciones y salida/cambio de miembro si existen"
+      ]
+    },
+    {
+      "id": "consolidation-presentation-currency",
+      "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+      "required_scenario_prefixes": [
+        "Consolidación: moneda de presentación",
+        "Consolidación: tasas propias",
+        "Consolidación: tasa futura",
+        "Consolidación: colisión de intención",
+        "Consolidación: miembro no controlador",
+        "Consolidación: tasa para miembro",
+        "Consolidación: tasa innecesaria"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/tasas"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/reportes-configurables/:reporteId/generar"
+        }
+      ],
+      "verified_checks": [
+        "PEN a USD de controladora y miembro, corte, falta de tasa, replay/conflicto y permiso",
+        "UI registra ambas tasas y obtiene 125 con fuentes reales"
+      ],
+      "pending_checks": [
+        "tipos cierre/histórica y monedas/fechas restantes"
+      ]
+    },
+    {
+      "id": "consolidation-account-mapping",
+      "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+      "required_scenario_prefixes": [
+        "Consolidación: mapeo real",
+        "Consolidación: cuenta inexistente"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/mapeos-cuentas"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/reportes-configurables/:reporteId/generar"
+        }
+      ],
+      "verified_checks": [
+        "mapeo 70→20 persistido y replay sin duplicar",
+        "cuenta ausente rechazada y cálculo de grupo refleja el mapeo"
+      ],
+      "pending_checks": [
+        "otros mapeos y variantes de edición/retiro disponibles"
+      ]
+    },
+    {
+      "id": "consolidation-adjustment-keeps-legal-books",
+      "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+      "required_scenario_prefixes": [
+        "Consolidación: ajuste y replay",
+        "Consolidación: colisión de ajuste",
+        "Consolidación: debe/haber simultáneos",
+        "Consolidación: cuenta de ajuste inexistente",
+        "Permisos: lector genera"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/ajustes"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/reportes-configurables/:reporteId/generar"
+        }
+      ],
+      "verified_checks": [
+        "eliminación con replay/conflicto, cuenta inválida y debe/haber inválido",
+        "sólo cambia reporte, conserva huella de libros legales; lector no ajusta"
+      ],
+      "pending_checks": [
+        "otros tipos y períodos de ajustes; UI de ajustes"
+      ]
+    },
+    {
+      "id": "consignment-delivery-intents",
+      "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+      "required_scenario_prefixes": [
+        "Consignaciones: alta y replay",
+        "Consignaciones: nueva intención idéntica",
+        "Consignaciones: cantidad y valor inválidos"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/registro-consignaciones"
+        }
+      ],
+      "verified_checks": [
+        "dos intenciones idénticas crean dos IDs; replay recupera el primero",
+        "cantidad/precio inválidos no insertan; total 24.68 calculado por servidor",
+        "UI commit con respuesta perdida conserva campos, recupera entrega y permite otra idéntica; reload muestra dos"
+      ],
+      "pending_checks": [
+        "otras monedas, bienes/orígenes y formulario restaurado antes de confirmar tras cerrar navegador"
+      ]
+    },
+    {
+      "id": "consignment-delivery-state-lifecycle",
+      "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+      "required_scenario_prefixes": [
+        "Consignaciones: venta, replay y cierre",
+        "Consignaciones: devolución",
+        "Consignaciones: anulación",
+        "Consignaciones: estado terminal"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/registro-consignaciones/:id/estado"
+        }
+      ],
+      "verified_checks": [
+        "venta y cierre, devolución/anulación de pendiente y replay persistidos",
+        "estado terminal y mutación ajena/inexistente rechazados sin cambiar entrega"
+      ],
+      "pending_checks": [
+        "cambios de estado desde navegador y variantes comerciales restantes"
+      ]
+    },
+    {
+      "id": "consignment-reader-and-ledger-boundary",
+      "source": "scripts/ci/test-peru-reports-consolidation-local.mjs",
+      "required_scenario_prefixes": [
+        "Consignaciones: lector consulta"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/registro-consignaciones"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/registro-consignaciones"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/registro-consignaciones/:id/estado"
+        }
+      ],
+      "verified_checks": [
+        "lector consulta y no crea ni cambia estados; registros no alteran libros legales"
+      ],
+      "pending_checks": [
+        "filtros, exportación e impresión que existan y otros permisos"
+      ]
+    },
+    {
+      "id": "gre-manual-creation-persistence",
+      "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "GRE: alta interna",
+        "GRE: DTO inválido"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id"
+        }
+      ],
+      "verified_checks": [
+        "primera empresa no demo crea borrador y líneas reales; inválidos no insertan",
+        "UI acepta peso 2 kg y documento manual; con certificado desechable firma y persiste tras recarga"
+      ],
+      "pending_checks": [
+        "altas a partir de CPE/pedido y variantes de transporte/origen/bienes ofrecidas"
+      ]
+    },
+    {
+      "id": "gre-intent-replay-conflict",
+      "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "GRE: replay y concurrencia",
+        "GRE: colisión de clave"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias"
+        }
+      ],
+      "verified_checks": [
+        "replay y concurrencia recuperan un ID y un detalle; conflicto 409 conserva documento",
+        "UI recupera respuesta perdida sin otra fila; nueva intención idéntica crea otro ID"
+      ],
+      "pending_checks": [
+        "otras mutaciones concurrentes y recuperación tras cerrar completamente el navegador"
+      ]
+    },
+    {
+      "id": "gre-queries-and-tenant-isolation",
+      "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "GRE: detalle, búsqueda",
+        "GRE: consulta, firma"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias/:id/firmar"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id/xml"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id/pdf"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias/:id/anular"
+        }
+      ],
+      "verified_checks": [
+        "consulta, búsqueda, filtros y detalle usan cabecera/líneas reales",
+        "operaciones ajenas 404 sin cambios ni fuga; listado de otra empresa vacío"
+      ],
+      "pending_checks": [
+        "otros filtros, paginación si existe y alcance por sucursal/almacén cuando corresponda"
+      ]
+    },
+    {
+      "id": "gre-unsigned-and-signed-local-xml",
+      "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "GRE: firma sin certificado",
+        "GRE: cliente configura",
+        "GRE: XML descargado"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias/:id/firmar"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id/xml"
+        }
+      ],
+      "verified_checks": [
+        "sin PFX falla cerrado con error durable sin XML",
+        "PFX desechable configurado por wizard; UBL real firmado con emisor y bienes persistidos"
+      ],
+      "pending_checks": [
+        "firma explícita de borrador previamente creado; otros motivos/modalidades y firma con proveedor del futuro cliente"
+      ]
+    },
+    {
+      "id": "gre-pdf-real-document",
+      "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "GRE: representación /pdf",
+        "GRE: PDF firmado conserva",
+        "GRE: PDF multipágina"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id/pdf"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id"
+        }
+      ],
+      "verified_checks": [
+        "PDF binario con cabecera y bienes; emisor firmado permanece congelado tras editar empresa",
+        "80 bienes en cuatro páginas; revisión visual de primera y última sin recortes",
+        "UI muestra bienes, descarga PDF y entrega el mismo tipo de documento al iframe de impresión"
+      ],
+      "pending_checks": [
+        "otras longitudes y caracteres; impresora física y botón de descarga desde listado"
+      ]
+    },
+    {
+      "id": "gre-csv-real-filtered-safe",
+      "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "GRE: reporte CSV contiene",
+        "GRE: CSV neutraliza"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/reporte"
+        }
+      ],
+      "verified_checks": [
+        "CSV de registros reales excluye empresa y período ajenos",
+        "neutraliza =1+1 y conserva comillas, comas y saltos"
+      ],
+      "pending_checks": [
+        "otras variantes de exportación, datos y acceso lector al reporte"
+      ]
+    },
+    {
+      "id": "gre-auto-configuration-and-statistics",
+      "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "GRE: estadísticas cuentan",
+        "GRE: configuración y replay"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/stats"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/auto-config"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/auto-config"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/evaluate-auto-creation"
+        }
+      ],
+      "verified_checks": [
+        "estadísticas por empresa; umbral, habilitación y replay persistidos",
+        "evaluación bajo/en/en exceso de umbral y deshabilitada"
+      ],
+      "pending_checks": [
+        "creación automática integrada con ventas/despacho y otras reglas configurables"
+      ]
+    },
+    {
+      "id": "gre-annulment-terminal-state",
+      "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "GRE: mutación sin clave",
+        "GRE: anulación y replay"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias/:id/anular"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias/:id/firmar"
+        }
+      ],
+      "verified_checks": [
+        "clave/motivo inválidos rechazados; anulación y replay terminales; firma posterior rechazada"
+      ],
+      "pending_checks": [
+        "anulación de otros estados ofrecidos y recorrido de anulación UI"
+      ]
+    },
+    {
+      "id": "gre-reader-permissions",
+      "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "GRE: usuario lector consulta"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias/:id/anular"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/auto-config"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id/xml"
+        }
+      ],
+      "verified_checks": [
+        "lector real consulta y no crea, anula, configura ni descarga XML"
+      ],
+      "pending_checks": [
+        "otros roles, permisos de firma/transmisión y worker firmado"
+      ]
+    },
+    {
+      "id": "gre-infrastructure-error-recovery",
+      "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "GRE: recuperación de infraestructura"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias"
+        }
+      ],
+      "verified_checks": [
+        "REVOKE EXECUTE local produce 503 genérico sin insertar; regrant y misma clave recuperan operación"
+      ],
+      "pending_checks": [
+        "otros fallos de red/Storage/autoridad externa"
+      ]
+    },
+    {
+      "id": "gre-external-transmission-fails-closed",
+      "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "GRE: enviar, reenviar",
+        "GRE: transmisión y consulta"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias/:id/enviar-sunat"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias/:id/reenviar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias/:id/consultar-sunat"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id/estado-sunat"
+        }
+      ],
+      "verified_checks": [
+        "borrador y firmado sin credenciales externas no fabrican ticket, CDR ni aceptación",
+        "consulta del último estado no transmite"
+      ],
+      "pending_checks": [
+        "aceptación/acuse SUNAT y reintentos tras rechazo/transitorio externo; acceso autorizado del futuro cliente"
+      ]
     }
   ]
 }
