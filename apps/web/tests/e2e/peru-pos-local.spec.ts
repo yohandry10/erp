@@ -30,14 +30,17 @@ async function setup(page: Page, context: BrowserContext) {
   // El iframe se retira en afterprint. Observar beforeprint conserva lo que
   // recibió el motor de impresión sin sustituir window.print ni congelar UI.
   await context.addInitScript(() => {
-    window.addEventListener('beforeprint', () => {
-      window.parent.postMessage({ type: 'local-pos-beforeprint', text: document.body.innerText }, '*');
-    });
-    window.addEventListener('message', event => {
-      if (event.data?.type === 'local-pos-beforeprint') {
-        (window as Window & { posPrintedText?: string }).posPrintedText = event.data.text;
+    new MutationObserver(records => {
+      for (const record of records) for (const node of Array.from(record.addedNodes)) {
+        if (node instanceof HTMLIFrameElement && node.title === 'Documento listo para imprimir') {
+          // document.open elimina listeners previos del iframe. El observador
+          // se ejecuta después de escribir el documento y antes de su load.
+          node.contentWindow?.addEventListener('beforeprint', () => {
+            (window as Window & { posPrintedText?: string }).posPrintedText = node.contentDocument?.body.innerText;
+          });
+        }
       }
-    });
+    }).observe(document, { childList: true, subtree: true });
   });
   await context.route('**/*', route => ['127.0.0.1', 'localhost', '[::1]']
     .includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort('blockedbyclient'));
