@@ -1,0 +1,11 @@
+{
+  "local_source": "artifacts/peru-pos-local-20261003153305963-6672",
+  "base_sha": "19fa239d9ddf0ba7d5ec08fcb3a3ca5dd7ac69f5",
+  "scope": "Candidate POS API/DB18 scenarios, UI1, restore; no global acceptance",
+  "remote_business_writes": false,
+  "dumps_extracted": false,
+  "limits": [
+    "Later canonical source preserves CO/AR exception results and adds retry UUID validation; full canonical run still required.",
+    "No SUNAT acceptance or physical printer."
+  ]
+}

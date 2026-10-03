@@ -1,24 +1,24 @@
 {
-  "generated_at": "2026-10-03T14:10:50.740Z",
+  "generated_at": "2026-10-03T16:15:56.883Z",
   "scope": "Inventario y aceptación por módulo/operación; únicamente Analytics excluido",
   "operational_accounting_tax_reports_included": true,
   "complete_acceptance": false,
   "source_api_matrix": "artifacts/peru-api-operation-matrix-20260930.json",
   "source_ui_matrix": "artifacts/peru-ui-operation-matrix-20261002.json",
   "country_applicability": "artifacts/peru-country-applicability-20261003.json",
-  "evidence": "artifacts/peru-integrated-local-gre-20261003",
+  "evidence": "artifacts/peru-integrated-20261003154825399-19744",
   "additional_evidence": [
     {
-      "evidence": "artifacts/peru-storage-ci-37125486977",
+      "evidence": "artifacts/peru-storage-ci-37132251731",
       "scope": "company_logo_real_storage_subset",
       "global_success": true,
       "ui_included": true
     }
   ],
   "latest_verified_production": {
-    "sha": "cf8680678f0e065cd439c3fafdea81a23db89670",
+    "sha": "19fa239d9ddf0ba7d5ec08fcb3a3ca5dd7ac69f5",
     "schema_at_last_runtime_read": 563,
-    "proof": "artifacts/peru-production-verification-after-132-20261003.json"
+    "proof": "artifacts/peru-production-verification-after-133-20261003.json"
   },
   "current_database_schema": {
     "version": 563,
@@ -1643,7 +1643,8 @@
         }
       ],
       "defects": [
-        "wizard-summary-without-completed-progress"
+        "wizard-summary-without-completed-progress",
+        "pos-first-client-missing-payment-catalog"
       ]
     },
     {
@@ -5853,21 +5854,28 @@
     {
       "module": "pos",
       "declared_contracts": 17,
-      "observed_contracts": 9,
-      "operations_with_functional_cases": 0,
+      "observed_contracts": 16,
+      "operations_with_functional_cases": 15,
       "complete_acceptance": false,
-      "verified_case_ids": [],
+      "verified_case_ids": [
+        "pos-reader-and-worker-permissions",
+        "pos-first-client-payment-catalog",
+        "pos-first-client-certificate-intent",
+        "pos-accounting-and-close",
+        "pos-fiscal-read-and-tenant-isolation",
+        "pos-ticket-sale-recovery",
+        "pos-mixed-payment-cash-isolation",
+        "pos-stock-repeated-sku",
+        "pos-exchange-reservation-and-intent",
+        "pos-worker-reservation-retry"
+      ],
       "pending_operations": [
         {
           "method": "GET",
           "endpoint": "/api/pos/productos",
-          "result": "http_contract_observed_not_full_acceptance",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "otros roles y combinaciones de permiso/sucursal; UI con lector"
           ]
         },
         {
@@ -5885,121 +5893,88 @@
         {
           "method": "GET",
           "endpoint": "/api/pos/metodos-pago",
-          "result": "http_contract_observed_not_full_acceptance",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "otras configuraciones de medios de pago ofrecidas y sus monedas/referencias"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/pos/empresa-config",
-          "result": "http_contract_observed_not_full_acceptance",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI de carga/rotación y variantes de RUC/vigencia/contraseña; credenciales futuras sin pedir cliente inexistente"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/pos/sesion-caja",
-          "result": "http_contract_observed_not_full_acceptance",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "cierres con diferencias/supervisor en primera empresa por UI y crédito; se conservan pruebas de cajas separadas"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/pos/ventas-recientes",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "detalle/historial propio, búsquedas/filtros/paginación y consulta UI de todos los estados"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/pos/venta",
-          "result": "http_contract_observed_not_full_acceptance",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "ventas a crédito/parciales, factura inmediata, descuentos/redondeo, divisas y todas las variantes de carrito ofrecidas",
+            "otros medios/combinaciones, referencias, vuelto y pago parcial/credito",
+            "varios almacenes/sucursales, concurrencia y líneas con descuentos/unidades distintos",
+            "otros roles y combinaciones de permiso/sucursal; UI con lector"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/pos/ventas/:ventaId/canjear-ticket",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "factura/RUC, umbral/receptor anónimo, ticket a crédito y canje por UI",
+            "otros roles y combinaciones de permiso/sucursal; UI con lector"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/pos/caja/abrir",
-          "result": "http_contract_observed_not_full_acceptance",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "otros roles y combinaciones de permiso/sucursal; UI con lector",
+            "cierres con diferencias/supervisor en primera empresa por UI y crédito; se conservan pruebas de cajas separadas"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/pos/caja/cerrar",
-          "result": "http_contract_observed_not_full_acceptance",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "otros roles y combinaciones de permiso/sucursal; UI con lector",
+            "cierres con diferencias/supervisor en primera empresa por UI y crédito; se conservan pruebas de cajas separadas"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/pos/detalles-venta/:id",
-          "result": "http_contract_observed_not_full_acceptance",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "detalle/historial propio, búsquedas/filtros/paginación y consulta UI de todos los estados"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/pos/configurar-certificado",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI de carga/rotación y variantes de RUC/vigencia/contraseña; credenciales futuras sin pedir cliente inexistente",
+            "otros roles y combinaciones de permiso/sucursal; UI con lector"
           ]
         },
         {
@@ -6017,53 +5992,47 @@
         {
           "method": "GET",
           "endpoint": "/api/pos/ventas-pendientes-facturacion",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "errores y agotamiento de firma/cola, aceptación SUNAT y reintentos tras fallos externos"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/pos/facturacion/:ventaId",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "detalle/historial propio, búsquedas/filtros/paginación y consulta UI de todos los estados",
+            "errores y agotamiento de firma/cola, aceptación SUNAT y reintentos tras fallos externos"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/pos/reintentar-facturacion/:ventaId",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "errores y agotamiento de firma/cola, aceptación SUNAT y reintentos tras fallos externos"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/pos/worker/procesar-pendientes",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "otros roles y combinaciones de permiso/sucursal; UI con lector",
+            "errores y agotamiento de firma/cola, aceptación SUNAT y reintentos tras fallos externos"
           ]
         }
       ],
-      "defects": []
+      "defects": [
+        "pos-first-client-missing-payment-catalog",
+        "pos-repeated-stock-sku-blocked-by-pricing",
+        "pos-ticket-exchange-rejection-returns-created",
+        "pos-certificate-direct-writer-and-invalid-http",
+        "pos-fiscal-status-missing-returns-500",
+        "pos-pure-ticket-retry-returns-created",
+        "pos-worker-null-attempts-excludes-exchange"
+      ]
     },
     {
       "module": "reports",

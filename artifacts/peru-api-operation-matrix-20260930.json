@@ -1,18 +1,18 @@
 {
-  "generated_at": "2026-10-03T14:08:31.028Z",
+  "generated_at": "2026-10-03T16:15:56.769Z",
   "inventory": "artifacts/peru-api-operation-inventory-20260930.json",
-  "evidence": "artifacts/peru-integrated-local-gre-20261003",
+  "evidence": "artifacts/peru-integrated-20261003154825399-19744",
   "additional_evidence": [
     {
-      "evidence": "artifacts/peru-storage-ci-37125486977",
+      "evidence": "artifacts/peru-storage-ci-37132251731",
       "scope": "company_logo_real_storage_subset",
       "global_success": true,
       "ui_included": true
     }
   ],
   "evidence_scope": "full",
-  "evidence_global_success": true,
-  "evidence_phase": "ensayo global aprobado",
+  "evidence_global_success": false,
+  "evidence_phase": "HTTP aprobado; el resultado global se conserva por separado",
   "evidence_kind": "HTTP contra Nest/PostgREST/PostgreSQL efímeros; no contiene cuerpos, tokens ni credenciales",
   "acceptance_rule": "HTTP observado no acredita aceptación funcional. verified_cases sólo recoge contratos cuyo escenario funcional pasó; conserva pendientes explícitos y no acepta toda la operación.",
   "acceptance_cases": "artifacts/peru-operation-acceptance-cases-20260930.json",
@@ -931,11 +931,23 @@
           "status": 201
         },
         {
-          "trace_index": 1251,
+          "trace_index": 1249,
           "status": 201
         },
         {
-          "trace_index": 1265,
+          "trace_index": 1289,
+          "status": 201
+        },
+        {
+          "trace_index": 1306,
+          "status": 201
+        },
+        {
+          "trace_index": 1309,
+          "status": 201
+        },
+        {
+          "trace_index": 1323,
           "status": 201
         }
       ],
@@ -1206,6 +1218,10 @@
         {
           "trace_index": 317,
           "status": 200
+        },
+        {
+          "trace_index": 1262,
+          "status": 200
         }
       ],
       "defects": [],
@@ -1228,6 +1244,10 @@
       "existing_evidence": [
         {
           "trace_index": 420,
+          "status": 201
+        },
+        {
+          "trace_index": 1266,
           "status": 201
         }
       ],
@@ -1465,6 +1485,18 @@
         },
         {
           "trace_index": 324,
+          "status": 200
+        },
+        {
+          "trace_index": 1272,
+          "status": 200
+        },
+        {
+          "trace_index": 1279,
+          "status": 200
+        },
+        {
+          "trace_index": 1303,
           "status": 200
         }
       ],
@@ -3570,9 +3602,27 @@
         {
           "trace_index": 1234,
           "status": 201
+        },
+        {
+          "trace_index": 1250,
+          "status": 201
         }
       ],
-      "defects": [],
+      "defects": [
+        {
+          "id": "pos-first-client-missing-payment-catalog",
+          "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-pos-api-defects-20261003/pos-operations.json",
+            "observed_error": "Catálogo POS vacío después del wizard",
+            "local_only": true
+          },
+          "correction": "564 crea cuatro referencias sólo para configuración nueva PE; sin backfill ni datos comerciales.",
+          "pending": [
+            "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+          ]
+        }
+      ],
       "verified_cases": [
         {
           "id": "first-customer-fiscal-configuration",
@@ -3670,55 +3720,55 @@
       "source": "apps/erp-api/src/modules/configuracion/configuration.controller.ts:795",
       "existing_evidence": [
         {
-          "trace_index": 1252,
+          "trace_index": 1310,
           "status": 201
         },
         {
-          "trace_index": 1253,
+          "trace_index": 1311,
           "status": 201
         },
         {
-          "trace_index": 1254,
+          "trace_index": 1312,
           "status": 201
         },
         {
-          "trace_index": 1255,
+          "trace_index": 1313,
           "status": 409
         },
         {
-          "trace_index": 1256,
+          "trace_index": 1314,
           "status": 400
         },
         {
-          "trace_index": 1257,
+          "trace_index": 1315,
           "status": 400
         },
         {
-          "trace_index": 1258,
+          "trace_index": 1316,
           "status": 400
         },
         {
-          "trace_index": 1259,
+          "trace_index": 1317,
           "status": 413
         },
         {
-          "trace_index": 1260,
+          "trace_index": 1318,
           "status": 201
         },
         {
-          "trace_index": 1261,
+          "trace_index": 1319,
           "status": 403
         },
         {
-          "trace_index": 1263,
+          "trace_index": 1321,
           "status": 400
         },
         {
-          "trace_index": 1264,
+          "trace_index": 1322,
           "status": 201
         },
         {
-          "trace_index": 1266,
+          "trace_index": 1324,
           "status": 201
         }
       ],
@@ -3747,15 +3797,15 @@
       "source": "apps/erp-api/src/modules/configuracion/configuration.controller.ts:837",
       "existing_evidence": [
         {
-          "trace_index": 1262,
+          "trace_index": 1320,
           "status": 403
         },
         {
-          "trace_index": 1267,
+          "trace_index": 1325,
           "status": 200
         },
         {
-          "trace_index": 1268,
+          "trace_index": 1326,
           "status": 200
         }
       ],
@@ -10958,12 +11008,10 @@
       "defects": [
         {
           "id": "gre-view-and-print-omit-transported-items",
-          "status": "canonical_full_local_passed_ci_main_deployment_pending",
+          "status": "corrected_merged_main_deployment_verified",
           "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-print.json",
           "correction": "Fuentes canónicas renderizan bienes y cantidades; impresión consume el PDF con datos del registro.",
-          "pending": [
-            "CI exacto, integración en main y despliegue de GRE"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -11071,39 +11119,31 @@
       "defects": [
         {
           "id": "gre-idempotency-collision-returns-400",
-          "status": "canonical_full_local_passed_ci_main_deployment_pending",
+          "status": "corrected_merged_main_deployment_verified",
           "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
           "correction": "Fuentes canónicas distingue conflictos de idempotencia con HTTP 409 y conserva estado persistido.",
-          "pending": [
-            "CI exacto, integración en main y despliegue de GRE"
-          ]
+          "pending": []
         },
         {
           "id": "gre-rpc-infrastructure-failure-returns-400",
-          "status": "canonical_full_local_passed_ci_main_deployment_pending",
+          "status": "corrected_merged_main_deployment_verified",
           "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
           "correction": "Fuentes canónicas distingue indisponibilidad RPC con HTTP 503 y mensaje sin detalles internos; misma clave recupera operación tras restaurar EXECUTE.",
-          "pending": [
-            "CI exacto, integración en main y despliegue de GRE"
-          ]
+          "pending": []
         },
         {
           "id": "gre-manual-weight-html-step-blocks-valid-values",
-          "status": "canonical_full_local_passed_ci_main_deployment_pending",
+          "status": "corrected_merged_main_deployment_verified",
           "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
           "correction": "Fuentes canónicas alinea step 0.001 con mínimo 0.001 y precisión de tres decimales del DTO.",
-          "pending": [
-            "CI exacto, integración en main y despliegue de GRE"
-          ]
+          "pending": []
         },
         {
           "id": "gre-manual-recipient-document-unavailable",
-          "status": "canonical_full_local_passed_ci_main_deployment_pending",
+          "status": "corrected_merged_main_deployment_verified",
           "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
           "correction": "Fuentes canónicas ofrece tipo/documento del destinatario manual y lo persiste en datosAdicionales para construir UBL firmado.",
-          "pending": [
-            "CI exacto, integración en main y despliegue de GRE"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -11178,12 +11218,10 @@
       "defects": [
         {
           "id": "gre-manual-recipient-document-unavailable",
-          "status": "canonical_full_local_passed_ci_main_deployment_pending",
+          "status": "corrected_merged_main_deployment_verified",
           "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
           "correction": "Fuentes canónicas ofrece tipo/documento del destinatario manual y lo persiste en datosAdicionales para construir UBL firmado.",
-          "pending": [
-            "CI exacto, integración en main y despliegue de GRE"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -11494,21 +11532,17 @@
       "defects": [
         {
           "id": "gre-pdf-endpoint-delivers-text",
-          "status": "canonical_full_local_passed_ci_main_deployment_pending",
+          "status": "corrected_merged_main_deployment_verified",
           "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
           "correction": "Fuentes canónicas entrega PDF A4 binario con emisor, estado, transporte y todos los bienes; emisor firmado se obtiene del XML congelado. El cliente debe conservar bytes/extensión PDF al descargar y ofrecer la acción en listado.",
-          "pending": [
-            "CI exacto, integración en main y despliegue de GRE"
-          ]
+          "pending": []
         },
         {
           "id": "gre-view-and-print-omit-transported-items",
-          "status": "canonical_full_local_passed_ci_main_deployment_pending",
+          "status": "corrected_merged_main_deployment_verified",
           "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-print.json",
           "correction": "Fuentes canónicas renderizan bienes y cantidades; impresión consume el PDF con datos del registro.",
-          "pending": [
-            "CI exacto, integración en main y despliegue de GRE"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -11567,12 +11601,10 @@
       "defects": [
         {
           "id": "gre-csv-untrusted-cell-keeps-formula",
-          "status": "canonical_full_local_passed_ci_main_deployment_pending",
+          "status": "corrected_merged_main_deployment_verified",
           "proof": "artifacts/peru-gre-csv-defect-20261003/gre-operations.json",
           "correction": "Escape CSV neutraliza prefijos de fórmula, conserva comillas, comas y saltos, conforme al exportador bancario existente.",
-          "pending": [
-            "CI exacto, integración en main y despliegue de GRE"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -11888,6 +11920,10 @@
         {
           "trace_index": 535,
           "status": 200
+        },
+        {
+          "trace_index": 1263,
+          "status": 200
         }
       ],
       "defects": [],
@@ -11934,6 +11970,10 @@
         },
         {
           "trace_index": 528,
+          "status": 201
+        },
+        {
+          "trace_index": 1264,
           "status": 201
         }
       ],
@@ -12326,6 +12366,14 @@
         {
           "trace_index": 547,
           "status": 201
+        },
+        {
+          "trace_index": 1261,
+          "status": 201
+        },
+        {
+          "trace_index": 1280,
+          "status": 201
         }
       ],
       "defects": [],
@@ -12710,6 +12758,10 @@
         },
         {
           "trace_index": 490,
+          "status": 201
+        },
+        {
+          "trace_index": 1260,
           "status": 201
         }
       ],
@@ -13937,7 +13989,11 @@
           "status": 201
         },
         {
-          "trace_index": 1249,
+          "trace_index": 1287,
+          "status": 201
+        },
+        {
+          "trace_index": 1307,
           "status": 201
         }
       ],
@@ -14183,17 +14239,25 @@
         {
           "trace_index": 182,
           "status": 200
+        },
+        {
+          "trace_index": 1290,
+          "status": 200
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "pos-reader-and-worker-permissions",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "rol lector real consulta pero cinco mutaciones 403; worker rechaza usuario/anónimo"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "otros roles y combinaciones de permiso/sucursal; UI con lector"
       ]
     },
     {
@@ -14233,17 +14297,39 @@
         {
           "trace_index": 3,
           "status": 200
+        },
+        {
+          "trace_index": 1267,
+          "status": 200
         }
       ],
-      "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "defects": [
+        {
+          "id": "pos-first-client-missing-payment-catalog",
+          "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-pos-api-defects-20261003/pos-operations.json",
+            "observed_error": "Catálogo POS vacío después del wizard",
+            "local_only": true
+          },
+          "correction": "564 crea cuatro referencias sólo para configuración nueva PE; sin backfill ni datos comerciales.",
+          "pending": [
+            "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "pos-first-client-payment-catalog",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "catálogo disponible para primer ADMIN no demo después del wizard; efectivo y tarjeta usados realmente"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "otras configuraciones de medios de pago ofrecidas y sus monedas/referencias"
       ]
     },
     {
@@ -14256,17 +14342,26 @@
         {
           "trace_index": 6,
           "status": 200
+        },
+        {
+          "trace_index": 1259,
+          "status": 200
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "pos-first-client-certificate-intent",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "PFX desechable válido, replay, colisión y ausencia de clave; inválido no sobrescribe",
+            "configuración pública no expone secretos"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de carga/rotación y variantes de RUC/vigencia/contraseña; credenciales futuras sin pedir cliente inexistente"
       ]
     },
     {
@@ -14291,17 +14386,26 @@
         {
           "trace_index": 260,
           "status": 200
+        },
+        {
+          "trace_index": 1305,
+          "status": 200
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "pos-accounting-and-close",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "cuatro ventas generan cada una un asiento confirmado y cuadrado",
+            "cierre usa saldo real, después de canje y outbox, y sesión queda cerrada"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "cierres con diferencias/supervisor en primera empresa por UI y crédito; se conservan pruebas de cajas separadas"
       ]
     },
     {
@@ -14310,16 +14414,25 @@
       "method": "GET",
       "endpoint": "/api/pos/ventas-recientes",
       "source": "apps/erp-api/src/modules/pos/pos.controller.ts:61",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1274,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "pos-fiscal-read-and-tenant-isolation",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "consulta fiscal inexistente/ajena 404; historial y detalle ajenos vacíos sin mutaciones"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "detalle/historial propio, búsquedas/filtros/paginación y consulta UI de todos los estados"
       ]
     },
     {
@@ -14336,17 +14449,88 @@
         {
           "trace_index": 12,
           "status": 201
+        },
+        {
+          "trace_index": 1269,
+          "status": 201
+        },
+        {
+          "trace_index": 1270,
+          "status": 201
+        },
+        {
+          "trace_index": 1271,
+          "status": 201
+        },
+        {
+          "trace_index": 1278,
+          "status": 201
+        },
+        {
+          "trace_index": 1281,
+          "status": 201
+        },
+        {
+          "trace_index": 1282,
+          "status": 400
+        },
+        {
+          "trace_index": 1291,
+          "status": 403
         }
       ],
-      "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "defects": [
+        {
+          "id": "pos-repeated-stock-sku-blocked-by-pricing",
+          "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-pos-api-defects-20261003/pos-operations.json",
+            "observed_error": "pos/venta: {\"statusCode\":500,\"message\":\"COMMERCIAL_PRICE_DUPLICATE_PRODUCT_LINE\",\"error\":{\"tipo\":\"DATABASE_ERROR\",\"mensaje\":\"COMMERCIAL_PRICE_DUPLICATE_PRODUCT_LINE\",\"codigo\":\"22023\"},\"timestamp\":\"2026-10-03T14:06:08.616Z\",\"path\":\"/api/pos/venta\"}\n\n500 !== 201\n",
+            "local_only": true
+          },
+          "correction": "Agrega cantidades e importes de SKU compatible antes del precio comercial; diferencias de precio/descuento 400.",
+          "pending": [
+            "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "pos-ticket-sale-recovery",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "ticket interno real no consume CPE ni kardex de servicio; replay conserva un ID; nueva intención crea otro",
+            "UI pierde respuesta tras commit, recupera sin duplicar y confirma otra intención idéntica"
+          ]
+        },
+        {
+          "id": "pos-mixed-payment-cash-isolation",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "pago efectivo/tarjeta totaliza venta; sólo efectivo modifica saldo de caja"
+          ]
+        },
+        {
+          "id": "pos-stock-repeated-sku",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "cantidades 1+2 descuentan tres de stock y un movimiento; precio incompatible 400 sin impacto en ensayo canónico"
+          ]
+        },
+        {
+          "id": "pos-reader-and-worker-permissions",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "rol lector real consulta pero cinco mutaciones 403; worker rechaza usuario/anónimo"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "ventas a crédito/parciales, factura inmediata, descuentos/redondeo, divisas y todas las variantes de carrito ofrecidas",
+        "otros medios/combinaciones, referencias, vuelto y pago parcial/credito",
+        "varios almacenes/sucursales, concurrencia y líneas con descuentos/unidades distintos",
+        "otros roles y combinaciones de permiso/sucursal; UI con lector"
       ]
     },
     {
@@ -14354,17 +14538,69 @@
       "operation": "canjearTicket",
       "method": "POST",
       "endpoint": "/api/pos/ventas/:ventaId/canjear-ticket",
-      "source": "apps/erp-api/src/modules/pos/pos.controller.ts:100",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/pos/pos.controller.ts:102",
+      "existing_evidence": [
+        {
+          "trace_index": 1258,
+          "status": 404
+        },
+        {
+          "trace_index": 1277,
+          "status": 404
+        },
+        {
+          "trace_index": 1283,
+          "status": 201
+        },
+        {
+          "trace_index": 1284,
+          "status": 201
+        },
+        {
+          "trace_index": 1286,
+          "status": 409
+        },
+        {
+          "trace_index": 1295,
+          "status": 403
+        }
+      ],
+      "defects": [
+        {
+          "id": "pos-ticket-exchange-rejection-returns-created",
+          "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-pos-api-defects-20261003/pos-operations.json",
+            "observed_error": "pos/ventas/df7df33b-0451-4cd0-a95b-e0d7c107bedf/canjear-ticket: {\"success\":false,\"message\":\"POS_TICKET_SALE_NOT_FOUND\",\"error\":{\"tipo\":\"POS_TICKET_EXCHANGE_ERROR\",\"codigo\":\"P0002\",\"mensaje\":\"POS_TICKET_SALE_NOT_FOUND\"}}\n\n201 !== 404\n; pos/ventas/56d41de8-5518-4e1e-9901-e86624775382/canjear-ticket: {\"success\":false,\"message\":\"POS_TICKET_EXCHANGE_IDEMPOTENCY_MISMATCH\",\"error\":{\"tipo\":\"POS_TICKET_EXCHANGE_ERROR\",\"codigo\":\"23505\",\"mensaje\":\"POS_TICKET_EXCHANGE_IDEMPOTENCY_MISMATCH\"}}\n\n201 !== 409\n",
+            "local_only": true
+          },
+          "correction": "404 inexistente, 409 colisión y 400 de dominio; 503 genérico de infraestructura.",
+          "pending": [
+            "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "pos-exchange-reservation-and-intent",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "reconstruye boleta desde ticket, no repite cobro/stock/evento contable; replay recupera documento",
+            "inexistente 404, intención distinta 409"
+          ]
+        },
+        {
+          "id": "pos-reader-and-worker-permissions",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "rol lector real consulta pero cinco mutaciones 403; worker rechaza usuario/anónimo"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "factura/RUC, umbral/receptor anónimo, ticket a crédito y canje por UI",
+        "otros roles y combinaciones de permiso/sucursal; UI con lector"
       ]
     },
     {
@@ -14372,7 +14608,7 @@
       "operation": "abrirCaja",
       "method": "POST",
       "endpoint": "/api/pos/caja/abrir",
-      "source": "apps/erp-api/src/modules/pos/pos.controller.ts:112",
+      "source": "apps/erp-api/src/modules/pos/pos.controller.ts:114",
       "existing_evidence": [
         {
           "trace_index": 9,
@@ -14385,17 +14621,38 @@
         {
           "trace_index": 318,
           "status": 201
+        },
+        {
+          "trace_index": 1268,
+          "status": 201
+        },
+        {
+          "trace_index": 1292,
+          "status": 403
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "pos-reader-and-worker-permissions",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "rol lector real consulta pero cinco mutaciones 403; worker rechaza usuario/anónimo"
+          ]
+        },
+        {
+          "id": "pos-accounting-and-close",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "cuatro ventas generan cada una un asiento confirmado y cuadrado",
+            "cierre usa saldo real, después de canje y outbox, y sesión queda cerrada"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "otros roles y combinaciones de permiso/sucursal; UI con lector",
+        "cierres con diferencias/supervisor en primera empresa por UI y crédito; se conservan pruebas de cajas separadas"
       ]
     },
     {
@@ -14403,7 +14660,7 @@
       "operation": "cerrarCaja",
       "method": "POST",
       "endpoint": "/api/pos/caja/cerrar",
-      "source": "apps/erp-api/src/modules/pos/pos.controller.ts:123",
+      "source": "apps/erp-api/src/modules/pos/pos.controller.ts:125",
       "existing_evidence": [
         {
           "trace_index": 8,
@@ -14420,17 +14677,38 @@
         {
           "trace_index": 326,
           "status": 201
+        },
+        {
+          "trace_index": 1293,
+          "status": 403
+        },
+        {
+          "trace_index": 1304,
+          "status": 201
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "pos-reader-and-worker-permissions",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "rol lector real consulta pero cinco mutaciones 403; worker rechaza usuario/anónimo"
+          ]
+        },
+        {
+          "id": "pos-accounting-and-close",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "cuatro ventas generan cada una un asiento confirmado y cuadrado",
+            "cierre usa saldo real, después de canje y outbox, y sesión queda cerrada"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "otros roles y combinaciones de permiso/sucursal; UI con lector",
+        "cierres con diferencias/supervisor en primera empresa por UI y crédito; se conservan pruebas de cajas separadas"
       ]
     },
     {
@@ -14438,7 +14716,7 @@
       "operation": "getDetallesVenta",
       "method": "GET",
       "endpoint": "/api/pos/detalles-venta/:id",
-      "source": "apps/erp-api/src/modules/pos/pos.controller.ts:131",
+      "source": "apps/erp-api/src/modules/pos/pos.controller.ts:133",
       "existing_evidence": [
         {
           "trace_index": 15,
@@ -14447,17 +14725,25 @@
         {
           "trace_index": 17,
           "status": 200
+        },
+        {
+          "trace_index": 1275,
+          "status": 200
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "pos-fiscal-read-and-tenant-isolation",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "consulta fiscal inexistente/ajena 404; historial y detalle ajenos vacíos sin mutaciones"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "detalle/historial propio, búsquedas/filtros/paginación y consulta UI de todos los estados"
       ]
     },
     {
@@ -14465,17 +14751,69 @@
       "operation": "configurarCertificado",
       "method": "POST",
       "endpoint": "/api/pos/configurar-certificado",
-      "source": "apps/erp-api/src/modules/pos/pos.controller.ts:139",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/pos/pos.controller.ts:141",
+      "existing_evidence": [
+        {
+          "trace_index": 1252,
+          "status": 201
+        },
+        {
+          "trace_index": 1253,
+          "status": 201
+        },
+        {
+          "trace_index": 1254,
+          "status": 409
+        },
+        {
+          "trace_index": 1255,
+          "status": 400
+        },
+        {
+          "trace_index": 1256,
+          "status": 400
+        },
+        {
+          "trace_index": 1294,
+          "status": 403
+        }
+      ],
+      "defects": [
+        {
+          "id": "pos-certificate-direct-writer-and-invalid-http",
+          "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-pos-api-defects-20261003/pos-operations.json",
+            "observed_error": "{\"success\":false,\"message\":\"permission denied for table empresa_config\"}\n\nfalse !== true\n",
+            "local_only": true
+          },
+          "correction": "Valida PFX/emisor/vigencia, cifra y utiliza writer con permiso/intención 564; inválido 400 sin cambio.",
+          "pending": [
+            "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "pos-first-client-certificate-intent",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "PFX desechable válido, replay, colisión y ausencia de clave; inválido no sobrescribe",
+            "configuración pública no expone secretos"
+          ]
+        },
+        {
+          "id": "pos-reader-and-worker-permissions",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "rol lector real consulta pero cinco mutaciones 403; worker rechaza usuario/anónimo"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de carga/rotación y variantes de RUC/vigencia/contraseña; credenciales futuras sin pedir cliente inexistente",
+        "otros roles y combinaciones de permiso/sucursal; UI con lector"
       ]
     },
     {
@@ -14483,7 +14821,7 @@
       "operation": "getConfigurationStatus",
       "method": "GET",
       "endpoint": "/api/pos/configuration-status",
-      "source": "apps/erp-api/src/modules/pos/pos.controller.ts:154",
+      "source": "apps/erp-api/src/modules/pos/pos.controller.ts:157",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -14501,17 +14839,27 @@
       "operation": "obtenerVentasPendientesFacturacion",
       "method": "GET",
       "endpoint": "/api/pos/ventas-pendientes-facturacion",
-      "source": "apps/erp-api/src/modules/pos/pos.controller.ts:162",
-      "existing_evidence": [],
+      "source": "apps/erp-api/src/modules/pos/pos.controller.ts:165",
+      "existing_evidence": [
+        {
+          "trace_index": 1299,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "pos-worker-reservation-retry",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "token worker limita tenant, incluye intentos NULL y produce UBL firmado con reserva única",
+            "retry recupera CPE y mantiene impactos; ticket puro 409 sin cambios"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "errores y agotamiento de firma/cola, aceptación SUNAT y reintentos tras fallos externos"
       ]
     },
     {
@@ -14519,17 +14867,61 @@
       "operation": "obtenerEstadoFacturacionVenta",
       "method": "GET",
       "endpoint": "/api/pos/facturacion/:ventaId",
-      "source": "apps/erp-api/src/modules/pos/pos.controller.ts:170",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/pos/pos.controller.ts:173",
+      "existing_evidence": [
+        {
+          "trace_index": 1257,
+          "status": 404
+        },
+        {
+          "trace_index": 1276,
+          "status": 404
+        },
+        {
+          "trace_index": 1285,
+          "status": 200
+        },
+        {
+          "trace_index": 1301,
+          "status": 200
+        }
+      ],
+      "defects": [
+        {
+          "id": "pos-fiscal-status-missing-returns-500",
+          "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-pos-api-defects-20261003/pos-operations.json",
+            "observed_error": "pos/facturacion/6e702019-8eff-4b3f-bdc2-38b41dfd621d: {\"statusCode\":500,\"message\":\"Venta no encontrada para el tenant activo\",\"error\":\"Error\",\"timestamp\":\"2026-10-03T14:06:05.909Z\",\"path\":\"/api/pos/facturacion/6e702019-8eff-4b3f-bdc2-38b41dfd621d\"}\n\n500 !== 404\n",
+            "local_only": true
+          },
+          "correction": "404 inexistente/ajeno y 503 de infraestructura; UUID validado.",
+          "pending": [
+            "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "pos-fiscal-read-and-tenant-isolation",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "consulta fiscal inexistente/ajena 404; historial y detalle ajenos vacíos sin mutaciones"
+          ]
+        },
+        {
+          "id": "pos-worker-reservation-retry",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "token worker limita tenant, incluye intentos NULL y produce UBL firmado con reserva única",
+            "retry recupera CPE y mantiene impactos; ticket puro 409 sin cambios"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "detalle/historial propio, búsquedas/filtros/paginación y consulta UI de todos los estados",
+        "errores y agotamiento de firma/cola, aceptación SUNAT y reintentos tras fallos externos"
       ]
     },
     {
@@ -14537,17 +14929,45 @@
       "operation": "reintentarFacturacionVenta",
       "method": "POST",
       "endpoint": "/api/pos/reintentar-facturacion/:ventaId",
-      "source": "apps/erp-api/src/modules/pos/pos.controller.ts:178",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/pos/pos.controller.ts:181",
+      "existing_evidence": [
+        {
+          "trace_index": 1273,
+          "status": 409
+        },
+        {
+          "trace_index": 1302,
+          "status": 201
+        }
+      ],
+      "defects": [
+        {
+          "id": "pos-pure-ticket-retry-returns-created",
+          "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-pos-api-defects-20261003/pos-operations.json",
+            "observed_error": "pos/reintentar-facturacion/56d41de8-5518-4e1e-9901-e86624775382: {\"success\":false,\"message\":\"El ticket interno no tiene una emisión CPE pendiente; use el flujo de canje a factura o boleta\"}\n\n201 !== 409\n",
+            "local_only": true
+          },
+          "correction": "409 sin incrementar contador ni alterar impactos; reserva existente se recupera.",
+          "pending": [
+            "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "pos-worker-reservation-retry",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "token worker limita tenant, incluye intentos NULL y produce UBL firmado con reserva única",
+            "retry recupera CPE y mantiene impactos; ticket puro 409 sin cambios"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "errores y agotamiento de firma/cola, aceptación SUNAT y reintentos tras fallos externos"
       ]
     },
     {
@@ -14555,17 +14975,61 @@
       "operation": "procesarVentasPendientesWorker",
       "method": "POST",
       "endpoint": "/api/pos/worker/procesar-pendientes",
-      "source": "apps/erp-api/src/modules/pos/pos.controller.ts:186",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/pos/pos.controller.ts:189",
+      "existing_evidence": [
+        {
+          "trace_index": 1296,
+          "status": 401
+        },
+        {
+          "trace_index": 1297,
+          "status": 401
+        },
+        {
+          "trace_index": 1298,
+          "status": 401
+        },
+        {
+          "trace_index": 1300,
+          "status": 201
+        }
+      ],
+      "defects": [
+        {
+          "id": "pos-worker-null-attempts-excludes-exchange",
+          "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-pos-worker-null-defect-20261003/pos-operations.json",
+            "observed_error": "procesadas=0, errores=0 con cpe_pendiente=true, cpe_data presente, cpe_id NULL e intentos_facturacion NULL",
+            "local_only": true
+          },
+          "correction": "Incluye NULL como cero y adopta CPE firmado sin repetir pago/stock/CxC/asiento.",
+          "pending": [
+            "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "pos-reader-and-worker-permissions",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "rol lector real consulta pero cinco mutaciones 403; worker rechaza usuario/anónimo"
+          ]
+        },
+        {
+          "id": "pos-worker-reservation-retry",
+          "source": "scripts/ci/test-peru-pos-first-client-local.mjs",
+          "verified_checks": [
+            "token worker limita tenant, incluye intentos NULL y produce UBL firmado con reserva única",
+            "retry recupera CPE y mantiene impactos; ticket puro 409 sin cambios"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "otros roles y combinaciones de permiso/sucursal; UI con lector",
+        "errores y agotamiento de firma/cola, aceptación SUNAT y reintentos tras fallos externos"
       ]
     },
     {
@@ -17506,6 +17970,10 @@
         {
           "trace_index": 943,
           "status": 201
+        },
+        {
+          "trace_index": 1265,
+          "status": 201
         }
       ],
       "defects": [
@@ -18515,7 +18983,11 @@
           "status": 201
         },
         {
-          "trace_index": 1250,
+          "trace_index": 1288,
+          "status": 201
+        },
+        {
+          "trace_index": 1308,
           "status": 201
         }
       ],
@@ -18907,6 +19379,10 @@
         },
         {
           "trace_index": 983,
+          "status": 201
+        },
+        {
+          "trace_index": 1251,
           "status": 201
         }
       ],

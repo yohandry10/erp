@@ -1,0 +1,14 @@
+{
+  "completedAt": "2026-10-03T15:35:09.023Z",
+  "success": true,
+  "withBrowser": true,
+  "withSurvey": false,
+  "withRecords": false,
+  "candidateApi": true,
+  "candidateSql": true,
+  "candidateUi": false,
+  "scope": "pos_diagnostic_api_subset",
+  "database": "PostgreSQL 16 efímero",
+  "output": "C:\\Users\\PC\\Desktop\\erp-peru-production\\artifacts\\peru-pos-local-20261003153305963-6672",
+  "remoteWrites": false
+}

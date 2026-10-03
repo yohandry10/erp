@@ -1,0 +1,16 @@
+{
+  "local_source": "artifacts/peru-integrated-20261003154825399-19744",
+  "global_success": false,
+  "http_cases": 316,
+  "browser_passed": 29,
+  "browser_failed": 1,
+  "failure": "Test read an iframe after native afterprint cleanup; sale/replay and preview passed.",
+  "scope": "Failed global run preserved; no final backup/restore was executed because browser phase failed.",
+  "api_code_sha": "20345d8a545ba9dc30445d952f46c8b749a7ee0a",
+  "limits": [
+    "Line endings normalized after runner start, with identical code semantics.",
+    "Later scrypt derivation and print observer require separate/CI proof."
+  ],
+  "remote_business_writes": false,
+  "dumps_extracted": false
+}

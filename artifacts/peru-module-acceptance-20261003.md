@@ -2,7 +2,7 @@
 
 No hay aceptación integral de lanzamiento. Los casos se vinculan a operaciones concretas en la matriz API; navegación y controles visibles describen la oferta y no demuestran ejecución. Sólo Analytics excluido; reportes operativos, contables y tributarios incluidos.
 
-Último runtime comprobado: `cf868067`, esquema 563. PR #132 cerró ambos CI exactos, main 37125486977 y despliegue API/web/DB/Redis/CORS con preflight; conserva el timeout HTTP inicial de 20 segundos. DB 563 preservó 37 tablas, funciones y seguridad. GRE canónico `094be1a7` pasó 298 casos API/29 UI sin reintentos, barridos y restore; CI e integración/despliegue de GRE pendientes. Render: plan efectivo y continuidad sin confirmar. No hubo datos sintéticos de negocio en PROD.
+Último runtime comprobado: `19fa239d`, esquema 563. #133 cerró ambos CI exactos, main 37132251731 y despliegue API/web/DB/Redis/CORS con preflight; conserva el timeout HTTP inicial de 20 segundos. GRE pasó 298 casos API/29 UI sin reintentos, barridos y restore. POS candidato pasó 18 API/un UI y restore; fuentes canónicas y 564 están en PR #134, con CI/ensayo completo pendientes. La copia privada 563 pasó rollback y preservación de 38 tablas/funciones/seguridad al ensayar 564. PROD sigue en 563. Render: plan efectivo y continuidad sin confirmar. No hubo datos sintéticos de negocio en PROD.
 
 | Dominio de código | Contratos declarados | HTTP observado | Operaciones con casos funcionales | Aceptación completa |
 |---|---:|---:|---:|---|
@@ -30,7 +30,7 @@ No hay aceptación integral de lanzamiento. Los casos se vinculan a operaciones 
 | observability | 5 | 0 | 0 | Pendiente |
 | paises | 7 | 0 | 0 | Pendiente |
 | permissions | 1 | 0 | 0 | Pendiente |
-| pos | 17 | 9 | 0 | Pendiente |
+| pos | 17 | 16 | 15 | Pendiente |
 | reports | 3 | 0 | 0 | Pendiente |
 | retenciones | 8 | 7 | 7 | Pendiente |
 | roles | 9 | 5 | 4 | Pendiente |
@@ -56,7 +56,7 @@ Los 11 contratos específicos de Argentina/Colombia identificados en el artefact
 ## Evidencia
 
 - `peru-integrated-local-gre-20261003`: ensayo real API/UI/DB y restore; 22 casos API y tres recorridos GRE.
-- `peru-storage-ci-37125486977`: API/UI/DB/blobs locales; proveedor remoto sin aceptación por inferencia.
+- `peru-storage-ci-37132251731`: API/UI/DB/blobs locales; proveedor remoto sin aceptación por inferencia.
 - `peru-operation-acceptance-cases-20260930.json`: qué se probó y variantes pendientes.
 - `peru-functional-defects-20260930.json`: reproducción, corrección y estado de cada defecto.
 - `peru-api-operation-matrix-20260930.json` y `peru-ui-operation-matrix-20261002.json`: operaciones y controles trazables.
