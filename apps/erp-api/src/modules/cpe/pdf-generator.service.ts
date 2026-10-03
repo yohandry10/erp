@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import axios from 'axios';
 import { lookup as dnsLookup } from 'node:dns';
 import { Agent as HttpsAgent } from 'node:https';
@@ -386,9 +386,8 @@ export class PdfGeneratorService {
       .eq('tenant_id', tenantId)
       .single();
 
-    if (error || !data) {
-      throw new Error(`CPE no encontrado: ${cpeId}`);
-    }
+    if (error && error.code !== 'PGRST116') throw new ServiceUnavailableException('No se pudo consultar el CPE para PDF');
+    if (!data) throw new NotFoundException('CPE no encontrado');
 
     const cpeData = data as any;
     const persistedItems = Array.isArray(cpeData.items)

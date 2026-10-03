@@ -1,0 +1,10 @@
+{
+  "capturedAt": "2026-10-03T19:50:13.715Z",
+  "source_hashes": {
+    "apps/erp-api/tests/e2e/helpers/local-api-harness.ts": "665121ca342285ffa09cde246295a5fb9053d9099d6ccf5163c1e80d1c7e4588",
+    "apps/web/tests/e2e/helpers/peru-local-accounting.ts": "892e26271f527efbe3d3e3647170ebc9ddca09e094a51d4ab80009135a86a760",
+    "artifacts/peru-cpe-accounting-drain-probe-20261003.mjs": "8e1514dcf8b7cb5c06133391bce08e36315d7909e38596a836f6fc4127db4655"
+  },
+  "remoteWrites": false,
+  "complete_acceptance": false
+}

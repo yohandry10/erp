@@ -1,0 +1,15 @@
+{
+  "head_sha": "0707be1034f6cdfebf7cb783ba0efd10ee8d4f3a",
+  "source": "artifacts/peru-cpe-local-20261003163538135-23588",
+  "canonical_cpe_source_unchanged_from": "19fa239d9ddf0ba7d5ec08fcb3a3ca5dd7ac69f5",
+  "candidate_api": false,
+  "candidate_sql": false,
+  "remoteWrites": false,
+  "global_acceptance": false,
+  "dumps_extracted": false,
+  "limits": [
+    "API/DB efímeras; no navegador ni aceptación SUNAT",
+    "Primer intento anterior detenido por medio_pago de más de tres caracteres, corregido únicamente en el ensayo",
+    "Comprobación PDF sólo identificó salida binaria; lectura visual y variantes multipágina pendientes"
+  ]
+}

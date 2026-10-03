@@ -1,0 +1,9 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "Payload real del formulario PE; writer y XML locales, sin transmisión",
+  "http_status": 201,
+  "expected_net_unit_price": 20,
+  "stored_net_unit_price": 20,
+  "xml_net_unit_price": 20
+}

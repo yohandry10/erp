@@ -200,6 +200,17 @@ describe('CpeRegistrationService - snapshot desktop 476', () => {
     ]);
   });
 
+  it('conserva el valor neto del formulario PE separado del precio bruto con IGV', () => {
+    const { service } = createService();
+    expect(service.normalizeComprobanteItems([{
+      codigo: 'UI-PE', descripcion: 'Dos servicios', cantidad: 2,
+      valorUnitario: 20, precioUnitario: 23.6, igv: 7.2, total: 47.2,
+    }])).toEqual([expect.objectContaining({
+      precio_unitario: 20, valor_venta: 40, precio_venta: 23.6,
+      igv: 7.2, total_item: 47.2,
+    })]);
+  });
+
   it('rechaza aliases contradictorios de afectación en el mismo ítem', () => {
     const { service } = createService();
 

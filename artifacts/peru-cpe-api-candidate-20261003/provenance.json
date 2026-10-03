@@ -1,0 +1,20 @@
+{
+  "source": "artifacts/peru-cpe-local-20261003171447362-26128",
+  "scope": "Candidato CPE: 19 API y restore; sin volumen ni navegador/aceptación externa",
+  "global_acceptance": false,
+  "remoteWrites": false,
+  "dumps_extracted": false,
+  "candidate_hashes": {
+    "cpe.service.ts": "e6394ed7ba0c5b08876456edba8bbb8016de2af2a61f791a07ce9e38b8275af7",
+    "cpe.controller.ts": "8f4b5c3730452f391a6eca760303804ff475a5f861cc0ba0571540304488320e",
+    "cpe-delivery.service.ts": "4577d43bdca58c6b223c6e8dd5bf5b5e57ea971f30c38831fa9a03105a3a05b2",
+    "pdf-generator.service.ts": "a5b9fa04ac616a74092e479e4855799d54d98df20f64b32b28b62e2be839ecd9",
+    "cpe-reporting.service.ts": "346ea4bbd789d7b6bc2732c383f94d196e15f7a502dbacee99549796e281df5b"
+  },
+  "sql_sha256": "a6fded10f1b82c99c100251c03bcaf926e22fd637057c3d7602fed1de010b8a1",
+  "limits": [
+    "Infraestructura efímera real; no transmite ni acredita aceptación SUNAT",
+    "Certificado desechable local no publicado",
+    "PDFs, PFX, dumps y logs completos permanecen privados"
+  ]
+}

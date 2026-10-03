@@ -1,0 +1,14 @@
+{
+  "completedAt": "2026-10-03T16:37:34.489Z",
+  "success": false,
+  "withBrowser": false,
+  "withSurvey": false,
+  "withRecords": false,
+  "candidateApi": false,
+  "candidateSql": false,
+  "candidateUi": false,
+  "scope": "cpe_diagnostic_api_subset",
+  "database": "PostgreSQL 16 efímero",
+  "output": "C:\\Users\\PC\\Desktop\\erp-peru-production\\artifacts\\peru-cpe-local-20261003163538135-23588",
+  "remoteWrites": false
+}

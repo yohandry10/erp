@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  ConflictException,
+  HttpException,
   Logger,
   NotFoundException,
   ServiceUnavailableException,
@@ -702,16 +704,15 @@ async findOne(id: string, tenantId: string): Promise<FacturaDto> {
         .eq('tenant_id', tenantId)
         .single();
 
-      if (error || !data) {
-        throw new NotFoundException('CPE not found');
-      }
+      if (error && error.code !== 'PGRST116') throw new ServiceUnavailableException('No se pudo consultar el CPE');
+      if (!data) throw new NotFoundException('CPE not found');
 
       return this.mapToPublicDto(data);
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (error instanceof HttpException) {
         throw error;
       }
-      throw new BadRequestException('Error fetching CPE');
+      throw new ServiceUnavailableException('No se pudo consultar el CPE');
     }
   }
 
@@ -726,9 +727,8 @@ async getCpeById(id: string, tenantId: string): Promise<any> {
         .eq('tenant_id', tenantId)
         .single();
 
-      if (error || !cpeData) {
-        throw new Error('CPE no encontrado');
-      }
+      if (error && error.code !== 'PGRST116') throw new ServiceUnavailableException('No se pudo consultar el CPE');
+      if (!cpeData) throw new NotFoundException('CPE no encontrado');
 
       // La vista previa HTML necesita los mismos datos visibles que el PDF.
       // Se resuelven siempre por tenant para no mezclar emisores.
@@ -826,7 +826,8 @@ async getCpeById(id: string, tenantId: string): Promise<any> {
     } catch (error) {
       const detail = error instanceof Error ? error.message : 'error desconocido';
       this.logger.error(`No se pudo preparar la representación del CPE ${id}: ${detail}`);
-      throw new Error(`Error obteniendo CPE: ${detail}`);
+      if (error instanceof HttpException) throw error;
+      throw new ServiceUnavailableException('No se pudo preparar la representación del CPE');
     }
   }
 
@@ -843,7 +844,8 @@ async generatePdf(id: string, tenantId: string): Promise<Buffer> {
       
     } catch (error) {
       this.logger.error(`❌ Error generando PDF para CPE ${id}:`, error);
-      throw new Error(`Error generando PDF: ${error.message}`);
+      if (error instanceof HttpException) throw error;
+      throw new ServiceUnavailableException('No se pudo generar el PDF del CPE');
     }
   }
 
@@ -854,7 +856,8 @@ async getSignedXml(id: string, tenantId: string): Promise<string> {
       .eq('id', id)
       .eq('tenant_id', tenantId)
       .maybeSingle();
-    if (error || !cpe) throw new NotFoundException('CPE not found');
+    if (error) throw new ServiceUnavailableException('No se pudo consultar el XML del CPE');
+    if (!cpe) throw new NotFoundException('CPE not found');
     if (!(cpe as any).xml_firmado) {
       throw new BadRequestException('XML not available for this CPE');
     }
@@ -1799,7 +1802,10 @@ async retrySendToOse(
   private async reserveOperation(rpc: string, args: Record<string, unknown>): Promise<any> {
     const { data, error } = await this.supabaseService.getClient().rpc(rpc, args);
     if (error) {
-      throw new BadRequestException(`No se pudo reservar la operación fiscal: ${error.message}`);
+      if (error.code === '23505' || error.code === '55000') throw new ConflictException('La operación fiscal entra en conflicto con la intención o estado persistido');
+      if (error.code === 'P0002') throw new NotFoundException('CPE no encontrado para la empresa activa');
+      if (['22023','23514','22P02'].includes(error.code)) throw new BadRequestException('La solicitud fiscal no cumple las validaciones del comprobante');
+      throw new ServiceUnavailableException('No se pudo reservar la operación fiscal; conserve la misma intención y reintente');
     }
     const claim = Array.isArray(data) ? data[0] : data;
     if (!claim?.cpe || (claim.claimed && (!claim.operation?.id || !claim.operation?.claim_token))) {
@@ -2005,6 +2011,10 @@ async retrySendToOse(
   private deliveryResult(payload: any) {
     const operation = payload?.operation ?? null;
     const cpe = payload?.cpe ?? null;
+    if (operation?.result_kind === 'TECHNICAL_ERROR' || payload?.reason === 'RETRY_LATER') {
+      throw new ServiceUnavailableException('La operación fiscal sigue pendiente por un error técnico; reintente con la misma intención');
+    }
+    if (operation?.result_kind === 'REJECTED') throw new BadRequestException('La autoridad fiscal rechazó el comprobante');
     return {
       success: true,
       claimed: Boolean(payload?.claimed),
@@ -2012,7 +2022,7 @@ async retrySendToOse(
       reason: payload?.reason ?? null,
       operationId: operation?.id ?? null,
       resultKind: operation?.result_kind ?? null,
-      cpe,
+      cpe: cpe ? this.mapToPublicRecord(cpe) : null,
       estado: cpe?.estado ?? null,
       codigoSunat: operation?.response_code ?? null,
       descripcionSunat: operation?.error_message ?? null,

@@ -2689,6 +2689,303 @@
       "pending_checks": [
         "cierres con diferencias/supervisor en primera empresa por UI y crédito; se conservan pruebas de cajas separadas"
       ]
+    },
+    {
+      "id": "cpe-direct-signed-invoice-replay",
+      "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "CPE: factura manual de contado",
+        "CPE: replay y dos",
+        "CPE: conflicto de intención"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cpe/comprobantes"
+        }
+      ],
+      "verified_checks": [
+        "PFX propio configurado por API, factura/documento/outbox persistidos sin transmisión",
+        "Replay/concurrencia conserva el ID; contenido cambiado 409 sin efectos"
+      ],
+      "pending_checks": [
+        "Variantes de receptor, afectación, descuentos, transporte y certificado; claves legacy sin huella fallan cerrado"
+      ]
+    },
+    {
+      "id": "cpe-detail-xml-pdf-isolation",
+      "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "CPE: detalle, XML autorizado",
+        "CPE: descarga PDF",
+        "CPE: inexistente y ajeno",
+        "CPE: ID mal formado"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/cpe/comprobantes/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cpe/comprobantes/:id/pdf"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cpe/:id/xml"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cpe/:id"
+        }
+      ],
+      "verified_checks": [
+        "Lecturas reales representan ID, emisor, total y QR; XML con firma y PDF binario",
+        "Inexistente/ajeno 404; UUID inválido 400"
+      ],
+      "pending_checks": [
+        "Variantes históricas, otros roles y clientes; PDF visual tiene evidencia separada"
+      ]
+    },
+    {
+      "id": "cpe-query-validation-export",
+      "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "CPE: listado, búsqueda",
+        "CPE: página inválida",
+        "CPE: CSV cita",
+        "CPE: exportación y listado ajenos",
+        "CPE: exportación incluye más de 200"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/cpe/comprobantes"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cpe/comprobantes/export"
+        }
+      ],
+      "verified_checks": [
+        "Filtros/conteo/paginación reales; fechas/página inválidas 400",
+        "CSV escapado, fórmulas neutralizadas y 201 registros completos; aislamiento"
+      ],
+      "pending_checks": [
+        "Concurrencia de altas durante exportación; variantes de volúmenes y búsqueda"
+      ]
+    },
+    {
+      "id": "cpe-credit-and-no-invalid-effects",
+      "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "CPE: factura a crédito",
+        "CPE: totales manipulados",
+        "CPE: crédito con cliente ajeno"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cpe/comprobantes"
+        }
+      ],
+      "verified_checks": [
+        "Contrato UI conserva cliente_id y crea CxC por S/23,60",
+        "Totales/cantidad/receptor/cliente de otra empresa rechazan sin efectos"
+      ],
+      "pending_checks": [
+        "Retenciones, percepciones, detracciones, anticipos y cobros parciales por factura manual"
+      ]
+    },
+    {
+      "id": "cpe-boleta-and-multipage",
+      "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "CPE: boleta DNI y factura multipágina"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cpe/comprobantes"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cpe/comprobantes/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cpe/comprobantes/:id/pdf"
+        }
+      ],
+      "verified_checks": [
+        "Boleta con DNI y factura de 80 líneas se firman y persisten; PDF binario"
+      ],
+      "pending_checks": [
+        "Más variantes de boleta, IGV y monedas permitidas; representación física"
+      ]
+    },
+    {
+      "id": "cpe-external-failure-and-note-gates",
+      "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "CPE: envío sin credenciales",
+        "CPE: nota sin origen aceptado",
+        "CPE: origen rechazado"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cpe/:id/resend"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/cpe/notas-referenciadas"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cpe/notas-referenciadas/origenes"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cpe/baja/elegibles"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cpe/baja/lotes"
+        }
+      ],
+      "verified_checks": [
+        "Sin SOL, intento/replay 503 explícito, sin CDR ni cambio económico",
+        "Notas/bajas no inventan origen aceptado ni aceptación"
+      ],
+      "pending_checks": [
+        "Notas y bajas con precondición de CDR local controlada; aceptación, acuses y reintentos externos SUNAT"
+      ]
+    },
+    {
+      "id": "cpe-real-read-failure-recovery",
+      "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "CPE: caída real de SELECT"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/cpe/comprobantes"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cpe/comprobantes/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cpe/comprobantes/:id/pdf"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cpe/:id/xml"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cpe/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cpe/stats"
+        }
+      ],
+      "verified_checks": [
+        "REVOKE SELECT real devuelve 503 en seis lecturas; GRANT permite recuperar, sin impactos económicos"
+      ],
+      "pending_checks": [
+        "Errores de red y de PDF/Storage; UI bajo caída real de lectura"
+      ]
+    },
+    {
+      "id": "cpe-reader-and-sql-authorization",
+      "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "CPE: lectura y reenvío sin permiso XML",
+        "CPE: actor ajeno y permiso revocado"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cpe/comprobantes"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cpe/comprobantes/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cpe/comprobantes/:id/pdf"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cpe/:id/xml"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/cpe/:id/resend"
+        }
+      ],
+      "verified_checks": [
+        "Usuario/rol reales: lectura pública sin XML, emisión/PDF/XML 403 y retry técnico sin datos privados",
+        "Actor ajeno y permiso retirado rechazan en SQL sin efectos"
+      ],
+      "pending_checks": [
+        "Otras combinaciones de permisos/sucursal y UI con lector"
+      ]
+    },
+    {
+      "id": "cpe-write-rollback-recovery",
+      "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "CPE: fallo real después del INSERT",
+        "CPE: RPC sin EXECUTE"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cpe/comprobantes"
+        }
+      ],
+      "verified_checks": [
+        "Fallo de trigger después de INSERT revierte documento/CPE/outbox; misma intención recupera uno",
+        "RPC sin EXECUTE da 503 y reintento tras restaurar conserva un ID"
+      ],
+      "pending_checks": [
+        "Fallos externos post commit y recuperación tras reinicio de worker"
+      ]
+    },
+    {
+      "id": "cpe-ui-net-price-and-emission-date",
+      "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "CPE: contrato UI conserva precio neto"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cpe/comprobantes"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cpe/comprobantes"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cpe/:id/xml"
+        }
+      ],
+      "verified_checks": [
+        "Cantidad dos: valor neto S/20, precio bruto S/23,60 y total S/47,20 coherentes en fila y XML",
+        "Filtro PE usa fecha de emisión anterior al alta"
+      ],
+      "pending_checks": [
+        "Fechas históricas con hora real; otras afectaciones tributarias"
+      ]
     }
   ]
 }

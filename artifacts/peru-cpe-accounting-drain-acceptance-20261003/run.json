@@ -1,0 +1,15 @@
+{
+  "completedAt": "2026-10-03T19:54:15.772Z",
+  "success": true,
+  "withBrowser": false,
+  "withSurvey": false,
+  "withRecords": false,
+  "candidateApi": false,
+  "candidateSql": false,
+  "candidateUi": false,
+  "scope": "cpe_accounting_drain_real_local_subset",
+  "database": "PostgreSQL 16 efímero",
+  "output": "artifacts/peru-cpe-accounting-drain-local-20261003195013713-9744",
+  "remoteWrites": false,
+  "complete_acceptance": false
+}

@@ -1,0 +1,60 @@
+import {test,expect} from '@playwright/test';
+import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';import {execFileSync} from 'node:child_process';
+import {loginPeruLocal} from './helpers/peru-login-local';
+test('CPE local: listado completo, formulario manual, recuperación y crédito',async({page,context})=>{
+ test.setTimeout(360000);page.setDefaultTimeout(30000);
+ const output=process.env.LOCAL_INTEGRATED_OUTPUT_DIR!;const first=JSON.parse(fs.readFileSync(path.join(output,'cpe-first-fixture.json'),'utf8'));
+ assert.equal(process.env.E2E_EPHEMERAL_LOCAL_DB,'1');assert.equal(process.env.PGHOST,'127.0.0.1');assert.equal(process.env.PGDATABASE,'erp_e2e');assert.match(first.tenant,/^[0-9a-f-]{36}$/i);
+ const sql=(query:string)=>execFileSync(process.env.PSQL_BIN!,['-XqAt','-h','127.0.0.1','-p',process.env.PGPORT!,'-U','postgres','-d','erp_e2e','-v','ON_ERROR_STOP=1'],{input:query,encoding:'utf8',windowsHide:true}).trim();
+ assert.equal(sql("SELECT current_database()||'|'||environment||'|'||project_ref FROM app.deployment_environment WHERE singleton;"),'erp_e2e|DEV|localerpephemeralqax');
+ const count=()=>Number(sql(`SELECT count(*) FROM cpe WHERE tenant_id='${first.tenant}'::uuid;`));
+ let complete=false;const checks:any[]=[];const proof=()=>fs.writeFileSync(path.join(output,'cpe-browser.json'),JSON.stringify({success:complete&&checks.length>0&&checks.every(c=>c.passed),remoteWrites:false,scope:'UI real y API/DB locales; sin transporte fiscal externo',checks},null,2));
+ await context.route('**/*',route=>['127.0.0.1','localhost','[::1]'].includes(new URL(route.request().url()).hostname)?route.continue():route.abort('blockedbyclient'));
+ await loginPeruLocal(page,first.email,'Cliente-Local-2026-Only!');
+ await page.goto('/dashboard/cpe/',{waitUntil:'domcontentloaded',timeout:120000});
+ await expect(page.getByRole('button',{name:'Nuevo CPE',exact:true})).toBeVisible({timeout:90000});
+ const listResponse=page.waitForResponse(r=>new URL(r.url()).pathname.replace(/\/$/,'').endsWith('/cpe/comprobantes')&&r.request().method()==='GET'&&new URL(r.url()).searchParams.get('cliente')==='VOLUMEN-CPE-LOCAL');
+ await page.getByRole('textbox',{name:'Cliente',exact:true}).fill('VOLUMEN-CPE-LOCAL');
+ const list=await (await listResponse).json();await expect(page.locator('table tbody tr')).toHaveCount(50);
+ const pagination=page.getByRole('navigation',{name:'Paginación de comprobantes'});
+ let accessible=await pagination.count()>0;
+ if(accessible){await expect(pagination).toContainText('201');for(let i=0;i<4;i++){const next=page.waitForResponse(r=>new URL(r.url()).pathname.replace(/\/$/,'').endsWith('/cpe/comprobantes')&&r.request().method()==='GET'&&new URL(r.url()).searchParams.get('page')===String(i+2));await pagination.getByRole('button',{name:'Siguiente',exact:true}).click();await next;}await expect(page.locator('table tbody tr')).toHaveCount(1);}
+ checks.push({check:'Las 201 coincidencias son accesibles por páginas',passed:accessible,api_total:list.meta?.total??null,first_page_rows:list.data?.length??null});proof();
+ const [csvDownload]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'Exportar CSV',exact:true}).click()]);const csvFile=path.join(output,'cpe-ui-volume.csv');await csvDownload.saveAs(csvFile);
+ checks.push({check:'CSV descargado desde UI incluye las 201 coincidencias',passed:fs.readFileSync(csvFile,'utf8').split('\n').filter(row=>row.includes('VOLUMEN-CPE-LOCAL-')).length===201});proof();
+ const row=page.locator('table tbody tr').first();const [pdfDownload]=await Promise.all([page.waitForEvent('download'),row.getByRole('button',{name:'Descargar A4',exact:true}).click()]);const pdfFile=path.join(output,'cpe-ui-downloaded.pdf');await pdfDownload.saveAs(pdfFile);const bytes=fs.readFileSync(pdfFile);
+ checks.push({check:'PDF descargado desde UI conserva binario y terminador PDF',passed:pdfDownload.suggestedFilename().endsWith('.pdf')&&bytes.subarray(0,5).toString()==='%PDF-'&&bytes.subarray(-30).toString().includes('%%EOF')});proof();
+ await row.getByRole('button',{name:'Vista A4',exact:true}).click();await expect(page.getByText(/Estado SUNAT: READY/)).toBeVisible({timeout:25000});await page.getByRole('button',{name:'Cerrar vista previa A4',exact:true}).click();
+ checks.push({check:'Vista A4 representa el estado READY persistido',passed:true});proof();
+ const beforeCreate=count();
+ await page.getByRole('button',{name:'Nuevo CPE',exact:true}).click();
+ await page.locator('#cpe-modal-cliente-ruc').fill('20987654342');
+ await page.locator('#cpe-modal-cliente-razon-social').fill('CLIENTE-CPE-BROWSER-LOCAL');
+ await page.locator('#cpe-item-codigo-0').fill('CPE-BROWSER-LOCAL');
+ await page.locator('#cpe-item-descripcion-0').fill('Servicio manual CPE navegador');
+ await page.locator('#cpe-item-valor-unitario-0').fill('20');
+ const created:any[]=[];let lost=true;
+ const cpeEndpoint=/\/cpe\/comprobantes\/?(?:\?.*)?$/;
+ await page.route(cpeEndpoint,async route=>{if(route.request().method()!=='POST')return route.continue();const response=await route.fetch();const body=await response.json();created.push({status:response.status(),id:body.data?.id??body.id,key:route.request().headers()['idempotency-key']});proof();if(lost&&response.status()===201){lost=false;await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({message:'Respuesta interrumpida después del commit local'})});}else await route.fulfill({response});});
+ await page.getByRole('button',{name:'Crear Comprobante',exact:true}).click();
+ await expect(page.getByText('Respuesta interrumpida después del commit local').first()).toBeVisible();
+ await page.getByRole('button',{name:'Crear Comprobante',exact:true}).click();
+ await expect(page.locator('#cpe-item-descripcion-0')).toHaveCount(0);
+ const recovered=created.length===2&&created.every(c=>c.status===201)&&created[0].id===created[1].id&&created[0].key===created[1].key&&count()===beforeCreate+1;
+ checks.push({check:'Formulario recupera una respuesta perdida con el mismo CPE y la misma intención',passed:recovered,statuses:created.map(c=>c.status)});proof();
+ await page.unroute(cpeEndpoint);
+ await page.getByRole('button',{name:'Nuevo CPE',exact:true}).click();
+ if(await page.locator('[name="condicionPago"]').count()===0){checks.push({check:'Formulario PE a crédito selecciona maestro y confirma CPE',passed:false,payment_condition_control:false});proof();expect(checks.every(c=>c.passed)).toBe(true);return;}
+ await page.locator('[name="condicionPago"]').selectOption('CREDITO');
+ const clientSearch=page.getByRole('textbox',{name:'Buscar',exact:true});const canSelect=await clientSearch.count()>0;
+ if(canSelect){await clientSearch.fill('Cliente CPE local');await page.getByText('Cliente CPE local',{exact:true}).last().click();}
+ else{await page.locator('#cpe-modal-cliente-ruc').fill('20987654342');await page.locator('#cpe-modal-cliente-razon-social').fill('CLIENTE-CREDITO-LOCAL');}
+ await page.locator('#cpe-item-codigo-0').fill('CPE-CREDITO-LOCAL');await page.locator('#cpe-item-descripcion-0').fill('Servicio crédito CPE navegador');await page.locator('#cpe-item-valor-unitario-0').fill('20');
+ const creditPromise=page.waitForResponse(r=>new URL(r.url()).pathname.replace(/\/$/,'').endsWith('/cpe/comprobantes')&&r.request().method()==='POST');await page.getByRole('button',{name:'Crear Comprobante',exact:true}).click();const credit=await creditPromise;
+ checks.push({check:'Formulario PE a crédito selecciona maestro y confirma CPE',passed:canSelect&&credit.status()===201,master_selector:canSelect,http_status:credit.status()});proof();
+ const creditBody=await credit.json(),creditId=creditBody.data?.id??creditBody.id;assert.match(creditId,/^[0-9a-f-]{36}$/i);
+ const debt=Number(sql(`SELECT count(*) FROM cuentas_por_cobrar WHERE tenant_id='${first.tenant}'::uuid AND documento_id=(SELECT documento_id FROM cpe WHERE id='${creditId}'::uuid) AND monto_total=23.6 AND monto_pendiente=23.6;`));
+ checks.push({check:'Factura UI a crédito conserva CxC única de S/23,60 en la base',passed:debt===1&&count()===beforeCreate+2});proof();
+ expect(checks.every(c=>c.passed)).toBe(true);
+ complete=true;proof();
+});

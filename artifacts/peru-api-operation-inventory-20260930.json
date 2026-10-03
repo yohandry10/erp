@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-10-03T16:15:55.827Z",
-  "commit": "d3788eca6c8bbd719180966d5d8b87677cc9dad8",
+  "generated_at": "2026-10-03T18:46:37.826Z",
+  "commit": "9e301e2ae9f470b56ffc10d775ab09c4a8d6a76b",
   "excluded": [
     "Analytics"
   ],
@@ -6081,7 +6081,7 @@
       "endpoint": "/api/cpe/worker/create",
       "summary": "Crear CPE desde Worker",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 53,
+      "line": 52,
       "access_declarations": [
         "Public()",
         "UseGuards(WorkerAuthGuard)"
@@ -6104,7 +6104,7 @@
       "endpoint": "/api/cpe/worker/:id/enviar-sunat",
       "summary": "Enviar CPE a SUNAT/OSE (worker)",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 68,
+      "line": 67,
       "access_declarations": [
         "Public()",
         "UseGuards(WorkerAuthGuard)"
@@ -6127,7 +6127,7 @@
       "endpoint": "/api/cpe/worker/:id/status",
       "summary": "Consultar estado CPE en OSE (worker)",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 85,
+      "line": 84,
       "access_declarations": [
         "Public()",
         "UseGuards(WorkerAuthGuard)"
@@ -6150,7 +6150,7 @@
       "endpoint": "/api/cpe/worker/comprobantes/:id/pdf",
       "summary": "Descargar PDF del CPE (worker)",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 102,
+      "line": 101,
       "access_declarations": [
         "Public()",
         "UseGuards(WorkerAuthGuard)"
@@ -6173,7 +6173,7 @@
       "endpoint": "/api/cpe",
       "summary": "Crear y enviar comprobante CPE",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 122,
+      "line": 121,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.comprobantes.emitir')"
@@ -6196,7 +6196,7 @@
       "endpoint": "/api/cpe",
       "summary": "Listar CPEs con paginación",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 140,
+      "line": 139,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.comprobantes.listar')"
@@ -6219,7 +6219,7 @@
       "endpoint": "/api/cpe/notas-referenciadas/origenes",
       "summary": "Listar facturas/boletas elegibles para NC o ND referenciada",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 151,
+      "line": 150,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.comprobantes.ver')"
@@ -6242,7 +6242,7 @@
       "endpoint": "/api/cpe/notas-referenciadas",
       "summary": "Crear borrador NC/ND fiscalmente neutro; el efecto nace con aceptación fiscal durable",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 162,
+      "line": 161,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.comprobantes.emitir')"
@@ -6265,7 +6265,7 @@
       "endpoint": "/api/cpe/notas-referenciadas/:id/firmar",
       "summary": "Preparar y firmar una NC/ND pendiente; todavía no modifica CxC ni contabilidad",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 177,
+      "line": 176,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.comprobantes.emitir')"
@@ -6288,7 +6288,7 @@
       "endpoint": "/api/cpe/stats",
       "summary": "Obtener estadísticas de CPE",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 192,
+      "line": 191,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.reportes.ver')"
@@ -6311,7 +6311,7 @@
       "endpoint": "/api/cpe/comprobantes",
       "summary": "Crear comprobante CPE desde UI",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 214,
+      "line": 199,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.comprobantes.emitir')"
@@ -6334,7 +6334,7 @@
       "endpoint": "/api/cpe/receptores",
       "summary": "Listar receptores maestros disponibles para emitir CPE",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 232,
+      "line": 217,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.comprobantes.emitir')"
@@ -6357,7 +6357,7 @@
       "endpoint": "/api/cpe/receptores/:clienteId",
       "summary": "Obtener un receptor maestro para emitir CPE",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 244,
+      "line": 229,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.comprobantes.emitir')"
@@ -6380,7 +6380,7 @@
       "endpoint": "/api/cpe/desktop/signed",
       "summary": "Registrar XML firmado desde desktop offline",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 255,
+      "line": 240,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.comprobantes.emitir')"
@@ -6403,7 +6403,7 @@
       "endpoint": "/api/cpe/comprobantes",
       "summary": "Listar comprobantes CPE",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 267,
+      "line": 252,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.comprobantes.listar')"
@@ -6426,7 +6426,7 @@
       "endpoint": "/api/cpe/comprobantes/export",
       "summary": "Exportar comprobantes CPE a CSV",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 288,
+      "line": 263,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.comprobantes.listar')"
@@ -6449,7 +6449,7 @@
       "endpoint": "/api/cpe/comprobantes/:id",
       "summary": "Obtener datos del CPE",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 308,
+      "line": 280,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.comprobantes.ver')"
@@ -6472,7 +6472,7 @@
       "endpoint": "/api/cpe/comprobantes/:id/pdf",
       "summary": "Descargar PDF del CPE",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 335,
+      "line": 291,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.comprobantes.descargar_pdf')"
@@ -6495,7 +6495,7 @@
       "endpoint": "/api/cpe/comprobantes/:id/enviar-sunat",
       "summary": "Enviar CPE a autoridad fiscal (SUNAT/DIAN)",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 366,
+      "line": 310,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.comprobantes.enviar')"
@@ -6518,7 +6518,7 @@
       "endpoint": "/api/cpe/:id/dian/eventos",
       "summary": "Registrar evento DIAN 034 como facturador sobre una factura aceptada",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 389,
+      "line": 333,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.dian.eventos_034.emitir')"
@@ -6541,7 +6541,7 @@
       "endpoint": "/api/cpe/dian/eventos/:operationId/reintentar",
       "summary": "Reconciliar/reintentar un evento DIAN 034 usando su clave idempotente persistida",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 411,
+      "line": 355,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.dian.eventos_034.emitir')"
@@ -6564,7 +6564,7 @@
       "endpoint": "/api/cpe/dian/facturas-recibidas/importar",
       "summary": "Importar una FEV recibida aceptada y comprobada directamente en DIAN",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 430,
+      "line": 374,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.dian.facturas_recibidas.gestionar')"
@@ -6587,7 +6587,7 @@
       "endpoint": "/api/cpe/dian/facturas-recibidas/:id/eventos",
       "summary": "Registrar evento DIAN 030-033 como adquirente de una FEV recibida",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 448,
+      "line": 392,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.dian.facturas_recibidas.gestionar')"
@@ -6610,7 +6610,7 @@
       "endpoint": "/api/cpe/dian/facturas-recibidas/eventos/:operationId/reintentar",
       "summary": "Reconciliar/reintentar un evento DIAN 030-033 con la clave persistida en servidor",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 468,
+      "line": 412,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.dian.facturas_recibidas.gestionar')"
@@ -6633,7 +6633,7 @@
       "endpoint": "/api/cpe/dian/facturas-recibidas",
       "summary": "Listar FEV recibidas y sus eventos DIAN sin exponer XML/PFX",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 487,
+      "line": 431,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.dian.facturas_recibidas.ver')"
@@ -6656,7 +6656,7 @@
       "endpoint": "/api/cpe/:id/anulacion-financiera",
       "summary": "Consultar cobros y estado financiero de una anulación CPE",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 498,
+      "line": 442,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('finanzas.cxc.cobros.revertir')"
@@ -6679,7 +6679,7 @@
       "endpoint": "/api/cpe/:id/cobros/:pagoId/revertir",
       "summary": "Revertir un cobro aplicado y continuar la anulación CPE",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 516,
+      "line": 460,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('finanzas.cxc.cobros.revertir')"
@@ -6702,7 +6702,7 @@
       "endpoint": "/api/cpe/:id/ajustes/:operacionId/revertir",
       "summary": "Revertir un ajuste fiscal aplicado y continuar la anulación CPE",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 540,
+      "line": 484,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('finanzas.cxc.cobros.revertir')"
@@ -6725,7 +6725,7 @@
       "endpoint": "/api/cpe/:id/anulacion/finalizar",
       "summary": "Reintentar el cierre operativo de la anulación",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 564,
+      "line": 508,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.comprobantes.anular')"
@@ -6748,7 +6748,7 @@
       "endpoint": "/api/cpe/:id",
       "summary": "Obtener CPE por ID",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 582,
+      "line": 526,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.comprobantes.ver')"
@@ -6771,7 +6771,7 @@
       "endpoint": "/api/cpe/:id/xml",
       "summary": "Descargar XML firmado del CPE",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 593,
+      "line": 537,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.comprobantes.descargar_xml')"
@@ -6794,7 +6794,7 @@
       "endpoint": "/api/cpe/:id/resend",
       "summary": "Reenviar CPE a OSE/SUNAT",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 612,
+      "line": 556,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.comprobantes.reenviar')"
@@ -6817,7 +6817,7 @@
       "endpoint": "/api/cpe/:id/status",
       "summary": "Consultar estado del CPE en OSE",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 629,
+      "line": 573,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.comprobantes.consultar')"
@@ -6840,7 +6840,7 @@
       "endpoint": "/api/cpe/:id/enviar-sunat",
       "summary": "Enviar CPE firmado a SUNAT manualmente",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 646,
+      "line": 590,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.comprobantes.enviar')"
@@ -6863,7 +6863,7 @@
       "endpoint": "/api/cpe/:id/anular",
       "summary": "Anular comprobante CPE",
       "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts",
-      "line": 669,
+      "line": 613,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('cpe.comprobantes.anular')"

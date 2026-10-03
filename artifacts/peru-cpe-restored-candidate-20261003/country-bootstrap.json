@@ -1,0 +1,39 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "Dos cargas locales aisladas; no acredita barrido de99 ni disponibilidad PROD",
+  "checks": [
+    {
+      "reload": false,
+      "passed": true,
+      "elapsed_ms": 2257
+    },
+    {
+      "reload": true,
+      "passed": true,
+      "elapsed_ms": 1735
+    }
+  ],
+  "failures": [
+    {
+      "path": "/dashboard/",
+      "started": 1791050022688,
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "path": "/_next/static/webpack/webpack.915dfcdd70e0a7c6.hot-update.js",
+      "started": 1791050027757,
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "path": "/_next/static/chunks/app/dashboard/page.js",
+      "started": 1791050028336,
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "path": "/_next/static/chunks/main-app.js",
+      "started": 1791050028327,
+      "error": "net::ERR_ABORTED"
+    }
+  ]
+}

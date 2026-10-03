@@ -1,0 +1,8 @@
+{
+  "success": true,
+  "suites": 37,
+  "passed": 492,
+  "failed": 0,
+  "scope": "Regresión CPE/configuración con mocks; aceptación funcional separada",
+  "remoteWrites": false
+}

@@ -1,0 +1,44 @@
+{
+  "source_sha": "abac249c3124d3d9a63ad40cb526a8e73de3eae7",
+  "runs": [
+    37147317004,
+    37147319665
+  ],
+  "jobs": [
+    111273954548,
+    111273955073
+  ],
+  "success": false,
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "observed": {
+    "first_browser_passed": 28,
+    "first_browser_failed": 3,
+    "affected": [
+      "RMA refund accounting",
+      "Liquidation payment reversal accounting",
+      "Tax adjustments accounting"
+    ],
+    "cause": "A single real batch handles at most 50 accounting events; the new 201-invoice phase leaves earlier invoice events ahead of browser events. Retries then mutate already-used business fixtures."
+  },
+  "correction": "Local-only --accounting-drain invokes the same real worker repeatedly until it returns an empty batch, with a limit of twenty batches. Production worker remains unchanged.",
+  "local_validation": {
+    "proof": "artifacts/peru-cpe-accounting-drain-acceptance-20261003",
+    "batches": [
+      50,
+      50,
+      50,
+      50,
+      10,
+      0
+    ],
+    "invoice_postings": 210,
+    "replay_batches": [
+      0
+    ],
+    "restore": true
+  },
+  "pending": [
+    "Exact-head full CI including SQL fresh, all browser flows, module/record surveys, backup recovery, main and runtime; 565 remains unpromoted"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "Navegador/API/PostgreSQL reales locales de consolidación",
+  "checks": [
+    {
+      "check": "Grupo e invitación creados en UI; otra empresa acepta por su sesión",
+      "passed": true
+    },
+    {
+      "check": "Controladora y miembro registran tasas necesarias por UI",
+      "passed": true
+    },
+    {
+      "check": "Definición y fórmula UI muestran 125.00 de dos empresas con fuentes reales",
+      "passed": true
+    }
+  ],
+  "unexpected_errors": []
+}

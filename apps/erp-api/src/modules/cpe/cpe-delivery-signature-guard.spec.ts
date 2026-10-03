@@ -1,10 +1,10 @@
-import { BadRequestException } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 import { CpeDeliveryService } from './cpe-delivery.service';
 
 describe('CpeDeliveryService - frontera de firma 476', () => {
   function createService(databaseMessage: string) {
     const rpc = jest.fn().mockResolvedValue({
-      data: null, error: { message: databaseMessage },
+      data: null, error: { code: '55000', message: databaseMessage },
     });
     const supabase = {
       getClient: jest.fn(() => ({ rpc })),
@@ -31,12 +31,12 @@ describe('CpeDeliveryService - frontera de firma 476', () => {
   }
 
   it('un CPE no enviable falla durante la reserva y no muta ni sale a red', async () => {
-    const { service, rpc, supabase, fiscal } = createService('CPE_NOT_SENDABLE');
+    const { service, rpc, supabase, fiscal } = createService('CPE_NOT_READY_TO_SEND');
 
     await expect(service.retrySendToOse(
       'cpe-note-476', 'tenant-476',
       { actorId: 'actor-476', origin: 'USER' },
-    )).rejects.toBeInstanceOf(BadRequestException);
+    )).rejects.toBeInstanceOf(ConflictException);
 
     expect(rpc).toHaveBeenCalledTimes(1);
     expect(supabase.update).not.toHaveBeenCalled();
@@ -45,12 +45,12 @@ describe('CpeDeliveryService - frontera de firma 476', () => {
   });
 
   it('un CPE sin XML firmado queda bloqueado en la reserva', async () => {
-    const { service, rpc, supabase, fiscal } = createService('CPE_SIGNED_XML_REQUIRED');
+    const { service, rpc, supabase, fiscal } = createService('CPE_NOT_READY_TO_SEND');
 
     await expect(service.retrySendToOse(
       'cpe-note-476', 'tenant-476',
       { actorId: 'actor-476', origin: 'USER' },
-    )).rejects.toThrow('CPE_SIGNED_XML_REQUIRED');
+    )).rejects.toBeInstanceOf(ConflictException);
 
     expect(rpc).toHaveBeenCalledTimes(1);
     expect(supabase.update).not.toHaveBeenCalled();
