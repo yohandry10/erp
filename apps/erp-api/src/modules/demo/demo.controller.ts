@@ -46,7 +46,6 @@ export class DemoController {
   @ApiOperation({ summary: 'Obtener estado del tenant demo y planes disponibles' })
   @ApiResponse({ status: 200, description: 'Estado del demo con planes' })
   async getStatus(@Req() req: any) {
-    this.ensureDemoApiEnabled();
     const tenantId = req.user?.tenant_id;
     return this.demoService.getDemoStatus(tenantId);
   }

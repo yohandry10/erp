@@ -22,8 +22,8 @@ const routes = JSON.parse(fs.readFileSync(path.join(root, 'artifacts/peru-route-
 const api = JSON.parse(fs.readFileSync(path.join(root, 'artifacts/peru-api-operation-matrix-20260930.json'), 'utf8'));
 const relative = file => path.relative(root, file).replaceAll('\\', '/');
 const normal = route => route.replace(/\/$/, '');
-const cache = new Map();
-const methods = { get: 'GET', post: 'POST', put: 'PUT', patch: 'PATCH', del: 'DELETE', delete: 'DELETE', fetch: 'GET' };
+
+const methods = { get: 'GET', post: 'POST', put: 'PUT', patch: 'PATCH', del: 'DELETE', delete: 'DELETE', fetch: 'GET', fetchApi: 'GET' };
 function template(node) {
   if (ts.isStringLiteralLike(node)) return node.text;
   if (ts.isTemplateExpression(node)) return node.head.text + node.templateSpans.map(span => ':dynamic' + span.literal.text).join('');
@@ -38,14 +38,14 @@ function resolveImport(file, name) {
 function sourceCalls(file, visited = new Set()) {
   if (visited.has(file)) return [];
   visited.add(file);
-  if (cache.has(file)) return cache.get(file);
+
   const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const calls = [];
   const imports = [];
   function visit(node) {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
       const dependency = resolveImport(file, node.moduleSpecifier.text);
-      if (dependency && /^apps\/web\/(app|components)\//.test(relative(dependency))) imports.push(dependency);
+      if (dependency && !/^apps\/web\/tests\//.test(relative(dependency))) imports.push(dependency);
     }
     if (ts.isCallExpression(node)) {
       const verb = ts.isIdentifier(node.expression) ? node.expression.text
@@ -54,11 +54,11 @@ function sourceCalls(file, visited = new Set()) {
       if (methods[verb] && endpoint?.includes('/api/')) {
         endpoint = endpoint.slice(endpoint.indexOf('/api/')).split('?')[0].replace(/\/$/, '');
         let method = methods[verb];
-        if (verb === 'fetch' && node.arguments[1] && ts.isObjectLiteralExpression(node.arguments[1])) {
-          const property = node.arguments[1].properties.find(item => ts.isPropertyAssignment(item) && item.name.getText(source) === 'method');
-          method = property && template(property.initializer)?.toUpperCase() || 'GET';
+        if (['fetch', 'fetchApi'].includes(verb) && node.arguments[1] && ts.isObjectLiteralExpression(node.arguments[1])) {
+          const property = node.arguments[1].properties.find(item => ts.isPropertyAssignment(item) && (ts.isIdentifier(item.name) || ts.isStringLiteralLike(item.name)) && item.name.text === 'method');
+          method = property ? template(property.initializer)?.toUpperCase() || 'UNRESOLVED' : 'GET';
         }
-        calls.push({ method, endpoint, source: `${relative(file)}:${source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1}` });
+        if (!endpoint.startsWith('/api/analytics')) calls.push({ method, endpoint, source: `${relative(file)}:${source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1}` });
       }
     }
     ts.forEachChild(node, visit);
@@ -66,7 +66,7 @@ function sourceCalls(file, visited = new Set()) {
   visit(source);
   for (const dependency of imports) calls.push(...sourceCalls(dependency, visited));
   const unique = [...new Map(calls.map(call => [JSON.stringify(call), call])).values()];
-  cache.set(file, unique);
+
   return unique;
 }
 const matching = (left, right) => {
@@ -78,7 +78,7 @@ const result = {
   operational_accounting_tax_reports_included: true, navigation,
   limitations: [
     'Los controles visibles no se marcan como ejecutados. La evidencia de API relacionada no acepta la acción UI.',
-    'Las llamadas se extraen de literales y plantillas en páginas y componentes locales; wrappers de lib/hooks, endpoints calculados y menús/modales cerrados requieren inspección funcional.',
+    'Se siguen imports locales de páginas, componentes, hooks, lib y contextos; incluye fetchApi y métodos explícitos. Endpoints/métodos calculados, efectos de soporte y menús/modales cerrados requieren inspección funcional.',
     'Las pantallas con registro usan los actores indicados por el ensayo; no se atribuyen al primer ADMIN.',
     'La disponibilidad depende del estado del registro, rol y configuración. Los contratos API sin vínculo a una página no se declaran ofrecidos por esta matriz.',
   ],

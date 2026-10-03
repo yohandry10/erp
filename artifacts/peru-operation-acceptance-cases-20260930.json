@@ -933,6 +933,206 @@
         "reactivación de producto/categoría",
         "permisos y tenant de cada mutación de ubicación/almacén"
       ]
+    },
+    {
+      "id": "annual-profit-loss-reopen",
+      "source": "scripts/ci/test-peru-year-close-local.mjs",
+      "required_scenario_prefixes": [
+        "Cierre anual con utilidad",
+        "Reapertura administrativa anual",
+        "Pérdida anual"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/periodos"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/periodos/:id/cerrar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/periodos/:id/reabrir"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/estados/balance-general"
+        }
+      ],
+      "verified_checks": [
+        "Utilidad 25/pérdida -7 y resultado siguiente 8 separados",
+        "cierre/replay con asiento único cuadrado",
+        "reapertura administrativa anula cierre y recierre secuenciado",
+        "ADMIN normal rechazado sin mutar",
+        "período posterior cerrado bloquea reapertura"
+      ],
+      "pending_checks": [
+        "UI de períodos/cierre anual",
+        "variantes de cero resultado/múltiples monedas",
+        "aislamiento de cada transición anual"
+      ]
+    },
+    {
+      "id": "bank-first-admin-lifecycle",
+      "source": "scripts/ci/test-peru-finance-lifecycle-local.mjs",
+      "required_scenario_prefixes": [
+        "Bancos: altas",
+        "Bancos: abono",
+        "Finanzas: reporte",
+        "Contabilidad: un asiento"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/finanzas/bancos/cuentas"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/finanzas/bancos/cuentas/:id"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/finanzas/bancos/movimientos"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/finanzas/bancos/transferencias"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/bancos/cuentas/:id"
+        }
+      ],
+      "verified_checks": [
+        "cuenta operativa explícita y saldo cero",
+        "altas/replays/edición persistida",
+        "transferencia pareada y saldo insuficiente rechazado",
+        "lector no muta",
+        "consulta ajena 404",
+        "un asiento por evento"
+      ],
+      "pending_checks": [
+        "UI de alta/movimiento/transferencia",
+        "aislamiento de cada mutación",
+        "otras monedas/sobregiros/desactivación"
+      ]
+    },
+    {
+      "id": "supplier-partial-bank-payments",
+      "source": "scripts/ci/test-peru-finance-lifecycle-local.mjs",
+      "required_scenario_prefixes": [
+        "CxP y tesorería:",
+        "Contabilidad: un asiento",
+        "Finanzas: reporte"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/finanzas/cxp"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/finanzas/tesoreria/pagos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxp/:id"
+        }
+      ],
+      "verified_checks": [
+        "deuda 17.70 pagada en 6/11.70",
+        "replay no duplica deuda/pago/banco",
+        "exceso rechazado",
+        "lector no crea deuda ni paga",
+        "deuda ajena 404",
+        "factura y dos pagos con asientos cuadrados"
+      ],
+      "pending_checks": [
+        "UI de factura/pago",
+        "lotes/programación/reversos",
+        "otras monedas/ajustes fiscales",
+        "aislamiento de cada mutación"
+      ]
+    },
+    {
+      "id": "bank-reconciliation-monthly",
+      "source": "scripts/ci/test-peru-finance-lifecycle-local.mjs",
+      "required_scenario_prefixes": [
+        "Conciliación: CSV",
+        "Finanzas: reporte",
+        "Contabilidad: un asiento"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/finanzas/conciliacion"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/finanzas/conciliacion/:id/importar-csv"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/finanzas/conciliacion/:id/match-automatico"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/finanzas/conciliacion/:id/marcar-item"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/finanzas/conciliacion/:id/cerrar"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/conciliacion/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/conciliacion/:id/diferencias"
+        }
+      ],
+      "verified_checks": [
+        "CSV inválido no inserta filas",
+        "6 extractos importados/replay",
+        "match automático/manual/replay",
+        "diferencia bloquea cierre",
+        "ajuste explícito con contracuenta/asiento",
+        "cierre/replay e inmutabilidad mensual",
+        "lector rechazado en 6 mutaciones y consulta ajena 404"
+      ],
+      "pending_checks": [
+        "UI de importación/match/ajuste/cierre",
+        "match por lote y plantillas CSV de bancos",
+        "aislamiento de cada mutación"
+      ]
+    },
+    {
+      "id": "bank-csv-date-columns-formulas",
+      "source": "scripts/ci/test-peru-finance-lifecycle-local.mjs",
+      "required_scenario_prefixes": [
+        "CSV bancario:",
+        "Finanzas: reporte"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/bancos/cuentas/:id/movimientos/exportar"
+        }
+      ],
+      "verified_checks": [
+        "parser CSV independiente",
+        "fecha documental preservada",
+        "9 campos por fila con comas escapadas",
+        "fórmulas neutralizadas",
+        "filtros y exportación ajena 404"
+      ],
+      "pending_checks": [
+        "descarga/lectura por UI",
+        "escala/múltiples páginas",
+        "variantes de otras monedas y países"
+      ]
     }
   ]
 }

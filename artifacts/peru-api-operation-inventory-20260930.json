@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-10-03T02:31:22.041Z",
-  "commit": "d96aee30b771524bbad90ee95457574902ebac0a",
+  "generated_at": "2026-10-03T03:51:36.485Z",
+  "commit": "82000ee927426134dea7bef69d8c54e6695f8dca",
   "excluded": [
     "Analytics"
   ],
@@ -6997,7 +6997,7 @@
       "endpoint": "/api/demo/planes",
       "summary": "Obtener planes disponibles para conversión",
       "source": "apps/erp-api/src/modules/demo/demo.controller.ts",
-      "line": 54,
+      "line": 53,
       "access_declarations": [
         "Public()"
       ],
@@ -7019,7 +7019,7 @@
       "endpoint": "/api/demo/convert-to-real",
       "summary": "Iniciar conversión a cuenta real (requiere pago)",
       "source": "apps/erp-api/src/modules/demo/demo.controller.ts",
-      "line": 63,
+      "line": 62,
       "access_declarations": [
         "UseGuards(JwtAuthGuard)"
       ],
@@ -7041,7 +7041,7 @@
       "endpoint": "/api/demo/conversiones-pendientes/:id/estado",
       "summary": "Estado de una solicitud de activación",
       "source": "apps/erp-api/src/modules/demo/demo.controller.ts",
-      "line": 87,
+      "line": 86,
       "access_declarations": [
         "Public()"
       ],
@@ -7063,7 +7063,7 @@
       "endpoint": "/api/demo/conversiones-pendientes",
       "summary": "Solicitudes de activación esperando confirmación de pago",
       "source": "apps/erp-api/src/modules/demo/demo.controller.ts",
-      "line": 96,
+      "line": 95,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, SuperAdminGuard)"
       ],
@@ -7085,7 +7085,7 @@
       "endpoint": "/api/demo/conversiones-pendientes/:id/aprobar",
       "summary": "Confirmar el pago y activar la cuenta del cliente",
       "source": "apps/erp-api/src/modules/demo/demo.controller.ts",
-      "line": 104,
+      "line": 103,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, SuperAdminGuard)"
       ],
@@ -7107,7 +7107,7 @@
       "endpoint": "/api/demo/conversiones-pendientes/:id/rechazar",
       "summary": "Rechazar una solicitud dejando dicho el motivo",
       "source": "apps/erp-api/src/modules/demo/demo.controller.ts",
-      "line": 113,
+      "line": 112,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, SuperAdminGuard)"
       ],

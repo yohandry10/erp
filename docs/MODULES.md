@@ -559,6 +559,10 @@ Código principal: `apps/erp-api/src/modules/inventario`,
   idempotente; movimiento, tres saldos y outbox contable se confirman en una
   sola transacción. Las transferencias internas crean un par cargo/abono
   inseparable, bloqueando ambas cuentas en orden estable.
+- El CSV bancario conserva la fecha documental del movimiento y usa la zona
+  del país para la hora de registro. Todas las celdas escapan comillas y
+  separadores; las fórmulas de hoja de cálculo se neutralizan también en
+  descripciones, referencias y nombres. Los filtros de conciliación se conservan.
 - La conciliación opera por RPCs reservadas al servicio: período mensual único,
   importación CSV como lote atómico con saldos inicial/final comprobables,
   match exacto manual/automático/por lote y cierre sin excepción forzada. Toda
@@ -615,6 +619,12 @@ Código principal: `apps/erp-api/src/modules/finanzas`,
 - Reabrir un período requiere superadministrador tanto en servidor como en
   la acción disponible en pantalla. Un rechazo de reapertura conserva el
   detalle y su estado cerrado, mostrando el motivo sin aparentar éxito.
+- El catálogo inicial Perú incluye 89 y 59 para el cierre anual. El alta y
+  configuración completan sólo códigos ausentes, conservando las cuentas
+  personalizadas o inactivas. El balance conserva el signo de resultados
+  acumulados, incluida una pérdida deudora, y el resultado del nuevo ejercicio
+  se calcula por separado. Reabrir anula el asiento de cierre anterior; recerrar
+  genera una nueva secuencia sin dos cierres activos.
 - Presupuestos conserva los importes al editar y recargar. Si falla alguno de
   los tres catálogos del formulario, informa el error, bloquea el guardado y
   ofrece reintentar la carga completa para evitar selecciones incompletas.
@@ -873,6 +883,11 @@ si ese período carece de normativa aplicable.
   La validación previa del PFX contrasta el RUC que el cliente está introduciendo,
   sin cambiar el emisor persistido; al completar el alta se vuelve a validar el
   certificado contra la identidad definitiva antes de guardar y cifrar.
+- El asistente distingue identidad básica preparada de progreso finalizado.
+  Restaura el progreso público y sólo muestra resumen cuando el servidor confirma
+  el cierre. Una consulta fallida bloquea avanzar y permite reintentar; conserva
+  la misma intención ante respuestas perdidas de paso o cierre. La consulta
+  autenticada del estado demo sigue disponible con la creación demo desactivada.
 - La configuración fiscal SUNAT/OSE (PE), ARCA WSAA/WSFE (AR) o DIAN (CO) es
   por tenant y cifra secretos; GRE y SIRE sólo están disponibles para Perú.
   SIRE comparte las credenciales API SUNAT cifradas con GRE REST, pero su

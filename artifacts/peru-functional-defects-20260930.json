@@ -148,7 +148,7 @@
     },
     {
       "id": "first-customer-annual-close-accounts",
-      "status": "open_reproduced",
+      "status": "local_candidate_corrected_pending_integration",
       "operations": [
         {
           "method": "POST",
@@ -160,12 +160,123 @@
         "observed_error": "ACCOUNTING_YEAR_CLOSE_ACCOUNTS_89_59_REQUIRED",
         "local_only": true
       },
-      "correction": "Pendiente: completar cuentas de cierre para empresas Perú sin alterar configuraciones previas",
+      "correction": "Candidato 558 inserta sólo 59/89 ausentes en empresas PE; conserva cuentas personalizadas/inactivas y permisos",
       "pending": [
-        "corrección y contratos SQL",
-        "cierre/reapertura/reintentos anuales por API",
-        "reportes antes/después del cierre",
-        "CI y promoción/despliegue"
+        "integración canónica",
+        "CI y promoción/despliegue",
+        "recorrido anual por navegador"
+      ],
+      "local_followup": {
+        "source": "artifacts/peru-year-close-acceptance-20261002.json",
+        "result": "Cierre con utilidad/pérdida, replay, reapertura/recierre, año siguiente y restricción cronológica; SQL y restauración local aprobados"
+      }
+    },
+    {
+      "id": "annual-loss-balance-sign",
+      "status": "local_candidate_corrected_pending_integration",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/estados/balance-general"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/estados/balance-general/formatted"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-year-loss-balance-defect-20261002.json",
+        "observed": "Pérdida confirmada 7, asientos balanceados, patrimonio reportado 0 en vez de -7; balance descuadrado -7",
+        "local_only": true
+      },
+      "correction": "Candidato 558 conserva el signo acreedor/deudor de resultados acumulados en balance_general_live",
+      "pending": [
+        "integración canónica",
+        "CI y promoción/despliegue",
+        "variantes de patrimonio fuera del resultado acumulado"
+      ],
+      "local_followup": {
+        "source": "artifacts/peru-year-close-acceptance-20261002.json",
+        "result": "Cierre con utilidad/pérdida, replay, reapertura/recierre, año siguiente y restricción cronológica; SQL y restauración local aprobados"
+      }
+    },
+    {
+      "id": "wizard-status-coupled-to-demo-api",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/demo/status"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-integrated-20261003032954428-15196/wizard-browser.json",
+        "local_only": true,
+        "observed": "Empresa no demo confirmada en SQL; DEMO_API_ENABLED=false produce 403 en consulta de estado y redirección del asistente",
+        "scope": "Configuración con demo API deshabilitada; la bandera efectiva de PROD no se afirma"
+      },
+      "correction": "Candidato permite estado autenticado de sólo lectura sin habilitar mutaciones demo; la UI espera el estado confirmado y permite reintentar errores",
+      "status": "local_candidate_corrected_pending_integration",
+      "local_followup": {
+        "source": "artifacts/peru-first-client-wizard-acceptance-20261002.json",
+        "result": "Primer ADMIN completa parámetros y certificado local, reanuda progreso, recupera respuestas perdidas y recarga resumen sin divulgar secretos"
+      },
+      "pending": [
+        "integración canónica",
+        "CI y despliegue"
+      ]
+    },
+    {
+      "id": "wizard-summary-without-completed-progress",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/configuration/status"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/configuration/wizard/progress"
+        }
+      ],
+      "proof": {
+        "source": "apps/web/app/dashboard/wizard/useWizard.ts",
+        "commit": "82000ee927426134dea7bef69d8c54e6695f8dca",
+        "source_analysis": true,
+        "observed": "La condición inicial de resumen sólo requiere identidad preparada del ERP y no comprueba completado del asistente; el alta ya proporciona RUC, razón social y dirección"
+      },
+      "correction": "Candidato exige cierre persistido del asistente para mostrar resumen; preparación del ERP y habilitación fiscal permanecen separadas",
+      "status": "local_candidate_corrected_pending_integration",
+      "local_followup": {
+        "source": "artifacts/peru-first-client-wizard-acceptance-20261002.json",
+        "result": "Primer ADMIN completa parámetros y certificado local, reanuda progreso, recupera respuestas perdidas y recarga resumen sin divulgar secretos"
+      },
+      "pending": [
+        "integración canónica",
+        "CI y despliegue"
+      ]
+    },
+    {
+      "id": "bank-csv-date-columns-formulas",
+      "status": "local_candidate_corrected_pending_integration",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/bancos/cuentas/:id/movimientos/exportar"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-bank-csv-defect-20261002.json",
+        "local_only": true,
+        "observed": "Fecha 01/10 en vez de 02/10; diez columnas frente a nueve y celda =1+1 sin neutralizar"
+      },
+      "correction": "Candidato conserva calendario fiscal, presenta instantes en zona del tenant, escapa todas las columnas y neutraliza fórmulas",
+      "local_followup": {
+        "source": "artifacts/peru-finance-lifecycle-20261002.json",
+        "result": "Ciclo real bancos/CxP/pagos/conciliación, CSV contrastado con parser independiente, lector, aislamiento, siete asientos únicos/cuadrados y restauración"
+      },
+      "pending": [
+        "integración canónica",
+        "CI y despliegue",
+        "recorrido financiero por navegador"
       ]
     }
   ]
