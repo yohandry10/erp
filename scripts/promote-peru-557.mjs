@@ -69,7 +69,7 @@ for (const name of ['Tests', 'Build', 'Security audit', 'Type-check', 'Lint',
   'Playwright isolated browser contracts']) {
   assert.ok(checks.some(check => check.name === name && check.state === 'SUCCESS'), `Falta ${name}`);
 }
-const sourcePaths = ['scripts', 'supabase', 'apps/erp-api/src', 'apps/worker/src', 'libs/crypto/src', 'libs/dtos/src', 'apps/web/app', 'apps/web/components', 'apps/web/hooks', 'apps/web/lib', 'apps/web/contexts', 'apps/web/tests', '.github/workflows/ci.yml', 'render.yaml'];
+const sourcePaths = ['scripts', 'supabase', 'patches', 'package.json', 'pnpm-lock.yaml', 'apps/erp-api/Dockerfile', 'apps/worker/Dockerfile', 'apps/web/Dockerfile', 'apps/erp-api/src', 'apps/worker/src', 'libs/crypto/src', 'libs/dtos/src', 'apps/web/app', 'apps/web/components', 'apps/web/hooks', 'apps/web/lib', 'apps/web/contexts', 'apps/web/tests', '.github/workflows', 'render.yaml'];
 assert.equal(command('git', ['diff', 'HEAD', '--name-only', '--', ...sourcePaths]), '');
 assert.equal(command('git', ['ls-files', '--others', '--exclude-standard', '--', ...sourcePaths]), '');
 const report = { commit, prNumber: Number(prNumber), project,

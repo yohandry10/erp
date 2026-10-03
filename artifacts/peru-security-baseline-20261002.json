@@ -1,0 +1,17 @@
+{
+  "checkedAt": "2026-10-03T03:10:39.321Z",
+  "remoteWrites": false,
+  "nodeForge": {
+    "nestedGarbageRejected": false,
+    "outerGarbageRejected": true,
+    "validWithAndWithoutNull": true,
+    "validSignature": true,
+    "changedMessageRejected": true,
+    "pssUnaffected": true
+  },
+  "braces": {
+    "baselineStackOverflowReproduced": true,
+    "ordinaryPatternsPreserved": true
+  },
+  "scope": "Unmodified npm package baselines, synthetic keys and patterns, no customer data"
+}
