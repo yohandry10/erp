@@ -1,0 +1,1303 @@
+{
+  "generated_at": "2026-10-03T21:14:41.640Z",
+  "scope": "Cajas: 28 contratos reales, aceptación por operación y variante; Analytics excluido",
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "candidate_proof": "artifacts/peru-cash-browser-candidate-20261003",
+  "candidate_summary": {
+    "passed": 23,
+    "failed": 0
+  },
+  "fault_proof": "artifacts/peru-cash-faults-candidate-20261003",
+  "fault_summary": {
+    "passed": 11,
+    "failed": 0
+  },
+  "browser_checks": [
+    {
+      "operation": "Open from denomination form",
+      "passed": true
+    },
+    {
+      "operation": "Lost acknowledgement after real commit keeps form and replays same intent once",
+      "passed": true
+    },
+    {
+      "operation": "Manual income with selected posting account",
+      "passed": true
+    },
+    {
+      "operation": "Count, preview and advanced close persist amount/cut",
+      "passed": true
+    },
+    {
+      "operation": "Reload durable closed state",
+      "passed": true
+    },
+    {
+      "operation": "Download CSV from actual durable cut row",
+      "passed": true
+    },
+    {
+      "operation": "Download PDF from actual durable cut row",
+      "passed": true
+    },
+    {
+      "operation": "Real accounting worker confirms balanced browser income exactly once",
+      "passed": true
+    },
+    {
+      "operation": "Retry after real sesiones_caja SELECT outage clears error and shows durable data",
+      "endpoint": "/cajas/sesiones",
+      "retry_http_status": 200,
+      "error_cleared": true,
+      "data_visible": true,
+      "passed": true
+    },
+    {
+      "operation": "Retry after real cortes_caja SELECT outage clears error and shows durable data",
+      "endpoint": "/cajas/cortes",
+      "retry_http_status": 200,
+      "error_cleared": true,
+      "data_visible": true,
+      "passed": true
+    }
+  ],
+  "operations": [
+    {
+      "method": "GET",
+      "endpoint": "/api/cajas",
+      "existing_evidence": [
+        {
+          "trace_index": 5,
+          "status": 200
+        },
+        {
+          "trace_index": 247,
+          "status": 200
+        },
+        {
+          "trace_index": 317,
+          "status": 200
+        },
+        {
+          "trace_index": 1262,
+          "status": 200
+        }
+      ],
+      "candidate_cases": [
+        {
+          "id": "cash-alta-replay-y-edicion",
+          "operations": [
+            "POST /api/cajas",
+            "PUT /api/cajas/:id",
+            "GET /api/cajas"
+          ],
+          "scenario": {
+            "scenario": "Caja: alta, replay y edición persisten una caja; identidad cambiada no duplica",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Recorrido UI real",
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ]
+    },
+    {
+      "method": "POST",
+      "endpoint": "/api/cajas",
+      "existing_evidence": [
+        {
+          "trace_index": 420,
+          "status": 201
+        },
+        {
+          "trace_index": 1266,
+          "status": 201
+        }
+      ],
+      "candidate_cases": [
+        {
+          "id": "cash-alta-replay-y-edicion",
+          "operations": [
+            "POST /api/cajas",
+            "PUT /api/cajas/:id",
+            "GET /api/cajas"
+          ],
+          "scenario": {
+            "scenario": "Caja: alta, replay y edición persisten una caja; identidad cambiada no duplica",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Recorrido UI real",
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ]
+    },
+    {
+      "method": "PUT",
+      "endpoint": "/api/cajas/supervisores/:supervisorId/pin",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-PIN-supervisor",
+          "operations": [
+            "PUT /api/cajas/supervisores/:id/pin",
+            "GET /api/cajas/supervisores-gestion-pin",
+            "GET /api/cajas/supervisores-autorizados/:id"
+          ],
+          "scenario": {
+            "scenario": "Caja: PIN supervisor se registra/rota por intención sin exponer código ni hash",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Recorrido UI real",
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ]
+    },
+    {
+      "method": "PUT",
+      "endpoint": "/api/cajas/:id",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-alta-replay-y-edicion",
+          "operations": [
+            "POST /api/cajas",
+            "PUT /api/cajas/:id",
+            "GET /api/cajas"
+          ],
+          "scenario": {
+            "scenario": "Caja: alta, replay y edición persisten una caja; identidad cambiada no duplica",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Recorrido UI real",
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ]
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/cajas/opciones-contables",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-ingreso-gasto-manual",
+          "operations": [
+            "POST /api/cajas/movimientos/manual/:id",
+            "GET /api/cajas/opciones-contables"
+          ],
+          "scenario": {
+            "scenario": "Caja: ingreso/gasto manual, ledger y replay conservan un solo movimiento y saldo",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [
+        "cash-first-client-account-missing"
+      ],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Recorrido UI real",
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ]
+    },
+    {
+      "method": "POST",
+      "endpoint": "/api/cajas/:id/apertura",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-apertura-y-consultas",
+          "operations": [
+            "POST /api/cajas/:id/apertura",
+            "GET /api/cajas/sesiones",
+            "GET /api/cajas/movimientos/:id",
+            "GET /api/cajas/saldo-esperado/:id",
+            "GET /api/cajas/validar-precierre/:id",
+            "GET /api/cajas/:id/corte-z"
+          ],
+          "scenario": {
+            "scenario": "Caja: apertura y consultas no cambian la sesión; segunda apertura rechaza sin autocierre",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ],
+      "ui_evidence": "artifacts/peru-cash-canonical-local-20261003/cash-browser.json"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/api/cajas/:id/cierre",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-deposito-bancario-y-conciliacion-positiva",
+          "operations": [
+            "POST /api/cajas/retiros/:id/conciliar",
+            "POST /api/cajas/:id/cierre"
+          ],
+          "scenario": {
+            "scenario": "Caja: depósito bancario y conciliación positiva son idempotentes en caja y banco",
+            "passed": true
+          }
+        },
+        {
+          "id": "cash-cierre-basico-admite-el-alias",
+          "operations": [
+            "POST /api/cajas/:id/cierre"
+          ],
+          "scenario": {
+            "scenario": "Caja: cierre básico admite el alias monto_contado y sesionId ofrecido por el controlador",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [
+        "cash-close-amount-alias-rejected"
+      ],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Recorrido UI real",
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ]
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/cajas/sesiones",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-apertura-y-consultas",
+          "operations": [
+            "POST /api/cajas/:id/apertura",
+            "GET /api/cajas/sesiones",
+            "GET /api/cajas/movimientos/:id",
+            "GET /api/cajas/saldo-esperado/:id",
+            "GET /api/cajas/validar-precierre/:id",
+            "GET /api/cajas/:id/corte-z"
+          ],
+          "scenario": {
+            "scenario": "Caja: apertura y consultas no cambian la sesión; segunda apertura rechaza sin autocierre",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [
+        "cash-invalid-date-500",
+        "cash-day-filter-midnight",
+        "cash-session-read-unavailability-masked"
+      ],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ],
+      "ui_evidence": "artifacts/peru-cash-canonical-local-20261003/cash-browser.json"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/cajas/cortes",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-corte-filtros-CSV-y-PDF",
+          "operations": [
+            "GET /api/cajas/cortes",
+            "GET /api/cajas/cortes/:id",
+            "GET /api/cajas/cortes/:id/csv",
+            "GET /api/cajas/cortes/:id/pdf"
+          ],
+          "scenario": {
+            "scenario": "Caja: corte, filtros, CSV y PDF representan sesión cerrada; no producen efectos",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [
+        "cash-invalid-date-500",
+        "cash-day-filter-midnight",
+        "cash-cut-read-unavailability-masked"
+      ],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ],
+      "ui_evidence": "artifacts/peru-cash-canonical-local-20261003/cash-browser.json"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/cajas/cortes/:corteId",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-corte-filtros-CSV-y-PDF",
+          "operations": [
+            "GET /api/cajas/cortes",
+            "GET /api/cajas/cortes/:id",
+            "GET /api/cajas/cortes/:id/csv",
+            "GET /api/cajas/cortes/:id/pdf"
+          ],
+          "scenario": {
+            "scenario": "Caja: corte, filtros, CSV y PDF representan sesión cerrada; no producen efectos",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [
+        "cash-cut-read-unavailability-masked"
+      ],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Recorrido UI real",
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ]
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/cajas/cortes/:corteId/pdf",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-corte-filtros-CSV-y-PDF",
+          "operations": [
+            "GET /api/cajas/cortes",
+            "GET /api/cajas/cortes/:id",
+            "GET /api/cajas/cortes/:id/csv",
+            "GET /api/cajas/cortes/:id/pdf"
+          ],
+          "scenario": {
+            "scenario": "Caja: corte, filtros, CSV y PDF representan sesión cerrada; no producen efectos",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [
+        "cash-withdrawals-report-read-privilege",
+        "cash-cut-read-unavailability-masked",
+        "cash-cut-pdf-layout",
+        "cash-fiscal-payment-report-infrastructure-400"
+      ],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ],
+      "ui_evidence": "artifacts/peru-cash-canonical-local-20261003/cash-browser.json"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/cajas/cortes/:corteId/csv",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-corte-filtros-CSV-y-PDF",
+          "operations": [
+            "GET /api/cajas/cortes",
+            "GET /api/cajas/cortes/:id",
+            "GET /api/cajas/cortes/:id/csv",
+            "GET /api/cajas/cortes/:id/pdf"
+          ],
+          "scenario": {
+            "scenario": "Caja: corte, filtros, CSV y PDF representan sesión cerrada; no producen efectos",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [
+        "cash-fiscal-payment-report-infrastructure-400",
+        "cash-csv-free-text-formula"
+      ],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ],
+      "ui_evidence": "artifacts/peru-cash-canonical-local-20261003/cash-browser.json"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/cajas/validar-precierre/:sesionId",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-apertura-y-consultas",
+          "operations": [
+            "POST /api/cajas/:id/apertura",
+            "GET /api/cajas/sesiones",
+            "GET /api/cajas/movimientos/:id",
+            "GET /api/cajas/saldo-esperado/:id",
+            "GET /api/cajas/validar-precierre/:id",
+            "GET /api/cajas/:id/corte-z"
+          ],
+          "scenario": {
+            "scenario": "Caja: apertura y consultas no cambian la sesión; segunda apertura rechaza sin autocierre",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [
+        "cash-session-read-unavailability-masked",
+        "cash-preclose-read-validation-false-positive"
+      ],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Recorrido UI real",
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ]
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/cajas/saldo-esperado/:sesionId",
+      "existing_evidence": [
+        {
+          "trace_index": 7,
+          "status": 200
+        },
+        {
+          "trace_index": 14,
+          "status": 200
+        },
+        {
+          "trace_index": 258,
+          "status": 200
+        },
+        {
+          "trace_index": 321,
+          "status": 200
+        },
+        {
+          "trace_index": 324,
+          "status": 200
+        },
+        {
+          "trace_index": 1272,
+          "status": 200
+        },
+        {
+          "trace_index": 1279,
+          "status": 200
+        },
+        {
+          "trace_index": 1303,
+          "status": 200
+        }
+      ],
+      "candidate_cases": [
+        {
+          "id": "cash-apertura-y-consultas",
+          "operations": [
+            "POST /api/cajas/:id/apertura",
+            "GET /api/cajas/sesiones",
+            "GET /api/cajas/movimientos/:id",
+            "GET /api/cajas/saldo-esperado/:id",
+            "GET /api/cajas/validar-precierre/:id",
+            "GET /api/cajas/:id/corte-z"
+          ],
+          "scenario": {
+            "scenario": "Caja: apertura y consultas no cambian la sesión; segunda apertura rechaza sin autocierre",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [
+        "cash-movement-read-unavailability-400"
+      ],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Recorrido UI real",
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ]
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/cajas/movimientos/:sesionId",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-apertura-y-consultas",
+          "operations": [
+            "POST /api/cajas/:id/apertura",
+            "GET /api/cajas/sesiones",
+            "GET /api/cajas/movimientos/:id",
+            "GET /api/cajas/saldo-esperado/:id",
+            "GET /api/cajas/validar-precierre/:id",
+            "GET /api/cajas/:id/corte-z"
+          ],
+          "scenario": {
+            "scenario": "Caja: apertura y consultas no cambian la sesión; segunda apertura rechaza sin autocierre",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [
+        "cash-movement-read-unavailability-400"
+      ],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Recorrido UI real",
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ]
+    },
+    {
+      "method": "POST",
+      "endpoint": "/api/cajas/validar-cierre/:sesionId",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-arqueo-inconsistente",
+          "operations": [
+            "POST /api/cajas/validar-cierre/:id"
+          ],
+          "scenario": {
+            "scenario": "Caja: arqueo inconsistente y diferencia sin autorización no cierran ni mutan",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [
+        "cash-close-preview-infrastructure-400",
+        "cash-close-preview-false-zero"
+      ],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ],
+      "ui_evidence": "artifacts/peru-cash-canonical-local-20261003/cash-browser.json"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/cajas/supervisores-autorizados/:sesionId",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-PIN-supervisor",
+          "operations": [
+            "PUT /api/cajas/supervisores/:id/pin",
+            "GET /api/cajas/supervisores-gestion-pin",
+            "GET /api/cajas/supervisores-autorizados/:id"
+          ],
+          "scenario": {
+            "scenario": "Caja: PIN supervisor se registra/rota por intención sin exponer código ni hash",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Recorrido UI real",
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ]
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/cajas/supervisores-gestion-pin",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-PIN-supervisor",
+          "operations": [
+            "PUT /api/cajas/supervisores/:id/pin",
+            "GET /api/cajas/supervisores-gestion-pin",
+            "GET /api/cajas/supervisores-autorizados/:id"
+          ],
+          "scenario": {
+            "scenario": "Caja: PIN supervisor se registra/rota por intención sin exponer código ni hash",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Recorrido UI real",
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ]
+    },
+    {
+      "method": "POST",
+      "endpoint": "/api/cajas/cerrar/:sesionId",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-cierre-con-supervisor",
+          "operations": [
+            "POST /api/cajas/cerrar/:id"
+          ],
+          "scenario": {
+            "scenario": "Caja: cierre con supervisor distinto y PIN produce corte durable; replay no duplica",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ],
+      "ui_evidence": "artifacts/peru-cash-canonical-local-20261003/cash-browser.json"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/api/cajas/retiros/:sesionId",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-retiro-a-boveda",
+          "operations": [
+            "POST /api/cajas/retiros/:id"
+          ],
+          "scenario": {
+            "scenario": "Caja: retiro a bóveda/replay conserva saldo; conciliación bancaria inaplicable rechaza sin efectos",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [
+        "cash-first-client-account-missing"
+      ],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Recorrido UI real",
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ]
+    },
+    {
+      "method": "POST",
+      "endpoint": "/api/cajas/retiros/:retiroId/conciliar",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-deposito-bancario-y-conciliacion-positiva",
+          "operations": [
+            "POST /api/cajas/retiros/:id/conciliar",
+            "POST /api/cajas/:id/cierre"
+          ],
+          "scenario": {
+            "scenario": "Caja: depósito bancario y conciliación positiva son idempotentes en caja y banco",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Recorrido UI real",
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ]
+    },
+    {
+      "method": "POST",
+      "endpoint": "/api/cajas/cambio-turno/iniciar/:sesionId",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-cambio-de-turno-congela",
+          "operations": [
+            "POST /api/cajas/cambio-turno/iniciar/:id",
+            "POST /api/cajas/cambio-turno/cancelar/:id"
+          ],
+          "scenario": {
+            "scenario": "Caja: cambio de turno congela; movimiento rechaza y cancelar/replay descongela una vez",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Recorrido UI real",
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ]
+    },
+    {
+      "method": "POST",
+      "endpoint": "/api/cajas/cambio-turno/completar/:cambioId",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-cambio-completado",
+          "operations": [
+            "POST /api/cajas/cambio-turno/completar/:id",
+            "GET /api/cajas/sesiones/:id/cambios-turno"
+          ],
+          "scenario": {
+            "scenario": "Caja: cambio completado transfiere responsabilidad, no inventa ingreso y congela confirmaciones como hashes",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Recorrido UI real",
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ]
+    },
+    {
+      "method": "POST",
+      "endpoint": "/api/cajas/cambio-turno/cancelar/:cambioId",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-cambio-de-turno-congela",
+          "operations": [
+            "POST /api/cajas/cambio-turno/iniciar/:id",
+            "POST /api/cajas/cambio-turno/cancelar/:id"
+          ],
+          "scenario": {
+            "scenario": "Caja: cambio de turno congela; movimiento rechaza y cancelar/replay descongela una vez",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Recorrido UI real",
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ]
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/cajas/sesiones/:sesionId/cambios-turno",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-cambio-completado",
+          "operations": [
+            "POST /api/cajas/cambio-turno/completar/:id",
+            "GET /api/cajas/sesiones/:id/cambios-turno"
+          ],
+          "scenario": {
+            "scenario": "Caja: cambio completado transfiere responsabilidad, no inventa ingreso y congela confirmaciones como hashes",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [
+        "cash-shift-history-read-privilege"
+      ],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Recorrido UI real",
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ]
+    },
+    {
+      "method": "POST",
+      "endpoint": "/api/cajas/movimientos/manual/:sesionId",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-ingreso-gasto-manual",
+          "operations": [
+            "POST /api/cajas/movimientos/manual/:id",
+            "GET /api/cajas/opciones-contables"
+          ],
+          "scenario": {
+            "scenario": "Caja: ingreso/gasto manual, ledger y replay conservan un solo movimiento y saldo",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [
+        "cash-first-client-account-missing",
+        "cash-manual-infrastructure-400"
+      ],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ],
+      "ui_evidence": "artifacts/peru-cash-canonical-local-20261003/cash-browser.json"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/api/cajas/sesiones/:sesionId/cierre-administrativo",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-cierre-administrativo-exige",
+          "operations": [
+            "POST /api/cajas/sesiones/:id/cierre-administrativo"
+          ],
+          "scenario": {
+            "scenario": "Caja: cierre administrativo exige razón y es durable sin duplicar efectos al reintentar",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [
+        "cash-administrative-close-replay-not-found"
+      ],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Recorrido UI real",
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ]
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/cajas/:id/corte-z",
+      "existing_evidence": [],
+      "candidate_cases": [
+        {
+          "id": "cash-apertura-y-consultas",
+          "operations": [
+            "POST /api/cajas/:id/apertura",
+            "GET /api/cajas/sesiones",
+            "GET /api/cajas/movimientos/:id",
+            "GET /api/cajas/saldo-esperado/:id",
+            "GET /api/cajas/validar-precierre/:id",
+            "GET /api/cajas/:id/corte-z"
+          ],
+          "scenario": {
+            "scenario": "Caja: apertura y consultas no cambian la sesión; segunda apertura rechaza sin autocierre",
+            "passed": true
+          }
+        }
+      ],
+      "confirmed_defects": [
+        "cash-withdrawals-report-read-privilege",
+        "cash-session-read-unavailability-masked",
+        "cash-fiscal-payment-report-infrastructure-400"
+      ],
+      "result": "canonical_local_variant_passed",
+      "complete_acceptance": false,
+      "pending": [
+        "Recorrido UI real",
+        "Permisos e aislamiento de todas las variantes",
+        "Infraestructura/fallos de escritura/concurrencia según operación",
+        "CI exacto, promoción 566 y despliegue"
+      ]
+    }
+  ],
+  "confirmed_defects": [
+    {
+      "id": "cash-close-amount-alias-rejected",
+      "operations": [
+        "POST /api/cajas/:id/cierre"
+      ],
+      "status": "canonical_local_subset_verified",
+      "observed": "monto_contado es un alias documentado en el controlador, pero el DTO lo rechaza antes de normalizar.",
+      "correction": "Validación condicional exige uno de los campos de monto.",
+      "baseline": "artifacts/peru-cash-close-failures-20261003",
+      "candidate_proof": "artifacts/peru-cash-browser-candidate-20261003",
+      "pending": [
+        "Reconstrucción SQL fresca y CI exactos, promoción 566 y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-administrative-close-replay-not-found",
+      "operations": [
+        "POST /api/cajas/sesiones/:id/cierre-administrativo"
+      ],
+      "status": "canonical_local_subset_verified",
+      "observed": "El primer cierre confirma; el mismo reintento devuelve 404 antes de llegar al writer idempotente.",
+      "correction": "Consulta sin excluir sesiones cerradas y deja que SQL valide actor/huella/replay.",
+      "baseline": "artifacts/peru-cash-close-failures-20261003",
+      "candidate_proof": "artifacts/peru-cash-browser-candidate-20261003",
+      "pending": [
+        "Reconstrucción SQL fresca y CI exactos, promoción 566 y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-first-client-account-missing",
+      "operations": [
+        "GET /api/cajas/opciones-contables",
+        "POST /api/cajas/movimientos/manual/:id",
+        "POST /api/cajas/retiros/:id"
+      ],
+      "status": "canonical_local_subset_verified",
+      "observed": "Un primer cliente PE configurado con certificado propio no dispone de 10111.",
+      "correction": "566 crea la referencia sólo al configurar PE; sin backfill.",
+      "baseline": "artifacts/peru-cash-local-20261003190124613-17344",
+      "candidate_proof": "artifacts/peru-cash-browser-candidate-20261003",
+      "pending": [
+        "Reconstrucción SQL fresca y CI exactos, promoción 566 y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-shift-history-read-privilege",
+      "operations": [
+        "GET /api/cajas/sesiones/:id/cambios-turno"
+      ],
+      "status": "canonical_local_subset_verified",
+      "observed": "El historial devuelve 400 por SELECT ausente aunque el cambio se confirmó.",
+      "correction": "566 concede SELECT exclusivamente al backend.",
+      "baseline": "artifacts/peru-cash-local-20261003190536775-24348",
+      "candidate_proof": "artifacts/peru-cash-browser-candidate-20261003",
+      "pending": [
+        "Reconstrucción SQL fresca y CI exactos, promoción 566 y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-withdrawals-report-read-privilege",
+      "operations": [
+        "GET /api/cajas/:id/corte-z",
+        "GET /api/cajas/cortes/:id/pdf"
+      ],
+      "status": "canonical_local_subset_verified",
+      "observed": "Un retiro durable desaparece del reporte (cero de uno).",
+      "correction": "566 concede SELECT de retiros al backend; reporte falla explícitamente si no puede leer.",
+      "baseline": "artifacts/peru-cash-expanded-failures-20261003",
+      "candidate_proof": "artifacts/peru-cash-browser-candidate-20261003",
+      "pending": [
+        "Reconstrucción SQL fresca y CI exactos, promoción 566 y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-invalid-date-500",
+      "operations": [
+        "GET /api/cajas/sesiones",
+        "GET /api/cajas/cortes"
+      ],
+      "status": "canonical_local_subset_verified",
+      "observed": "2026-02-31 alcanza PostgreSQL y responde 500.",
+      "correction": "Valida calendario y rango antes de consultar.",
+      "baseline": "artifacts/peru-cash-local-20261003191130521-900",
+      "candidate_proof": "artifacts/peru-cash-browser-candidate-20261003",
+      "pending": [
+        "Reconstrucción SQL fresca y CI exactos, promoción 566 y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-day-filter-midnight",
+      "operations": [
+        "GET /api/cajas/sesiones",
+        "GET /api/cajas/cortes"
+      ],
+      "status": "canonical_local_subset_verified",
+      "observed": "El día actual queda excluido por fecha_hasta a medianoche.",
+      "correction": "Rango desde inicio local, hasta inicio del siguiente día exclusivo.",
+      "baseline": "artifacts/peru-cash-read-failures-20261003",
+      "candidate_proof": "artifacts/peru-cash-browser-candidate-20261003",
+      "pending": [
+        "Reconstrucción SQL fresca y CI exactos, promoción 566 y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-session-read-unavailability-masked",
+      "operations": [
+        "GET /api/cajas/sesiones",
+        "GET /api/cajas/validar-precierre/:id",
+        "GET /api/cajas/:id/corte-z"
+      ],
+      "status": "canonical_local_subset_verified",
+      "observed": "REVOKE SELECT produce 500, 200 y 404 respectivamente.",
+      "correction": "503 en indisponibilidad; ausencia conserva semántica de validación o 404.",
+      "baseline": "artifacts/peru-cash-expanded-failures-20261003",
+      "candidate_proof": "artifacts/peru-cash-browser-candidate-20261003",
+      "pending": [
+        "Reconstrucción SQL fresca y CI exactos, promoción 566 y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-movement-read-unavailability-400",
+      "operations": [
+        "GET /api/cajas/movimientos/:id",
+        "GET /api/cajas/saldo-esperado/:id"
+      ],
+      "status": "canonical_local_subset_verified",
+      "observed": "REVOKE SELECT devuelve 400 en las dos consultas.",
+      "correction": "503 explícito y recuperación con saldo inalterado.",
+      "baseline": "artifacts/peru-cash-expanded-failures-20261003",
+      "candidate_proof": "artifacts/peru-cash-browser-candidate-20261003",
+      "pending": [
+        "Reconstrucción SQL fresca y CI exactos, promoción 566 y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-cut-read-unavailability-masked",
+      "operations": [
+        "GET /api/cajas/cortes",
+        "GET /api/cajas/cortes/:id",
+        "GET /api/cajas/cortes/:id/pdf"
+      ],
+      "status": "canonical_local_subset_verified",
+      "observed": "REVOKE SELECT produce 500 y falsos 404.",
+      "correction": "503 para infraestructura; 404 sólo para inexistente/ajeno/ID no válido.",
+      "baseline": "artifacts/peru-cash-expanded-failures-20261003",
+      "candidate_proof": "artifacts/peru-cash-browser-candidate-20261003",
+      "pending": [
+        "Reconstrucción SQL fresca y CI exactos, promoción 566 y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-cut-pdf-layout",
+      "operations": [
+        "GET /api/cajas/cortes/:id/pdf"
+      ],
+      "status": "canonical_local_subset_verified",
+      "observed": "Identificadores superpuestos, títulos desplazados y tablas de cuatro columnas fuera de ancho A4.",
+      "correction": "Columnas acotadas, títulos y pie con ancho completo, filas con altura y salto de página.",
+      "baseline": "artifacts/peru-cash-first-candidate-20261003",
+      "candidate_proof": "artifacts/peru-cash-browser-candidate-20261003",
+      "pending": [
+        "Reconstrucción SQL fresca y CI exactos, promoción 566 y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-manual-infrastructure-400",
+      "operations": [
+        "POST /api/cajas/movimientos/manual/:id"
+      ],
+      "status": "canonical_local_subset_verified",
+      "observed": "EXECUTE revocado y fallo XX000 posterior al INSERT responden 400 pese a ser fallos recuperables.",
+      "correction": "503 en infraestructura; rollback y misma intención recuperada una vez.",
+      "baseline": "artifacts/peru-cash-faults-baseline-20261003",
+      "candidate_proof": "artifacts/peru-cash-browser-candidate-20261003",
+      "pending": [
+        "Reconstrucción SQL fresca y CI exactos, promoción 566 y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-preclose-read-validation-false-positive",
+      "operations": [
+        "GET /api/cajas/validar-precierre/:id"
+      ],
+      "status": "canonical_local_subset_verified",
+      "observed": "Sin SELECT en ventas, retiros o cambios de turno, precierre responde válido=true.",
+      "correction": "Toda lectura requerida falla con 503 y permite recuperación explícita.",
+      "baseline": "artifacts/peru-cash-faults-baseline-20261003",
+      "candidate_proof": "artifacts/peru-cash-browser-candidate-20261003",
+      "pending": [
+        "Reconstrucción SQL fresca y CI exactos, promoción 566 y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-close-preview-infrastructure-400",
+      "operations": [
+        "POST /api/cajas/validar-cierre/:id"
+      ],
+      "status": "canonical_local_subset_verified",
+      "observed": "Sin EXECUTE de tolerancia, el preview responde 400.",
+      "correction": "503 en configuración, moneda o evidencia inaccesible; conserva arqueo.",
+      "baseline": "artifacts/peru-cash-preview-report-failures-20261003",
+      "candidate_proof": "artifacts/peru-cash-browser-candidate-20261003",
+      "pending": [
+        "Reconstrucción SQL fresca y CI exactos, promoción 566 y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-close-preview-false-zero",
+      "operations": [
+        "POST /api/cajas/validar-cierre/:id"
+      ],
+      "status": "canonical_local_subset_verified",
+      "observed": "Sin SELECT de movimientos, preview usa fondo inicial y declara caja cuadrada en lugar del saldo durable 104,01.",
+      "correction": "La indisponibilidad del ledger bloquea el preview con 503.",
+      "baseline": "artifacts/peru-cash-preview-report-failures-20261003",
+      "candidate_proof": "artifacts/peru-cash-browser-candidate-20261003",
+      "pending": [
+        "Reconstrucción SQL fresca y CI exactos, promoción 566 y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-fiscal-payment-report-infrastructure-400",
+      "operations": [
+        "GET /api/cajas/:id/corte-z",
+        "GET /api/cajas/cortes/:id/pdf",
+        "GET /api/cajas/cortes/:id/csv"
+      ],
+      "status": "canonical_local_subset_verified",
+      "observed": "Sin SELECT en ventas o pagos, los reportes responden 400.",
+      "correction": "503 explícito y recuperación de reportes sin efectos financieros.",
+      "baseline": "artifacts/peru-cash-preview-report-failures-20261003",
+      "candidate_proof": "artifacts/peru-cash-browser-candidate-20261003",
+      "pending": [
+        "Reconstrucción SQL fresca y CI exactos, promoción 566 y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-csv-free-text-formula",
+      "operations": [
+        "GET /api/cajas/cortes/:id/csv"
+      ],
+      "status": "canonical_local_subset_verified",
+      "observed": "El CSV conserva una fórmula activa en el nombre libre de la caja.",
+      "correction": "Neutraliza texto libre y conserva comillas/salto de línea e importes numéricos.",
+      "baseline": "artifacts/peru-cash-preview-report-failures-20261003",
+      "candidate_proof": "artifacts/peru-cash-browser-candidate-20261003",
+      "pending": [
+        "Reconstrucción SQL fresca y CI exactos, promoción 566 y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-ui-session-error-sticky",
+      "operations": [
+        "GET /api/cajas/sesiones"
+      ],
+      "status": "canonical_local_subset_verified",
+      "observed": "CashSessionSelector conservaba el estado de error después de un reintento exitoso: con SELECT de sesiones_caja restituido, Reintentar obtuvo HTTP 200 y la pantalla siguió mostrando el error sin datos.",
+      "correction": "La carga limpia el error antes de consultar.",
+      "baseline": "artifacts/peru-cash-ui-recovery-defect-20261003",
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003",
+      "pending": [
+        "CI exacto y despliegue web."
+      ]
+    },
+    {
+      "id": "cash-ui-cuts-error-sticky",
+      "operations": [
+        "GET /api/cajas/cortes"
+      ],
+      "status": "canonical_local_subset_verified",
+      "observed": "CortesList conservaba el estado de error después de un reintento exitoso: con SELECT de cortes_caja restituido, Reintentar obtuvo HTTP 200 y la pantalla siguió mostrando el error sin datos.",
+      "correction": "La carga limpia el error antes de consultar.",
+      "baseline": "artifacts/peru-cash-ui-recovery-defect-20261003",
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003",
+      "pending": [
+        "CI exacto y despliegue web."
+      ]
+    }
+  ],
+  "limits": [
+    "Fuentes canónicas integradas en la rama; todavía no están en main ni PROD",
+    "El ensayo parte de un snapshot local restaurado más DDL 559-566; la reconstrucción fresca y CI exactos se registran aparte",
+    "La UI cubre apertura, ingreso con respuesta perdida, cierre, descargas, contabilidad y recuperación de sesiones/cortes; el resto de operaciones conserva su pendiente UI",
+    "Se conservan privados PDFs, certificados, dumps, logs y trazas"
+  ],
+  "canonical_proof": "artifacts/peru-cash-canonical-local-20261003",
+  "canonical_summary": {
+    "api_scenarios_passed": 23,
+    "api_scenarios_failed": 0,
+    "browser_checks_passed": 10,
+    "browser_checks_failed": 0,
+    "migration": "supabase/migrations/566__peru_cash_first_client_account.sql",
+    "verifier": "supabase/verify/566__peru_cash_first_client_account.sql",
+    "restore": "passed",
+    "database": "restored local snapshot plus DDL 559-566; not a fresh rebuild"
+  },
+  "attempts": [
+    {
+      "output": "artifacts/peru-cash-local-20261003205621519-3108",
+      "result": "local_infrastructure_failure",
+      "detail": "Docker Desktop terminó durante la fase de navegador; login 503 por PostgREST inaccesible; no es defecto de producto"
+    },
+    {
+      "output": "artifacts/peru-cash-ui-recovery-defect-20261003",
+      "result": "product_defects_reproduced",
+      "detail": "Ocho comprobaciones UI aprobadas; Sesiones y Cortes mantuvieron el error tras un reintento con HTTP 200"
+    },
+    {
+      "output": "artifacts/peru-cash-canonical-local-20261003",
+      "result": "passed",
+      "detail": "Fuentes API/UI/SQL canónicas; 23 API, 10 UI y restore"
+    }
+  ]
+}

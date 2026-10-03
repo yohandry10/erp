@@ -168,12 +168,22 @@ BEGIN
   SELECT tenant_id, actor_id, planilla_id INTO v_tenant, v_actor, v_planilla
   FROM verify_492_context;
 
+  -- Desde 566 una empresa PE recibe 10111 al configurarse. El resolver debe
+  -- conservar esa misma cuenta; el fixture no crea un segundo código 10111.
+  SELECT coalesce((SELECT id FROM public.plan_cuentas
+    WHERE tenant_id = v_tenant AND codigo = '10111'
+    ORDER BY created_at, id LIMIT 1), v_cash_account) INTO v_cash_account;
+  INSERT INTO public.plan_cuentas(
+    id, tenant_id, codigo, nombre, estado, activo, acepta_movimiento,
+    tipo, tipo_cuenta, nivel
+  ) SELECT v_cash_account, v_tenant, '10111', 'Caja laboral verify 492',
+     'ACTIVO', true, true, 'ACTIVO', 'ACTIVO', 5
+  WHERE NOT EXISTS (SELECT 1 FROM public.plan_cuentas WHERE id = v_cash_account);
+
   INSERT INTO public.plan_cuentas(
     id, tenant_id, codigo, nombre, estado, activo, acepta_movimiento,
     tipo, tipo_cuenta, nivel
   ) VALUES
-    (v_cash_account, v_tenant, '10111', 'Caja laboral verify 492',
-     'ACTIVO', true, true, 'ACTIVO', 'ACTIVO', 5),
     (v_bank_account_a, v_tenant, '104101', 'Banco laboral A verify 492',
      'ACTIVO', true, true, 'ACTIVO', 'ACTIVO', 6),
     (v_bank_account_b, v_tenant, '104102', 'Banco laboral B verify 492',

@@ -1,0 +1,22 @@
+{
+  "capturedAt": "2026-10-03T20:08:39.188Z",
+  "capture": "Before launch",
+  "source_hashes": {
+    "artifacts/peru-cash-faults-probe-20261003.mjs": "fb66e441fc51b03624b1792e5b03275c26392f52d476a5f7b814db1018c95208",
+    "artifacts/peru-cerrar-caja.dto.candidate.ts": "f22525d945253114faa15f81f73464a2c9cdbc872dc142426b314c2db85b5447",
+    "artifacts/peru-cash-operations-probe-20261003.mjs": "d29d1fe8e496c6d421cc66f4108d5e59ea2426284d00e428bc7af6efe483c786",
+    "artifacts/peru-cash-operations-runner-20261003.mjs": "f21bbcdae9337acb1fb4f3661c05bf5f944fa472df38215dea86951e3d33d556",
+    "apps/erp-api/src/modules/cajas/cajas.service.ts": "2c8457304cbfd900e0a3c20d6d9a5902c3330885f701813e36828d73d8beb313",
+    "apps/erp-api/src/modules/cajas/services/cash-movements.service.ts": "fb5470afb0d349e20f98fe3fafa350c91501556bc1cd6f54c5331f3560ad7b86",
+    "apps/erp-api/src/modules/cajas/services/cash-closing.service.ts": "a24444438c3b4e0fd9b4fc42dfd7cc1167b7638f09ccd79d15f6115b09288911",
+    "apps/erp-api/src/modules/cajas/services/cash-reports.service.ts": "e03df657a628482fe5f36e895766922f70e0543b466db38ef395f2e05f89a67b",
+    "artifacts/566__peru_cash_first_client_account.candidate.sql": "f9be0cb34993894bd4026f84ab4278adcdc168b2c3afc7adc3c0dd11b12bbb78",
+    "artifacts/peru-cajas.service.candidate.ts": "5bfc835a29ab5f4dd5fd8a437e1a29f52f527a3e8d4a2fda09d352d7de2c7e31",
+    "artifacts/peru-cash-api-overlay.cjs": "560eb57b3672740bf13310f5993343109aa829d12a3839cf3411f7a02a8100fc",
+    "artifacts/peru-cash-movements.service.candidate.ts": "6e7911bbe63f863c754453bbfa24f69aa6bf22d6df3df78ac3b9d675da752154",
+    "artifacts/peru-cash-closing.service.candidate.ts": "04f6b4f7c636e573b5f33c464229050f9164533cee6684a15982c9246561a5c7",
+    "artifacts/peru-cash-reports.service.candidate.ts": "79e20d88006d684ced3309e3c07b47e50723e2134ed0562be25614ddd1a87d7d"
+  },
+  "complete_acceptance": false,
+  "remoteWrites": false
+}

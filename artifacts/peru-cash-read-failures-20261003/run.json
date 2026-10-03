@@ -1,0 +1,17 @@
+{
+  "completedAt": "2026-10-03T19:31:13.671Z",
+  "success": false,
+  "withBrowser": false,
+  "withSurvey": false,
+  "withRecords": false,
+  "candidateCashApi": true,
+  "candidateCashSql": true,
+  "candidateApi": false,
+  "candidateSql": false,
+  "candidateUi": false,
+  "scope": "cash_diagnostic_api_subset",
+  "database": "PostgreSQL 16 efímero",
+  "output": "artifacts/peru-cash-local-20261003193004343-18848",
+  "remoteWrites": false,
+  "complete_acceptance": false
+}

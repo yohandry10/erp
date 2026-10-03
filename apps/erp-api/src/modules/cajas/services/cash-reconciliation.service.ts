@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, ServiceUnavailableException, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import {
@@ -202,6 +202,7 @@ export class CashReconciliationService {
             .eq('tenant_id', tenantId)
             .single();
 
+        if (sesionError && !['PGRST116','22P02'].includes(sesionError.code ?? '')) throw new ServiceUnavailableException('No se pudo consultar la sesión de caja; reintente');
         if (sesionError || !sesion) {
             throw new BadRequestException('Sesión de caja no encontrada');
         }
@@ -232,7 +233,7 @@ export class CashReconciliationService {
         // el importe exacto de las ventas del día y se le exigía autorización de
         // supervisor sin motivo; quien entregaba sólo el fondo de apertura pasaba
         // este filtro y sólo lo frenaba el writer.
-        const { data: ultimoMovimiento } = await this.supabase
+        const { data: ultimoMovimiento, error: movimientosError } = await this.supabase
             .getClient()
             .from('movimientos_caja')
             .select('saldo_nuevo')
@@ -242,6 +243,7 @@ export class CashReconciliationService {
             .limit(1)
             .maybeSingle();
 
+        if (movimientosError) throw new ServiceUnavailableException('No se pudo consultar el saldo de caja; reintente');
         const saldoTeorico = Number(
             ultimoMovimiento?.saldo_nuevo ?? sesion.monto_inicio ?? 0,
         );
@@ -284,7 +286,7 @@ export class CashReconciliationService {
             this.logger.error(
                 `No se pudo resolver la tolerancia de cierre: ${configResult.error.message}`,
             );
-            throw new BadRequestException(
+            throw new ServiceUnavailableException(
                 'No se pudo resolver la configuración vigente de cierre de caja',
             );
         }
@@ -293,7 +295,7 @@ export class CashReconciliationService {
             this.logger.error(
                 `No se pudo resolver el país del cierre: ${tenantResult.error.message}`,
             );
-            throw new BadRequestException(
+            throw new ServiceUnavailableException(
                 'No se pudo resolver el contexto monetario vigente de la caja',
             );
         }
@@ -302,7 +304,7 @@ export class CashReconciliationService {
             this.logger.error(
                 `No se pudo resolver el redondeo documentado: ${redondeoResult.error.message}`,
             );
-            throw new BadRequestException(
+            throw new ServiceUnavailableException(
                 'No se pudo reconciliar la evidencia de redondeo del cierre',
             );
         }

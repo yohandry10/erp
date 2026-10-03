@@ -1,0 +1,138 @@
+{
+  "success": false,
+  "scenarios": [
+    {
+      "scenario": "Caja: dos ingresos concurrentes de la misma intención producen un único movimiento/evento",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: writer manual sin EXECUTE devuelve 503 y recupera la intención tras restituir permiso",
+      "passed": false,
+      "message": "cajas/movimientos/manual/306e79c8-5c43-4b19-b7bb-b586a77cba16: {\"statusCode\":400,\"message\":\"permission denied for function registrar_movimiento_manual_caja_tx\",\"error\":\"Bad Request\",\"timestamp\":\"2026-10-03T20:09:59.838Z\",\"path\":\"/api/cajas/movimientos/manual/306e79c8-5c43-4b19-b7bb-b586a77cba16\"}\n\n400 !== 503\n"
+    },
+    {
+      "scenario": "Caja: fallo interno después de INSERT revierte saldo/ledger/outbox y la intención se recupera una vez",
+      "passed": false,
+      "message": "cajas/movimientos/manual/306e79c8-5c43-4b19-b7bb-b586a77cba16: {\"statusCode\":400,\"message\":\"LOCAL_CASH_AFTER_INSERT_FAILURE\",\"error\":\"Bad Request\",\"timestamp\":\"2026-10-03T20:10:00.264Z\",\"path\":\"/api/cajas/movimientos/manual/306e79c8-5c43-4b19-b7bb-b586a77cba16\"}\n\n400 !== 503\n"
+    },
+    {
+      "scenario": "Caja: precierre no declara validación exitosa cuando no puede leer ventas_pos",
+      "passed": false,
+      "message": "cajas/validar-precierre/306e79c8-5c43-4b19-b7bb-b586a77cba16: {\"valido\":true,\"errores\":[],\"warnings\":[]}\n\n200 !== 503\n"
+    },
+    {
+      "scenario": "Caja: precierre no declara validación exitosa cuando no puede leer retiros_caja",
+      "passed": false,
+      "message": "cajas/validar-precierre/306e79c8-5c43-4b19-b7bb-b586a77cba16: {\"valido\":true,\"errores\":[],\"warnings\":[]}\n\n200 !== 503\n"
+    },
+    {
+      "scenario": "Caja: precierre no declara validación exitosa cuando no puede leer cambios_turno",
+      "passed": false,
+      "message": "cajas/validar-precierre/306e79c8-5c43-4b19-b7bb-b586a77cba16: {\"valido\":true,\"errores\":[],\"warnings\":[]}\n\n200 !== 503\n"
+    },
+    {
+      "scenario": "Caja: RPC de tolerancia indisponible bloquea el preview con 503 y conserva el arqueo",
+      "passed": false,
+      "message": "cajas/validar-cierre/306e79c8-5c43-4b19-b7bb-b586a77cba16: {\"statusCode\":400,\"message\":\"Denominaciones inválidas: Moneda de 0.01 no es válida\",\"error\":\"Bad Request\",\"timestamp\":\"2026-10-03T20:10:01.564Z\",\"path\":\"/api/cajas/validar-cierre/306e79c8-5c43-4b19-b7bb-b586a77cba16\"}\n\n400 !== 503\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/:id/apertura",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/saldo-esperado/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/validar-precierre/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/validar-precierre/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/validar-precierre/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/validar-precierre/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/validar-precierre/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/validar-precierre/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/validar-cierre/:id",
+      "status": 400
+    }
+  ],
+  "remoteWrites": false,
+  "complete_acceptance": false
+}

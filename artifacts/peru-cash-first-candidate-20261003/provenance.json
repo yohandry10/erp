@@ -1,0 +1,11 @@
+{
+  "capture": "After run, before the first subsequent modification; sources unchanged during execution",
+  "source_hashes": {
+    "artifacts/peru-cash-operations-probe-20261003.mjs": "451c85334bcd4fd38428c2e00d05f4146d5c86141955f80e715ced177349ad18",
+    "artifacts/peru-cash-operations-runner-20261003.mjs": "1b18a77d36f66643adf1518ecc09fbd789aae1b5529dc445424d58b446496961",
+    "artifacts/peru-cajas.service.candidate.ts": "afc5c911e69d9c98b02f2e13dba07fae67c58937516f26b4a0017a76fe600a26",
+    "artifacts/566__peru_cash_first_client_account.candidate.sql": "458963c27c5ee08480b90a5045be66f332dd764f7b0014e73b849327668a197f"
+  },
+  "complete_acceptance": false,
+  "remoteWrites": false
+}

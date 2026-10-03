@@ -2,7 +2,7 @@
 
 No hay aceptación integral de lanzamiento. Los casos se vinculan a operaciones concretas en la matriz API; navegación y controles visibles describen la oferta y no demuestran ejecución. Sólo Analytics excluido; reportes operativos, contables y tributarios incluidos.
 
-Último cierre completo: #133, 19fa239d/esquema 563. #134 se integró como 9e301e2a; 564 promovida una vez, runtime exacto observado. Los dos CI de fuente c0f055eb pasaron 316 API/30 UI sin reintentos, SQL fresco, barridos y restore. CI main 37142023714 relanzado tras OOM de Next dev en el barrido con registros; E2E y seguridad aprobaron. CPE canónico pasó 26 API/siete comprobaciones UI y restore sobre snapshot local; 565 ensayada con rollback y preservación de 42 tablas, sin promoción todavía. Faltan CI exacto con SQL fresco, main y runtime 565. Render: plan efectivo y continuidad sin confirmar. No hubo datos sintéticos de negocio en PROD.
+Último cierre completo: #135, 8d717bcf/esquema 565: 28 checks, CI 342 API/31 UI sin reintentos, SQL fresco, barridos, restore; main 37152767852, E2E y seguridad aprobados; runtime exacto verificado tras un primer timeout de 20 s. #134 (9e301e2a/564) no cerró main: dos OOM de Next dev. Caja: 19 defectos con correcciones canónicas en rama (23 API/10 UI locales, SQL fresco 566 aprobado); 566 sin promover. Histórico: #133, 19fa239d/esquema 563. #134 promovió 564 una vez; sus CI de fuente c0f055eb pasaron 316 API/30 UI y su main no cerró por OOM. La 565 se ensayó con rollback y preservación de 42 tablas antes de su promoción única. Render: plan efectivo y continuidad sin confirmar. No hubo datos sintéticos de negocio en PROD.
 
 | Dominio de código | Contratos declarados | HTTP observado | Operaciones con casos funcionales | Aceptación completa |
 |---|---:|---:|---:|---|
@@ -57,6 +57,8 @@ Los 11 contratos específicos de Argentina/Colombia identificados en el artefact
 
 - `peru-integrated-local-gre-20261003`: ensayo real API/UI/DB y restore; 22 casos API y tres recorridos GRE.
 - `peru-storage-ci-37139151230`: API/UI/DB/blobs locales; proveedor remoto sin aceptación por inferencia.
+- `peru-integrated-main-37152767852`: main exacto de #135, 342 HTTP/31 UI y restore.
+- `peru-cash-canonical-local-20261003` y `peru-cash-operation-matrix-20261003.json`: caja canónica local y sus 28 operaciones.
 - `peru-operation-acceptance-cases-20260930.json`: qué se probó y variantes pendientes.
 - `peru-functional-defects-20260930.json`: reproducción, corrección y estado de cada defecto.
 - `peru-api-operation-matrix-20260930.json` y `peru-ui-operation-matrix-20261002.json`: operaciones y controles trazables.

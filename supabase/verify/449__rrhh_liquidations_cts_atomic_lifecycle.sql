@@ -157,14 +157,23 @@ BEGIN
     (v_contrato_cts_id, v_tenant_id, v_empleado_cts_id, v_empleado_cts_id, 'indefinido',
      '2024-05-01', 'vigente', true, 2500, 2500, 'PEN', 'ONP', 'tiempo_completo');
 
+  -- Desde 566 una empresa PE recibe 10111 al configurarse. El pago en
+  -- efectivo debe congelar esa misma cuenta; el fixture no crea otra 10111.
+  SELECT coalesce((SELECT id FROM public.plan_cuentas
+    WHERE tenant_id = v_tenant_id AND codigo = '10111'
+    ORDER BY created_at, id LIMIT 1), v_cash_account_id) INTO v_cash_account_id;
   INSERT INTO public.plan_cuentas(
     id, tenant_id, codigo, nombre, estado, activo, acepta_movimiento,
     tipo, tipo_cuenta, nivel
   ) VALUES
     (v_bank_account_id, v_tenant_id, '104491', 'Banco RRHH Verify 449',
-     'ACTIVO', true, true, 'ACTIVO', 'ACTIVO', 6),
-    (v_cash_account_id, v_tenant_id, '10111', 'Caja RRHH Verify 449',
-     'ACTIVO', true, true, 'ACTIVO', 'ACTIVO', 5);
+     'ACTIVO', true, true, 'ACTIVO', 'ACTIVO', 6);
+  INSERT INTO public.plan_cuentas(
+    id, tenant_id, codigo, nombre, estado, activo, acepta_movimiento,
+    tipo, tipo_cuenta, nivel
+  ) SELECT v_cash_account_id, v_tenant_id, '10111', 'Caja RRHH Verify 449',
+     'ACTIVO', true, true, 'ACTIVO', 'ACTIVO', 5
+  WHERE NOT EXISTS (SELECT 1 FROM public.plan_cuentas WHERE id = v_cash_account_id);
 
   INSERT INTO public.cuentas_bancarias (
     id, tenant_id, nombre, codigo, banco, numero_cuenta, tipo_cuenta,

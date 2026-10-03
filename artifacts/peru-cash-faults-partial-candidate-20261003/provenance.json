@@ -1,0 +1,30 @@
+{
+  "capturedAt": "2026-10-03T20:28:05.567Z",
+  "capture": "Before launch",
+  "source_hashes": {
+    "artifacts/peru-cash-faults-runner-20261003.mjs": "429115a198dac3a0f0729f8c9ae2718e854c23609eeeed8054b46b303c5a49e0",
+    "artifacts/peru-cash-faults-probe-20261003.mjs": "4385bfa0da0d5801f08e8fd53f6cdf970b16ef4cde517d3825cb694d19dfa87e",
+    "artifacts/peru-cash-browser-20261003.spec.mjs": "fe1115c996e42b64093539507803da31410c30c25647244e0a7b867183434945",
+    "artifacts/peru-cash-playwright.config.mjs": "279334ceaf7eb06fbd32ad26e61467266d4f1d32f1b44f673f579a2e41934b1e",
+    "apps/web/app/dashboard/cajas/page.tsx": "0372a135d415805d87ebfe3882b21e4e78833c916d58cc7037c68c0fe9199f8e",
+    "apps/web/app/dashboard/cajas/components/CashOpenDialog.tsx": "c68eb7a3deb95b955f03758e583a3c793d5271224632512f861a9cea70a535f4",
+    "apps/web/app/dashboard/cajas/components/CashIncomeExpenseDialog.tsx": "26dd6dddafdc927c610ebc5879eee94c80f857dca2b0dd897e72f5415aac1722",
+    "apps/web/app/dashboard/cajas/components/CashClosingDialog.tsx": "f243ed69d668b52ac653b2f2587958027f4b90b7c5ac5638320fad3b429a7349",
+    "apps/web/app/dashboard/cajas/components/DenominationForm.tsx": "b8b30869b978e0ad6b8fe46cae0fec320db6608546f141edbd10e30eea32e539",
+    "artifacts/peru-cash-operations-probe-20261003.mjs": "d29d1fe8e496c6d421cc66f4108d5e59ea2426284d00e428bc7af6efe483c786",
+    "artifacts/peru-cash-operations-runner-20261003.mjs": "d78c026aa444418519550ff10c971129cde1bc9c8058566ee5b92563d4c2e5dc",
+    "apps/erp-api/src/modules/cajas/cajas.service.ts": "2c8457304cbfd900e0a3c20d6d9a5902c3330885f701813e36828d73d8beb313",
+    "apps/erp-api/src/modules/cajas/services/cash-movements.service.ts": "fb5470afb0d349e20f98fe3fafa350c91501556bc1cd6f54c5331f3560ad7b86",
+    "apps/erp-api/src/modules/cajas/services/cash-closing.service.ts": "a24444438c3b4e0fd9b4fc42dfd7cc1167b7638f09ccd79d15f6115b09288911",
+    "apps/erp-api/src/modules/cajas/services/cash-reports.service.ts": "e03df657a628482fe5f36e895766922f70e0543b466db38ef395f2e05f89a67b",
+    "artifacts/566__peru_cash_first_client_account.candidate.sql": "f9be0cb34993894bd4026f84ab4278adcdc168b2c3afc7adc3c0dd11b12bbb78",
+    "artifacts/peru-cajas.service.candidate.ts": "008ec54c5f2844cdb6da510d0dd17725ff973302a4677b4139cccb459b0e1f23",
+    "artifacts/peru-cerrar-caja.dto.candidate.ts": "f22525d945253114faa15f81f73464a2c9cdbc872dc142426b314c2db85b5447",
+    "artifacts/peru-cash-api-overlay.cjs": "560eb57b3672740bf13310f5993343109aa829d12a3839cf3411f7a02a8100fc",
+    "artifacts/peru-cash-movements.service.candidate.ts": "6e7911bbe63f863c754453bbfa24f69aa6bf22d6df3df78ac3b9d675da752154",
+    "artifacts/peru-cash-closing.service.candidate.ts": "4053569e278e2a710641420a74adc4812ca03c9b29c4f6351c7f500c2b943879",
+    "artifacts/peru-cash-reports.service.candidate.ts": "79e20d88006d684ced3309e3c07b47e50723e2134ed0562be25614ddd1a87d7d"
+  },
+  "complete_acceptance": false,
+  "remoteWrites": false
+}

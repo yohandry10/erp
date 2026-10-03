@@ -2,28 +2,30 @@
 
 Actualizado: 2026-10-03.
 
-Corte vigente POS/CPE: #134 se integró como `9e301e2a` después de 28 checks
-aprobados; ambos CI del SHA `c0f055eb` pasaron 316 escenarios API, 30 pruebas
-de navegador sin reintentos, SQL fresco, barridos y restore. La 564 se promovió
-una sola vez con preflight, respaldo 563 y preservación de las 38 tablas,
-funciones y seguridad existentes. El runtime observado responde con ese SHA
-y esquema 564. Main 37142023714 falló por OOM de Next dev en el barrido con
-registros; se relanzó el job y permanece pendiente su cierre. E2E y seguridad
-de main aprobaron. Evidencia: `artifacts/peru-main-134-heap-failure-20261003`
-y `artifacts/peru-production-pending-main-after-134-20261003.json`.
+Corte vigente POS/CPE: #135 se integró como `8d717bcf` (fuente `c7e28691`) tras
+28 checks; sus dos CI (37150593171/37150595858) pasaron 342 escenarios HTTP y
+31 pruebas UI sin reintentos, SQL fresco, barridos, restore y Storage local.
+La 565 se promovió una sola vez con preflight, respaldo 564 y preservación de
+42 tablas, funciones y seguridad (`artifacts/peru-565-promotion-20261003204614178.json`).
+Main 37152767852, E2E y seguridad aprobaron; el runtime exacto `8d717bcf`/565
+pasó preflight y lectura API/web/DB/Redis/CORS
+(`artifacts/peru-production-verification-after-135-20261003.json`). Se conserva
+el primer timeout de 20 segundos. #134 (`9e301e2a`, 564) no cerró main: sus dos
+intentos 37142023714 agotaron el heap de Next dev en el barrido con registros
+(`artifacts/peru-main-134-heap-failure-20261003`); #135 reinicia Next entre
+fases y su main sí aprobó. CPE corrigió 15 defectos; no acredita SUNAT.
+PROD actual: 565; NO reaplicar 565.
 
-CPE directo PE corrigió 15 defectos de intención/replay, crédito, precio neto,
-lecturas, permisos, filtros, CSV y formulario. Las fuentes canónicas pasaron
-26 escenarios API, siete comprobaciones UI y restore sobre un snapshot local
-con DDL 559–565; no equivale a reconstrucción fresca ni aceptación SUNAT.
-Regresión CPE/configuración: 37 suites/492 pruebas; tipos API/web aprobados.
-La 565 ata contenido y actor a la intención de factura/boleta directa, conserva
-los writers de pedido/POS y permite sólo ejecución service_role. El ensayo
-del respaldo privado 564 pasó rollback y preservación de 42 tablas, funciones,
-RLS, triggers y ACL. **565 no está promovida**; falta CI exacto, promoción única,
-main y runtime. Evidencia: `artifacts/peru-cpe-canonical-acceptance-20261003`
-y `artifacts/erp-peru-565-rehearsal-20261003181225075-17072.json`.
-La matriz conserva 717 contratos, 97 casos y 64 defectos con sus pendientes;
+Caja PE (rama `codex/peru-cash-first-client-20261003`): 19 defectos confirmados,
+17 de API/SQL y dos de UI (Sesiones y Cortes conservaban el error tras un
+reintento con HTTP 200). Las correcciones son canónicas en la rama: 23 escenarios
+API, 10 comprobaciones UI y restore pasaron sobre snapshot local con 566
+(`artifacts/peru-cash-canonical-local-20261003`). La reconstrucción fresca
+PostgreSQL 16 aprobó 562 migraciones hasta 566 y 75 verificadores tras ajustar
+dos fixtures (492/449) que insertaban una segunda `10111`
+(`artifacts/peru-566-fresh-contracts-local-20261003.json`). **566 no está
+promovida**; faltan CI exacto, respaldo/ensayo 565→566, promoción, main y runtime.
+La matriz conserva 717 contratos, 118 casos y 83 defectos con sus pendientes;
 no hay aceptación integral del lanzamiento ni confirmación del plan de Render.
 
 Corte técnico 131/132: el cierre 131 promovió 562 una sola vez con preflight,
