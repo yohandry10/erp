@@ -1,0 +1,11 @@
+{
+  "completedAt": "2026-10-03T06:26:57.359Z",
+  "success": true,
+  "withBrowser": true,
+  "withSurvey": false,
+  "withRecords": false,
+  "scope": "plame_financial_canonical_subset",
+  "database": "PostgreSQL 16 efímero",
+  "output": "C:\\Users\\PC\\Desktop\\erp-peru-production\\artifacts\\peru-integrated-20261003062442888-21592",
+  "remoteWrites": false
+}

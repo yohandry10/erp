@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { createHash, randomUUID } from 'crypto';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 
@@ -444,12 +444,18 @@ export class PlanillaElectronicaPeruService {
     );
   }
 
-  async guardarPaquete(tenantId: string, userId: string, planillaId: string, notas?: string) {
+  async guardarPaquete(tenantId: string, userId: string, planillaId: string, notas?: string, idempotencyKey?: string) {
     const paquete = await this.previsualizar(tenantId, planillaId);
     const { data, error } = await this.supabase.getClient().rpc('guardar_rrhh_peru_presentacion_tx', {
-      p_tenant_id: tenantId, p_user_id: userId, p_payload: { ...paquete, notas: notas || null },
+      p_tenant_id: tenantId, p_user_id: userId, p_payload: {
+        ...paquete, notas: notas || null,
+        idempotency_key: idempotencyKey === undefined ? 'plame-' + randomUUID() : idempotencyKey.trim(),
+      },
     });
-    if (error) throw new BadRequestException(error.message);
+    if (error?.code === '23505') throw new ConflictException(error.message);
+    if (error?.code === '42501') throw new ForbiddenException(error.message);
+    if (error?.code === 'P0002') throw new NotFoundException('Planilla no encontrada');
+    if (error || !data) throw new BadRequestException(error?.message || 'No se pudo guardar el paquete PLAME');
     return data;
   }
 
