@@ -1,0 +1,170 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Diagnóstico API real de consignaciones y reportes/consolidación; no aceptación completa",
+  "scenarios": [
+    {
+      "scenario": "Consignaciones: alta persiste total calculado por servidor",
+      "passed": true
+    },
+    {
+      "scenario": "Consignaciones: replay conserva registro",
+      "passed": true
+    },
+    {
+      "scenario": "Consignaciones: consulta/filtro contiene registro propio",
+      "passed": true
+    },
+    {
+      "scenario": "Consignaciones: otra empresa no consulta el registro",
+      "passed": true
+    },
+    {
+      "scenario": "Consignaciones: transición vendida persistida",
+      "passed": true
+    },
+    {
+      "scenario": "Reporte configurable: alta de líneas y fórmula persiste",
+      "passed": true
+    },
+    {
+      "scenario": "Reporte configurable: fórmula usa asiento real confirmado",
+      "passed": true
+    },
+    {
+      "scenario": "Reporte configurable: edición reemplaza definición sin otro reporte",
+      "passed": true
+    },
+    {
+      "scenario": "Reporte configurable: otra empresa no genera definición ajena",
+      "passed": true
+    },
+    {
+      "scenario": "Consolidación: grupo y controladora creados por API real",
+      "passed": true
+    },
+    {
+      "scenario": "Consolidación: invita por RUC exacto de segunda empresa local",
+      "passed": true
+    },
+    {
+      "scenario": "Consolidación: empresa invitada consulta/acepta su membresía",
+      "passed": true
+    },
+    {
+      "scenario": "Reportes/consolidación: diagnóstico local",
+      "passed": false,
+      "message": "contabilidad/reportes-configurables/e2402ac6-d728-46b6-b1d5-b7e7a21723ac/generar?fecha_desde=2026-09-01&fecha_hasta=2026-09-30&grupo_id=03b55e26-1f7a-4b7c-aab6-713bb72bd48f: {\"statusCode\":500,\"message\":\"Error obteniendo mapeos de cuentas: permission denied for table mapeos_cuentas_consolidacion\",\"error\":\"Error\",\"timestamp\":\"2026-10-03T11:27:46.438Z\",\"path\":\"/api/contabilidad/reportes-configurables/e2402ac6-d728-46b6-b1d5-b7e7a21723ac/generar?fecha_desde=2026-09-01&fecha_hasta=2026-09-30&grupo_id=03b55e26-1f7a-4b7c-aab6-713bb72bd48f\"}\n\n500 !== 200\n"
+    }
+  ],
+  "defects": [
+    {
+      "operation": "contabilidad/reportes-configurables/e2402ac6-d728-46b6-b1d5-b7e7a21723ac/generar",
+      "status": 500,
+      "expected": 200,
+      "message": "Error obteniendo mapeos de cuentas: permission denied for table mapeos_cuentas_consolidacion"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/registro-consignaciones",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/registro-consignaciones",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/registro-consignaciones",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/registro-consignaciones",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/registro-consignaciones/:id/estado",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/plan-cuentas",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/periodos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/asiento-contable",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/reportes-configurables",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/reportes-configurables/:id/generar",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/reportes-configurables",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/reportes-configurables",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/reportes-configurables/:id/generar",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/invitaciones",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/consolidacion/grupos",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/respuesta",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/reportes-configurables/:id/generar",
+      "status": 500
+    }
+  ]
+}

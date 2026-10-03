@@ -1,0 +1,12 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Navegador/API/PostgreSQL reales locales de consignaciones",
+  "checks": [
+    {
+      "check": "Fallo tras commit conserva campos y retry recupera una sola entrega",
+      "passed": true
+    }
+  ],
+  "unexpected_errors": []
+}

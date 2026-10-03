@@ -1,0 +1,21 @@
+{
+  "local_source": "artifacts/peru-integrated-20261003120033436-15980",
+  "base_sha": "3088474df0f78e0bee026580c203a9f23243887b",
+  "candidate_uncommitted": true,
+  "remoteWrites": false,
+  "dumps_extracted": false,
+  "traces_extracted": false,
+  "candidate_sha256": {
+    "artifacts/563__consolidation_read_privileges.candidate.sql": "6b7f13d1c1a79773a4787173099e576916315b4f61298f14afc646f94c4e37c2",
+    "artifacts/peru-consolidation-service.candidate.ts": "55c9eb3f5c5c727c554afc2372d40e5e81c0d6a01dc945ad172098646f7b68ac",
+    "artifacts/peru-consolidation-page.candidate.tsx": "47ef28529996174e29868a9ee064bede91b9cf8c8668047ed9e9d9f8ad8f80be",
+    "artifacts/peru-consignations-page.candidate.tsx": "cafab079fe73fe09294a4e39082f834f86479c6897c2f4002367e57800cc5e23"
+  },
+  "scope": "reports_consignations_api_ui_subset",
+  "completed_at": "2026-10-03T12:02:15.796Z",
+  "limits": [
+    "27 casos API y dos recorridos UI; no acepta los módulos completos",
+    "SQL aplicado únicamente en infraestructura local efímera",
+    "Fuentes web restauradas después del ensayo; CI y despliegue pendientes"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "local_source": "artifacts/peru-integrated-20261003115616136-14888",
+  "base_sha": "3088474df0f78e0bee026580c203a9f23243887b",
+  "candidate_uncommitted": true,
+  "candidate": "Sólo GRANT SELECT local de fuentes de consolidación; API/web originales para los defectos HTTP/UI",
+  "scope": "reports_consignations_diagnostic_subset",
+  "remoteWrites": false,
+  "dumps_extracted": false,
+  "traces_extracted": false,
+  "limits": [
+    "19 casos API pasaron y 8 rechazaron con 500",
+    "Dos reproducciones UI; no acredita aceptación de módulos",
+    "Se conservan aparte dos fallos previos del ensayo: espera de login abortada y aserción SQL antes de respuesta"
+  ]
+}

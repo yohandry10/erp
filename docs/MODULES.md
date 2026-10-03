@@ -692,10 +692,17 @@ Código principal: `apps/erp-api/src/modules/finanzas`,
   analítica por línea. El registro de consignaciones calcula el total en el
   servidor, toma el tenant del contexto autenticado y limita sus cambios a
   estados válidos; el cliente no puede imponer tenant, total ni estado inicial.
+  La web conserva la intención durante un fallo y la libera tras confirmar el
+  alta, de modo que una nueva entrega idéntica obtiene su propio registro.
 - Consolidación agrupa empresas legalmente separadas solo después de que cada
   miembro acepta la invitación. Homologa códigos de cuenta, exige tasas de
   cierre/promedio/históricas cuando cambia la moneda y aplica eliminaciones o
   reclasificaciones en una capa de reporte que no toca los libros legales.
+  Las fuentes de consolidación tienen lectura de servicio y conservan la
+  escritura exclusivamente por RPC. El selector de tasas incluye a la
+  controladora cuando su moneda funcional difiere de la de presentación.
+  Las colisiones de intención, falta de pertenencia y estados inválidos se
+  distinguen de la indisponibilidad del servicio.
 - Los reportes configurables admiten líneas por prefijos de cuentas y fórmulas
   entre líneas, con alcance de período o acumulado. Las fórmulas son estructuras
   validadas con detección de ciclos; nunca SQL suministrado por el usuario.

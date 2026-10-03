@@ -1757,6 +1757,133 @@
         "JPEG/dimensiones/todas las concurrencias y fallas de limpieza, lector/navegador para todas las variantes",
         "Storage remoto del futuro cliente; CI/despliegue del gate nuevo"
       ]
+    },
+    {
+      "id": "monthly-tax-durable-intent",
+      "source": "scripts/ci/test-peru-tax-intents-local.mjs",
+      "required_scenario_prefixes": [
+        "Mensual: misma intención",
+        "Mensual: colisión 409",
+        "Mensual: dos solicitudes concurrentes",
+        "Mensual: replay histórico",
+        "Permiso retirado",
+        "Aislamiento: la misma clave",
+        "Rollback: fallo real tras reserva"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/impuestos/mensual"
+        }
+      ],
+      "verified_checks": [
+        "ID, versión y corte congelado",
+        "colisión sin escritura, concurrencia y rollback",
+        "permiso retirado con JWT previo y clave aislada por empresa",
+        "UI recupera respuesta perdida y recarga confirmada"
+      ],
+      "pending_checks": [
+        "fuentes mensuales no vacías y variantes normativas restantes",
+        "restauración de formulario antes de confirmación tras cerrar navegador",
+        "interoperabilidad externa SUNAT"
+      ]
+    },
+    {
+      "id": "annual-tax-durable-intent",
+      "source": "scripts/ci/test-peru-tax-intents-local.mjs",
+      "required_scenario_prefixes": [
+        "Anual: replay conserva",
+        "Anual: cambio de adición",
+        "Anual: concurrencia tras cierre",
+        "Anual: rectifica constancia"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/impuestos/anual"
+        }
+      ],
+      "verified_checks": [
+        "corte, UIT y versión congelados",
+        "conflicto de cuerpo, concurrencia tras cierre real",
+        "UI respuesta perdida, recuperación y recarga confirmada"
+      ],
+      "pending_checks": [
+        "otras fuentes fiscales, pérdidas, regímenes e ITAN",
+        "interoperabilidad externa SUNAT"
+      ]
+    },
+    {
+      "id": "monthly-tax-receipt-replay",
+      "source": "scripts/ci/test-peru-tax-intents-local.mjs",
+      "required_scenario_prefixes": [
+        "Mensual: constancia simulada y replay",
+        "Mensual: constancia distinta",
+        "Mensual: presentación corregida",
+        "Aislamiento: administrador"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/impuestos/declaraciones/:id/constancia"
+        }
+      ],
+      "verified_checks": [
+        "constancia/intención atómicas",
+        "replay histórico y rectificación de versión anterior",
+        "consulta/mutación ajena rechazada",
+        "UI conserva campos y recupera constancia tras respuesta perdida"
+      ],
+      "pending_checks": [
+        "acuse fiscal real y validación normativa de otras advertencias"
+      ]
+    },
+    {
+      "id": "annual-tax-receipt-replay",
+      "source": "scripts/ci/test-peru-tax-intents-local.mjs",
+      "required_scenario_prefixes": [
+        "Anual: ejercicio abierto",
+        "Anual: cierre contable real",
+        "Anual: constancia simulada y replay",
+        "Anual: rectifica constancia"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/impuestos/anuales/:id/constancia"
+        }
+      ],
+      "verified_checks": [
+        "cierre previo exigido",
+        "presentación local simulada y respuesta congelada",
+        "rectificación y UI de pérdida/retry/recarga"
+      ],
+      "pending_checks": [
+        "permisos/aislamiento específicos de constancia anual",
+        "acuse fiscal real y otras advertencias"
+      ]
+    },
+    {
+      "id": "auth-office-throttle-recovery",
+      "source": "scripts/ci/test-peru-login-office-local.mjs",
+      "required_scenario_prefixes": [
+        "Login oficina: rotación de cuentas",
+        "Login oficina: respetar Retry-After"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/auth/login"
+        }
+      ],
+      "verified_checks": [
+        "429 agregado publica Retry-After estándar/específico igual y acotado",
+        "login 201 después de espera efectiva sin desactivar limitador"
+      ],
+      "pending_checks": [
+        "otras políticas de sesión y recuperación",
+        "límite agregado desde UI"
+      ]
     }
   ]
 }

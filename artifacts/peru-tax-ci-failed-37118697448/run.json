@@ -1,0 +1,10 @@
+{
+  "completedAt": "2026-10-03T11:16:41.375Z",
+  "success": false,
+  "withBrowser": true,
+  "withSurvey": true,
+  "withRecords": true,
+  "scope": "full",
+  "database": "PostgreSQL 16 efímero",
+  "remoteWrites": false
+}

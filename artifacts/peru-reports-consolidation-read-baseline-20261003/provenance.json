@@ -1,0 +1,13 @@
+{
+  "local_source": "artifacts/peru-integrated-20261003112654773-5484",
+  "scope": "reports_consignations_api_subset",
+  "base_sha": "3088474df0f78e0bee026580c203a9f23243887b",
+  "candidate_uncommitted": false,
+  "candidate": null,
+  "remoteWrites": false,
+  "dumps_extracted": false,
+  "limits": [
+    "API real con PostgreSQL/PostgREST locales; no incluye navegador",
+    "No acredita todas las acciones de consignaciones y consolidación"
+  ]
+}

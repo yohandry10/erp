@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { createHash } from 'crypto';
 import {
@@ -45,10 +46,25 @@ export class ConsolidacionReportesService {
   }
 
   private dbError(contexto: string, error: any): never {
-    if (error?.code === '23505') {
-      throw new ConflictException(`${contexto}: ya existe un registro con ese código.`);
+    const message = String(error?.message || '');
+    if (error?.code === '23505' || message === 'CONSOLIDATION_IDEMPOTENCY_CONFLICT') {
+      throw new ConflictException('El código o la intención ya corresponde a otro registro.');
     }
-    throw new Error(`${contexto}: ${error?.message || 'error de base de datos'}`);
+    if (['CONSOLIDATION_CONTROLLER_REQUIRED', 'FINANCIAL_MASTER_ACTOR_INVALID'].includes(message)
+      || (error?.code === '42501' && ['Reporte no existe o no pertenece a la empresa',
+        'Grupo no existe o no pertenece a la empresa controladora'].includes(message))) {
+      throw new ForbiddenException('La empresa o el usuario no puede realizar esta operación.');
+    }
+    if (error?.code === 'P0002' || message === 'CONSOLIDATION_ACCOUNT_NOT_FOUND') {
+      throw new NotFoundException('No existe un registro disponible para esta operación.');
+    }
+    if (['CONSOLIDATION_REQUEST_INVALID', 'CONSOLIDATION_ACTIVE_MEMBER_REQUIRED',
+      'CONSOLIDATION_ACTIVE_EXTERNAL_MEMBER_REQUIRED', 'CONSOLIDATION_RATE_NOT_REQUIRED',
+      'CONSOLIDATION_ADJUSTMENT_INVALID'].includes(message)
+      || ['23514', '23502', '22007', '22008', '22P02'].includes(error?.code)) {
+      throw new BadRequestException('Los datos o el estado actual no permiten esta operación.');
+    }
+    throw new ServiceUnavailableException(contexto + ': servicio temporalmente no disponible.');
   }
 
   async listarGrupos(tenantId: string) {
