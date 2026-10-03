@@ -94,7 +94,6 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
       ...(isArgentina ? { cuil: formData.numero_documento.replace(/\D/g, '') } : {}),
       cantidad_hijos: formData.tiene_hijos ? Number(formData.cantidad_hijos) || 0 : 0
     })
-    setFormData(createEmptyForm(country.paisCodigo))
   }
 
   const handleChange = (field: string, value: string | boolean) => {

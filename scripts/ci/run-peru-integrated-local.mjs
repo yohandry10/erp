@@ -172,13 +172,13 @@ try {
   const api = launch('api', process.execPath, [apiRequire.resolve('ts-node/dist/bin.js'), '--transpile-only', 'tests/e2e/helpers/local-api-harness.ts'], apiDirectory);
   await waitReady('API', () => readFileSync(path.join(output, 'api.log'), 'utf8').includes('LOCAL_INTEGRATED_API_READY') && httpReady(`${apiUrl}/api/auth/profile`), api);
   await run('http', process.execPath, ['scripts/ci/test-peru-integrated-local.mjs']);
-  for (const kind of ['annual','finance']) {
+  for (const kind of ['annual','finance','hr']) {
     await run('prepare-' + kind, process.execPath, ['scripts/ci/prepare-peru-first-client-local.mjs',kind]);
-    await run(kind + '-lifecycle', process.execPath, [kind==='annual'?'scripts/ci/test-peru-year-close-local.mjs':'scripts/ci/test-peru-finance-lifecycle-local.mjs']);
+    await run(kind + '-lifecycle', process.execPath, [{annual:'scripts/ci/test-peru-year-close-local.mjs',finance:'scripts/ci/test-peru-finance-lifecycle-local.mjs',hr:'scripts/ci/test-peru-hr-lifecycle-local.mjs'}[kind]]);
   }
   if(withBrowser) await run('prepare-wizard',process.execPath,['scripts/ci/prepare-peru-first-client-local.mjs','wizard']);
   const httpEvidence=JSON.parse(readFileSync(path.join(output,'http.json'),'utf8'));
-  for(const file of ['annual-acceptance.json','finance-lifecycle.json']) {
+  for(const file of ['annual-acceptance.json','finance-lifecycle.json','hr-lifecycle.json']) {
     const phase=JSON.parse(readFileSync(path.join(output,file),'utf8'));
     if(phase.success!==true||phase.remoteWrites!==false) throw new Error('Fase funcional incompleta: '+file);
     const offset=httpEvidence.results.length;
@@ -186,7 +186,6 @@ try {
     httpEvidence.request_traces.push(...phase.requests.map(request=>({method:request.method,pathname:new URL('/api/'+request.endpoint,apiUrl).pathname,status:request.status,scenario_index_hint:offset,evidence_file:file})));
   }
   writeFileSync(path.join(output,'http.json'),JSON.stringify(httpEvidence,null,2));
-  await run('backup-restore', process.execPath, ['scripts/ci/test-peru-backup-restore-local.mjs', pg, path.join(output, 'backup')]);
   if (withBrowser) {
     const web = launch('web', process.execPath, [webRequire.resolve('next/dist/bin/next'), 'dev', '-p', webPort, '--hostname', '127.0.0.1'], webDirectory);
     await waitReady('Web', () => readFileSync(path.join(output, 'web.log'), 'utf8').includes('Ready in') && httpReady(`${webUrl}/login/`), web);
@@ -195,6 +194,7 @@ try {
     if (withSurvey) await run('module-survey', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-module-survey-local.spec.ts', '--reporter=list'], webDirectory);
     if (withRecords) await run('record-survey', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-record-survey-local.spec.ts', '--reporter=list'], webDirectory);
   }
+  await run('backup-restore', process.execPath, ['scripts/ci/test-peru-backup-restore-local.mjs', pg, path.join(output, 'backup')]);
   success = true;
   console.log('[peru-integrated] PASS: contratos SQL, HTTP y contabilidad; alcance ' + (focusOnboarding ? 'onboarding/inventario/contabilidad' : recordsOnly ? 'pantallas con registros' : 'completo') + (withBrowser ? ', con recorridos de navegador' : ''));
 } catch (error) {

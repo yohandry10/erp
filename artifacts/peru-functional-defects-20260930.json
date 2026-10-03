@@ -3,7 +3,7 @@
   "defects": [
     {
       "id": "manual-accounting-retry-duplicates",
-      "status": "corrected_locally_deployment_pending",
+      "status": "corrected_ci_main_deployment_verified_read_only",
       "operations": [
         {
           "method": "POST",
@@ -16,15 +16,18 @@
         "local_only": true
       },
       "correction": "557 y escritor manual guardan asiento e intención en una transacción; UI conserva clave tras respuesta perdida",
-      "pending": [
-        "CI del cambio",
-        "promoción 557",
-        "main y despliegue"
-      ]
+      "pending": [],
+      "release_verification": {
+        "merge_sha": "f53d84dc6cc87e2b2fbe146a286cc9bac276d3de",
+        "schema": 557,
+        "main_evidence": "artifacts/peru-integrated-main-37096505168",
+        "production_read_only": "artifacts/peru-production-verification-after-124-20261002.json",
+        "scope": "CI funcional local y despliegue exacto en sólo lectura; sin escrituras sintéticas PROD ni aceptación de cada operación"
+      }
     },
     {
       "id": "depreciation-accrual-final-cent",
-      "status": "corrected_locally_deployment_pending",
+      "status": "corrected_ci_main_deployment_verified_read_only",
       "operations": [
         {
           "method": "POST",
@@ -41,14 +44,18 @@
         "local_only": true
       },
       "correction": "La cuota ejecutada del último período absorbe el saldo pendiente y respeta el residual",
-      "pending": [
-        "CI del cambio",
-        "main y despliegue"
-      ]
+      "pending": [],
+      "release_verification": {
+        "merge_sha": "f53d84dc6cc87e2b2fbe146a286cc9bac276d3de",
+        "schema": 557,
+        "main_evidence": "artifacts/peru-integrated-main-37096505168",
+        "production_read_only": "artifacts/peru-production-verification-after-124-20261002.json",
+        "scope": "CI funcional local y despliegue exacto en sólo lectura; sin escrituras sintéticas PROD ni aceptación de cada operación"
+      }
     },
     {
       "id": "foreign-accounting-period-http-errors",
-      "status": "corrected_locally_deployment_pending",
+      "status": "corrected_ci_main_deployment_verified_read_only",
       "operations": [
         {
           "method": "GET",
@@ -76,18 +83,22 @@
         "observed": "Detalle ajeno 200; validar/cerrar/bloquear 500; cuatro operaciones reproducidas localmente"
       },
       "correction": "404 para registro inexistente o ajeno; se conservan errores operativos de DB",
-      "pending": [
-        "CI del cambio",
-        "main y despliegue"
-      ],
+      "pending": [],
       "local_followup": {
         "source": "artifacts/peru-period-reopen-isolation-20261002.json",
         "result": "Superadministrador con contexto cambiado recibe 404 para período ajeno; todas sus columnas permanecen iguales"
+      },
+      "release_verification": {
+        "merge_sha": "f53d84dc6cc87e2b2fbe146a286cc9bac276d3de",
+        "schema": 557,
+        "main_evidence": "artifacts/peru-integrated-main-37096505168",
+        "production_read_only": "artifacts/peru-production-verification-after-124-20261002.json",
+        "scope": "CI funcional local y despliegue exacto en sólo lectura; sin escrituras sintéticas PROD ni aceptación de cada operación"
       }
     },
     {
       "id": "manual-accounting-lima-boundary",
-      "status": "corrected_locally_deployment_pending",
+      "status": "corrected_ci_main_deployment_verified_read_only",
       "operations": [
         {
           "method": "POST",
@@ -99,15 +110,18 @@
         "observed_error": "VERIFY_557_CALENDAR_SHIFTED"
       },
       "correction": "La propuesta 557 usa zona coherente con fecha/instante durante la escritura y restaura la zona SQL previa",
-      "pending": [
-        "CI del cambio",
-        "promoción 557",
-        "fronteras de otros escritores contables"
-      ]
+      "pending": [],
+      "release_verification": {
+        "merge_sha": "f53d84dc6cc87e2b2fbe146a286cc9bac276d3de",
+        "schema": 557,
+        "main_evidence": "artifacts/peru-integrated-main-37096505168",
+        "production_read_only": "artifacts/peru-production-verification-after-124-20261002.json",
+        "scope": "CI funcional local y despliegue exacto en sólo lectura; sin escrituras sintéticas PROD ni aceptación de cada operación"
+      }
     },
     {
       "id": "platform-accounting-period-reopen",
-      "status": "corrected_locally_deployment_pending",
+      "status": "corrected_ci_main_deployment_verified_read_only",
       "operations": [
         {
           "method": "POST",
@@ -120,14 +134,18 @@
         "local_only": true
       },
       "correction": "557 añade una RPC de reapertura con validación explícita de superadministrador activo, identidad conservada y locks/reglas originales",
-      "pending": [
-        "CI y promoción 557",
-        "main y despliegue"
-      ]
+      "pending": [],
+      "release_verification": {
+        "merge_sha": "f53d84dc6cc87e2b2fbe146a286cc9bac276d3de",
+        "schema": 557,
+        "main_evidence": "artifacts/peru-integrated-main-37096505168",
+        "production_read_only": "artifacts/peru-production-verification-after-124-20261002.json",
+        "scope": "CI funcional local y despliegue exacto en sólo lectura; sin escrituras sintéticas PROD ni aceptación de cada operación"
+      }
     },
     {
       "id": "manual-accounting-default-date-utc",
-      "status": "corrected_locally_final_browser_pending",
+      "status": "corrected_ci_main_deployment_verified_read_only",
       "operations": [
         {
           "method": "POST",
@@ -140,15 +158,18 @@
         "local_only": true
       },
       "correction": "AsientoForm reutiliza fiscalDateForCountry con país del tenant; navegador contrasta fecha inicial con app.hoy_tenant",
-      "pending": [
-        "ensayo integrado completo",
-        "CI y despliegue",
-        "otras fechas por defecto fuera del formulario de asientos"
-      ]
+      "pending": [],
+      "release_verification": {
+        "merge_sha": "f53d84dc6cc87e2b2fbe146a286cc9bac276d3de",
+        "schema": 557,
+        "main_evidence": "artifacts/peru-integrated-main-37096505168",
+        "production_read_only": "artifacts/peru-production-verification-after-124-20261002.json",
+        "scope": "CI funcional local y despliegue exacto en sólo lectura; sin escrituras sintéticas PROD ni aceptación de cada operación"
+      }
     },
     {
       "id": "first-customer-annual-close-accounts",
-      "status": "local_candidate_corrected_pending_integration",
+      "status": "corrected_ci_merged_deployment_pending",
       "operations": [
         {
           "method": "POST",
@@ -162,18 +183,22 @@
       },
       "correction": "Candidato 558 inserta sólo 59/89 ausentes en empresas PE; conserva cuentas personalizadas/inactivas y permisos",
       "pending": [
-        "integración canónica",
-        "CI y promoción/despliegue",
-        "recorrido anual por navegador"
+        "CI main y despliegue exacto"
       ],
       "local_followup": {
-        "source": "artifacts/peru-year-close-acceptance-20261002.json",
-        "result": "Cierre con utilidad/pérdida, replay, reapertura/recierre, año siguiente y restricción cronológica; SQL y restauración local aprobados"
+        "source": "artifacts/peru-integrated-local-year-wizard-finance-20261003",
+        "result": "Runner canónico completo: 138 HTTP, 17 UI, 99 pantallas, 22 con registros, SQL y restauración"
+      },
+      "release_verification": {
+        "merge_sha": "b359c31177d884d65332fbc8a0d9dc7c9ce0c883",
+        "schema": 558,
+        "ci_evidence": "artifacts/peru-integrated-ci-37097869477",
+        "promotion": "artifacts/peru-558-promotion-20261003052409868.json"
       }
     },
     {
       "id": "annual-loss-balance-sign",
-      "status": "local_candidate_corrected_pending_integration",
+      "status": "corrected_ci_merged_deployment_pending",
       "operations": [
         {
           "method": "GET",
@@ -191,13 +216,17 @@
       },
       "correction": "Candidato 558 conserva el signo acreedor/deudor de resultados acumulados en balance_general_live",
       "pending": [
-        "integración canónica",
-        "CI y promoción/despliegue",
-        "variantes de patrimonio fuera del resultado acumulado"
+        "CI main y despliegue exacto"
       ],
       "local_followup": {
-        "source": "artifacts/peru-year-close-acceptance-20261002.json",
-        "result": "Cierre con utilidad/pérdida, replay, reapertura/recierre, año siguiente y restricción cronológica; SQL y restauración local aprobados"
+        "source": "artifacts/peru-integrated-local-year-wizard-finance-20261003",
+        "result": "Runner canónico completo: 138 HTTP, 17 UI, 99 pantallas, 22 con registros, SQL y restauración"
+      },
+      "release_verification": {
+        "merge_sha": "b359c31177d884d65332fbc8a0d9dc7c9ce0c883",
+        "schema": 558,
+        "ci_evidence": "artifacts/peru-integrated-ci-37097869477",
+        "promotion": "artifacts/peru-558-promotion-20261003052409868.json"
       }
     },
     {
@@ -215,15 +244,20 @@
         "scope": "Configuración con demo API deshabilitada; la bandera efectiva de PROD no se afirma"
       },
       "correction": "Candidato permite estado autenticado de sólo lectura sin habilitar mutaciones demo; la UI espera el estado confirmado y permite reintentar errores",
-      "status": "local_candidate_corrected_pending_integration",
+      "status": "corrected_ci_merged_deployment_pending",
       "local_followup": {
-        "source": "artifacts/peru-first-client-wizard-acceptance-20261002.json",
-        "result": "Primer ADMIN completa parámetros y certificado local, reanuda progreso, recupera respuestas perdidas y recarga resumen sin divulgar secretos"
+        "source": "artifacts/peru-integrated-local-year-wizard-finance-20261003",
+        "result": "Runner canónico completo: 138 HTTP, 17 UI, 99 pantallas, 22 con registros, SQL y restauración"
       },
       "pending": [
-        "integración canónica",
-        "CI y despliegue"
-      ]
+        "CI main y despliegue exacto"
+      ],
+      "release_verification": {
+        "merge_sha": "b359c31177d884d65332fbc8a0d9dc7c9ce0c883",
+        "schema": 558,
+        "ci_evidence": "artifacts/peru-integrated-ci-37097869477",
+        "promotion": "artifacts/peru-558-promotion-20261003052409868.json"
+      }
     },
     {
       "id": "wizard-summary-without-completed-progress",
@@ -244,19 +278,24 @@
         "observed": "La condición inicial de resumen sólo requiere identidad preparada del ERP y no comprueba completado del asistente; el alta ya proporciona RUC, razón social y dirección"
       },
       "correction": "Candidato exige cierre persistido del asistente para mostrar resumen; preparación del ERP y habilitación fiscal permanecen separadas",
-      "status": "local_candidate_corrected_pending_integration",
+      "status": "corrected_ci_merged_deployment_pending",
       "local_followup": {
-        "source": "artifacts/peru-first-client-wizard-acceptance-20261002.json",
-        "result": "Primer ADMIN completa parámetros y certificado local, reanuda progreso, recupera respuestas perdidas y recarga resumen sin divulgar secretos"
+        "source": "artifacts/peru-integrated-local-year-wizard-finance-20261003",
+        "result": "Runner canónico completo: 138 HTTP, 17 UI, 99 pantallas, 22 con registros, SQL y restauración"
       },
       "pending": [
-        "integración canónica",
-        "CI y despliegue"
-      ]
+        "CI main y despliegue exacto"
+      ],
+      "release_verification": {
+        "merge_sha": "b359c31177d884d65332fbc8a0d9dc7c9ce0c883",
+        "schema": 558,
+        "ci_evidence": "artifacts/peru-integrated-ci-37097869477",
+        "promotion": "artifacts/peru-558-promotion-20261003052409868.json"
+      }
     },
     {
       "id": "bank-csv-date-columns-formulas",
-      "status": "local_candidate_corrected_pending_integration",
+      "status": "corrected_ci_merged_deployment_pending",
       "operations": [
         {
           "method": "GET",
@@ -270,14 +309,105 @@
       },
       "correction": "Candidato conserva calendario fiscal, presenta instantes en zona del tenant, escapa todas las columnas y neutraliza fórmulas",
       "local_followup": {
-        "source": "artifacts/peru-finance-lifecycle-20261002.json",
-        "result": "Ciclo real bancos/CxP/pagos/conciliación, CSV contrastado con parser independiente, lector, aislamiento, siete asientos únicos/cuadrados y restauración"
+        "source": "artifacts/peru-integrated-local-year-wizard-finance-20261003",
+        "result": "Runner canónico completo: 138 HTTP, 17 UI, 99 pantallas, 22 con registros, SQL y restauración"
       },
       "pending": [
-        "integración canónica",
-        "CI y despliegue",
-        "recorrido financiero por navegador"
+        "CI main y despliegue exacto"
+      ],
+      "release_verification": {
+        "merge_sha": "b359c31177d884d65332fbc8a0d9dc7c9ce0c883",
+        "schema": 558,
+        "ci_evidence": "artifacts/peru-integrated-ci-37097869477",
+        "promotion": "artifacts/peru-558-promotion-20261003052409868.json"
+      }
+    },
+    {
+      "id": "employee-create-replay-prevalidation",
+      "status": "canonical_local_api_ui_passed_ci_deployment_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/rrhh/empleados"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-hr-lifecycle-defects-20261003.json",
+        "local_only": true,
+        "observed": {
+          "id": "employee-create-replay-prevalidation",
+          "endpoint": "/api/rrhh/empleados",
+          "observed_status": 409,
+          "message": "Ya existe un empleado con el mismo documento de identidad",
+          "cause": "Validación de documento único precede al recibo transaccional de idempotencia",
+          "employee_count": 1,
+          "recovery_blocked": true
+        }
+      },
+      "local_followup": {
+        "source": "artifacts/peru-hr-canonical-subset-20261003",
+        "scope": "Diez casos API y un recorrido UI RRHH; no acepta planilla completa"
+      },
+      "pending": [
+        "suite completa",
+        "CI y despliegue"
       ]
+    },
+    {
+      "id": "employee-family-allowance-not-cleared",
+      "status": "canonical_local_api_ui_passed_ci_deployment_pending",
+      "operations": [
+        {
+          "method": "PUT",
+          "endpoint": "/api/rrhh/empleados/:id"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-hr-lifecycle-defects-20261003.json",
+        "local_only": true,
+        "observed": {
+          "id": "employee-family-allowance-not-cleared",
+          "endpoint": "/api/rrhh/empleados/:id",
+          "observed_status": 200,
+          "persisted": {
+            "tiene_hijos": false,
+            "cantidad_hijos": 0,
+            "asignacion_familiar": true
+          },
+          "cause": "La derivación sólo activa asignacion_familiar; no la desactiva al guardar tiene_hijos=false/cantidad_hijos=0"
+        }
+      },
+      "local_followup": {
+        "source": "artifacts/peru-hr-canonical-subset-20261003",
+        "scope": "Diez casos API y un recorrido UI RRHH; no acepta planilla completa"
+      },
+      "pending": [
+        "suite completa",
+        "CI y despliegue"
+      ]
+    },
+    {
+      "id": "employee-modal-clears-before-response",
+      "status": "canonical_local_api_ui_passed_ci_deployment_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/rrhh/empleados"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-hr-ui-defect-20261003.json",
+        "local_only": true,
+        "observed": "Alta confirma en DB, respuesta perdida 503, formulario vacía campos antes de confirmar y bloquea reintento"
+      },
+      "pending": [
+        "suite completa",
+        "CI y despliegue"
+      ],
+      "local_followup": {
+        "source": "artifacts/peru-hr-canonical-subset-20261003",
+        "scope": "Diez casos API y un recorrido UI RRHH; no acepta planilla completa"
+      }
     }
   ]
 }

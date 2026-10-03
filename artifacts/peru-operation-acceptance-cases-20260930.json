@@ -1126,12 +1126,126 @@
         "fecha documental preservada",
         "9 campos por fila con comas escapadas",
         "fórmulas neutralizadas",
-        "filtros y exportación ajena 404"
+        "filtros y exportación ajena 404",
+        "Descarga CSV filtrada desde UI real"
       ],
       "pending_checks": [
-        "descarga/lectura por UI",
         "escala/múltiples páginas",
         "variantes de otras monedas y países"
+      ]
+    },
+    {
+      "id": "hr-first-admin-employees-recovery",
+      "source": "scripts/ci/test-peru-hr-lifecycle-local.mjs",
+      "required_scenario_prefixes": [
+        "Empleado: replay retorna",
+        "Empleado: edición explícita",
+        "Empleado: documento duplicado",
+        "RRHH: rol sin acceso",
+        "RRHH: edición de empleado"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/rrhh/empleados"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/rrhh/empleados/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/empleados"
+        },
+        {
+          "method": "DELETE",
+          "endpoint": "/api/rrhh/empleados/:id"
+        }
+      ],
+      "verified_checks": [
+        "Alta, edición, consulta y baja lógica persistidas",
+        "Replay y huella incompatible sin duplicar",
+        "Documento duplicado rechazado por writer/índice",
+        "Sin hijos retira asignación; edición parcial conserva",
+        "Rol sin acceso no consulta ni muta",
+        "Edición ajena 404 sin mutar"
+      ],
+      "pending_checks": [
+        "Permisos/aislamiento de alta, baja y consulta por cada variante",
+        "Foto, expediente y ficha SUNAT",
+        "Validaciones de todas las identidades",
+        "UI de baja"
+      ]
+    },
+    {
+      "id": "hr-first-admin-contracts",
+      "source": "scripts/ci/test-peru-hr-lifecycle-local.mjs",
+      "required_scenario_prefixes": [
+        "Contrato: remuneración",
+        "Contrato: renovación",
+        "RRHH: edición de empleado"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/rrhh/contratos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/contratos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/contratos/:id/generar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/rrhh/contratos/:id/renovar"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/rrhh/contratos/:id/finalizar"
+        }
+      ],
+      "verified_checks": [
+        "Alta temporal ONP, replay y consulta",
+        "Régimen ausente y remuneración inválida rechazados",
+        "PDF real del registro, visual independiente",
+        "PDF ajeno oculto",
+        "Renovación/finalización con replay conservan registro"
+      ],
+      "pending_checks": [
+        "UI",
+        "Permisos/aislamiento de cada escritura",
+        "AFP, adendas, períodos superpuestos y otras modalidades"
+      ]
+    },
+    {
+      "id": "hr-first-admin-attendance",
+      "source": "scripts/ci/test-peru-hr-lifecycle-local.mjs",
+      "required_scenario_prefixes": [
+        "Asistencia: entrada/salida"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/rrhh/asistencias/marcar"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/asistencias"
+        }
+      ],
+      "verified_checks": [
+        "Entrada 08:00 y salida 17:00 persistidas",
+        "Replay conserva una fila",
+        "Salida anterior a entrada rechazada",
+        "Consulta en fecha fiscal del tenant"
+      ],
+      "pending_checks": [
+        "UI",
+        "Permisos/aislamiento",
+        "Importación, ausencias, turnos nocturnos y horas extra"
       ]
     }
   ]
