@@ -800,7 +800,7 @@
     {
       "id": "monthly-tax-uses-2026-uit-for-other-exercises",
       "module": "contabilidad/impuestos",
-      "status": "canonical_subset_passed_full_ci_deployment_pending",
+      "status": "corrected_merged_main_deployment_verified",
       "proof": "artifacts/peru-monthly-period-baseline-20261003/monthly-period.json",
       "operations": [
         {
@@ -818,15 +818,21 @@
       ],
       "correction": "UIT compartida mensual/anual por ejercicio verificado: 2024 5150, 2025 5350, 2026 5500; límite RMT depende del período, ejercicio no verificado rechazado. Regresión con acumulado 1620000 calcula pago 150 en 2025 y 100 en 2026.",
       "canonical_proof": "artifacts/peru-monthly-period-canonical-subset-20261003",
-      "pending": [
-        "Flujo mensual completo API/UI, fuentes no vacías, versiones/constancias/permisos/aislamiento/recuperación",
-        "Reconstrucción global, CI y despliegue exacto"
-      ]
+      "pending": [],
+      "ci": {
+        "sha": "0b7d8f432d3850215dc63906bda834711e259cef",
+        "pr": 37115734724,
+        "branch": 37115729735,
+        "checks_success": 28,
+        "merge": "c96293740d910e7ee09c7067a4cebbc4c30df871"
+      },
+      "main_ci": 37118191630,
+      "deployment_proof": "artifacts/peru-production-verification-after-130-20261003.json"
     },
     {
       "id": "monthly-tax-read-error-becomes-zero-credit",
       "module": "contabilidad/impuestos",
-      "status": "canonical_subset_passed_full_ci_deployment_pending",
+      "status": "corrected_merged_main_deployment_verified",
       "proof": "artifacts/peru-monthly-recovery-baseline-20261003/monthly-period.json",
       "operations": [
         {
@@ -844,9 +850,16 @@
       ],
       "correction": "Lecturas fallidas de saldo previo y declaración vigente devuelven 503; no producen cálculo exitoso con crédito cero ni un borrador basado en lectura incompleta. Recuperación conserva saldo persistido 125.50.",
       "canonical_proof": "artifacts/peru-monthly-recovery-canonical-subset-20261003",
-      "pending": [
-        "CI/global y despliegue exacto; variantes de error de declaración vigente, fuentes y UI"
-      ]
+      "pending": [],
+      "ci": {
+        "sha": "0b7d8f432d3850215dc63906bda834711e259cef",
+        "pr": 37115734724,
+        "branch": 37115729735,
+        "checks_success": 28,
+        "merge": "c96293740d910e7ee09c7067a4cebbc4c30df871"
+      },
+      "main_ci": 37118191630,
+      "deployment_proof": "artifacts/peru-production-verification-after-130-20261003.json"
     },
     {
       "id": "monthly-tax-save-retry-duplicates-version",
@@ -857,14 +870,15 @@
           "endpoint": "/api/contabilidad/impuestos/mensual"
         }
       ],
-      "status": "candidate_subset_passed_canonical_full_ci_deployment_pending",
+      "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
       "proof": "artifacts/peru-tax-version-retry-baseline-20261003/tax-version-retry.json",
       "correction": "Intención durable, conflicto de cuerpo y respuesta congelada; transacción única y web retiene clave durante fallo",
       "candidate_proof": "artifacts/peru-tax-intents-candidate-subset-20261003",
       "pending": [
-        "Reconstrucción canónica 562, CI exacto, ensayo/preservación y promoción DB-first, main/despliegue",
-        "Variantes normativas, fuentes no vacías e interoperabilidad SUNAT siguen separadas"
-      ]
+        "CI exacto, promoción DB-first 562, main y despliegue"
+      ],
+      "canonical_proof": "artifacts/peru-integrated-local-tax-intents-20261003",
+      "local_sha": "3088474df0f78e0bee026580c203a9f23243887b"
     },
     {
       "id": "annual-tax-save-retry-duplicates-version",
@@ -875,14 +889,15 @@
           "endpoint": "/api/contabilidad/impuestos/anual"
         }
       ],
-      "status": "candidate_subset_passed_canonical_full_ci_deployment_pending",
+      "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
       "proof": "artifacts/peru-tax-version-retry-baseline-20261003/tax-version-retry.json",
       "correction": "Intención anual durable y replay del corte congelado antes de recalcular fuentes",
       "candidate_proof": "artifacts/peru-tax-intents-candidate-subset-20261003",
       "pending": [
-        "Reconstrucción canónica 562, CI exacto, ensayo/preservación y promoción DB-first, main/despliegue",
-        "Variantes normativas, fuentes no vacías e interoperabilidad SUNAT siguen separadas"
-      ]
+        "CI exacto, promoción DB-first 562, main y despliegue"
+      ],
+      "canonical_proof": "artifacts/peru-integrated-local-tax-intents-20261003",
+      "local_sha": "3088474df0f78e0bee026580c203a9f23243887b"
     },
     {
       "id": "monthly-tax-receipt-retry-500",
@@ -893,14 +908,15 @@
           "endpoint": "/api/contabilidad/impuestos/declaraciones/:id/constancia"
         }
       ],
-      "status": "candidate_subset_passed_canonical_full_ci_deployment_pending",
+      "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
       "proof": "artifacts/peru-tax-version-retry-baseline-20261003/tax-version-retry.json",
       "correction": "Constancia e intención atómicas; replay confirmado se recupera antes de exigir estado BORRADOR",
       "candidate_proof": "artifacts/peru-tax-intents-candidate-subset-20261003",
       "pending": [
-        "Reconstrucción canónica 562, CI exacto, ensayo/preservación y promoción DB-first, main/despliegue",
-        "Variantes normativas, fuentes no vacías e interoperabilidad SUNAT siguen separadas"
-      ]
+        "CI exacto, promoción DB-first 562, main y despliegue"
+      ],
+      "canonical_proof": "artifacts/peru-integrated-local-tax-intents-20261003",
+      "local_sha": "3088474df0f78e0bee026580c203a9f23243887b"
     },
     {
       "id": "auth-office-throttle-missing-standard-retry-after",
@@ -911,13 +927,94 @@
           "endpoint": "/api/auth/login"
         }
       ],
-      "status": "canonical_http_restore_passed_full_ci_deployment_pending",
+      "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
       "proof": "artifacts/peru-tax-full-local-failed-login-office-20261003/failure.json",
       "correction": "Límite agregado publica Retry-After estándar además de Retry-After-Office; conserva 5/cuenta-IP y 20/IP por minuto. API real verifica 429/60s y recuperación 201 sin modificar limitador.",
-      "canonical_proof": "artifacts/peru-login-office-canonical-subset-20261003",
+      "canonical_proof": "artifacts/peru-integrated-local-tax-intents-20261003",
       "pending": [
-        "CI y repetición global con cabecera corregida, main y despliegue exacto"
+        "CI exacto, promoción DB-first 562, main y despliegue"
+      ],
+      "local_sha": "3088474df0f78e0bee026580c203a9f23243887b"
+    },
+    {
+      "id": "consolidation-report-missing-service-select",
+      "module": "contabilidad/consolidacion",
+      "status": "candidate_api_ui_restore_passed_canonical_ci_deployment_pending",
+      "proof": "artifacts/peru-reports-consolidation-read-baseline-20261003/reports-consignations.json",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/reportes-configurables/:reporteId/generar"
+        }
+      ],
+      "correction": "Candidato local concede únicamente SELECT de los tres orígenes de consolidación a service_role; preserva escrituras RPC y no concede lectura a anon/authenticated.",
+      "candidate_proof": "artifacts/peru-reports-consignations-candidate-20261003",
+      "pending": [
+        "Fuentes/migración/verificador canónicos, CI, ensayo de preservación y despliegue"
       ]
+    },
+    {
+      "id": "consolidation-domain-rejections-return-500",
+      "module": "contabilidad/consolidacion",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/reportes-configurables"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/invitaciones"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/tasas"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/ajustes"
+        }
+      ],
+      "correction": "Candidato distingue colisión 409, pertenencia 403, estado/datos 400 y fallo de infraestructura 503; no cambia escrituras ni límites.",
+      "status": "candidate_api_ui_restore_passed_canonical_ci_deployment_pending",
+      "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
+      "pending": [
+        "Fuentes/migración/verificador canónicos, CI, ensayo de preservación y despliegue"
+      ],
+      "candidate_proof": "artifacts/peru-reports-consignations-candidate-20261003"
+    },
+    {
+      "id": "consolidation-controller-rate-unavailable-in-ui",
+      "module": "contabilidad/consolidacion",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/consolidacion/grupos/:grupoId/tasas"
+        }
+      ],
+      "correction": "Candidato selecciona miembros activos cuya moneda necesita conversión, incluida la controladora.",
+      "status": "candidate_api_ui_restore_passed_canonical_ci_deployment_pending",
+      "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
+      "pending": [
+        "Fuentes/migración/verificador canónicos, CI, ensayo de preservación y despliegue"
+      ],
+      "candidate_proof": "artifacts/peru-reports-consignations-candidate-20261003"
+    },
+    {
+      "id": "consignment-ui-new-identical-delivery-replays-old-record",
+      "module": "contabilidad/consignaciones",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/registro-consignaciones"
+        }
+      ],
+      "correction": "Candidato web conserva intención durante fallo y la libera después de éxito para permitir otra entrega idéntica.",
+      "status": "candidate_api_ui_restore_passed_canonical_ci_deployment_pending",
+      "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
+      "pending": [
+        "Fuentes/migración/verificador canónicos, CI, ensayo de preservación y despliegue"
+      ],
+      "candidate_proof": "artifacts/peru-reports-consignations-candidate-20261003"
     }
   ]
 }

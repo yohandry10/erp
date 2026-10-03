@@ -1,0 +1,301 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "local_only": true,
+  "scope": "Versionado y constancias simuladas exclusivamente locales; no envío ni aceptación SUNAT",
+  "scenarios": [
+    {
+      "scenario": "Mensual: misma intención conserva ID, versión y corte congelado",
+      "passed": true
+    },
+    {
+      "scenario": "Mensual: colisión 409 no altera borradores ni intenciones",
+      "passed": true
+    },
+    {
+      "scenario": "Mensual: dos solicitudes concurrentes producen una sola versión",
+      "passed": true
+    },
+    {
+      "scenario": "Mensual: constancia simulada y replay devuelven una misma presentación local",
+      "passed": true
+    },
+    {
+      "scenario": "Mensual: constancia distinta con misma intención rechazada",
+      "passed": true
+    },
+    {
+      "scenario": "Mensual: nueva versión conserva constancia previa hasta presentar corrección",
+      "passed": true
+    },
+    {
+      "scenario": "Mensual: presentación corregida rectifica únicamente la versión anterior",
+      "passed": true
+    },
+    {
+      "scenario": "Mensual: replay histórico recupera respuesta congelada sin reactivar versión anterior",
+      "passed": true
+    },
+    {
+      "scenario": "Anual: replay conserva ID, versión, UIT y corte",
+      "passed": true
+    },
+    {
+      "scenario": "Anual: cambio de adición con misma clave rechaza sin escritura",
+      "passed": true
+    },
+    {
+      "scenario": "Anual: ejercicio abierto bloquea constancia sin presentarla",
+      "passed": true
+    },
+    {
+      "scenario": "Anual: cierre contable real habilita un nuevo papel de trabajo revisable",
+      "passed": true
+    },
+    {
+      "scenario": "Anual: concurrencia tras cierre produce una sola nueva versión",
+      "passed": true
+    },
+    {
+      "scenario": "Anual: constancia simulada y replay recuperan el resultado local",
+      "passed": true
+    },
+    {
+      "scenario": "Anual: rectifica constancia previa y conserva replay histórico congelado",
+      "passed": true
+    },
+    {
+      "scenario": "Validaciones: clave ausente, crédito negativo y año sin UIT no escriben",
+      "passed": true
+    },
+    {
+      "scenario": "Permiso retirado: JWT previo no recupera ni muta intención",
+      "passed": true
+    },
+    {
+      "scenario": "Aislamiento: administrador de otra empresa no registra constancia ajena",
+      "passed": true
+    },
+    {
+      "scenario": "Aislamiento: la misma clave en otra empresa genera sólo su propio borrador",
+      "passed": true
+    },
+    {
+      "scenario": "Rollback: fallo real tras reserva no deja intención ni nueva versión",
+      "passed": true
+    },
+    {
+      "scenario": "Recuperación: misma intención después de fallo real guarda exactamente una versión",
+      "passed": true
+    },
+    {
+      "scenario": "Indisponibilidad de RPC: devuelve 503 sin alterar datos",
+      "passed": true
+    },
+    {
+      "scenario": "Consulta persistida: historial de tres versiones y recuperación tras error de RPC",
+      "passed": true
+    },
+    {
+      "scenario": "ACL: intenciones privadas y RPC no accesible a anon/authenticated",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/mensual",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/mensual",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/mensual",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/mensual",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/mensual",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/declaraciones/:id/constancia",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/declaraciones/:id/constancia",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/declaraciones/:id/constancia",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/mensual",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/declaraciones/:id/constancia",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/mensual",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/declaraciones/:id/constancia",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/anual",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/anual",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/anual",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/anuales/:id/constancia",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/periodos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/periodos/:id/cerrar",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/impuestos/anual",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/anual",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/anual",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/anuales/:id/constancia",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/anuales/:id/constancia",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/anual",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/anuales/:id/constancia",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/anuales/:id/constancia",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/mensual",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/mensual",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/anual",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/mensual",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/declaraciones/:id/constancia",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/mensual",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/mensual",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/mensual",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/mensual",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/impuestos/mensual",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/impuestos/declaraciones",
+      "status": 200
+    }
+  ]
+}

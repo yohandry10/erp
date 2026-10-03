@@ -1,0 +1,20 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "Navegador/API/DB reales locales; constancia simulada sin envío SUNAT",
+  "checks": [
+    {
+      "check": "Guardado: API confirmó una versión; 503 conserva notas y replay de la misma clave recupera el mismo ID/corte",
+      "passed": true
+    },
+    {
+      "check": "Recarga: versión guardada persiste en el estado e historial",
+      "passed": true
+    },
+    {
+      "check": "Constancia simulada: pérdida de respuesta conserva campos y misma clave; replay/recarga mantienen una sola presentación",
+      "passed": true
+    }
+  ],
+  "unexpected_errors": []
+}
