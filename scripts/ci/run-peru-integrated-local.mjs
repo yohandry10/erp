@@ -183,7 +183,6 @@ try {
   for(const kind of ['tax-intents','tax-other']) await run('prepare-'+kind,process.execPath,['scripts/ci/prepare-peru-first-client-local.mjs',kind]);
   await run('tax-intents-lifecycle',process.execPath,['scripts/ci/test-peru-tax-intents-local.mjs']);
   await run('reports-consolidation-lifecycle',process.execPath,['scripts/ci/test-peru-reports-consolidation-local.mjs']);
-  await run('reports-consolidation-lifecycle',process.execPath,['scripts/ci/test-peru-reports-consolidation-local.mjs']);
   if(withBrowser) await run('prepare-wizard',process.execPath,['scripts/ci/prepare-peru-first-client-local.mjs','wizard']);
   const httpEvidence=JSON.parse(readFileSync(path.join(output,'http.json'),'utf8'));
   for(const file of ['annual-acceptance.json','finance-lifecycle.json','hr-lifecycle.json','hr-financial.json','payroll-plame.json','configuration-admin.json','series-lifecycle.json','tax-adjustments.json','monthly-period.json','tax-intents.json','login-office.json','reports-consolidation-expanded.json']) {

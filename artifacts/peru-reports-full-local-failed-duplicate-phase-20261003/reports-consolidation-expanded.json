@@ -1,0 +1,47 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "API real local de reportes y consolidación; sin aceptación global",
+  "scenarios": [
+    {
+      "scenario": "Reportes/consolidación: preparación o flujo dependiente",
+      "passed": false,
+      "message": "contabilidad/periodos: {\"statusCode\":400,\"message\":\"A record with this information already exists\",\"error\":\"Bad Request\",\"timestamp\":\"2026-10-03T12:26:46.108Z\",\"path\":\"/api/contabilidad/periodos\"}\n\n400 !== 201\n"
+    }
+  ],
+  "defects": [
+    {
+      "operation": "contabilidad/periodos",
+      "status": 400,
+      "expected": 201,
+      "message": "A record with this information already exists"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/plan-cuentas",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/plan-cuentas",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/periodos",
+      "status": 400
+    }
+  ]
+}
