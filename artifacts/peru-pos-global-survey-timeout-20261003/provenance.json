@@ -1,0 +1,13 @@
+{
+  "head_sha": "0522780c73e5ba5679487227a1706f7e82b28e90",
+  "local_source": "artifacts/peru-integrated-20261003161601014-20904",
+  "global_success": false,
+  "http_scenarios_passed": 316,
+  "browser_scenarios_passed": 30,
+  "browser_retries": 0,
+  "failed_phase": "module-survey",
+  "reason": "Next dev compiló tipos-cambio en 86.3s; navegación limitada a 45s terminó y destruyó contexto durante inventario",
+  "backup_restore_completed": false,
+  "remoteWrites": false,
+  "dumps_extracted": false
+}

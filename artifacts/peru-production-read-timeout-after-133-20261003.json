@@ -1,0 +1,14 @@
+{
+  "observed_at": "2026-10-03T15:39:51.861209+00:00",
+  "merge_sha": "19fa239d9ddf0ba7d5ec08fcb3a3ca5dd7ac69f5",
+  "schema": 563,
+  "verification_passed": false,
+  "read_only": true,
+  "synthetic_prod_writes": false,
+  "prod_preflight": "passed before HTTP",
+  "error": "HTTP read aborted after 20000 ms",
+  "source": "scripts/verify-peru-production.mjs",
+  "limits": [
+    "No response proves availability or effective Render plan. Preserve first failure before retry."
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "Navegador, API, DB reales GRE; impresión a ventana, sin impresora física",
+  "checks": [
+    {
+      "check": "Detalle visible incluye descripción y cantidad de bienes",
+      "passed": true
+    },
+    {
+      "check": "Descarga mantiene PDF binario y extensión .pdf",
+      "passed": true,
+      "filename": "GRE-T001-00000003.pdf",
+      "bytes": 2157
+    },
+    {
+      "check": "Ventana de impresión recibe representación con bienes persistidos",
+      "passed": true,
+      "physical_printer_verified": false
+    }
+  ],
+  "unexpected_errors": []
+}

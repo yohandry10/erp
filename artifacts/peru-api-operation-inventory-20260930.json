@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-10-03T14:08:30.147Z",
-  "commit": "094be1a7fca3ce47192150f85add38e3322b4eca",
+  "generated_at": "2026-10-03T16:15:55.827Z",
+  "commit": "d3788eca6c8bbd719180966d5d8b87677cc9dad8",
   "excluded": [
     "Analytics"
   ],
@@ -11024,7 +11024,7 @@
       "endpoint": "/api/pos/ventas/:ventaId/canjear-ticket",
       "summary": null,
       "source": "apps/erp-api/src/modules/pos/pos.controller.ts",
-      "line": 100,
+      "line": 102,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('pos.ticket.canjear')"
@@ -11047,7 +11047,7 @@
       "endpoint": "/api/pos/caja/abrir",
       "summary": null,
       "source": "apps/erp-api/src/modules/pos/pos.controller.ts",
-      "line": 112,
+      "line": 114,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('pos.caja.write')"
@@ -11070,7 +11070,7 @@
       "endpoint": "/api/pos/caja/cerrar",
       "summary": null,
       "source": "apps/erp-api/src/modules/pos/pos.controller.ts",
-      "line": 123,
+      "line": 125,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('pos.caja.write')"
@@ -11093,7 +11093,7 @@
       "endpoint": "/api/pos/detalles-venta/:id",
       "summary": null,
       "source": "apps/erp-api/src/modules/pos/pos.controller.ts",
-      "line": 131,
+      "line": 133,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('pos.read')"
@@ -11116,7 +11116,7 @@
       "endpoint": "/api/pos/configurar-certificado",
       "summary": null,
       "source": "apps/erp-api/src/modules/pos/pos.controller.ts",
-      "line": 139,
+      "line": 141,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('pos.configuracion.write')"
@@ -11139,7 +11139,7 @@
       "endpoint": "/api/pos/configuration-status",
       "summary": null,
       "source": "apps/erp-api/src/modules/pos/pos.controller.ts",
-      "line": 154,
+      "line": 157,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('pos.read')"
@@ -11162,7 +11162,7 @@
       "endpoint": "/api/pos/ventas-pendientes-facturacion",
       "summary": null,
       "source": "apps/erp-api/src/modules/pos/pos.controller.ts",
-      "line": 162,
+      "line": 165,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('pos.read')"
@@ -11185,7 +11185,7 @@
       "endpoint": "/api/pos/facturacion/:ventaId",
       "summary": null,
       "source": "apps/erp-api/src/modules/pos/pos.controller.ts",
-      "line": 170,
+      "line": 173,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('pos.read')"
@@ -11208,7 +11208,7 @@
       "endpoint": "/api/pos/reintentar-facturacion/:ventaId",
       "summary": null,
       "source": "apps/erp-api/src/modules/pos/pos.controller.ts",
-      "line": 178,
+      "line": 181,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('pos.vender')"
@@ -11231,7 +11231,7 @@
       "endpoint": "/api/pos/worker/procesar-pendientes",
       "summary": null,
       "source": "apps/erp-api/src/modules/pos/pos.controller.ts",
-      "line": 186,
+      "line": 189,
       "access_declarations": [
         "Public()",
         "UseGuards(WorkerAuthGuard)"
