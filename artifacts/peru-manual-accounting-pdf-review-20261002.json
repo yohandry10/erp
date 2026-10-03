@@ -1,0 +1,22 @@
+{
+  "scope": "Inspección visual local de PDF del asiento manual; no acredita todos los formatos ni impresión física",
+  "source": "artifacts/peru-integrated-20261003020511191-22508/manual-asiento-ui.pdf",
+  "sha256": "e89da86a93b3326727c6085aeb503ca09c408a41f6fb6a75f682e764cad1fd1c",
+  "pages": 1,
+  "format": "A4",
+  "calendar_date": "2026-10-02",
+  "debe": 20,
+  "haber": 20,
+  "visual_checks": [
+    "fecha fiscal legible",
+    "cuentas 63/1041 y conceptos legibles",
+    "totales y encabezados con contraste",
+    "sin cortes ni solapamientos"
+  ],
+  "local_only": true,
+  "pending": [
+    "varias páginas y textos largos",
+    "todas las monedas",
+    "impresora física"
+  ]
+}

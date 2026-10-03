@@ -312,6 +312,17 @@ describe('DiferidosService', () => {
   });
 
   describe('cuotaDelPeriodo', () => {
+    it('las cuotas devengadas agotan el monto al céntimo', () => {
+      const diferido = { monto_total: 100, monto_devengado: 0, periodos: 3, fecha_inicio: '2026-01-01' };
+      const cuotas = [1, 2, 3].map(mes => {
+        const cuota = DiferidosService.cuotaDelPeriodo(diferido, 2026, mes);
+        diferido.monto_devengado = Math.round((diferido.monto_devengado + cuota) * 100) / 100;
+        return cuota;
+      });
+      expect(cuotas).toEqual([33.33, 33.33, 33.34]);
+      expect(diferido.monto_devengado).toBe(100);
+    });
+
     const base = {
       monto_total: 1200,
       monto_devengado: 0,

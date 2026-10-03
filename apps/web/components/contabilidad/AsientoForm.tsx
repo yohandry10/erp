@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import { obtenerEstadoBalanceAsiento } from '@/lib/contabilidad/asiento-balance'
+import { fiscalDateForCountry } from '@/lib/fiscal-date'
 
 interface DetalleAsiento {
   cuenta_id: string
@@ -61,10 +62,10 @@ export default function AsientoForm({
   initialData,
   submitLabel = 'Guardar asiento',
 }: AsientoFormProps) {
-  const { formatCurrency } = useLocalizedMoney()
+  const { country, formatCurrency } = useLocalizedMoney()
   const [formData, setFormData] = useState<AsientoFormData>(
     initialData ?? {
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: fiscalDateForCountry(country.paisCodigo),
       concepto: '',
       referencia: '',
       detalles: [

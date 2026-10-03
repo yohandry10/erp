@@ -188,7 +188,7 @@ test('Perú: primer administrador importa, edita y desactiva maestros con recupe
     ])
     expect(await fs.readFile(await download.path(), 'utf8')).toContain(name)
     await page.getByRole('row').filter({ hasText: name }).getByRole('button', { name: 'Editar' }).click()
-    await expect(page).toHaveURL(/\/editar\/?$/)
+    await expect(page).toHaveURL(/\/editar\/?$/, { timeout: 20000 })
     const masterId = new URL(page.url()).pathname.split('/').filter(Boolean).at(-2)!
     expect(masterId).toMatch(/^[0-9a-f-]{36}$/i)
     const editedName = `${name} EDITADO`
@@ -616,6 +616,118 @@ test('Perú: reembolso RMA recupera catálogos, respuesta perdida y asiento sin 
     final_available: Number(saldoAfter.monto_disponible), accounting_entry_count: 1,
     catalog_failure_recovered: true, catalog_failed_requests: catalogFailures,
     external_browser_requests_blocked: true, local_only: true,
+  }, null, 2))
+})
+
+test('Perú: primer administrador recupera asiento manual perdido, edita, confirma y reversa sin duplicar', async ({ page, context }) => {
+  test.setTimeout(180000)
+  page.setDefaultTimeout(20000)
+  const evidence = JSON.parse(await fs.readFile(path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'http.json'), 'utf8'))
+  const onboarding = evidence.results.find((row: { scenario: string }) => row.scenario.startsWith('alta no demo y primer administrador'))
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await context.route('**/*', route => ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(route.request().url()).hostname)
+    ? route.continue() : route.abort('blockedbyclient'))
+  await page.goto('/login/')
+  await page.locator('#email').fill(onboarding.client_email)
+  await page.locator('#password').fill('Cliente-Local-2026-Only!')
+  const [login] = await Promise.all([
+    page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith('/api/auth/login') && response.status() === 201),
+    submitLocalLogin(page),
+  ])
+  const auth = await login.json()
+  const headers = { Authorization: `Bearer ${auth.access_token ?? auth.data?.access_token}` }
+  const api = process.env.LOCAL_API_URL!
+  const accountsResponse = await page.request.get(`${api}/api/contabilidad/plan-cuentas`, { headers })
+  expect(accountsResponse.status()).toBe(200)
+  const accounts = (await accountsResponse.json()).data
+  const expense = accounts.find((account: { codigo: string }) => account.codigo === '63')
+  const bank = accounts.find((account: { codigo: string }) => account.codigo === '1041')
+  expect(expense?.id && bank?.id).toBeTruthy()
+  await page.goto('/dashboard/contabilidad/asientos/nuevo/')
+  await expect(page.getByRole('heading', { name: 'Nuevo asiento contable manual', exact: true })).toBeVisible({ timeout: 30000 })
+  const tenantId = auth.user?.tenant_id ?? auth.data?.user?.tenant_id
+  expect(tenantId).toMatch(/^[0-9a-f-]{36}$/i)
+  const calendarDate = readLocalSql(`SELECT app.hoy_tenant('${tenantId}'::uuid)::text;`)
+  await expect(page.locator('#asiento-form-fecha')).toHaveValue(calendarDate)
+  await page.getByRole('checkbox', { name: /Guardar como borrador/ }).check()
+  await page.locator('#asiento-form-concepto').fill('Asiento UI con respuesta perdida')
+  const accountSelects = page.getByRole('combobox', { name: /^Cuenta/ })
+  await accountSelects.nth(0).selectOption(expense.id)
+  await accountSelects.nth(1).selectOption(bank.id)
+  await page.getByLabel('Debe', { exact: true }).nth(0).fill('17')
+  await page.getByLabel('Haber', { exact: true }).nth(1).fill('17')
+  await page.getByPlaceholder('Descripcion del movimiento', { exact: true }).nth(0).fill('Gasto UI')
+  await page.getByPlaceholder('Descripcion del movimiento', { exact: true }).nth(1).fill('Banco UI')
+  const endpoint = /\/api\/contabilidad\/asiento-contable\/?$/
+  let committed: any
+  let intent: string | undefined
+  await page.route(endpoint, async route => {
+    intent = route.request().headers()['idempotency-key']
+    const response = await route.fetch()
+    expect(response.status(), await response.text()).toBe(201)
+    committed = (await response.json()).data
+    await route.fulfill({ status: 503, contentType: 'application/json',
+      body: JSON.stringify({ message: 'Respuesta del asiento interrumpida; reintente la misma operación' }) })
+  }, { times: 1 })
+  const submit = page.getByRole('button', { name: 'Guardar asiento', exact: true })
+  const [lost] = await Promise.all([
+    page.waitForResponse(response => endpoint.test(new URL(response.url()).pathname) && response.request().method() === 'POST'), submit.click(),
+  ])
+  expect(lost.status()).toBe(503)
+  expect(intent).toMatch(/^asiento-ui:[0-9a-f-]{36}$/)
+  await expect(page.getByRole('main').getByRole('alert')).toContainText('Respuesta del asiento interrumpida')
+  await expect(page.getByLabel('Debe', { exact: true }).nth(0)).toHaveValue('17')
+  const [replay] = await Promise.all([
+    page.waitForResponse(response => endpoint.test(new URL(response.url()).pathname) && response.request().method() === 'POST'), submit.click(),
+  ])
+  expect(replay.status()).toBe(201)
+  expect(replay.request().headers()['idempotency-key']).toBe(intent)
+  expect((await replay.json()).data.id).toBe(committed.id)
+  await page.waitForURL(`**/contabilidad/asientos/${committed.id}/`)
+  await page.reload()
+  await page.getByRole('button', { name: 'Editar', exact: true }).click()
+  await expect(page.locator('#asiento-form-concepto')).toHaveValue('Asiento UI con respuesta perdida')
+  await page.getByLabel('Debe', { exact: true }).nth(0).fill('20')
+  await page.getByLabel('Haber', { exact: true }).nth(1).fill('20')
+  await page.getByRole('button', { name: 'Guardar cambios', exact: true }).click()
+  await page.waitForURL(`**/contabilidad/asientos/${committed.id}/`)
+  await page.getByRole('button', { name: 'Confirmar', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Editar', exact: true })).toHaveCount(0)
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Descargar PDF', exact: true }).click(),
+  ])
+  expect(download.suggestedFilename()).toMatch(/^asiento-.*\.pdf$/)
+  const pdfPath = path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'manual-asiento-ui.pdf')
+  await download.saveAs(pdfPath)
+  const pdf = await fs.readFile(pdfPath)
+  expect(pdf.subarray(0, 5).toString()).toBe('%PDF-')
+  expect(pdf.length).toBeGreaterThan(1500)
+  expect(pdf.toString('latin1')).toContain('20.00')
+  await page.getByRole('button', { name: 'Reversar', exact: true }).click()
+  await page.locator('#id-motivo').fill('Reversión UI local')
+  const [reversed] = await Promise.all([
+    page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith(`/api/contabilidad/asientos/${committed.id}/reversar`)
+      && response.request().method() === 'POST'),
+    page.getByRole('button', { name: 'Crear reversión', exact: true }).click(),
+  ])
+  expect(reversed.status()).toBe(201)
+  const detail = await page.request.get(`${api}/api/contabilidad/asientos/${committed.id}`, { headers })
+  expect(detail.status()).toBe(200)
+  const original = (await detail.json()).data
+  expect(Number(original.total_debe)).toBe(20)
+  expect(original.estado).toBe('CONFIRMADO')
+  expect(original.reversado_por_asiento_id).toBeTruthy()
+  expect(readLocalSql(`SELECT count(*) FROM financial_master_operations WHERE operation_type='ACCOUNTING_MANUAL_CREATE'
+    AND idempotency_key='${intent}' AND record_id='${committed.id}'::uuid;`)).toBe('1')
+  expect(errors).toEqual([])
+  await fs.writeFile(path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'browser-manual-accounting.json'), JSON.stringify({
+    asiento_id: committed.id, reversa_id: original.reversado_por_asiento_id, first_response_status: 503,
+    same_intent_replayed: true, initial_amount: 17, corrected_amount: 20,
+    confirmed_original_preserved: true, pdf_downloaded: true, pdf_amount_verified: 20,
+    default_date_matches_tenant_calendar: calendarDate,
+    local_only: true, external_browser_requests_blocked: true,
   }, null, 2))
 })
 

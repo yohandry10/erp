@@ -70,7 +70,8 @@ if (process.argv[2]) {
   if (!evidenceDirectory.startsWith(path.join(root, 'artifacts', 'peru-integrated-'))) throw new Error('La evidencia debe provenir de un ensayo integrado local');
   const run = JSON.parse(readFileSync(path.join(evidenceDirectory, 'run.json'), 'utf8'));
   const http = JSON.parse(readFileSync(path.join(evidenceDirectory, 'http.json'), 'utf8'));
-  if (run.success !== true || run.remoteWrites !== false || http.success !== true || !Array.isArray(http.request_traces)) {
+  const httpPhaseOnly = process.argv.includes('--http-phase-only');
+  if ((!httpPhaseOnly && run.success !== true) || run.remoteWrites !== false || http.success !== true || !Array.isArray(http.request_traces)) {
     throw new Error('Se requiere ensayo local terminado con trazas HTTP, sin escrituras remotas');
   }
   const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -78,6 +79,8 @@ if (process.argv[2]) {
   const requestMatches = new Map(operations.map(operation => [operation, []]));
   const acceptancePath = 'artifacts/peru-operation-acceptance-cases-20260930.json';
   const acceptance = JSON.parse(readFileSync(path.join(root, acceptancePath), 'utf8'));
+  const defectPath = 'artifacts/peru-functional-defects-20260930.json';
+  const defects = JSON.parse(readFileSync(path.join(root, defectPath), 'utf8')).defects;
   for (const testCase of acceptance.cases) for (const declared of testCase.operations) {
     if (!operations.some(operation => operation.method === declared.method && operation.endpoint === declared.endpoint)) {
       throw new Error(`Caso ${testCase.id}: operación inexistente ${declared.method} ${declared.endpoint}`);
@@ -96,13 +99,19 @@ if (process.argv[2]) {
   const matrix = { generated_at: new Date().toISOString(), inventory: path.relative(root, output).replaceAll('\\', '/'),
     evidence: path.relative(root, evidenceDirectory).replaceAll('\\', '/'),
     evidence_scope: run.scope ?? 'full',
+    evidence_global_success: run.success,
+    evidence_phase: httpPhaseOnly ? 'HTTP aprobado; el resultado global se conserva por separado' : 'ensayo global aprobado',
     evidence_kind: 'HTTP contra Nest/PostgREST/PostgreSQL efímeros; no contiene cuerpos, tokens ni credenciales',
     acceptance_rule: 'HTTP observado no acredita aceptación funcional. verified_cases sólo recoge contratos cuyo escenario funcional pasó; conserva pendientes explícitos y no acepta toda la operación.',
     acceptance_cases: acceptancePath,
+    defect_register: defectPath,
     excluded: ['Analytics'], operational_accounting_tax_reports_included: true,
     operations: operations.map(operation => ({ module: operation.module, operation: operation.operation,
       method: operation.method, endpoint: operation.endpoint, source: `${operation.source}:${operation.line}`,
-      existing_evidence: requestMatches.get(operation), defects: [],
+      existing_evidence: requestMatches.get(operation),
+      defects: defects.filter(defect => defect.operations.some(declared =>
+        declared.method === operation.method && declared.endpoint === operation.endpoint))
+        .map(({ id, status, proof, correction, pending }) => ({ id, status, proof, correction, pending })),
       verified_cases: casesFor(operation).map(({ id, source, verified_checks }) => ({ id, source, verified_checks })),
       result: casesFor(operation).length ? 'functional_cases_verified_with_remaining_checks'
         : requestMatches.get(operation).length ? 'http_contract_observed_not_full_acceptance' : 'pending_functional_execution',

@@ -189,7 +189,7 @@ jobs:
           --health-retries 20
     env:
       E2E_EPHEMERAL_LOCAL_DB: "1"
-      REQUIRED_DATABASE_SCHEMA_VERSION: "556"
+      REQUIRED_DATABASE_SCHEMA_VERSION: "557"
       PGPASSWORD: postgres
       PGHOST: 127.0.0.1
       PGPORT: 5442
@@ -247,7 +247,7 @@ jobs:
       - name: Install Chromium
         run: pnpm --filter @erp-suite/web exec playwright install --with-deps chromium
       - name: Verify integrated Peru flows and recovery
-        run: node scripts/ci/run-peru-integrated-local.mjs --records
+        run: node scripts/ci/run-peru-integrated-local.mjs --survey --records
       - name: Preserve local test evidence
         if: always()
         uses: actions/upload-artifact@v4

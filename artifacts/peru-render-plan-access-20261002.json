@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-02",
+  "effective_plan_confirmed": false,
+  "declared_plan": "Starter",
+  "evidence": [
+    "Inventario cua: sólo superficies Codex IAB/MCP Apps; no sesión administrativa Render expuesta",
+    "No se encontró credencial RENDER_*TOKEN/KEY en .env.production ni en entorno inyectado; comprobación booleana sin exponer secretos"
+  ],
+  "dependent_check": "Tipo de instancia/plan activo del servicio en dashboard Render o API administrativa autenticada",
+  "remaining_limit": "Health/readiness no acreditan disponibilidad continua ni sustituyen la comprobación del plan",
+  "purchase_authorized": false
+}

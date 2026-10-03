@@ -1,4 +1,4 @@
-# Matriz de aceptación funcional Perú — corte 2026-09-30
+# Matriz de aceptación funcional Perú — corte 2026-10-02
 
 Alcance: rutas visibles de `apps/web/components/layout/sidebar.tsx`, páginas de
 `apps/web/app/dashboard`, flujos de `docs/MODULES.md` y escenarios de
@@ -19,6 +19,13 @@ la exposición de una acción en Perú exige contrastar navegación y reglas del
 servicio. El inventario no representa operaciones aceptadas. La matriz API
 por operación conserva las comprobaciones pendientes aunque exista respuesta HTTP.
 
+El ensayo contable del 02/10 conserva 128 HTTP y quince recorridos UI aprobados
+en `artifacts/peru-integrated-accounting-phases-20261002`. Su resultado global
+sigue **fallido**: Next dev reinició por umbral de memoria al abrir Ventas durante
+el barrido de 99 pantallas; no se ejecutó el barrido de registros. La matriz API
+marca explícitamente esa diferencia entre fase HTTP aprobada y ejecución global.
+CI debe repetir todos los gates antes de promover la 557 o integrar el cambio.
+
 | Módulo / operaciones ofrecidas | Evidencia de operación | Pendiente funcional concreto | Resultado |
 | --- | --- | --- | --- |
 | Alta empresa, login, wizard fiscal, PFX y SUNAT | `http.json`: alta no demo, reintento, login, validación de RUC/titular/clave, secretos cifrados y reanudación | Recorrer wizard desde navegador con errores de red y roles; aceptación fiscal externa cuando exista cliente | OK local API; navegador parcial |
@@ -36,8 +43,9 @@ por operación conserva las comprobaciones pendientes aunque exista respuesta HT
 | SIRE: preparar, consultar, exportar, presentar/rectificar | `artifacts/peru-integrated-20260923071858181-5776/http.json`: RVIE/RCE locales generados, repetidos sin duplicar, listados, descargados con SHA-256 verificado, aislados por tenant; período inválido y envío desde demo rechazados | Navegador, conciliación con fuentes fiscales, respuesta oficial SUNAT y rectificación | Instantánea local OK; presentación externa pendiente |
 | CxP, bancos, tesorería, conciliación, detracciones | `http.json`: deuda, pago, banco, asiento; conciliación creada/consultada | Pagos parciales, programación/lotes, reversos, conciliación aplicada, detracción y recuperación de fallos | Parcial |
 | CxC, cobranzas, caja, reportes financieros | `artifacts/peru-integrated-20260923122407762-17892`: dos cobros de pedido, banco/caja, sesión inválida rechazada sin mutación, arqueo/cierre y dos asientos cuadrados. Historial y CSV UI. `artifacts/peru-integrated-20260930192830556-23344`: primer ADMIN no demo crea caja, cobra CxC inicial desde navegador y cierra; la API confirma pero se pierde la respuesta. El diálogo muestra error y conserva datos; reintentar devuelve el mismo pago y movimiento de caja, un solo pago, saldo cero y caja correcta. | Cobro bancario desde UI, nota sobre cuenta pagada, conciliación, permisos diferenciados por rol y reportes financieros | Parcial; efectivo UI con respuesta perdida/replay OK local; transferencia API e historial/exportación UI OK local |
-| Contabilidad: asientos, periodos, centros, plan, presupuestos | `http.json`: asientos automáticos únicos/cuadrados. Navegador integrado: crea centro de costo, presupuesto y asignación; edita y confirma persistencia después de recargar | Asiento manual/edición/reverso, cierre/rehabilitación de periodo y permisos diferenciados para centros/presupuestos | Parcial; centros/presupuestos UI persistidos |
-| Contabilidad: activos, diferidos, consignación, consolidación, revaluación | `http.json`: sólo lecturas de activos/diferidos/consignación/consolidación/tipos de cambio | Alta→proceso→asiento→reporte por cada submódulo, reversos y aislamiento | Sólo lectura verificada |
+| Contabilidad: asientos, periodos, centros, plan, presupuestos | `artifacts/peru-integrated-accounting-phases-20261002`: manual validado, replay sin duplicar, borrador editado/confirmado, confirmado inmutable, reversa única, anulación/eliminación de borradores. Cierre bloqueado por borrador; cierre/bloqueo/reapertura mensual, permisos y tenant por API. Superadministrador en contexto cambiado reabre; probe adicional rechaza período ajeno 404 sin mutar. UI pierde respuesta, recupera misma intención, edita, confirma, descarga PDF legible con fecha Lima y reversa; centros/presupuestos persisten tras recarga. | Cierre anual y reapertura anual; períodos por UI; plantillas, partidas y distribución analítica; permisos diferenciados de centros/presupuestos; fronteras horarias de escritores automáticos. 557/CI/despliegue pendientes. | Casos manuales y mensuales observados OK local; módulo parcial |
+| Contabilidad: activos y diferidos | `artifacts/peru-integrated-accounting-phases-20261002`: activo 1001/residual 1, adquisición manual explícita, edición, cronograma y tres depreciaciones 333.33/333.33/333.34; baja y asientos únicos/cuadrados. Diferido de gasto 100 con asiento inicial manual, cuotas 33.33/33.33/33.34, cancelación/replay, lector y consulta ajena. | UI de altas/procesos/bajas; venta de activo, cambios de vida útil y períodos omitidos; diferidos de ingreso/monedas; aislamiento de cada mutación, informes y reversas. CI/despliegue pendientes. | Ciclos API observados OK local; variantes pendientes |
+| Contabilidad: consignación, consolidación, revaluación | `http.json`: sólo lecturas de consignación/consolidación/tipos de cambio | Alta→proceso→asiento→reporte, reversos y aislamiento de cada submódulo | Sólo lectura verificada |
 | Reportes contables y tributarios, libros, impuestos anual | `artifacts/peru-integrated-20260923073133928-14620/http.json`: cinco TXT PLE exportados individualmente y en lote, RUC del emisor, Diario con 21 campos y debe=haber, contenido aislado por tenant, mes inválido rechazado; reportes comerciales filtrados | PVS SUNAT, conciliación completa de RV/RCE con documentos, UI/impresión y cálculos/declaraciones anuales | PLE local parcial; aceptación tributaria externa pendiente |
 | RR. HH.: candidatos, empleado, contrato, asistencia | `http.json`: lecturas. Navegador integrado: candidato creado y editado, perfil y vacante conservados tras recarga | Contratación, alta/edición de empleados/contratos, asistencia y permisos/aislamiento completos | Parcial; alta/edición de candidato UI persistidas |
 | Planilla, pagos, T-Registro, PLAME, liquidaciones | `http.json`: cálculo PE con norma, aprobación distinta, pago/banco/asiento únicos y bloqueo sin norma | Altas laborales desde UI, liquidación, CTS, exportaciones T-Registro/PLAME y constancias externas | OK local cadena planilla; resto pendiente |
@@ -145,4 +153,8 @@ no demuestra ejecución. La matriz API observa 170 contratos y vincula cinco
 casos RMA a sus operaciones, con comprobaciones y pendientes específicos en
 `artifacts/peru-operation-acceptance-cases-20260930.json`. Cada caso exige que
 sus escenarios hayan pasado; se conserva la distinción entre contrato HTTP,
-caso funcional comprobado y aceptación completa. CI/despliegue pendientes.
+caso funcional comprobado y aceptación completa. El PR #123 quedó integrado
+como `d96aee30`; CI de main 36789420677 repitió 124 HTTP/catorce UI/22 pantallas.
+E2E y Security Scan pasaron. Render/Vercel sirven ese SHA, esquema 556,
+DB/Redis, login y CORS verificados sólo en lectura con preflight
+(`artifacts/peru-production-verification-after-123-20260930.json`).

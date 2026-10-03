@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-03T02:19:28.405Z",
+  "local_only": true,
+  "database": "erp_e2e",
+  "scope": "Probe adicional; no sumado a los 128 escenarios del ensayo principal",
+  "method": "POST",
+  "endpoint": "/api/contabilidad/periodos/:id/reabrir",
+  "actor": "Superadministrador local con contexto cambiado a primer cliente",
+  "foreign_period_status": 404,
+  "foreign_period_unchanged": true,
+  "message": "Período no encontrado"
+}

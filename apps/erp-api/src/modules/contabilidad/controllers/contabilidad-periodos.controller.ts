@@ -6,6 +6,7 @@ import {
   Param,
   UseGuards,
   BadRequestException,
+  NotFoundException,
   Headers,
   Query,
 } from "@nestjs/common";
@@ -129,11 +130,11 @@ export class ContabilidadPeriodosController {
         .eq("tenant_id", tenantId)
         .single();
 
-      if (error || !data) {
-        return {
-          success: false,
-          data: null,
-        };
+      if (error && error.code !== "PGRST116") {
+        throw new Error(`Error obteniendo período: ${error.message}`);
+      }
+      if (!data) {
+        throw new NotFoundException("Período no encontrado");
       }
 
       return {
@@ -179,8 +180,11 @@ export class ContabilidadPeriodosController {
           .eq("tenant_id", tenantId)
           .single();
 
-      if (periodoError || !periodoData) {
-        throw new Error("Período no encontrado");
+      if (periodoError && periodoError.code !== "PGRST116") {
+        throw new Error(`Error obteniendo período: ${periodoError.message}`);
+      }
+      if (!periodoData) {
+        throw new NotFoundException("Período no encontrado");
       }
 
       // Validate asientos
@@ -249,8 +253,11 @@ export class ContabilidadPeriodosController {
           .eq("tenant_id", tenantId)
           .single();
 
-      if (periodoError || !periodoData) {
-        throw new Error("Período no encontrado");
+      if (periodoError && periodoError.code !== "PGRST116") {
+        throw new Error(`Error obteniendo período: ${periodoError.message}`);
+      }
+      if (!periodoData) {
+        throw new NotFoundException("Período no encontrado");
       }
 
       // Call the service method with validations
@@ -345,8 +352,11 @@ export class ContabilidadPeriodosController {
           .eq("tenant_id", tenantId)
           .single();
 
-      if (periodoError || !periodoData) {
-        throw new Error("Período no encontrado");
+      if (periodoError && periodoError.code !== "PGRST116") {
+        throw new Error(`Error obteniendo período: ${periodoError.message}`);
+      }
+      if (!periodoData) {
+        throw new NotFoundException("Período no encontrado");
       }
 
       // Call the service method to reopen
@@ -404,8 +414,11 @@ export class ContabilidadPeriodosController {
           .eq("tenant_id", tenantId)
           .single();
 
-      if (periodoError || !periodoData) {
-        throw new Error("Período no encontrado");
+      if (periodoError && periodoError.code !== "PGRST116") {
+        throw new Error(`Error obteniendo período: ${periodoError.message}`);
+      }
+      if (!periodoData) {
+        throw new NotFoundException("Período no encontrado");
       }
 
       // Call the service method to block

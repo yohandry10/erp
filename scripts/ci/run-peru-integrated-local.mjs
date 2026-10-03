@@ -182,12 +182,12 @@ try {
     if (withRecords) await run('record-survey', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-record-survey-local.spec.ts', '--reporter=list'], webDirectory);
   }
   success = true;
-  console.log('[peru-integrated] PASS: contratos SQL, HTTP y contabilidad; alcance ' + (focusOnboarding ? 'onboarding/inventario' : recordsOnly ? 'pantallas con registros' : 'completo') + (withBrowser ? ', con recorridos de navegador' : ''));
+  console.log('[peru-integrated] PASS: contratos SQL, HTTP y contabilidad; alcance ' + (focusOnboarding ? 'onboarding/inventario/contabilidad' : recordsOnly ? 'pantallas con registros' : 'completo') + (withBrowser ? ', con recorridos de navegador' : ''));
 } catch (error) {
   console.error(error);
   process.exitCode = 1;
 } finally {
   await cleanup();
   writeFileSync(path.join(output, 'run.json'), JSON.stringify({ completedAt: new Date().toISOString(), success, withBrowser, withSurvey, withRecords,
-    scope: focusOnboarding ? 'onboarding_inventory_subset' : recordsOnly ? 'record_survey_subset' : 'full', database: 'PostgreSQL 16 efímero', output, remoteWrites: false }, null, 2));
+    scope: focusOnboarding ? 'onboarding_inventory_accounting_subset' : recordsOnly ? 'record_survey_subset' : 'full', database: 'PostgreSQL 16 efímero', output, remoteWrites: false }, null, 2));
 }

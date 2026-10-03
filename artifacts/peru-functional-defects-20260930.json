@@ -1,0 +1,150 @@
+{
+  "scope": "Defectos reproducidos y seguimiento; corrección local no implica despliegue ni aceptación completa",
+  "defects": [
+    {
+      "id": "manual-accounting-retry-duplicates",
+      "status": "corrected_locally_deployment_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/asiento-contable"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-integrated-20260930225329486-9024/http.json",
+        "observed_error": "La misma intención de asiento manual debe devolver el agregado original\n+ actual - expected\n\n+ '58ca04ff-f7ac-4279-9508-77a372767c8c'\n- '46794437-b8ae-46b5-9016-6afff9c9a4da'\n",
+        "local_only": true
+      },
+      "correction": "557 y escritor manual guardan asiento e intención en una transacción; UI conserva clave tras respuesta perdida",
+      "pending": [
+        "CI del cambio",
+        "promoción 557",
+        "main y despliegue"
+      ]
+    },
+    {
+      "id": "depreciation-accrual-final-cent",
+      "status": "corrected_locally_deployment_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/activos-fijos/depreciar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/diferidos/devengar"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-integrated-20260930231135744-6004/http.json",
+        "observed_error": "Expected values to be strictly equal:\n\n33333 !== 33334\n",
+        "local_only": true
+      },
+      "correction": "La cuota ejecutada del último período absorbe el saldo pendiente y respeta el residual",
+      "pending": [
+        "CI del cambio",
+        "main y despliegue"
+      ]
+    },
+    {
+      "id": "foreign-accounting-period-http-errors",
+      "status": "corrected_locally_deployment_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/periodos/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/periodos/:id/validar-cierre"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/periodos/:id/cerrar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/periodos/:id/bloquear"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/periodos/:id/reabrir"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-period-foreign-defect-20260930.json",
+        "observed": "Detalle ajeno 200; validar/cerrar/bloquear 500; cuatro operaciones reproducidas localmente"
+      },
+      "correction": "404 para registro inexistente o ajeno; se conservan errores operativos de DB",
+      "pending": [
+        "CI del cambio",
+        "main y despliegue"
+      ],
+      "local_followup": {
+        "source": "artifacts/peru-period-reopen-isolation-20261002.json",
+        "result": "Superadministrador con contexto cambiado recibe 404 para período ajeno; todas sus columnas permanecen iguales"
+      }
+    },
+    {
+      "id": "manual-accounting-lima-boundary",
+      "status": "corrected_locally_deployment_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/asiento-contable"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-integrated-20260930230932944-4760/database-contracts.log",
+        "observed_error": "VERIFY_557_CALENDAR_SHIFTED"
+      },
+      "correction": "La propuesta 557 usa zona coherente con fecha/instante durante la escritura y restaura la zona SQL previa",
+      "pending": [
+        "CI del cambio",
+        "promoción 557",
+        "fronteras de otros escritores contables"
+      ]
+    },
+    {
+      "id": "platform-accounting-period-reopen",
+      "status": "corrected_locally_deployment_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/periodos/:id/reabrir"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-integrated-20260930233445013-9812/http.json",
+        "observed_error": "contabilidad/periodos/a5ad056e-4a90-43f1-a4db-0b341d3eeb2d/reabrir: HTTP 400; ACCOUNTING_ACTOR_NOT_ACTIVE_IN_TENANT\n\n400 !== 201\n",
+        "local_only": true
+      },
+      "correction": "557 añade una RPC de reapertura con validación explícita de superadministrador activo, identidad conservada y locks/reglas originales",
+      "pending": [
+        "CI y promoción 557",
+        "main y despliegue"
+      ]
+    },
+    {
+      "id": "manual-accounting-default-date-utc",
+      "status": "corrected_locally_final_browser_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/asiento-contable"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-integrated-20261003015814635-23596/manual-asiento-ui.pdf",
+        "observed": "PDF fechado 2026-10-03, generado 2026-10-03T02:04:49Z (2026-10-02 en Lima); AsientoForm usaba fecha UTC por defecto",
+        "local_only": true
+      },
+      "correction": "AsientoForm reutiliza fiscalDateForCountry con país del tenant; navegador contrasta fecha inicial con app.hoy_tenant",
+      "pending": [
+        "ensayo integrado completo",
+        "CI y despliegue",
+        "otras fechas por defecto fuera del formulario de asientos"
+      ]
+    }
+  ]
+}

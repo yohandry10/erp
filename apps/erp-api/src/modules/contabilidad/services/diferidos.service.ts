@@ -96,7 +96,9 @@ export class DiferidosService {
       return 0;
     }
 
-    const cuota = Math.round(total / diferido.periodos);
+    const cuota = transcurridos === diferido.periodos - 1
+      ? pendiente
+      : Math.round(total / diferido.periodos);
     return Math.min(cuota, pendiente) / 100;
   }
 
