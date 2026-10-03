@@ -1,0 +1,29 @@
+{
+  "defect": "plame-package-duplicates-on-retry",
+  "checkedAt": "2026-10-03T06:06:21.706Z",
+  "local_only": true,
+  "remoteWrites": false,
+  "source": "artifacts/peru-integrated-20261003060524782-21136",
+  "proof": {
+    "same_intent": true,
+    "first_version": 4,
+    "retry_version": 5,
+    "same_package": false,
+    "defect_reproduced": true,
+    "message": "Una intención HTTP debe devolver el paquete ya guardado, sin nueva versión"
+  },
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "rrhh/peru/planilla-electronica/:id/paquetes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/peru/planilla-electronica/:id/paquetes",
+      "status": 201
+    }
+  ],
+  "preceding_positive_cases": 5,
+  "global_success": false
+}

@@ -1,0 +1,36 @@
+{
+  "source": "artifacts/peru-integrated-20261003062814324-21228",
+  "global_success": false,
+  "remoteWrites": false,
+  "migration": 559,
+  "fresh_migrations": 556,
+  "sql_contracts": 69,
+  "base_http_cases": 128,
+  "positive_phases": [
+    {
+      "file": "annual-acceptance.json",
+      "success": true,
+      "cases": 3
+    },
+    {
+      "file": "finance-lifecycle.json",
+      "success": true,
+      "cases": 7
+    },
+    {
+      "file": "hr-lifecycle.json",
+      "success": true,
+      "cases": 10
+    },
+    {
+      "file": "hr-financial.json",
+      "success": true,
+      "cases": 7
+    }
+  ],
+  "failure": "prepare-payroll-plame: auth/login HTTP 429, límite real compartido por IP local",
+  "browser_phase_started": false,
+  "restore_phase_completed": false,
+  "repeated_with_bounded_login_retry": true,
+  "source_changed_after_schema_phase": "559 añadió revocación explícita del writer interno encontrada en ensayo PROD; se repite reconstrucción"
+}

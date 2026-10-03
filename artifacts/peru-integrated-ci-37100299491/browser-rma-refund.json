@@ -1,0 +1,15 @@
+{
+  "rma_id": "66660fdd-ab04-4b28-a419-84334d1be199",
+  "saldo_favor_id": "1dc7cd65-4433-4ace-bc51-1524bcdbf098",
+  "amount": 4,
+  "first_response_status": 503,
+  "same_intent_replayed": true,
+  "movement_id": "7005a6a6-4b91-4604-88a8-a6df8244961b",
+  "event_id": "29599561-d63a-430a-89dd-ffcc0e02dd41",
+  "final_available": 12.6,
+  "accounting_entry_count": 1,
+  "catalog_failure_recovered": true,
+  "catalog_failed_requests": 2,
+  "external_browser_requests_blocked": true,
+  "local_only": true
+}

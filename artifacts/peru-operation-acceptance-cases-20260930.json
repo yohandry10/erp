@@ -1247,6 +1247,199 @@
         "Permisos/aislamiento",
         "Importación, ausencias, turnos nocturnos y horas extra"
       ]
+    },
+    {
+      "id": "hr-first-admin-cts",
+      "source": "scripts/ci/test-peru-hr-financial-local.mjs",
+      "required_scenario_prefixes": [
+        "CTS: semestre inválido",
+        "CTS: depositante distinto",
+        "RRHH financiero: confirmación",
+        "RRHH financiero: fondo"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/rrhh/cts/depositos"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/rrhh/cts/depositos/:id/depositar"
+        }
+      ],
+      "verified_checks": [
+        "Semestre inválido rechazado; cálculo/recálculo conserva filas",
+        "Depósito por actor distinto, banco exacto y replay",
+        "Depósito contabilizado no se recalcula ni se consume dos veces",
+        "Depósito ajeno 404; asiento único confirmado cuadrado"
+      ],
+      "pending_checks": [
+        "Cálculo/depósito por UI",
+        "Lector y demás roles de cada escritura",
+        "Otras jornadas/regímenes/salarios y aceptación normativa externa"
+      ]
+    },
+    {
+      "id": "hr-first-admin-liquidation",
+      "source": "scripts/ci/test-peru-hr-financial-local.mjs",
+      "required_scenario_prefixes": [
+        "Liquidación: cálculo/replay",
+        "Liquidación: pagador distinto",
+        "Liquidación: reversor distinto",
+        "RRHH financiero: confirmación",
+        "RRHH financiero: fondo"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/liquidaciones"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/rrhh/empleados/:id/liquidacion"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/rrhh/liquidaciones/:id/confirmar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/rrhh/liquidaciones/:id/pagar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/rrhh/liquidaciones/:id/pago/revertir"
+        }
+      ],
+      "verified_checks": [
+        "Cálculo/replay no causa cese; aprobación distinta termina contrato y consume CTS pendiente",
+        "Banco, transferencia y reversa conservan pago original y saldos exactos",
+        "Segregación de calculador/aprobador/pagador/reversor",
+        "Mutaciones ajenas 404 y consulta aislada",
+        "Un asiento confirmado cuadrado por devengo, pago y reversa"
+      ],
+      "pending_checks": [
+        "UI de cálculo/confirmación y otras causas de cese",
+        "Lector/demás roles por operación",
+        "Casos normativos de jornadas/regímenes/beneficios; efectivo no ofrecido por la UI"
+      ]
+    },
+    {
+      "id": "payroll-first-admin-approval-bank",
+      "source": "scripts/ci/test-peru-payroll-plame-local.mjs",
+      "required_scenario_prefixes": [
+        "Planilla primer ADMIN: alta/replay",
+        "Planilla primer ADMIN: aprobación/pago"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/rrhh/planillas"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/rrhh/planillas/:id/calcular"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/planillas/:id/detalle"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/boleta/:empleadoPlanillaId"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/rrhh/planillas/:id/aprobar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/rrhh/planillas/:id/pagar"
+        }
+      ],
+      "verified_checks": [
+        "Alta/replay, cálculo con norma vigente, detalle y boleta JSON persistidos",
+        "Aprobación y pago separados; banco exacto y replay sin duplicar",
+        "Tres eventos consumidos con un asiento confirmado cuadrado por evento"
+      ],
+      "pending_checks": [
+        "Alta/cálculo/aprobación/pago y PDF/impresión por UI",
+        "Cada rol/aislamiento por operación",
+        "Cálculo personalizado, conceptos, pago parcial/por empleado, otras jornadas y aceptación normativa externa"
+      ]
+    },
+    {
+      "id": "plame-first-admin-sources-zip",
+      "source": "scripts/ci/test-peru-payroll-plame-local.mjs",
+      "required_scenario_prefixes": [
+        "PLAME/T-Registro: ficha/jornada",
+        "PLAME/T-Registro: ficha y jornada",
+        "PLAME/T-Registro: ZIP real",
+        "PLAME/T-Registro: ficha ajena"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/peru/planilla-electronica/:planillaId/preview"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/rrhh/peru/planilla-electronica/empleados/:empleadoId/ficha"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/rrhh/peru/planilla-electronica/detalles/:detalleId/jornada"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/peru/planilla-electronica/paquetes/historial"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/peru/planilla-electronica/paquetes/:id/descargar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/rrhh/peru/planilla-electronica/paquetes/:id/evidencia"
+        }
+      ],
+      "verified_checks": [
+        "Ficha/jornada incompletas bloquean fuentes; corrección explícita y replay habilitan cuatro RP_*",
+        "Delimitador, RUC y SHA-256; ZIP real contiene las mismas fuentes",
+        "Historial congelado con una versión vigente; evidencia vacía no genera presentación",
+        "Ficha ajena no muta, descarga 404 e historial aislado"
+      ],
+      "pending_checks": [
+        "Edición de ficha/jornada por UI",
+        "Permisos/aislamiento restantes de cada operación",
+        "Códigos/tablas vigentes en PVS, fuentes de cuarta y quinta, cambios/bajas; constancias PVS/SOL cuando exista cliente"
+      ]
+    },
+    {
+      "id": "plame-package-intent-recovery",
+      "source": "scripts/ci/test-peru-payroll-plame-local.mjs",
+      "required_scenario_prefixes": [
+        "Paquete PLAME: misma intención",
+        "Paquete PLAME: clave incompatible",
+        "Paquete PLAME: seis solicitudes",
+        "Paquete PLAME: rol sin permisos"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/rrhh/peru/planilla-electronica/:planillaId/paquetes"
+        }
+      ],
+      "verified_checks": [
+        "Replay devuelve respuesta congelada pese a cambios de fuente/corte",
+        "Actor/cuerpo incompatible y clave inválida rechazados sin versiones residuales",
+        "Seis solicitudes concurrentes crean una sola versión",
+        "Rol sin permisos no consulta ni guarda; SQL prueba revocación e inactividad"
+      ],
+      "pending_checks": [
+        "Aislamiento de la creación por API",
+        "Promoción 559, CI y despliegue exacto"
+      ]
     }
   ]
 }

@@ -68,7 +68,7 @@ http = json.loads(read("http.json"))
 if run.get("success") is not True or run.get("remoteWrites") is not False or run.get("scope", "full") != "full" or http.get("success") is not True:
     raise RuntimeError("Sólo se exportan ensayos completos aprobados sin escritura remota")
 selected = {"run.json": run, "http.json": http, "restore.json": json.loads(read("backup/restore.json"))}
-for name in ["browser-cxc-collection.json", "browser-inventory.json", "browser-rma-refund.json", "browser-manual-accounting.json", "browser-first-client-wizard.json", "browser-bank-finance.json", "browser-hr-lifecycle.json", "annual-acceptance.json", "finance-lifecycle.json", "hr-lifecycle.json", "peru-navigation-admin.json"]:
+for name in ["browser-cxc-collection.json", "browser-inventory.json", "browser-rma-refund.json", "browser-manual-accounting.json", "browser-first-client-wizard.json", "browser-bank-finance.json", "browser-hr-lifecycle.json", "annual-acceptance.json", "finance-lifecycle.json", "hr-lifecycle.json", "hr-financial.json", "payroll-plame.json", "browser-hr-financial.json", "browser-payroll-plame.json", "peru-navigation-admin.json"]:
     try:
         selected[name] = json.loads(read(name))
     except (FileNotFoundError, KeyError):

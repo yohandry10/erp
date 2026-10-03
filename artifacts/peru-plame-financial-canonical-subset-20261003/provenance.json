@@ -1,0 +1,12 @@
+{
+  "local_source": "artifacts/peru-integrated-20261003062442888-21592",
+  "snapshot_local_schema": 558,
+  "applied_local_migration": 559,
+  "all_migrations_fresh": false,
+  "full_erp_acceptance": false,
+  "remoteWrites": false,
+  "dumps_extracted": false,
+  "browser_passed": 2,
+  "official_pvs_validation": false,
+  "sunat_presentation": false
+}
