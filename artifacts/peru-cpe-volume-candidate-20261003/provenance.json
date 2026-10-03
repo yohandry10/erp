@@ -1,0 +1,12 @@
+{
+  "source": "artifacts/peru-cpe-local-20261003165832973-19440",
+  "scope": "Candidato anterior: 18 de 19 API; volumen201/PDF80 aprobados, replay técnico fallido",
+  "global_acceptance": false,
+  "remoteWrites": false,
+  "dumps_extracted": false,
+  "limits": [
+    "Infraestructura efímera real; no transmite ni acredita aceptación SUNAT",
+    "Certificado desechable local no publicado",
+    "PDFs, PFX, dumps y logs completos permanecen privados"
+  ]
+}

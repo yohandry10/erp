@@ -1,0 +1,9 @@
+{
+  "read_only": true,
+  "run_id": 35826660731,
+  "sha": "62068eecb5b7b7c23db6a56f8baa00f92a4a330d",
+  "workflow": "CI",
+  "status": "completed",
+  "conclusion": "success",
+  "scope": "Cierra la consulta histórica pendiente del 23 de septiembre; no acredita versiones posteriores ni aceptación integral."
+}

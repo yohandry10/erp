@@ -1,0 +1,19 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "source": "artifacts/peru-cpe-canonical-local-20261003181318910-19008",
+  "api_passed": 24,
+  "api_failed": [
+    {
+      "scenario": "CPE: lectura y reenvío sin permiso XML no revelan XML y emisión/PDF quedan prohibidos"
+    },
+    {
+      "scenario": "CPE: RPC sin EXECUTE responde 503 y permite reintento único tras restaurar permiso"
+    }
+  ],
+  "browser_complete": false,
+  "browser_partial_checks": 3,
+  "browser_instrumentation_error": "El JSON inicial marcaba success antes de terminar; el test ahora exige todas las comprobaciones. La expectativa de una leyenda no existente fue sustituida por el estado READY realmente persistido.",
+  "restore_success": true,
+  "complete_erp_acceptance": false
+}

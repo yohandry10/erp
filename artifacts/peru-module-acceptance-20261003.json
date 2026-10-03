@@ -1,17 +1,25 @@
 {
-  "generated_at": "2026-10-03T16:15:56.883Z",
+  "generated_at": "2026-10-03T18:46:44.042Z",
   "scope": "Inventario y aceptación por módulo/operación; únicamente Analytics excluido",
   "operational_accounting_tax_reports_included": true,
   "complete_acceptance": false,
   "source_api_matrix": "artifacts/peru-api-operation-matrix-20260930.json",
   "source_ui_matrix": "artifacts/peru-ui-operation-matrix-20261002.json",
   "country_applicability": "artifacts/peru-country-applicability-20261003.json",
-  "evidence": "artifacts/peru-integrated-20261003154825399-19744",
+  "evidence": "artifacts/peru-integrated-ci-37139151230",
   "additional_evidence": [
     {
-      "evidence": "artifacts/peru-storage-ci-37132251731",
+      "evidence": "artifacts/peru-storage-ci-37139151230",
       "scope": "company_logo_real_storage_subset",
-      "global_success": true,
+      "phase_success": true,
+      "complete_erp_acceptance": false,
+      "ui_included": true
+    },
+    {
+      "evidence": "artifacts/peru-cpe-canonical-acceptance-20261003",
+      "scope": "cpe_canonical_restored_subset",
+      "phase_success": true,
+      "complete_erp_acceptance": false,
       "ui_included": true
     }
   ],
@@ -20,9 +28,15 @@
     "schema_at_last_runtime_read": 563,
     "proof": "artifacts/peru-production-verification-after-133-20261003.json"
   },
+  "current_runtime_observation": {
+    "sha": "9e301e2ae9f470b56ffc10d775ab09c4a8d6a76b",
+    "schema": 564,
+    "proof": "artifacts/peru-production-pending-main-after-134-20261003.json",
+    "main_ci": "37142023714 rerun pending"
+  },
   "current_database_schema": {
-    "version": 563,
-    "proof": "artifacts/peru-563-promotion-20261003131306420.json"
+    "version": 564,
+    "proof": "artifacts/peru-564-promotion-20261003175006608.json"
   },
   "acceptance_rule": "Contrato observado o control visible no implica ejecutar ni aceptar toda una operación. Se conservan variantes de país, infraestructura y pendientes por operación para no ocultar huecos.",
   "navigation": {
@@ -3119,33 +3133,36 @@
     {
       "module": "cpe",
       "declared_contracts": 43,
-      "observed_contracts": 1,
-      "operations_with_functional_cases": 0,
+      "observed_contracts": 13,
+      "operations_with_functional_cases": 13,
       "complete_acceptance": false,
-      "verified_case_ids": [],
+      "verified_case_ids": [
+        "cpe-external-failure-and-note-gates",
+        "cpe-real-read-failure-recovery",
+        "cpe-direct-signed-invoice-replay",
+        "cpe-credit-and-no-invalid-effects",
+        "cpe-boleta-and-multipage",
+        "cpe-reader-and-sql-authorization",
+        "cpe-write-rollback-recovery",
+        "cpe-ui-net-price-and-emission-date",
+        "cpe-query-validation-export",
+        "cpe-detail-xml-pdf-isolation"
+      ],
       "pending_operations": [
         {
           "method": "GET",
           "endpoint": "/api/cpe/baja/elegibles",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "Notas y bajas con precondición de CDR local controlada; aceptación, acuses y reintentos externos SUNAT"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/cpe/baja/lotes",
-          "result": "http_contract_observed_not_full_acceptance",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "Notas y bajas con precondición de CDR local controlada; aceptación, acuses y reintentos externos SUNAT"
           ]
         },
         {
@@ -3295,25 +3312,17 @@
         {
           "method": "GET",
           "endpoint": "/api/cpe/notas-referenciadas/origenes",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "Notas y bajas con precondición de CDR local controlada; aceptación, acuses y reintentos externos SUNAT"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/cpe/notas-referenciadas",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "Notas y bajas con precondición de CDR local controlada; aceptación, acuses y reintentos externos SUNAT"
           ]
         },
         {
@@ -3331,25 +3340,22 @@
         {
           "method": "GET",
           "endpoint": "/api/cpe/stats",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "Errores de red y de PDF/Storage; UI bajo caída real de lectura"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/cpe/comprobantes",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "Variantes de receptor, afectación, descuentos, transporte y certificado; claves legacy sin huella fallan cerrado",
+            "Retenciones, percepciones, detracciones, anticipos y cobros parciales por factura manual",
+            "Más variantes de boleta, IGV y monedas permitidas; representación física",
+            "Otras combinaciones de permisos/sucursal y UI con lector",
+            "Fallos externos post commit y recuperación tras reinicio de worker",
+            "Fechas históricas con hora real; otras afectaciones tributarias"
           ]
         },
         {
@@ -3391,49 +3397,41 @@
         {
           "method": "GET",
           "endpoint": "/api/cpe/comprobantes",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "Concurrencia de altas durante exportación; variantes de volúmenes y búsqueda",
+            "Errores de red y de PDF/Storage; UI bajo caída real de lectura",
+            "Fechas históricas con hora real; otras afectaciones tributarias"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/cpe/comprobantes/export",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "Concurrencia de altas durante exportación; variantes de volúmenes y búsqueda"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/cpe/comprobantes/:id",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "Variantes históricas, otros roles y clientes; PDF visual tiene evidencia separada",
+            "Más variantes de boleta, IGV y monedas permitidas; representación física",
+            "Errores de red y de PDF/Storage; UI bajo caída real de lectura",
+            "Otras combinaciones de permisos/sucursal y UI con lector"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/cpe/comprobantes/:id/pdf",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "Variantes históricas, otros roles y clientes; PDF visual tiene evidencia separada",
+            "Más variantes de boleta, IGV y monedas permitidas; representación física",
+            "Errores de red y de PDF/Storage; UI bajo caída real de lectura",
+            "Otras combinaciones de permisos/sucursal y UI con lector"
           ]
         },
         {
@@ -3571,37 +3569,30 @@
         {
           "method": "GET",
           "endpoint": "/api/cpe/:id",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "Variantes históricas, otros roles y clientes; PDF visual tiene evidencia separada",
+            "Errores de red y de PDF/Storage; UI bajo caída real de lectura"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/cpe/:id/xml",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "Variantes históricas, otros roles y clientes; PDF visual tiene evidencia separada",
+            "Errores de red y de PDF/Storage; UI bajo caída real de lectura",
+            "Otras combinaciones de permisos/sucursal y UI con lector",
+            "Fechas históricas con hora real; otras afectaciones tributarias"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/cpe/:id/resend",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "Notas y bajas con precondición de CDR local controlada; aceptación, acuses y reintentos externos SUNAT",
+            "Otras combinaciones de permisos/sucursal y UI con lector"
           ]
         },
         {
@@ -3641,7 +3632,23 @@
           ]
         }
       ],
-      "defects": []
+      "defects": [
+        "cpe-read-failure-hidden-as-empty-success",
+        "cpe-direct-intent-different-content",
+        "cpe-ui-credit-client-id-discarded",
+        "cpe-ui-net-price-written-as-gross",
+        "cpe-peru-credit-controls-missing",
+        "cpe-rpc-execute-failure-misclassified",
+        "cpe-invalid-page-and-date-http-success",
+        "cpe-ui-first-page-only",
+        "cpe-emission-date-filter-uses-creation",
+        "cpe-csv-unescaped-fields",
+        "cpe-csv-truncated-at-200",
+        "cpe-missing-detail-http-success",
+        "cpe-invalid-read-id-http-success",
+        "cpe-fiscal-technical-replay-created-success",
+        "cpe-resend-key-conflict-misclassified"
+      ]
     },
     {
       "module": "dashboard",

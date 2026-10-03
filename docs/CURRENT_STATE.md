@@ -2,6 +2,30 @@
 
 Actualizado: 2026-10-03.
 
+Corte vigente POS/CPE: #134 se integró como `9e301e2a` después de 28 checks
+aprobados; ambos CI del SHA `c0f055eb` pasaron 316 escenarios API, 30 pruebas
+de navegador sin reintentos, SQL fresco, barridos y restore. La 564 se promovió
+una sola vez con preflight, respaldo 563 y preservación de las 38 tablas,
+funciones y seguridad existentes. El runtime observado responde con ese SHA
+y esquema 564. Main 37142023714 falló por OOM de Next dev en el barrido con
+registros; se relanzó el job y permanece pendiente su cierre. E2E y seguridad
+de main aprobaron. Evidencia: `artifacts/peru-main-134-heap-failure-20261003`
+y `artifacts/peru-production-pending-main-after-134-20261003.json`.
+
+CPE directo PE corrigió 15 defectos de intención/replay, crédito, precio neto,
+lecturas, permisos, filtros, CSV y formulario. Las fuentes canónicas pasaron
+26 escenarios API, siete comprobaciones UI y restore sobre un snapshot local
+con DDL 559–565; no equivale a reconstrucción fresca ni aceptación SUNAT.
+Regresión CPE/configuración: 37 suites/492 pruebas; tipos API/web aprobados.
+La 565 ata contenido y actor a la intención de factura/boleta directa, conserva
+los writers de pedido/POS y permite sólo ejecución service_role. El ensayo
+del respaldo privado 564 pasó rollback y preservación de 42 tablas, funciones,
+RLS, triggers y ACL. **565 no está promovida**; falta CI exacto, promoción única,
+main y runtime. Evidencia: `artifacts/peru-cpe-canonical-acceptance-20261003`
+y `artifacts/erp-peru-565-rehearsal-20261003181225075-17072.json`.
+La matriz conserva 717 contratos, 97 casos y 64 defectos con sus pendientes;
+no hay aceptación integral del lanzamiento ni confirmación del plan de Render.
+
 Corte técnico 131/132: el cierre 131 promovió 562 una sola vez con preflight,
 respaldo 560, rollback local y preservación de 29 tablas/funciones/seguridad
 (artifacts/peru-562-promotion-20261003120329303.json). #131 se integró como

@@ -39,14 +39,18 @@ try{
  mkdirSync(path.join(output,'backup'),{recursive:true});
  writeFileSync(path.join(output,'backup/storage-files.tar'),archive);
  proof.archive_bytes=archive.length;proof.archive_sha256=sha(archive);
- target=docker(['run','--rm','--detach','--name',network+'-restored-storage','--network',network,'--publish','127.0.0.1:55520:5000',
+ target=docker(['run','--rm','--detach','--name',network+'-restored-storage','--network',network,'--publish','127.0.0.1::5000',
   '--env','ANON_KEY='+jwt('anon'),'--env','SERVICE_KEY='+jwt('service_role'),'--env','AUTH_JWT_SECRET=local-integration-key-only-never-production-20260905',
   '--env',`DATABASE_URL=postgres://postgres@${database.Name.slice(1)}:5432/erp_e2e`,'--env',`POSTGREST_URL=http://${network}-rest:3000`,
   '--env','STORAGE_BACKEND=file','--env','FILE_STORAGE_BACKEND_PATH=/var/lib/storage','--env','TENANT_ID=local-storage-peru-only','--env','REGION=local','--env','GLOBAL_S3_BUCKET=local-ephemeral','--env','FILE_SIZE_LIMIT=2097152','--env','ENABLE_IMAGE_TRANSFORMATION=false',image],{encoding:'utf8'}).trim();
  assert.match(target,/^[0-9a-f]{64}$/);
+ const bindings=inspect(target).NetworkSettings.Ports['5000/tcp'];
+ assert.equal(bindings.length,1);assert.equal(bindings[0].HostIp,'127.0.0.1');assert.match(bindings[0].HostPort,/^\d{4,5}$/);
+ const restoredOrigin='http://127.0.0.1:'+bindings[0].HostPort;
+ proof.restored_local_port=Number(bindings[0].HostPort);
  let ready=false;
  for(let attempt=0;attempt<60;attempt++){
-  try{const r=await fetch('http://127.0.0.1:55520/status',{signal:AbortSignal.timeout(1000)});await r.body?.cancel();if(r.status===200){ready=true;break;}}catch{}
+  try{const r=await fetch(restoredOrigin+'/status',{signal:AbortSignal.timeout(1000)});await r.body?.cancel();if(r.status===200){ready=true;break;}}catch{}
   await delay(500);
  }
  assert.ok(ready,'Storage restaurado debe estar disponible');
@@ -55,12 +59,12 @@ try{
   assert.equal(object.bucket,'company-assets');assert.ok(!object.name.includes('..'));
   const suffix='/object/public/'+encodeURIComponent(object.bucket)+'/'+object.name.split('/').map(encodeURIComponent).join('/');
   const read=async url=>{const r=await fetch(url,{redirect:'error',signal:AbortSignal.timeout(5000)});assert.equal(r.status,200);return Buffer.from(await r.arrayBuffer());};
-  const before=await read(sourceUrl.origin+suffix),after=await read('http://127.0.0.1:55520'+suffix);
+  const before=await read(sourceUrl.origin+suffix),after=await read(restoredOrigin+suffix);
   assert.deepEqual(after,before);assert.ok(after.length>0);
   proof.objects.push({path_sha256:sha(object.name),bytes:after.length,content_sha256:sha(after)});
  }
  proof.success=true;
-}catch(error){proof.error=error.message;throw error;}
+}catch(error){proof.error='Fallo de recuperación de archivos Storage; diagnóstico completo en log privado';proof.error_code=error.code||'STORAGE_RESTORE_FAILED';throw error;}
 finally{
  if(target)docker(['stop','--time','2',target],{stdio:'ignore'});
  proof.checkedAt=new Date().toISOString();writeFileSync(path.join(output,'storage-restore.json'),JSON.stringify(proof,null,2));

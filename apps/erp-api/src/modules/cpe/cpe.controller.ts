@@ -35,7 +35,7 @@ import { ReferencedNotesService } from './referenced-notes.service';
 import { DesktopSignedCpeDto } from './dto/desktop-signed-cpe.dto';
 import { CreateDianEventDto, ImportDianReceivedInvoiceDto } from './dto/dian-event.dto';
 import { CpeDianEventsService } from './cpe-dian-events.service';
-
+
 import { CrearComprobanteUiDto } from './dto/crear-comprobante-ui.dto';
 
 @ApiTags('cpe')
@@ -193,21 +193,7 @@ export class CpeController {
   @RequirePermission('cpe.reportes.ver')
   @ApiOperation({ summary: 'Obtener estadísticas de CPE' })
   async getStats(@CurrentTenant() tenantId: string) {
-    try {
-      console.log('📊 Calculando estadísticas CPE...');
-      return await this.cpeService.getStatsFromDatabase(tenantId);
-    } catch (error) {
-      console.error('❌ Error calculando stats CPE:', error);
-      return {
-        success: false,
-        data: {
-          cpeEmitidosHoy: 0,
-          cpeDelMes: 0,
-          montoFacturado: 0,
-          rechazados: 0
-        }
-      };
-    }
+    return this.cpeService.getStatsFromDatabase(tenantId);
   }
 
   @Post('comprobantes')
@@ -271,17 +257,7 @@ export class CpeController {
     @Query() filters: any,
     @CurrentTenant() tenantId: string,
   ) {
-    try {
-      console.log('📄 Cargando comprobantes CPE desde BD...');
-      return await this.cpeService.getComprobantesFromDatabase(filters, tenantId);
-    } catch (error) {
-      console.error('❌ Error cargando comprobantes CPE:', error);
-      return {
-        success: false,
-        message: 'Error cargando comprobantes',
-        data: []
-      };
-    }
+    return this.cpeService.getComprobantesFromDatabase(filters, tenantId);
   }
 
   @Get('comprobantes/export')
@@ -295,9 +271,6 @@ export class CpeController {
     @Res() res: Response,
   ) {
     const result = await this.cpeService.exportComprobantesCsv(filters, tenantId);
-    if (!result.success) {
-      return res.status(400).json({ success: false, message: result.message || 'Error exportando comprobantes' });
-    }
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
@@ -309,26 +282,10 @@ export class CpeController {
   @RequirePermission('cpe.comprobantes.ver')
   @ApiOperation({ summary: 'Obtener datos del CPE' })
   async getCpeData(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentTenant() tenantId: string,
   ) {
-    try {
-      console.log(`📄 Obteniendo datos CPE: ${id}`);
-
-      const cpeData = await this.cpeService.getCpeById(id, tenantId);
-
-      return {
-        success: true,
-        data: cpeData
-      };
-    } catch (error) {
-      console.error('❌ Error obteniendo datos CPE:', error);
-      return {
-        success: false,
-        message: 'Error obteniendo datos del CPE',
-        error: error.message
-      };
-    }
+    return { success: true, data: await this.cpeService.getCpeById(id, tenantId) };
   }
 
   @Get('comprobantes/:id/pdf')
@@ -337,29 +294,17 @@ export class CpeController {
   @ApiOperation({ summary: 'Descargar PDF del CPE' })
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   async downloadPdf(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentTenant() tenantId: string,
     @Res() res: Response,
   ) {
-    try {
-      console.log(`📄 Generando PDF para CPE: ${id}`);
-      const pdfBuffer = await this.cpeService.generatePdf(id, tenantId);
-
-      res.set({
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="cpe-${id}.pdf"`,
-        'Content-Length': pdfBuffer.length,
-      });
-
-      res.send(pdfBuffer);
-    } catch (error) {
-      console.error('❌ Error generando PDF:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error generando PDF',
-        error: error.message
-      });
-    }
+    const pdfBuffer = await this.cpeService.generatePdf(id, tenantId);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="cpe-${id}.pdf"`,
+      'Content-Length': pdfBuffer.length,
+    });
+    return res.send(pdfBuffer);
   }
 
   @Post('comprobantes/:id/enviar-sunat')
@@ -583,7 +528,7 @@ export class CpeController {
   @RequirePermission('cpe.comprobantes.ver')
   @ApiOperation({ summary: 'Obtener CPE por ID' })
   async findOne(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentTenant() tenantId: string,
   ): Promise<any> {
     return this.cpeService.findOne(id, tenantId);
@@ -594,7 +539,7 @@ export class CpeController {
   @RequirePermission('cpe.comprobantes.descargar_xml')
   @ApiOperation({ summary: 'Descargar XML firmado del CPE' })
   async downloadXml(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentTenant() tenantId: string,
     @Res() res: Response,
   ) {

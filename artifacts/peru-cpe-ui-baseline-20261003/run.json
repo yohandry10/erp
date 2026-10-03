@@ -1,0 +1,15 @@
+{
+  "completedAt": "2026-10-03T17:51:01.681Z",
+  "success": false,
+  "withBrowser": true,
+  "withSurvey": false,
+  "withRecords": false,
+  "candidateApi": true,
+  "candidateSql": false,
+  "candidateUi": false,
+  "scope": "cpe_export_restored_subset",
+  "database": "PostgreSQL 16 efímero",
+  "output": "artifacts/peru-cpe-restored-local-20261003174901380-26012",
+  "remoteWrites": false,
+  "global_acceptance": false
+}

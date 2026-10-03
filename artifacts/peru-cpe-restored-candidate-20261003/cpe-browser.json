@@ -1,0 +1,27 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "UI real y API/DB locales; sin transporte fiscal externo",
+  "checks": [
+    {
+      "check": "Las 201 coincidencias son accesibles por páginas",
+      "passed": true,
+      "api_total": 201,
+      "first_page_rows": 50
+    },
+    {
+      "check": "Formulario recupera una respuesta perdida con el mismo CPE y la misma intención",
+      "passed": true,
+      "statuses": [
+        201,
+        201
+      ]
+    },
+    {
+      "check": "Formulario PE a crédito selecciona maestro y confirma CPE",
+      "passed": true,
+      "master_selector": true,
+      "http_status": 201
+    }
+  ]
+}

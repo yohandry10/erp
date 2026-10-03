@@ -1,0 +1,23 @@
+{
+  "remoteWrites": false,
+  "source": "artifacts/peru-cpe-canonical-local-20261003184138928-26460",
+  "complete_erp_acceptance": false,
+  "canonical_source_hashes": {
+    "apps/erp-api/src/modules/cpe/cpe.service.ts": "632503a2d336b7c68c3c438414a5df4f19d712a5e12d71add30a1d2b3fe8af1a",
+    "apps/erp-api/src/modules/cpe/cpe.controller.ts": "8f4b5c3730452f391a6eca760303804ff475a5f861cc0ba0571540304488320e",
+    "apps/erp-api/src/modules/cpe/cpe-delivery.service.ts": "be93b2cd982e3b07a4ac684ed6dbbc0728e48c990db1805aaabf9aa93a24e49e",
+    "apps/erp-api/src/modules/cpe/pdf-generator.service.ts": "d6217e7472831d26c57bd45ebfefa5e6190867b600ad9ed61a868dd032a5bd3c",
+    "apps/erp-api/src/modules/cpe/cpe-reporting.service.ts": "2e1038febc9517a3e432e666e29b70a127e98f3767e4fde049d7f93c10a50709",
+    "apps/erp-api/src/modules/cpe/cpe-registration.service.ts": "00c22deaf979981853925cf7a0d05115ebcb96285d51e192cd2141f6669789af",
+    "apps/web/app/dashboard/cpe/page.tsx": "656e084970ab62918a7cc25fd892ab4827d7a0269fcfde7cd465ccb3973b6d72",
+    "apps/web/components/modals/CpeModal.tsx": "9cbdc77f04e1a6d3dfc06d017a58aaf71ccb6334029dd6253cd2dcf09df26993",
+    "supabase/migrations/565__peru_direct_cpe_intents.sql": "bf23425b73e3eb1c587203e103bf3e2bdc595a9fff999d92e82ab86d02cccbb6",
+    "scripts/ci/test-peru-cpe-operations-local.mjs": "bae92ab20062204ec1b76bc3d37af0119e8ea2e4d9c203b781fd9bc32638e54d",
+    "apps/web/tests/e2e/peru-cpe-local.spec.ts": "0f5b1a6e2677b19ed10c3a22624ba36007429e582a43c0d98faf3b3e8bf096c0"
+  },
+  "limits": [
+    "Snapshot local restaurado y DDL canónica 559–565; no reconstrucción fresca de todas las migraciones",
+    "No hubo transporte fiscal ni aceptación SUNAT",
+    "PFX, dumps, PDF completo, logs y trazas de navegador permanecen privados"
+  ]
+}

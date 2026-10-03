@@ -1,18 +1,26 @@
 {
-  "generated_at": "2026-10-03T16:15:56.769Z",
+  "generated_at": "2026-10-03T18:46:38.972Z",
   "inventory": "artifacts/peru-api-operation-inventory-20260930.json",
-  "evidence": "artifacts/peru-integrated-20261003154825399-19744",
+  "evidence": "artifacts/peru-integrated-ci-37139151230",
   "additional_evidence": [
     {
-      "evidence": "artifacts/peru-storage-ci-37132251731",
+      "evidence": "artifacts/peru-storage-ci-37139151230",
       "scope": "company_logo_real_storage_subset",
-      "global_success": true,
+      "phase_success": true,
+      "complete_erp_acceptance": false,
+      "ui_included": true
+    },
+    {
+      "evidence": "artifacts/peru-cpe-canonical-acceptance-20261003",
+      "scope": "cpe_canonical_restored_subset",
+      "phase_success": true,
+      "complete_erp_acceptance": false,
       "ui_included": true
     }
   ],
   "evidence_scope": "full",
-  "evidence_global_success": false,
-  "evidence_phase": "HTTP aprobado; el resultado global se conserva por separado",
+  "evidence_global_success": true,
+  "evidence_phase": "ensayo global aprobado",
   "evidence_kind": "HTTP contra Nest/PostgREST/PostgreSQL efímeros; no contiene cuerpos, tokens ni credenciales",
   "acceptance_rule": "HTTP observado no acredita aceptación funcional. verified_cases sólo recoge contratos cuyo escenario funcional pasó; conserva pendientes explícitos y no acepta toda la operación.",
   "acceptance_cases": "artifacts/peru-operation-acceptance-cases-20260930.json",
@@ -948,6 +956,18 @@
         },
         {
           "trace_index": 1323,
+          "status": 201
+        },
+        {
+          "trace_index": 1327,
+          "status": 201
+        },
+        {
+          "trace_index": 1328,
+          "status": 201
+        },
+        {
+          "trace_index": 1388,
           "status": 201
         }
       ],
@@ -3606,12 +3626,16 @@
         {
           "trace_index": 1250,
           "status": 201
+        },
+        {
+          "trace_index": 1329,
+          "status": 201
         }
       ],
       "defects": [
         {
           "id": "pos-first-client-missing-payment-catalog",
-          "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+          "status": "corrected_merged_main_runtime_observed_main_ci_retry",
           "proof": {
             "source": "artifacts/peru-pos-api-defects-20261003/pos-operations.json",
             "observed_error": "Catálogo POS vacío después del wizard",
@@ -3619,7 +3643,7 @@
           },
           "correction": "564 crea cuatro referencias sólo para configuración nueva PE; sin backfill ni datos comerciales.",
           "pending": [
-            "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+            "CI main 37142023714 relanzado tras OOM del servidor Next de pruebas; verificación final del runtime."
           ]
         }
       ],
@@ -7985,16 +8009,26 @@
       "method": "GET",
       "endpoint": "/api/cpe/baja/elegibles",
       "source": "apps/erp-api/src/modules/cpe/comunicacion-baja.controller.ts:22",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1377,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "cpe-external-failure-and-note-gates",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Sin SOL, intento/replay 503 explícito, sin CDR ni cambio económico",
+            "Notas/bajas no inventan origen aceptado ni aceptación"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Notas y bajas con precondición de CDR local controlada; aceptación, acuses y reintentos externos SUNAT"
       ]
     },
     {
@@ -8011,17 +8045,26 @@
         {
           "trace_index": 159,
           "status": 200
+        },
+        {
+          "trace_index": 1378,
+          "status": 200
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "cpe-external-failure-and-note-gates",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Sin SOL, intento/replay 503 explícito, sin CDR ni cambio económico",
+            "Notas/bajas no inventan origen aceptado ni aceptación"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Notas y bajas con precondición de CDR local controlada; aceptación, acuses y reintentos externos SUNAT"
       ]
     },
     {
@@ -8137,7 +8180,7 @@
       "operation": "createFromWorker",
       "method": "POST",
       "endpoint": "/api/cpe/worker/create",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:53",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:52",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8155,7 +8198,7 @@
       "operation": "enviarSunatWorker",
       "method": "POST",
       "endpoint": "/api/cpe/worker/:id/enviar-sunat",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:68",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:67",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8173,7 +8216,7 @@
       "operation": "checkStatusWorker",
       "method": "GET",
       "endpoint": "/api/cpe/worker/:id/status",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:85",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:84",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8191,7 +8234,7 @@
       "operation": "downloadPdfWorker",
       "method": "GET",
       "endpoint": "/api/cpe/worker/comprobantes/:id/pdf",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:102",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:101",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8209,7 +8252,7 @@
       "operation": "create",
       "method": "POST",
       "endpoint": "/api/cpe",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:122",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:121",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8227,7 +8270,7 @@
       "operation": "findAll",
       "method": "GET",
       "endpoint": "/api/cpe",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:140",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:139",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8245,17 +8288,27 @@
       "operation": "listarOrigenesNota",
       "method": "GET",
       "endpoint": "/api/cpe/notas-referenciadas/origenes",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:151",
-      "existing_evidence": [],
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:150",
+      "existing_evidence": [
+        {
+          "trace_index": 1376,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "cpe-external-failure-and-note-gates",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Sin SOL, intento/replay 503 explícito, sin CDR ni cambio económico",
+            "Notas/bajas no inventan origen aceptado ni aceptación"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Notas y bajas con precondición de CDR local controlada; aceptación, acuses y reintentos externos SUNAT"
       ]
     },
     {
@@ -8263,17 +8316,27 @@
       "operation": "crearNotaReferenciada",
       "method": "POST",
       "endpoint": "/api/cpe/notas-referenciadas",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:162",
-      "existing_evidence": [],
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:161",
+      "existing_evidence": [
+        {
+          "trace_index": 1361,
+          "status": 400
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "cpe-external-failure-and-note-gates",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Sin SOL, intento/replay 503 explícito, sin CDR ni cambio económico",
+            "Notas/bajas no inventan origen aceptado ni aceptación"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Notas y bajas con precondición de CDR local controlada; aceptación, acuses y reintentos externos SUNAT"
       ]
     },
     {
@@ -8281,7 +8344,7 @@
       "operation": "firmarNotaReferenciada",
       "method": "POST",
       "endpoint": "/api/cpe/notas-referenciadas/:id/firmar",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:177",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:176",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8299,17 +8362,40 @@
       "operation": "getStats",
       "method": "GET",
       "endpoint": "/api/cpe/stats",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:192",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:191",
+      "existing_evidence": [
+        {
+          "trace_index": 1384,
+          "status": 503
+        }
+      ],
+      "defects": [
+        {
+          "id": "cpe-read-failure-hidden-as-empty-success",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-read-errors-20261003",
+            "observed_error": "REVOKE SELECT real devolvía 200/404/500; estadísticas aparentaban cero exitoso.",
+            "local_only": true
+          },
+          "correction": "503 explícito en lecturas y errores visibles en UI.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "cpe-real-read-failure-recovery",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "REVOKE SELECT real devuelve 503 en seis lecturas; GRANT permite recuperar, sin impactos económicos"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Errores de red y de PDF/Storage; UI bajo caída real de lectura"
       ]
     },
     {
@@ -8317,17 +8403,1037 @@
       "operation": "createComprobante",
       "method": "POST",
       "endpoint": "/api/cpe/comprobantes",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:214",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:199",
+      "existing_evidence": [
+        {
+          "trace_index": 1331,
+          "status": 201
+        },
+        {
+          "trace_index": 1332,
+          "status": 201
+        },
+        {
+          "trace_index": 1333,
+          "status": 201
+        },
+        {
+          "trace_index": 1334,
+          "status": 409
+        },
+        {
+          "trace_index": 1357,
+          "status": 201
+        },
+        {
+          "trace_index": 1358,
+          "status": 400
+        },
+        {
+          "trace_index": 1359,
+          "status": 400
+        },
+        {
+          "trace_index": 1360,
+          "status": 400
+        },
+        {
+          "trace_index": 1362,
+          "status": 201
+        },
+        {
+          "trace_index": 1366,
+          "status": 201
+        },
+        {
+          "trace_index": 1368,
+          "status": 201
+        },
+        {
+          "trace_index": 1389,
+          "status": 403
+        },
+        {
+          "trace_index": 1393,
+          "status": 201
+        },
+        {
+          "trace_index": 1398,
+          "status": 403
+        },
+        {
+          "trace_index": 1400,
+          "status": 400
+        },
+        {
+          "trace_index": 1401,
+          "status": 400
+        },
+        {
+          "trace_index": 1402,
+          "status": 503
+        },
+        {
+          "trace_index": 1403,
+          "status": 201
+        },
+        {
+          "trace_index": 1404,
+          "status": 201
+        },
+        {
+          "trace_index": 1405,
+          "status": 503
+        },
+        {
+          "trace_index": 1406,
+          "status": 201
+        },
+        {
+          "trace_index": 1407,
+          "status": 201
+        },
+        {
+          "trace_index": 1408,
+          "status": 201
+        },
+        {
+          "trace_index": 1411,
+          "status": 201
+        },
+        {
+          "trace_index": 1412,
+          "status": 201
+        },
+        {
+          "trace_index": 1413,
+          "status": 201
+        },
+        {
+          "trace_index": 1414,
+          "status": 201
+        },
+        {
+          "trace_index": 1415,
+          "status": 201
+        },
+        {
+          "trace_index": 1416,
+          "status": 201
+        },
+        {
+          "trace_index": 1417,
+          "status": 201
+        },
+        {
+          "trace_index": 1418,
+          "status": 201
+        },
+        {
+          "trace_index": 1419,
+          "status": 201
+        },
+        {
+          "trace_index": 1420,
+          "status": 201
+        },
+        {
+          "trace_index": 1421,
+          "status": 201
+        },
+        {
+          "trace_index": 1422,
+          "status": 201
+        },
+        {
+          "trace_index": 1423,
+          "status": 201
+        },
+        {
+          "trace_index": 1424,
+          "status": 201
+        },
+        {
+          "trace_index": 1425,
+          "status": 201
+        },
+        {
+          "trace_index": 1426,
+          "status": 201
+        },
+        {
+          "trace_index": 1427,
+          "status": 201
+        },
+        {
+          "trace_index": 1428,
+          "status": 201
+        },
+        {
+          "trace_index": 1429,
+          "status": 201
+        },
+        {
+          "trace_index": 1430,
+          "status": 201
+        },
+        {
+          "trace_index": 1431,
+          "status": 201
+        },
+        {
+          "trace_index": 1432,
+          "status": 201
+        },
+        {
+          "trace_index": 1433,
+          "status": 201
+        },
+        {
+          "trace_index": 1434,
+          "status": 201
+        },
+        {
+          "trace_index": 1435,
+          "status": 201
+        },
+        {
+          "trace_index": 1436,
+          "status": 201
+        },
+        {
+          "trace_index": 1437,
+          "status": 201
+        },
+        {
+          "trace_index": 1438,
+          "status": 201
+        },
+        {
+          "trace_index": 1439,
+          "status": 201
+        },
+        {
+          "trace_index": 1440,
+          "status": 201
+        },
+        {
+          "trace_index": 1441,
+          "status": 201
+        },
+        {
+          "trace_index": 1442,
+          "status": 201
+        },
+        {
+          "trace_index": 1443,
+          "status": 201
+        },
+        {
+          "trace_index": 1444,
+          "status": 201
+        },
+        {
+          "trace_index": 1445,
+          "status": 201
+        },
+        {
+          "trace_index": 1446,
+          "status": 201
+        },
+        {
+          "trace_index": 1447,
+          "status": 201
+        },
+        {
+          "trace_index": 1448,
+          "status": 201
+        },
+        {
+          "trace_index": 1449,
+          "status": 201
+        },
+        {
+          "trace_index": 1450,
+          "status": 201
+        },
+        {
+          "trace_index": 1451,
+          "status": 201
+        },
+        {
+          "trace_index": 1452,
+          "status": 201
+        },
+        {
+          "trace_index": 1453,
+          "status": 201
+        },
+        {
+          "trace_index": 1454,
+          "status": 201
+        },
+        {
+          "trace_index": 1455,
+          "status": 201
+        },
+        {
+          "trace_index": 1456,
+          "status": 201
+        },
+        {
+          "trace_index": 1457,
+          "status": 201
+        },
+        {
+          "trace_index": 1458,
+          "status": 201
+        },
+        {
+          "trace_index": 1459,
+          "status": 201
+        },
+        {
+          "trace_index": 1460,
+          "status": 201
+        },
+        {
+          "trace_index": 1461,
+          "status": 201
+        },
+        {
+          "trace_index": 1462,
+          "status": 201
+        },
+        {
+          "trace_index": 1463,
+          "status": 201
+        },
+        {
+          "trace_index": 1464,
+          "status": 201
+        },
+        {
+          "trace_index": 1465,
+          "status": 201
+        },
+        {
+          "trace_index": 1466,
+          "status": 201
+        },
+        {
+          "trace_index": 1467,
+          "status": 201
+        },
+        {
+          "trace_index": 1468,
+          "status": 201
+        },
+        {
+          "trace_index": 1469,
+          "status": 201
+        },
+        {
+          "trace_index": 1470,
+          "status": 201
+        },
+        {
+          "trace_index": 1471,
+          "status": 201
+        },
+        {
+          "trace_index": 1472,
+          "status": 201
+        },
+        {
+          "trace_index": 1473,
+          "status": 201
+        },
+        {
+          "trace_index": 1474,
+          "status": 201
+        },
+        {
+          "trace_index": 1475,
+          "status": 201
+        },
+        {
+          "trace_index": 1476,
+          "status": 201
+        },
+        {
+          "trace_index": 1477,
+          "status": 201
+        },
+        {
+          "trace_index": 1478,
+          "status": 201
+        },
+        {
+          "trace_index": 1479,
+          "status": 201
+        },
+        {
+          "trace_index": 1480,
+          "status": 201
+        },
+        {
+          "trace_index": 1481,
+          "status": 201
+        },
+        {
+          "trace_index": 1482,
+          "status": 201
+        },
+        {
+          "trace_index": 1483,
+          "status": 429
+        },
+        {
+          "trace_index": 1484,
+          "status": 201
+        },
+        {
+          "trace_index": 1485,
+          "status": 201
+        },
+        {
+          "trace_index": 1486,
+          "status": 201
+        },
+        {
+          "trace_index": 1487,
+          "status": 201
+        },
+        {
+          "trace_index": 1488,
+          "status": 201
+        },
+        {
+          "trace_index": 1489,
+          "status": 201
+        },
+        {
+          "trace_index": 1490,
+          "status": 201
+        },
+        {
+          "trace_index": 1491,
+          "status": 201
+        },
+        {
+          "trace_index": 1492,
+          "status": 201
+        },
+        {
+          "trace_index": 1493,
+          "status": 201
+        },
+        {
+          "trace_index": 1494,
+          "status": 201
+        },
+        {
+          "trace_index": 1495,
+          "status": 201
+        },
+        {
+          "trace_index": 1496,
+          "status": 201
+        },
+        {
+          "trace_index": 1497,
+          "status": 201
+        },
+        {
+          "trace_index": 1498,
+          "status": 201
+        },
+        {
+          "trace_index": 1499,
+          "status": 201
+        },
+        {
+          "trace_index": 1500,
+          "status": 201
+        },
+        {
+          "trace_index": 1501,
+          "status": 201
+        },
+        {
+          "trace_index": 1502,
+          "status": 201
+        },
+        {
+          "trace_index": 1503,
+          "status": 201
+        },
+        {
+          "trace_index": 1504,
+          "status": 201
+        },
+        {
+          "trace_index": 1505,
+          "status": 201
+        },
+        {
+          "trace_index": 1506,
+          "status": 201
+        },
+        {
+          "trace_index": 1507,
+          "status": 201
+        },
+        {
+          "trace_index": 1508,
+          "status": 201
+        },
+        {
+          "trace_index": 1509,
+          "status": 201
+        },
+        {
+          "trace_index": 1510,
+          "status": 201
+        },
+        {
+          "trace_index": 1511,
+          "status": 201
+        },
+        {
+          "trace_index": 1512,
+          "status": 201
+        },
+        {
+          "trace_index": 1513,
+          "status": 201
+        },
+        {
+          "trace_index": 1514,
+          "status": 201
+        },
+        {
+          "trace_index": 1515,
+          "status": 201
+        },
+        {
+          "trace_index": 1516,
+          "status": 201
+        },
+        {
+          "trace_index": 1517,
+          "status": 201
+        },
+        {
+          "trace_index": 1518,
+          "status": 201
+        },
+        {
+          "trace_index": 1519,
+          "status": 201
+        },
+        {
+          "trace_index": 1520,
+          "status": 201
+        },
+        {
+          "trace_index": 1521,
+          "status": 201
+        },
+        {
+          "trace_index": 1522,
+          "status": 201
+        },
+        {
+          "trace_index": 1523,
+          "status": 201
+        },
+        {
+          "trace_index": 1524,
+          "status": 201
+        },
+        {
+          "trace_index": 1525,
+          "status": 201
+        },
+        {
+          "trace_index": 1526,
+          "status": 201
+        },
+        {
+          "trace_index": 1527,
+          "status": 201
+        },
+        {
+          "trace_index": 1528,
+          "status": 201
+        },
+        {
+          "trace_index": 1529,
+          "status": 201
+        },
+        {
+          "trace_index": 1530,
+          "status": 201
+        },
+        {
+          "trace_index": 1531,
+          "status": 201
+        },
+        {
+          "trace_index": 1532,
+          "status": 201
+        },
+        {
+          "trace_index": 1533,
+          "status": 201
+        },
+        {
+          "trace_index": 1534,
+          "status": 201
+        },
+        {
+          "trace_index": 1535,
+          "status": 201
+        },
+        {
+          "trace_index": 1536,
+          "status": 201
+        },
+        {
+          "trace_index": 1537,
+          "status": 201
+        },
+        {
+          "trace_index": 1538,
+          "status": 201
+        },
+        {
+          "trace_index": 1539,
+          "status": 201
+        },
+        {
+          "trace_index": 1540,
+          "status": 201
+        },
+        {
+          "trace_index": 1541,
+          "status": 201
+        },
+        {
+          "trace_index": 1542,
+          "status": 201
+        },
+        {
+          "trace_index": 1543,
+          "status": 201
+        },
+        {
+          "trace_index": 1544,
+          "status": 201
+        },
+        {
+          "trace_index": 1545,
+          "status": 201
+        },
+        {
+          "trace_index": 1546,
+          "status": 201
+        },
+        {
+          "trace_index": 1547,
+          "status": 201
+        },
+        {
+          "trace_index": 1548,
+          "status": 201
+        },
+        {
+          "trace_index": 1549,
+          "status": 201
+        },
+        {
+          "trace_index": 1550,
+          "status": 201
+        },
+        {
+          "trace_index": 1551,
+          "status": 201
+        },
+        {
+          "trace_index": 1552,
+          "status": 201
+        },
+        {
+          "trace_index": 1553,
+          "status": 201
+        },
+        {
+          "trace_index": 1554,
+          "status": 201
+        },
+        {
+          "trace_index": 1555,
+          "status": 201
+        },
+        {
+          "trace_index": 1556,
+          "status": 201
+        },
+        {
+          "trace_index": 1557,
+          "status": 201
+        },
+        {
+          "trace_index": 1558,
+          "status": 201
+        },
+        {
+          "trace_index": 1559,
+          "status": 201
+        },
+        {
+          "trace_index": 1560,
+          "status": 201
+        },
+        {
+          "trace_index": 1561,
+          "status": 201
+        },
+        {
+          "trace_index": 1562,
+          "status": 201
+        },
+        {
+          "trace_index": 1563,
+          "status": 201
+        },
+        {
+          "trace_index": 1564,
+          "status": 201
+        },
+        {
+          "trace_index": 1565,
+          "status": 201
+        },
+        {
+          "trace_index": 1566,
+          "status": 201
+        },
+        {
+          "trace_index": 1567,
+          "status": 201
+        },
+        {
+          "trace_index": 1568,
+          "status": 201
+        },
+        {
+          "trace_index": 1569,
+          "status": 201
+        },
+        {
+          "trace_index": 1570,
+          "status": 201
+        },
+        {
+          "trace_index": 1571,
+          "status": 201
+        },
+        {
+          "trace_index": 1572,
+          "status": 201
+        },
+        {
+          "trace_index": 1573,
+          "status": 201
+        },
+        {
+          "trace_index": 1574,
+          "status": 201
+        },
+        {
+          "trace_index": 1575,
+          "status": 201
+        },
+        {
+          "trace_index": 1576,
+          "status": 201
+        },
+        {
+          "trace_index": 1577,
+          "status": 201
+        },
+        {
+          "trace_index": 1578,
+          "status": 201
+        },
+        {
+          "trace_index": 1579,
+          "status": 201
+        },
+        {
+          "trace_index": 1580,
+          "status": 201
+        },
+        {
+          "trace_index": 1581,
+          "status": 201
+        },
+        {
+          "trace_index": 1582,
+          "status": 201
+        },
+        {
+          "trace_index": 1583,
+          "status": 201
+        },
+        {
+          "trace_index": 1584,
+          "status": 429
+        },
+        {
+          "trace_index": 1585,
+          "status": 201
+        },
+        {
+          "trace_index": 1586,
+          "status": 201
+        },
+        {
+          "trace_index": 1587,
+          "status": 201
+        },
+        {
+          "trace_index": 1588,
+          "status": 201
+        },
+        {
+          "trace_index": 1589,
+          "status": 201
+        },
+        {
+          "trace_index": 1590,
+          "status": 201
+        },
+        {
+          "trace_index": 1591,
+          "status": 201
+        },
+        {
+          "trace_index": 1592,
+          "status": 201
+        },
+        {
+          "trace_index": 1593,
+          "status": 201
+        },
+        {
+          "trace_index": 1594,
+          "status": 201
+        },
+        {
+          "trace_index": 1595,
+          "status": 201
+        },
+        {
+          "trace_index": 1596,
+          "status": 201
+        },
+        {
+          "trace_index": 1597,
+          "status": 201
+        },
+        {
+          "trace_index": 1598,
+          "status": 201
+        },
+        {
+          "trace_index": 1599,
+          "status": 201
+        },
+        {
+          "trace_index": 1600,
+          "status": 201
+        },
+        {
+          "trace_index": 1601,
+          "status": 201
+        },
+        {
+          "trace_index": 1602,
+          "status": 201
+        },
+        {
+          "trace_index": 1603,
+          "status": 201
+        },
+        {
+          "trace_index": 1604,
+          "status": 201
+        },
+        {
+          "trace_index": 1605,
+          "status": 201
+        },
+        {
+          "trace_index": 1606,
+          "status": 201
+        },
+        {
+          "trace_index": 1607,
+          "status": 201
+        },
+        {
+          "trace_index": 1608,
+          "status": 201
+        },
+        {
+          "trace_index": 1609,
+          "status": 201
+        },
+        {
+          "trace_index": 1610,
+          "status": 201
+        },
+        {
+          "trace_index": 1611,
+          "status": 201
+        },
+        {
+          "trace_index": 1612,
+          "status": 201
+        },
+        {
+          "trace_index": 1613,
+          "status": 201
+        }
+      ],
+      "defects": [
+        {
+          "id": "cpe-direct-intent-different-content",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-api-defects-20261003/cpe-operations.json",
+            "observed_error": "Una misma clave con distinto receptor respondía 201 recuperando la factura previa.",
+            "local_only": true
+          },
+          "correction": "RPC 565 ata contenido y actor a la intención, conflicto 409.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cpe-ui-credit-client-id-discarded",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-api-defects-20261003/cpe-operations.json",
+            "observed_error": "Contrato válido a crédito perdía cliente_id y respondía 400.",
+            "local_only": true
+          },
+          "correction": "Normalizador PE propaga el cliente maestro a la CxC atómica.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cpe-ui-net-price-written-as-gross",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-restored-baseline-20261003/cpe-ui-net-price.json",
+            "observed_error": "Formulario de S/20 + IGV guardaba y firmaba PriceAmount 23.60.",
+            "local_only": true
+          },
+          "correction": "Valor neto prevalece; precio_venta conserva unitario bruto.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cpe-peru-credit-controls-missing",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-ui-baseline-20261003/failure.json",
+            "observed_error": "El formulario PE omitía forma/plazo de pago y cliente maestro para crédito.",
+            "local_only": true
+          },
+          "correction": "Crédito PE selecciona maestro; persiste CPE y CxC única.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cpe-rpc-execute-failure-misclassified",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-canonical-first-failure-20261003/failure.json",
+            "observed_error": "REVOKE EXECUTE real en RPC 565 respondía 403; era una caída de infraestructura, no permiso del usuario.",
+            "local_only": true
+          },
+          "correction": "Sólo PE_DIRECT_CPE_PERMISSION_REQUIRED se clasifica como permiso; pérdida de EXECUTE da 503 recuperable.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "cpe-direct-signed-invoice-replay",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "PFX propio configurado por API, factura/documento/outbox persistidos sin transmisión",
+            "Replay/concurrencia conserva el ID; contenido cambiado 409 sin efectos"
+          ]
+        },
+        {
+          "id": "cpe-credit-and-no-invalid-effects",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Contrato UI conserva cliente_id y crea CxC por S/23,60",
+            "Totales/cantidad/receptor/cliente de otra empresa rechazan sin efectos"
+          ]
+        },
+        {
+          "id": "cpe-boleta-and-multipage",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Boleta con DNI y factura de 80 líneas se firman y persisten; PDF binario"
+          ]
+        },
+        {
+          "id": "cpe-reader-and-sql-authorization",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Usuario/rol reales: lectura pública sin XML, emisión/PDF/XML 403 y retry técnico sin datos privados",
+            "Actor ajeno y permiso retirado rechazan en SQL sin efectos"
+          ]
+        },
+        {
+          "id": "cpe-write-rollback-recovery",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Fallo de trigger después de INSERT revierte documento/CPE/outbox; misma intención recupera uno",
+            "RPC sin EXECUTE da 503 y reintento tras restaurar conserva un ID"
+          ]
+        },
+        {
+          "id": "cpe-ui-net-price-and-emission-date",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Cantidad dos: valor neto S/20, precio bruto S/23,60 y total S/47,20 coherentes en fila y XML",
+            "Filtro PE usa fecha de emisión anterior al alta"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Variantes de receptor, afectación, descuentos, transporte y certificado; claves legacy sin huella fallan cerrado",
+        "Retenciones, percepciones, detracciones, anticipos y cobros parciales por factura manual",
+        "Más variantes de boleta, IGV y monedas permitidas; representación física",
+        "Otras combinaciones de permisos/sucursal y UI con lector",
+        "Fallos externos post commit y recuperación tras reinicio de worker",
+        "Fechas históricas con hora real; otras afectaciones tributarias"
       ]
     },
     {
@@ -8335,7 +9441,7 @@
       "operation": "listReceivers",
       "method": "GET",
       "endpoint": "/api/cpe/receptores",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:232",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:217",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8353,7 +9459,7 @@
       "operation": "getReceiver",
       "method": "GET",
       "endpoint": "/api/cpe/receptores/:clienteId",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:244",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:229",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8371,7 +9477,7 @@
       "operation": "registerDesktopSignedXml",
       "method": "POST",
       "endpoint": "/api/cpe/desktop/signed",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:255",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:240",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8389,17 +9495,125 @@
       "operation": "getComprobantes",
       "method": "GET",
       "endpoint": "/api/cpe/comprobantes",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:267",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:252",
+      "existing_evidence": [
+        {
+          "trace_index": 1351,
+          "status": 200
+        },
+        {
+          "trace_index": 1352,
+          "status": 200
+        },
+        {
+          "trace_index": 1353,
+          "status": 200
+        },
+        {
+          "trace_index": 1354,
+          "status": 400
+        },
+        {
+          "trace_index": 1355,
+          "status": 400
+        },
+        {
+          "trace_index": 1356,
+          "status": 400
+        },
+        {
+          "trace_index": 1379,
+          "status": 503
+        },
+        {
+          "trace_index": 1409,
+          "status": 200
+        }
+      ],
+      "defects": [
+        {
+          "id": "cpe-invalid-page-and-date-http-success",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-api-defects-20261003/cpe-operations.json",
+            "observed_error": "Página negativa/fecha inválida devolvían HTTP 200 false.",
+            "local_only": true
+          },
+          "correction": "Valida enteros, límite y fechas antes de consultar; 400.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cpe-read-failure-hidden-as-empty-success",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-read-errors-20261003",
+            "observed_error": "REVOKE SELECT real devolvía 200/404/500; estadísticas aparentaban cero exitoso.",
+            "local_only": true
+          },
+          "correction": "503 explícito en lecturas y errores visibles en UI.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cpe-ui-first-page-only",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-ui-baseline-20261003/cpe-browser.json",
+            "observed_error": "Navegador mostraba 50 de 201, sin acceso a otra página.",
+            "local_only": true
+          },
+          "correction": "Paginación visible, total, bloqueo de carga y reset de filtros.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cpe-emission-date-filter-uses-creation",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-restored-candidate-20261003/cpe-emission-date-filter.json",
+            "observed_error": "Factura con fecha de emisión de ayer no aparecía en el filtro de ayer (0 coincidencias).",
+            "local_only": true
+          },
+          "correction": "Filtro PE consulta fecha_emision; mantiene semántica previa CO/AR.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "cpe-query-validation-export",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Filtros/conteo/paginación reales; fechas/página inválidas 400",
+            "CSV escapado, fórmulas neutralizadas y 201 registros completos; aislamiento"
+          ]
+        },
+        {
+          "id": "cpe-real-read-failure-recovery",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "REVOKE SELECT real devuelve 503 en seis lecturas; GRANT permite recuperar, sin impactos económicos"
+          ]
+        },
+        {
+          "id": "cpe-ui-net-price-and-emission-date",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Cantidad dos: valor neto S/20, precio bruto S/23,60 y total S/47,20 coherentes en fila y XML",
+            "Filtro PE usa fecha de emisión anterior al alta"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Concurrencia de altas durante exportación; variantes de volúmenes y búsqueda",
+        "Errores de red y de PDF/Storage; UI bajo caída real de lectura",
+        "Fechas históricas con hora real; otras afectaciones tributarias"
       ]
     },
     {
@@ -8407,17 +9621,79 @@
       "operation": "exportComprobantes",
       "method": "GET",
       "endpoint": "/api/cpe/comprobantes/export",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:288",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:263",
+      "existing_evidence": [
+        {
+          "trace_index": 1363,
+          "status": 200
+        },
+        {
+          "trace_index": 1364,
+          "status": 200
+        },
+        {
+          "trace_index": 1365,
+          "status": 200
+        },
+        {
+          "trace_index": 1614,
+          "status": 200
+        }
+      ],
+      "defects": [
+        {
+          "id": "cpe-csv-unescaped-fields",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-api-defects-20261003/cpe-operations.json",
+            "observed_error": "Comas, comillas, saltos y fórmula del receptor no se escapaban.",
+            "local_only": true
+          },
+          "correction": "Cita CSV y neutraliza fórmulas en texto.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cpe-csv-truncated-at-200",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-restored-baseline-20261003/cpe-export-restored.json",
+            "observed_error": "201 filas persistidas exportaban sólo 200.",
+            "local_only": true
+          },
+          "correction": "Exporta todas las páginas, sin límite silencioso.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cpe-emission-date-filter-uses-creation",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-restored-candidate-20261003/cpe-emission-date-filter.json",
+            "observed_error": "Factura con fecha de emisión de ayer no aparecía en el filtro de ayer (0 coincidencias).",
+            "local_only": true
+          },
+          "correction": "Filtro PE consulta fecha_emision; mantiene semántica previa CO/AR.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "cpe-query-validation-export",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Filtros/conteo/paginación reales; fechas/página inválidas 400",
+            "CSV escapado, fórmulas neutralizadas y 201 registros completos; aislamiento"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Concurrencia de altas durante exportación; variantes de volúmenes y búsqueda"
       ]
     },
     {
@@ -8425,17 +9701,120 @@
       "operation": "getCpeData",
       "method": "GET",
       "endpoint": "/api/cpe/comprobantes/:id",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:308",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:280",
+      "existing_evidence": [
+        {
+          "trace_index": 1335,
+          "status": 200
+        },
+        {
+          "trace_index": 1339,
+          "status": 404
+        },
+        {
+          "trace_index": 1343,
+          "status": 404
+        },
+        {
+          "trace_index": 1347,
+          "status": 400
+        },
+        {
+          "trace_index": 1367,
+          "status": 200
+        },
+        {
+          "trace_index": 1369,
+          "status": 200
+        },
+        {
+          "trace_index": 1380,
+          "status": 503
+        },
+        {
+          "trace_index": 1392,
+          "status": 200
+        }
+      ],
+      "defects": [
+        {
+          "id": "cpe-missing-detail-http-success",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-api-defects-20261003/cpe-operations.json",
+            "observed_error": "Detalle inexistente/ajeno respondía HTTP 200 success=false; PDF podía 500.",
+            "local_only": true
+          },
+          "correction": "404 para ausencia/aislamiento y 503 para infraestructura.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cpe-invalid-read-id-http-success",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-api-defects-20261003/cpe-operations.json",
+            "observed_error": "ID no UUID llegaba a PostgreSQL y devolvía HTTP 200.",
+            "local_only": true
+          },
+          "correction": "ParseUUIDPipe antes de leer.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cpe-read-failure-hidden-as-empty-success",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-read-errors-20261003",
+            "observed_error": "REVOKE SELECT real devolvía 200/404/500; estadísticas aparentaban cero exitoso.",
+            "local_only": true
+          },
+          "correction": "503 explícito en lecturas y errores visibles en UI.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "cpe-detail-xml-pdf-isolation",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Lecturas reales representan ID, emisor, total y QR; XML con firma y PDF binario",
+            "Inexistente/ajeno 404; UUID inválido 400"
+          ]
+        },
+        {
+          "id": "cpe-boleta-and-multipage",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Boleta con DNI y factura de 80 líneas se firman y persisten; PDF binario"
+          ]
+        },
+        {
+          "id": "cpe-real-read-failure-recovery",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "REVOKE SELECT real devuelve 503 en seis lecturas; GRANT permite recuperar, sin impactos económicos"
+          ]
+        },
+        {
+          "id": "cpe-reader-and-sql-authorization",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Usuario/rol reales: lectura pública sin XML, emisión/PDF/XML 403 y retry técnico sin datos privados",
+            "Actor ajeno y permiso retirado rechazan en SQL sin efectos"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Variantes históricas, otros roles y clientes; PDF visual tiene evidencia separada",
+        "Más variantes de boleta, IGV y monedas permitidas; representación física",
+        "Errores de red y de PDF/Storage; UI bajo caída real de lectura",
+        "Otras combinaciones de permisos/sucursal y UI con lector"
       ]
     },
     {
@@ -8443,17 +9822,116 @@
       "operation": "downloadPdf",
       "method": "GET",
       "endpoint": "/api/cpe/comprobantes/:id/pdf",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:335",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:291",
+      "existing_evidence": [
+        {
+          "trace_index": 1338,
+          "status": 200
+        },
+        {
+          "trace_index": 1340,
+          "status": 404
+        },
+        {
+          "trace_index": 1344,
+          "status": 404
+        },
+        {
+          "trace_index": 1350,
+          "status": 400
+        },
+        {
+          "trace_index": 1370,
+          "status": 200
+        },
+        {
+          "trace_index": 1383,
+          "status": 503
+        },
+        {
+          "trace_index": 1391,
+          "status": 403
+        }
+      ],
+      "defects": [
+        {
+          "id": "cpe-missing-detail-http-success",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-api-defects-20261003/cpe-operations.json",
+            "observed_error": "Detalle inexistente/ajeno respondía HTTP 200 success=false; PDF podía 500.",
+            "local_only": true
+          },
+          "correction": "404 para ausencia/aislamiento y 503 para infraestructura.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cpe-invalid-read-id-http-success",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-api-defects-20261003/cpe-operations.json",
+            "observed_error": "ID no UUID llegaba a PostgreSQL y devolvía HTTP 200.",
+            "local_only": true
+          },
+          "correction": "ParseUUIDPipe antes de leer.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cpe-read-failure-hidden-as-empty-success",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-read-errors-20261003",
+            "observed_error": "REVOKE SELECT real devolvía 200/404/500; estadísticas aparentaban cero exitoso.",
+            "local_only": true
+          },
+          "correction": "503 explícito en lecturas y errores visibles en UI.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "cpe-detail-xml-pdf-isolation",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Lecturas reales representan ID, emisor, total y QR; XML con firma y PDF binario",
+            "Inexistente/ajeno 404; UUID inválido 400"
+          ]
+        },
+        {
+          "id": "cpe-boleta-and-multipage",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Boleta con DNI y factura de 80 líneas se firman y persisten; PDF binario"
+          ]
+        },
+        {
+          "id": "cpe-real-read-failure-recovery",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "REVOKE SELECT real devuelve 503 en seis lecturas; GRANT permite recuperar, sin impactos económicos"
+          ]
+        },
+        {
+          "id": "cpe-reader-and-sql-authorization",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Usuario/rol reales: lectura pública sin XML, emisión/PDF/XML 403 y retry técnico sin datos privados",
+            "Actor ajeno y permiso retirado rechazan en SQL sin efectos"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Variantes históricas, otros roles y clientes; PDF visual tiene evidencia separada",
+        "Más variantes de boleta, IGV y monedas permitidas; representación física",
+        "Errores de red y de PDF/Storage; UI bajo caída real de lectura",
+        "Otras combinaciones de permisos/sucursal y UI con lector"
       ]
     },
     {
@@ -8461,7 +9939,7 @@
       "operation": "enviarSunat",
       "method": "POST",
       "endpoint": "/api/cpe/comprobantes/:id/enviar-sunat",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:366",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:310",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8479,7 +9957,7 @@
       "operation": "registrarEventoDian",
       "method": "POST",
       "endpoint": "/api/cpe/:id/dian/eventos",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:389",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:333",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8497,7 +9975,7 @@
       "operation": "reintentarEventoDianEmitido",
       "method": "POST",
       "endpoint": "/api/cpe/dian/eventos/:operationId/reintentar",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:411",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:355",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8515,7 +9993,7 @@
       "operation": "importarFacturaRecibidaDian",
       "method": "POST",
       "endpoint": "/api/cpe/dian/facturas-recibidas/importar",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:430",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:374",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8533,7 +10011,7 @@
       "operation": "registrarEventoFacturaRecibidaDian",
       "method": "POST",
       "endpoint": "/api/cpe/dian/facturas-recibidas/:id/eventos",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:448",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:392",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8551,7 +10029,7 @@
       "operation": "reintentarEventoFacturaRecibidaDian",
       "method": "POST",
       "endpoint": "/api/cpe/dian/facturas-recibidas/eventos/:operationId/reintentar",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:468",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:412",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8569,7 +10047,7 @@
       "operation": "listarFacturasRecibidasDian",
       "method": "GET",
       "endpoint": "/api/cpe/dian/facturas-recibidas",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:487",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:431",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8587,7 +10065,7 @@
       "operation": "obtenerAnulacionFinanciera",
       "method": "GET",
       "endpoint": "/api/cpe/:id/anulacion-financiera",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:498",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:442",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8605,7 +10083,7 @@
       "operation": "revertirCobroAplicado",
       "method": "POST",
       "endpoint": "/api/cpe/:id/cobros/:pagoId/revertir",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:516",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:460",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8623,7 +10101,7 @@
       "operation": "revertirAjusteAplicado",
       "method": "POST",
       "endpoint": "/api/cpe/:id/ajustes/:operacionId/revertir",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:540",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:484",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8641,7 +10119,7 @@
       "operation": "finalizarAnulacion",
       "method": "POST",
       "endpoint": "/api/cpe/:id/anulacion/finalizar",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:564",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:508",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8659,17 +10137,95 @@
       "operation": "findOne",
       "method": "GET",
       "endpoint": "/api/cpe/:id",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:582",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:526",
+      "existing_evidence": [
+        {
+          "trace_index": 1336,
+          "status": 200
+        },
+        {
+          "trace_index": 1341,
+          "status": 404
+        },
+        {
+          "trace_index": 1345,
+          "status": 404
+        },
+        {
+          "trace_index": 1348,
+          "status": 400
+        },
+        {
+          "trace_index": 1381,
+          "status": 503
+        },
+        {
+          "trace_index": 1385,
+          "status": 200
+        }
+      ],
+      "defects": [
+        {
+          "id": "cpe-missing-detail-http-success",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-api-defects-20261003/cpe-operations.json",
+            "observed_error": "Detalle inexistente/ajeno respondía HTTP 200 success=false; PDF podía 500.",
+            "local_only": true
+          },
+          "correction": "404 para ausencia/aislamiento y 503 para infraestructura.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cpe-invalid-read-id-http-success",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-api-defects-20261003/cpe-operations.json",
+            "observed_error": "ID no UUID llegaba a PostgreSQL y devolvía HTTP 200.",
+            "local_only": true
+          },
+          "correction": "ParseUUIDPipe antes de leer.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cpe-read-failure-hidden-as-empty-success",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-read-errors-20261003",
+            "observed_error": "REVOKE SELECT real devolvía 200/404/500; estadísticas aparentaban cero exitoso.",
+            "local_only": true
+          },
+          "correction": "503 explícito en lecturas y errores visibles en UI.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "cpe-detail-xml-pdf-isolation",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Lecturas reales representan ID, emisor, total y QR; XML con firma y PDF binario",
+            "Inexistente/ajeno 404; UUID inválido 400"
+          ]
+        },
+        {
+          "id": "cpe-real-read-failure-recovery",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "REVOKE SELECT real devuelve 503 en seis lecturas; GRANT permite recuperar, sin impactos económicos"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Variantes históricas, otros roles y clientes; PDF visual tiene evidencia separada",
+        "Errores de red y de PDF/Storage; UI bajo caída real de lectura"
       ]
     },
     {
@@ -8677,17 +10233,142 @@
       "operation": "downloadXml",
       "method": "GET",
       "endpoint": "/api/cpe/:id/xml",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:593",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:537",
+      "existing_evidence": [
+        {
+          "trace_index": 1337,
+          "status": 200
+        },
+        {
+          "trace_index": 1342,
+          "status": 404
+        },
+        {
+          "trace_index": 1346,
+          "status": 404
+        },
+        {
+          "trace_index": 1349,
+          "status": 400
+        },
+        {
+          "trace_index": 1371,
+          "status": 200
+        },
+        {
+          "trace_index": 1373,
+          "status": 200
+        },
+        {
+          "trace_index": 1375,
+          "status": 200
+        },
+        {
+          "trace_index": 1382,
+          "status": 503
+        },
+        {
+          "trace_index": 1390,
+          "status": 403
+        },
+        {
+          "trace_index": 1410,
+          "status": 200
+        }
+      ],
+      "defects": [
+        {
+          "id": "cpe-missing-detail-http-success",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-api-defects-20261003/cpe-operations.json",
+            "observed_error": "Detalle inexistente/ajeno respondía HTTP 200 success=false; PDF podía 500.",
+            "local_only": true
+          },
+          "correction": "404 para ausencia/aislamiento y 503 para infraestructura.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cpe-invalid-read-id-http-success",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-api-defects-20261003/cpe-operations.json",
+            "observed_error": "ID no UUID llegaba a PostgreSQL y devolvía HTTP 200.",
+            "local_only": true
+          },
+          "correction": "ParseUUIDPipe antes de leer.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cpe-read-failure-hidden-as-empty-success",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-read-errors-20261003",
+            "observed_error": "REVOKE SELECT real devolvía 200/404/500; estadísticas aparentaban cero exitoso.",
+            "local_only": true
+          },
+          "correction": "503 explícito en lecturas y errores visibles en UI.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cpe-ui-net-price-written-as-gross",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-restored-baseline-20261003/cpe-ui-net-price.json",
+            "observed_error": "Formulario de S/20 + IGV guardaba y firmaba PriceAmount 23.60.",
+            "local_only": true
+          },
+          "correction": "Valor neto prevalece; precio_venta conserva unitario bruto.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "cpe-detail-xml-pdf-isolation",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Lecturas reales representan ID, emisor, total y QR; XML con firma y PDF binario",
+            "Inexistente/ajeno 404; UUID inválido 400"
+          ]
+        },
+        {
+          "id": "cpe-real-read-failure-recovery",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "REVOKE SELECT real devuelve 503 en seis lecturas; GRANT permite recuperar, sin impactos económicos"
+          ]
+        },
+        {
+          "id": "cpe-reader-and-sql-authorization",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Usuario/rol reales: lectura pública sin XML, emisión/PDF/XML 403 y retry técnico sin datos privados",
+            "Actor ajeno y permiso retirado rechazan en SQL sin efectos"
+          ]
+        },
+        {
+          "id": "cpe-ui-net-price-and-emission-date",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Cantidad dos: valor neto S/20, precio bruto S/23,60 y total S/47,20 coherentes en fila y XML",
+            "Filtro PE usa fecha de emisión anterior al alta"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Variantes históricas, otros roles y clientes; PDF visual tiene evidencia separada",
+        "Errores de red y de PDF/Storage; UI bajo caída real de lectura",
+        "Otras combinaciones de permisos/sucursal y UI con lector",
+        "Fechas históricas con hora real; otras afectaciones tributarias"
       ]
     },
     {
@@ -8695,17 +10376,83 @@
       "operation": "resend",
       "method": "POST",
       "endpoint": "/api/cpe/:id/resend",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:612",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:556",
+      "existing_evidence": [
+        {
+          "trace_index": 1372,
+          "status": 503
+        },
+        {
+          "trace_index": 1374,
+          "status": 503
+        },
+        {
+          "trace_index": 1394,
+          "status": 503
+        },
+        {
+          "trace_index": 1395,
+          "status": 503
+        },
+        {
+          "trace_index": 1396,
+          "status": 409
+        },
+        {
+          "trace_index": 1397,
+          "status": 404
+        }
+      ],
+      "defects": [
+        {
+          "id": "cpe-fiscal-technical-replay-created-success",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-volume-candidate-20261003",
+            "observed_error": "Primer intento 503; replay respondía 201 con RETRY_LATER/TECHNICAL_ERROR y CPE interno.",
+            "local_only": true
+          },
+          "correction": "503 también en replay y respuesta pública sin XML/metadata interna.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        },
+        {
+          "id": "cpe-resend-key-conflict-misclassified",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cpe-canonical-first-failure-20261003/failure.json",
+            "observed_error": "Una segunda clave de reenvío respondía 400 pese a la colisión SQL 23505.",
+            "local_only": true
+          },
+          "correction": "Colisiones y estados no reclamables devuelven 409; ausencia 404 e infraestructura 503.",
+          "pending": [
+            "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "cpe-external-failure-and-note-gates",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Sin SOL, intento/replay 503 explícito, sin CDR ni cambio económico",
+            "Notas/bajas no inventan origen aceptado ni aceptación"
+          ]
+        },
+        {
+          "id": "cpe-reader-and-sql-authorization",
+          "source": "scripts/ci/test-peru-cpe-operations-local.mjs",
+          "verified_checks": [
+            "Usuario/rol reales: lectura pública sin XML, emisión/PDF/XML 403 y retry técnico sin datos privados",
+            "Actor ajeno y permiso retirado rechazan en SQL sin efectos"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Notas y bajas con precondición de CDR local controlada; aceptación, acuses y reintentos externos SUNAT",
+        "Otras combinaciones de permisos/sucursal y UI con lector"
       ]
     },
     {
@@ -8713,7 +10460,7 @@
       "operation": "checkStatus",
       "method": "GET",
       "endpoint": "/api/cpe/:id/status",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:629",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:573",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8731,7 +10478,7 @@
       "operation": "enviarManualmenteSunat",
       "method": "POST",
       "endpoint": "/api/cpe/:id/enviar-sunat",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:646",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:590",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8749,7 +10496,7 @@
       "operation": "anularCPE",
       "method": "POST",
       "endpoint": "/api/cpe/:id/anular",
-      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:669",
+      "source": "apps/erp-api/src/modules/cpe/cpe.controller.ts:613",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -13995,6 +15742,10 @@
         {
           "trace_index": 1307,
           "status": 201
+        },
+        {
+          "trace_index": 1386,
+          "status": 201
         }
       ],
       "defects": [],
@@ -14306,7 +16057,7 @@
       "defects": [
         {
           "id": "pos-first-client-missing-payment-catalog",
-          "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+          "status": "corrected_merged_main_runtime_observed_main_ci_retry",
           "proof": {
             "source": "artifacts/peru-pos-api-defects-20261003/pos-operations.json",
             "observed_error": "Catálogo POS vacío después del wizard",
@@ -14314,7 +16065,7 @@
           },
           "correction": "564 crea cuatro referencias sólo para configuración nueva PE; sin backfill ni datos comerciales.",
           "pending": [
-            "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+            "CI main 37142023714 relanzado tras OOM del servidor Next de pruebas; verificación final del runtime."
           ]
         }
       ],
@@ -14482,7 +16233,7 @@
       "defects": [
         {
           "id": "pos-repeated-stock-sku-blocked-by-pricing",
-          "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+          "status": "corrected_merged_main_runtime_observed_main_ci_retry",
           "proof": {
             "source": "artifacts/peru-pos-api-defects-20261003/pos-operations.json",
             "observed_error": "pos/venta: {\"statusCode\":500,\"message\":\"COMMERCIAL_PRICE_DUPLICATE_PRODUCT_LINE\",\"error\":{\"tipo\":\"DATABASE_ERROR\",\"mensaje\":\"COMMERCIAL_PRICE_DUPLICATE_PRODUCT_LINE\",\"codigo\":\"22023\"},\"timestamp\":\"2026-10-03T14:06:08.616Z\",\"path\":\"/api/pos/venta\"}\n\n500 !== 201\n",
@@ -14490,7 +16241,7 @@
           },
           "correction": "Agrega cantidades e importes de SKU compatible antes del precio comercial; diferencias de precio/descuento 400.",
           "pending": [
-            "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+            "CI main 37142023714 relanzado tras OOM del servidor Next de pruebas; verificación final del runtime."
           ]
         }
       ],
@@ -14568,7 +16319,7 @@
       "defects": [
         {
           "id": "pos-ticket-exchange-rejection-returns-created",
-          "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+          "status": "corrected_merged_main_runtime_observed_main_ci_retry",
           "proof": {
             "source": "artifacts/peru-pos-api-defects-20261003/pos-operations.json",
             "observed_error": "pos/ventas/df7df33b-0451-4cd0-a95b-e0d7c107bedf/canjear-ticket: {\"success\":false,\"message\":\"POS_TICKET_SALE_NOT_FOUND\",\"error\":{\"tipo\":\"POS_TICKET_EXCHANGE_ERROR\",\"codigo\":\"P0002\",\"mensaje\":\"POS_TICKET_SALE_NOT_FOUND\"}}\n\n201 !== 404\n; pos/ventas/56d41de8-5518-4e1e-9901-e86624775382/canjear-ticket: {\"success\":false,\"message\":\"POS_TICKET_EXCHANGE_IDEMPOTENCY_MISMATCH\",\"error\":{\"tipo\":\"POS_TICKET_EXCHANGE_ERROR\",\"codigo\":\"23505\",\"mensaje\":\"POS_TICKET_EXCHANGE_IDEMPOTENCY_MISMATCH\"}}\n\n201 !== 409\n",
@@ -14576,7 +16327,7 @@
           },
           "correction": "404 inexistente, 409 colisión y 400 de dominio; 503 genérico de infraestructura.",
           "pending": [
-            "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+            "CI main 37142023714 relanzado tras OOM del servidor Next de pruebas; verificación final del runtime."
           ]
         }
       ],
@@ -14781,7 +16532,7 @@
       "defects": [
         {
           "id": "pos-certificate-direct-writer-and-invalid-http",
-          "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+          "status": "corrected_merged_main_runtime_observed_main_ci_retry",
           "proof": {
             "source": "artifacts/peru-pos-api-defects-20261003/pos-operations.json",
             "observed_error": "{\"success\":false,\"message\":\"permission denied for table empresa_config\"}\n\nfalse !== true\n",
@@ -14789,7 +16540,7 @@
           },
           "correction": "Valida PFX/emisor/vigencia, cifra y utiliza writer con permiso/intención 564; inválido 400 sin cambio.",
           "pending": [
-            "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+            "CI main 37142023714 relanzado tras OOM del servidor Next de pruebas; verificación final del runtime."
           ]
         }
       ],
@@ -14889,7 +16640,7 @@
       "defects": [
         {
           "id": "pos-fiscal-status-missing-returns-500",
-          "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+          "status": "corrected_merged_main_runtime_observed_main_ci_retry",
           "proof": {
             "source": "artifacts/peru-pos-api-defects-20261003/pos-operations.json",
             "observed_error": "pos/facturacion/6e702019-8eff-4b3f-bdc2-38b41dfd621d: {\"statusCode\":500,\"message\":\"Venta no encontrada para el tenant activo\",\"error\":\"Error\",\"timestamp\":\"2026-10-03T14:06:05.909Z\",\"path\":\"/api/pos/facturacion/6e702019-8eff-4b3f-bdc2-38b41dfd621d\"}\n\n500 !== 404\n",
@@ -14897,7 +16648,7 @@
           },
           "correction": "404 inexistente/ajeno y 503 de infraestructura; UUID validado.",
           "pending": [
-            "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+            "CI main 37142023714 relanzado tras OOM del servidor Next de pruebas; verificación final del runtime."
           ]
         }
       ],
@@ -14943,7 +16694,7 @@
       "defects": [
         {
           "id": "pos-pure-ticket-retry-returns-created",
-          "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+          "status": "corrected_merged_main_runtime_observed_main_ci_retry",
           "proof": {
             "source": "artifacts/peru-pos-api-defects-20261003/pos-operations.json",
             "observed_error": "pos/reintentar-facturacion/56d41de8-5518-4e1e-9901-e86624775382: {\"success\":false,\"message\":\"El ticket interno no tiene una emisión CPE pendiente; use el flujo de canje a factura o boleta\"}\n\n201 !== 409\n",
@@ -14951,7 +16702,7 @@
           },
           "correction": "409 sin incrementar contador ni alterar impactos; reserva existente se recupera.",
           "pending": [
-            "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+            "CI main 37142023714 relanzado tras OOM del servidor Next de pruebas; verificación final del runtime."
           ]
         }
       ],
@@ -14997,7 +16748,7 @@
       "defects": [
         {
           "id": "pos-worker-null-attempts-excludes-exchange",
-          "status": "canonical_sources_candidate_local_passed_full_ci_deployment_pending",
+          "status": "corrected_merged_main_runtime_observed_main_ci_retry",
           "proof": {
             "source": "artifacts/peru-pos-worker-null-defect-20261003/pos-operations.json",
             "observed_error": "procesadas=0, errores=0 con cpe_pendiente=true, cpe_data presente, cpe_id NULL e intentos_facturacion NULL",
@@ -15005,7 +16756,7 @@
           },
           "correction": "Incluye NULL como cero y adopta CPE firmado sin repetir pago/stock/CxC/asiento.",
           "pending": [
-            "Ensayo integrado canónico, CI exacto, promoción 564, main y despliegue."
+            "CI main 37142023714 relanzado tras OOM del servidor Next de pruebas; verificación final del runtime."
           ]
         }
       ],
@@ -18989,6 +20740,10 @@
         {
           "trace_index": 1308,
           "status": 201
+        },
+        {
+          "trace_index": 1387,
+          "status": 201
         }
       ],
       "defects": [],
@@ -19383,6 +21138,14 @@
         },
         {
           "trace_index": 1251,
+          "status": 201
+        },
+        {
+          "trace_index": 1330,
+          "status": 201
+        },
+        {
+          "trace_index": 1399,
           "status": 201
         }
       ],

@@ -1,0 +1,14 @@
+{
+  "source_sha": "97e26bedaace0f64ce9f7e0011732f52c44706af",
+  "ci_run": 37149634430,
+  "job": 111280630581,
+  "success": false,
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "scope": "Local Storage gate failure, not a business operation in PROD",
+  "passed_phases": ["Logo lifecycle with real local Storage API", "Browser logo operation", "Database backup restoration"],
+  "failure": "The restored Storage server could not bind fixed loopback port 55520 because it was already occupied.",
+  "correction": "Docker allocates an unused local port atomically; the probe verifies the loopback binding and reads both object copies over HTTP. Public failure metadata excludes full commands and generated local keys.",
+  "local_retest": "artifacts/peru-storage-dynamic-port-acceptance-20261003",
+  "pending": ["All exact-head CI checks, migration 565 promotion, main checks and exact runtime"]
+}

@@ -111,12 +111,24 @@ export default function CPEPage() {
     serie: '',
     moneda: ''
   })
+  const [page, setPage] = useState(1)
+  const pageSize = 50
+  const [totalDocuments, setTotalDocuments] = useState(0)
+  const [documentsLoading, setDocumentsLoading] = useState(false)
+  const [documentsError, setDocumentsError] = useState<string | null>(null)
+  const [statsError, setStatsError] = useState<string | null>(null)
+  const documentsRequest = useRef(0)
 
   const { get, post } = useApiCall<CpeDocument[]>()
   const { get: getStats } = useApiCall<CpeStats>()
 
   const loadDocuments = useCallback(async () => {
+    const request = ++documentsRequest.current
+    setDocumentsLoading(true)
+    setDocumentsError(null)
     const queryParams = new URLSearchParams()
+    queryParams.set('page', String(page))
+    queryParams.set('pageSize', String(pageSize))
     if (filters.tipoComprobante) queryParams.append('tipoComprobante', filters.tipoComprobante)
     if (filters.estado) queryParams.append('estado', filters.estado)
     if (filters.serie) queryParams.append('serie', filters.serie)
@@ -127,17 +139,24 @@ export default function CPEPage() {
 
     console.log('📄 CPE: Cargando comprobantes...', { filters, queryParams: queryParams.toString() })
     const response = await get(`/api/cpe/comprobantes?${queryParams}`)
+    if (request !== documentsRequest.current) return
+    setDocumentsLoading(false)
     console.log('📄 CPE: Respuesta completa de comprobantes:', response)
 
     const documents = unwrapApiArray<CpeDocument>(response)
     if (apiSucceeded(response)) {
       console.log('📄 CPE: Datos de comprobantes recibidos:', documents.length)
       setDocuments(documents)
+      const metadata = response as typeof response & { meta?: { total?: number } }
+      const total = Number(metadata?.meta?.total)
+      setTotalDocuments(Number.isSafeInteger(total) && total >= 0 ? total : documents.length)
     } else {
       console.warn('⚠️ CPE: No se recibieron datos de comprobantes o hay error:', response?.message)
       setDocuments([])
+      setTotalDocuments(0)
+      setDocumentsError(response?.message || 'No se pudieron cargar los comprobantes. Vuelve a intentar.')
     }
-  }, [get, filters])
+  }, [get, filters, page])
 
   const loadStats = useCallback(async () => {
     console.log('📊 CPE: Cargando estadísticas...')
@@ -145,6 +164,7 @@ export default function CPEPage() {
     console.log('📊 CPE: Respuesta completa de estadísticas:', response)
 
     if (apiSucceeded(response)) {
+      setStatsError(null)
       const stats = unwrapApiObject<CpeStats>(response, {
         cpeEmitidosHoy: 0,
         cpeDelMes: 0,
@@ -156,6 +176,7 @@ export default function CPEPage() {
     } else {
       console.warn('⚠️ CPE: No se recibieron estadísticas o hay error:', response?.message)
       setStats(null)
+      setStatsError('No se pudieron cargar los totales de comprobantes. Vuelve a intentar.')
     }
   }, [getStats])
 
@@ -426,10 +447,10 @@ export default function CPEPage() {
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            [isArgentina ? 'Comprobantes hoy' : 'CPE emitidos hoy', stats?.cpeEmitidosHoy || 0, 'Comprobantes hoy'],
-            [isArgentina ? 'Comprobantes del mes' : 'CPE del mes', stats?.cpeDelMes || 0, 'Total del mes'],
-            ['Monto facturado', money.format(stats?.montoFacturado || 0), 'Ingresos del mes'],
-            ['Rechazados', stats?.rechazados || 0, 'Requieren correccion'],
+            [isArgentina ? 'Comprobantes hoy' : 'CPE emitidos hoy', stats?.cpeEmitidosHoy ?? '—', 'Comprobantes hoy'],
+            [isArgentina ? 'Comprobantes del mes' : 'CPE del mes', stats?.cpeDelMes ?? '—', 'Total del mes'],
+            ['Monto facturado', stats ? money.format(stats.montoFacturado) : '—', 'Ingresos del mes'],
+            ['Rechazados', stats?.rechazados ?? '—', 'Requieren correccion'],
           ].map(([label, value, description]) => (
             <Card key={label} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
               <CardContent className="flex items-start justify-between gap-3 p-4">
@@ -446,11 +467,13 @@ export default function CPEPage() {
           ))}
         </section>
 
+        {statsError && <p role="alert">{statsError}</p>}
+
         <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardContent className="p-4">
             <ComprobantesFilters
               filters={{ ...filters }}
-              onChange={(next) => setFilters((prev) => ({ ...prev, ...next }))}
+              onChange={(next) => { setPage(1); setFilters((prev) => ({ ...prev, ...next })) }}
               onExport={(f) => {
                 const params = new URLSearchParams()
                 if (f.tipoComprobante) params.append('tipoComprobante', f.tipoComprobante)
@@ -468,6 +491,7 @@ export default function CPEPage() {
 
         <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardContent className="p-4">
+            {documentsError && <div role="alert" className="mb-3 flex items-center gap-3"><span>{documentsError}</span><Button type="button" onClick={() => { void loadData() }}>Reintentar</Button></div>}
             <ComprobantesTable
               documents={documents}
               onView={viewDocument}
@@ -480,6 +504,13 @@ export default function CPEPage() {
               canSend={canSendToFiscal}
               countryCode={paisCodigo}
             />
+            <nav aria-label="Paginación de comprobantes" className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <span>{documentsLoading ? 'Cargando comprobantes…' : `${totalDocuments} comprobantes · Página ${page} de ${Math.max(1, Math.ceil(totalDocuments / pageSize))}`}</span>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" disabled={documentsLoading || page <= 1} onClick={() => setPage(current => current - 1)}>Anterior</Button>
+                <Button type="button" variant="outline" disabled={documentsLoading || page * pageSize >= totalDocuments} onClick={() => setPage(current => current + 1)}>Siguiente</Button>
+              </div>
+            </nav>
           </CardContent>
         </Card>
       </div>

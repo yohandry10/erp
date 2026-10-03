@@ -1,0 +1,13 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "run_id": 37142023714,
+  "sha": "9e301e2ae9f470b56ffc10d775ab09c4a8d6a76b",
+  "api_success": true,
+  "api_scenarios": 316,
+  "record_findings": 19,
+  "record_passed": 4,
+  "cause": "FATAL ERROR: JavaScript heap out of memory en Next dev tras el barrido de módulos; conexión rechazada en las vistas posteriores.",
+  "rerun_requested": true,
+  "complete_erp_acceptance": false
+}
