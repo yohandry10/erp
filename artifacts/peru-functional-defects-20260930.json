@@ -901,6 +901,23 @@
         "Reconstrucción canónica 562, CI exacto, ensayo/preservación y promoción DB-first, main/despliegue",
         "Variantes normativas, fuentes no vacías e interoperabilidad SUNAT siguen separadas"
       ]
+    },
+    {
+      "id": "auth-office-throttle-missing-standard-retry-after",
+      "module": "administracion/auth",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/auth/login"
+        }
+      ],
+      "status": "canonical_http_restore_passed_full_ci_deployment_pending",
+      "proof": "artifacts/peru-tax-full-local-failed-login-office-20261003/failure.json",
+      "correction": "Límite agregado publica Retry-After estándar además de Retry-After-Office; conserva 5/cuenta-IP y 20/IP por minuto. API real verifica 429/60s y recuperación 201 sin modificar limitador.",
+      "canonical_proof": "artifacts/peru-login-office-canonical-subset-20261003",
+      "pending": [
+        "CI y repetición global con cabecera corregida, main y despliegue exacto"
+      ]
     }
   ]
 }

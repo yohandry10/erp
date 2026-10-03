@@ -100,6 +100,14 @@ el primer fallo de mapeo RPC y los dos fallos del gate SQL (prefijo duplicado,
 política privada faltante). La reconstrucción canónica pasó 558 migraciones
 hasta 562/71 verificadores y está completando API/UI/barridos/restore. CI, ensayo
 de respaldo 560, promoción única 562 y despliegue siguen pendientes.
+El ensayo del respaldo 560 del 03/10 aprobó restore, rollback negativo y
+preservación de 29 tablas, funciones, RLS y ACL existentes; el verificador
+562 revirtió sus fixtures (`artifacts/erp-peru-562-rehearsal-20261003110902737-23172.json`).
+El primer global completó los casos API pero falló al preparar wizard porque
+el 429 del límite agregado de login omitía Retry-After estándar; el proceso
+Node después también afirmó un handle de Windows al cerrar. Ese intento se
+conserva; no acredita UI/restore. Se añade Retry-After sin modificar los límites
+de cuenta/IP y oficina, con prueba de contrato y recuperación HTTP real local.
 
 Los dos jobs integrados de #124, CI 37090225590 y 37090197674, aprobaron API,
 navegador y recuperación. Sus auditorías fallaron por dos avisos recién
