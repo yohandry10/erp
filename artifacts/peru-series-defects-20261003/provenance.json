@@ -1,0 +1,7 @@
+{
+  "source": "artifacts/peru-integrated-20261003075436312-18540",
+  "source_head": "3e9c0585ae454bfc7ff4d8fedc20f37aedc1a81d",
+  "scope": "Reproducción de defectos; el runner completó el diagnóstico y restore, la aceptación de series es false",
+  "remoteWrites": false,
+  "dumps_extracted": false
+}

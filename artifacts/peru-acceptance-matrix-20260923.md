@@ -199,3 +199,9 @@ como `d96aee30`; CI de main 36789420677 repitió 124 HTTP/catorce UI/22 pantalla
 E2E y Security Scan pasaron. Render/Vercel sirven ese SHA, esquema 556,
 DB/Redis, login y CORS verificados sólo en lectura con preflight
 (`artifacts/peru-production-verification-after-123-20260930.json`).
+
+## Corte adicional 03/10
+
+#127 cerró CI main, E2E, seguridad y despliegue exacto c034639f/schema 559 en sólo lectura. #128 aprobó reconstrucción y CI con 181 API/21 UI sin reintentos/99 pantallas/22 con registros y restore; 560 quedó promovida e integrada como 8417ff23. CI main 37110032921, E2E/seguridad y despliegue exacto 8417ff23/schema560 cerrados en sólo lectura con preflight. La matriz observa 245 de 717 contratos declarados; no acepta todas sus variantes. UI conserva 121 rutas estáticas, 35 enlaces renderizados y 1292 controles, cuya presencia no acredita ejecución.
+
+Series y ajustes fiscales tienen evidencia canónica de subconjunto (43 API/un UI y restore) en `artifacts/peru-tax-series-canonical-subset-20261003`, incluidos validaciones/conflictos, tipos, aislamiento, reintentos de tres mutaciones, deuda/banco y asientos. Los casos nuevos quedan incorporados al runner completo/CI; el primer intento falló en una espera de cinco segundos de edición del asiento, después de 208 API/21 UI. Se conserva ese intento y se repite con espera de URL/encabezado en 25 segundos; restore posterior aún pendiente. CxC/reversa, monedas, roles sólo lectura, UI de series y consumo de cada tipo siguen pendientes. Sólo Analytics excluido; reportes incluidos. No hay aceptación global de lanzamiento.
