@@ -5,6 +5,7 @@ RUN npm install -g pnpm@9.15.4
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+COPY patches/ ./patches/
 COPY libs/ ./libs/
 COPY apps/web/ ./apps/web/
 
@@ -22,6 +23,7 @@ ENV NODE_ENV=production
 ENV PORT=3001
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+COPY patches/ ./patches/
 COPY libs/ ./libs/
 COPY apps/web/package.json ./apps/web/package.json
 COPY apps/web/next.config.js ./apps/web/next.config.js

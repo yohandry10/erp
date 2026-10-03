@@ -2,6 +2,17 @@
 
 Actualizado: 2026-10-02.
 
+Los dos jobs integrados de #124, CI 37090225590 y 37090197674, aprobaron API,
+navegador y recuperación. Sus auditorías fallaron por dos avisos recién
+incorporados al registro, sin versión corregida: node-forge y braces. Se
+aplicaron parches locales con integridad SHA-256 y regresiones de todas las
+copias instaladas; el gate conserva los dos hallazgos y sólo los considera
+mitigados tras verificar los parches. La auditoría local pasó y 26 pruebas de
+firma/certificado conservaron el comportamiento válido
+(`artifacts/peru-security-backports-20261002.json`,
+`artifacts/peru-security-baseline-20261002.json`). La nueva revisión de #124
+debe completar CI antes de promover 557; todavía no hay lanzamiento aprobado.
+
 La ampliación contable local corrigió duplicación del asiento manual al
 reintentar, residuos finales de depreciación/devengo, respuestas 200/500 para
 períodos ajenos, una frontera de fecha Lima en la propuesta manual, reapertura
@@ -22,6 +33,13 @@ respuesta perdida, edita, confirma, descarga PDF y reversa; su fecha coincide
 con `app.hoy_tenant`. Activo y diferido procesan tres cuotas con residuo final y
 asientos únicos/cuadrados. Cierre/bloqueo/reapertura mensual, lector y tenant
 ajeno pasaron por API. No acreditan contabilidad completa ni habilitan lanzamiento.
+
+Un probe posterior reproduce un bloqueo anual del primer cliente: ingreso 30 y
+gasto 5 en el ejercicio anterior llegan al cierre, que devuelve
+`ACCOUNTING_YEAR_CLOSE_ACCOUNTS_89_59_REQUIRED`. El período conserva `ABIERTO`
+y no aparecen asientos parciales. Las cuentas 89/59 no nacen con la empresa;
+la corrección y el recorrido anual siguen pendientes
+(`artifacts/peru-year-close-missing-accounts-20261002.json`).
 
 La ampliación local de RMA sobre factura pagada pasó 124 escenarios HTTP,
 catorce recorridos UI, 22 pantallas, contratos SQL y restauración

@@ -145,6 +145,28 @@
         "CI y despliegue",
         "otras fechas por defecto fuera del formulario de asientos"
       ]
+    },
+    {
+      "id": "first-customer-annual-close-accounts",
+      "status": "open_reproduced",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/periodos/:id/cerrar"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-year-close-missing-accounts-20261002.json",
+        "observed_error": "ACCOUNTING_YEAR_CLOSE_ACCOUNTS_89_59_REQUIRED",
+        "local_only": true
+      },
+      "correction": "Pendiente: completar cuentas de cierre para empresas Perú sin alterar configuraciones previas",
+      "pending": [
+        "corrección y contratos SQL",
+        "cierre/reapertura/reintentos anuales por API",
+        "reportes antes/después del cierre",
+        "CI y promoción/despliegue"
+      ]
     }
   ]
 }

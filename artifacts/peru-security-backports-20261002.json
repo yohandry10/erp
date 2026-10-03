@@ -1,0 +1,59 @@
+{
+  "checkedAt": "2026-10-03T03:13:06.657Z",
+  "success": true,
+  "registryVulnerabilities": {
+    "info": 0,
+    "low": 0,
+    "moderate": 0,
+    "high": 2,
+    "critical": 0
+  },
+  "verified": [
+    {
+      "package": "node-forge",
+      "version": "1.4.0",
+      "advisory": "GHSA-86w9-cpqp-85rv",
+      "installedCopy": "node_modules/.pnpm/node-forge@1.4.0_patch_hash=wvikv3di5njctolqvyfwq6w6va/node_modules/node-forge",
+      "integrityPassed": true,
+      "tests": {
+        "nestedGarbageRejected": true,
+        "outerGarbageRejected": true,
+        "validWithAndWithoutNull": true,
+        "validSignature": true,
+        "changedMessageRejected": true,
+        "pssUnaffected": true
+      }
+    },
+    {
+      "package": "braces",
+      "version": "3.0.3",
+      "advisory": "GHSA-vfj7-8cjw-p6xm",
+      "installedCopy": "node_modules/.pnpm/braces@3.0.3_patch_hash=yoco2kisy6ui2aeks4wz6urc44/node_modules/braces",
+      "integrityPassed": true,
+      "tests": {
+        "ordinaryPatternsPreserved": true,
+        "deepBracesRejected": true,
+        "deepParenthesesRejected": true,
+        "directAstRejected": true,
+        "boundedSyntaxError": true
+      }
+    }
+  ],
+  "mitigated": [
+    {
+      "advisory": "GHSA-86w9-cpqp-85rv",
+      "package": "node-forge",
+      "registrySeverity": "high",
+      "version": "1.4.0",
+      "reason": "Verified local backport; registry has no fixed release"
+    },
+    {
+      "advisory": "GHSA-vfj7-8cjw-p6xm",
+      "package": "braces",
+      "registrySeverity": "high",
+      "version": "3.0.3",
+      "reason": "Verified local backport; registry has no fixed release"
+    }
+  ],
+  "unresolved": []
+}
