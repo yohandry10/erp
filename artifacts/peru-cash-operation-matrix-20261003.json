@@ -1264,6 +1264,19 @@
       "pending": [
         "CI exacto y despliegue web."
       ]
+    },
+    {
+      "id": "cash-administrative-close-stale-expected-amount",
+      "operations": [
+        "POST /api/cajas/sesiones/:sesionId/cierre-administrativo"
+      ],
+      "status": "canonical_correction_ci_pending",
+      "observed": "Con ingresos de 4,01 sobre un fondo de 100, el cierre administrativo envió 100 como monto contado: usaba sesiones_caja.monto_esperado (valor de apertura), ordenaba por created_at, convertía un error de lectura en el fondo inicial y trataba un saldo 0 como ausencia. Resultado: CASH_CLOSE_SUPERVISOR_REQUIRED diferencia=-4.01.",
+      "correction": "Saldo teórico del ledger por secuencia, igual que el preview y cerrar_caja_tx; lectura fallida 503 sin cerrar; saldo 0 se conserva.",
+      "baseline": "artifacts/peru-pr136-ci-second-failures-20261003.json",
+      "pending": [
+        "CI exacto, promoción 566, main y runtime."
+      ]
     }
   ],
   "limits": [

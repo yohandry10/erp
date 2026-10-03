@@ -16,16 +16,17 @@ intentos 37142023714 agotaron el heap de Next dev en el barrido con registros
 fases y su main sí aprobó. CPE corrigió 15 defectos; no acredita SUNAT.
 PROD actual: 565; NO reaplicar 565.
 
-Caja PE (rama `codex/peru-cash-first-client-20261003`): 19 defectos confirmados,
-17 de API/SQL y dos de UI (Sesiones y Cortes conservaban el error tras un
-reintento con HTTP 200). Las correcciones son canónicas en la rama: 23 escenarios
+Caja PE (rama `codex/peru-cash-first-client-20261003`): 20 defectos confirmados,
+18 de API/SQL y dos de UI (Sesiones y Cortes conservaban el error tras un
+reintento con HTTP 200). El CI del PR destapó el 20: el cierre administrativo
+usaba el `monto_esperado` de apertura y exigía supervisor por una diferencia falsa. Las correcciones son canónicas en la rama: 23 escenarios
 API, 10 comprobaciones UI y restore pasaron sobre snapshot local con 566
 (`artifacts/peru-cash-canonical-local-20261003`). La reconstrucción fresca
 PostgreSQL 16 aprobó 562 migraciones hasta 566 y 75 verificadores tras ajustar
 dos fixtures (492/449) que insertaban una segunda `10111`
 (`artifacts/peru-566-fresh-contracts-local-20261003.json`). **566 no está
 promovida**; faltan CI exacto, respaldo/ensayo 565→566, promoción, main y runtime.
-La matriz conserva 717 contratos, 118 casos y 83 defectos con sus pendientes;
+La matriz conserva 717 contratos, 123 casos y 84 defectos con sus pendientes;
 no hay aceptación integral del lanzamiento ni confirmación del plan de Render.
 
 Corte técnico 131/132: el cierre 131 promovió 562 una sola vez con preflight,

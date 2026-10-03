@@ -569,30 +569,23 @@ export class CajasService {
   }
 
   private async resolveMontoEsperadoCierre(tenantId: string, sesion: any): Promise<number> {
-    const montoEsperado = Number(sesion.monto_esperado ?? 0);
-    if (montoEsperado > 0) {
-      return montoEsperado;
-    }
-
+    // Mismo saldo teórico que el preview y cerrar_caja_tx: último movimiento por
+    // secuencia y fondo inicial sólo si aún no hay movimientos. La columna
+    // monto_esperado se escribe al abrir y nadie la actualiza; un saldo 0 es real.
     const { data: ultimoMovimiento, error } = await this.supabase.getClient()
       .from('movimientos_caja')
       .select('saldo_nuevo')
       .eq('tenant_id', tenantId)
       .eq('sesion_caja_id', sesion.id)
-      .order('created_at', { ascending: false })
+      .order('secuencia', { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (error) {
-      this.logger.warn(`No se pudo calcular monto esperado desde movimientos de caja: ${error.message}`);
+      throw new ServiceUnavailableException('No se pudo consultar el saldo de caja para el cierre administrativo; reintente');
     }
 
-    const saldoNuevo = Number(ultimoMovimiento?.saldo_nuevo ?? 0);
-    if (saldoNuevo > 0) {
-      return saldoNuevo;
-    }
-
-    return Number(sesion.monto_inicial ?? sesion.monto_inicio ?? 0);
+    return Number(ultimoMovimiento?.saldo_nuevo ?? sesion.monto_inicio ?? sesion.monto_inicial ?? 0);
   }
 
   private validateDateFilters(filters: { fecha_desde?: string; fecha_hasta?: string }) {

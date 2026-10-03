@@ -2185,6 +2185,25 @@
         "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
       ],
       "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+    },
+    {
+      "id": "cash-administrative-close-stale-expected-amount",
+      "status": "canonical_correction_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/cajas/sesiones/:sesionId/cierre-administrativo"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-pr136-ci-second-failures-20261003.json",
+        "observed_error": "Con ingresos de 4,01 sobre un fondo de 100, el cierre administrativo envió 100 como monto contado: usaba sesiones_caja.monto_esperado (valor de apertura), ordenaba por created_at, convertía un error de lectura en el fondo inicial y trataba un saldo 0 como ausencia. Resultado: CASH_CLOSE_SUPERVISOR_REQUIRED diferencia=-4.01.",
+        "local_only": true
+      },
+      "correction": "Saldo teórico del ledger por secuencia, igual que el preview y cerrar_caja_tx; lectura fallida 503 sin cerrar; saldo 0 se conserva.",
+      "pending": [
+        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+      ]
     }
   ]
 }

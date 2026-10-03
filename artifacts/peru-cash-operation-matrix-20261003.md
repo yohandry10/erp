@@ -32,7 +32,7 @@ Ensayo canónico local: 23 escenarios API y 10 comprobaciones UI aprobados, con 
 | POST /api/cajas/cambio-turno/cancelar/:cambioId | canonical_local_variant_passed | pendiente |  |
 | GET /api/cajas/sesiones/:sesionId/cambios-turno | canonical_local_variant_passed | pendiente |  |
 | POST /api/cajas/movimientos/manual/:sesionId | canonical_local_variant_passed | sí |  |
-| POST /api/cajas/sesiones/:sesionId/cierre-administrativo | canonical_local_variant_passed | pendiente |  |
+| POST /api/cajas/sesiones/:sesionId/cierre-administrativo | canonical_local_variant_passed | pendiente | cash-administrative-close-stale-expected-amount |
 | GET /api/cajas/:id/corte-z | canonical_local_variant_passed | pendiente | cash-withdrawals-report-read-privilege, cash-session-read-unavailability-masked, cash-fiscal-payment-report-infrastructure-400 |
 
 Intentos conservados:
@@ -41,4 +41,4 @@ Intentos conservados:
 - `artifacts/peru-cash-ui-recovery-defect-20261003`: product_defects_reproduced. Ocho comprobaciones UI aprobadas; Sesiones y Cortes mantuvieron el error tras un reintento con HTTP 200.
 - `artifacts/peru-cash-canonical-local-20261003`: passed. Fuentes API/UI/SQL canónicas; 23 API, 10 UI y restore.
 
-El JSON conserva evidencias previas, escenarios concretos, 19 defectos confirmados (incluidos dos de recuperación UI reproducidos en navegador) y comprobaciones pendientes. Las consultas que cargan no acreditan mutaciones ni flujos completos.
+El JSON conserva evidencias previas, escenarios concretos, 20 defectos confirmados (incluidos dos de recuperación UI reproducidos en navegador) y comprobaciones pendientes. Las consultas que cargan no acreditan mutaciones ni flujos completos.

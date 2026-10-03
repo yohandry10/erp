@@ -201,7 +201,9 @@ Apertura -> Venta -> Pago -> Ticket/CPE -> Movimiento de caja -> Cierre
 - Los filtros `fecha_desde/fecha_hasta` exigen `YYYY-MM-DD` real, rechazan
   rangos invertidos y cubren el día local completo del tenant. El cierre
   admite el alias `monto_contado`; repetir un cierre administrativo ya
-  confirmado devuelve su resultado aunque la sesión esté cerrada.
+  confirmado devuelve su resultado aunque la sesión esté cerrada. El cierre
+  administrativo cuenta el saldo del ledger por secuencia, como el preview; no
+  usa `monto_esperado` de apertura ni sustituye un error de lectura por el fondo.
 - El PDF de cierre conserva columnas dentro de A4 y pagina tablas; el CSV
   neutraliza fórmulas en el nombre de caja. Sesiones y cortes limpian el error
   al reintentar una lectura recuperada.
