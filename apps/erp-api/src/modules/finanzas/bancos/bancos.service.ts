@@ -1,4 +1,6 @@
 import Decimal from 'decimal.js';
+import { fechaDeDocumentoEnPais, fechaHoyEnPais, zonaHorariaDePais } from '../../../shared/utils/fecha-peru.util';
+import { paisDelTenant } from '../../../shared/utils/fecha-tenant.util';
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
@@ -583,74 +585,42 @@ export class BancosService {
       throw new BadRequestException('No se pudieron obtener los movimientos para exportar');
     }
 
-    // Generar CSV
-    const headers = [
-      'Fecha',
-      'Tipo',
-      'Descripción',
-      'Proveedor',
-      'RUC',
-      'Referencia',
-      'Monto',
-      'Conciliado',
-      'Fecha Registro'
-    ];
-
+    const country = await paisDelTenant(client, tenantId);
+    const timeZone = zonaHorariaDePais(country);
+    const headers = ['Fecha', 'Tipo', 'Descripción', 'Proveedor', 'RUC', 'Referencia',
+      'Monto', 'Conciliado', 'Fecha Registro'];
     const rows = (movimientos || []).map(mov => [
-      this.formatDate(mov.fecha),
-      mov.tipo,
-      this.escapeCsvValue(mov.descripcion),
-      mov.proveedores ? this.escapeCsvValue(mov.proveedores.razon_social) : '',
-      mov.proveedores ? mov.proveedores.ruc : '',
-      mov.referencia || '',
-      mov.monto.toFixed(2),
-      mov.conciliado ? 'Sí' : 'No',
-      this.formatDateTime(mov.created_at)
+      this.formatDate(mov.fecha, timeZone), mov.tipo, mov.descripcion,
+      mov.proveedores?.razon_social ?? '', mov.proveedores?.ruc ?? '', mov.referencia ?? '',
+      Number(mov.monto).toFixed(2), mov.conciliado ? 'Sí' : 'No',
+      this.formatDateTime(mov.created_at, timeZone),
     ]);
-
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n');
-
-    // Generar nombre de archivo
-    const fechaActual = new Date().toISOString().split('T')[0];
-    const filename = `movimientos_${cuenta.banco}_${cuenta.numero_cuenta}_${fechaActual}.csv`;
-
-    return {
-      success: true,
-      data: csvContent,
-      filename,
-    };
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(value => this.escapeCsvValue(value)).join(','))
+      .join('\r\n');
+    const filename = ('movimientos_' + cuenta.banco + '_' + cuenta.numero_cuenta + '_' +
+      fechaHoyEnPais(country) + '.csv').replace(/[^a-zA-Z0-9._-]/g, '_');
+    return { success: true, data: csvContent, filename };
   }
 
-  private formatDate(dateString: string): string {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-PE', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
+  private formatDate(dateString: string, timeZone: string): string {
+    const calendar = fechaDeDocumentoEnPais(dateString, timeZone);
+    return /^\d{4}-\d{2}-\d{2}$/.test(calendar)
+      ? calendar.split('-').reverse().join('/') : '';
+  }
+
+  private formatDateTime(dateString: string, timeZone: string): string {
+    const instant = new Date(dateString);
+    return Number.isNaN(instant.getTime()) ? '' : instant.toLocaleString('es-PE', {
+      timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
     });
   }
 
-  private formatDateTime(dateString: string): string {
-    const date = new Date(dateString);
-    return date.toLocaleString('es-PE', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  }
-
-  private escapeCsvValue(value: string): string {
-    if (!value) return '';
-    // Si contiene coma, comillas o salto de línea, envolver en comillas y escapar comillas internas
-    if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-      return `"${value.replace(/"/g, '""')}"`;
-    }
-    return value;
+  private escapeCsvValue(value: unknown): string {
+    const text = value === null || value === undefined ? '' : String(value);
+    const safe = /^\s*[=+\-@]|^[\t\r\n]/.test(text) ? "'" + text : text;
+    return '"' + safe.replace(/"/g, '""') + '"';
   }
 
   async obtenerMovimientosPorPeriodo(

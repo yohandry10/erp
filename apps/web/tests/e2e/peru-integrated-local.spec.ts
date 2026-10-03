@@ -32,6 +32,199 @@ function isHandledHttpResponse(row: { path: string; status: number }) {
     || (row.status === 429 && pathname.endsWith('/api/auth/login'))
 }
 
+test('Perú: primer administrador completa wizard, recupera progreso y respuestas perdidas sin duplicar', async ({ page, context }) => {
+  test.setTimeout(300000)
+  if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere base local efímera')
+  page.setDefaultTimeout(25000)
+  const output = process.env.LOCAL_INTEGRATED_OUTPUT_DIR!
+  const fixture = JSON.parse(await fs.readFile(path.join(output, 'wizard-fixture.json'), 'utf8'))
+  expect(fixture.tenant).toMatch(/^[0-9a-f-]{36}$/i)
+  const tenant = `'${fixture.tenant}'::uuid`
+  await context.route('**/*', route => ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(route.request().url()).hostname)
+    ? route.continue() : route.abort('blockedbyclient'))
+  const requests: { method: string; path: string; status: number }[] = []
+  page.on('response', response => {
+    const url = new URL(response.url())
+    if (url.pathname.includes('/api/configuration/')) requests.push({ method: response.request().method(), path: url.pathname, status: response.status() })
+  })
+  const stepKeys: (string | undefined)[] = []
+  const completionKeys: (string | undefined)[] = []
+  let lostStep = false
+  let lostCompletion = false
+  await page.route(/\/api\/configuration\/wizard\/step\/?(?:\?.*)?$/, async route => {
+    if (route.request().method() !== 'POST') return route.continue()
+    stepKeys.push(route.request().headers()['idempotency-key'])
+    const response = await route.fetch()
+    expect(response.status()).toBe(201)
+    if (!lostStep) {
+      lostStep = true
+      return route.fulfill({ status: 503, json: { message: 'Respuesta perdida local del paso' } })
+    }
+    return route.fulfill({ response })
+  })
+  await page.route(/\/api\/configuration\/complete\/?(?:\?.*)?$/, async route => {
+    if (route.request().method() !== 'POST') return route.continue()
+    completionKeys.push(route.request().headers()['idempotency-key'])
+    const response = await route.fetch()
+    expect(response.status()).toBe(201)
+    if (!lostCompletion) {
+      lostCompletion = true
+      return route.fulfill({ status: 503, json: { message: 'Respuesta perdida local del cierre' } })
+    }
+    return route.fulfill({ response })
+  })
+  await page.goto('/login/')
+  await page.locator('#email').fill(fixture.email)
+  await page.locator('#password').fill('Cliente-Local-2026-Only!')
+  await submitLocalLogin(page)
+  await page.waitForURL('**/dashboard/**')
+  const core = await (await page.request.get('/backend/api/configuration/status')).json()
+  expect(core.data.isComplete).toBe(true)
+  expect(readLocalSql(`SELECT coalesce(bool_or(completado),false) FROM wizard_progress WHERE tenant_id=${tenant};`)).toBe('f')
+  const status = await page.request.get('/backend/api/demo/status')
+  expect(status.status()).toBe(200)
+  expect((await status.json()).is_demo).toBe(false)
+  // DEMO_API_ENABLED=false en este harness. Sólo la consulta autenticada está disponible.
+  expect((await page.request.get('/backend/api/demo/planes')).status()).toBe(403)
+  await page.goto('/dashboard/wizard/')
+  await expect(page.getByRole('heading', { name: 'Bienvenido', exact: true })).toBeVisible({ timeout: 30000 })
+  const next = page.getByRole('button', { name: 'Siguiente', exact: true })
+  await next.click()
+  await expect(page.getByText('Error al guardar el progreso', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Bienvenido', exact: true })).toBeVisible()
+  await next.click()
+  await expect(page.getByRole('heading', { name: 'Tipo de Empresa', exact: true })).toBeVisible()
+  expect(stepKeys[0]).toBeTruthy()
+  expect(stepKeys[1]).toBe(stepKeys[0])
+  await page.getByRole('button', { name: /Microempresa/ }).click()
+  await next.click()
+  await page.locator('#ruc').fill('123')
+  await page.locator('#razonSocial').fill('Primera empresa del navegador local')
+  await page.locator('#direccion').fill('Av. QA local 456')
+  await expect(next).toBeDisabled()
+  await page.locator('#ruc').fill(fixture.ruc)
+  await page.locator('#ubigeo').fill('150101')
+  await next.click()
+  await expect(page.locator('#certificatePassword')).toBeVisible()
+  const progress = /\/api\/configuration\/wizard\/progress\/?(?:\?.*)?$/
+  await page.route(progress, route => route.fulfill({ status: 503, json: { message: 'Consulta local fallida' } }))
+  await page.reload()
+  await expect(page.getByText('No se pudo recuperar la configuración guardada. Reintenta la consulta.', { exact: true })).toBeVisible()
+  await expect(next).toHaveCount(0)
+  await page.unroute(progress)
+  await page.getByRole('button', { name: 'Reintentar', exact: true }).click()
+  await expect(page.locator('#ruc')).toHaveValue(fixture.ruc)
+  await expect(page.locator('#razonSocial')).toHaveValue('Primera empresa del navegador local')
+  await next.click()
+  await page.locator('input[type=file]').setInputFiles(path.join(output, 'wizard-local.pfx'))
+  await page.locator('#certificatePassword').fill('Clave-incorrecta-local')
+  await next.click()
+  await page.locator('#regimen_tributario').selectOption('GENERAL')
+  await page.locator('#serie_factura').fill('F001')
+  await page.locator('#serie_boleta').fill('B001')
+  await page.locator('#serie_guia_remision').fill('T001')
+  await next.click()
+  await page.locator('#sunat_username').fill('SOL_SECUNDARIO_LOCAL')
+  await page.locator('#sunat_password').fill('Clave-SOL-ensayo-local')
+  await next.click()
+  await expect(page.getByRole('heading', { name: 'Se encontraron problemas' })).toBeVisible()
+  await expect(next).toBeDisabled()
+  expect(readLocalSql(`SELECT coalesce(bool_or(completado),false) FROM wizard_progress WHERE tenant_id=${tenant};`)).toBe('f')
+  for (let step = 0; step < 3; step++) await page.getByRole('button', { name: 'Anterior', exact: true }).click()
+  await page.locator('#certificatePassword').fill('Clave-PFX-local')
+  await next.click()
+  await expect(page.locator('#regimen_tributario')).toBeVisible()
+  await next.click()
+  await expect(page.locator('#sunat_username')).toHaveValue('SOL_SECUNDARIO_LOCAL')
+  await next.click()
+  await expect(page.getByText('Respuesta perdida local del cierre', { exact: true })).toBeVisible()
+  expect(lostCompletion).toBe(true)
+  expect(readLocalSql(`SELECT completado FROM wizard_progress WHERE tenant_id=${tenant};`)).toBe('t')
+  await next.click()
+  await page.getByRole('button', { name: 'Ir al Dashboard', exact: true }).click()
+  await page.waitForURL(/\/dashboard\/$/)
+  expect(completionKeys).toHaveLength(2)
+  expect(completionKeys[0]).toBeTruthy()
+  expect(completionKeys[1]).toBe(completionKeys[0])
+  expect(readLocalSql(`SELECT count(*) FROM outbox_events WHERE tenant_id=${tenant} AND event_type='configuracion.wizard.completado';`)).toBe('1')
+  await page.goto('/dashboard/wizard/')
+  await expect(page.getByRole('heading', { name: 'Resumen de Configuración', exact: true })).toBeVisible()
+  const company = (await (await page.request.get('/backend/api/configuration/empresa')).json()).data
+  expect(company.ruc).toBe(fixture.ruc)
+  expect(company.certificateConfigured).toBe(true)
+  expect(company.sunatUsernameConfigured).toBe(true)
+  for (const secret of ['Clave-PFX-local', 'Clave-SOL-ensayo-local', 'Clave-incorrecta-local']) expect(JSON.stringify(company)).not.toContain(secret)
+  await page.screenshot({ path: path.join(output, 'wizard-completed.png'), fullPage: true })
+  await fs.writeFile(path.join(output, 'browser-first-client-wizard.json'), JSON.stringify({ success: true, remoteWrites: false,
+    scope: 'Primer ADMIN no demo, configuración fiscal local sin transmisión', requests,
+    coreReadyBeforeWizard: true, progressRecovered: true, invalidRucRejected: true, invalidPfxRejected: true,
+    stepReplyLostSameIntent: true, completionReplyLostSameIntent: true, singleCompletion: true, publicSecretsAbsent: true }, null, 2))
+})
+
+test('Perú: primer administrador edita banco, descarga CSV filtrado y consulta conciliación cerrada', async ({ browser }) => {
+  test.setTimeout(180000)
+  if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere base local efímera')
+  const output = process.env.LOCAL_INTEGRATED_OUTPUT_DIR!
+  const fixture = JSON.parse(await fs.readFile(path.join(output, 'finance-fixture.json'), 'utf8'))
+  expect(fixture.tenant).toMatch(/^[0-9a-f-]{36}$/i)
+  const tenant = `'${fixture.tenant}'::uuid`
+  const bank = readLocalSql(`SELECT id FROM cuentas_bancarias WHERE tenant_id=${tenant} AND nombre='Banco A editado';`)
+  const reconciliation = readLocalSql(`SELECT id FROM conciliaciones_bancarias WHERE tenant_id=${tenant} AND cuenta_bancaria_id='${bank}'::uuid AND estado='CERRADA';`)
+  expect(bank).toMatch(/^[0-9a-f-]{36}$/i)
+  expect(reconciliation).toMatch(/^[0-9a-f-]{36}$/i)
+  const context = await browser.newContext({ baseURL: process.env.LOCAL_WEB_URL, timezoneId: 'America/Lima' })
+  try {
+    await context.route('**/*', route => ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(route.request().url()).hostname)
+      ? route.continue() : route.abort('blockedbyclient'))
+    const page = await context.newPage()
+    await page.goto('/login/')
+    await page.locator('#email').fill(fixture.email)
+    await page.locator('#password').fill('Cliente-Local-2026-Only!')
+    await submitLocalLogin(page)
+    await page.waitForURL('**/dashboard/**')
+    await page.goto(`/dashboard/finanzas/bancos/${bank}/editar/`)
+    await expect(page.locator('#editar-nombre-de-la-cuenta')).toHaveValue('Banco A editado', { timeout: 30000 })
+    await page.locator('#editar-nombre-de-la-cuenta').fill('Banco A editado en navegador')
+    const endpoint = new RegExp('/api/finanzas/bancos/cuentas/' + bank + '/?$')
+    const [saved] = await Promise.all([
+      page.waitForResponse(response => endpoint.test(new URL(response.url()).pathname) && response.request().method() === 'PUT'),
+      page.getByRole('button', { name: 'Guardar Cambios', exact: true }).click(),
+    ])
+    expect(saved.status()).toBe(200)
+    await page.waitForURL(/\/dashboard\/finanzas\/bancos\/$/)
+    await page.goto(`/dashboard/finanzas/bancos/${bank}/editar/`)
+    await expect(page.locator('#editar-nombre-de-la-cuenta')).toHaveValue('Banco A editado en navegador')
+    await page.goto(`/dashboard/finanzas/bancos/${bank}/`)
+    await page.getByRole('button', { name: 'Filtros', exact: true }).click()
+    await expect(page.locator('#id-conciliado')).toBeVisible()
+    await page.locator('#id-conciliado').selectOption('true')
+    await expect(page.locator('tbody tr')).not.toHaveCount(0)
+    const [download] = await Promise.all([
+      page.waitForEvent('download'), page.getByRole('button', { name: 'Exportar', exact: true }).click(),
+    ])
+    const filename = path.join(output, 'bank-filtered-ui.csv')
+    await download.saveAs(filename)
+    const csv = await fs.readFile(filename, 'utf8')
+    const date = readLocalSql(`SELECT app.hoy_tenant(${tenant});`).split('-').reverse().join('/')
+    expect(csv).toContain('"' + date + '"')
+    expect(csv).toContain('"\'=1+1"')
+    for (const reference of ['FUND-LOCAL', 'FEE-LOCAL', 'TRANSFER-LOCAL', 'PAY-PARTIAL', 'PAY-FINAL', 'ADJUST-LOCAL']) expect(csv).toContain(reference)
+    expect(csv).toContain('"Sí"')
+    await page.goto(`/dashboard/finanzas/conciliacion/${reconciliation}/`)
+    await expect(page.getByRole('heading', { name: 'Conciliación Bancaria', exact: true })).toBeVisible({ timeout: 30000 })
+    await expect(page.getByText('CERRADA', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Modo Wizard/ })).toBeDisabled()
+    expect(readLocalSql(`SELECT saldo FROM cuentas_bancarias WHERE id='${bank}'::uuid;`)).toBe('68.30')
+    await page.screenshot({ path: path.join(output, 'bank-reconciliation-closed.png'), fullPage: true })
+    await fs.writeFile(path.join(output, 'browser-bank-finance.json'), JSON.stringify({ success: true, remoteWrites: false,
+      scope: 'Banco editado/recargado, CSV filtrado descargado y conciliación cerrada consultada; no acepta sus mutaciones por UI',
+      browserTimeZone: 'America/Lima', editPersisted: true, filteredCsvDownloaded: true, fiscalDatePreserved: true,
+      formulaNeutralized: true, reconciliationReadOnly: true, balancePreserved: true }, null, 2))
+  } finally {
+    await context.close()
+  }
+})
+
 test('Perú: reportes muestran tendencia, código del producto y filtro de cliente real', async ({ page, context }) => {
   test.setTimeout(180000)
   if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere base local efímera')

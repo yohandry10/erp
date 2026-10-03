@@ -40,32 +40,35 @@ else:
         raise RuntimeError("El CI debe haber terminado con éxito para ese SHA")
     artifacts = json.loads(github(f"repos/yohandry10/erp/actions/runs/{args.run_id}/artifacts"))["artifacts"]
     matching = [item for item in artifacts if item["name"] == "peru-integrated-local" and not item["expired"]]
-    if len(matching) != 1:
-        raise RuntimeError("No existe un único artefacto funcional vigente")
-    artifact = matching[0]
-    archive = zipfile.ZipFile(io.BytesIO(github(f"repos/yohandry10/erp/actions/artifacts/{artifact['id']}/zip")))
+    if not matching:
+        raise RuntimeError("No existe un artefacto funcional vigente")
     candidates = []
-    for name in archive.namelist():
-        if name.endswith("/run.json"):
-            value = json.loads(archive.read(name))
-            if value.get("success") is True and value.get("scope", "full") == "full" and value.get("remoteWrites") is False and value.get("withBrowser") is True:
-                when = datetime.fromisoformat(value["completedAt"].replace("Z", "+00:00"))
-                start = datetime.fromisoformat(run_meta["created_at"].replace("Z", "+00:00"))
-                if when >= start:
-                    candidates.append((when, name.removesuffix("run.json")))
+    start = datetime.fromisoformat(run_meta["created_at"].replace("Z", "+00:00"))
+    # Un rerun conserva también el artefacto del intento cancelado. Se inspeccionan
+    # los JSON en memoria; ningún dump ni archivo del ZIP se extrae al disco.
+    for item in matching:
+        source_archive = zipfile.ZipFile(io.BytesIO(github(f"repos/yohandry10/erp/actions/artifacts/{item['id']}/zip")))
+        for name in source_archive.namelist():
+            if name.endswith("/run.json"):
+                value = json.loads(source_archive.read(name))
+                if value.get("success") is True and value.get("scope", "full") == "full" and value.get("remoteWrites") is False and value.get("withBrowser") is True:
+                    when = datetime.fromisoformat(value["completedAt"].replace("Z", "+00:00"))
+                    if when >= start:
+                        candidates.append((when, item["id"], name.removesuffix("run.json"), item, source_archive))
     if not candidates:
         raise RuntimeError("No hay ejecución completa nueva para este CI")
-    _, prefix = max(candidates)
+    _, _, prefix, artifact, archive = max(candidates, key=lambda value: value[:3])
     read = lambda name: archive.read(prefix + name)
     provenance.update(github_run_id=args.run_id, github_artifact_id=artifact["id"],
-                      head_sha=args.sha, selected_prefix=prefix)
+                      head_sha=args.sha, selected_prefix=prefix,
+                      github_run_attempt=run_meta["run_attempt"], inspected_artifact_ids=[item["id"] for item in matching])
 
 run = json.loads(read("run.json"))
 http = json.loads(read("http.json"))
 if run.get("success") is not True or run.get("remoteWrites") is not False or run.get("scope", "full") != "full" or http.get("success") is not True:
     raise RuntimeError("Sólo se exportan ensayos completos aprobados sin escritura remota")
 selected = {"run.json": run, "http.json": http, "restore.json": json.loads(read("backup/restore.json"))}
-for name in ["browser-cxc-collection.json", "browser-inventory.json", "browser-rma-refund.json", "browser-manual-accounting.json", "peru-navigation-admin.json"]:
+for name in ["browser-cxc-collection.json", "browser-inventory.json", "browser-rma-refund.json", "browser-manual-accounting.json", "browser-first-client-wizard.json", "browser-bank-finance.json", "annual-acceptance.json", "finance-lifecycle.json", "peru-navigation-admin.json"]:
     try:
         selected[name] = json.loads(read(name))
     except (FileNotFoundError, KeyError):

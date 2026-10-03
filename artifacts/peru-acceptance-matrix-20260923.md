@@ -19,12 +19,29 @@ la exposición de una acción en Perú exige contrastar navegación y reglas del
 servicio. El inventario no representa operaciones aceptadas. La matriz API
 por operación conserva las comprobaciones pendientes aunque exista respuesta HTTP.
 
-El ensayo contable del 02/10 conserva 128 HTTP y quince recorridos UI aprobados
-en `artifacts/peru-integrated-accounting-phases-20261002`. Su resultado global
-sigue **fallido**: Next dev reinició por umbral de memoria al abrir Ventas durante
-el barrido de 99 pantallas; no se ejecutó el barrido de registros. La matriz API
-marca explícitamente esa diferencia entre fase HTTP aprobada y ejecución global.
-CI debe repetir todos los gates antes de promover la 557 o integrar el cambio.
+El CI de PR 37092538107 en `82000ee9` aprobó 128 HTTP, quince recorridos UI,
+99 pantallas y 22 pantallas con registros, SQL y restauración. La exportación
+segura está en `artifacts/peru-integrated-ci-37092538107`; no incluye dumps.
+El ensayo local anterior permanece **fallido** por reinicio de Next dev durante
+el barrido estático, conservado en `artifacts/peru-integrated-accounting-phases-20261002`.
+La ejecución duplicada de rama agotó 35 minutos en el último barrido; el segundo
+intento pasó (`artifacts/peru-integrated-ci-37092535897`), conservando el fallo.
+557 se promovió con respaldo/ensayo y #124 se integró como `f53d84dc`.
+La verificación de main/despliegue sigue en curso. La matriz UI por ruta y
+control está en `artifacts/peru-ui-operation-matrix-20261002.json`: inventario
+visible no implica ejecución de cada botón, formulario o variante.
+
+Tres ensayos adicionales se incorporan al runner, pendientes de CI/despliegue:
+`artifacts/peru-year-close-acceptance-20261002.json` verifica cierre anual,
+utilidad/pérdida, reapertura/recierre, cronología y resultado del año siguiente;
+`artifacts/peru-first-client-wizard-acceptance-20261002.json` verifica desde UI
+RUC, razón social, PFX desechable, parámetros fiscales y credenciales, reanudación,
+contraseña incorrecta y respuestas perdidas sin duplicar pasos ni cierre.
+`artifacts/peru-finance-lifecycle-20261002.json` verifica banco, transferencia,
+CxP con pagos parciales, CSV/match/ajuste/cierre de conciliación, lector,
+consultas ajenas y siete asientos cuadrados. El CSV corregido conserva fecha,
+columnas y fórmulas neutralizadas. La 558 continúa sin promoción.
+No acreditan aceptación de SUNAT ni despliegue de esos candidatos.
 
 | Módulo / operaciones ofrecidas | Evidencia de operación | Pendiente funcional concreto | Resultado |
 | --- | --- | --- | --- |
