@@ -1,0 +1,7 @@
+{
+  "source": "artifacts/peru-integrated-20261003102801724-23948",
+  "source_sha": "0b7d8f432d3850215dc63906bda834711e259cef",
+  "scope": "Diagnóstico fallido: guardado mensual/anual repetido, colisión mensual y replay de constancia mensual; restore posterior. Referencia de constancia sólo simulación local, sin envío ni aceptación SUNAT",
+  "production_business_writes": false,
+  "private_files_copied": false
+}

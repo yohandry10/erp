@@ -714,6 +714,14 @@ Código principal: `apps/erp-api/src/modules/finanzas`,
 - Este espacio no presenta FV 621 ni FV 1611. El contador contrasta contra
   RVIE/RCE, presenta en SUNAT y registra la constancia externa; cada corrección
   crea otra versión y conserva el historial.
+- Los cuatro guardados de versión/constancia mensual y anual exigen
+  `Idempotency-Key`. La intención, versión y respuesta se confirman en una
+  transacción. Repetir la misma solicitud/actor devuelve el corte congelado;
+  cambiarla con la misma clave devuelve conflicto sin otra versión. Cada replay
+  valida nuevamente actor activo y permiso de actualización. La web conserva
+  clave y campos durante el reintento del mismo formulario, y libera la clave
+  después de confirmar éxito. Una nueva versión conserva la constancia previa
+  hasta registrar la constancia de la corrección.
 - `Contabilidad > Renta anual e ITAN` toma el resultado y los activos del cierre
   contable y prepara la conciliación del FV 710 para Régimen General/RMT. General
   aplica 29,5 %; RMT aplica 10 % hasta 15 UIT y 29,5 % al exceso. Selecciona el
@@ -849,6 +857,9 @@ normativa del período consultado; no muestra configuración laboral completa
 si ese período carece de normativa aplicable.
 
 - Tenants, usuarios, roles y permisos determinan acceso.
+- Login limita por cuenta/IP y por IP de oficina. Ambos bloqueos publican
+  `Retry-After` estándar; el agregado conserva también `Retry-After-Office`.
+  Respetar ese plazo permite reintentar sin desactivar las defensas.
 - En demo, `ADMIN_DEMO` puede crear usuarios y roles operativos del propio
   tenant para probar segregación y permisos. No puede delegar `users.manage`,
   conceder permisos globales ni crear otro `ADMIN_DEMO` mediante un writer

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsISO8601, IsNumber, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
 import { CurrentTenant, CurrentUser } from '../../../common';
@@ -92,12 +92,13 @@ export class ContabilidadTributosController {
   async guardar(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: CalcularTributoMensualDto,
   ) {
     const { periodo, ...ajustes } = dto;
     return {
       success: true,
-      data: await this.service.guardar(tenantId, userId, periodo, ajustes),
+      data: await this.service.guardar(tenantId, userId, periodo, ajustes, idempotencyKey),
       message: 'Borrador tributario versionado. Aún debe presentarse en SUNAT.',
     };
   }
@@ -119,6 +120,7 @@ export class ContabilidadTributosController {
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: RegistrarConstanciaDto,
   ) {
     return {
@@ -129,6 +131,7 @@ export class ContabilidadTributosController {
         id,
         dto.constancia,
         dto.fecha_presentacion,
+        idempotencyKey,
       ),
       message: 'Constancia SUNAT registrada como evidencia externa.',
     };
@@ -159,12 +162,13 @@ export class ContabilidadTributosController {
   async guardarAnual(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: CalcularTributoAnualDto,
   ) {
     const { ejercicio, ...ajustes } = dto;
     return {
       success: true,
-      data: await this.anual.guardar(tenantId, userId, ejercicio, ajustes),
+      data: await this.anual.guardar(tenantId, userId, ejercicio, ajustes, idempotencyKey),
       message: 'Borrador anual versionado. Presente FV 710/ITAN en SUNAT antes de registrar la constancia.',
     };
   }
@@ -181,11 +185,12 @@ export class ContabilidadTributosController {
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: RegistrarConstanciaDto,
   ) {
     return {
       success: true,
-      data: await this.anual.registrarConstancia(tenantId, userId, id, dto.constancia, dto.fecha_presentacion),
+      data: await this.anual.registrarConstancia(tenantId, userId, id, dto.constancia, dto.fecha_presentacion, idempotencyKey),
       message: 'Constancia anual SUNAT registrada como evidencia externa.',
     };
   }
