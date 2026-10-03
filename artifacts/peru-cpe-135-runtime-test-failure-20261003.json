@@ -1,0 +1,11 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "run_id": 37145585945,
+  "sha": "45a83f3cd4537feee8b184ea0dfa819a106ea285",
+  "failed_suite": "src/app.controller.runtime.spec.ts",
+  "failed_tests": 2,
+  "observed": "Dos expectativas conservaban el piso 564; el runtime pasó correctamente 565 a outbox_runtime_health_492.",
+  "correction": "Actualizar ambas expectativas a 565; las cinco pruebas del contrato runtime pasaron localmente.",
+  "complete_erp_acceptance": false
+}
