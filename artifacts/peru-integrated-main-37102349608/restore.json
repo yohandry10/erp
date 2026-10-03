@@ -1,0 +1,24 @@
+{
+  "success": true,
+  "completedAt": "2026-10-03T06:44:17.012Z",
+  "remoteWrites": false,
+  "source": "/erp-peru-integrated-20261003061441620-3354-pg",
+  "database": "PostgreSQL 16 local efímero",
+  "tables": 257,
+  "rows": 9526,
+  "archiveBytes": 7981072,
+  "archiveSha256": "05fa6589b2b8a2b8ad42ad26fbb7a78a0a9f416c8a46f0a8fddd7b64bae7d964",
+  "elapsedMs": 8346,
+  "restoreMs": 6191,
+  "checks": [
+    "mismo snapshot para dump y huellas",
+    "contenido íntegro de todas las tablas",
+    "restore atómico sin errores",
+    "ACL y RLS conservados"
+  ],
+  "limits": [
+    "No acredita backup de PROD",
+    "No incluye archivos externos de Storage ni disponibilidad del proveedor",
+    "Duración local no equivale a RTO productivo"
+  ]
+}

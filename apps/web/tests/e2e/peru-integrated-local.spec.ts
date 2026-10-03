@@ -478,12 +478,19 @@ test('Perú: primer administrador importa, edita y desactiva maestros con recupe
     const editedName = `${name} EDITADO`
     await page.locator(item.entity === 'clientes' ? '#razon_social' : '#proveedorform-razon-social').fill(editedName)
     if (item.entity === 'clientes') page.once('dialog', dialog => dialog.accept())
-    await page.getByRole('button', { name: item.entity === 'clientes' ? 'Actualizar Cliente' : 'Actualizar Proveedor' }).click()
-    await expect(page).not.toHaveURL(/\/editar\/?$/)
+    const masterPath = item.entity === 'clientes' ? 'ventas/clientes' : 'compras/proveedores'
+    const [updatedMaster] = await Promise.all([
+      page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith(`/api/${masterPath}/${masterId}`)
+        && response.request().method() === 'PUT'),
+      page.getByRole('button', { name: item.entity === 'clientes' ? 'Actualizar Cliente' : 'Actualizar Proveedor' }).click(),
+    ])
+    expect(updatedMaster.status(), await updatedMaster.text()).toBe(200)
+    const updatedRaw = await updatedMaster.json()
+    expect((updatedRaw.data ?? updatedRaw).razon_social).toBe(editedName)
+    await expect(page).not.toHaveURL(/\/editar\/?$/, { timeout: 25000 })
     await page.goto(item.route)
     await page.getByRole('textbox', { name: 'Buscar' }).fill(editedName)
     await expect(page.getByRole('row').filter({ hasText: editedName })).toBeVisible()
-    const masterPath = item.entity === 'clientes' ? 'ventas/clientes' : 'compras/proveedores'
     const deleteRoute = new RegExp(`/api/${masterPath}/${masterId}/?$`)
     const nativeMessages: string[] = []
     const acceptNativeDialog = async (nativeDialog: Dialog) => {

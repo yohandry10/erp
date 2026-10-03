@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-10-03T06:37:12.721Z",
+  "generated_at": "2026-10-03T07:38:00.407Z",
   "inventory": "artifacts/peru-api-operation-inventory-20260930.json",
-  "evidence": "artifacts/peru-integrated-ci-37100302015",
+  "evidence": "artifacts/peru-integrated-ci-37104147139",
   "evidence_scope": "full",
   "evidence_global_success": true,
   "evidence_phase": "ensayo global aprobado",
@@ -547,6 +547,34 @@
         },
         {
           "trace_index": 766,
+          "status": 201
+        },
+        {
+          "trace_index": 789,
+          "status": 201
+        },
+        {
+          "trace_index": 792,
+          "status": 201
+        },
+        {
+          "trace_index": 793,
+          "status": 201
+        },
+        {
+          "trace_index": 829,
+          "status": 201
+        },
+        {
+          "trace_index": 830,
+          "status": 201
+        },
+        {
+          "trace_index": 833,
+          "status": 201
+        },
+        {
+          "trace_index": 882,
           "status": 201
         }
       ],
@@ -2585,7 +2613,27 @@
       "endpoint": "/api/configuracion/parametros-facturacion",
       "source": "apps/erp-api/src/modules/configuracion.controller.ts:323",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "billing-zero-precision-read",
+          "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-configuration-admin-defects-20261003.json",
+            "observed": {
+              "id": "billing-zero-precision-read",
+              "expected": 0,
+              "stored": 0,
+              "observed": 2
+            },
+            "local_only": true
+          },
+          "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
+          "pending": [
+            "Reconstrucción completa y CI",
+            "Promoción 560 después de gates y despliegue exacto"
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -4741,6 +4789,14 @@
         },
         {
           "trace_index": 686,
+          "status": 200
+        },
+        {
+          "trace_index": 794,
+          "status": 200
+        },
+        {
+          "trace_index": 860,
           "status": 200
         }
       ],
@@ -7952,6 +8008,22 @@
         {
           "trace_index": 746,
           "status": 404
+        },
+        {
+          "trace_index": 807,
+          "status": 200
+        },
+        {
+          "trace_index": 819,
+          "status": 200
+        },
+        {
+          "trace_index": 823,
+          "status": 200
+        },
+        {
+          "trace_index": 866,
+          "status": 200
         }
       ],
       "defects": [],
@@ -8002,6 +8074,14 @@
         {
           "trace_index": 735,
           "status": 403
+        },
+        {
+          "trace_index": 795,
+          "status": 201
+        },
+        {
+          "trace_index": 861,
+          "status": 201
         }
       ],
       "defects": [],
@@ -8116,6 +8196,14 @@
         {
           "trace_index": 737,
           "status": 403
+        },
+        {
+          "trace_index": 796,
+          "status": 201
+        },
+        {
+          "trace_index": 862,
+          "status": 201
         }
       ],
       "defects": [],
@@ -11671,6 +11759,14 @@
         {
           "trace_index": 452,
           "status": 403
+        },
+        {
+          "trace_index": 790,
+          "status": 200
+        },
+        {
+          "trace_index": 831,
+          "status": 200
         }
       ],
       "defects": [],
@@ -11761,6 +11857,10 @@
         },
         {
           "trace_index": 764,
+          "status": 201
+        },
+        {
+          "trace_index": 880,
           "status": 201
         }
       ],
@@ -12622,12 +12722,24 @@
         {
           "trace_index": 768,
           "status": 403
+        },
+        {
+          "trace_index": 797,
+          "status": 201
+        },
+        {
+          "trace_index": 799,
+          "status": 201
+        },
+        {
+          "trace_index": 834,
+          "status": 201
         }
       ],
       "defects": [
         {
           "id": "employee-create-replay-prevalidation",
-          "status": "corrected_ci_merged_deployment_pending",
+          "status": "corrected_ci_main_deployment_verified_read_only",
           "proof": {
             "source": "artifacts/peru-hr-lifecycle-defects-20261003.json",
             "local_only": true,
@@ -12641,21 +12753,17 @@
               "recovery_blocked": true
             }
           },
-          "pending": [
-            "CI main y despliegue exacto"
-          ]
+          "pending": []
         },
         {
           "id": "employee-modal-clears-before-response",
-          "status": "corrected_ci_merged_deployment_pending",
+          "status": "corrected_ci_main_deployment_verified_read_only",
           "proof": {
             "source": "artifacts/peru-hr-ui-defect-20261003.json",
             "local_only": true,
             "observed": "Alta confirma en DB, respuesta perdida 503, formulario vacía campos antes de confirmar y bloquea reintento"
           },
-          "pending": [
-            "CI main y despliegue exacto"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -12719,7 +12827,7 @@
       "defects": [
         {
           "id": "employee-family-allowance-not-cleared",
-          "status": "corrected_ci_merged_deployment_pending",
+          "status": "corrected_ci_main_deployment_verified_read_only",
           "proof": {
             "source": "artifacts/peru-hr-lifecycle-defects-20261003.json",
             "local_only": true,
@@ -12735,9 +12843,7 @@
               "cause": "La derivación sólo activa asignacion_familiar; no la desactiva al guardar tiene_hijos=false/cantidad_hijos=0"
             }
           },
-          "pending": [
-            "CI main y despliegue exacto"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -12874,17 +12980,33 @@
         {
           "trace_index": 173,
           "status": 201
+        },
+        {
+          "trace_index": 836,
+          "status": 201
+        },
+        {
+          "trace_index": 837,
+          "status": 201
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "payroll-first-admin-approval-bank",
+          "source": "scripts/ci/test-peru-payroll-plame-local.mjs",
+          "verified_checks": [
+            "Alta/replay, cálculo con norma vigente, detalle y boleta JSON persistidos",
+            "Aprobación y pago separados; banco exacto y replay sin duplicar",
+            "Tres eventos consumidos con un asiento confirmado cuadrado por evento"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Alta/cálculo/aprobación/pago y PDF/impresión por UI",
+        "Cada rol/aislamiento por operación",
+        "Cálculo personalizado, conceptos, pago parcial/por empleado, otras jornadas y aceptación normativa externa"
       ]
     },
     {
@@ -12901,17 +13023,29 @@
         {
           "trace_index": 174,
           "status": 201
+        },
+        {
+          "trace_index": 838,
+          "status": 201
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "payroll-first-admin-approval-bank",
+          "source": "scripts/ci/test-peru-payroll-plame-local.mjs",
+          "verified_checks": [
+            "Alta/replay, cálculo con norma vigente, detalle y boleta JSON persistidos",
+            "Aprobación y pago separados; banco exacto y replay sin duplicar",
+            "Tres eventos consumidos con un asiento confirmado cuadrado por evento"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Alta/cálculo/aprobación/pago y PDF/impresión por UI",
+        "Cada rol/aislamiento por operación",
+        "Cálculo personalizado, conceptos, pago parcial/por empleado, otras jornadas y aceptación normativa externa"
       ]
     },
     {
@@ -12920,16 +13054,29 @@
       "method": "GET",
       "endpoint": "/api/rrhh/planillas/:id/detalle",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:178",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 839,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "payroll-first-admin-approval-bank",
+          "source": "scripts/ci/test-peru-payroll-plame-local.mjs",
+          "verified_checks": [
+            "Alta/replay, cálculo con norma vigente, detalle y boleta JSON persistidos",
+            "Aprobación y pago separados; banco exacto y replay sin duplicar",
+            "Tres eventos consumidos con un asiento confirmado cuadrado por evento"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Alta/cálculo/aprobación/pago y PDF/impresión por UI",
+        "Cada rol/aislamiento por operación",
+        "Cálculo personalizado, conceptos, pago parcial/por empleado, otras jornadas y aceptación normativa externa"
       ]
     },
     {
@@ -12938,16 +13085,29 @@
       "method": "GET",
       "endpoint": "/api/rrhh/boleta/:empleadoPlanillaId",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:188",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 840,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "payroll-first-admin-approval-bank",
+          "source": "scripts/ci/test-peru-payroll-plame-local.mjs",
+          "verified_checks": [
+            "Alta/replay, cálculo con norma vigente, detalle y boleta JSON persistidos",
+            "Aprobación y pago separados; banco exacto y replay sin duplicar",
+            "Tres eventos consumidos con un asiento confirmado cuadrado por evento"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Alta/cálculo/aprobación/pago y PDF/impresión por UI",
+        "Cada rol/aislamiento por operación",
+        "Cálculo personalizado, conceptos, pago parcial/por empleado, otras jornadas y aceptación normativa externa"
       ]
     },
     {
@@ -12986,17 +13146,33 @@
         {
           "trace_index": 177,
           "status": 201
+        },
+        {
+          "trace_index": 858,
+          "status": 403
+        },
+        {
+          "trace_index": 859,
+          "status": 201
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "payroll-first-admin-approval-bank",
+          "source": "scripts/ci/test-peru-payroll-plame-local.mjs",
+          "verified_checks": [
+            "Alta/replay, cálculo con norma vigente, detalle y boleta JSON persistidos",
+            "Aprobación y pago separados; banco exacto y replay sin duplicar",
+            "Tres eventos consumidos con un asiento confirmado cuadrado por evento"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Alta/cálculo/aprobación/pago y PDF/impresión por UI",
+        "Cada rol/aislamiento por operación",
+        "Cálculo personalizado, conceptos, pago parcial/por empleado, otras jornadas y aceptación normativa externa"
       ]
     },
     {
@@ -13103,17 +13279,37 @@
         {
           "trace_index": 180,
           "status": 201
+        },
+        {
+          "trace_index": 863,
+          "status": 403
+        },
+        {
+          "trace_index": 864,
+          "status": 201
+        },
+        {
+          "trace_index": 865,
+          "status": 201
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "payroll-first-admin-approval-bank",
+          "source": "scripts/ci/test-peru-payroll-plame-local.mjs",
+          "verified_checks": [
+            "Alta/replay, cálculo con norma vigente, detalle y boleta JSON persistidos",
+            "Aprobación y pago separados; banco exacto y replay sin duplicar",
+            "Tres eventos consumidos con un asiento confirmado cuadrado por evento"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Alta/cálculo/aprobación/pago y PDF/impresión por UI",
+        "Cada rol/aislamiento por operación",
+        "Cálculo personalizado, conceptos, pago parcial/por empleado, otras jornadas y aceptación normativa externa"
       ]
     },
     {
@@ -13158,16 +13354,38 @@
       "method": "GET",
       "endpoint": "/api/rrhh/peru/planilla-electronica/:planillaId/preview",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:314",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 841,
+          "status": 200
+        },
+        {
+          "trace_index": 848,
+          "status": 200
+        },
+        {
+          "trace_index": 884,
+          "status": 403
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "plame-first-admin-sources-zip",
+          "source": "scripts/ci/test-peru-payroll-plame-local.mjs",
+          "verified_checks": [
+            "Ficha/jornada incompletas bloquean fuentes; corrección explícita y replay habilitan cuatro RP_*",
+            "Delimitador, RUC y SHA-256; ZIP real contiene las mismas fuentes",
+            "Historial congelado con una versión vigente; evidencia vacía no genera presentación",
+            "Ficha ajena no muta, descarga 404 e historial aislado"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Edición de ficha/jornada por UI",
+        "Permisos/aislamiento restantes de cada operación",
+        "Códigos/tablas vigentes en PVS, fuentes de cuarta y quinta, cambios/bajas; constancias PVS/SOL cuando exista cliente"
       ]
     },
     {
@@ -13176,16 +13394,38 @@
       "method": "PUT",
       "endpoint": "/api/rrhh/peru/planilla-electronica/empleados/:empleadoId/ficha",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:323",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 844,
+          "status": 200
+        },
+        {
+          "trace_index": 845,
+          "status": 200
+        },
+        {
+          "trace_index": 855,
+          "status": 400
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "plame-first-admin-sources-zip",
+          "source": "scripts/ci/test-peru-payroll-plame-local.mjs",
+          "verified_checks": [
+            "Ficha/jornada incompletas bloquean fuentes; corrección explícita y replay habilitan cuatro RP_*",
+            "Delimitador, RUC y SHA-256; ZIP real contiene las mismas fuentes",
+            "Historial congelado con una versión vigente; evidencia vacía no genera presentación",
+            "Ficha ajena no muta, descarga 404 e historial aislado"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Edición de ficha/jornada por UI",
+        "Permisos/aislamiento restantes de cada operación",
+        "Códigos/tablas vigentes en PVS, fuentes de cuarta y quinta, cambios/bajas; constancias PVS/SOL cuando exista cliente"
       ]
     },
     {
@@ -13194,16 +13434,42 @@
       "method": "PUT",
       "endpoint": "/api/rrhh/peru/planilla-electronica/detalles/:detalleId/jornada",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:337",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 846,
+          "status": 200
+        },
+        {
+          "trace_index": 847,
+          "status": 200
+        },
+        {
+          "trace_index": 851,
+          "status": 200
+        },
+        {
+          "trace_index": 869,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "plame-first-admin-sources-zip",
+          "source": "scripts/ci/test-peru-payroll-plame-local.mjs",
+          "verified_checks": [
+            "Ficha/jornada incompletas bloquean fuentes; corrección explícita y replay habilitan cuatro RP_*",
+            "Delimitador, RUC y SHA-256; ZIP real contiene las mismas fuentes",
+            "Historial congelado con una versión vigente; evidencia vacía no genera presentación",
+            "Ficha ajena no muta, descarga 404 e historial aislado"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Edición de ficha/jornada por UI",
+        "Permisos/aislamiento restantes de cada operación",
+        "Códigos/tablas vigentes en PVS, fuentes de cuarta y quinta, cambios/bajas; constancias PVS/SOL cuando exista cliente"
       ]
     },
     {
@@ -13212,30 +13478,119 @@
       "method": "POST",
       "endpoint": "/api/rrhh/peru/planilla-electronica/:planillaId/paquetes",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:351",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 842,
+          "status": 201
+        },
+        {
+          "trace_index": 849,
+          "status": 201
+        },
+        {
+          "trace_index": 852,
+          "status": 201
+        },
+        {
+          "trace_index": 867,
+          "status": 201
+        },
+        {
+          "trace_index": 868,
+          "status": 201
+        },
+        {
+          "trace_index": 870,
+          "status": 201
+        },
+        {
+          "trace_index": 871,
+          "status": 409
+        },
+        {
+          "trace_index": 872,
+          "status": 409
+        },
+        {
+          "trace_index": 873,
+          "status": 400
+        },
+        {
+          "trace_index": 874,
+          "status": 201
+        },
+        {
+          "trace_index": 875,
+          "status": 201
+        },
+        {
+          "trace_index": 876,
+          "status": 201
+        },
+        {
+          "trace_index": 877,
+          "status": 201
+        },
+        {
+          "trace_index": 878,
+          "status": 201
+        },
+        {
+          "trace_index": 879,
+          "status": 201
+        },
+        {
+          "trace_index": 883,
+          "status": 403
+        }
+      ],
       "defects": [
         {
           "id": "plame-package-duplicates-on-retry",
-          "status": "canonical_local_api_ui_passed_ci_promotion_deployment_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_pending",
           "proof": {
             "source": "artifacts/peru-plame-retry-defect-20261003.json",
             "local_only": true,
             "observed": "Dos POST con mismo Idempotency-Key/cuerpo generan versiones 4 y 5"
           },
           "pending": [
-            "Reconstrucción limpia y CI",
-            "Ensayo de permisos heredados, promoción 559 y despliegue"
+            "CI main 37106520278 y verificación de despliegue exacto c034639f"
+          ]
+        },
+        {
+          "id": "plame-private-writer-prod-acl-bypass",
+          "status": "corrected_ci_promoted_merged_main_deployment_pending",
+          "proof": {
+            "source": "artifacts/erp-peru-559-rehearsal-20261003063550149-15392.json",
+            "scope": "Copia aislada sin red del respaldo PROD 558; no se invocó el writer en PROD",
+            "observed": {
+              "private_service_execute_before": true,
+              "private_service_execute_after": false
+            },
+            "cause": "EXECUTE heredado permitía al backend llamar el writer interno sin la autorización del wrapper"
+          },
+          "correction": "559 revoca únicamente EXECUTE interno de service_role/PUBLIC/anon/authenticated; wrapper público y cuerpo interno conservados",
+          "pending": [
+            "CI main 37106520278 y verificación de despliegue exacto c034639f"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "plame-package-intent-recovery",
+          "source": "scripts/ci/test-peru-payroll-plame-local.mjs",
+          "verified_checks": [
+            "Replay devuelve respuesta congelada pese a cambios de fuente/corte",
+            "Actor/cuerpo incompatible y clave inválida rechazados sin versiones residuales",
+            "Seis solicitudes concurrentes crean una sola versión",
+            "Rol sin permisos no consulta ni guarda; SQL prueba revocación e inactividad"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Aislamiento de la creación por API",
+        "Promoción 559, CI y despliegue exacto"
       ]
     },
     {
@@ -13244,16 +13599,34 @@
       "method": "GET",
       "endpoint": "/api/rrhh/peru/planilla-electronica/paquetes/historial",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:363",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 853,
+          "status": 200
+        },
+        {
+          "trace_index": 857,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "plame-first-admin-sources-zip",
+          "source": "scripts/ci/test-peru-payroll-plame-local.mjs",
+          "verified_checks": [
+            "Ficha/jornada incompletas bloquean fuentes; corrección explícita y replay habilitan cuatro RP_*",
+            "Delimitador, RUC y SHA-256; ZIP real contiene las mismas fuentes",
+            "Historial congelado con una versión vigente; evidencia vacía no genera presentación",
+            "Ficha ajena no muta, descarga 404 e historial aislado"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Edición de ficha/jornada por UI",
+        "Permisos/aislamiento restantes de cada operación",
+        "Códigos/tablas vigentes en PVS, fuentes de cuarta y quinta, cambios/bajas; constancias PVS/SOL cuando exista cliente"
       ]
     },
     {
@@ -13262,16 +13635,34 @@
       "method": "POST",
       "endpoint": "/api/rrhh/peru/planilla-electronica/paquetes/:id/evidencia",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:372",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 843,
+          "status": 400
+        },
+        {
+          "trace_index": 854,
+          "status": 400
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "plame-first-admin-sources-zip",
+          "source": "scripts/ci/test-peru-payroll-plame-local.mjs",
+          "verified_checks": [
+            "Ficha/jornada incompletas bloquean fuentes; corrección explícita y replay habilitan cuatro RP_*",
+            "Delimitador, RUC y SHA-256; ZIP real contiene las mismas fuentes",
+            "Historial congelado con una versión vigente; evidencia vacía no genera presentación",
+            "Ficha ajena no muta, descarga 404 e historial aislado"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Edición de ficha/jornada por UI",
+        "Permisos/aislamiento restantes de cada operación",
+        "Códigos/tablas vigentes en PVS, fuentes de cuarta y quinta, cambios/bajas; constancias PVS/SOL cuando exista cliente"
       ]
     },
     {
@@ -13280,16 +13671,34 @@
       "method": "GET",
       "endpoint": "/api/rrhh/peru/planilla-electronica/paquetes/:id/descargar",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:383",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 850,
+          "status": 200
+        },
+        {
+          "trace_index": 856,
+          "status": 404
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "plame-first-admin-sources-zip",
+          "source": "scripts/ci/test-peru-payroll-plame-local.mjs",
+          "verified_checks": [
+            "Ficha/jornada incompletas bloquean fuentes; corrección explícita y replay habilitan cuatro RP_*",
+            "Delimitador, RUC y SHA-256; ZIP real contiene las mismas fuentes",
+            "Historial congelado con una versión vigente; evidencia vacía no genera presentación",
+            "Ficha ajena no muta, descarga 404 e historial aislado"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Edición de ficha/jornada por UI",
+        "Permisos/aislamiento restantes de cada operación",
+        "Códigos/tablas vigentes en PVS, fuentes de cuarta y quinta, cambios/bajas; constancias PVS/SOL cuando exista cliente"
       ]
     },
     {
@@ -13400,6 +13809,18 @@
         },
         {
           "trace_index": 774,
+          "status": 201
+        },
+        {
+          "trace_index": 798,
+          "status": 201
+        },
+        {
+          "trace_index": 800,
+          "status": 201
+        },
+        {
+          "trace_index": 835,
           "status": 201
         }
       ],
@@ -14027,16 +14448,31 @@
       "method": "GET",
       "endpoint": "/api/rrhh/liquidaciones",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:765",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 828,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "hr-first-admin-liquidation",
+          "source": "scripts/ci/test-peru-hr-financial-local.mjs",
+          "verified_checks": [
+            "Cálculo/replay no causa cese; aprobación distinta termina contrato y consume CTS pendiente",
+            "Banco, transferencia y reversa conservan pago original y saldos exactos",
+            "Segregación de calculador/aprobador/pagador/reversor",
+            "Mutaciones ajenas 404 y consulta aislada",
+            "Un asiento confirmado cuadrado por devengo, pago y reversa"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de cálculo/confirmación y otras causas de cese",
+        "Lector/demás roles por operación",
+        "Casos normativos de jornadas/regímenes/beneficios; efectivo no ofrecido por la UI"
       ]
     },
     {
@@ -14045,16 +14481,35 @@
       "method": "POST",
       "endpoint": "/api/rrhh/empleados/:id/liquidacion",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:771",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 809,
+          "status": 201
+        },
+        {
+          "trace_index": 810,
+          "status": 201
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "hr-first-admin-liquidation",
+          "source": "scripts/ci/test-peru-hr-financial-local.mjs",
+          "verified_checks": [
+            "Cálculo/replay no causa cese; aprobación distinta termina contrato y consume CTS pendiente",
+            "Banco, transferencia y reversa conservan pago original y saldos exactos",
+            "Segregación de calculador/aprobador/pagador/reversor",
+            "Mutaciones ajenas 404 y consulta aislada",
+            "Un asiento confirmado cuadrado por devengo, pago y reversa"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de cálculo/confirmación y otras causas de cese",
+        "Lector/demás roles por operación",
+        "Casos normativos de jornadas/regímenes/beneficios; efectivo no ofrecido por la UI"
       ]
     },
     {
@@ -14063,16 +14518,43 @@
       "method": "POST",
       "endpoint": "/api/rrhh/liquidaciones/:id/confirmar",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:789",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 811,
+          "status": 403
+        },
+        {
+          "trace_index": 812,
+          "status": 201
+        },
+        {
+          "trace_index": 813,
+          "status": 201
+        },
+        {
+          "trace_index": 824,
+          "status": 404
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "hr-first-admin-liquidation",
+          "source": "scripts/ci/test-peru-hr-financial-local.mjs",
+          "verified_checks": [
+            "Cálculo/replay no causa cese; aprobación distinta termina contrato y consume CTS pendiente",
+            "Banco, transferencia y reversa conservan pago original y saldos exactos",
+            "Segregación de calculador/aprobador/pagador/reversor",
+            "Mutaciones ajenas 404 y consulta aislada",
+            "Un asiento confirmado cuadrado por devengo, pago y reversa"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de cálculo/confirmación y otras causas de cese",
+        "Lector/demás roles por operación",
+        "Casos normativos de jornadas/regímenes/beneficios; efectivo no ofrecido por la UI"
       ]
     },
     {
@@ -14081,16 +14563,47 @@
       "method": "POST",
       "endpoint": "/api/rrhh/liquidaciones/:id/pagar",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:800",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 815,
+          "status": 403
+        },
+        {
+          "trace_index": 816,
+          "status": 409
+        },
+        {
+          "trace_index": 817,
+          "status": 201
+        },
+        {
+          "trace_index": 818,
+          "status": 201
+        },
+        {
+          "trace_index": 825,
+          "status": 404
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "hr-first-admin-liquidation",
+          "source": "scripts/ci/test-peru-hr-financial-local.mjs",
+          "verified_checks": [
+            "Cálculo/replay no causa cese; aprobación distinta termina contrato y consume CTS pendiente",
+            "Banco, transferencia y reversa conservan pago original y saldos exactos",
+            "Segregación de calculador/aprobador/pagador/reversor",
+            "Mutaciones ajenas 404 y consulta aislada",
+            "Un asiento confirmado cuadrado por devengo, pago y reversa"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de cálculo/confirmación y otras causas de cese",
+        "Lector/demás roles por operación",
+        "Casos normativos de jornadas/regímenes/beneficios; efectivo no ofrecido por la UI"
       ]
     },
     {
@@ -14099,16 +14612,43 @@
       "method": "POST",
       "endpoint": "/api/rrhh/liquidaciones/:id/pago/revertir",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:811",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 820,
+          "status": 403
+        },
+        {
+          "trace_index": 821,
+          "status": 201
+        },
+        {
+          "trace_index": 822,
+          "status": 201
+        },
+        {
+          "trace_index": 826,
+          "status": 404
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "hr-first-admin-liquidation",
+          "source": "scripts/ci/test-peru-hr-financial-local.mjs",
+          "verified_checks": [
+            "Cálculo/replay no causa cese; aprobación distinta termina contrato y consume CTS pendiente",
+            "Banco, transferencia y reversa conservan pago original y saldos exactos",
+            "Segregación de calculador/aprobador/pagador/reversor",
+            "Mutaciones ajenas 404 y consulta aislada",
+            "Un asiento confirmado cuadrado por devengo, pago y reversa"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de cálculo/confirmación y otras causas de cese",
+        "Lector/demás roles por operación",
+        "Casos normativos de jornadas/regímenes/beneficios; efectivo no ofrecido por la UI"
       ]
     },
     {
@@ -14135,16 +14675,42 @@
       "method": "POST",
       "endpoint": "/api/rrhh/cts/depositos",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:838",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 801,
+          "status": 400
+        },
+        {
+          "trace_index": 802,
+          "status": 201
+        },
+        {
+          "trace_index": 803,
+          "status": 201
+        },
+        {
+          "trace_index": 808,
+          "status": 409
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "hr-first-admin-cts",
+          "source": "scripts/ci/test-peru-hr-financial-local.mjs",
+          "verified_checks": [
+            "Semestre inválido rechazado; cálculo/recálculo conserva filas",
+            "Depósito por actor distinto, banco exacto y replay",
+            "Depósito contabilizado no se recalcula ni se consume dos veces",
+            "Depósito ajeno 404; asiento único confirmado cuadrado"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Cálculo/depósito por UI",
+        "Lector y demás roles de cada escritura",
+        "Otras jornadas/regímenes/salarios y aceptación normativa externa"
       ]
     },
     {
@@ -14153,16 +14719,46 @@
       "method": "POST",
       "endpoint": "/api/rrhh/cts/depositos/:id/depositar",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:849",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 804,
+          "status": 403
+        },
+        {
+          "trace_index": 805,
+          "status": 201
+        },
+        {
+          "trace_index": 806,
+          "status": 201
+        },
+        {
+          "trace_index": 814,
+          "status": 409
+        },
+        {
+          "trace_index": 827,
+          "status": 404
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "hr-first-admin-cts",
+          "source": "scripts/ci/test-peru-hr-financial-local.mjs",
+          "verified_checks": [
+            "Semestre inválido rechazado; cálculo/recálculo conserva filas",
+            "Depósito por actor distinto, banco exacto y replay",
+            "Depósito contabilizado no se recalcula ni se consume dos veces",
+            "Depósito ajeno 404; asiento único confirmado cuadrado"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Cálculo/depósito por UI",
+        "Lector y demás roles de cada escritura",
+        "Otras jornadas/regímenes/salarios y aceptación normativa externa"
       ]
     },
     {
@@ -14609,9 +15205,29 @@
       "operation": "listar",
       "method": "GET",
       "endpoint": "/api/sucursales",
-      "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:19",
+      "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:32",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "branch-inactive-list-filter-ineffective",
+          "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-configuration-admin-defects-20261003.json",
+            "observed": {
+              "id": "branch-inactive-list-filter-ineffective",
+              "inactive_stored": true,
+              "include_inactive_requested": true,
+              "absent": true
+            },
+            "local_only": true
+          },
+          "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
+          "pending": [
+            "Reconstrucción completa y CI",
+            "Promoción 560 después de gates y despliegue exacto"
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -14627,7 +15243,7 @@
       "operation": "resumen",
       "method": "GET",
       "endpoint": "/api/sucursales/resumen",
-      "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:38",
+      "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:51",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -14645,9 +15261,29 @@
       "operation": "obtener",
       "method": "GET",
       "endpoint": "/api/sucursales/:id",
-      "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:50",
+      "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:63",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "branch-assigned-reader-detail-bypass",
+          "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-configuration-admin-defects-20261003.json",
+            "observed": {
+              "id": "branch-assigned-reader-detail-bypass",
+              "list_count": 1,
+              "hidden_detail_status": 200,
+              "hidden_branch_code": "0002"
+            },
+            "local_only": true
+          },
+          "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
+          "pending": [
+            "Reconstrucción completa y CI",
+            "Promoción 560 después de gates y despliegue exacto"
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -14663,14 +15299,57 @@
       "operation": "crear",
       "method": "POST",
       "endpoint": "/api/sucursales",
-      "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:60",
+      "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:74",
       "existing_evidence": [
         {
           "trace_index": 418,
           "status": 201
         }
       ],
-      "defects": [],
+      "defects": [
+        {
+          "id": "branch-create-retry-duplicate",
+          "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-configuration-admin-defects-20261003.json",
+            "observed": {
+              "id": "branch-create-retry-duplicate",
+              "same_intent": true,
+              "rows_created": 2,
+              "codes": [
+                "0003",
+                "0004"
+              ]
+            },
+            "local_only": true
+          },
+          "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
+          "pending": [
+            "Reconstrucción completa y CI",
+            "Promoción 560 después de gates y despliegue exacto"
+          ]
+        },
+        {
+          "id": "branch-editor-clears-after-failed-response",
+          "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-configuration-admin-ui-defect-20261003.json",
+            "observed": {
+              "id": "branch-editor-clears-after-failed-response",
+              "observed": true,
+              "editor_closed": true,
+              "rows_committed": 1,
+              "explicit_intent_sent": false
+            },
+            "local_only": true
+          },
+          "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
+          "pending": [
+            "Reconstrucción completa y CI",
+            "Promoción 560 después de gates y despliegue exacto"
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
@@ -14686,9 +15365,30 @@
       "operation": "actualizar",
       "method": "PUT",
       "endpoint": "/api/sucursales/:id",
-      "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:67",
+      "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:91",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "branch-editor-clears-after-failed-response",
+          "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-configuration-admin-ui-defect-20261003.json",
+            "observed": {
+              "id": "branch-editor-clears-after-failed-response",
+              "observed": true,
+              "editor_closed": true,
+              "rows_committed": 1,
+              "explicit_intent_sent": false
+            },
+            "local_only": true
+          },
+          "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
+          "pending": [
+            "Reconstrucción completa y CI",
+            "Promoción 560 después de gates y despliegue exacto"
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -14704,7 +15404,7 @@
       "operation": "desactivar",
       "method": "DELETE",
       "endpoint": "/api/sucursales/:id",
-      "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:78",
+      "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:110",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -14722,7 +15422,7 @@
       "operation": "sucursalesDeUsuario",
       "method": "GET",
       "endpoint": "/api/sucursales/usuarios/:usuarioId",
-      "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:88",
+      "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:127",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -14740,9 +15440,30 @@
       "operation": "asignarUsuario",
       "method": "PUT",
       "endpoint": "/api/sucursales/usuarios/:usuarioId",
-      "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:98",
+      "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts:137",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "branch-assignment-failure-removes-scope",
+          "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-configuration-admin-defects-20261003.json",
+            "observed": {
+              "id": "branch-assignment-failure-removes-scope",
+              "insert_rejected": true,
+              "previous_assignment_lost": true,
+              "visible_before": 1,
+              "visible_after": 5
+            },
+            "local_only": true
+          },
+          "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
+          "pending": [
+            "Reconstrucción completa y CI",
+            "Promoción 560 después de gates y despliegue exacto"
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -15451,6 +16172,18 @@
         },
         {
           "trace_index": 765,
+          "status": 201
+        },
+        {
+          "trace_index": 791,
+          "status": 201
+        },
+        {
+          "trace_index": 832,
+          "status": 201
+        },
+        {
+          "trace_index": 881,
           "status": 201
         }
       ],

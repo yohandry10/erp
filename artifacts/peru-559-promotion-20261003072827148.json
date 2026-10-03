@@ -1,0 +1,126 @@
+{
+  "commit": "2627275581077eec752f6674acf2c8ccdd5977dc",
+  "prNumber": 127,
+  "project": "wypnbcptofqdmoynlonq",
+  "backupSha256": "c40567b0c2473b14732783fb59cb711812c2c4d6992a1f9a93a838afb9c32666",
+  "migrationSha256": "8deb938f5cf7f25d6d3fbc31ba65a7993c6ca8b6075b7150ff7b7478becce898",
+  "bundleSha256": "c0ce9108a20780525bf90354ebfc63e53890362aad290c1cef70bbe4372b3634",
+  "success": true,
+  "remoteWrites": true,
+  "before": {
+    "project": "wypnbcptofqdmoynlonq",
+    "environment": "PROD",
+    "schema": 558,
+    "ready": true,
+    "privateImplementation": "fcb748566f503b6641c2129838396f10",
+    "wrapper": {
+      "hash": "aaa1277e9545431ab19d230b2154131e",
+      "guarded": false,
+      "security": [
+        true,
+        "v",
+        [
+          "postgres=X/postgres",
+          "service_role=X/postgres"
+        ],
+        "rrhh_peru_presentaciones_planilla"
+      ]
+    },
+    "privilegesValid": false,
+    "privileges": {
+      "privateAnon": false,
+      "wrapperAnon": false,
+      "privateService": true,
+      "wrapperService": true,
+      "intentServiceInsert": false,
+      "privateAuthenticated": false,
+      "wrapperAuthenticated": false,
+      "intentAuthenticatedSelect": false
+    },
+    "comparedData": [
+      "asientos_contables",
+      "audit_log",
+      "contratos",
+      "cuentas_bancarias",
+      "depositos_cts",
+      "detalle_asientos",
+      "empleado_planilla",
+      "empleados",
+      "empresa_config",
+      "historial_pagos_planilla",
+      "liquidaciones",
+      "pagos_empleados",
+      "pagos_liquidaciones",
+      "permisos",
+      "plan_cuentas",
+      "planillas",
+      "rol_permisos",
+      "rrhh_operaciones_475",
+      "rrhh_pagos",
+      "rrhh_peru_fichas_laborales",
+      "rrhh_peru_presentaciones_planilla",
+      "user_roles",
+      "usuarios_sistema"
+    ]
+  },
+  "after": {
+    "project": "wypnbcptofqdmoynlonq",
+    "environment": "PROD",
+    "schema": 559,
+    "ready": true,
+    "privateImplementation": "fcb748566f503b6641c2129838396f10",
+    "wrapper": {
+      "hash": "c83a03e60dd384b376c9a0d3926ba76b",
+      "guarded": true,
+      "security": [
+        true,
+        "v",
+        [
+          "postgres=X/postgres",
+          "service_role=X/postgres"
+        ],
+        "rrhh_peru_presentaciones_planilla"
+      ]
+    },
+    "privilegesValid": true,
+    "privileges": {
+      "privateAnon": false,
+      "wrapperAnon": false,
+      "privateService": false,
+      "wrapperService": true,
+      "intentServiceInsert": false,
+      "privateAuthenticated": false,
+      "wrapperAuthenticated": false,
+      "intentAuthenticatedSelect": false
+    },
+    "comparedData": [
+      "asientos_contables",
+      "audit_log",
+      "contratos",
+      "cuentas_bancarias",
+      "depositos_cts",
+      "detalle_asientos",
+      "empleado_planilla",
+      "empleados",
+      "empresa_config",
+      "historial_pagos_planilla",
+      "liquidaciones",
+      "pagos_empleados",
+      "pagos_liquidaciones",
+      "permisos",
+      "plan_cuentas",
+      "planillas",
+      "rol_permisos",
+      "rrhh_operaciones_475",
+      "rrhh_pagos",
+      "rrhh_peru_fichas_laborales",
+      "rrhh_peru_presentaciones_planilla",
+      "user_roles",
+      "usuarios_sistema"
+    ]
+  },
+  "existingDataPreserved": true,
+  "existingFunctionsPreserved": true,
+  "tableSecurityPreserved": true,
+  "completedAt": "2026-10-03T07:28:41.265Z"
+}

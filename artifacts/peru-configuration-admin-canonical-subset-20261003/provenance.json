@@ -1,0 +1,9 @@
+{
+  "source": "artifacts/peru-integrated-20261003072307240-18168",
+  "scope": "Fuente canónica 560 sin commit sobre snapshot local 558 más 559 y 560; SQL/API/UI y restore posterior, sin reconstrucción completa",
+  "dumps_extracted": false,
+  "sql_contract_560": true,
+  "api_scenarios": 16,
+  "api_requests": 67,
+  "browser_passed": 1
+}
