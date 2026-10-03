@@ -1,0 +1,18 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "scope": "Actual accounting batches after 201 real API CPE creations",
+  "batches": [
+    50,
+    50,
+    50,
+    50,
+    10,
+    0
+  ],
+  "postings": 210,
+  "replay_batches": [
+    0
+  ]
+}
