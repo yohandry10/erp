@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import {
   esCompraFiscal,
   esEstadoFiscal,
@@ -6,6 +6,7 @@ import {
   importeFiscal,
 } from './documento-fiscal.rules';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { uitPeruPorEjercicio } from './uit-peru';
 
 export type RegimenTributarioPeru = 'NRUS' | 'RER' | 'MYPE' | 'GENERAL';
 
@@ -47,9 +48,6 @@ export interface AdvertenciaTributaria {
   mensaje: string;
   bloquea_presentacion?: boolean;
 }
-
-const UIT_2026 = 5500;
-const LIMITE_RMT_300_UIT_2026 = 300 * UIT_2026;
 
 function money(value: unknown): number {
   const parsed = Number(value ?? 0);
@@ -148,7 +146,10 @@ export function calcularTributoMensualPeru(
   regimen: RegimenTributarioPeru,
   fuentes: FuentesTributariasMensuales,
   ajustes: AjustesTributariosMensuales = {},
+  ejercicio = 2026,
 ) {
+  const uit = uitPeruPorEjercicio(ejercicio);
+  const limiteRmt = 300 * uit;
   const warnings: AdvertenciaTributaria[] = [];
   const ventasGravadas = money(fuentes.ventas_gravadas);
   const ventasExoneradas = money(fuentes.ventas_exoneradas);
@@ -240,10 +241,10 @@ export function calcularTributoMensualPeru(
       }
       coeficiente = parsed;
     }
-    const tasaMinima = regimen === 'MYPE' && ingresosNetosAcumulados <= LIMITE_RMT_300_UIT_2026
+    const tasaMinima = regimen === 'MYPE' && ingresosNetosAcumulados <= limiteRmt
       ? 0.01
       : 0.015;
-    const tasaAplicable = regimen === 'MYPE' && ingresosNetosAcumulados <= LIMITE_RMT_300_UIT_2026
+    const tasaAplicable = regimen === 'MYPE' && ingresosNetosAcumulados <= limiteRmt
       ? tasaMinima
       : Math.max(coeficiente ?? 0, tasaMinima);
     pagoCuentaRenta = money(ingresosNetosMes * tasaAplicable);
@@ -271,8 +272,8 @@ export function calcularTributoMensualPeru(
   return {
     regimen,
     formulario,
-    uit: UIT_2026,
-    limite_rmt_300_uit: LIMITE_RMT_300_UIT_2026,
+    uit,
+    limite_rmt_300_uit: limiteRmt,
     ventas_gravadas: ventasGravadas,
     ventas_exoneradas: ventasExoneradas,
     ventas_inafectas: ventasInafectas,
@@ -407,7 +408,7 @@ export class TributosMensualesService {
    * legitimo puede no ser el que quedo guardado. Lo que cambia es el defecto.
    */
   private async saldoFavorDelMesAnterior(tenantId: string, periodo: string): Promise<number> {
-    const { data } = await this.supabase.getClient()
+    const { data, error } = await this.supabase.getClient()
       .from('tributos_declaraciones_mensuales')
       .select('saldo_favor_siguiente')
       .eq('tenant_id', tenantId)
@@ -415,6 +416,7 @@ export class TributosMensualesService {
       .eq('vigente', true)
       .maybeSingle();
 
+    if (error) throw new ServiceUnavailableException('No se pudo recuperar el saldo tributario anterior. Reintente la consulta.');
     return Math.max(Number((data as any)?.saldo_favor_siguiente ?? 0), 0);
   }
 
@@ -429,14 +431,15 @@ export class TributosMensualesService {
       ...ajustes,
       saldo_favor_anterior: ajustes.saldo_favor_anterior ?? arrastrado,
     };
-    const calculo = calcularTributoMensualPeru(regimen, fuentes, ajustesConArrastre);
+    const calculo = calcularTributoMensualPeru(regimen, fuentes, ajustesConArrastre, Number(periodo.slice(0, 4)));
     (snapshot as any).saldo_favor_arrastrado = arrastrado;
     (snapshot as any).saldo_favor_origen =
       ajustes.saldo_favor_anterior === undefined ? 'periodo_anterior' : 'declarado';
-    const { data: declaracion } = await this.supabase.getClient()
+    const { data: declaracion, error: declaracionError } = await this.supabase.getClient()
       .from('tributos_declaraciones_mensuales')
       .select('*').eq('tenant_id', tenantId).eq('periodo', periodo).eq('vigente', true)
       .maybeSingle();
+    if (declaracionError) throw new ServiceUnavailableException('No se pudo consultar la declaración tributaria vigente. Reintente la consulta.');
     return { periodo, ...calculo, source_snapshot: snapshot, declaracion_vigente: declaracion || null };
   }
 

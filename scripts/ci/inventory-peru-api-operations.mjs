@@ -74,6 +74,22 @@ if (process.argv[2]) {
   if ((!httpPhaseOnly && run.success !== true) || run.remoteWrites !== false || http.success !== true || !Array.isArray(http.request_traces)) {
     throw new Error('Se requiere ensayo local terminado con trazas HTTP, sin escrituras remotas');
   }
+  const additionalEvidence = [];
+  for(let argument=3;argument<process.argv.length;argument++) {
+    if(process.argv[argument]!=='--phase-evidence')continue;
+    const phaseDirectory=path.resolve(root,process.argv[++argument]||'');
+    if(!phaseDirectory.startsWith(path.join(root,'artifacts')+path.sep))throw new Error('Fase adicional debe estar en artifacts');
+    const phaseRun=JSON.parse(readFileSync(path.join(phaseDirectory,'run.json'),'utf8'));
+    if(phaseRun.success!==true||phaseRun.remoteWrites!==false)throw new Error('Fase adicional debe estar aprobada sin escritura remota');
+    const names={'company_logo_real_storage_subset':'company-logo.json','monthly_period_diagnostic_subset':'monthly-period.json'};
+    const filename=names[phaseRun.scope];if(!filename)throw new Error('Alcance adicional no reconocido');
+    const phase=JSON.parse(readFileSync(path.join(phaseDirectory,filename),'utf8'));
+    if(phase.success!==true||phase.remoteWrites!==false)throw new Error('Prueba de fase incompleta');
+    const evidence=path.relative(root,phaseDirectory).replaceAll('\\','/');
+    const offset=http.results.length;http.results.push(...phase.scenarios);
+    http.request_traces.push(...phase.requests.map(request=>({method:request.method,pathname:new URL('/api/'+request.endpoint.replace(/^\/?api\//,''), 'http://127.0.0.1').pathname,status:request.status,scenario_index_hint:offset,evidence_file:evidence+'/'+filename})));
+    additionalEvidence.push({evidence,scope:phaseRun.scope,global_success:true,ui_included:phaseRun.withBrowser===true});
+  }
   const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const routePattern = endpoint => new RegExp('^' + endpoint.split('/').map(part => part.startsWith(':') ? '[^/]+' : escape(part)).join('/') + '/?$');
   const requestMatches = new Map(operations.map(operation => [operation, []]));
@@ -98,6 +114,7 @@ if (process.argv[2]) {
   }
   const matrix = { generated_at: new Date().toISOString(), inventory: path.relative(root, output).replaceAll('\\', '/'),
     evidence: path.relative(root, evidenceDirectory).replaceAll('\\', '/'),
+    additional_evidence: additionalEvidence,
     evidence_scope: run.scope ?? 'full',
     evidence_global_success: run.success,
     evidence_phase: httpPhaseOnly ? 'HTTP aprobado; el resultado global se conserva por separado' : 'ensayo global aprobado',

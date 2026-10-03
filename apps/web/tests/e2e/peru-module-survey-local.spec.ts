@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { createHash } from 'node:crypto'
 import { visiblePeruActions } from './helpers/peru-visible-actions'
 
 async function staticPages(directory: string, root = directory): Promise<string[]> {
@@ -61,7 +62,39 @@ test('Perú: inspección de carga de todas las pantallas estáticas con API y ba
   const routes = (await staticPages(path.resolve('app/dashboard'))).filter(route => !route.startsWith('/dashboard/analytics/'))
   const findings: Array<{ route: string; finalUrl: string; status: number | null; errors: string[]; text: string; expectedRestriction: boolean; recovery?: { reason: string; evidence: string }; controls: Awaited<ReturnType<typeof visiblePeruActions>> }> = []
   let currentErrors: string[] = []
-  page.on('pageerror', error => currentErrors.push(error.message))
+  const scriptDiagnostics: Array<Record<string, unknown>> = []
+  const captureTasks: Array<Promise<void>> = []
+  const session = await context.newCDPSession(page)
+  const scripts = new Map<string, string>()
+  session.on('Debugger.scriptParsed', event => scripts.set(event.scriptId, event.url))
+  session.on('Runtime.exceptionThrown', event => {
+    const detail = event.exceptionDetails
+    const scriptId = detail.scriptId || detail.stackTrace?.callFrames[0]?.scriptId
+    const record: Record<string, unknown> = {
+      page: new URL(page.url()).pathname, text: detail.text,
+      description: detail.exception?.description, url: detail.url || (scriptId && scripts.get(scriptId)),
+      line: detail.lineNumber, column: detail.columnNumber, stack: detail.stackTrace,
+    }
+    scriptDiagnostics.push(record)
+    const sourceUrl = String(record.url || '')
+    if (scriptId && sourceUrl.includes('/_next/') && ['127.0.0.1', 'localhost'].includes(new URL(sourceUrl).hostname)) {
+      captureTasks.push((async () => {
+        try {
+          await session.send('Debugger.enable')
+          const result = await session.send('Debugger.getScriptSource', { scriptId })
+          const filename = `failed-script-${scriptDiagnostics.length}.js`
+          record.source_sha256 = createHash('sha256').update(result.scriptSource).digest('hex')
+          record.private_source_file = filename
+          await fs.writeFile(path.join(output, filename), result.scriptSource)
+        } catch (error) { record.capture_error = error instanceof Error ? error.message : String(error) }
+      })())
+    }
+  })
+  await session.send('Runtime.enable')
+  page.on('pageerror', error => {
+    currentErrors.push(error.message)
+    scriptDiagnostics.push({ page: new URL(page.url()).pathname, name: error.name, message: error.message, stack: error.stack })
+  })
   page.on('response', response => {
     const url = new URL(response.url())
     if (url.pathname.includes('/api/') && response.status() >= 400
@@ -116,6 +149,8 @@ test('Perú: inspección de carga de todas las pantallas estáticas con API y ba
       scope: 'Carga y controles visibles de pantallas estáticas; no acredita ejecución de acciones ni rutas con identificador. Restricción de auditoría contrastada con permisos reales', routes: findings }, null, 2))
     console.log(`[module-survey] ${route}: ${errors.length ? errors.join('; ') : expectedRestriction ? 'restricción de auditoría comprobada' : 'carga sin errores HTTP/JS'}`)
   }
+  await Promise.all(captureTasks)
+  await fs.writeFile(path.join(output, 'script-diagnostics.json'), JSON.stringify({ scope: 'Traza privada de errores; no modifica el resultado ni reintenta fallos JS', entries: scriptDiagnostics }, null, 2))
   const failed = findings.filter(row => row.errors.length)
   expect(failed.map(row => ({ route: row.route, errors: row.errors })), 'Defectos de carga que requieren corrección').toEqual([])
 })

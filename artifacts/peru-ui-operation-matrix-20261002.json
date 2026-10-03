@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-10-03T08:14:40.260Z",
-  "evidence": "artifacts/peru-integrated-local-configuration-admin-20261003",
+  "generated_at": "2026-10-03T10:10:57.541Z",
+  "evidence": "artifacts/peru-integrated-ci-37111841817",
   "excluded": [
     "Analytics"
   ],
@@ -226,7 +226,7 @@
         },
         {
           "element": "select",
-          "label": "UsuarioTodos los usuariosCliente (primer-cliente-1c48c2da-4afe-48fd-bc25-f5bb47fa543e@example.test)Lector local (lector-maestros-d3edb03d@example.test)Lector de inventario local (l",
+          "label": "UsuarioTodos los usuariosLector contable local (lector-contable-fffcfc3f@example.test)Cliente (primer-cliente-847e5fc8-8c30-4e72-9833-cebc7f7cc83f@example.test)Lector local (lector",
           "type": null,
           "disabled": false,
           "path": null,
@@ -1250,73 +1250,8 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "visible_controls_pending_functional_execution",
-      "controls": [
-        {
-          "element": "button",
-          "label": "Abrir notificaciones",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Cambiar a tema claro",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Gestionar PIN supervisor",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Abrir Nueva Caja",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Actualizar",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Actualizar",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "PDF",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "CSV",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        }
-      ],
+      "result": "pending_browser_evidence",
+      "controls": [],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -2212,7 +2147,7 @@
         },
         {
           "element": "select",
-          "label": "ProveedorTodos los proveedoresAlta proveedor d3edb03dIMPORT UI LOCAL PROVEEDORES 87787488 EDITADOMAESTRO LOCAL PROVEEDORES 8b5b4e7b EDITADO",
+          "label": "ProveedorTodos los proveedoresAlta proveedor bcd704f2IMPORT UI LOCAL PROVEEDORES 2c00ae69 EDITADOMAESTRO LOCAL PROVEEDORES d045df45 EDITADO",
           "type": null,
           "disabled": false,
           "path": null,
@@ -2244,7 +2179,7 @@
         },
         {
           "element": "button",
-          "label": "Alta proveedor d3edb03dRUC: 20555697253Activoproveedor-d3edb03d@example.test",
+          "label": "Alta proveedor bcd704f2RUC: 20682081148Activoproveedor-bcd704f2@example.test",
           "type": "button",
           "disabled": false,
           "path": null,
@@ -2252,7 +2187,7 @@
         },
         {
           "element": "button",
-          "label": "IMPORT UI LOCAL PROVEEDORES 87787488 EDITADORUC: 20728183129Activoui-local@example.test",
+          "label": "IMPORT UI LOCAL PROVEEDORES 2c00ae69 EDITADORUC: 20382421532Activoui-local@example.test",
           "type": "button",
           "disabled": false,
           "path": null,
@@ -2260,7 +2195,7 @@
         },
         {
           "element": "button",
-          "label": "MAESTRO LOCAL PROVEEDORES 8b5b4e7b EDITADORUC: 20123456786Activoeditado-8b5b4e7b@example.test",
+          "label": "MAESTRO LOCAL PROVEEDORES d045df45 EDITADORUC: 20123456786Activoeditado-d045df45@example.test",
           "type": "button",
           "disabled": false,
           "path": null,
@@ -7772,129 +7707,8 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "visible_controls_pending_functional_execution",
-      "controls": [
-        {
-          "element": "button",
-          "label": "Abrir notificaciones",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Cambiar a tema claro",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Volver a Proveedores",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "input",
-          "label": "RUC *",
-          "type": "text",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "input",
-          "label": "Razón Social *",
-          "type": "text",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "input",
-          "label": "Nombre Comercial",
-          "type": "text",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "input",
-          "label": "Email *",
-          "type": "email",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "input",
-          "label": "Nombre del Contacto",
-          "type": "text",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "input",
-          "label": "Teléfono",
-          "type": "text",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "textarea",
-          "label": "Dirección",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "select",
-          "label": "Condiciones de Pago",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "input",
-          "label": "Límite de Crédito (PEN)",
-          "type": "number",
-          "disabled": true,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "input",
-          "label": "Suspensión vigente hasta",
-          "type": "date",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Cancelar",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Crear Proveedor",
-          "type": "submit",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        }
-      ],
+      "result": "pending_browser_evidence",
+      "controls": [],
       "declared_api_calls": [
         {
           "method": "POST",
@@ -8446,57 +8260,8 @@
           "errors": []
         }
       ],
-      "result": "visible_controls_pending_functional_execution",
-      "controls": [
-        {
-          "element": "button",
-          "label": "Abrir notificaciones",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Cambiar a tema claro",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Convertir a cuenta real",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Ocultar aviso de cuenta demo",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Volver a Recepciones",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Ver Orden",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        }
-      ],
+      "result": "pending_browser_evidence",
+      "controls": [],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -9044,89 +8809,8 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "visible_controls_pending_functional_execution",
-      "controls": [
-        {
-          "element": "button",
-          "label": "Abrir notificaciones",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Cambiar a tema claro",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Actualizar",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "a",
-          "label": "Resumen",
-          "type": null,
-          "disabled": false,
-          "path": "/dashboard/configuracion/",
-          "executed": false
-        },
-        {
-          "element": "a",
-          "label": "Empresa",
-          "type": null,
-          "disabled": false,
-          "path": "/dashboard/configuracion/empresa/",
-          "executed": false
-        },
-        {
-          "element": "a",
-          "label": "Ventas",
-          "type": null,
-          "disabled": false,
-          "path": "/dashboard/configuracion/ventas/",
-          "executed": false
-        },
-        {
-          "element": "a",
-          "label": "RRHH",
-          "type": null,
-          "disabled": false,
-          "path": "/dashboard/configuracion/rrhh/",
-          "executed": false
-        },
-        {
-          "element": "a",
-          "label": "Editar en asistente",
-          "type": null,
-          "disabled": false,
-          "path": "/dashboard/wizard/",
-          "executed": false
-        },
-        {
-          "element": "a",
-          "label": "Establecimientos anexos",
-          "type": null,
-          "disabled": false,
-          "path": "/dashboard/configuracion/sucursales/",
-          "executed": false
-        },
-        {
-          "element": "a",
-          "label": "Revisar RRHH Perú",
-          "type": null,
-          "disabled": false,
-          "path": "/dashboard/configuracion/rrhh/",
-          "executed": false
-        }
-      ],
+      "result": "pending_browser_evidence",
+      "controls": [],
       "declared_api_calls": [
         {
           "method": "POST",
@@ -10297,7 +9981,7 @@
         },
         {
           "element": "button",
-          "label": "Editar establecimiento Sucursal apertura 8b5b4e7b",
+          "label": "Editar establecimiento Sucursal apertura d045df45",
           "type": null,
           "disabled": false,
           "path": null,
@@ -10305,7 +9989,7 @@
         },
         {
           "element": "button",
-          "label": "Desactivar establecimiento Sucursal apertura 8b5b4e7b",
+          "label": "Desactivar establecimiento Sucursal apertura d045df45",
           "type": null,
           "disabled": false,
           "path": null,
@@ -10313,7 +9997,7 @@
         },
         {
           "element": "button",
-          "label": "Asignar Casa matriz a lector-contable-57907162@example.test",
+          "label": "Asignar Casa matriz a lector-contable-fffcfc3f@example.test",
           "type": null,
           "disabled": false,
           "path": null,
@@ -10321,7 +10005,7 @@
         },
         {
           "element": "button",
-          "label": "Asignar Sucursal apertura 8b5b4e7b a lector-contable-57907162@example.test",
+          "label": "Asignar Sucursal apertura d045df45 a lector-contable-fffcfc3f@example.test",
           "type": null,
           "disabled": false,
           "path": null,
@@ -10329,7 +10013,7 @@
         },
         {
           "element": "button",
-          "label": "Asignar Casa matriz a lector-inventario-7ca733d8@example.test",
+          "label": "Asignar Casa matriz a lector-inventario-86c55427@example.test",
           "type": null,
           "disabled": false,
           "path": null,
@@ -10337,7 +10021,7 @@
         },
         {
           "element": "button",
-          "label": "Asignar Sucursal apertura 8b5b4e7b a lector-inventario-7ca733d8@example.test",
+          "label": "Asignar Sucursal apertura d045df45 a lector-inventario-86c55427@example.test",
           "type": null,
           "disabled": false,
           "path": null,
@@ -10345,7 +10029,7 @@
         },
         {
           "element": "button",
-          "label": "Asignar Casa matriz a primer-cliente-1c48c2da-4afe-48fd-bc25-f5bb47fa543e@example.test",
+          "label": "Asignar Casa matriz a primer-cliente-847e5fc8-8c30-4e72-9833-cebc7f7cc83f@example.test",
           "type": null,
           "disabled": false,
           "path": null,
@@ -10353,7 +10037,7 @@
         },
         {
           "element": "button",
-          "label": "Asignar Sucursal apertura 8b5b4e7b a primer-cliente-1c48c2da-4afe-48fd-bc25-f5bb47fa543e@example.test",
+          "label": "Asignar Sucursal apertura d045df45 a primer-cliente-847e5fc8-8c30-4e72-9833-cebc7f7cc83f@example.test",
           "type": null,
           "disabled": false,
           "path": null,
@@ -10387,7 +10071,7 @@
               "defects": [
                 {
                   "id": "branch-inactive-list-filter-ineffective",
-                  "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+                  "status": "corrected_ci_promoted_merged_main_deployment_verified",
                   "proof": {
                     "source": "artifacts/peru-configuration-admin-defects-20261003.json",
                     "observed": {
@@ -10399,10 +10083,7 @@
                     "local_only": true
                   },
                   "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
-                  "pending": [
-                    "Reconstrucción completa y CI",
-                    "Promoción 560 después de gates y despliegue exacto"
-                  ]
+                  "pending": []
                 }
               ]
             }
@@ -10434,7 +10115,7 @@
               "defects": [
                 {
                   "id": "branch-editor-clears-after-failed-response",
-                  "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+                  "status": "corrected_ci_promoted_merged_main_deployment_verified",
                   "proof": {
                     "source": "artifacts/peru-configuration-admin-ui-defect-20261003.json",
                     "observed": {
@@ -10447,10 +10128,7 @@
                     "local_only": true
                   },
                   "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
-                  "pending": [
-                    "Reconstrucción completa y CI",
-                    "Promoción 560 después de gates y despliegue exacto"
-                  ]
+                  "pending": []
                 }
               ]
             }
@@ -10482,7 +10160,7 @@
               "defects": [
                 {
                   "id": "branch-create-retry-duplicate",
-                  "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+                  "status": "corrected_ci_promoted_merged_main_deployment_verified",
                   "proof": {
                     "source": "artifacts/peru-configuration-admin-defects-20261003.json",
                     "observed": {
@@ -10497,14 +10175,11 @@
                     "local_only": true
                   },
                   "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
-                  "pending": [
-                    "Reconstrucción completa y CI",
-                    "Promoción 560 después de gates y despliegue exacto"
-                  ]
+                  "pending": []
                 },
                 {
                   "id": "branch-editor-clears-after-failed-response",
-                  "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+                  "status": "corrected_ci_promoted_merged_main_deployment_verified",
                   "proof": {
                     "source": "artifacts/peru-configuration-admin-ui-defect-20261003.json",
                     "observed": {
@@ -10517,10 +10192,7 @@
                     "local_only": true
                   },
                   "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
-                  "pending": [
-                    "Reconstrucción completa y CI",
-                    "Promoción 560 después de gates y despliegue exacto"
-                  ]
+                  "pending": []
                 }
               ]
             }
@@ -10579,7 +10251,7 @@
               "defects": [
                 {
                   "id": "branch-editor-clears-after-failed-response",
-                  "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+                  "status": "corrected_ci_promoted_merged_main_deployment_verified",
                   "proof": {
                     "source": "artifacts/peru-configuration-admin-ui-defect-20261003.json",
                     "observed": {
@@ -10592,10 +10264,7 @@
                     "local_only": true
                   },
                   "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
-                  "pending": [
-                    "Reconstrucción completa y CI",
-                    "Promoción 560 después de gates y despliegue exacto"
-                  ]
+                  "pending": []
                 }
               ]
             }
@@ -10848,7 +10517,7 @@
               "defects": [
                 {
                   "id": "branch-assignment-failure-removes-scope",
-                  "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+                  "status": "corrected_ci_promoted_merged_main_deployment_verified",
                   "proof": {
                     "source": "artifacts/peru-configuration-admin-defects-20261003.json",
                     "observed": {
@@ -10861,10 +10530,7 @@
                     "local_only": true
                   },
                   "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
-                  "pending": [
-                    "Reconstrucción completa y CI",
-                    "Promoción 560 después de gates y despliegue exacto"
-                  ]
+                  "pending": []
                 }
               ]
             }
@@ -10910,7 +10576,7 @@
               "defects": [
                 {
                   "id": "branch-assigned-reader-detail-bypass",
-                  "status": "canonical_api_sql_ui_rehearsal_passed_full_ci_promotion_deployment_pending",
+                  "status": "corrected_ci_promoted_merged_main_deployment_verified",
                   "proof": {
                     "source": "artifacts/peru-configuration-admin-defects-20261003.json",
                     "observed": {
@@ -10922,10 +10588,7 @@
                     "local_only": true
                   },
                   "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
-                  "pending": [
-                    "Reconstrucción completa y CI",
-                    "Promoción 560 después de gates y despliegue exacto"
-                  ]
+                  "pending": []
                 }
               ]
             }
@@ -11401,185 +11064,8 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "visible_controls_pending_functional_execution",
-      "controls": [
-        {
-          "element": "button",
-          "label": "Abrir notificaciones",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Cambiar a tema claro",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Estado de ResultadosAnálisis financiero y rentabilidad operativa.",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Registro de ComprasDetalle tributario y contable de adquisiciones.",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Balance de ComprobaciónValidación de saldos, debe y haber.",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Kardex ValorizadoControl valorizado de inventario.",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Libro Caja y BancosTrazabilidad de caja, bancos y movimientos.",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Registro Activos FijosActivos, depreciación y valor neto.",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Libro de PlanillasIntegración contable con RRHH.",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Inventarios y BalancesLibro de inventarios, activos y patrimonio.",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Registro de CostosCentros de costo y costos operativos.",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Libros Electrónicos SUNATPreparación de libros electrónicos.",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "a",
-          "label": "AsientosLibro diario y detalle debe/haber.",
-          "type": null,
-          "disabled": false,
-          "path": "/dashboard/contabilidad/asientos",
-          "executed": false
-        },
-        {
-          "element": "a",
-          "label": "EstadosBalance, resultados y comprobación.",
-          "type": null,
-          "disabled": false,
-          "path": "/dashboard/contabilidad/estados",
-          "executed": false
-        },
-        {
-          "element": "a",
-          "label": "MonitoreoEventos contables y reintentos.",
-          "type": null,
-          "disabled": false,
-          "path": "/dashboard/contabilidad/monitoreo",
-          "executed": false
-        },
-        {
-          "element": "a",
-          "label": "PeriodosControl de apertura y cierre.",
-          "type": null,
-          "disabled": false,
-          "path": "/dashboard/contabilidad/periodos",
-          "executed": false
-        },
-        {
-          "element": "a",
-          "label": "Centros de costoAsignación operativa por unidad.",
-          "type": null,
-          "disabled": false,
-          "path": "/dashboard/contabilidad/centros-costo",
-          "executed": false
-        },
-        {
-          "element": "a",
-          "label": "ConsignacionesMercadería de terceros, venta, devolución y cierre.",
-          "type": null,
-          "disabled": false,
-          "path": "/dashboard/contabilidad/consignaciones",
-          "executed": false
-        },
-        {
-          "element": "a",
-          "label": "PresupuestosEjecución y alertas del periodo.",
-          "type": null,
-          "disabled": false,
-          "path": "/dashboard/contabilidad/presupuestos",
-          "executed": false
-        },
-        {
-          "element": "a",
-          "label": "ConsolidaciónGrupos empresariales y reportes configurables.",
-          "type": null,
-          "disabled": false,
-          "path": "/dashboard/contabilidad/consolidacion",
-          "executed": false
-        },
-        {
-          "element": "a",
-          "label": "Impuestos PerúBorrador mensual IGV/Renta y constancias SUNAT.",
-          "type": null,
-          "disabled": false,
-          "path": "/dashboard/contabilidad/impuestos",
-          "executed": false
-        },
-        {
-          "element": "a",
-          "label": "Renta anual e ITANConciliación FV 710, escala RMT e ITAN.",
-          "type": null,
-          "disabled": false,
-          "path": "/dashboard/contabilidad/impuestos/anual",
-          "executed": false
-        }
-      ],
+      "result": "pending_browser_evidence",
+      "controls": [],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -12085,7 +11571,7 @@
         },
         {
           "element": "button",
-          "label": "Ver cronograma AF-57907162",
+          "label": "Ver cronograma AF-FFFCFC3F",
           "type": "button",
           "disabled": false,
           "path": null,
@@ -17765,16 +17251,53 @@
             {
               "method": "GET",
               "endpoint": "/api/contabilidad/impuestos/mensual",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
-              "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "monthly-tax-uit-by-exercise",
+                  "source": "scripts/ci/test-peru-monthly-period-local.mjs",
+                  "verified_checks": [
+                    "API real selecciona UIT/límite RMT de períodos 2024, 2025 y 2026; rechaza 2027 sin parámetro verificado",
+                    "Regresión de cálculo RMT prueba cambio de umbral 2025/2026, separado de evidencia de operación completa"
+                  ]
+                },
+                {
+                  "id": "monthly-tax-credit-read-recovery",
+                  "source": "scripts/ci/test-peru-monthly-period-local.mjs",
+                  "verified_checks": [
+                    "Borrador anterior guardado por API real y saldo 125.50 persistido",
+                    "Error real de permisos SQL se devuelve como 503; cálculo/guardado fallan sin nueva versión; tras restaurar acceso recupera saldo"
+                  ]
+                }
               ],
-              "defects": []
+              "pending_checks": [
+                "Flujo mensual completo: fuentes no vacías, guardado/versiones/constancias/historial y navegador",
+                "Todos los regímenes/variantes/créditos, permisos/aislamiento y recuperación",
+                "Validación externa/PVS/SUNAT; CI/despliegue",
+                "Declaración vigente/fuentes: otras fallas de lectura y recuperación UI",
+                "Versiones/constancia/regímenes, permisos/aislamiento por operación; CI/despliegue"
+              ],
+              "defects": [
+                {
+                  "id": "monthly-tax-uses-2026-uit-for-other-exercises",
+                  "status": "canonical_subset_passed_full_ci_deployment_pending",
+                  "proof": "artifacts/peru-monthly-period-baseline-20261003/monthly-period.json",
+                  "correction": "UIT compartida mensual/anual por ejercicio verificado: 2024 5150, 2025 5350, 2026 5500; límite RMT depende del período, ejercicio no verificado rechazado. Regresión con acumulado 1620000 calcula pago 150 en 2025 y 100 en 2026.",
+                  "pending": [
+                    "Flujo mensual completo API/UI, fuentes no vacías, versiones/constancias/permisos/aislamiento/recuperación",
+                    "Reconstrucción global, CI y despliegue exacto"
+                  ]
+                },
+                {
+                  "id": "monthly-tax-read-error-becomes-zero-credit",
+                  "status": "canonical_subset_passed_full_ci_deployment_pending",
+                  "proof": "artifacts/peru-monthly-recovery-baseline-20261003/monthly-period.json",
+                  "correction": "Lecturas fallidas de saldo previo y declaración vigente devuelven 503; no producen cálculo exitoso con crédito cero ni un borrador basado en lectura incompleta. Recuperación conserva saldo persistido 125.50.",
+                  "pending": [
+                    "CI/global y despliegue exacto; variantes de error de declaración vigente, fuentes y UI"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -17816,7 +17339,27 @@
                 "validaciones",
                 "recuperación de errores"
               ],
-              "defects": []
+              "defects": [
+                {
+                  "id": "monthly-tax-uses-2026-uit-for-other-exercises",
+                  "status": "canonical_subset_passed_full_ci_deployment_pending",
+                  "proof": "artifacts/peru-monthly-period-baseline-20261003/monthly-period.json",
+                  "correction": "UIT compartida mensual/anual por ejercicio verificado: 2024 5150, 2025 5350, 2026 5500; límite RMT depende del período, ejercicio no verificado rechazado. Regresión con acumulado 1620000 calcula pago 150 en 2025 y 100 en 2026.",
+                  "pending": [
+                    "Flujo mensual completo API/UI, fuentes no vacías, versiones/constancias/permisos/aislamiento/recuperación",
+                    "Reconstrucción global, CI y despliegue exacto"
+                  ]
+                },
+                {
+                  "id": "monthly-tax-read-error-becomes-zero-credit",
+                  "status": "canonical_subset_passed_full_ci_deployment_pending",
+                  "proof": "artifacts/peru-monthly-recovery-baseline-20261003/monthly-period.json",
+                  "correction": "Lecturas fallidas de saldo previo y declaración vigente devuelven 503; no producen cálculo exitoso con crédito cero ni un borrador basado en lectura incompleta. Recuperación conserva saldo persistido 125.50.",
+                  "pending": [
+                    "CI/global y despliegue exacto; variantes de error de declaración vigente, fuentes y UI"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -17828,16 +17371,42 @@
             {
               "method": "POST",
               "endpoint": "/api/contabilidad/impuestos/mensual",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
-              "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "monthly-tax-credit-read-recovery",
+                  "source": "scripts/ci/test-peru-monthly-period-local.mjs",
+                  "verified_checks": [
+                    "Borrador anterior guardado por API real y saldo 125.50 persistido",
+                    "Error real de permisos SQL se devuelve como 503; cálculo/guardado fallan sin nueva versión; tras restaurar acceso recupera saldo"
+                  ]
+                }
               ],
-              "defects": []
+              "pending_checks": [
+                "Declaración vigente/fuentes: otras fallas de lectura y recuperación UI",
+                "Versiones/constancia/regímenes, permisos/aislamiento por operación; CI/despliegue"
+              ],
+              "defects": [
+                {
+                  "id": "monthly-tax-uses-2026-uit-for-other-exercises",
+                  "status": "canonical_subset_passed_full_ci_deployment_pending",
+                  "proof": "artifacts/peru-monthly-period-baseline-20261003/monthly-period.json",
+                  "correction": "UIT compartida mensual/anual por ejercicio verificado: 2024 5150, 2025 5350, 2026 5500; límite RMT depende del período, ejercicio no verificado rechazado. Regresión con acumulado 1620000 calcula pago 150 en 2025 y 100 en 2026.",
+                  "pending": [
+                    "Flujo mensual completo API/UI, fuentes no vacías, versiones/constancias/permisos/aislamiento/recuperación",
+                    "Reconstrucción global, CI y despliegue exacto"
+                  ]
+                },
+                {
+                  "id": "monthly-tax-read-error-becomes-zero-credit",
+                  "status": "canonical_subset_passed_full_ci_deployment_pending",
+                  "proof": "artifacts/peru-monthly-recovery-baseline-20261003/monthly-period.json",
+                  "correction": "Lecturas fallidas de saldo previo y declaración vigente devuelven 503; no producen cálculo exitoso con crédito cero ni un borrador basado en lectura incompleta. Recuperación conserva saldo persistido 125.50.",
+                  "pending": [
+                    "CI/global y despliegue exacto; variantes de error de declaración vigente, fuentes y UI"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -19274,57 +18843,8 @@
           "errors": []
         }
       ],
-      "result": "visible_controls_pending_functional_execution",
-      "controls": [
-        {
-          "element": "button",
-          "label": "Abrir notificaciones",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Cambiar a tema claro",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Convertir a cuenta real",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Ocultar aviso de cuenta demo",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Volver a Períodos",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Cerrar Período",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        }
-      ],
+      "result": "pending_browser_evidence",
+      "controls": [],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -20950,49 +20470,8 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "visible_controls_pending_functional_execution",
-      "controls": [
-        {
-          "element": "button",
-          "label": "Abrir notificaciones",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Cambiar a tema claro",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Volver a presupuestos",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "select",
-          "label": "Periodo",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Exportar a Excel",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        }
-      ],
+      "result": "pending_browser_evidence",
+      "controls": [],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -22649,129 +22128,8 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "visible_controls_pending_functional_execution",
-      "controls": [
-        {
-          "element": "button",
-          "label": "Abrir notificaciones",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Cambiar a tema claro",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Nueva NC / ND",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Nuevo CPE",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "input",
-          "label": "Cliente",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "select",
-          "label": "Tipo comprobante",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "select",
-          "label": "Estado",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "input",
-          "label": "Fecha desde",
-          "type": "date",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "input",
-          "label": "Fecha hasta",
-          "type": "date",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Exportar CSV",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Vista A4",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Descargar A4",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Enviar SUNAT",
-          "type": null,
-          "disabled": true,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "GRE",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Anulación",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        }
-      ],
+      "result": "pending_browser_evidence",
+      "controls": [],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -23586,6 +22944,54 @@
           "element": "button",
           "label": "Cambiar a tema claro",
           "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Dashboard",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/",
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Ventas",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/ventas/",
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Nueva Cotización",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Buscar",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "select",
+          "label": "Filtrar por estado",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Actualizar",
+          "type": null,
           "disabled": false,
           "path": null,
           "executed": false
@@ -24818,7 +24224,7 @@
           "element": "button",
           "label": "Actualizar",
           "type": null,
-          "disabled": false,
+          "disabled": true,
           "path": null,
           "executed": false
         },
@@ -24936,14 +24342,20 @@
             {
               "method": "GET",
               "endpoint": "/api/retenciones",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "tax-advance-cxp-bank-accounting-lifecycle",
+                  "source": "scripts/ci/test-peru-tax-adjustments-local.mjs",
+                  "verified_checks": [
+                    "Anticipos proveedor/cliente, aplicación parcial a CxP, retención/percepción/detracción y depósito contable local",
+                    "Pago neto, replays sin doble movimiento, permisos/tenant/rechazos sin residuos y asientos reales únicos/cuadrados",
+                    "UI conserva tres intenciones/campos ante respuestas perdidas y recupera sin pageerror; recarga persistida"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "Aplicación/reversa CxC, monedas/tipos de cambio, roles sólo lectura de finanzas, anulaciones y todos los filtros; tasas normativas/depósito externo; CI/despliegue"
               ],
               "defects": []
             }
@@ -24957,28 +24369,40 @@
             {
               "method": "GET",
               "endpoint": "/api/retenciones/anticipos",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "tax-advance-cxp-bank-accounting-lifecycle",
+                  "source": "scripts/ci/test-peru-tax-adjustments-local.mjs",
+                  "verified_checks": [
+                    "Anticipos proveedor/cliente, aplicación parcial a CxP, retención/percepción/detracción y depósito contable local",
+                    "Pago neto, replays sin doble movimiento, permisos/tenant/rechazos sin residuos y asientos reales únicos/cuadrados",
+                    "UI conserva tres intenciones/campos ante respuestas perdidas y recupera sin pageerror; recarga persistida"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "Aplicación/reversa CxC, monedas/tipos de cambio, roles sólo lectura de finanzas, anulaciones y todos los filtros; tasas normativas/depósito externo; CI/despliegue"
               ],
               "defects": []
             },
             {
               "method": "GET",
               "endpoint": "/api/retenciones/:id",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "tax-advance-cxp-bank-accounting-lifecycle",
+                  "source": "scripts/ci/test-peru-tax-adjustments-local.mjs",
+                  "verified_checks": [
+                    "Anticipos proveedor/cliente, aplicación parcial a CxP, retención/percepción/detracción y depósito contable local",
+                    "Pago neto, replays sin doble movimiento, permisos/tenant/rechazos sin residuos y asientos reales únicos/cuadrados",
+                    "UI conserva tres intenciones/campos ante respuestas perdidas y recupera sin pageerror; recarga persistida"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "Aplicación/reversa CxC, monedas/tipos de cambio, roles sólo lectura de finanzas, anulaciones y todos los filtros; tasas normativas/depósito externo; CI/despliegue"
               ],
               "defects": []
             }
@@ -25131,16 +24555,32 @@
             {
               "method": "POST",
               "endpoint": "/api/retenciones/anticipos",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
-              "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "tax-advance-cxp-bank-accounting-lifecycle",
+                  "source": "scripts/ci/test-peru-tax-adjustments-local.mjs",
+                  "verified_checks": [
+                    "Anticipos proveedor/cliente, aplicación parcial a CxP, retención/percepción/detracción y depósito contable local",
+                    "Pago neto, replays sin doble movimiento, permisos/tenant/rechazos sin residuos y asientos reales únicos/cuadrados",
+                    "UI conserva tres intenciones/campos ante respuestas perdidas y recupera sin pageerror; recarga persistida"
+                  ]
+                }
               ],
-              "defects": []
+              "pending_checks": [
+                "Aplicación/reversa CxC, monedas/tipos de cambio, roles sólo lectura de finanzas, anulaciones y todos los filtros; tasas normativas/depósito externo; CI/despliegue"
+              ],
+              "defects": [
+                {
+                  "id": "tax-adjustments-unhandled-ui-rejection",
+                  "status": "merged_pr_ci_passed_main_deployment_pending",
+                  "proof": "artifacts/peru-tax-adjustments-ui-defect-20261003.json",
+                  "correction": "UI canónica captura el rechazo ya mostrado por useApi, conserva campos y llave; evita pageerror sin esconder fallo ni limpiar datos",
+                  "pending": [
+                    "CI main y verificación del despliegue exacto de #129"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -25152,37 +24592,69 @@
             {
               "method": "POST",
               "endpoint": "/api/retenciones/ajustes",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
-              "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "tax-advance-cxp-bank-accounting-lifecycle",
+                  "source": "scripts/ci/test-peru-tax-adjustments-local.mjs",
+                  "verified_checks": [
+                    "Anticipos proveedor/cliente, aplicación parcial a CxP, retención/percepción/detracción y depósito contable local",
+                    "Pago neto, replays sin doble movimiento, permisos/tenant/rechazos sin residuos y asientos reales únicos/cuadrados",
+                    "UI conserva tres intenciones/campos ante respuestas perdidas y recupera sin pageerror; recarga persistida"
+                  ]
+                }
               ],
-              "defects": []
+              "pending_checks": [
+                "Aplicación/reversa CxC, monedas/tipos de cambio, roles sólo lectura de finanzas, anulaciones y todos los filtros; tasas normativas/depósito externo; CI/despliegue"
+              ],
+              "defects": [
+                {
+                  "id": "tax-adjustments-unhandled-ui-rejection",
+                  "status": "merged_pr_ci_passed_main_deployment_pending",
+                  "proof": "artifacts/peru-tax-adjustments-ui-defect-20261003.json",
+                  "correction": "UI canónica captura el rechazo ya mostrado por useApi, conserva campos y llave; evita pageerror sin esconder fallo ni limpiar datos",
+                  "pending": [
+                    "CI main y verificación del despliegue exacto de #129"
+                  ]
+                }
+              ]
             }
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/retenciones/:dynamic/depositar-detraccion",
-          "source": "apps/web/app/dashboard/finanzas/ajustes-fiscales/page.tsx:240",
+          "source": "apps/web/app/dashboard/finanzas/ajustes-fiscales/page.tsx:242",
           "contracts": [
             {
               "method": "POST",
               "endpoint": "/api/retenciones/:id/depositar-detraccion",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
-              "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "tax-advance-cxp-bank-accounting-lifecycle",
+                  "source": "scripts/ci/test-peru-tax-adjustments-local.mjs",
+                  "verified_checks": [
+                    "Anticipos proveedor/cliente, aplicación parcial a CxP, retención/percepción/detracción y depósito contable local",
+                    "Pago neto, replays sin doble movimiento, permisos/tenant/rechazos sin residuos y asientos reales únicos/cuadrados",
+                    "UI conserva tres intenciones/campos ante respuestas perdidas y recupera sin pageerror; recarga persistida"
+                  ]
+                }
               ],
-              "defects": []
+              "pending_checks": [
+                "Aplicación/reversa CxC, monedas/tipos de cambio, roles sólo lectura de finanzas, anulaciones y todos los filtros; tasas normativas/depósito externo; CI/despliegue"
+              ],
+              "defects": [
+                {
+                  "id": "tax-adjustments-unhandled-ui-rejection",
+                  "status": "merged_pr_ci_passed_main_deployment_pending",
+                  "proof": "artifacts/peru-tax-adjustments-ui-defect-20261003.json",
+                  "correction": "UI canónica captura el rechazo ya mostrado por useApi, conserva campos y llave; evita pageerror sin esconder fallo ni limpiar datos",
+                  "pending": [
+                    "CI main y verificación del despliegue exacto de #129"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -27960,113 +27432,8 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "visible_controls_pending_functional_execution",
-      "controls": [
-        {
-          "element": "button",
-          "label": "Abrir notificaciones",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Cambiar a tema claro",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Actualizar",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Exportar",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "input",
-          "label": "Buscar",
-          "type": "text",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "select",
-          "label": "EstadoTodosPendienteParcialVencidoCancelado",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "select",
-          "label": "ClienteTodosIMPORT UI LOCAL CLIENTES 87787488 EDITADOAlta cliente d3edb03dMAESTRO LOCAL CLIENTES 8b5b4e7b EDITADO",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "input",
-          "label": "Desde",
-          "type": "date",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "input",
-          "label": "Hasta",
-          "type": "date",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Cobro",
-          "type": "button",
-          "disabled": true,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Nota",
-          "type": "button",
-          "disabled": true,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Reprogramar",
-          "type": "button",
-          "disabled": true,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Historial",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        }
-      ],
+      "result": "pending_browser_evidence",
+      "controls": [],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -34825,121 +34192,8 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "visible_controls_pending_functional_execution",
-      "controls": [
-        {
-          "element": "button",
-          "label": "Abrir notificaciones",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Cambiar a tema claro",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "a",
-          "label": "Nuevo Producto",
-          "type": null,
-          "disabled": false,
-          "path": "/dashboard/inventario/productos/nuevo/",
-          "executed": false
-        },
-        {
-          "element": "input",
-          "label": "Buscar",
-          "type": "text",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "select",
-          "label": "Categoría",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "select",
-          "label": "Estado",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "input",
-          "label": "Solo stock crítico",
-          "type": "checkbox",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Actualizar",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Editar",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Eliminar",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Editar",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Eliminar",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Editar",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Eliminar",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        }
-      ],
+      "result": "pending_browser_evidence",
+      "controls": [],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -37982,57 +37236,8 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "visible_controls_pending_functional_execution",
-      "controls": [
-        {
-          "element": "button",
-          "label": "Abrir notificaciones",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Cambiar a tema claro",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Nueva Vacante",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Nuevo Candidato",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Filtrar candidatos por estado",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Filtrar candidatos por vacante",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        }
-      ],
+      "result": "pending_browser_evidence",
+      "controls": [],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -38350,11 +37555,7 @@
         "actor": "Primer ADMIN Perú no demo, sin privilegio global",
         "status": 200,
         "errors": [],
-        "expectedRestriction": false,
-        "recovery": {
-          "reason": "page.goto: net::ERR_CONNECTION_RESET at http://127.0.0.1:3125/dashboard/rrhh/contratos/",
-          "evidence": "Server is approaching the used memory threshold, restarting..."
-        }
+        "expectedRestriction": false
       },
       "result": "visible_controls_pending_functional_execution",
       "controls": [
@@ -39983,19 +39184,17 @@
               "defects": [
                 {
                   "id": "plame-package-duplicates-on-retry",
-                  "status": "corrected_ci_promoted_merged_main_deployment_pending",
+                  "status": "corrected_ci_promoted_merged_main_deployment_verified",
                   "proof": {
                     "source": "artifacts/peru-plame-retry-defect-20261003.json",
                     "local_only": true,
                     "observed": "Dos POST con mismo Idempotency-Key/cuerpo generan versiones 4 y 5"
                   },
-                  "pending": [
-                    "CI main 37106520278 y verificación de despliegue exacto c034639f"
-                  ]
+                  "pending": []
                 },
                 {
                   "id": "plame-private-writer-prod-acl-bypass",
-                  "status": "corrected_ci_promoted_merged_main_deployment_pending",
+                  "status": "corrected_ci_promoted_merged_main_deployment_verified",
                   "proof": {
                     "source": "artifacts/erp-peru-559-rehearsal-20261003063550149-15392.json",
                     "scope": "Copia aislada sin red del respaldo PROD 558; no se invocó el writer en PROD",
@@ -40006,9 +39205,7 @@
                     "cause": "EXECUTE heredado permitía al backend llamar el writer interno sin la autorización del wrapper"
                   },
                   "correction": "559 revoca únicamente EXECUTE interno de service_role/PUBLIC/anon/authenticated; wrapper público y cuerpo interno conservados",
-                  "pending": [
-                    "CI main 37106520278 y verificación de despliegue exacto c034639f"
-                  ]
+                  "pending": []
                 }
               ]
             }
@@ -40266,41 +39463,8 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "visible_controls_pending_functional_execution",
-      "controls": [
-        {
-          "element": "button",
-          "label": "Abrir notificaciones",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Cambiar a tema claro",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Crear Nueva Planilla",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Crear primera planilla",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        }
-      ],
+      "result": "pending_browser_evidence",
+      "controls": [],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -41549,185 +40713,8 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "visible_controls_pending_functional_execution",
-      "controls": [
-        {
-          "element": "button",
-          "label": "Abrir notificaciones",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Cambiar a tema claro",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Nuevo usuario",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "select",
-          "label": "Filtro rol",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "select",
-          "label": "Filtro estado",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Editar",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Desactivar",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Editar",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Desactivar",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Editar",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Activar",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Nuevo rol",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Ver 24 permisos más",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Ver 31 permisos más",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Ver 30 permisos más",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Ver 97 permisos más",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Ver 35 permisos más",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Ver 61 permisos más",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Ver 11 permisos más",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Ver 54 permisos más",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Ver 272 permisos más",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Ver 20 permisos más",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        }
-      ],
+      "result": "pending_browser_evidence",
+      "controls": [],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -42110,49 +41097,8 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "visible_controls_pending_functional_execution",
-      "controls": [
-        {
-          "element": "button",
-          "label": "Abrir notificaciones",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Cambiar a tema claro",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "a",
-          "label": "Dashboard",
-          "type": null,
-          "disabled": false,
-          "path": "/dashboard/",
-          "executed": false
-        },
-        {
-          "element": "a",
-          "label": "Ventas",
-          "type": null,
-          "disabled": false,
-          "path": "/dashboard/ventas/",
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Actualizar",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        }
-      ],
+      "result": "pending_browser_evidence",
+      "controls": [],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -44142,7 +43088,7 @@
         },
         {
           "element": "select",
-          "label": "Selecciona productoFAL-7CA733D8 · Faltante local 7ca733d8APERTURA-8B5B4E7B · Producto apertura 8b5b4e7bIC-7CA733D8 · Producto ciclo 7ca733d8",
+          "label": "Selecciona productoFAL-86C55427 · Faltante local 86c55427APERTURA-D045DF45 · Producto apertura d045df45IC-86C55427 · Producto ciclo 86c55427",
           "type": null,
           "disabled": false,
           "path": null,
@@ -45885,73 +44831,8 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "visible_controls_pending_functional_execution",
-      "controls": [
-        {
-          "element": "button",
-          "label": "Abrir notificaciones",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Cambiar a tema claro",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "a",
-          "label": "Dashboard",
-          "type": null,
-          "disabled": false,
-          "path": "/dashboard/",
-          "executed": false
-        },
-        {
-          "element": "a",
-          "label": "Ventas",
-          "type": null,
-          "disabled": false,
-          "path": "/dashboard/ventas/",
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Nuevo Pedido",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "input",
-          "label": "Buscar",
-          "type": "text",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Filtros",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Actualizar",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        }
-      ],
+      "result": "pending_browser_evidence",
+      "controls": [],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -49110,33 +47991,8 @@
         "errors": [],
         "expectedRestriction": false
       },
-      "result": "visible_controls_pending_functional_execution",
-      "controls": [
-        {
-          "element": "button",
-          "label": "Abrir notificaciones",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Cambiar a tema claro",
-          "type": "button",
-          "disabled": false,
-          "path": null,
-          "executed": false
-        },
-        {
-          "element": "button",
-          "label": "Ir al Dashboard",
-          "type": null,
-          "disabled": false,
-          "path": null,
-          "executed": false
-        }
-      ],
+      "result": "pending_browser_evidence",
+      "controls": [],
       "declared_api_calls": [
         {
           "method": "GET",
@@ -49490,14 +48346,20 @@
             {
               "method": "POST",
               "endpoint": "/api/configuration/empresa/logo",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "company-logo-real-storage-lifecycle",
+                  "source": "scripts/ci/test-peru-company-logo-local.mjs",
+                  "verified_checks": [
+                    "PNG real por multipart, persistencia empresa/asset/objeto/bytes; replay/mismo contenido/reemplazo y limpieza/borrado",
+                    "Conflictos/MIME/corrupción/falta/tamaño, lector, segundo tenant, Storage RLS; recuperación de fallo real después de almacenar sin duplicar"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "JPEG/dimensiones/todas las concurrencias y fallas de limpieza, lector/navegador para todas las variantes",
+                "Storage remoto del futuro cliente; CI/despliegue del gate nuevo"
               ],
               "defects": []
             }

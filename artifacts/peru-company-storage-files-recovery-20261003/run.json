@@ -1,0 +1,9 @@
+{
+  "completedAt": "2026-10-03T10:07:47.486Z",
+  "success": true,
+  "withBrowser": false,
+  "scope": "company_logo_real_storage_subset",
+  "database": "PostgreSQL 16 efímero",
+  "output": "C:\\Users\\PC\\Desktop\\erp-peru-production\\artifacts\\peru-company-storage-20261003100537901-24604",
+  "remoteWrites": false
+}

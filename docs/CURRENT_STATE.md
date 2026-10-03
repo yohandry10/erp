@@ -53,7 +53,30 @@ interno PLAME para service_role; el wrapper conserva sus permisos. El primer
 ensayo completo ampliado se detuvo por login 429; se conserva la evidencia y
 se repite respetando Retry-After, sin alterar el limitador. CI PR 37104147139 y rama 37104135035 del SHA `26272755` aprobaron 165 API/20 UI, SQL, barridos y restore, además de todos los gates. 559 se promovió el 03/10 con preflight/backup/ensayo; preservó 23 tablas, funciones restantes, RLS y ACL, cerrando sólo EXECUTE interno (`artifacts/peru-559-promotion-20261003072827148.json`). #127 se integró como `c034639f`; main 37106520278, E2E y seguridad aprobaron 165 API/20 UI y restore. Render/Vercel y esquema 559 pasaron sólo lectura con preflight (`artifacts/peru-production-verification-after-127-20261003.json`); el primer timeout de 20 segundos y la repetición aprobada no acreditan continuidad ni plan efectivo. El estado posterior vigente es 560 (véase el cierre de #128).
 
-Configuración/sucursales cerró los seis defectos reproducidos de precisión, alta repetida, alcance por asignación, atomicidad de asignaciones, inactivos y recuperación del editor. La repetición completa aprobó 181 API/21 UI sin reintentos, 99 pantallas, 22 con registros, 557 migraciones/70 verificadores y restore (`artifacts/peru-integrated-local-configuration-admin-20261003`). CI del SHA `3e9c0585` aprobó los mismos contratos y 560 quedó promovida; main/despliegue del merge se verifican antes de cerrar esos gates. Se conserva el primer ensayo fallido de navegación de edición de cliente importado y su repetición con respuesta PUT real y nombre persistido; no se atribuye a un defecto del producto sin reproducción. No hubo datos de negocio sintéticos en PROD.
+Configuración/sucursales cerró los seis defectos reproducidos de precisión, alta repetida, alcance por asignación, atomicidad de asignaciones, inactivos y recuperación del editor. La repetición completa aprobó 181 API/21 UI sin reintentos, 99 pantallas, 22 con registros, 557 migraciones/70 verificadores y restore (`artifacts/peru-integrated-local-configuration-admin-20261003`). CI del SHA `3e9c0585` aprobó los mismos contratos y 560 quedó promovida. #128 se integró como `8417ff23`; main 37110032921, E2E y seguridad aprobaron 181 API/21 UI sin reintentos, barridos y restore. Render/Vercel y esquema 560 pasaron sólo lectura con preflight (`artifacts/peru-production-verification-after-128-20261003.json`); el primer timeout de Render queda conservado y no acredita continuidad ni plan efectivo. Se conserva el primer ensayo fallido de navegación de edición de cliente importado y su repetición con respuesta PUT real y nombre persistido; no se atribuye a un defecto del producto sin reproducción. No hubo datos de negocio sintéticos en PROD.
+
+Series y ajustes fiscales: #129 se integró como `5a23c4c1`. Los 26 checks del SHA
+`22cf5bb6` aprobaron, incluidos ambos CI con 208 API/22 UI sin reintentos,
+99 pantallas, 22 con registros, SQL y restore. Los dos intentos locales fallidos
+se conservan: espera de edición y error JS intermitente en usuarios. La causa
+de ese último error sigue pendiente; el barrido añade traza de script sin
+reintentar errores JS. Faltan CI main y comprobación del despliegue exacto.
+No hay migración nueva ni aceptación global. La UIT mensual estaba fija en
+2026 incluso al consultar 2024/2025 y aceptaba 2027 sin parámetro. La corrección
+canónica usa el ejercicio y pasó 35 pruebas enfocadas, cuatro comprobaciones
+API reales y restauración local; CI/despliegue y ciclo mensual completo siguen
+pendientes (`artifacts/peru-monthly-period-baseline-20261003` y
+`artifacts/peru-monthly-period-canonical-subset-20261003`).
+
+El segundo defecto mensual absorbía un error real de lectura y devolvía crédito
+cero. La corrección pasó guardado de saldo 125.50, denegación SQL real, cálculo
+y guardado 503 sin nueva versión y recuperación del crédito, con restore
+(`artifacts/peru-monthly-recovery-canonical-subset-20261003`). Logo empresarial
+pasó 10 casos API y un UI con Storage file oficial local; una ejecución separada
+restauró DB y archivos en un servidor nuevo y comparó bytes/SHA. El gate nuevo
+de CI combina API/UI/DB/blobs y publica sólo JSON seleccionados. Quedan formatos,
+concurrencias/limpieza adicionales y proveedor remoto; no se extrapola aceptación
+completa ni disponibilidad. La repetición global de estas fuentes está en curso.
 
 Los dos jobs integrados de #124, CI 37090225590 y 37090197674, aprobaron API,
 navegador y recuperación. Sus auditorías fallaron por dos avisos recién

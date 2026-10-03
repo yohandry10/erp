@@ -3,6 +3,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EstadosFinancierosService } from './estados-financieros.service';
 import { AdvertenciaTributaria, normalizarRegimenPeru } from './tributos-mensuales.service';
+import { uitPeruPorEjercicio } from './uit-peru';
 
 export interface AjustesTributariosAnuales {
   adiciones_tributarias?: number;
@@ -25,12 +26,6 @@ export interface FuentesTributariasAnuales {
   diferencia_balance?: number;
 }
 
-const UIT_POR_EJERCICIO: Record<number, number> = {
-  2024: 5150,
-  2025: 5350,
-  2026: 5500,
-};
-
 function roundMoney(value: unknown, clamp = true): number {
   const parsed = Number(value ?? 0);
   if (!Number.isFinite(parsed)) return 0;
@@ -46,10 +41,7 @@ export function calcularRentaAnualItanPeru(
   fuentes: FuentesTributariasAnuales,
   ajustes: AjustesTributariosAnuales = {},
 ) {
-  const uit = UIT_POR_EJERCICIO[ejercicio];
-  if (!uit) {
-    throw new BadRequestException(`No hay UIT verificada para el ejercicio ${ejercicio}.`);
-  }
+  const uit = uitPeruPorEjercicio(ejercicio);
   const warnings: AdvertenciaTributaria[] = [];
   const ingresosNetos = roundMoney(fuentes.ingresos_netos);
   const resultadoContable = roundMoney(fuentes.resultado_contable, false);
@@ -142,9 +134,7 @@ export class TributosAnualesService {
     if (!Number.isInteger(parsed) || parsed < 2024 || parsed > new Date().getFullYear()) {
       throw new BadRequestException('El ejercicio debe ser un año soportado entre 2024 y el año actual.');
     }
-    if (!UIT_POR_EJERCICIO[parsed]) {
-      throw new BadRequestException(`No hay UIT verificada para el ejercicio ${parsed}.`);
-    }
+    uitPeruPorEjercicio(parsed);
     return parsed;
   }
 
