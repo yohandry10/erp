@@ -1,0 +1,198 @@
+{
+  "success": false,
+  "local_only": true,
+  "remoteWrites": false,
+  "scope": "RRHH primer ADMIN no demo: empleados, contrato, asistencia y recuperación; no acepta planilla completa",
+  "scenarios": [
+    {
+      "scenario": "Empleado: alta validada, documento duplicado rechazado, edición y asignación familiar persistidas",
+      "passed": true
+    },
+    {
+      "scenario": "Contrato: remuneración/régimen inválidos rechazados, alta/replay, consulta y PDF reales",
+      "passed": true
+    },
+    {
+      "scenario": "Asistencia: entrada/salida en fecha fiscal, replay, orden horario y consulta persistida",
+      "passed": true
+    },
+    {
+      "scenario": "RRHH: edición de empleado y PDF de contrato ajenos ocultos sin mutación",
+      "passed": true
+    },
+    {
+      "scenario": "Contrato: renovación y finalización con replay conservan el historial",
+      "passed": true
+    },
+    {
+      "scenario": "Empleado: baja lógica conserva empleado e historial",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/departamentos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/empleados",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/empleados",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/empleados",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/empleados",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/empleados",
+      "status": 409
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/empleados/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/empleados",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/contratos",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/contratos",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/contratos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/contratos",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/contratos?empleado_id=:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/contratos/:id/generar",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/asistencias/marcar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/asistencias/marcar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/asistencias/marcar",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/asistencias/marcar",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/asistencias?fecha=2026-10-03",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/empleados/:id",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/contratos/:id/generar",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/contratos/:id/renovar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/contratos/:id/renovar",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/contratos/:id/finalizar",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/contratos/:id/finalizar",
+      "status": 200
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "rrhh/empleados/:id",
+      "status": 200
+    }
+  ],
+  "defects": [
+    {
+      "id": "employee-create-replay-prevalidation",
+      "endpoint": "/api/rrhh/empleados",
+      "observed_status": 409,
+      "message": "Ya existe un empleado con el mismo documento de identidad",
+      "cause": "Validación de documento único precede al recibo transaccional de idempotencia",
+      "employee_count": 1,
+      "recovery_blocked": true
+    },
+    {
+      "id": "employee-family-allowance-not-cleared",
+      "endpoint": "/api/rrhh/empleados/:id",
+      "observed_status": 200,
+      "persisted": {
+        "tiene_hijos": false,
+        "cantidad_hijos": 0,
+        "asignacion_familiar": true
+      },
+      "cause": "La derivación sólo activa asignacion_familiar; no la desactiva al guardar tiene_hijos=false/cantidad_hijos=0"
+    }
+  ],
+  "checkedAt": "2026-10-03T05:05:32.505Z",
+  "source_run": "artifacts/peru-integrated-20261003050429347-17156"
+}

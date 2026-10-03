@@ -1,0 +1,9 @@
+{
+  "producto_id": "9e75c4d9-5492-457b-8954-a98cdedf5b2f",
+  "initial_stock": 12.25,
+  "final_stock": 13.75,
+  "destination_stock": 6.5,
+  "added_ledger_rows": 3,
+  "response_lost_after_local_commit": true,
+  "same_intent_replayed": true
+}

@@ -1,0 +1,88 @@
+{
+  "checkedAt": "2026-10-03T05:23:27.920287+00:00",
+  "success": true,
+  "remoteWrites": false,
+  "scope": "RRHH: recuperación real del formulario de empleado, primer ADMIN no demo; no acepta planilla completa",
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/backend/api/rrhh/empleados/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/rrhh/departamentos/",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/backend/api/rrhh/empleados/",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "path": "/backend/api/rrhh/empleados/",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/rrhh/departamentos/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/rrhh/empleados/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/rrhh/departamentos/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/rrhh/empleados/",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/backend/api/rrhh/empleados/:id/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/rrhh/departamentos/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/rrhh/empleados/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/rrhh/departamentos/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/rrhh/empleados/",
+      "status": 200
+    }
+  ],
+  "incidents": [
+    {
+      "operation": "employee create",
+      "committed": true,
+      "reply": 503
+    },
+    {
+      "message": "Error al crear empleado"
+    }
+  ],
+  "defects": [],
+  "committed_employee_count": 1,
+  "fields_preserved_after_lost_response": true,
+  "same_intent_recovered_without_duplicate": true,
+  "edit_persisted_after_reload": true
+}
