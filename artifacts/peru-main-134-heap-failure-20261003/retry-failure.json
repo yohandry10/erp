@@ -1,0 +1,13 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "run_id": 37142023714,
+  "attempt": 2,
+  "sha": "9e301e2ae9f470b56ffc10d775ab09c4a8d6a76b",
+  "source": "artifacts/peru-main-134-second-failure-private-20261003/artifacts/peru-integrated-20261003183200807-3614",
+  "record_findings": 19,
+  "record_passed": 12,
+  "cause": "Next dev volvió a agotar el heap después de pasar API/browser y el barrido de módulos; las vistas posteriores encontraron el servidor caído.",
+  "next_verification": "PR 135 reinicia el proceso local entre cada fase y conserva todas las aserciones. El siguiente cierre requiere sus CI y main exactos.",
+  "complete_erp_acceptance": false
+}
