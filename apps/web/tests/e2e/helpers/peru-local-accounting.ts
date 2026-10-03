@@ -25,7 +25,7 @@ export async function consumeLocalAccounting(label: string) {
   const apiDirectory = path.resolve('../erp-api')
   const requireApi = createRequire(path.join(apiDirectory, 'package.json'))
   const log = execFileSync(process.execPath, [requireApi.resolve('ts-node/dist/bin.js'), '--transpile-only',
-    'tests/e2e/helpers/local-api-harness.ts', '--accounting-once'], {
+    'tests/e2e/helpers/local-api-harness.ts', '--accounting-drain'], {
     cwd: apiDirectory, env: { ...process.env, E2E_EPHEMERAL_LOCAL_DB: '1' }, encoding: 'utf8',
     timeout: 60000, maxBuffer: 5 * 1024 * 1024,
   })

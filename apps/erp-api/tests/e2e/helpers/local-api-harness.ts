@@ -100,8 +100,31 @@ async function main() {
   // La prueba decide cuándo consumir el outbox y puede observar primero la
   // transacción de venta. El procesador invocado sigue siendo el servicio real.
   accounting.onApplicationBootstrap = () => undefined;
-  if (process.argv.includes('--accounting-once')) {
-    try { await accounting.procesarEventosPendientes(); }
+  if (process.argv.includes('--accounting-once') || process.argv.includes('--accounting-drain')) {
+    try {
+      if (process.argv.includes('--accounting-drain')) {
+        const { OutboxEventsService } = await import('../../../src/modules/contabilidad/services/outbox-events.service');
+        const outbox = moduleRef.get(OutboxEventsService);
+        const claim = outbox.reclamarEventosContables.bind(outbox);
+        let claimed = -1;
+        // Observa los claims reales; no cambia el límite ni devuelve eventos ficticios.
+        outbox.reclamarEventosContables = async (...args) => {
+          const events = await claim(...args);
+          claimed = events.length;
+          process.stdout.write(`LOCAL_ACCOUNTING_CLAIMED ${claimed}\n`);
+          return events;
+        };
+        for (let batch = 0; batch < 20; batch++) {
+          claimed = -1;
+          await accounting.procesarEventosPendientes();
+          if (claimed === 0) break;
+          if (claimed < 0) throw new Error('No se pudo observar un claim contable local');
+          if (batch === 19) throw new Error('La cola contable local superó veinte lotes reales');
+        }
+      } else {
+        await accounting.procesarEventosPendientes();
+      }
+    }
     finally { await moduleRef.close(); }
     process.stdout.write('LOCAL_ACCOUNTING_BATCH_FINISHED\n');
     return;
