@@ -1,0 +1,43 @@
+{
+  "checkedAt": "2026-10-03T05:20:50.003021+00:00",
+  "success": false,
+  "remoteWrites": false,
+  "scope": "RRHH: recuperación real del formulario de empleado, primer ADMIN no demo; no acepta planilla completa",
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/backend/api/rrhh/departamentos/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/rrhh/empleados/",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/backend/api/rrhh/empleados/",
+      "status": 503
+    }
+  ],
+  "incidents": [
+    {
+      "operation": "employee create",
+      "committed": true,
+      "reply": 503
+    },
+    {
+      "message": "Error al crear empleado"
+    }
+  ],
+  "defects": [
+    {
+      "id": "employee-modal-clears-before-response",
+      "persisted": true,
+      "observed_name_field": "",
+      "recovery_blocked": true
+    }
+  ],
+  "committed_employee_count": 1,
+  "fields_preserved_after_lost_response": false
+}

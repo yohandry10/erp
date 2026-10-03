@@ -74,7 +74,10 @@ export class RrhhService {
     const message = String(error?.message || 'No se pudo completar la operación de RRHH');
     if (error?.code === '42501') throw new ForbiddenException(message);
     if (error?.code === 'P0002') throw new NotFoundException(message);
-    if (error?.code === '23505') throw new ConflictException(message);
+    if (error?.code === '23505') throw new ConflictException(
+      message.includes('RRHH_EMPLOYEE_DOCUMENT_DUPLICATE')
+        ? 'Ya existe un empleado con el mismo documento de identidad' : message,
+    );
     throw new BadRequestException(message);
   }
 
@@ -542,13 +545,17 @@ export class RrhhService {
    * asignacion_familiar, asi que ambos campos quedaban en contradiccion y la
    * planilla no pagaba los S/ 113 que corresponden.
    */
-  private derivarAsignacionFamiliar(datos: any) {
+  private derivarAsignacionFamiliar(datos: any, paisLaboral: string) {
     const tieneHijos =
       datos?.tiene_hijos === true || Number(datos?.cantidad_hijos ?? 0) > 0;
 
     if (tieneHijos) {
       datos.tiene_hijos = true;
       datos.asignacion_familiar = true;
+    } else if (paisLaboral === 'PE' && datos?.tiene_hijos === false && datos?.cantidad_hijos === 0) {
+      // Una edición explícita de ambos campos debe retirar el indicador derivado.
+      // Las ediciones parciales de otros datos conservan el valor persistido.
+      datos.asignacion_familiar = false;
     }
 
     return datos;
@@ -619,26 +626,6 @@ export class RrhhService {
     }
   }
 
-  private async validarDocumentoUnico(tenantId: string, numeroDocumento: string, empleadoId?: string) {
-    let query = this.supabaseService
-      .getClient()
-      .from('empleados')
-      .select('id, estado')
-      .eq('tenant_id', tenantId)
-      .eq('numero_documento', numeroDocumento)
-      .limit(1);
-
-    if (empleadoId) {
-      query = query.neq('id', empleadoId);
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
-    if ((data || []).length > 0) {
-      throw new ConflictException('Ya existe un empleado con el mismo documento de identidad');
-    }
-  }
-
   private estadoActivoPatch(estado: unknown) {
     if (typeof estado !== 'string') return {};
     const normalizado = estado.trim().toLowerCase();
@@ -660,7 +647,7 @@ export class RrhhService {
     const currentTenantId = tenantId;
     const paisLaboral = await this.obtenerPaisLaboral(currentTenantId);
 
-    const datosLimpios = this.derivarAsignacionFamiliar(this.limpiarEmpleadoData(empleadoData));
+    const datosLimpios = this.derivarAsignacionFamiliar(this.limpiarEmpleadoData(empleadoData), paisLaboral);
     this.validarEmpleadoData(datosLimpios, false, paisLaboral);
     if (paisLaboral === 'AR') {
       datosLimpios.cuil = String(datosLimpios.cuil || datosLimpios.numero_documento).replace(/\D/g, '');
@@ -671,7 +658,8 @@ export class RrhhService {
       datosLimpios.tipo_documento = datosLimpios.tipo_documento || 'CC';
       datosLimpios.nacionalidad = datosLimpios.nacionalidad || 'CO';
     }
-    await this.validarDocumentoUnico(currentTenantId, String(datosLimpios.numero_documento));
+    // La unicidad documental se comprueba bajo lock en el writer 475, después
+    // de recuperar una intención anterior. La consulta previa impedía un replay.
 
     return this.ejecutarOperacionRrhh(
       'EMPLOYEE_CREATE',
@@ -702,16 +690,14 @@ export class RrhhService {
     const currentTenantId = tenantId;
     const paisLaboral = await this.obtenerPaisLaboral(currentTenantId);
 
-    const datosLimpios = this.derivarAsignacionFamiliar(this.limpiarEmpleadoData(empleadoData));
+    const datosLimpios = this.derivarAsignacionFamiliar(this.limpiarEmpleadoData(empleadoData), paisLaboral);
     this.validarEmpleadoData(datosLimpios, true, paisLaboral);
     if (paisLaboral === 'AR' && (datosLimpios.cuil || datosLimpios.tipo_documento === 'CUIL')) {
       datosLimpios.cuil = String(datosLimpios.cuil || datosLimpios.numero_documento).replace(/\D/g, '');
       datosLimpios.numero_documento = datosLimpios.cuil;
       datosLimpios.tipo_documento = 'CUIL';
     }
-    if (datosLimpios.numero_documento) {
-      await this.validarDocumentoUnico(currentTenantId, String(datosLimpios.numero_documento), id);
-    }
+
 
     return this.ejecutarOperacionRrhh(
       'EMPLOYEE_UPDATE',

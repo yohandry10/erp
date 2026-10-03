@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-10-03T03:51:37.000Z",
+  "generated_at": "2026-10-03T05:33:10.994Z",
   "inventory": "artifacts/peru-api-operation-inventory-20260930.json",
-  "evidence": "artifacts/peru-integrated-ci-37092538107",
+  "evidence": "artifacts/peru-integrated-ci-37097869477",
   "evidence_scope": "full",
   "evidence_global_success": true,
   "evidence_phase": "ensayo global aprobado",
@@ -516,6 +516,26 @@
         {
           "trace_index": 552,
           "status": 201
+        },
+        {
+          "trace_index": 656,
+          "status": 201
+        },
+        {
+          "trace_index": 657,
+          "status": 201
+        },
+        {
+          "trace_index": 684,
+          "status": 201
+        },
+        {
+          "trace_index": 685,
+          "status": 201
+        },
+        {
+          "trace_index": 731,
+          "status": 201
         }
       ],
       "defects": [],
@@ -699,6 +719,10 @@
         },
         {
           "trace_index": 645,
+          "status": 201
+        },
+        {
+          "trace_index": 658,
           "status": 201
         }
       ],
@@ -2033,6 +2057,10 @@
         {
           "trace_index": 475,
           "status": 409
+        },
+        {
+          "trace_index": 702,
+          "status": 201
         }
       ],
       "defects": [],
@@ -2743,7 +2771,22 @@
       "endpoint": "/api/configuration/status",
       "source": "apps/erp-api/src/modules/configuracion/configuration.controller.ts:166",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "wizard-summary-without-completed-progress",
+          "status": "corrected_ci_merged_deployment_pending",
+          "proof": {
+            "source": "apps/web/app/dashboard/wizard/useWizard.ts",
+            "commit": "82000ee927426134dea7bef69d8c54e6695f8dca",
+            "source_analysis": true,
+            "observed": "La condición inicial de resumen sólo requiere identidad preparada del ERP y no comprueba completado del asistente; el alta ya proporciona RUC, razón social y dirección"
+          },
+          "correction": "Candidato exige cierre persistido del asistente para mostrar resumen; preparación del ERP y habilitación fiscal permanecen separadas",
+          "pending": [
+            "CI main y despliegue exacto"
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -2807,7 +2850,22 @@
           "status": 200
         }
       ],
-      "defects": [],
+      "defects": [
+        {
+          "id": "wizard-summary-without-completed-progress",
+          "status": "corrected_ci_merged_deployment_pending",
+          "proof": {
+            "source": "apps/web/app/dashboard/wizard/useWizard.ts",
+            "commit": "82000ee927426134dea7bef69d8c54e6695f8dca",
+            "source_analysis": true,
+            "observed": "La condición inicial de resumen sólo requiere identidad preparada del ERP y no comprueba completado del asistente; el alta ya proporciona RUC, razón social y dirección"
+          },
+          "correction": "Candidato exige cierre persistido del asistente para mostrar resumen; preparación del ERP y habilitación fiscal permanecen separadas",
+          "pending": [
+            "CI main y despliegue exacto"
+          ]
+        }
+      ],
       "verified_cases": [
         {
           "id": "first-customer-fiscal-configuration",
@@ -3265,17 +3323,14 @@
       "defects": [
         {
           "id": "depreciation-accrual-final-cent",
-          "status": "corrected_locally_deployment_pending",
+          "status": "corrected_ci_main_deployment_verified_read_only",
           "proof": {
             "source": "artifacts/peru-integrated-20260930231135744-6004/http.json",
             "observed_error": "Expected values to be strictly equal:\n\n33333 !== 33334\n",
             "local_only": true
           },
           "correction": "La cuota ejecutada del último período absorbe el saldo pendiente y respeta el residual",
-          "pending": [
-            "CI del cambio",
-            "main y despliegue"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -3546,17 +3601,14 @@
       "defects": [
         {
           "id": "depreciation-accrual-final-cent",
-          "status": "corrected_locally_deployment_pending",
+          "status": "corrected_ci_main_deployment_verified_read_only",
           "proof": {
             "source": "artifacts/peru-integrated-20260930231135744-6004/http.json",
             "observed_error": "Expected values to be strictly equal:\n\n33333 !== 33334\n",
             "local_only": true
           },
           "correction": "La cuota ejecutada del último período absorbe el saldo pendiente y respeta el residual",
-          "pending": [
-            "CI del cambio",
-            "main y despliegue"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -3675,52 +3727,56 @@
         {
           "trace_index": 654,
           "status": 400
+        },
+        {
+          "trace_index": 661,
+          "status": 201
+        },
+        {
+          "trace_index": 662,
+          "status": 201
+        },
+        {
+          "trace_index": 674,
+          "status": 201
+        },
+        {
+          "trace_index": 678,
+          "status": 201
         }
       ],
       "defects": [
         {
           "id": "manual-accounting-retry-duplicates",
-          "status": "corrected_locally_deployment_pending",
+          "status": "corrected_ci_main_deployment_verified_read_only",
           "proof": {
             "source": "artifacts/peru-integrated-20260930225329486-9024/http.json",
             "observed_error": "La misma intención de asiento manual debe devolver el agregado original\n+ actual - expected\n\n+ '58ca04ff-f7ac-4279-9508-77a372767c8c'\n- '46794437-b8ae-46b5-9016-6afff9c9a4da'\n",
             "local_only": true
           },
           "correction": "557 y escritor manual guardan asiento e intención en una transacción; UI conserva clave tras respuesta perdida",
-          "pending": [
-            "CI del cambio",
-            "promoción 557",
-            "main y despliegue"
-          ]
+          "pending": []
         },
         {
           "id": "manual-accounting-lima-boundary",
-          "status": "corrected_locally_deployment_pending",
+          "status": "corrected_ci_main_deployment_verified_read_only",
           "proof": {
             "source": "artifacts/peru-integrated-20260930230932944-4760/database-contracts.log",
             "observed_error": "VERIFY_557_CALENDAR_SHIFTED"
           },
           "correction": "La propuesta 557 usa zona coherente con fecha/instante durante la escritura y restaura la zona SQL previa",
-          "pending": [
-            "CI del cambio",
-            "promoción 557",
-            "fronteras de otros escritores contables"
-          ]
+          "pending": []
         },
         {
           "id": "manual-accounting-default-date-utc",
-          "status": "corrected_locally_final_browser_pending",
+          "status": "corrected_ci_main_deployment_verified_read_only",
           "proof": {
             "source": "artifacts/peru-integrated-20261003015814635-23596/manual-asiento-ui.pdf",
             "observed": "PDF fechado 2026-10-03, generado 2026-10-03T02:04:49Z (2026-10-02 en Lima); AsientoForm usaba fecha UTC por defecto",
             "local_only": true
           },
           "correction": "AsientoForm reutiliza fiscalDateForCountry con país del tenant; navegador contrasta fecha inicial con app.hoy_tenant",
-          "pending": [
-            "ensayo integrado completo",
-            "CI y despliegue",
-            "otras fechas por defecto fuera del formulario de asientos"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -4462,10 +4518,19 @@
       "method": "GET",
       "endpoint": "/api/contabilidad/estados/estado-resultados",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:125",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 667,
+          "status": 200
+        },
+        {
+          "trace_index": 680,
+          "status": 200
+        }
+      ],
       "defects": [],
       "verified_cases": [],
-      "result": "pending_functional_execution",
+      "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
         "persistencia y resultado funcional",
         "permisos",
@@ -4480,11 +4545,32 @@
       "method": "GET",
       "endpoint": "/api/contabilidad/estados/balance-general",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:209",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 663,
+          "status": 200
+        },
+        {
+          "trace_index": 666,
+          "status": 200
+        },
+        {
+          "trace_index": 671,
+          "status": 200
+        },
+        {
+          "trace_index": 676,
+          "status": 200
+        },
+        {
+          "trace_index": 679,
+          "status": 200
+        }
+      ],
       "defects": [
         {
           "id": "annual-loss-balance-sign",
-          "status": "local_candidate_corrected_pending_integration",
+          "status": "corrected_ci_merged_deployment_pending",
           "proof": {
             "source": "artifacts/peru-year-loss-balance-defect-20261002.json",
             "observed": "Pérdida confirmada 7, asientos balanceados, patrimonio reportado 0 en vez de -7; balance descuadrado -7",
@@ -4492,20 +4578,28 @@
           },
           "correction": "Candidato 558 conserva el signo acreedor/deudor de resultados acumulados en balance_general_live",
           "pending": [
-            "contratos SQL y recorrido anual completo",
-            "integración canónica",
-            "CI y promoción/despliegue"
+            "CI main y despliegue exacto"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "annual-profit-loss-reopen",
+          "source": "scripts/ci/test-peru-year-close-local.mjs",
+          "verified_checks": [
+            "Utilidad 25/pérdida -7 y resultado siguiente 8 separados",
+            "cierre/replay con asiento único cuadrado",
+            "reapertura administrativa anula cierre y recierre secuenciado",
+            "ADMIN normal rechazado sin mutar",
+            "período posterior cerrado bloquea reapertura"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de períodos/cierre anual",
+        "variantes de cero resultado/múltiples monedas",
+        "aislamiento de cada transición anual"
       ]
     },
     {
@@ -4554,7 +4648,7 @@
       "defects": [
         {
           "id": "annual-loss-balance-sign",
-          "status": "local_candidate_corrected_pending_integration",
+          "status": "corrected_ci_merged_deployment_pending",
           "proof": {
             "source": "artifacts/peru-year-loss-balance-defect-20261002.json",
             "observed": "Pérdida confirmada 7, asientos balanceados, patrimonio reportado 0 en vez de -7; balance descuadrado -7",
@@ -4562,9 +4656,7 @@
           },
           "correction": "Candidato 558 conserva el signo acreedor/deudor de resultados acumulados en balance_general_live",
           "pending": [
-            "contratos SQL y recorrido anual completo",
-            "integración canónica",
-            "CI y promoción/despliegue"
+            "CI main y despliegue exacto"
           ]
         }
       ],
@@ -4638,10 +4730,19 @@
       "method": "GET",
       "endpoint": "/api/contabilidad/plan-cuentas",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:833",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 660,
+          "status": 200
+        },
+        {
+          "trace_index": 686,
+          "status": 200
+        }
+      ],
       "defects": [],
       "verified_cases": [],
-      "result": "pending_functional_execution",
+      "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
         "persistencia y resultado funcional",
         "permisos",
@@ -5310,6 +5411,14 @@
         {
           "trace_index": 626,
           "status": 400
+        },
+        {
+          "trace_index": 659,
+          "status": 201
+        },
+        {
+          "trace_index": 677,
+          "status": 201
         }
       ],
       "defects": [],
@@ -5328,6 +5437,17 @@
             "ADMIN cliente no reabre",
             "plataforma cambia contexto y reabre con replay"
           ]
+        },
+        {
+          "id": "annual-profit-loss-reopen",
+          "source": "scripts/ci/test-peru-year-close-local.mjs",
+          "verified_checks": [
+            "Utilidad 25/pérdida -7 y resultado siguiente 8 separados",
+            "cierre/replay con asiento único cuadrado",
+            "reapertura administrativa anula cierre y recierre secuenciado",
+            "ADMIN normal rechazado sin mutar",
+            "período posterior cerrado bloquea reapertura"
+          ]
         }
       ],
       "result": "functional_cases_verified_with_remaining_checks",
@@ -5335,7 +5455,10 @@
         "UI",
         "cierre anual y reglas de períodos anteriores",
         "eventos pendientes y concurrencia",
-        "aislamiento de reapertura de actor autorizado"
+        "aislamiento de reapertura de actor autorizado",
+        "UI de períodos/cierre anual",
+        "variantes de cero resultado/múltiples monedas",
+        "aislamiento de cada transición anual"
       ]
     },
     {
@@ -5391,21 +5514,22 @@
         {
           "trace_index": 644,
           "status": 200
+        },
+        {
+          "trace_index": 683,
+          "status": 200
         }
       ],
       "defects": [
         {
           "id": "foreign-accounting-period-http-errors",
-          "status": "corrected_locally_deployment_pending",
+          "status": "corrected_ci_main_deployment_verified_read_only",
           "proof": {
             "source": "artifacts/peru-period-foreign-defect-20260930.json",
             "observed": "Detalle ajeno 200; validar/cerrar/bloquear 500; cuatro operaciones reproducidas localmente"
           },
           "correction": "404 para registro inexistente o ajeno; se conservan errores operativos de DB",
-          "pending": [
-            "CI del cambio",
-            "main y despliegue"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -5452,16 +5576,13 @@
       "defects": [
         {
           "id": "foreign-accounting-period-http-errors",
-          "status": "corrected_locally_deployment_pending",
+          "status": "corrected_ci_main_deployment_verified_read_only",
           "proof": {
             "source": "artifacts/peru-period-foreign-defect-20260930.json",
             "observed": "Detalle ajeno 200; validar/cerrar/bloquear 500; cuatro operaciones reproducidas localmente"
           },
           "correction": "404 para registro inexistente o ajeno; se conservan errores operativos de DB",
-          "pending": [
-            "CI del cambio",
-            "main y despliegue"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -5519,36 +5640,50 @@
         {
           "trace_index": 649,
           "status": 201
+        },
+        {
+          "trace_index": 664,
+          "status": 201
+        },
+        {
+          "trace_index": 665,
+          "status": 201
+        },
+        {
+          "trace_index": 672,
+          "status": 201
+        },
+        {
+          "trace_index": 675,
+          "status": 201
+        },
+        {
+          "trace_index": 681,
+          "status": 201
         }
       ],
       "defects": [
         {
           "id": "foreign-accounting-period-http-errors",
-          "status": "corrected_locally_deployment_pending",
+          "status": "corrected_ci_main_deployment_verified_read_only",
           "proof": {
             "source": "artifacts/peru-period-foreign-defect-20260930.json",
             "observed": "Detalle ajeno 200; validar/cerrar/bloquear 500; cuatro operaciones reproducidas localmente"
           },
           "correction": "404 para registro inexistente o ajeno; se conservan errores operativos de DB",
-          "pending": [
-            "CI del cambio",
-            "main y despliegue"
-          ]
+          "pending": []
         },
         {
           "id": "first-customer-annual-close-accounts",
-          "status": "open_reproduced",
+          "status": "corrected_ci_merged_deployment_pending",
           "proof": {
             "source": "artifacts/peru-year-close-missing-accounts-20261002.json",
             "observed_error": "ACCOUNTING_YEAR_CLOSE_ACCOUNTS_89_59_REQUIRED",
             "local_only": true
           },
-          "correction": "Pendiente: completar cuentas de cierre para empresas Perú sin alterar configuraciones previas",
+          "correction": "Candidato 558 inserta sólo 59/89 ausentes en empresas PE; conserva cuentas personalizadas/inactivas y permisos",
           "pending": [
-            "corrección y contratos SQL",
-            "cierre/reapertura/reintentos anuales por API",
-            "reportes antes/después del cierre",
-            "CI y promoción/despliegue"
+            "CI main y despliegue exacto"
           ]
         }
       ],
@@ -5567,6 +5702,17 @@
             "ADMIN cliente no reabre",
             "plataforma cambia contexto y reabre con replay"
           ]
+        },
+        {
+          "id": "annual-profit-loss-reopen",
+          "source": "scripts/ci/test-peru-year-close-local.mjs",
+          "verified_checks": [
+            "Utilidad 25/pérdida -7 y resultado siguiente 8 separados",
+            "cierre/replay con asiento único cuadrado",
+            "reapertura administrativa anula cierre y recierre secuenciado",
+            "ADMIN normal rechazado sin mutar",
+            "período posterior cerrado bloquea reapertura"
+          ]
         }
       ],
       "result": "functional_cases_verified_with_remaining_checks",
@@ -5574,7 +5720,10 @@
         "UI",
         "cierre anual y reglas de períodos anteriores",
         "eventos pendientes y concurrencia",
-        "aislamiento de reapertura de actor autorizado"
+        "aislamiento de reapertura de actor autorizado",
+        "UI de períodos/cierre anual",
+        "variantes de cero resultado/múltiples monedas",
+        "aislamiento de cada transición anual"
       ]
     },
     {
@@ -5625,35 +5774,49 @@
         {
           "trace_index": 655,
           "status": 201
+        },
+        {
+          "trace_index": 668,
+          "status": 403
+        },
+        {
+          "trace_index": 669,
+          "status": 201
+        },
+        {
+          "trace_index": 670,
+          "status": 201
+        },
+        {
+          "trace_index": 673,
+          "status": 201
+        },
+        {
+          "trace_index": 682,
+          "status": 400
         }
       ],
       "defects": [
         {
           "id": "foreign-accounting-period-http-errors",
-          "status": "corrected_locally_deployment_pending",
+          "status": "corrected_ci_main_deployment_verified_read_only",
           "proof": {
             "source": "artifacts/peru-period-foreign-defect-20260930.json",
             "observed": "Detalle ajeno 200; validar/cerrar/bloquear 500; cuatro operaciones reproducidas localmente"
           },
           "correction": "404 para registro inexistente o ajeno; se conservan errores operativos de DB",
-          "pending": [
-            "CI del cambio",
-            "main y despliegue"
-          ]
+          "pending": []
         },
         {
           "id": "platform-accounting-period-reopen",
-          "status": "corrected_locally_deployment_pending",
+          "status": "corrected_ci_main_deployment_verified_read_only",
           "proof": {
             "source": "artifacts/peru-integrated-20260930233445013-9812/http.json",
             "observed_error": "contabilidad/periodos/a5ad056e-4a90-43f1-a4db-0b341d3eeb2d/reabrir: HTTP 400; ACCOUNTING_ACTOR_NOT_ACTIVE_IN_TENANT\n\n400 !== 201\n",
             "local_only": true
           },
           "correction": "557 añade una RPC de reapertura con validación explícita de superadministrador activo, identidad conservada y locks/reglas originales",
-          "pending": [
-            "CI y promoción 557",
-            "main y despliegue"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -5671,6 +5834,17 @@
             "ADMIN cliente no reabre",
             "plataforma cambia contexto y reabre con replay"
           ]
+        },
+        {
+          "id": "annual-profit-loss-reopen",
+          "source": "scripts/ci/test-peru-year-close-local.mjs",
+          "verified_checks": [
+            "Utilidad 25/pérdida -7 y resultado siguiente 8 separados",
+            "cierre/replay con asiento único cuadrado",
+            "reapertura administrativa anula cierre y recierre secuenciado",
+            "ADMIN normal rechazado sin mutar",
+            "período posterior cerrado bloquea reapertura"
+          ]
         }
       ],
       "result": "functional_cases_verified_with_remaining_checks",
@@ -5678,7 +5852,10 @@
         "UI",
         "cierre anual y reglas de períodos anteriores",
         "eventos pendientes y concurrencia",
-        "aislamiento de reapertura de actor autorizado"
+        "aislamiento de reapertura de actor autorizado",
+        "UI de períodos/cierre anual",
+        "variantes de cero resultado/múltiples monedas",
+        "aislamiento de cada transición anual"
       ]
     },
     {
@@ -5712,16 +5889,13 @@
       "defects": [
         {
           "id": "foreign-accounting-period-http-errors",
-          "status": "corrected_locally_deployment_pending",
+          "status": "corrected_ci_main_deployment_verified_read_only",
           "proof": {
             "source": "artifacts/peru-period-foreign-defect-20260930.json",
             "observed": "Detalle ajeno 200; validar/cerrar/bloquear 500; cuatro operaciones reproducidas localmente"
           },
           "correction": "404 para registro inexistente o ajeno; se conservan errores operativos de DB",
-          "pending": [
-            "CI del cambio",
-            "main y despliegue"
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -7125,7 +7299,22 @@
       "endpoint": "/api/demo/status",
       "source": "apps/erp-api/src/modules/demo/demo.controller.ts:44",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "wizard-status-coupled-to-demo-api",
+          "status": "corrected_ci_merged_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-integrated-20261003032954428-15196/wizard-browser.json",
+            "local_only": true,
+            "observed": "Empresa no demo confirmada en SQL; DEMO_API_ENABLED=false produce 403 en consulta de estado y redirección del asistente",
+            "scope": "Configuración con demo API deshabilitada; la bandera efectiva de PROD no se afirma"
+          },
+          "correction": "Candidato permite estado autenticado de sólo lectura sin habilitar mutaciones demo; la UI espera el estado confirmado y permite reintentar errores",
+          "pending": [
+            "CI main y despliegue exacto"
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -7735,17 +7924,56 @@
         {
           "trace_index": 344,
           "status": 200
+        },
+        {
+          "trace_index": 692,
+          "status": 200
+        },
+        {
+          "trace_index": 699,
+          "status": 200
+        },
+        {
+          "trace_index": 700,
+          "status": 200
+        },
+        {
+          "trace_index": 711,
+          "status": 200
+        },
+        {
+          "trace_index": 724,
+          "status": 200
+        },
+        {
+          "trace_index": 732,
+          "status": 200
+        },
+        {
+          "trace_index": 746,
+          "status": 404
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "bank-first-admin-lifecycle",
+          "source": "scripts/ci/test-peru-finance-lifecycle-local.mjs",
+          "verified_checks": [
+            "cuenta operativa explícita y saldo cero",
+            "altas/replays/edición persistida",
+            "transferencia pareada y saldo insuficiente rechazado",
+            "lector no muta",
+            "consulta ajena 404",
+            "un asiento por evento"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de alta/movimiento/transferencia",
+        "aislamiento de cada mutación",
+        "otras monedas/sobregiros/desactivación"
       ]
     },
     {
@@ -7754,16 +7982,48 @@
       "method": "POST",
       "endpoint": "/api/finanzas/bancos/cuentas",
       "source": "apps/erp-api/src/modules/finanzas/bancos/bancos.controller.ts:58",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 687,
+          "status": 201
+        },
+        {
+          "trace_index": 688,
+          "status": 201
+        },
+        {
+          "trace_index": 689,
+          "status": 201
+        },
+        {
+          "trace_index": 690,
+          "status": 400
+        },
+        {
+          "trace_index": 735,
+          "status": 403
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "bank-first-admin-lifecycle",
+          "source": "scripts/ci/test-peru-finance-lifecycle-local.mjs",
+          "verified_checks": [
+            "cuenta operativa explícita y saldo cero",
+            "altas/replays/edición persistida",
+            "transferencia pareada y saldo insuficiente rechazado",
+            "lector no muta",
+            "consulta ajena 404",
+            "un asiento por evento"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de alta/movimiento/transferencia",
+        "aislamiento de cada mutación",
+        "otras monedas/sobregiros/desactivación"
       ]
     },
     {
@@ -7772,16 +8032,36 @@
       "method": "PUT",
       "endpoint": "/api/finanzas/bancos/cuentas/:id",
       "source": "apps/erp-api/src/modules/finanzas/bancos/bancos.controller.ts:75",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 691,
+          "status": 200
+        },
+        {
+          "trace_index": 736,
+          "status": 403
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "bank-first-admin-lifecycle",
+          "source": "scripts/ci/test-peru-finance-lifecycle-local.mjs",
+          "verified_checks": [
+            "cuenta operativa explícita y saldo cero",
+            "altas/replays/edición persistida",
+            "transferencia pareada y saldo insuficiente rechazado",
+            "lector no muta",
+            "consulta ajena 404",
+            "un asiento por evento"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de alta/movimiento/transferencia",
+        "aislamiento de cada mutación",
+        "otras monedas/sobregiros/desactivación"
       ]
     },
     {
@@ -7808,16 +8088,56 @@
       "method": "POST",
       "endpoint": "/api/finanzas/bancos/movimientos",
       "source": "apps/erp-api/src/modules/finanzas/bancos/bancos.controller.ts:111",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 693,
+          "status": 201
+        },
+        {
+          "trace_index": 694,
+          "status": 201
+        },
+        {
+          "trace_index": 695,
+          "status": 400
+        },
+        {
+          "trace_index": 696,
+          "status": 201
+        },
+        {
+          "trace_index": 719,
+          "status": 201
+        },
+        {
+          "trace_index": 725,
+          "status": 400
+        },
+        {
+          "trace_index": 737,
+          "status": 403
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "bank-first-admin-lifecycle",
+          "source": "scripts/ci/test-peru-finance-lifecycle-local.mjs",
+          "verified_checks": [
+            "cuenta operativa explícita y saldo cero",
+            "altas/replays/edición persistida",
+            "transferencia pareada y saldo insuficiente rechazado",
+            "lector no muta",
+            "consulta ajena 404",
+            "un asiento por evento"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de alta/movimiento/transferencia",
+        "aislamiento de cada mutación",
+        "otras monedas/sobregiros/desactivación"
       ]
     },
     {
@@ -7826,16 +8146,44 @@
       "method": "POST",
       "endpoint": "/api/finanzas/bancos/transferencias",
       "source": "apps/erp-api/src/modules/finanzas/bancos/bancos.controller.ts:128",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 697,
+          "status": 201
+        },
+        {
+          "trace_index": 698,
+          "status": 201
+        },
+        {
+          "trace_index": 701,
+          "status": 400
+        },
+        {
+          "trace_index": 738,
+          "status": 403
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "bank-first-admin-lifecycle",
+          "source": "scripts/ci/test-peru-finance-lifecycle-local.mjs",
+          "verified_checks": [
+            "cuenta operativa explícita y saldo cero",
+            "altas/replays/edición persistida",
+            "transferencia pareada y saldo insuficiente rechazado",
+            "lector no muta",
+            "consulta ajena 404",
+            "un asiento por evento"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de alta/movimiento/transferencia",
+        "aislamiento de cada mutación",
+        "otras monedas/sobregiros/desactivación"
       ]
     },
     {
@@ -7862,16 +8210,49 @@
       "method": "GET",
       "endpoint": "/api/finanzas/bancos/cuentas/:id/movimientos/exportar",
       "source": "apps/erp-api/src/modules/finanzas/bancos/bancos.controller.ts:153",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "existing_evidence": [
+        {
+          "trace_index": 727,
+          "status": 200
+        },
+        {
+          "trace_index": 728,
+          "status": 404
+        }
+      ],
+      "defects": [
+        {
+          "id": "bank-csv-date-columns-formulas",
+          "status": "corrected_ci_merged_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-bank-csv-defect-20261002.json",
+            "local_only": true,
+            "observed": "Fecha 01/10 en vez de 02/10; diez columnas frente a nueve y celda =1+1 sin neutralizar"
+          },
+          "correction": "Candidato conserva calendario fiscal, presenta instantes en zona del tenant, escapa todas las columnas y neutraliza fórmulas",
+          "pending": [
+            "CI main y despliegue exacto"
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "bank-csv-date-columns-formulas",
+          "source": "scripts/ci/test-peru-finance-lifecycle-local.mjs",
+          "verified_checks": [
+            "parser CSV independiente",
+            "fecha documental preservada",
+            "9 campos por fila con comas escapadas",
+            "fórmulas neutralizadas",
+            "filtros y exportación ajena 404",
+            "Descarga CSV filtrada desde UI real"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "escala/múltiples páginas",
+        "variantes de otras monedas y países"
       ]
     },
     {
@@ -7979,17 +8360,37 @@
         {
           "trace_index": 189,
           "status": 200
+        },
+        {
+          "trace_index": 734,
+          "status": 200
+        },
+        {
+          "trace_index": 748,
+          "status": 404
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "bank-reconciliation-monthly",
+          "source": "scripts/ci/test-peru-finance-lifecycle-local.mjs",
+          "verified_checks": [
+            "CSV inválido no inserta filas",
+            "6 extractos importados/replay",
+            "match automático/manual/replay",
+            "diferencia bloquea cierre",
+            "ajuste explícito con contracuenta/asiento",
+            "cierre/replay e inmutabilidad mensual",
+            "lector rechazado en 6 mutaciones y consulta ajena 404"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de importación/match/ajuste/cierre",
+        "match por lote y plantillas CSV de bancos",
+        "aislamiento de cada mutación"
       ]
     },
     {
@@ -8006,17 +8407,37 @@
         {
           "trace_index": 190,
           "status": 201
+        },
+        {
+          "trace_index": 712,
+          "status": 201
+        },
+        {
+          "trace_index": 741,
+          "status": 403
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "bank-reconciliation-monthly",
+          "source": "scripts/ci/test-peru-finance-lifecycle-local.mjs",
+          "verified_checks": [
+            "CSV inválido no inserta filas",
+            "6 extractos importados/replay",
+            "match automático/manual/replay",
+            "diferencia bloquea cierre",
+            "ajuste explícito con contracuenta/asiento",
+            "cierre/replay e inmutabilidad mensual",
+            "lector rechazado en 6 mutaciones y consulta ajena 404"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de importación/match/ajuste/cierre",
+        "match por lote y plantillas CSV de bancos",
+        "aislamiento de cada mutación"
       ]
     },
     {
@@ -8025,16 +8446,45 @@
       "method": "POST",
       "endpoint": "/api/finanzas/conciliacion/:id/importar-csv",
       "source": "apps/erp-api/src/modules/finanzas/conciliacion/conciliacion.controller.ts:110",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 713,
+          "status": 400
+        },
+        {
+          "trace_index": 714,
+          "status": 201
+        },
+        {
+          "trace_index": 715,
+          "status": 201
+        },
+        {
+          "trace_index": 742,
+          "status": 403
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "bank-reconciliation-monthly",
+          "source": "scripts/ci/test-peru-finance-lifecycle-local.mjs",
+          "verified_checks": [
+            "CSV inválido no inserta filas",
+            "6 extractos importados/replay",
+            "match automático/manual/replay",
+            "diferencia bloquea cierre",
+            "ajuste explícito con contracuenta/asiento",
+            "cierre/replay e inmutabilidad mensual",
+            "lector rechazado en 6 mutaciones y consulta ajena 404"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de importación/match/ajuste/cierre",
+        "match por lote y plantillas CSV de bancos",
+        "aislamiento de cada mutación"
       ]
     },
     {
@@ -8043,16 +8493,41 @@
       "method": "POST",
       "endpoint": "/api/finanzas/conciliacion/:id/match-automatico",
       "source": "apps/erp-api/src/modules/finanzas/conciliacion/conciliacion.controller.ts:128",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 716,
+          "status": 201
+        },
+        {
+          "trace_index": 717,
+          "status": 201
+        },
+        {
+          "trace_index": 743,
+          "status": 403
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "bank-reconciliation-monthly",
+          "source": "scripts/ci/test-peru-finance-lifecycle-local.mjs",
+          "verified_checks": [
+            "CSV inválido no inserta filas",
+            "6 extractos importados/replay",
+            "match automático/manual/replay",
+            "diferencia bloquea cierre",
+            "ajuste explícito con contracuenta/asiento",
+            "cierre/replay e inmutabilidad mensual",
+            "lector rechazado en 6 mutaciones y consulta ajena 404"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de importación/match/ajuste/cierre",
+        "match por lote y plantillas CSV de bancos",
+        "aislamiento de cada mutación"
       ]
     },
     {
@@ -8061,16 +8536,41 @@
       "method": "POST",
       "endpoint": "/api/finanzas/conciliacion/:id/marcar-item",
       "source": "apps/erp-api/src/modules/finanzas/conciliacion/conciliacion.controller.ts:146",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 720,
+          "status": 201
+        },
+        {
+          "trace_index": 721,
+          "status": 201
+        },
+        {
+          "trace_index": 744,
+          "status": 403
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "bank-reconciliation-monthly",
+          "source": "scripts/ci/test-peru-finance-lifecycle-local.mjs",
+          "verified_checks": [
+            "CSV inválido no inserta filas",
+            "6 extractos importados/replay",
+            "match automático/manual/replay",
+            "diferencia bloquea cierre",
+            "ajuste explícito con contracuenta/asiento",
+            "cierre/replay e inmutabilidad mensual",
+            "lector rechazado en 6 mutaciones y consulta ajena 404"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de importación/match/ajuste/cierre",
+        "match por lote y plantillas CSV de bancos",
+        "aislamiento de cada mutación"
       ]
     },
     {
@@ -8097,16 +8597,33 @@
       "method": "GET",
       "endpoint": "/api/finanzas/conciliacion/:id/diferencias",
       "source": "apps/erp-api/src/modules/finanzas/conciliacion/conciliacion.controller.ts:176",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 726,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "bank-reconciliation-monthly",
+          "source": "scripts/ci/test-peru-finance-lifecycle-local.mjs",
+          "verified_checks": [
+            "CSV inválido no inserta filas",
+            "6 extractos importados/replay",
+            "match automático/manual/replay",
+            "diferencia bloquea cierre",
+            "ajuste explícito con contracuenta/asiento",
+            "cierre/replay e inmutabilidad mensual",
+            "lector rechazado en 6 mutaciones y consulta ajena 404"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de importación/match/ajuste/cierre",
+        "match por lote y plantillas CSV de bancos",
+        "aislamiento de cada mutación"
       ]
     },
     {
@@ -8115,16 +8632,45 @@
       "method": "POST",
       "endpoint": "/api/finanzas/conciliacion/:id/cerrar",
       "source": "apps/erp-api/src/modules/finanzas/conciliacion/conciliacion.controller.ts:191",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 718,
+          "status": 400
+        },
+        {
+          "trace_index": 722,
+          "status": 201
+        },
+        {
+          "trace_index": 723,
+          "status": 201
+        },
+        {
+          "trace_index": 745,
+          "status": 403
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "bank-reconciliation-monthly",
+          "source": "scripts/ci/test-peru-finance-lifecycle-local.mjs",
+          "verified_checks": [
+            "CSV inválido no inserta filas",
+            "6 extractos importados/replay",
+            "match automático/manual/replay",
+            "diferencia bloquea cierre",
+            "ajuste explícito con contracuenta/asiento",
+            "cierre/replay e inmutabilidad mensual",
+            "lector rechazado en 6 mutaciones y consulta ajena 404"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de importación/match/ajuste/cierre",
+        "match por lote y plantillas CSV de bancos",
+        "aislamiento de cada mutación"
       ]
     },
     {
@@ -8429,17 +8975,45 @@
         {
           "trace_index": 105,
           "status": 200
+        },
+        {
+          "trace_index": 706,
+          "status": 200
+        },
+        {
+          "trace_index": 710,
+          "status": 200
+        },
+        {
+          "trace_index": 733,
+          "status": 200
+        },
+        {
+          "trace_index": 747,
+          "status": 404
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "supplier-partial-bank-payments",
+          "source": "scripts/ci/test-peru-finance-lifecycle-local.mjs",
+          "verified_checks": [
+            "deuda 17.70 pagada en 6/11.70",
+            "replay no duplica deuda/pago/banco",
+            "exceso rechazado",
+            "lector no crea deuda ni paga",
+            "deuda ajena 404",
+            "factura y dos pagos con asientos cuadrados"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de factura/pago",
+        "lotes/programación/reversos",
+        "otras monedas/ajustes fiscales",
+        "aislamiento de cada mutación"
       ]
     },
     {
@@ -8484,17 +9058,37 @@
         {
           "trace_index": 104,
           "status": 409
+        },
+        {
+          "trace_index": 703,
+          "status": 201
+        },
+        {
+          "trace_index": 739,
+          "status": 403
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "supplier-partial-bank-payments",
+          "source": "scripts/ci/test-peru-finance-lifecycle-local.mjs",
+          "verified_checks": [
+            "deuda 17.70 pagada en 6/11.70",
+            "replay no duplica deuda/pago/banco",
+            "exceso rechazado",
+            "lector no crea deuda ni paga",
+            "deuda ajena 404",
+            "factura y dos pagos con asientos cuadrados"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de factura/pago",
+        "lotes/programación/reversos",
+        "otras monedas/ajustes fiscales",
+        "aislamiento de cada mutación"
       ]
     },
     {
@@ -8584,16 +9178,53 @@
       "method": "POST",
       "endpoint": "/api/finanzas/tesoreria/pagos",
       "source": "apps/erp-api/src/modules/finanzas/tesoreria/tesoreria.controller.ts:25",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 704,
+          "status": 201
+        },
+        {
+          "trace_index": 705,
+          "status": 201
+        },
+        {
+          "trace_index": 707,
+          "status": 400
+        },
+        {
+          "trace_index": 708,
+          "status": 201
+        },
+        {
+          "trace_index": 709,
+          "status": 201
+        },
+        {
+          "trace_index": 740,
+          "status": 403
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "supplier-partial-bank-payments",
+          "source": "scripts/ci/test-peru-finance-lifecycle-local.mjs",
+          "verified_checks": [
+            "deuda 17.70 pagada en 6/11.70",
+            "replay no duplica deuda/pago/banco",
+            "exceso rechazado",
+            "lector no crea deuda ni paga",
+            "deuda ajena 404",
+            "factura y dos pagos con asientos cuadrados"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI de factura/pago",
+        "lotes/programación/reversos",
+        "otras monedas/ajustes fiscales",
+        "aislamiento de cada mutación"
       ]
     },
     {
@@ -11125,6 +11756,10 @@
         {
           "trace_index": 550,
           "status": 201
+        },
+        {
+          "trace_index": 729,
+          "status": 201
         }
       ],
       "defects": [],
@@ -11938,7 +12573,42 @@
       "endpoint": "/api/rrhh/empleados",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:94",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "employee-create-replay-prevalidation",
+          "status": "canonical_local_api_ui_passed_ci_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-hr-lifecycle-defects-20261003.json",
+            "local_only": true,
+            "observed": {
+              "id": "employee-create-replay-prevalidation",
+              "endpoint": "/api/rrhh/empleados",
+              "observed_status": 409,
+              "message": "Ya existe un empleado con el mismo documento de identidad",
+              "cause": "Validación de documento único precede al recibo transaccional de idempotencia",
+              "employee_count": 1,
+              "recovery_blocked": true
+            }
+          },
+          "pending": [
+            "suite completa",
+            "CI y despliegue"
+          ]
+        },
+        {
+          "id": "employee-modal-clears-before-response",
+          "status": "canonical_local_api_ui_passed_ci_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-hr-ui-defect-20261003.json",
+            "local_only": true,
+            "observed": "Alta confirma en DB, respuesta perdida 503, formulario vacía campos antes de confirmar y bloquea reintento"
+          },
+          "pending": [
+            "suite completa",
+            "CI y despliegue"
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -11956,7 +12626,31 @@
       "endpoint": "/api/rrhh/empleados/:id",
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:105",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "employee-family-allowance-not-cleared",
+          "status": "canonical_local_api_ui_passed_ci_deployment_pending",
+          "proof": {
+            "source": "artifacts/peru-hr-lifecycle-defects-20261003.json",
+            "local_only": true,
+            "observed": {
+              "id": "employee-family-allowance-not-cleared",
+              "endpoint": "/api/rrhh/empleados/:id",
+              "observed_status": 200,
+              "persisted": {
+                "tiene_hijos": false,
+                "cantidad_hijos": 0,
+                "asignacion_familiar": true
+              },
+              "cause": "La derivación sólo activa asignacion_familiar; no la desactiva al guardar tiene_hijos=false/cantidad_hijos=0"
+            }
+          },
+          "pending": [
+            "suite completa",
+            "CI y despliegue"
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -14470,6 +15164,10 @@
         },
         {
           "trace_index": 551,
+          "status": 201
+        },
+        {
+          "trace_index": 730,
           "status": 201
         }
       ],

@@ -32,6 +32,97 @@ function isHandledHttpResponse(row: { path: string; status: number }) {
     || (row.status === 429 && pathname.endsWith('/api/auth/login'))
 }
 
+test('Perú: RRHH conserva formulario, recupera alta perdida y persiste edición sin asignación familiar', async ({ page, context }) => {
+  test.setTimeout(180000)
+  if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere base local efímera')
+  page.setDefaultTimeout(25000)
+  const output = process.env.LOCAL_INTEGRATED_OUTPUT_DIR!
+  const fixture = JSON.parse(await fs.readFile(path.join(output, 'hr-fixture.json'), 'utf8'))
+  expect(fixture.tenant).toMatch(/^[0-9a-f-]{36}$/i)
+  const tenant = `'${fixture.tenant}'::uuid`
+  const count = () => readLocalSql(`SELECT count(*) FROM empleados WHERE tenant_id=${tenant} AND numero_documento='98765430';`)
+  await context.route('**/*', route => ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(route.request().url()).hostname)
+    ? route.continue() : route.abort('blockedbyclient'))
+  const keys: (string | undefined)[] = []
+  const dialogs: string[] = []
+  const requests: { method: string; path: string; status: number }[] = []
+  const scriptErrors: string[] = []
+  let lost = false
+  let success = false
+  page.on('pageerror', error => scriptErrors.push(error.message))
+  page.on('dialog', async dialog => { dialogs.push(dialog.message()); await dialog.accept() })
+  page.on('response', response => {
+    const pathname = new URL(response.url()).pathname
+    if (pathname.includes('/api/rrhh/')) requests.push({ method: response.request().method(),
+      path: pathname.replace(/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}/gi, ':id'), status: response.status() })
+  })
+  await page.route(/\/api\/rrhh\/empleados\/?(?:\?.*)?$/, async route => {
+    if (route.request().method() !== 'POST') return route.continue()
+    keys.push(route.request().headers()['idempotency-key'])
+    const response = await route.fetch()
+    expect(response.status(), await response.text()).toBe(201)
+    if (!lost) {
+      lost = true
+      return route.fulfill({ status: 503, json: { message: 'Respuesta perdida local del empleado' } })
+    }
+    return route.fulfill({ response })
+  })
+  try {
+    expect(count()).toBe('0')
+    await page.goto('/login/')
+    await page.locator('#email').fill(fixture.email)
+    await page.locator('#password').fill('Cliente-Local-2026-Only!')
+    await submitLocalLogin(page)
+    await page.waitForURL('**/dashboard/**')
+    await page.goto('/dashboard/rrhh/')
+    await page.getByRole('button', { name: 'Agregar empleado', exact: true }).click()
+    await page.locator('#empleado-modal-nombres').fill('Empleado navegador')
+    await page.locator('#empleado-modal-apellidos').fill('Local recuperación')
+    await page.locator('#empleado-modal-numero-documento').fill('98765430')
+    await page.locator('#empleado-modal-email').fill('empleado-browser@example.test')
+    await page.locator('#empleado-modal-fecha-nacimiento').fill('1990-01-15')
+    await page.locator('#empleado-modal-genero').selectOption('masculino')
+    await page.locator('#empleado-modal-puesto').fill('Puesto navegador')
+    await page.locator('#empleado-modal-id-departamento').selectOption(readLocalSql(`SELECT id FROM departamentos WHERE tenant_id=${tenant} ORDER BY created_at LIMIT 1;`))
+    await page.locator('#empleado-modal-fecha-ingreso').fill(readLocalSql(`SELECT app.hoy_tenant(${tenant});`))
+    await page.locator('#empleado-modal-tiene-hijos').check()
+    await page.locator('#empleado-modal-cantidad-hijos').fill('1')
+    await page.getByRole('button', { name: /Guardar Empleado/ }).click()
+    await expect.poll(() => dialogs.length).toBe(1)
+    expect(lost).toBe(true)
+    expect(count()).toBe('1')
+    await expect(page.locator('#empleado-modal-nombres')).toHaveValue('Empleado navegador')
+    await expect(page.locator('#empleado-modal-numero-documento')).toHaveValue('98765430')
+    await expect(page.locator('#empleado-modal-tiene-hijos')).toBeChecked()
+    await page.getByRole('button', { name: /Guardar Empleado/ }).click()
+    await expect(page.locator('#empleado-modal-nombres')).toHaveCount(0)
+    expect(keys).toHaveLength(2)
+    expect(keys[0]).toBeTruthy()
+    expect(keys[1]).toBe(keys[0])
+    expect(count()).toBe('1')
+    await page.reload()
+    const row = page.getByRole('row').filter({ hasText: '98765430' })
+    await expect(row).toHaveCount(1)
+    await row.getByRole('button', { name: 'Editar', exact: true }).click()
+    await expect(page.locator('#empleado-modal-tiene-hijos')).toBeChecked()
+    await page.locator('#empleado-modal-tiene-hijos').uncheck()
+    await page.locator('#empleado-modal-puesto').fill('Puesto editado navegador')
+    await page.getByRole('button', { name: /Actualizar Empleado/ }).click()
+    await expect(page.locator('#empleado-modal-nombres')).toHaveCount(0)
+    await page.reload()
+    await expect(page.getByRole('row').filter({ hasText: '98765430' })).toContainText('Puesto editado navegador')
+    expect(readLocalSql(`SELECT tiene_hijos::text||':'||cantidad_hijos::text||':'||asignacion_familiar::text FROM empleados WHERE tenant_id=${tenant} AND numero_documento='98765430';`)).toBe('false:0:false')
+    expect(scriptErrors).toEqual([])
+    await page.screenshot({ path: path.join(output, 'hr-employees-recovery.png'), fullPage: true })
+    success = true
+  } finally {
+    await fs.writeFile(path.join(output, 'browser-hr-lifecycle.json'), JSON.stringify({ success, remoteWrites: false,
+      scope: 'RRHH primer ADMIN: alta perdida/replay sin duplicar, edición y recarga; no acepta contratos/asistencia/planilla UI',
+      same_intent_recovered: success && keys[0] === keys[1], scriptErrors, requests, lost_committed_response: lost,
+      completedAt: new Date().toISOString() }, null, 2))
+  }
+})
+
 test('Perú: primer administrador completa wizard, recupera progreso y respuestas perdidas sin duplicar', async ({ page, context }) => {
   test.setTimeout(300000)
   if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere base local efímera')

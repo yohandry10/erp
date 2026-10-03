@@ -1,6 +1,29 @@
 # Estado actual del ERP
 
-Actualizado: 2026-10-02.
+Actualizado: 2026-10-03.
+
+El ensayo canónico de #125 (`354989d1`) aprobó 138 escenarios HTTP, 17 recorridos
+UI, 99 pantallas, 22 vistas con registros, SQL y restauración
+(`artifacts/peru-integrated-local-year-wizard-finance-20261003`). Incluye cierre
+anual con utilidad/pérdida, wizard del primer ADMIN no demo y ciclo bancario/CxP/
+conciliación. Se conserva el fallo anterior de prueba UI de Filtros. CI PR
+37097869477 y rama 37097855546 aprobaron los mismos recorridos, builds y gates.
+La 558 se promovió el 03/10 con respaldo/ensayo, preservando datos, funciones,
+RLS y ACL (`artifacts/peru-558-promotion-20261003052409868.json`). #125 se integró
+como `b359c311`; main y despliegue siguen en verificación. No hay aceptación
+global del producto.
+
+Dos defectos de RRHH reproducidos por API bloqueaban recuperar el alta repetida
+de empleado y retirar asignación familiar al guardar sin hijos. El candidato
+pasó nueve escenarios API con PostgreSQL efímero: empleados, contratos/PDF,
+asistencia, permisos y consulta ajena (`artifacts/peru-hr-lifecycle-defects-20261003.json`,
+`artifacts/peru-hr-lifecycle-candidate-20261003.json`). El navegador reprodujo
+un tercer defecto: el modal vaciaba campos tras guardar, antes de recibir éxito
+(`artifacts/peru-hr-ui-defect-20261003.json`). La corrección canónica pasó diez
+casos API, un recorrido Playwright de alta perdida/replay/edición/recarga y
+restauración posterior (`artifacts/peru-hr-canonical-subset-20261003`). Tipos API
+y web pasaron. El runner incorpora estos casos; faltan repetición completa,
+CI y despliegue. No acredita RRHH ni planilla completos.
 
 Los dos jobs integrados de #124, CI 37090225590 y 37090197674, aprobaron API,
 navegador y recuperación. Sus auditorías fallaron por dos avisos recién
@@ -16,7 +39,14 @@ aprobó CI de PR 37092538107, seguridad, builds y 128 HTTP/quince UI/99 pantalla
 ejecución duplicada de rama 37092535897 agotó 35 minutos en el último barrido;
 su segundo intento pasó completo. La exportación segura distingue los dos
 artefactos y conserva el fallo anterior. El PR #124 se integró como `f53d84dc`;
-CI main 37096505168 sigue en curso; E2E y seguridad de main aprobaron.
+CI main 37096505168, E2E 37096505095 y seguridad 37096505160 aprobaron.
+La evidencia completa repitió 128 HTTP, quince UI, 99 pantallas y 22 con registros
+(`artifacts/peru-integrated-main-37096505168`). Render sirve ese SHA exacto con
+DB/Redis listos y esquema requerido/aplicado 557; Vercel Production, login 200
+y CORS 204 pasaron con preflight y sólo lectura
+(`artifacts/peru-production-verification-after-124-20261002.json`). La primera
+consulta agotó 20 segundos; la repetición pasó y no acredita disponibilidad
+continua ni plan administrativo (`artifacts/peru-production-read-timeout-after-124-20261002.json`).
 Todavía no hay lanzamiento aprobado.
 
 La ampliación contable local corrigió duplicación del asiento manual al
@@ -31,8 +61,8 @@ inyectado, preservación de datos/funciones/RLS/ACL y contratos SQL
 `artifacts/erp-peru-557-rehearsal-20261003020438386-17216.json`).
 La 557 se promovió transaccionalmente el 02/10 después de CI y ensayo
 (`artifacts/peru-557-promotion-20261003042433425.json`), conservando datos,
-funciones previas, RLS y permisos. Su despliegue exacto se verifica al terminar
-CI main. Pasaron 128 escenarios HTTP y quince recorridos
+funciones previas, RLS y permisos. Su despliegue exacto y CI main están verificados.
+Pasaron 128 escenarios HTTP y quince recorridos
 UI. La ejecución global falló en una de 99 pantallas estáticas: el log demuestra
 un reinicio de Next dev por umbral de memoria al abrir Ventas. Se conserva el
 fallo y las fases aprobadas por separado
@@ -63,8 +93,8 @@ El respaldo nuevo de 557 y su ensayo sin red pasaron restauración, rollback
 inyectado y controles negativos de conservación: completa 164 cuentas ausentes
 sin alterar las 3.427 existentes, funciones previas, datos, RLS o ACL
 (`artifacts/peru-prod-backup-20261003043115676.json`,
-`artifacts/erp-peru-558-rehearsal-20261003044021269-18344.json`). La 558 no está
-promovida; CI y despliegue siguen pendientes.
+`artifacts/erp-peru-558-rehearsal-20261003044021269-18344.json`). La 558 está
+promovida; #125 y sus CI pasaron. Main y despliegue siguen pendientes.
 
 Las correcciones del asistente distinguen identidad preparada de progreso
 finalizado y bloquean avanzar cuando falla la recuperación del progreso.

@@ -1,0 +1,19 @@
+{
+  "success": true,
+  "local_only": true,
+  "pages": 1,
+  "page_size_points": [
+    595.28,
+    841.89
+  ],
+  "checked": [
+    "Texto visible sin recortes",
+    "Documento y empleado del fixture local",
+    "Fechas 2026-02-01 y 2026-12-31",
+    "Remuneración S/ 1,500.00",
+    "Representación del registro explícita"
+  ],
+  "representation_only": true,
+  "legal_acceptance": false,
+  "render_image": "artifacts/peru-hr-contract-visual-20261003.png"
+}

@@ -729,6 +729,13 @@ Código principal: `apps/erp-api/src/modules/contabilidad`.
   ficha PLAME convergen en un writer operativo con actor, permiso, huella e
   idempotencia. El job de ausencias exige un actor técnico explícito y falla
   cerrado si no está configurado.
+- El alta y edición de empleados recuperan la intención en el writer antes de
+  comprobar duplicados; la unicidad documental permanece en la transacción y
+  el índice de base de datos. Un reintento del alta devuelve el mismo empleado.
+  En Perú, guardar explícitamente `tiene_hijos=false` y `cantidad_hijos=0`
+  retira el indicador derivado de asignación familiar; editar otros datos lo
+  conserva. El formulario mantiene sus campos ante un fallo de guardado y sólo
+  se cierra cuando la operación devuelve éxito.
 - Reclutamiento conserva los años de experiencia y el estado civil opcional
   del candidato al crear y editar (writer 543). No completa datos personales
   ausentes por defecto. La lista y el filtro usan la vacante persistida; un
