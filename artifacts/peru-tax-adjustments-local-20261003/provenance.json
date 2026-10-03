@@ -1,0 +1,7 @@
+{
+  "source": "artifacts/peru-integrated-20261003080636053-23928",
+  "source_head": "3e9c0585ae454bfc7ff4d8fedc20f37aedc1a81d",
+  "scope": "Subconjunto local 558 restaurado + 559/560; script de aceptación en artifacts, aún no integrado en CI",
+  "remoteWrites": false,
+  "dumps_extracted": false
+}

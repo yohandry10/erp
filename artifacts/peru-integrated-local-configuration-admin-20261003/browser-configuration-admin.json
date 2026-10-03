@@ -1,0 +1,24 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "CRUD de anexo, recuperación de cuatro respuestas perdidas, inactivos/recarga, asignación y lector; un recibo y auditoría por intención; sin parámetros fiscales externos",
+  "operations": {
+    "create": {
+      "requests": 2,
+      "same_intent": true
+    },
+    "edit": {
+      "requests": 2,
+      "same_intent": true
+    },
+    "deactivate": {
+      "requests": 2,
+      "same_intent": true
+    },
+    "assign": {
+      "requests": 2,
+      "same_intent": true
+    }
+  },
+  "scriptErrors": []
+}

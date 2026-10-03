@@ -1,0 +1,11 @@
+{
+  "completedAt": "2026-10-03T08:08:09.720Z",
+  "success": true,
+  "withBrowser": false,
+  "withSurvey": false,
+  "withRecords": false,
+  "scope": "tax_adjustments_local_probe",
+  "database": "PostgreSQL 16 efímero",
+  "output": "C:\\Users\\PC\\Desktop\\erp-peru-production\\artifacts\\peru-integrated-20261003080636053-23928",
+  "remoteWrites": false
+}

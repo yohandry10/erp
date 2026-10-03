@@ -1575,7 +1575,101 @@
         "Primer ADMIN crea F901, consulta y recupera ID en replay"
       ],
       "pending_checks": [
-        "Edición, inactivación, límites de correlativo, roles, aislamiento de cada operación y UI"
+        "UI y consumo del correlativo por cada documento; variantes completas de tipos y roles"
+      ]
+    },
+    {
+      "id": "document-series-lifecycle-validation-isolation",
+      "source": "scripts/ci/test-peru-document-series-local.mjs",
+      "required_scenario_prefixes": [
+        "Series: seis replays concurrentes conservan ID, recibo y auditoría",
+        "Series: edición e inactivación persistidas y replay sin doble auditoría",
+        "Series: consulta operativa omite inactivas; recuperación administrativa requiere usar el código",
+        "series-replay-conflict",
+        "series-zero-maximum",
+        "series-overflow-maximum",
+        "series-invalid-format",
+        "series-negative-maximum",
+        "series-invalid-number",
+        "series-unsupported-type",
+        "series-reader-write-denied",
+        "Series: otro tenant no consulta la serie propia",
+        "Series: mismo código en otro tenant crea fila aislada",
+        "Series: reactivación conserva número y límites",
+        "series-maximum-below-current"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/configuracion/series"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/configuracion/series/:tipo"
+        }
+      ],
+      "verified_checks": [
+        "Alta/edición/inactivación/reactivación, concurrencia de seis replays y auditoría única",
+        "400/409 para formato/tipo/límites/conflicto sin residuos, lector 403 y tenant aislado"
+      ],
+      "pending_checks": [
+        "UI de edición de series, uso completo del correlativo por cada documento y todos los tipos vigentes; CI/despliegue"
+      ]
+    },
+    {
+      "id": "tax-advance-cxp-bank-accounting-lifecycle",
+      "source": "scripts/ci/test-peru-tax-adjustments-local.mjs",
+      "required_scenario_prefixes": [
+        "Ajustes: cálculo y validación por API; quinta no ofrecida y base cero rechazadas",
+        "Anticipo proveedor: cargo bancario y saldo disponible persistidos; replay sin residuos",
+        "Anticipo cliente: abono bancario, consulta y replay persistidos",
+        "Anticipo proveedor: aplicación parcial reduce deuda y disponible una vez",
+        "CxP: retención, percepción y detracción alteran deuda correctamente sin tocar banco",
+        "Ajustes: exceso de deuda/anticipo, cálculo incompatible y tercero incorrecto rechazados sin residuos",
+        "Ajustes: consulta y depósito ajenos aislados",
+        "Detracción: depósito contable local y replay cargan banco una vez sin repetir reducción de CxP",
+        "Ajustes: consulta por ID y filtros de origen/tipo/estado; anticipos por cliente",
+        "Ajustes: rol sin finanzas no consulta ni aplica movimientos",
+        "CxP ajustada: pago neto y replay liquidan deuda, banco y obligación sin doble movimiento",
+        "Ajustes: consumidor real publica asientos únicos y cuadrados de deuda, anticipos, reclasificación y depósito"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/retenciones/calcular"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/retenciones"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/retenciones/anticipos"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/retenciones/anticipos"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/retenciones/ajustes"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/retenciones/:id/depositar-detraccion"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/retenciones/:id"
+        }
+      ],
+      "verified_checks": [
+        "Anticipos proveedor/cliente, aplicación parcial a CxP, retención/percepción/detracción y depósito contable local",
+        "Pago neto, replays sin doble movimiento, permisos/tenant/rechazos sin residuos y asientos reales únicos/cuadrados",
+        "UI conserva tres intenciones/campos ante respuestas perdidas y recupera sin pageerror; recarga persistida"
+      ],
+      "pending_checks": [
+        "Aplicación/reversa CxC, monedas/tipos de cambio, roles sólo lectura de finanzas, anulaciones y todos los filtros; tasas normativas/depósito externo; CI/despliegue"
       ]
     }
   ]
