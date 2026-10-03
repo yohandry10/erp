@@ -469,7 +469,7 @@
     },
     {
       "id": "billing-zero-precision-read",
-      "status": "corrected_ci_promoted_merged_main_deployment_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -487,9 +487,7 @@
         "local_only": true
       },
       "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
-      "pending": [
-        "CI main 37110032921 y verificación de despliegue exacto/schema 560"
-      ],
+      "pending": [],
       "local_followup": {
         "source": "artifacts/peru-configuration-admin-canonical-subset-20261003",
         "api_scenarios": 16,
@@ -502,11 +500,15 @@
         "artifacts/peru-integrated-ci-37107579263"
       ],
       "promotion_proof": "artifacts/peru-560-promotion-20261003083056001.json",
-      "merge_sha": "8417ff234bde20636d865ebf2d096c8a1bd9359b"
+      "merge_sha": "8417ff234bde20636d865ebf2d096c8a1bd9359b",
+      "release_evidence": [
+        "artifacts/peru-integrated-main-37110032921",
+        "artifacts/peru-production-verification-after-128-20261003.json"
+      ]
     },
     {
       "id": "branch-create-retry-duplicate",
-      "status": "corrected_ci_promoted_merged_main_deployment_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -527,9 +529,7 @@
         "local_only": true
       },
       "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
-      "pending": [
-        "CI main 37110032921 y verificación de despliegue exacto/schema 560"
-      ],
+      "pending": [],
       "local_followup": {
         "source": "artifacts/peru-configuration-admin-canonical-subset-20261003",
         "api_scenarios": 16,
@@ -542,11 +542,15 @@
         "artifacts/peru-integrated-ci-37107579263"
       ],
       "promotion_proof": "artifacts/peru-560-promotion-20261003083056001.json",
-      "merge_sha": "8417ff234bde20636d865ebf2d096c8a1bd9359b"
+      "merge_sha": "8417ff234bde20636d865ebf2d096c8a1bd9359b",
+      "release_evidence": [
+        "artifacts/peru-integrated-main-37110032921",
+        "artifacts/peru-production-verification-after-128-20261003.json"
+      ]
     },
     {
       "id": "branch-assigned-reader-detail-bypass",
-      "status": "corrected_ci_promoted_merged_main_deployment_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -564,9 +568,7 @@
         "local_only": true
       },
       "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
-      "pending": [
-        "CI main 37110032921 y verificación de despliegue exacto/schema 560"
-      ],
+      "pending": [],
       "local_followup": {
         "source": "artifacts/peru-configuration-admin-canonical-subset-20261003",
         "api_scenarios": 16,
@@ -579,11 +581,15 @@
         "artifacts/peru-integrated-ci-37107579263"
       ],
       "promotion_proof": "artifacts/peru-560-promotion-20261003083056001.json",
-      "merge_sha": "8417ff234bde20636d865ebf2d096c8a1bd9359b"
+      "merge_sha": "8417ff234bde20636d865ebf2d096c8a1bd9359b",
+      "release_evidence": [
+        "artifacts/peru-integrated-main-37110032921",
+        "artifacts/peru-production-verification-after-128-20261003.json"
+      ]
     },
     {
       "id": "branch-assignment-failure-removes-scope",
-      "status": "corrected_ci_promoted_merged_main_deployment_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "PUT",
@@ -602,9 +608,7 @@
         "local_only": true
       },
       "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
-      "pending": [
-        "CI main 37110032921 y verificación de despliegue exacto/schema 560"
-      ],
+      "pending": [],
       "local_followup": {
         "source": "artifacts/peru-configuration-admin-canonical-subset-20261003",
         "api_scenarios": 16,
@@ -617,11 +621,15 @@
         "artifacts/peru-integrated-ci-37107579263"
       ],
       "promotion_proof": "artifacts/peru-560-promotion-20261003083056001.json",
-      "merge_sha": "8417ff234bde20636d865ebf2d096c8a1bd9359b"
+      "merge_sha": "8417ff234bde20636d865ebf2d096c8a1bd9359b",
+      "release_evidence": [
+        "artifacts/peru-integrated-main-37110032921",
+        "artifacts/peru-production-verification-after-128-20261003.json"
+      ]
     },
     {
       "id": "branch-inactive-list-filter-ineffective",
-      "status": "corrected_ci_promoted_merged_main_deployment_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -639,9 +647,7 @@
         "local_only": true
       },
       "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
-      "pending": [
-        "CI main 37110032921 y verificación de despliegue exacto/schema 560"
-      ],
+      "pending": [],
       "local_followup": {
         "source": "artifacts/peru-configuration-admin-canonical-subset-20261003",
         "api_scenarios": 16,
@@ -654,11 +660,15 @@
         "artifacts/peru-integrated-ci-37107579263"
       ],
       "promotion_proof": "artifacts/peru-560-promotion-20261003083056001.json",
-      "merge_sha": "8417ff234bde20636d865ebf2d096c8a1bd9359b"
+      "merge_sha": "8417ff234bde20636d865ebf2d096c8a1bd9359b",
+      "release_evidence": [
+        "artifacts/peru-integrated-main-37110032921",
+        "artifacts/peru-production-verification-after-128-20261003.json"
+      ]
     },
     {
       "id": "branch-editor-clears-after-failed-response",
-      "status": "corrected_ci_promoted_merged_main_deployment_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -681,9 +691,7 @@
         "local_only": true
       },
       "correction": "560: mutación y reemplazo en una transacción con permiso/intención/auditoría; listado inactivo y detalle limitado; UI conserva campos/llave tras 503; lectura de precisión 0 respetada",
-      "pending": [
-        "CI main 37110032921 y verificación de despliegue exacto/schema 560"
-      ],
+      "pending": [],
       "local_followup": {
         "source": "artifacts/peru-configuration-admin-canonical-subset-20261003",
         "api_scenarios": 16,
@@ -696,7 +704,11 @@
         "artifacts/peru-integrated-ci-37107579263"
       ],
       "promotion_proof": "artifacts/peru-560-promotion-20261003083056001.json",
-      "merge_sha": "8417ff234bde20636d865ebf2d096c8a1bd9359b"
+      "merge_sha": "8417ff234bde20636d865ebf2d096c8a1bd9359b",
+      "release_evidence": [
+        "artifacts/peru-integrated-main-37110032921",
+        "artifacts/peru-production-verification-after-128-20261003.json"
+      ]
     },
     {
       "id": "document-series-validation-conflict-generic-500",
