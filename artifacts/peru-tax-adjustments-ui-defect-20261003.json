@@ -1,0 +1,27 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "UI real de ajustes fiscales: anticipo proveedor, detracción y depósito con respuesta perdida; no depósito bancario externo",
+  "checks": [
+    {
+      "check": "Anticipo: 503 conserva campos y retry recupera ID sin segundo cargo",
+      "passed": true
+    },
+    {
+      "check": "Detracción: respuesta perdida y retry mantienen una reducción de deuda",
+      "passed": true
+    },
+    {
+      "check": "Depósito: retry conserva cargo único y retira pendiente",
+      "passed": true
+    }
+  ],
+  "unexpected_errors": [
+    "Interrupción local confirmada",
+    "Interrupción local confirmada",
+    "Interrupción local confirmada"
+  ],
+  "provenance": "artifacts/peru-integrated-20261003082335938-22820",
+  "defect": "Los handlers submit/depositar propagan rechazo de useApi: tres pageerror tras tres respuestas perdidas. Campos/llaves y movimientos sí se conservan.",
+  "no_restore_after_browser": true
+}

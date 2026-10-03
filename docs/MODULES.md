@@ -570,6 +570,7 @@ Código principal: `apps/erp-api/src/modules/inventario`,
   contracuenta y outbox; un período cerrado y sus movimientos son inmutables,
   incluso frente a escrituras tardías sin `conciliacion_id`.
 - Cobranzas y pagos por lote requieren referencias idempotentes.
+- La pantalla de ajustes fiscales conserva campos e intención hasta recibir éxito. Ante una respuesta perdida de anticipo, ajuste o depósito muestra el error y permite recuperar la misma operación; captura el rechazo de la petición sin duplicar banco/deuda.
 - Retenciones, percepciones, detracciones y anticipos se aplican a una CxC o
   CxP mediante el writer `registrar_ajuste_fiscal_financiero_tx`: recibe tenant,
   actor e intención idempotente, bloquea documento/anticipo, verifica la huella,
@@ -876,7 +877,7 @@ si ese período carece de normativa aplicable.
   escrituras convergen en las mismas fronteras SQL: empresa, parámetros, GRE,
   wizard, series y preferencia de país exigen actor y llave idempotente, toman
   locks por tenant y dejan auditoría. Crear o editar una serie usa el mismo
-  contrato, sin recuperar el upsert directo anterior. La lectura de parámetros respeta cero decimales y los booleanos false; el valor por defecto sólo sustituye campos ausentes.
+  contrato, sin recuperar el upsert directo anterior. Los tipos de serie se validan contra los contratos operativos y fiscales vigentes; formato/límites inválidos retornan 400 y una intención reutilizada con otro cuerpo retorna 409, sin persistir residuos. La lectura de parámetros respeta cero decimales y los booleanos false; el valor por defecto sólo sustituye campos ausentes.
 - Las mutaciones de autenticación/configuración, conversión demo y material
   fiscal sensible no son offline-capable. En Colombia, numeración, emisión,
   notas, firma, consulta y transmisión DIAN requieren backend en línea y se

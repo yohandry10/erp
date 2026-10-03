@@ -1,0 +1,15 @@
+{
+  "local_source": "artifacts/peru-integrated-20261003083835192-9052",
+  "scope": "canonical_tax_series_subset",
+  "source_base_sha": "3e9c0585ae454bfc7ff4d8fedc20f37aedc1a81d",
+  "canonical_changes_uncommitted_at_run": true,
+  "http_cases": 43,
+  "browser_passed": 1,
+  "typechecks_api_web_passed": true,
+  "restore_after_browser": true,
+  "dumps_extracted": false,
+  "limitations": [
+    "No sustituye reconstrucción completa ni CI del SHA final",
+    "No acredita depósito externo, tasas normativas, consumo fiscal completo de series ni todas las variantes CxC"
+  ]
+}

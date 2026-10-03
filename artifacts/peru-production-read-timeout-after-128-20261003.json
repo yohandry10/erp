@@ -1,0 +1,11 @@
+{
+  "checkedAt": "2026-10-03T09:00:28.752635+00:00",
+  "success": false,
+  "remoteWrites": false,
+  "expected_sha": "8417ff234bde20636d865ebf2d096c8a1bd9359b",
+  "expected_schema": 560,
+  "stage": "consulta paralela de API con plazo de 20 segundos",
+  "error": "TimeoutError",
+  "limitation": "No determina el plan efectivo ni la causa; la repetición aprobada no acredita continuidad",
+  "phase": "first_read_only_verification_after_128"
+}
