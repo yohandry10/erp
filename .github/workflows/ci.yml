@@ -189,7 +189,7 @@ jobs:
           --health-retries 20
     env:
       E2E_EPHEMERAL_LOCAL_DB: "1"
-      REQUIRED_DATABASE_SCHEMA_VERSION: "557"
+      REQUIRED_DATABASE_SCHEMA_VERSION: "558"
       PGPASSWORD: postgres
       PGHOST: 127.0.0.1
       PGPORT: 5442
@@ -226,7 +226,7 @@ jobs:
   peru-integrated:
     name: Peru API, browser and backup recovery
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 50
     needs: [install]
     steps:
       - name: Checkout

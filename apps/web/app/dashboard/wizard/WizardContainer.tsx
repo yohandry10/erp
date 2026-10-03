@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useWizard } from './useWizard'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react'
@@ -22,8 +22,11 @@ export function WizardContainer({ children }: WizardContainerProps) {
   const documentoFiscal = country.documentoFiscal || 'RUC'
   const servicioFiscal = country.servicioFiscal || 'SUNAT'
 
+  const [progressLoaded, setProgressLoaded] = useState(false)
+  const recoverProgress = async () => setProgressLoaded(await loadProgress())
+
   useEffect(() => {
-    loadProgress()
+    void recoverProgress()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -127,12 +130,16 @@ export function WizardContainer({ children }: WizardContainerProps) {
                 Cargando configuración inicial del sistema
               </p>
             </div>
-          ) : (
+          ) : progressLoaded ? (
             children
+          ) : (
+            <button type="button" onClick={() => void recoverProgress()} className="rounded border px-4 py-2">
+              Reintentar
+            </button>
           )}
 
           {/* Navigation Buttons - No mostrar si el wizard ya está completado */}
-          {!state.isLoading && !isPersistedSummary && (
+          {!state.isLoading && progressLoaded && !isPersistedSummary && (
             <div className="flex mt-10 pt-8 border-t gap-4">
               {state.currentStep > 0 && !isFinalStep && (
                 <button

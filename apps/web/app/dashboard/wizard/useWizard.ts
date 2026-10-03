@@ -35,98 +35,45 @@ export function useWizard() {
     resetWizardState,
   } = useWizardContext()
 
-  const loadProgress = async () => {
+  const loadProgress = async (): Promise<boolean> => {
     try {
       setLoading(true)
-
+      setError(null)
       const headers: HeadersInit = { 'Content-Type': 'application/json' }
-
-      // PRIMERO: Verificar si la configuración ya está completa
-      const statusResponse = await fetchApi('/api/configuration/status', {
-        headers,
-        credentials: 'include',
-      })
-
-      if (statusResponse.ok) {
-        const statusData = await statusResponse.json()
-
-        // isComplete representa preparación del ERP, no habilitación fiscal.
-        // El certificado propio del cliente se muestra por separado y no reabre onboarding.
-        const isReallyComplete = statusData.success &&
-          statusData.data?.isComplete === true &&
-          statusData.data?.ruc?.isConfigured === true &&
-          (!statusData.data?.ruc?.missingFields || statusData.data.ruc.missingFields.length === 0)
-
-        if (isReallyComplete) {
-          console.log('✅ Configuration already complete - showing summary view')
-
-          // Marcar todos los pasos como completados
-          state.steps.forEach((_, index) => {
-            markStepComplete(index)
-          })
-
-          // Ir al paso de resumen (último paso + 1 = modo resumen)
-          // Usamos un flag especial para indicar que estamos en modo resumen
-          setPersistedConfiguration(true)
-
-          // Ir al último paso (completion) que ahora mostrará el resumen
-          goToStep(state.steps.length - 1)
-
-          setLoading(false)
-          return
-        }
+      const [statusResponse, progressResponse] = await Promise.all([
+        fetchApi('/api/configuration/status', { headers, credentials: 'include' }),
+        fetchApi('/api/configuration/wizard/progress', { headers, credentials: 'include' }),
+      ])
+      if (!statusResponse.ok || !progressResponse.ok) {
+        throw new Error('No se pudo recuperar la configuración guardada. Reintenta la consulta.')
       }
-
-      // SEGUNDO: Si no está completa, cargar el progreso del wizard
-      const response = await fetchApi('/api/configuration/wizard/progress', {
-        headers,
-        credentials: 'include',
-      })
-
-      if (!response.ok) {
-        // Si no hay progreso guardado, simplemente continuar
-        console.log('No previous wizard progress found, starting fresh')
-        setLoading(false)
-        return
+      const [statusData, progressData] = await Promise.all([statusResponse.json(), progressResponse.json()])
+      if (!statusData.success || !progressData.success) {
+        throw new Error('No se pudo recuperar la configuración guardada. Reintenta la consulta.')
       }
-
-      const data = await response.json()
-
-      if (data.success && data.data) {
-        const progress = data.data
-
-        // Restaurar configuración temporal si existe
-        if (progress.configuracionTemporal) {
-          updateConfiguration(progress.configuracionTemporal)
-        }
-
-        // Restaurar pasos completados
-        if (Array.isArray(progress.pasosCompletados) && progress.pasosCompletados.length > 0) {
-          progress.pasosCompletados.forEach((stepNumber: number) => {
-            const stepIndex = stepNumber - 1
-            if (stepIndex >= 0 && stepIndex < state.steps.length) {
-              markStepComplete(stepIndex)
-            }
-          })
-
-          // Completar un paso no acredita que la configuración se haya guardado.
-          // El paso 6 corresponde a SUNAT; sólo el servidor confirma el cierre.
-          if (progress.completado === true) {
-            goToStep(state.steps.length - 1)
-            setLoading(false)
-            return
-          }
-        }
-
-        // Ir al paso actual guardado
-        if (progress.pasoActual !== undefined && progress.pasoActual > 0) {
-          goToStep(progress.pasoActual - 1)
-        }
+      const progress = progressData.data
+      // Identidad preparada del ERP y asistente finalizado son estados diferentes.
+      const coreReady = statusData.data?.isComplete === true &&
+        statusData.data?.ruc?.isConfigured === true &&
+        (!statusData.data?.ruc?.missingFields || statusData.data.ruc.missingFields.length === 0)
+      if (coreReady && progress?.completado === true) {
+        state.steps.forEach((_, index) => markStepComplete(index))
+        setPersistedConfiguration(true)
+        goToStep(state.steps.length - 1)
+        return true
       }
+      if (progress?.configuracionTemporal) updateConfiguration(progress.configuracionTemporal)
+      if (Array.isArray(progress?.pasosCompletados)) {
+        progress.pasosCompletados.forEach((stepNumber: number) => {
+          const stepIndex = stepNumber - 1
+          if (stepIndex >= 0 && stepIndex < state.steps.length) markStepComplete(stepIndex)
+        })
+      }
+      if (progress?.pasoActual > 0) goToStep(progress.pasoActual - 1)
+      return true
     } catch (error) {
-      console.error('Error loading wizard progress:', error)
-      // Don't set error on initial load failure - just log it
-      console.warn('Could not load wizard progress, starting fresh')
+      setError(error instanceof Error ? error.message : 'No se pudo recuperar la configuración guardada.')
+      return false
     } finally {
       setLoading(false)
     }

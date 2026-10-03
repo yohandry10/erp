@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-10-03T02:31:22.517Z",
+  "generated_at": "2026-10-03T03:51:37.000Z",
   "inventory": "artifacts/peru-api-operation-inventory-20260930.json",
-  "evidence": "artifacts/peru-integrated-accounting-phases-20261002",
+  "evidence": "artifacts/peru-integrated-ci-37092538107",
   "evidence_scope": "full",
-  "evidence_global_success": false,
-  "evidence_phase": "HTTP aprobado; el resultado global se conserva por separado",
+  "evidence_global_success": true,
+  "evidence_phase": "ensayo global aprobado",
   "evidence_kind": "HTTP contra Nest/PostgREST/PostgreSQL efímeros; no contiene cuerpos, tokens ni credenciales",
   "acceptance_rule": "HTTP observado no acredita aceptación funcional. verified_cases sólo recoge contratos cuyo escenario funcional pasó; conserva pendientes explícitos y no acepta toda la operación.",
   "acceptance_cases": "artifacts/peru-operation-acceptance-cases-20260930.json",
@@ -3673,7 +3673,7 @@
           "status": 400
         },
         {
-          "trace_index": 653,
+          "trace_index": 654,
           "status": 400
         }
       ],
@@ -4481,7 +4481,23 @@
       "endpoint": "/api/contabilidad/estados/balance-general",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:209",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "annual-loss-balance-sign",
+          "status": "local_candidate_corrected_pending_integration",
+          "proof": {
+            "source": "artifacts/peru-year-loss-balance-defect-20261002.json",
+            "observed": "Pérdida confirmada 7, asientos balanceados, patrimonio reportado 0 en vez de -7; balance descuadrado -7",
+            "local_only": true
+          },
+          "correction": "Candidato 558 conserva el signo acreedor/deudor de resultados acumulados en balance_general_live",
+          "pending": [
+            "contratos SQL y recorrido anual completo",
+            "integración canónica",
+            "CI y promoción/despliegue"
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -4535,7 +4551,23 @@
       "endpoint": "/api/contabilidad/estados/balance-general/formatted",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:454",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "annual-loss-balance-sign",
+          "status": "local_candidate_corrected_pending_integration",
+          "proof": {
+            "source": "artifacts/peru-year-loss-balance-defect-20261002.json",
+            "observed": "Pérdida confirmada 7, asientos balanceados, patrimonio reportado 0 en vez de -7; balance descuadrado -7",
+            "local_only": true
+          },
+          "correction": "Candidato 558 conserva el signo acreedor/deudor de resultados acumulados en balance_general_live",
+          "pending": [
+            "contratos SQL y recorrido anual completo",
+            "integración canónica",
+            "CI y promoción/despliegue"
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -5322,7 +5354,7 @@
           "status": 200
         },
         {
-          "trace_index": 650,
+          "trace_index": 651,
           "status": 200
         }
       ],
@@ -5485,7 +5517,7 @@
           "status": 201
         },
         {
-          "trace_index": 648,
+          "trace_index": 649,
           "status": 201
         }
       ],
@@ -5501,6 +5533,22 @@
           "pending": [
             "CI del cambio",
             "main y despliegue"
+          ]
+        },
+        {
+          "id": "first-customer-annual-close-accounts",
+          "status": "open_reproduced",
+          "proof": {
+            "source": "artifacts/peru-year-close-missing-accounts-20261002.json",
+            "observed_error": "ACCOUNTING_YEAR_CLOSE_ACCOUNTS_89_59_REQUIRED",
+            "local_only": true
+          },
+          "correction": "Pendiente: completar cuentas de cierre para empresas Perú sin alterar configuraciones previas",
+          "pending": [
+            "corrección y contratos SQL",
+            "cierre/reapertura/reintentos anuales por API",
+            "reportes antes/después del cierre",
+            "CI y promoción/despliegue"
           ]
         }
       ],
@@ -5564,14 +5612,18 @@
         },
         {
           "trace_index": 646,
-          "status": 201
+          "status": 404
         },
         {
           "trace_index": 647,
           "status": 201
         },
         {
-          "trace_index": 654,
+          "trace_index": 648,
+          "status": 201
+        },
+        {
+          "trace_index": 655,
           "status": 201
         }
       ],
@@ -5645,15 +5697,15 @@
           "status": 403
         },
         {
-          "trace_index": 649,
+          "trace_index": 650,
           "status": 400
         },
         {
-          "trace_index": 651,
+          "trace_index": 652,
           "status": 201
         },
         {
-          "trace_index": 652,
+          "trace_index": 653,
           "status": 201
         }
       ],
@@ -7089,7 +7141,7 @@
       "operation": "getPlanes",
       "method": "GET",
       "endpoint": "/api/demo/planes",
-      "source": "apps/erp-api/src/modules/demo/demo.controller.ts:54",
+      "source": "apps/erp-api/src/modules/demo/demo.controller.ts:53",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -7107,7 +7159,7 @@
       "operation": "convertToReal",
       "method": "POST",
       "endpoint": "/api/demo/convert-to-real",
-      "source": "apps/erp-api/src/modules/demo/demo.controller.ts:63",
+      "source": "apps/erp-api/src/modules/demo/demo.controller.ts:62",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -7125,7 +7177,7 @@
       "operation": "estadoConversion",
       "method": "GET",
       "endpoint": "/api/demo/conversiones-pendientes/:id/estado",
-      "source": "apps/erp-api/src/modules/demo/demo.controller.ts:87",
+      "source": "apps/erp-api/src/modules/demo/demo.controller.ts:86",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -7143,7 +7195,7 @@
       "operation": "listarConversionesPendientes",
       "method": "GET",
       "endpoint": "/api/demo/conversiones-pendientes",
-      "source": "apps/erp-api/src/modules/demo/demo.controller.ts:96",
+      "source": "apps/erp-api/src/modules/demo/demo.controller.ts:95",
       "existing_evidence": [
         {
           "trace_index": 129,
@@ -7170,7 +7222,7 @@
       "operation": "aprobarConversion",
       "method": "POST",
       "endpoint": "/api/demo/conversiones-pendientes/:id/aprobar",
-      "source": "apps/erp-api/src/modules/demo/demo.controller.ts:104",
+      "source": "apps/erp-api/src/modules/demo/demo.controller.ts:103",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -7188,7 +7240,7 @@
       "operation": "rechazarConversion",
       "method": "POST",
       "endpoint": "/api/demo/conversiones-pendientes/:id/rechazar",
-      "source": "apps/erp-api/src/modules/demo/demo.controller.ts:113",
+      "source": "apps/erp-api/src/modules/demo/demo.controller.ts:112",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],

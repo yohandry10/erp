@@ -1,0 +1,65 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "network": "none",
+  "project": "wypnbcptofqdmoynlonq",
+  "archiveSha256": "44f612d327dd78214b8a68e48bb0cc178e214b2e3bda916d95b396010e0b1ced",
+  "migrationSha256": "ad0fe86ba94ad0348b92980e6af523bf58f7ce281430fd8ef92a08b5bbde39ed",
+  "bundleSha256": "4a12ee8c3620f6ba6a9bac39fc8c1071b02d3acd5e657c4848ece9dd2a05239c",
+  "limits": [
+    "Sin objetos externos de Storage ni roles globales; tiempo local no acredita RTO."
+  ],
+  "restoreVerified": true,
+  "historyBefore": 557,
+  "atomicRollbackPassed": true,
+  "preservationNegativeControlsPassed": true,
+  "existingDataPreserved": true,
+  "existingFunctionsPreserved": true,
+  "tableSecurityPreserved": true,
+  "before": {
+    "project": "wypnbcptofqdmoynlonq",
+    "environment": "PROD",
+    "schema": 557,
+    "ready": true,
+    "trigger558": 0,
+    "privilegesValid": false,
+    "accountCount": 3427,
+    "missingClosingAccounts": 164,
+    "comparedData": [
+      "company",
+      "details",
+      "entries",
+      "intents",
+      "periods",
+      "permissions",
+      "rolePermissions"
+    ],
+    "functions558": []
+  },
+  "after": {
+    "project": "wypnbcptofqdmoynlonq",
+    "environment": "PROD",
+    "schema": 558,
+    "ready": true,
+    "trigger558": 1,
+    "privilegesValid": true,
+    "accountCount": 3591,
+    "missingClosingAccounts": 0,
+    "comparedData": [
+      "company",
+      "details",
+      "entries",
+      "intents",
+      "periods",
+      "permissions",
+      "rolePermissions"
+    ],
+    "functions558": [
+      "seed_peru_year_close_accounts_558",
+      "seed_peru_year_close_config_558"
+    ]
+  },
+  "sqlContractsPassed": true,
+  "historyAfter": 558,
+  "completedAt": "2026-10-03T04:40:38.622Z"
+}

@@ -1,0 +1,69 @@
+{
+  "checkedAt": "2026-10-03T03:29:10.617Z",
+  "local_only": true,
+  "remoteWrites": false,
+  "result": "defect_reproduced",
+  "source": "public.balance_general_live",
+  "endpoint": "/api/contabilidad/estados/balance-general",
+  "year": 2025,
+  "loss": -7,
+  "report": {
+    "periodo": {
+      "anio": 2025,
+      "mes": 12,
+      "descripcion": "2025-12"
+    },
+    "activos": {
+      "corrientes": {
+        "efectivo": 0,
+        "cuentas_por_cobrar": 0,
+        "inventarios": 0,
+        "otros_activos": 0,
+        "total_corrientes": 0
+      },
+      "no_corrientes": {
+        "activos_fijos": 0,
+        "depreciacion_acumulada": 0,
+        "activos_fijos_neto": 0,
+        "otros_activos": 0,
+        "total_no_corrientes": 0
+      },
+      "total_activos": 0
+    },
+    "pasivos": {
+      "corrientes": {
+        "cuentas_por_pagar": 0,
+        "tributos_por_pagar": 0,
+        "remuneraciones_por_pagar": 0,
+        "otros_pasivos": 7,
+        "total_corrientes": 7
+      },
+      "no_corrientes": {
+        "deudas_largo_plazo": 0,
+        "otros_pasivos": 0,
+        "total_no_corrientes": 0
+      },
+      "total_pasivos": 7
+    },
+    "patrimonio": {
+      "capital": 0,
+      "resultados_acumulados": 0,
+      "resultado_ejercicio": 0,
+      "total_patrimonio": 0
+    },
+    "advertencia_balance": {
+      "desbalanceado": true,
+      "diferencia": -7,
+      "mensaje": "La ecuación contable no está balanceada. Diferencia: -7.00"
+    },
+    "validacion": {
+      "ecuacion_contable": "Activos = Pasivos + Patrimonio",
+      "activos": 0,
+      "pasivos_patrimonio": 7,
+      "diferencia": -7,
+      "cuadrado": false
+    }
+  },
+  "all_entries_balanced": true,
+  "cause": "Saldo deudor de 59 descartado por least(saldo,0)"
+}
