@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-10-03T13:01:10.476Z",
-  "evidence": "artifacts/peru-integrated-local-reports-consignations-20261003",
+  "generated_at": "2026-10-03T14:08:31.299Z",
+  "evidence": "artifacts/peru-integrated-local-gre-20261003",
   "excluded": [
     "Analytics"
   ],
@@ -226,7 +226,7 @@
         },
         {
           "element": "select",
-          "label": "UsuarioTodos los usuariosLector local (lector-maestros-8a8a09a4@example.test)Lector contable local (lector-contable-4e6fb7ec@example.test)Lector de inventario local (lector-inventa",
+          "label": "UsuarioTodos los usuariosLector local (lector-maestros-dd5b9a40@example.test)Cliente (primer-cliente-76f8bdf3-6a4d-435b-8426-35f3a1d22261@example.test)Lector de inventario local (l",
           "type": null,
           "disabled": false,
           "path": null,
@@ -2212,7 +2212,7 @@
         },
         {
           "element": "select",
-          "label": "ProveedorTodos los proveedoresAlta proveedor 8a8a09a4IMPORT UI LOCAL PROVEEDORES a1735755 EDITADOMAESTRO LOCAL PROVEEDORES 94be609d EDITADO",
+          "label": "ProveedorTodos los proveedoresAlta proveedor dd5b9a40IMPORT UI LOCAL PROVEEDORES d69dbff6 EDITADOMAESTRO LOCAL PROVEEDORES 24f20fda EDITADO",
           "type": null,
           "disabled": false,
           "path": null,
@@ -2244,7 +2244,7 @@
         },
         {
           "element": "button",
-          "label": "Alta proveedor 8a8a09a4RUC: 20243022445Activoproveedor-8a8a09a4@example.test",
+          "label": "Alta proveedor dd5b9a40RUC: 20137680000Activoproveedor-dd5b9a40@example.test",
           "type": "button",
           "disabled": false,
           "path": null,
@@ -2252,7 +2252,7 @@
         },
         {
           "element": "button",
-          "label": "IMPORT UI LOCAL PROVEEDORES a1735755 EDITADORUC: 20086907730Activoui-local@example.test",
+          "label": "IMPORT UI LOCAL PROVEEDORES d69dbff6 EDITADORUC: 20006625186Activoui-local@example.test",
           "type": "button",
           "disabled": false,
           "path": null,
@@ -2260,7 +2260,7 @@
         },
         {
           "element": "button",
-          "label": "MAESTRO LOCAL PROVEEDORES 94be609d EDITADORUC: 20123456786Activoeditado-94be609d@example.test",
+          "label": "MAESTRO LOCAL PROVEEDORES 24f20fda EDITADORUC: 20123456786Activoeditado-24f20fda@example.test",
           "type": "button",
           "disabled": false,
           "path": null,
@@ -10297,7 +10297,7 @@
         },
         {
           "element": "button",
-          "label": "Editar establecimiento Sucursal apertura 94be609d",
+          "label": "Editar establecimiento Sucursal apertura 24f20fda",
           "type": null,
           "disabled": false,
           "path": null,
@@ -10305,7 +10305,7 @@
         },
         {
           "element": "button",
-          "label": "Desactivar establecimiento Sucursal apertura 94be609d",
+          "label": "Desactivar establecimiento Sucursal apertura 24f20fda",
           "type": null,
           "disabled": false,
           "path": null,
@@ -10313,7 +10313,7 @@
         },
         {
           "element": "button",
-          "label": "Asignar Casa matriz a lector-contable-4e6fb7ec@example.test",
+          "label": "Asignar Casa matriz a lector-contable-c861bd9e@example.test",
           "type": null,
           "disabled": false,
           "path": null,
@@ -10321,7 +10321,7 @@
         },
         {
           "element": "button",
-          "label": "Asignar Sucursal apertura 94be609d a lector-contable-4e6fb7ec@example.test",
+          "label": "Asignar Sucursal apertura 24f20fda a lector-contable-c861bd9e@example.test",
           "type": null,
           "disabled": false,
           "path": null,
@@ -10329,7 +10329,7 @@
         },
         {
           "element": "button",
-          "label": "Asignar Casa matriz a lector-inventario-45fe8075@example.test",
+          "label": "Asignar Casa matriz a lector-inventario-f58e7e51@example.test",
           "type": null,
           "disabled": false,
           "path": null,
@@ -10337,7 +10337,7 @@
         },
         {
           "element": "button",
-          "label": "Asignar Sucursal apertura 94be609d a lector-inventario-45fe8075@example.test",
+          "label": "Asignar Sucursal apertura 24f20fda a lector-inventario-f58e7e51@example.test",
           "type": null,
           "disabled": false,
           "path": null,
@@ -10345,7 +10345,7 @@
         },
         {
           "element": "button",
-          "label": "Asignar Casa matriz a primer-cliente-706db5c8-f66b-4b26-85cb-f2e9512b79f0@example.test",
+          "label": "Asignar Casa matriz a primer-cliente-76f8bdf3-6a4d-435b-8426-35f3a1d22261@example.test",
           "type": null,
           "disabled": false,
           "path": null,
@@ -10353,7 +10353,7 @@
         },
         {
           "element": "button",
-          "label": "Asignar Sucursal apertura 94be609d a primer-cliente-706db5c8-f66b-4b26-85cb-f2e9512b79f0@example.test",
+          "label": "Asignar Sucursal apertura 24f20fda a primer-cliente-76f8bdf3-6a4d-435b-8426-35f3a1d22261@example.test",
           "type": null,
           "disabled": false,
           "path": null,
@@ -12064,7 +12064,7 @@
         },
         {
           "element": "button",
-          "label": "Ver cronograma AF-4E6FB7EC",
+          "label": "Ver cronograma AF-C861BD9E",
           "type": "button",
           "disabled": false,
           "path": null,
@@ -15565,12 +15565,10 @@
               "defects": [
                 {
                   "id": "consignment-ui-new-identical-delivery-replays-old-record",
-                  "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
+                  "status": "corrected_merged_main_deployment_verified",
                   "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
                   "correction": "Candidato web conserva intención durante fallo y la libera después de éxito para permitir otra entrega idéntica.",
-                  "pending": [
-                    "CI exacto, promoción DB-first 563, main y despliegue"
-                  ]
+                  "pending": []
                 }
               ]
             }
@@ -16373,12 +16371,10 @@
               "defects": [
                 {
                   "id": "consolidation-domain-rejections-return-500",
-                  "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
+                  "status": "corrected_merged_main_deployment_verified",
                   "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
                   "correction": "Candidato distingue colisión 409, pertenencia 403, estado/datos 400 y fallo de infraestructura 503; no cambia escrituras ni límites.",
-                  "pending": [
-                    "CI exacto, promoción DB-first 563, main y despliegue"
-                  ]
+                  "pending": []
                 }
               ]
             }
@@ -16435,21 +16431,17 @@
               "defects": [
                 {
                   "id": "consolidation-domain-rejections-return-500",
-                  "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
+                  "status": "corrected_merged_main_deployment_verified",
                   "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
                   "correction": "Candidato distingue colisión 409, pertenencia 403, estado/datos 400 y fallo de infraestructura 503; no cambia escrituras ni límites.",
-                  "pending": [
-                    "CI exacto, promoción DB-first 563, main y despliegue"
-                  ]
+                  "pending": []
                 },
                 {
                   "id": "consolidation-controller-rate-unavailable-in-ui",
-                  "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
+                  "status": "corrected_merged_main_deployment_verified",
                   "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
                   "correction": "Candidato selecciona miembros activos cuya moneda necesita conversión, incluida la controladora.",
-                  "pending": [
-                    "CI exacto, promoción DB-first 563, main y despliegue"
-                  ]
+                  "pending": []
                 }
               ]
             }
@@ -16506,12 +16498,10 @@
               "defects": [
                 {
                   "id": "consolidation-domain-rejections-return-500",
-                  "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
+                  "status": "corrected_merged_main_deployment_verified",
                   "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
                   "correction": "Candidato distingue colisión 409, pertenencia 403, estado/datos 400 y fallo de infraestructura 503; no cambia escrituras ni límites.",
-                  "pending": [
-                    "CI exacto, promoción DB-first 563, main y despliegue"
-                  ]
+                  "pending": []
                 }
               ]
             }
@@ -16542,12 +16532,10 @@
               "defects": [
                 {
                   "id": "consolidation-domain-rejections-return-500",
-                  "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
+                  "status": "corrected_merged_main_deployment_verified",
                   "proof": "artifacts/peru-reports-consignations-defects-20261003/defects.json",
                   "correction": "Candidato distingue colisión 409, pertenencia 403, estado/datos 400 y fallo de infraestructura 503; no cambia escrituras ni límites.",
-                  "pending": [
-                    "CI exacto, promoción DB-first 563, main y despliegue"
-                  ]
+                  "pending": []
                 }
               ]
             }
@@ -16605,12 +16593,10 @@
               "defects": [
                 {
                   "id": "consolidation-report-missing-service-select",
-                  "status": "canonical_full_local_passed_ci_promotion_main_deployment_pending",
+                  "status": "corrected_merged_main_deployment_verified",
                   "proof": "artifacts/peru-reports-consolidation-read-baseline-20261003/reports-consignations.json",
                   "correction": "Candidato local concede únicamente SELECT de los tres orígenes de consolidación a service_role; preserva escrituras RPC y no concede lectura a anon/authenticated.",
-                  "pending": [
-                    "CI exacto, promoción DB-first 563, main y despliegue"
-                  ]
+                  "pending": []
                 }
               ]
             }
@@ -23551,21 +23537,97 @@
         {
           "method": "POST",
           "endpoint": "/api/gre/guias",
-          "source": "apps/web/components/modals/GreModal.tsx:151",
+          "source": "apps/web/components/modals/GreModal.tsx:156",
           "contracts": [
             {
               "method": "POST",
               "endpoint": "/api/gre/guias",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
-              "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-manual-creation-persistence",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "primera empresa no demo crea borrador y líneas reales; inválidos no insertan",
+                    "UI acepta peso 2 kg y documento manual; con certificado desechable firma y persiste tras recarga"
+                  ]
+                },
+                {
+                  "id": "gre-intent-replay-conflict",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "replay y concurrencia recuperan un ID y un detalle; conflicto 409 conserva documento",
+                    "UI recupera respuesta perdida sin otra fila; nueva intención idéntica crea otro ID"
+                  ]
+                },
+                {
+                  "id": "gre-unsigned-and-signed-local-xml",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "sin PFX falla cerrado con error durable sin XML",
+                    "PFX desechable configurado por wizard; UBL real firmado con emisor y bienes persistidos"
+                  ]
+                },
+                {
+                  "id": "gre-reader-permissions",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "lector real consulta y no crea, anula, configura ni descarga XML"
+                  ]
+                },
+                {
+                  "id": "gre-infrastructure-error-recovery",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "REVOKE EXECUTE local produce 503 genérico sin insertar; regrant y misma clave recuperan operación"
+                  ]
+                }
               ],
-              "defects": []
+              "pending_checks": [
+                "altas a partir de CPE/pedido y variantes de transporte/origen/bienes ofrecidas",
+                "otras mutaciones concurrentes y recuperación tras cerrar completamente el navegador",
+                "firma explícita de borrador previamente creado; otros motivos/modalidades y firma con proveedor del futuro cliente",
+                "otros roles, permisos de firma/transmisión y worker firmado",
+                "otros fallos de red/Storage/autoridad externa"
+              ],
+              "defects": [
+                {
+                  "id": "gre-idempotency-collision-returns-400",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
+                  "correction": "Fuentes canónicas distingue conflictos de idempotencia con HTTP 409 y conserva estado persistido.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-rpc-infrastructure-failure-returns-400",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
+                  "correction": "Fuentes canónicas distingue indisponibilidad RPC con HTTP 503 y mensaje sin detalles internos; misma clave recupera operación tras restaurar EXECUTE.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-manual-weight-html-step-blocks-valid-values",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
+                  "correction": "Fuentes canónicas alinea step 0.001 con mínimo 0.001 y precisión de tres decimales del DTO.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-manual-recipient-document-unavailable",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
+                  "correction": "Fuentes canónicas ofrece tipo/documento del destinatario manual y lo persiste en datosAdicionales para construir UBL firmado.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -28377,7 +28439,7 @@
         },
         {
           "element": "select",
-          "label": "ClienteTodosIMPORT UI LOCAL CLIENTES a1735755 EDITADOAlta cliente 8a8a09a4MAESTRO LOCAL CLIENTES 94be609d EDITADO",
+          "label": "ClienteTodosIMPORT UI LOCAL CLIENTES d69dbff6 EDITADOAlta cliente dd5b9a40MAESTRO LOCAL CLIENTES 24f20fda EDITADO",
           "type": null,
           "disabled": false,
           "path": null,
@@ -31796,19 +31858,24 @@
         {
           "method": "GET",
           "endpoint": "/api/gre/guias",
-          "source": "apps/web/app/dashboard/gre/page.tsx:88",
+          "source": "apps/web/app/dashboard/gre/page.tsx:89",
           "contracts": [
             {
               "method": "GET",
               "endpoint": "/api/gre/guias",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-queries-and-tenant-isolation",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "consulta, búsqueda, filtros y detalle usan cabecera/líneas reales",
+                    "operaciones ajenas 404 sin cambios ni fuga; listado de otra empresa vacío"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "otros filtros, paginación si existe y alcance por sucursal/almacén cuando corresponda"
               ],
               "defects": []
             }
@@ -31817,42 +31884,188 @@
         {
           "method": "GET",
           "endpoint": "/api/gre/reporte",
-          "source": "apps/web/app/dashboard/gre/page.tsx:133",
+          "source": "apps/web/app/dashboard/gre/page.tsx:134",
           "contracts": [
             {
               "method": "GET",
               "endpoint": "/api/gre/reporte",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
-              "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-csv-real-filtered-safe",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "CSV de registros reales excluye empresa y período ajenos",
+                    "neutraliza =1+1 y conserva comillas, comas y saltos"
+                  ]
+                }
               ],
-              "defects": []
+              "pending_checks": [
+                "otras variantes de exportación, datos y acceso lector al reporte"
+              ],
+              "defects": [
+                {
+                  "id": "gre-csv-untrusted-cell-keeps-formula",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-csv-defect-20261003/gre-operations.json",
+                  "correction": "Escape CSV neutraliza prefijos de fórmula, conserva comillas, comas y saltos, conforme al exportador bancario existente.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:dynamic/pdf",
+          "source": "apps/web/app/dashboard/gre/page.tsx:150",
+          "contracts": [
+            {
+              "method": "GET",
+              "endpoint": "/api/gre/guias/:id/pdf",
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-queries-and-tenant-isolation",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "consulta, búsqueda, filtros y detalle usan cabecera/líneas reales",
+                    "operaciones ajenas 404 sin cambios ni fuga; listado de otra empresa vacío"
+                  ]
+                },
+                {
+                  "id": "gre-pdf-real-document",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "PDF binario con cabecera y bienes; emisor firmado permanece congelado tras editar empresa",
+                    "80 bienes en cuatro páginas; revisión visual de primera y última sin recortes",
+                    "UI muestra bienes, descarga PDF y entrega el mismo tipo de documento al iframe de impresión"
+                  ]
+                }
+              ],
+              "pending_checks": [
+                "otros filtros, paginación si existe y alcance por sucursal/almacén cuando corresponda",
+                "otras longitudes y caracteres; impresora física y botón de descarga desde listado"
+              ],
+              "defects": [
+                {
+                  "id": "gre-pdf-endpoint-delivers-text",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
+                  "correction": "Fuentes canónicas entrega PDF A4 binario con emisor, estado, transporte y todos los bienes; emisor firmado se obtiene del XML congelado. El cliente debe conservar bytes/extensión PDF al descargar y ofrecer la acción en listado.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-view-and-print-omit-transported-items",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-print.json",
+                  "correction": "Fuentes canónicas renderizan bienes y cantidades; impresión consume el PDF con datos del registro.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                }
+              ]
             }
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/gre/guias",
-          "source": "apps/web/components/modals/GreModal.tsx:151",
+          "source": "apps/web/components/modals/GreModal.tsx:156",
           "contracts": [
             {
               "method": "POST",
               "endpoint": "/api/gre/guias",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
-              "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-manual-creation-persistence",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "primera empresa no demo crea borrador y líneas reales; inválidos no insertan",
+                    "UI acepta peso 2 kg y documento manual; con certificado desechable firma y persiste tras recarga"
+                  ]
+                },
+                {
+                  "id": "gre-intent-replay-conflict",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "replay y concurrencia recuperan un ID y un detalle; conflicto 409 conserva documento",
+                    "UI recupera respuesta perdida sin otra fila; nueva intención idéntica crea otro ID"
+                  ]
+                },
+                {
+                  "id": "gre-unsigned-and-signed-local-xml",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "sin PFX falla cerrado con error durable sin XML",
+                    "PFX desechable configurado por wizard; UBL real firmado con emisor y bienes persistidos"
+                  ]
+                },
+                {
+                  "id": "gre-reader-permissions",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "lector real consulta y no crea, anula, configura ni descarga XML"
+                  ]
+                },
+                {
+                  "id": "gre-infrastructure-error-recovery",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "REVOKE EXECUTE local produce 503 genérico sin insertar; regrant y misma clave recuperan operación"
+                  ]
+                }
               ],
-              "defects": []
+              "pending_checks": [
+                "altas a partir de CPE/pedido y variantes de transporte/origen/bienes ofrecidas",
+                "otras mutaciones concurrentes y recuperación tras cerrar completamente el navegador",
+                "firma explícita de borrador previamente creado; otros motivos/modalidades y firma con proveedor del futuro cliente",
+                "otros roles, permisos de firma/transmisión y worker firmado",
+                "otros fallos de red/Storage/autoridad externa"
+              ],
+              "defects": [
+                {
+                  "id": "gre-idempotency-collision-returns-400",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
+                  "correction": "Fuentes canónicas distingue conflictos de idempotencia con HTTP 409 y conserva estado persistido.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-rpc-infrastructure-failure-returns-400",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
+                  "correction": "Fuentes canónicas distingue indisponibilidad RPC con HTTP 503 y mensaje sin detalles internos; misma clave recupera operación tras restaurar EXECUTE.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-manual-weight-html-step-blocks-valid-values",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
+                  "correction": "Fuentes canónicas alinea step 0.001 con mínimo 0.001 y precisión de tres decimales del DTO.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-manual-recipient-document-unavailable",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
+                  "correction": "Fuentes canónicas ofrece tipo/documento del destinatario manual y lo persiste en datosAdicionales para construir UBL firmado.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -32032,75 +32245,143 @@
         {
           "method": "POST",
           "endpoint": "/api/gre/guias/:dynamic/:dynamic",
-          "source": "apps/web/components/modals/GreViewModal.tsx:60",
+          "source": "apps/web/components/modals/GreViewModal.tsx:61",
           "contracts": [
             {
               "method": "POST",
               "endpoint": "/api/gre/guias/:id/firmar",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
-              "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-queries-and-tenant-isolation",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "consulta, búsqueda, filtros y detalle usan cabecera/líneas reales",
+                    "operaciones ajenas 404 sin cambios ni fuga; listado de otra empresa vacío"
+                  ]
+                },
+                {
+                  "id": "gre-unsigned-and-signed-local-xml",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "sin PFX falla cerrado con error durable sin XML",
+                    "PFX desechable configurado por wizard; UBL real firmado con emisor y bienes persistidos"
+                  ]
+                },
+                {
+                  "id": "gre-annulment-terminal-state",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "clave/motivo inválidos rechazados; anulación y replay terminales; firma posterior rechazada"
+                  ]
+                }
               ],
-              "defects": []
+              "pending_checks": [
+                "otros filtros, paginación si existe y alcance por sucursal/almacén cuando corresponda",
+                "firma explícita de borrador previamente creado; otros motivos/modalidades y firma con proveedor del futuro cliente",
+                "anulación de otros estados ofrecidos y recorrido de anulación UI"
+              ],
+              "defects": [
+                {
+                  "id": "gre-manual-recipient-document-unavailable",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
+                  "correction": "Fuentes canónicas ofrece tipo/documento del destinatario manual y lo persiste en datosAdicionales para construir UBL firmado.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                }
+              ]
             },
             {
               "method": "POST",
               "endpoint": "/api/gre/guias/:id/enviar-sunat",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-external-transmission-fails-closed",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "borrador y firmado sin credenciales externas no fabrican ticket, CDR ni aceptación",
+                    "consulta del último estado no transmite"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "aceptación/acuse SUNAT y reintentos tras rechazo/transitorio externo; acceso autorizado del futuro cliente"
               ],
               "defects": []
             },
             {
               "method": "POST",
               "endpoint": "/api/gre/guias/:id/reenviar",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-external-transmission-fails-closed",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "borrador y firmado sin credenciales externas no fabrican ticket, CDR ni aceptación",
+                    "consulta del último estado no transmite"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "aceptación/acuse SUNAT y reintentos tras rechazo/transitorio externo; acceso autorizado del futuro cliente"
               ],
               "defects": []
             },
             {
               "method": "POST",
               "endpoint": "/api/gre/guias/:id/consultar-sunat",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-external-transmission-fails-closed",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "borrador y firmado sin credenciales externas no fabrican ticket, CDR ni aceptación",
+                    "consulta del último estado no transmite"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "aceptación/acuse SUNAT y reintentos tras rechazo/transitorio externo; acceso autorizado del futuro cliente"
               ],
               "defects": []
             },
             {
               "method": "POST",
               "endpoint": "/api/gre/guias/:id/anular",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-queries-and-tenant-isolation",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "consulta, búsqueda, filtros y detalle usan cabecera/líneas reales",
+                    "operaciones ajenas 404 sin cambios ni fuga; listado de otra empresa vacío"
+                  ]
+                },
+                {
+                  "id": "gre-annulment-terminal-state",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "clave/motivo inválidos rechazados; anulación y replay terminales; firma posterior rechazada"
+                  ]
+                },
+                {
+                  "id": "gre-reader-permissions",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "lector real consulta y no crea, anula, configura ni descarga XML"
+                  ]
+                }
+              ],
               "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+                "otros filtros, paginación si existe y alcance por sucursal/almacén cuando corresponda",
+                "anulación de otros estados ofrecidos y recorrido de anulación UI",
+                "otros roles, permisos de firma/transmisión y worker firmado"
               ],
               "defects": []
             }
@@ -32109,42 +32390,173 @@
         {
           "method": "GET",
           "endpoint": "/api/gre/guias/:dynamic",
-          "source": "apps/web/components/modals/GreViewModal.tsx:76",
+          "source": "apps/web/components/modals/GreViewModal.tsx:77",
           "contracts": [
             {
               "method": "GET",
               "endpoint": "/api/gre/guias/:id",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
-              "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-manual-creation-persistence",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "primera empresa no demo crea borrador y líneas reales; inválidos no insertan",
+                    "UI acepta peso 2 kg y documento manual; con certificado desechable firma y persiste tras recarga"
+                  ]
+                },
+                {
+                  "id": "gre-queries-and-tenant-isolation",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "consulta, búsqueda, filtros y detalle usan cabecera/líneas reales",
+                    "operaciones ajenas 404 sin cambios ni fuga; listado de otra empresa vacío"
+                  ]
+                },
+                {
+                  "id": "gre-pdf-real-document",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "PDF binario con cabecera y bienes; emisor firmado permanece congelado tras editar empresa",
+                    "80 bienes en cuatro páginas; revisión visual de primera y última sin recortes",
+                    "UI muestra bienes, descarga PDF y entrega el mismo tipo de documento al iframe de impresión"
+                  ]
+                },
+                {
+                  "id": "gre-reader-permissions",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "lector real consulta y no crea, anula, configura ni descarga XML"
+                  ]
+                }
               ],
-              "defects": []
+              "pending_checks": [
+                "altas a partir de CPE/pedido y variantes de transporte/origen/bienes ofrecidas",
+                "otros filtros, paginación si existe y alcance por sucursal/almacén cuando corresponda",
+                "otras longitudes y caracteres; impresora física y botón de descarga desde listado",
+                "otros roles, permisos de firma/transmisión y worker firmado"
+              ],
+              "defects": [
+                {
+                  "id": "gre-view-and-print-omit-transported-items",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-print.json",
+                  "correction": "Fuentes canónicas renderizan bienes y cantidades; impresión consume el PDF con datos del registro.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                }
+              ]
             }
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/gre/guias/:dynamic/pdf",
-          "source": "apps/web/components/modals/GreViewModal.tsx:96",
+          "source": "apps/web/components/modals/GreViewModal.tsx:97",
           "contracts": [
             {
               "method": "GET",
               "endpoint": "/api/gre/guias/:id/pdf",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
-              "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-queries-and-tenant-isolation",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "consulta, búsqueda, filtros y detalle usan cabecera/líneas reales",
+                    "operaciones ajenas 404 sin cambios ni fuga; listado de otra empresa vacío"
+                  ]
+                },
+                {
+                  "id": "gre-pdf-real-document",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "PDF binario con cabecera y bienes; emisor firmado permanece congelado tras editar empresa",
+                    "80 bienes en cuatro páginas; revisión visual de primera y última sin recortes",
+                    "UI muestra bienes, descarga PDF y entrega el mismo tipo de documento al iframe de impresión"
+                  ]
+                }
               ],
-              "defects": []
+              "pending_checks": [
+                "otros filtros, paginación si existe y alcance por sucursal/almacén cuando corresponda",
+                "otras longitudes y caracteres; impresora física y botón de descarga desde listado"
+              ],
+              "defects": [
+                {
+                  "id": "gre-pdf-endpoint-delivers-text",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
+                  "correction": "Fuentes canónicas entrega PDF A4 binario con emisor, estado, transporte y todos los bienes; emisor firmado se obtiene del XML congelado. El cliente debe conservar bytes/extensión PDF al descargar y ofrecer la acción en listado.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-view-and-print-omit-transported-items",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-print.json",
+                  "correction": "Fuentes canónicas renderizan bienes y cantidades; impresión consume el PDF con datos del registro.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:dynamic/pdf",
+          "source": "apps/web/components/modals/GreViewModal.tsx:127",
+          "contracts": [
+            {
+              "method": "GET",
+              "endpoint": "/api/gre/guias/:id/pdf",
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-queries-and-tenant-isolation",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "consulta, búsqueda, filtros y detalle usan cabecera/líneas reales",
+                    "operaciones ajenas 404 sin cambios ni fuga; listado de otra empresa vacío"
+                  ]
+                },
+                {
+                  "id": "gre-pdf-real-document",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "PDF binario con cabecera y bienes; emisor firmado permanece congelado tras editar empresa",
+                    "80 bienes en cuatro páginas; revisión visual de primera y última sin recortes",
+                    "UI muestra bienes, descarga PDF y entrega el mismo tipo de documento al iframe de impresión"
+                  ]
+                }
+              ],
+              "pending_checks": [
+                "otros filtros, paginación si existe y alcance por sucursal/almacén cuando corresponda",
+                "otras longitudes y caracteres; impresora física y botón de descarga desde listado"
+              ],
+              "defects": [
+                {
+                  "id": "gre-pdf-endpoint-delivers-text",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
+                  "correction": "Fuentes canónicas entrega PDF A4 binario con emisor, estado, transporte y todos los bienes; emisor firmado se obtiene del XML congelado. El cliente debe conservar bytes/extensión PDF al descargar y ofrecer la acción en listado.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-view-and-print-omit-transported-items",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-print.json",
+                  "correction": "Fuentes canónicas renderizan bienes y cantidades; impresión consume el PDF con datos del registro.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -32248,21 +32660,97 @@
         {
           "method": "POST",
           "endpoint": "/api/gre/guias",
-          "source": "apps/web/components/modals/GreModal.tsx:151",
+          "source": "apps/web/components/modals/GreModal.tsx:156",
           "contracts": [
             {
               "method": "POST",
               "endpoint": "/api/gre/guias",
-              "result": "pending_functional_execution",
-              "verified_cases": [],
-              "pending_checks": [
-                "persistencia y resultado funcional",
-                "permisos",
-                "aislamiento",
-                "validaciones",
-                "recuperación de errores"
+              "result": "functional_cases_verified_with_remaining_checks",
+              "verified_cases": [
+                {
+                  "id": "gre-manual-creation-persistence",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "primera empresa no demo crea borrador y líneas reales; inválidos no insertan",
+                    "UI acepta peso 2 kg y documento manual; con certificado desechable firma y persiste tras recarga"
+                  ]
+                },
+                {
+                  "id": "gre-intent-replay-conflict",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "replay y concurrencia recuperan un ID y un detalle; conflicto 409 conserva documento",
+                    "UI recupera respuesta perdida sin otra fila; nueva intención idéntica crea otro ID"
+                  ]
+                },
+                {
+                  "id": "gre-unsigned-and-signed-local-xml",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "sin PFX falla cerrado con error durable sin XML",
+                    "PFX desechable configurado por wizard; UBL real firmado con emisor y bienes persistidos"
+                  ]
+                },
+                {
+                  "id": "gre-reader-permissions",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "lector real consulta y no crea, anula, configura ni descarga XML"
+                  ]
+                },
+                {
+                  "id": "gre-infrastructure-error-recovery",
+                  "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+                  "verified_checks": [
+                    "REVOKE EXECUTE local produce 503 genérico sin insertar; regrant y misma clave recuperan operación"
+                  ]
+                }
               ],
-              "defects": []
+              "pending_checks": [
+                "altas a partir de CPE/pedido y variantes de transporte/origen/bienes ofrecidas",
+                "otras mutaciones concurrentes y recuperación tras cerrar completamente el navegador",
+                "firma explícita de borrador previamente creado; otros motivos/modalidades y firma con proveedor del futuro cliente",
+                "otros roles, permisos de firma/transmisión y worker firmado",
+                "otros fallos de red/Storage/autoridad externa"
+              ],
+              "defects": [
+                {
+                  "id": "gre-idempotency-collision-returns-400",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
+                  "correction": "Fuentes canónicas distingue conflictos de idempotencia con HTTP 409 y conserva estado persistido.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-rpc-infrastructure-failure-returns-400",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-api-defects-20261003/gre-operations.json",
+                  "correction": "Fuentes canónicas distingue indisponibilidad RPC con HTTP 503 y mensaje sin detalles internos; misma clave recupera operación tras restaurar EXECUTE.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-manual-weight-html-step-blocks-valid-values",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
+                  "correction": "Fuentes canónicas alinea step 0.001 con mínimo 0.001 y precisión de tres decimales del DTO.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                },
+                {
+                  "id": "gre-manual-recipient-document-unavailable",
+                  "status": "canonical_full_local_passed_ci_main_deployment_pending",
+                  "proof": "artifacts/peru-gre-ui-defects-20261003/browser-gre-create.json",
+                  "correction": "Fuentes canónicas ofrece tipo/documento del destinatario manual y lo persiste en datosAdicionales para construir UBL firmado.",
+                  "pending": [
+                    "CI exacto, integración en main y despliegue de GRE"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -34399,7 +34887,7 @@
             {
               "method": "PUT",
               "endpoint": "/api/configuration/empresa",
-              "result": "pending_functional_execution",
+              "result": "http_contract_observed_not_full_acceptance",
               "verified_cases": [],
               "pending_checks": [
                 "persistencia y resultado funcional",
@@ -34766,7 +35254,7 @@
             {
               "method": "PUT",
               "endpoint": "/api/configuration/empresa",
-              "result": "pending_functional_execution",
+              "result": "http_contract_observed_not_full_acceptance",
               "verified_cases": [],
               "pending_checks": [
                 "persistencia y resultado funcional",
@@ -36040,11 +36528,7 @@
         "actor": "Primer ADMIN Perú no demo, sin privilegio global",
         "status": 200,
         "errors": [],
-        "expectedRestriction": false,
-        "recovery": {
-          "reason": "page.goto: net::ERR_CONNECTION_RESET at http://127.0.0.1:3125/dashboard/inventario/productos/nuevo/",
-          "evidence": "Server is approaching the used memory threshold, restarting..."
-        }
+        "expectedRestriction": false
       },
       "result": "visible_controls_pending_functional_execution",
       "controls": [
@@ -36486,7 +36970,11 @@
         "actor": "Primer ADMIN Perú no demo, sin privilegio global",
         "status": 200,
         "errors": [],
-        "expectedRestriction": false
+        "expectedRestriction": false,
+        "recovery": {
+          "reason": "page.goto: net::ERR_CONNECTION_RESET at http://127.0.0.1:3125/dashboard/inventario/recepciones/",
+          "evidence": "Server is approaching the used memory threshold, restarting..."
+        }
       },
       "result": "visible_controls_pending_functional_execution",
       "controls": [
@@ -44503,7 +44991,7 @@
         },
         {
           "element": "select",
-          "label": "Selecciona productoFAL-45FE8075 · Faltante local 45fe8075APERTURA-94BE609D · Producto apertura 94be609dIC-45FE8075 · Producto ciclo 45fe8075",
+          "label": "Selecciona productoFAL-F58E7E51 · Faltante local f58e7e51APERTURA-24F20FDA · Producto apertura 24f20fdaIC-F58E7E51 · Producto ciclo f58e7e51",
           "type": null,
           "disabled": false,
           "path": null,

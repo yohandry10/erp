@@ -2121,6 +2121,315 @@
       "pending_checks": [
         "filtros, exportación e impresión que existan y otros permisos"
       ]
+    },
+    {
+      "id": "gre-manual-creation-persistence",
+      "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "GRE: alta interna",
+        "GRE: DTO inválido"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id"
+        }
+      ],
+      "verified_checks": [
+        "primera empresa no demo crea borrador y líneas reales; inválidos no insertan",
+        "UI acepta peso 2 kg y documento manual; con certificado desechable firma y persiste tras recarga"
+      ],
+      "pending_checks": [
+        "altas a partir de CPE/pedido y variantes de transporte/origen/bienes ofrecidas"
+      ]
+    },
+    {
+      "id": "gre-intent-replay-conflict",
+      "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "GRE: replay y concurrencia",
+        "GRE: colisión de clave"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias"
+        }
+      ],
+      "verified_checks": [
+        "replay y concurrencia recuperan un ID y un detalle; conflicto 409 conserva documento",
+        "UI recupera respuesta perdida sin otra fila; nueva intención idéntica crea otro ID"
+      ],
+      "pending_checks": [
+        "otras mutaciones concurrentes y recuperación tras cerrar completamente el navegador"
+      ]
+    },
+    {
+      "id": "gre-queries-and-tenant-isolation",
+      "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "GRE: detalle, búsqueda",
+        "GRE: consulta, firma"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias/:id/firmar"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id/xml"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id/pdf"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias/:id/anular"
+        }
+      ],
+      "verified_checks": [
+        "consulta, búsqueda, filtros y detalle usan cabecera/líneas reales",
+        "operaciones ajenas 404 sin cambios ni fuga; listado de otra empresa vacío"
+      ],
+      "pending_checks": [
+        "otros filtros, paginación si existe y alcance por sucursal/almacén cuando corresponda"
+      ]
+    },
+    {
+      "id": "gre-unsigned-and-signed-local-xml",
+      "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "GRE: firma sin certificado",
+        "GRE: cliente configura",
+        "GRE: XML descargado"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias/:id/firmar"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id/xml"
+        }
+      ],
+      "verified_checks": [
+        "sin PFX falla cerrado con error durable sin XML",
+        "PFX desechable configurado por wizard; UBL real firmado con emisor y bienes persistidos"
+      ],
+      "pending_checks": [
+        "firma explícita de borrador previamente creado; otros motivos/modalidades y firma con proveedor del futuro cliente"
+      ]
+    },
+    {
+      "id": "gre-pdf-real-document",
+      "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "GRE: representación /pdf",
+        "GRE: PDF firmado conserva",
+        "GRE: PDF multipágina"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id/pdf"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id"
+        }
+      ],
+      "verified_checks": [
+        "PDF binario con cabecera y bienes; emisor firmado permanece congelado tras editar empresa",
+        "80 bienes en cuatro páginas; revisión visual de primera y última sin recortes",
+        "UI muestra bienes, descarga PDF y entrega el mismo tipo de documento al iframe de impresión"
+      ],
+      "pending_checks": [
+        "otras longitudes y caracteres; impresora física y botón de descarga desde listado"
+      ]
+    },
+    {
+      "id": "gre-csv-real-filtered-safe",
+      "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "GRE: reporte CSV contiene",
+        "GRE: CSV neutraliza"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/reporte"
+        }
+      ],
+      "verified_checks": [
+        "CSV de registros reales excluye empresa y período ajenos",
+        "neutraliza =1+1 y conserva comillas, comas y saltos"
+      ],
+      "pending_checks": [
+        "otras variantes de exportación, datos y acceso lector al reporte"
+      ]
+    },
+    {
+      "id": "gre-auto-configuration-and-statistics",
+      "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "GRE: estadísticas cuentan",
+        "GRE: configuración y replay"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/stats"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/auto-config"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/auto-config"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/evaluate-auto-creation"
+        }
+      ],
+      "verified_checks": [
+        "estadísticas por empresa; umbral, habilitación y replay persistidos",
+        "evaluación bajo/en/en exceso de umbral y deshabilitada"
+      ],
+      "pending_checks": [
+        "creación automática integrada con ventas/despacho y otras reglas configurables"
+      ]
+    },
+    {
+      "id": "gre-annulment-terminal-state",
+      "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "GRE: mutación sin clave",
+        "GRE: anulación y replay"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias/:id/anular"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias/:id/firmar"
+        }
+      ],
+      "verified_checks": [
+        "clave/motivo inválidos rechazados; anulación y replay terminales; firma posterior rechazada"
+      ],
+      "pending_checks": [
+        "anulación de otros estados ofrecidos y recorrido de anulación UI"
+      ]
+    },
+    {
+      "id": "gre-reader-permissions",
+      "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "GRE: usuario lector consulta"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias/:id/anular"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/auto-config"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id/xml"
+        }
+      ],
+      "verified_checks": [
+        "lector real consulta y no crea, anula, configura ni descarga XML"
+      ],
+      "pending_checks": [
+        "otros roles, permisos de firma/transmisión y worker firmado"
+      ]
+    },
+    {
+      "id": "gre-infrastructure-error-recovery",
+      "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "GRE: recuperación de infraestructura"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias"
+        }
+      ],
+      "verified_checks": [
+        "REVOKE EXECUTE local produce 503 genérico sin insertar; regrant y misma clave recuperan operación"
+      ],
+      "pending_checks": [
+        "otros fallos de red/Storage/autoridad externa"
+      ]
+    },
+    {
+      "id": "gre-external-transmission-fails-closed",
+      "source": "scripts/ci/test-peru-gre-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "GRE: enviar, reenviar",
+        "GRE: transmisión y consulta"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias/:id/enviar-sunat"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias/:id/reenviar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/gre/guias/:id/consultar-sunat"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias/:id/estado-sunat"
+        }
+      ],
+      "verified_checks": [
+        "borrador y firmado sin credenciales externas no fabrican ticket, CDR ni aceptación",
+        "consulta del último estado no transmite"
+      ],
+      "pending_checks": [
+        "aceptación/acuse SUNAT y reintentos tras rechazo/transitorio externo; acceso autorizado del futuro cliente"
+      ]
     }
   ]
 }
