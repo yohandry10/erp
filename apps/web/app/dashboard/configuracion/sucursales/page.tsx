@@ -1,83 +1,108 @@
-'use client'
+"use client";
 
-import { useCallback, useEffect, useState } from 'react'
-import { Building2, MapPin, Pencil, Plus, Power, RotateCcw, Save, X } from 'lucide-react'
-import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { useApi } from '@/hooks/use-api'
-import { GuiaEstablecimientos } from './GuiaEstablecimientos'
-import { AsignacionUsuarios } from './AsignacionUsuarios'
-import { ResumenSucursales } from './ResumenSucursales'
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Building2,
+  MapPin,
+  Pencil,
+  Plus,
+  Power,
+  RotateCcw,
+  Save,
+  X,
+} from "lucide-react";
+import { ProtectedComponent } from "@/components/auth/ProtectedComponent";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { useApi } from "@/hooks/use-api";
+import { GuiaEstablecimientos } from "./GuiaEstablecimientos";
+import { AsignacionUsuarios } from "./AsignacionUsuarios";
+import { ResumenSucursales } from "./ResumenSucursales";
 
 type Sucursal = {
-  id: string
-  nombre: string
-  codigo: string
-  codigo_establecimiento: string
-  es_principal: boolean
-  activo: boolean
-  direccion?: string | null
-  ubigeo?: string | null
-  telefono?: string | null
-}
+  id: string;
+  nombre: string;
+  codigo: string;
+  codigo_establecimiento: string;
+  es_principal: boolean;
+  activo: boolean;
+  direccion?: string | null;
+  ubigeo?: string | null;
+  telefono?: string | null;
+};
 
 type SucursalForm = {
-  nombre: string
-  codigo_establecimiento: string
-  direccion: string
-  ubigeo: string
-  telefono: string
-}
+  nombre: string;
+  codigo_establecimiento: string;
+  direccion: string;
+  ubigeo: string;
+  telefono: string;
+};
 
 const EMPTY_SUCURSAL: SucursalForm = {
-  nombre: '',
-  codigo_establecimiento: '',
-  direccion: '',
-  ubigeo: '',
-  telefono: '',
-}
+  nombre: "",
+  codigo_establecimiento: "",
+  direccion: "",
+  ubigeo: "",
+  telefono: "",
+};
 
 function NoPermission() {
   return (
     <div className="rounded-xl border border-dashed border-blue-400/40 bg-blue-500/10 p-6 font-semibold text-primary">
-      Necesitas el permiso <code>configuracion.sucursales.read</code> para administrar los
-      establecimientos.
+      Necesitas el permiso <code>configuracion.sucursales.read</code> para
+      administrar los establecimientos.
     </div>
-  )
+  );
 }
 
 export default function SucursalesPage() {
-  const { get, post, put, del } = useApi()
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [sucursales, setSucursales] = useState<Sucursal[]>([])
-  const [editor, setEditor] = useState<{ id?: string; data: SucursalForm } | null>(null)
+  const { get, post, put, del } = useApi({ throwOnError: true });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+  const [editor, setEditor] = useState<{
+    id?: string;
+    data: SucursalForm;
+  } | null>(null);
+
+  const mutationIntents = useRef(new Map<string, string>());
+  const intentFor = (signature: string) => {
+    const existing = mutationIntents.current.get(signature);
+    if (existing) return existing;
+    const key = `sucursal:${crypto.randomUUID()}`;
+    mutationIntents.current.set(signature, key);
+    return key;
+  };
 
   const cargar = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
-      const response = await get('/sucursales?incluir_inactivas=true')
-      setSucursales(response?.success && Array.isArray(response.data) ? response.data : [])
+      const response = await get("/sucursales?incluir_inactivas=true");
+      setSucursales(
+        response?.success && Array.isArray(response.data) ? response.data : [],
+      );
     } catch {
-      setError('No se pudieron cargar los establecimientos. Intenta nuevamente.')
-      setSucursales([])
+      setError(
+        "No se pudieron cargar los establecimientos. Intenta nuevamente.",
+      );
+      setSucursales([]);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [get])
+  }, [get]);
 
   useEffect(() => {
-    void cargar()
-  }, [cargar])
+    void cargar();
+  }, [cargar]);
 
   const guardar = async () => {
-    if (!editor?.data.nombre.trim()) return
-    setSaving(true)
-    setError(null)
+    if (!editor?.data.nombre.trim()) return;
+    setSaving(true);
+    setError(null);
     try {
       // El codigo de establecimiento sale de la ficha RUC y no se reescribe:
       // sólo viaja al crear. Un anexo que cambia de codigo es otro anexo.
@@ -86,43 +111,74 @@ export default function SucursalesPage() {
         direccion: editor.data.direccion.trim() || undefined,
         ubigeo: editor.data.ubigeo.trim() || undefined,
         telefono: editor.data.telefono.trim() || undefined,
-      }
+      };
 
+      const signature = JSON.stringify({
+        id: editor.id ?? null,
+        payload: {
+          ...payload,
+          codigo_establecimiento: editor.id
+            ? undefined
+            : editor.data.codigo_establecimiento.trim() || undefined,
+        },
+      });
+      const requestOptions = {
+        headers: { "idempotency-key": intentFor(signature) },
+      };
       if (editor.id) {
-        await put(`/sucursales/${editor.id}`, payload)
+        await put(`/sucursales/${editor.id}`, payload, requestOptions);
       } else {
         if (editor.data.codigo_establecimiento.trim()) {
-          payload.codigo_establecimiento = editor.data.codigo_establecimiento.trim()
+          payload.codigo_establecimiento =
+            editor.data.codigo_establecimiento.trim();
         }
-        await post('/sucursales', payload)
+        await post("/sucursales", payload, requestOptions);
       }
 
-      setEditor(null)
-      await cargar()
+      mutationIntents.current.delete(signature);
+      setEditor(null);
+      await cargar();
     } catch {
-      setError('No se pudo guardar el establecimiento.')
+      setError("No se pudo guardar el establecimiento.");
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
   const cambiarEstado = async (sucursal: Sucursal) => {
-    setError(null)
+    setError(null);
     try {
+      const signature = JSON.stringify({
+        id: sucursal.id,
+        activo: !sucursal.activo,
+      });
+      const requestOptions = {
+        headers: { "idempotency-key": intentFor(signature) },
+      };
       if (sucursal.activo) {
-        await del(`/sucursales/${sucursal.id}`)
+        await del(`/sucursales/${sucursal.id}`, requestOptions);
       } else {
-        await put(`/sucursales/${sucursal.id}`, { activo: true })
+        await put(
+          `/sucursales/${sucursal.id}`,
+          { activo: true },
+          requestOptions,
+        );
       }
-      await cargar()
+      mutationIntents.current.delete(signature);
+      await cargar();
     } catch {
-      setError('No se pudo cambiar el estado del establecimiento.')
+      setError("No se pudo cambiar el estado del establecimiento.");
     }
-  }
+  };
 
   return (
     <div className="space-y-6 p-6">
-      <ProtectedComponent modulo="configuracion" recurso="sucursales" accion="read" fallback={<NoPermission />}>
+      <ProtectedComponent
+        modulo="configuracion"
+        recurso="sucursales"
+        accion="read"
+        fallback={<NoPermission />}
+      >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="flex items-center gap-2 text-2xl font-bold">
@@ -130,13 +186,23 @@ export default function SucursalesPage() {
               Establecimientos
             </h1>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Cada establecimiento es un anexo de tu ficha RUC. El código de cuatro dígitos viaja
-              dentro de cada comprobante electrónico, y las series de facturación se asignan por
-              establecimiento. La casa matriz es el <code>0000</code> y no se puede desactivar.
+              Cada establecimiento es un anexo de tu ficha RUC. El código de
+              cuatro dígitos viaja dentro de cada comprobante electrónico, y las
+              series de facturación se asignan por establecimiento. La casa
+              matriz es el <code>0000</code> y no se puede desactivar.
             </p>
           </div>
-          <ProtectedComponent modulo="configuracion" recurso="sucursales" accion="create">
-            <Button onClick={() => setEditor({ data: { ...EMPTY_SUCURSAL } })}>
+          <ProtectedComponent
+            modulo="configuracion"
+            recurso="sucursales"
+            accion="create"
+          >
+            <Button
+              onClick={() => {
+                mutationIntents.current.clear();
+                setEditor({ data: { ...EMPTY_SUCURSAL } });
+              }}
+            >
               <Plus className="mr-2 h-4 w-4" />
               Nuevo establecimiento
             </Button>
@@ -155,7 +221,7 @@ export default function SucursalesPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">
-                {editor.id ? 'Editar establecimiento' : 'Nuevo establecimiento'}
+                {editor.id ? "Editar establecimiento" : "Nuevo establecimiento"}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -165,7 +231,10 @@ export default function SucursalesPage() {
                   <Input
                     value={editor.data.nombre}
                     onChange={(event) =>
-                      setEditor({ ...editor, data: { ...editor.data, nombre: event.target.value } })
+                      setEditor({
+                        ...editor,
+                        data: { ...editor.data, nombre: event.target.value },
+                      })
                     }
                     placeholder="Sucursal Arequipa"
                   />
@@ -180,7 +249,9 @@ export default function SucursalesPage() {
                         ...editor,
                         data: {
                           ...editor.data,
-                          codigo_establecimiento: event.target.value.replace(/[^0-9]/g, '').slice(0, 4),
+                          codigo_establecimiento: event.target.value
+                            .replace(/[^0-9]/g, "")
+                            .slice(0, 4),
                         },
                       })
                     }
@@ -188,8 +259,8 @@ export default function SucursalesPage() {
                   />
                   <span className="block text-xs font-normal text-muted-foreground">
                     {editor.id
-                      ? 'No se puede cambiar: ya viaja dentro de comprobantes emitidos.'
-                      : 'El que figura en tu ficha RUC. Si lo dejas vacío se asigna el siguiente libre.'}
+                      ? "No se puede cambiar: ya viaja dentro de comprobantes emitidos."
+                      : "El que figura en tu ficha RUC. Si lo dejas vacío se asigna el siguiente libre."}
                   </span>
                 </label>
                 <label className="space-y-1 text-sm font-medium">
@@ -197,7 +268,10 @@ export default function SucursalesPage() {
                   <Input
                     value={editor.data.direccion}
                     onChange={(event) =>
-                      setEditor({ ...editor, data: { ...editor.data, direccion: event.target.value } })
+                      setEditor({
+                        ...editor,
+                        data: { ...editor.data, direccion: event.target.value },
+                      })
                     }
                   />
                 </label>
@@ -208,7 +282,12 @@ export default function SucursalesPage() {
                     onChange={(event) =>
                       setEditor({
                         ...editor,
-                        data: { ...editor.data, ubigeo: event.target.value.replace(/[^0-9]/g, '').slice(0, 6) },
+                        data: {
+                          ...editor.data,
+                          ubigeo: event.target.value
+                            .replace(/[^0-9]/g, "")
+                            .slice(0, 6),
+                        },
                       })
                     }
                     placeholder="040101"
@@ -219,17 +298,29 @@ export default function SucursalesPage() {
                   <Input
                     value={editor.data.telefono}
                     onChange={(event) =>
-                      setEditor({ ...editor, data: { ...editor.data, telefono: event.target.value } })
+                      setEditor({
+                        ...editor,
+                        data: { ...editor.data, telefono: event.target.value },
+                      })
                     }
                   />
                 </label>
               </div>
               <div className="flex gap-2">
-                <Button onClick={guardar} disabled={saving || !editor.data.nombre.trim()}>
+                <Button
+                  onClick={guardar}
+                  disabled={saving || !editor.data.nombre.trim()}
+                >
                   <Save className="mr-2 h-4 w-4" />
-                  {saving ? 'Guardando…' : 'Guardar'}
+                  {saving ? "Guardando…" : "Guardar"}
                 </Button>
-                <Button variant="ghost" onClick={() => setEditor(null)}>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    mutationIntents.current.clear();
+                    setEditor(null);
+                  }}
+                >
                   <X className="mr-2 h-4 w-4" />
                   Cancelar
                 </Button>
@@ -239,14 +330,18 @@ export default function SucursalesPage() {
         )}
 
         {loading ? (
-          <p className="text-sm text-muted-foreground">Cargando establecimientos…</p>
+          <p className="text-sm text-muted-foreground">
+            Cargando establecimientos…
+          </p>
         ) : sucursales.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Todavía no hay establecimientos.</p>
+          <p className="text-sm text-muted-foreground">
+            Todavía no hay establecimientos.
+          </p>
         ) : (
           <ul className="space-y-3">
             {sucursales.map((sucursal) => (
               <li key={sucursal.id}>
-                <Card className={sucursal.activo ? undefined : 'opacity-60'}>
+                <Card className={sucursal.activo ? undefined : "opacity-60"}>
                   <CardContent className="flex flex-wrap items-center justify-between gap-4 p-4">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
@@ -269,12 +364,16 @@ export default function SucursalesPage() {
                         <p className="flex items-center gap-1 text-sm text-muted-foreground">
                           <MapPin className="h-3.5 w-3.5" />
                           {sucursal.direccion}
-                          {sucursal.ubigeo ? ` · ${sucursal.ubigeo}` : ''}
+                          {sucursal.ubigeo ? ` · ${sucursal.ubigeo}` : ""}
                         </p>
                       )}
                     </div>
                     <div className="flex gap-1">
-                      <ProtectedComponent modulo="configuracion" recurso="sucursales" accion="update">
+                      <ProtectedComponent
+                        modulo="configuracion"
+                        recurso="sucursales"
+                        accion="update"
+                      >
                         <Button
                           aria-label={`Editar establecimiento ${sucursal.nombre}`}
                           size="sm"
@@ -284,10 +383,11 @@ export default function SucursalesPage() {
                               id: sucursal.id,
                               data: {
                                 nombre: sucursal.nombre,
-                                codigo_establecimiento: sucursal.codigo_establecimiento,
-                                direccion: sucursal.direccion ?? '',
-                                ubigeo: sucursal.ubigeo ?? '',
-                                telefono: sucursal.telefono ?? '',
+                                codigo_establecimiento:
+                                  sucursal.codigo_establecimiento,
+                                direccion: sucursal.direccion ?? "",
+                                ubigeo: sucursal.ubigeo ?? "",
+                                telefono: sucursal.telefono ?? "",
                               },
                             })
                           }
@@ -299,10 +399,10 @@ export default function SucursalesPage() {
                         <ProtectedComponent
                           modulo="configuracion"
                           recurso="sucursales"
-                          accion={sucursal.activo ? 'delete' : 'update'}
+                          accion={sucursal.activo ? "delete" : "update"}
                         >
                           <Button
-                            aria-label={`${sucursal.activo ? 'Desactivar' : 'Reactivar'} establecimiento ${sucursal.nombre}`}
+                            aria-label={`${sucursal.activo ? "Desactivar" : "Reactivar"} establecimiento ${sucursal.nombre}`}
                             size="sm"
                             variant="ghost"
                             onClick={() => cambiarEstado(sucursal)}
@@ -324,10 +424,14 @@ export default function SucursalesPage() {
         )}
         <ResumenSucursales />
 
-        <ProtectedComponent modulo="configuracion" recurso="sucursales" accion="assign">
+        <ProtectedComponent
+          modulo="configuracion"
+          recurso="sucursales"
+          accion="assign"
+        >
           <AsignacionUsuarios sucursales={sucursales} />
         </ProtectedComponent>
       </ProtectedComponent>
     </div>
-  )
+  );
 }

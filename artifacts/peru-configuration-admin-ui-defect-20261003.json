@@ -1,0 +1,14 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "UI original sobre API candidata 560 y DB efímera: respuesta real comprometida sustituida por 503",
+  "defect": {
+    "id": "branch-editor-clears-after-failed-response",
+    "observed": true,
+    "editor_closed": true,
+    "rows_committed": 1,
+    "explicit_intent_sent": false
+  },
+  "source": "artifacts/peru-integrated-20261003071029373-10456",
+  "privateDumpsExported": false
+}

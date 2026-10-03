@@ -1,0 +1,21 @@
+{
+  "completedAt": "2026-10-03T07:42:11.153Z",
+  "success": false,
+  "remoteWrites": false,
+  "source": "artifacts/peru-integrated-20261003072906075-2760",
+  "scope": "ensayo completo fallido; fases anteriores positivas no sustituyen aceptación integral",
+  "http_scenarios": 181,
+  "http_success": true,
+  "browser_passed": 20,
+  "browser_failed": 1,
+  "configuration_admin_browser_success": true,
+  "surveys_completed": false,
+  "restore_after_browser_completed": false,
+  "failure": {
+    "test": "primer administrador importa, edita y desactiva maestros con recuperación de error",
+    "operation": "edición de cliente importado",
+    "oracle": "espera de salida de /editar de 5 segundos agotada",
+    "product_cause": "no determinada; no se observó mensaje de validación en la captura",
+    "followup": "esperar PUT real, comprobar respuesta persistida y navegación hasta 25 segundos; repetir ensayo limpio"
+  }
+}

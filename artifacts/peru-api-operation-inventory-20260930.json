@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-10-03T06:37:12.150Z",
-  "commit": "3612a2d9f73ca867e7eed898e5a46678560e54ee",
+  "generated_at": "2026-10-03T07:37:59.663Z",
+  "commit": "2627275581077eec752f6674acf2c8ccdd5977dc",
   "excluded": [
     "Analytics"
   ],
@@ -13524,10 +13524,10 @@
       "endpoint": "/api/sucursales",
       "summary": null,
       "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts",
-      "line": 19,
+      "line": 32,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
-        "RequirePermission('configuracion.sucursales.read')"
+        "RequirePermission(\"configuracion.sucursales.read\")"
       ],
       "ui_domain": "administracion",
       "has_navigation_domain": false,
@@ -13547,10 +13547,10 @@
       "endpoint": "/api/sucursales/resumen",
       "summary": null,
       "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts",
-      "line": 38,
+      "line": 51,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
-        "RequirePermission('configuracion.sucursales.read')"
+        "RequirePermission(\"configuracion.sucursales.read\")"
       ],
       "ui_domain": "administracion",
       "has_navigation_domain": false,
@@ -13570,10 +13570,10 @@
       "endpoint": "/api/sucursales/:id",
       "summary": null,
       "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts",
-      "line": 50,
+      "line": 63,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
-        "RequirePermission('configuracion.sucursales.read')"
+        "RequirePermission(\"configuracion.sucursales.read\")"
       ],
       "ui_domain": "administracion",
       "has_navigation_domain": false,
@@ -13593,10 +13593,10 @@
       "endpoint": "/api/sucursales",
       "summary": null,
       "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts",
-      "line": 60,
+      "line": 74,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
-        "RequirePermission('configuracion.sucursales.create')"
+        "RequirePermission(\"configuracion.sucursales.create\")"
       ],
       "ui_domain": "administracion",
       "has_navigation_domain": false,
@@ -13616,10 +13616,10 @@
       "endpoint": "/api/sucursales/:id",
       "summary": null,
       "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts",
-      "line": 67,
+      "line": 91,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
-        "RequirePermission('configuracion.sucursales.update')"
+        "RequirePermission(\"configuracion.sucursales.update\")"
       ],
       "ui_domain": "administracion",
       "has_navigation_domain": false,
@@ -13639,10 +13639,10 @@
       "endpoint": "/api/sucursales/:id",
       "summary": null,
       "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts",
-      "line": 78,
+      "line": 110,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
-        "RequirePermission('configuracion.sucursales.delete')"
+        "RequirePermission(\"configuracion.sucursales.delete\")"
       ],
       "ui_domain": "administracion",
       "has_navigation_domain": false,
@@ -13662,10 +13662,10 @@
       "endpoint": "/api/sucursales/usuarios/:usuarioId",
       "summary": null,
       "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts",
-      "line": 88,
+      "line": 127,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
-        "RequirePermission('configuracion.sucursales.assign')"
+        "RequirePermission(\"configuracion.sucursales.assign\")"
       ],
       "ui_domain": "administracion",
       "has_navigation_domain": false,
@@ -13685,10 +13685,10 @@
       "endpoint": "/api/sucursales/usuarios/:usuarioId",
       "summary": null,
       "source": "apps/erp-api/src/modules/sucursales/sucursales.controller.ts",
-      "line": 98,
+      "line": 137,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
-        "RequirePermission('configuracion.sucursales.assign')"
+        "RequirePermission(\"configuracion.sucursales.assign\")"
       ],
       "ui_domain": "administracion",
       "has_navigation_domain": false,
