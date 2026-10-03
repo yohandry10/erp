@@ -1,0 +1,12 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "Banco editado/recargado, CSV filtrado descargado y conciliación cerrada consultada; no acepta sus mutaciones por UI",
+  "browserTimeZone": "America/Lima",
+  "editPersisted": true,
+  "filteredCsvDownloaded": true,
+  "fiscalDatePreserved": true,
+  "formulaNeutralized": true,
+  "reconciliationReadOnly": true,
+  "balancePreserved": true
+}

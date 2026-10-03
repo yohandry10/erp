@@ -1,0 +1,18 @@
+{
+  "source": "artifacts/peru-integrated-20261003084609294-6156",
+  "source_base_sha": "3e9c0585ae454bfc7ff4d8fedc20f37aedc1a81d",
+  "canonical_changes_uncommitted_at_start": true,
+  "success": false,
+  "remoteWrites": false,
+  "http_passed": 208,
+  "browser_passed": 21,
+  "browser_failed": 1,
+  "restore_after_browser": false,
+  "failure": "El elemento #asiento-form-concepto no llegó dentro de 5 segundos tras abrir edición",
+  "evidence": [
+    "Ruta editar devolvió 200 en 4294ms; snapshot posterior contiene formulario con montos 17 y Guardar cambios",
+    "El nuevo recorrido ajustes fiscales pasó con los tres reintentos y cero pageerror"
+  ],
+  "correction": "La aserción espera URL y encabezado Editar asiento con plazo 25 segundos, conservando comprobación del concepto original",
+  "limitation": "La causa funcional no se declara cerrada hasta repetir; no presenta este intento como aceptación completa"
+}
