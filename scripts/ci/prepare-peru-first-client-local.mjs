@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { randomUUID } from 'node:crypto';
 assert.equal(process.env.E2E_EPHEMERAL_LOCAL_DB,'1');
 const kind=process.argv[2];
-assert.ok(['wizard','annual','finance'].includes(kind));
+assert.ok(['wizard','annual','finance','hr'].includes(kind));
 assert.equal(process.env.PGHOST,'127.0.0.1');
 assert.equal(process.env.PGDATABASE,'erp_e2e');
 const api=process.env.LOCAL_API_URL;
@@ -30,7 +30,7 @@ try {
   token=(await call('auth/login',{email:'peru-integrated-restricted-1@example.test',password:'Local-Peru-2026-Only!'})).access_token;
   const email=`${kind}-nuevo-${randomUUID()}@example.test`;
   // Identidades distintas por caso: el alta protege la unicidad fiscal global.
-  const base={annual:'2019876543',finance:'2019876544',wizard:'2019876545'}[kind];
+  const base={annual:'2019876543',finance:'2019876544',wizard:'2019876545',hr:'2019876546'}[kind];
   const weights=[5,4,3,2,7,6,5,4,3,2];
   const candidate=11-weights.reduce((sum,weight,index)=>sum+Number(base[index])*weight,0)%11;
   const ruc=base+String(candidate===10?0:candidate===11?1:candidate);
