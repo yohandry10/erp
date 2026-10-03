@@ -1440,6 +1440,143 @@
         "Aislamiento de la creación por API",
         "Promoción 559, CI y despliegue exacto"
       ]
+    },
+    {
+      "id": "billing-parameters-zero-replay",
+      "source": "scripts/ci/test-peru-configuration-admin-local.mjs",
+      "required_scenario_prefixes": [
+        "Parámetros: lectura conserva precisión cero",
+        "Parámetros: escritura y replay",
+        "Lector: edición, baja, asignación y parámetros"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/configuracion/parametros-facturacion"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/configuracion/parametros-facturacion"
+        }
+      ],
+      "verified_checks": [
+        "Precisión 0/booleanos false persistidos y lectura fiel",
+        "Replay, validación 7 rechazada, consulta ajena y lector sin escritura"
+      ],
+      "pending_checks": [
+        "Otras variantes de parámetros y permisos; edición desde UI donde se ofrezca"
+      ]
+    },
+    {
+      "id": "branch-create-concurrency-recovery",
+      "source": "scripts/ci/test-peru-configuration-admin-local.mjs",
+      "required_scenario_prefixes": [
+        "Sucursal: retry de alta",
+        "Sucursal: intención incompatible",
+        "Sucursal: seis altas concurrentes",
+        "Sucursal: cuatro intenciones concurrentes"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/sucursales"
+        }
+      ],
+      "verified_checks": [
+        "Alta/replay e intención incompatible sin residuos",
+        "Misma clave concurrente crea una fila; cuatro claves distintas obtienen cuatro códigos",
+        "Lector 403 y centro ajeno/inexistente rechazado"
+      ],
+      "pending_checks": [
+        "Variantes de dirección/centro costo y límites de anexos; CI y despliegue"
+      ]
+    },
+    {
+      "id": "branch-update-deactivate-scope",
+      "source": "scripts/ci/test-peru-configuration-admin-local.mjs",
+      "required_scenario_prefixes": [
+        "Sucursales: alta, edición/consulta",
+        "Sucursal: detalle fuera",
+        "Sucursal: listado con inactivas",
+        "Anexo: desactivación y reactivación",
+        "Lector: edición, baja, asignación y parámetros"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/sucursales"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/sucursales/:id"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/sucursales/:id"
+        },
+        {
+          "method": "DELETE",
+          "endpoint": "/api/sucursales/:id"
+        }
+      ],
+      "verified_checks": [
+        "Edición/baja/reactivación persistidas, matriz protegida y código inmutable",
+        "Detalle asignado, ocultación ajena y listado de inactivos dentro del alcance",
+        "Lector sin mutación"
+      ],
+      "pending_checks": [
+        "Sucursal con dependencias históricas y todas las variantes de roles; CI y despliegue"
+      ]
+    },
+    {
+      "id": "branch-assignment-atomic-recovery",
+      "source": "scripts/ci/test-peru-configuration-admin-local.mjs",
+      "required_scenario_prefixes": [
+        "Asignación: fallo INSERT",
+        "Asignación y baja: usuario/sucursal ajenos",
+        "Asignación: orden normalizado/replay/conflicto"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/sucursales/usuarios/:usuarioId"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/sucursales/usuarios/:usuarioId"
+        }
+      ],
+      "verified_checks": [
+        "Fallo real de INSERT conserva alcance, recibos y auditoría",
+        "Tenant ajeno, permiso insuficiente, replay ordenado y conflicto sin residuos",
+        "Dos reemplazos concurrentes terminan con una lista completa"
+      ],
+      "pending_checks": [
+        "Consulta de asignación de identificador inexistente; todas las variantes de roles; CI y despliegue"
+      ]
+    },
+    {
+      "id": "document-series-first-admin-replay",
+      "source": "scripts/ci/test-peru-configuration-admin-local.mjs",
+      "required_scenario_prefixes": [
+        "Series: alta/consulta por tenant y replay"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/configuracion/series"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/configuracion/series/:tipo"
+        }
+      ],
+      "verified_checks": [
+        "Primer ADMIN crea F901, consulta y recupera ID en replay"
+      ],
+      "pending_checks": [
+        "Edición, inactivación, límites de correlativo, roles, aislamiento de cada operación y UI"
+      ]
     }
   ]
 }

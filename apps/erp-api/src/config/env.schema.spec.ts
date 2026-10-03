@@ -61,7 +61,7 @@ describe('env.schema', () => {
     });
 
     expect(result.error).toBeUndefined();
-    expect(result.value.REQUIRED_DATABASE_SCHEMA_VERSION).toBe(559);
+    expect(result.value.REQUIRED_DATABASE_SCHEMA_VERSION).toBe(560);
   });
 
   it('falla con secreto JWT demasiado débil', () => {

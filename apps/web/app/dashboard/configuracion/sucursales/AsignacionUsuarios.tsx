@@ -1,83 +1,111 @@
-'use client'
+"use client";
 
-import { useCallback, useEffect, useState } from 'react'
-import { Check, Users } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useApi } from '@/hooks/use-api'
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Check, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useApi } from "@/hooks/use-api";
 
 type SucursalResumen = {
-  id: string
-  nombre: string
-  codigo_establecimiento: string
-  activo: boolean
-}
+  id: string;
+  nombre: string;
+  codigo_establecimiento: string;
+  activo: boolean;
+};
 
 type UsuarioSistema = {
-  id: string
-  email: string
-  nombre?: string | null
-  apellido?: string | null
-}
+  id: string;
+  email: string;
+  nombre?: string | null;
+  apellido?: string | null;
+};
 
-export function AsignacionUsuarios({ sucursales }: { sucursales: SucursalResumen[] }) {
-  const { get, put } = useApi()
-  const [usuarios, setUsuarios] = useState<UsuarioSistema[]>([])
-  const [asignaciones, setAsignaciones] = useState<Record<string, string[]>>({})
-  const [loading, setLoading] = useState(true)
-  const [guardando, setGuardando] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+export function AsignacionUsuarios({
+  sucursales,
+}: {
+  sucursales: SucursalResumen[];
+}) {
+  const { get, put } = useApi({ throwOnError: true });
+  const [usuarios, setUsuarios] = useState<UsuarioSistema[]>([]);
+  const [asignaciones, setAsignaciones] = useState<Record<string, string[]>>(
+    {},
+  );
+  const [loading, setLoading] = useState(true);
+  const [guardando, setGuardando] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const mutationIntents = useRef(new Map<string, string>());
+  const intentFor = (signature: string) => {
+    const existing = mutationIntents.current.get(signature);
+    if (existing) return existing;
+    const key = `sucursal:${crypto.randomUUID()}`;
+    mutationIntents.current.set(signature, key);
+    return key;
+  };
 
   const cargar = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
-      const respuesta = await get('/usuarios-sistema?activo=true&limit=200')
+      const respuesta = await get("/usuarios-sistema?activo=true&limit=200");
       const lista: UsuarioSistema[] =
-        respuesta?.success && Array.isArray(respuesta.data) ? respuesta.data : []
-      setUsuarios(lista)
+        respuesta?.success && Array.isArray(respuesta.data)
+          ? respuesta.data
+          : [];
+      setUsuarios(lista);
 
       const pares = await Promise.all(
         lista.map(async (usuario) => {
-          const asignado = await get(`/sucursales/usuarios/${usuario.id}`)
+          const asignado = await get(`/sucursales/usuarios/${usuario.id}`);
           return [
             usuario.id,
-            asignado?.success && Array.isArray(asignado.data) ? asignado.data : [],
-          ] as const
+            asignado?.success && Array.isArray(asignado.data)
+              ? asignado.data
+              : [],
+          ] as const;
         }),
-      )
-      setAsignaciones(Object.fromEntries(pares))
+      );
+      setAsignaciones(Object.fromEntries(pares));
     } catch {
-      setError('No se pudo cargar la asignación de usuarios.')
-      setUsuarios([])
+      setError("No se pudo cargar la asignación de usuarios.");
+      setUsuarios([]);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [get])
+  }, [get]);
 
   useEffect(() => {
-    void cargar()
-  }, [cargar])
+    void cargar();
+  }, [cargar]);
 
   const alternar = async (usuarioId: string, sucursalId: string) => {
-    const actual = asignaciones[usuarioId] ?? []
+    const actual = asignaciones[usuarioId] ?? [];
     const siguiente = actual.includes(sucursalId)
       ? actual.filter((id) => id !== sucursalId)
-      : [...actual, sucursalId]
+      : [...actual, sucursalId];
 
-    setGuardando(usuarioId)
-    setError(null)
+    const signature = JSON.stringify({
+      usuarioId,
+      sucursal_ids: [...siguiente].sort(),
+    });
+    setGuardando(usuarioId);
+    setError(null);
     try {
-      await put(`/sucursales/usuarios/${usuarioId}`, { sucursal_ids: siguiente })
-      setAsignaciones((previo) => ({ ...previo, [usuarioId]: siguiente }))
+      await put(
+        `/sucursales/usuarios/${usuarioId}`,
+        { sucursal_ids: siguiente },
+        { headers: { "idempotency-key": intentFor(signature) } },
+      );
+      mutationIntents.current.delete(signature);
+      setAsignaciones((previo) => ({ ...previo, [usuarioId]: siguiente }));
     } catch {
-      setError('No se pudo guardar la asignación.')
+      setError("No se pudo guardar la asignación.");
     } finally {
-      setGuardando(null)
+      setGuardando(null);
     }
-  }
+  };
 
-  const activas = sucursales.filter((sucursal) => sucursal.activo)
+  const activas = sucursales.filter((sucursal) => sucursal.activo);
 
   return (
     <Card>
@@ -87,9 +115,10 @@ export function AsignacionUsuarios({ sucursales }: { sucursales: SucursalResumen
           Quién ve qué
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Un usuario <strong>sin ningún establecimiento marcado ve todos</strong> — es la oficina
-          central. Marca uno o varios para limitarlo a esos: dejará de ver las ventas, cajas y stock
-          del resto.
+          Un usuario{" "}
+          <strong>sin ningún establecimiento marcado ve todos</strong> — es la
+          oficina central. Marca uno o varios para limitarlo a esos: dejará de
+          ver las ventas, cajas y stock del resto.
         </p>
       </CardHeader>
       <CardContent>
@@ -102,7 +131,9 @@ export function AsignacionUsuarios({ sucursales }: { sucursales: SucursalResumen
         {loading ? (
           <p className="text-sm text-muted-foreground">Cargando usuarios…</p>
         ) : usuarios.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No hay usuarios activos.</p>
+          <p className="text-sm text-muted-foreground">
+            No hay usuarios activos.
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[560px] text-sm">
@@ -110,7 +141,10 @@ export function AsignacionUsuarios({ sucursales }: { sucursales: SucursalResumen
                 <tr className="border-b border-border text-left">
                   <th className="pb-2 pr-4 font-semibold">Usuario</th>
                   {activas.map((sucursal) => (
-                    <th key={sucursal.id} className="pb-2 pr-4 text-center font-semibold">
+                    <th
+                      key={sucursal.id}
+                      className="pb-2 pr-4 text-center font-semibold"
+                    >
                       <span className="block font-mono text-xs text-muted-foreground">
                         {sucursal.codigo_establecimiento}
                       </span>
@@ -122,40 +156,54 @@ export function AsignacionUsuarios({ sucursales }: { sucursales: SucursalResumen
               </thead>
               <tbody>
                 {usuarios.map((usuario) => {
-                  const asignado = asignaciones[usuario.id] ?? []
-                  const nombre = [usuario.nombre, usuario.apellido].filter(Boolean).join(' ')
+                  const asignado = asignaciones[usuario.id] ?? [];
+                  const nombre = [usuario.nombre, usuario.apellido]
+                    .filter(Boolean)
+                    .join(" ");
                   return (
-                    <tr key={usuario.id} className="border-b border-border/60 last:border-0">
+                    <tr
+                      key={usuario.id}
+                      className="border-b border-border/60 last:border-0"
+                    >
                       <td className="py-2 pr-4">
-                        <span className="block font-medium">{nombre || usuario.email}</span>
+                        <span className="block font-medium">
+                          {nombre || usuario.email}
+                        </span>
                         {Boolean(nombre) && (
-                          <span className="block text-xs text-muted-foreground">{usuario.email}</span>
+                          <span className="block text-xs text-muted-foreground">
+                            {usuario.email}
+                          </span>
                         )}
                       </td>
                       {activas.map((sucursal) => {
-                        const marcado = asignado.includes(sucursal.id)
+                        const marcado = asignado.includes(sucursal.id);
                         return (
-                          <td key={sucursal.id} className="py-2 pr-4 text-center">
+                          <td
+                            key={sucursal.id}
+                            className="py-2 pr-4 text-center"
+                          >
                             <Button
                               size="sm"
-                              variant={marcado ? 'default' : 'ghost'}
+                              variant={marcado ? "default" : "ghost"}
                               aria-pressed={marcado}
-                              aria-label={`${marcado ? 'Quitar' : 'Asignar'} ${sucursal.nombre} a ${usuario.email}`}
+                              aria-label={`${marcado ? "Quitar" : "Asignar"} ${sucursal.nombre} a ${usuario.email}`}
                               disabled={guardando === usuario.id}
                               onClick={() => alternar(usuario.id, sucursal.id)}
                             >
-                              <Check className={`h-3.5 w-3.5 ${marcado ? '' : 'opacity-25'}`} />
+                              <Check
+                                className={`h-3.5 w-3.5 ${marcado ? "" : "opacity-25"}`}
+                              />
                             </Button>
                           </td>
-                        )
+                        );
                       })}
                       <td className="py-2 text-xs text-muted-foreground">
                         {asignado.length === 0
-                          ? 'Todos los establecimientos'
+                          ? "Todos los establecimientos"
                           : `${asignado.length} de ${activas.length}`}
                       </td>
                     </tr>
-                  )
+                  );
                 })}
               </tbody>
             </table>
@@ -163,5 +211,5 @@ export function AsignacionUsuarios({ sucursales }: { sucursales: SucursalResumen
         )}
       </CardContent>
     </Card>
-  )
+  );
 }

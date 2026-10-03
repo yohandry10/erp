@@ -345,9 +345,9 @@ export class ConfiguracionController {
         success: true,
         data: {
           parametros: {
-            igv: data.igv_porcentaje || 18.00,
+            igv: data.igv_porcentaje ?? 18.00,
             monedaDefecto: data.moneda_defecto || 'PEN',
-            redondeoDecimales: data.redondeo_decimales || 2,
+            redondeoDecimales: data.redondeo_decimales ?? 2,
             incluirIgvEnPrecio: data.incluir_igv_en_precio !== false,
             envioAutomaticoSunat: data.envio_automatico_sunat !== false,
             generarPdfAutomatico: data.generar_pdf_automatico !== false,

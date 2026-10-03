@@ -1,0 +1,112 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "network": "none",
+  "project": "wypnbcptofqdmoynlonq",
+  "archiveSha256": "fc024ac16437887c1a8429838a92b0352be913cd3407d524a41a9c39364a8a86",
+  "migrationSha256": "07dd071cce9ae0a51f003f8c098b039f2f8d4ea0f177da32654e9800a9eeb1d9",
+  "bundleSha256": "8ca503fa9b45a23619cd32b3dbdedbd39fed1e948b64e937aaaa7b0e06a99751",
+  "limits": [
+    "Sin objetos externos de Storage ni roles globales; tiempo local no acredita RTO."
+  ],
+  "restoreVerified": true,
+  "before": {
+    "project": "wypnbcptofqdmoynlonq",
+    "environment": "PROD",
+    "schema": 559,
+    "ready": true,
+    "writer": null,
+    "comparedData": [
+      "almacenes",
+      "asientos_contables",
+      "audit_log",
+      "cajas",
+      "centros_costo",
+      "configuration_operation_intents",
+      "cuentas_bancarias",
+      "detalle_asientos",
+      "documento_series",
+      "documentos",
+      "empresa_config",
+      "movimientos_inventario",
+      "permisos",
+      "plan_cuentas",
+      "producto_stock_sucursal",
+      "productos",
+      "rol_permisos",
+      "roles",
+      "rrhh_peru_fichas_laborales",
+      "rrhh_peru_presentaciones_planilla",
+      "sesiones_caja",
+      "sucursales",
+      "tenants",
+      "user_roles",
+      "usuario_sucursales",
+      "usuarios_sistema",
+      "ventas_pos"
+    ]
+  },
+  "historyBefore": 559,
+  "atomicRollbackPassed": true,
+  "preservationNegativeControlsPassed": true,
+  "existingDataPreserved": true,
+  "existingFunctionsPreserved": true,
+  "tableSecurityPreserved": true,
+  "after": {
+    "project": "wypnbcptofqdmoynlonq",
+    "environment": "PROD",
+    "schema": 560,
+    "ready": true,
+    "writer": {
+      "hash": "c73d613563c619a75ae357e51412530e",
+      "guarded": true,
+      "security": [
+        true,
+        "v",
+        [
+          "postgres=X/postgres",
+          "service_role=X/postgres"
+        ],
+        "postgres",
+        [
+          "search_path=pg_catalog, public, app, extensions, pg_temp"
+        ]
+      ],
+      "service": true,
+      "anon": false,
+      "authenticated": false
+    },
+    "comparedData": [
+      "almacenes",
+      "asientos_contables",
+      "audit_log",
+      "cajas",
+      "centros_costo",
+      "configuration_operation_intents",
+      "cuentas_bancarias",
+      "detalle_asientos",
+      "documento_series",
+      "documentos",
+      "empresa_config",
+      "movimientos_inventario",
+      "permisos",
+      "plan_cuentas",
+      "producto_stock_sucursal",
+      "productos",
+      "rol_permisos",
+      "roles",
+      "rrhh_peru_fichas_laborales",
+      "rrhh_peru_presentaciones_planilla",
+      "sesiones_caja",
+      "sucursales",
+      "tenants",
+      "user_roles",
+      "usuario_sucursales",
+      "usuarios_sistema",
+      "ventas_pos"
+    ]
+  },
+  "sqlContractsPassed": true,
+  "historyAfter": 560,
+  "completedAt": "2026-10-03T07:35:51.488Z"
+}

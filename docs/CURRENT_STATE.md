@@ -30,7 +30,7 @@ y web pasaron. La repetición completa pasó 148 casos HTTP, 18 recorridos UI,
 (`artifacts/peru-integrated-local-hr-20261003`). El fallo previo de compra UI
 se conserva; la causa no está determinada y la repetición aislada/completa pasó.
 CI PR 37100302015 y rama 37100299491 aprobaron esos contratos y todos los gates.
-#126 se integró como `3612a2d9`; main 37102349608 y despliegue están pendientes.
+#126 se integró como `3612a2d9`; main 37102349608, E2E y seguridad aprobaron. El main registró 17 recorridos sin reintento y uno con reintento; no se oculta esa inestabilidad. La exportación segura está en `artifacts/peru-integrated-main-37102349608`. Render/Vercel y esquema 558 pasaron verificación de sólo lectura con preflight (`artifacts/peru-production-verification-after-126-20261003.json`); un primer timeout de 20 segundos y su repetición aprobada no acreditan continuidad.
 No acredita RRHH ni planilla completos.
 
 PLAME reprodujo una duplicación: el mismo cuerpo/Idempotency-Key creó versiones
@@ -43,7 +43,7 @@ aislamiento, banco y asientos únicos/cuadrados, con restauración después de U
 (`artifacts/peru-plame-financial-canonical-subset-20261003`). El primer intento
 UI agotó la espera de navegación tras login; el segundo pasó con el plazo usado
 por la suite existente. No acredita PVS/SOL ni todos los cálculos normativos.
-La reconstrucción limpia con los recorridos ampliados está en curso. La copia
+La repetición limpia pasó 556 migraciones hasta 559, 69 verificadores SQL, 165 escenarios API, 20 recorridos UI, 99 pantallas, 22 vistas con registros y restauración posterior (`artifacts/peru-integrated-local-plame-financial-20261003`). El ensayo comenzó antes del commit de las mismas fuentes funcionales; los CI del SHA `26272755` pasaron como gates reproducibles. La copia
 del respaldo PROD 558 detectó EXECUTE heredado de service_role sobre el writer
 interno PLAME; 559 cierra sólo esa vía, que la API no usa, y conserva su cuerpo.
 El respaldo 558 del 03/10 y el ensayo aislado sin red pasaron restauración,
@@ -51,8 +51,9 @@ rollback negativo, preservación de 23 tablas, funciones restantes, RLS/ACL y
 contratos SQL (`artifacts/erp-peru-559-rehearsal-20261003063550149-15392.json`). La única ACL retirada es EXECUTE del writer
 interno PLAME para service_role; el wrapper conserva sus permisos. El primer
 ensayo completo ampliado se detuvo por login 429; se conserva la evidencia y
-se repite respetando Retry-After, sin alterar el limitador. Faltan CI,
-promoción y despliegue. PROD sigue en 558.
+se repite respetando Retry-After, sin alterar el limitador. CI PR 37104147139 y rama 37104135035 del SHA `26272755` aprobaron 165 API/20 UI, SQL, barridos y restore, además de todos los gates. 559 se promovió el 03/10 con preflight/backup/ensayo; preservó 23 tablas, funciones restantes, RLS y ACL, cerrando sólo EXECUTE interno (`artifacts/peru-559-promotion-20261003072827148.json`). #127 se integró como `c034639f`; main 37106520278 y despliegue exacto siguen pendientes. PROD está en 559.
+
+Configuración/sucursales reprodujo cinco defectos API: lectura de precisión cero como dos, duplicación de alta al reintentar, detalle fuera de asignación, pérdida de restricciones tras fallar INSERT y omisión de anexos inactivos. La API candidata 560 pasó 16 escenarios/67 solicitudes y restauración (`artifacts/peru-configuration-admin-candidate-api-20261003`); no está integrada ni promovida. La UI original sobre API candidata confirmó un sexto defecto: cierra el editor tras recibir 503 de una escritura ya confirmada (`artifacts/peru-configuration-admin-ui-defect-20261003.json`). La corrección canónica 560 pasó 16 escenarios/67 solicitudes, SQL y un recorrido UI de alta/edición/baja/asignación perdidas, reactivación/recarga y lector, con restauración posterior (`artifacts/peru-configuration-admin-canonical-subset-20261003`). Tipos API/web y 39 pruebas enfocadas pasaron. Se conserva el primer intento UI fallido: la prueba omitía quitar el prefijo /backend al seleccionar la respuesta. La reconstrucción completa está en curso; CI, ensayo nuevo del respaldo 559, promoción 560 y despliegue permanecen pendientes. La matriz conserva los seis abiertos hasta cerrar esos gates. El respaldo posterior a 559 y su ensayo sin red pasaron rollback negativo, preservación de 27 tablas, funciones existentes, triggers, RLS/ACL y contratos SQL (`artifacts/erp-peru-560-rehearsal-20261003073532952-15440.json`). La reconstrucción nueva pasó 557 migraciones hasta 560, 70 verificadores y 181 escenarios API; falló en una espera de navegación de cinco segundos tras editar un cliente importado, con 20 UI aprobados incluido sucursales. Se conserva `artifacts/peru-configuration-admin-full-attempt-failure-20261003.json` y no se acredita restauración posterior ni barridos de ese intento. La causa funcional no está determinada; la repetición espera la respuesta PUT real, verifica su nombre y concede el plazo de navegación existente de 25 segundos. No hubo escrituras sintéticas en PROD.
 
 Los dos jobs integrados de #124, CI 37090225590 y 37090197674, aprobaron API,
 navegador y recuperación. Sus auditorías fallaron por dos avisos recién
