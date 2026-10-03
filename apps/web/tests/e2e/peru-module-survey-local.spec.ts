@@ -109,7 +109,7 @@ test('Perú: inspección de carga de todas las pantallas estáticas con API y ba
     const webLog = path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'web.log')
     const logBefore = (await fs.readFile(webLog, 'utf8')).length
     try {
-      const response = await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 45000 })
+      const response = await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 120000 })
       status = response?.status() ?? null
       await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {})
     } catch (error) {
@@ -124,10 +124,16 @@ test('Perú: inspección de carga de todas las pantallas estáticas con API y ba
           try { return (await page.request.get('/login/', { timeout: 2000 })).status() === 200 }
           catch { return false }
         }, { timeout: 30000, intervals: [250, 500, 1000] }).toBe(true)
-        status = (await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 45000 }))?.status() ?? null
+        status = (await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 120000 }))?.status() ?? null
         await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {})
       } else currentErrors.push(reason)
     }
+    // Next dev puede compilar una ruta fría mientras la anterior sigue visible.
+    // Capturar controles sólo después de que termine el bootstrap fiscal; un
+    // timeout se conserva como fallo del barrido, sin reintentar la operación.
+    try {
+      await page.getByText('Preparando configuración fiscal del tenant…', { exact: true }).waitFor({ state: 'hidden', timeout: 20000 })
+    } catch { currentErrors.push('La configuración fiscal no terminó de cargar en 20 segundos') }
     const text = (await page.locator('body').innerText().catch(() => '')).slice(0, 6000)
     if (status && status >= 400) currentErrors.push(`HTTP ${status} al abrir pantalla`)
     if (new URL(page.url()).pathname.startsWith('/login')) currentErrors.push('La navegación perdió la sesión')
@@ -141,7 +147,7 @@ test('Perú: inspección de carga de todas las pantallas estáticas con API y ba
     }
     if (expectedRestriction && !denied) currentErrors.push('La auditoría debe estar restringida sin el permiso de lectura')
     const errors = [...new Set(currentErrors)]
-    const controls = await visiblePeruActions(page)
+    const controls = errors.length ? [] : await visiblePeruActions(page)
     findings.push({ route, finalUrl: new URL(page.url()).pathname, status, errors, text, expectedRestriction, recovery, controls })
     if (errors.length) await page.screenshot({ path: path.join(output, `${findings.length}-failure.png`), fullPage: true }).catch(() => {})
     await fs.writeFile(path.join(output, 'survey.json'), JSON.stringify({ remoteWrites: false,

@@ -1,0 +1,14 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "POS API/UI/DB locales; ticket térmico representado, sin impresora física ni aceptación SUNAT",
+  "checks": [
+    {
+      "check": "Respuesta perdida recupera una venta y mantiene el total persistido",
+      "passed": true,
+      "venta_id": "1a675eb6-1774-43dd-9bb8-411ac7e65651",
+      "total": 23.6
+    }
+  ],
+  "unexpected_errors": []
+}

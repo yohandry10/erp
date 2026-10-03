@@ -21,7 +21,7 @@ describe('PosController.procesarVenta (contrato HTTP del fallo)', () => {
   });
 
   it.each([
-    ['DATABASE_ERROR', HttpStatus.INTERNAL_SERVER_ERROR],
+    ['DATABASE_ERROR', HttpStatus.SERVICE_UNAVAILABLE],
     ['VALIDATION_ERROR', HttpStatus.BAD_REQUEST],
     ['CONFIG_ERROR', HttpStatus.BAD_REQUEST],
     ['CAJA_CERRADA', HttpStatus.CONFLICT],
@@ -46,6 +46,15 @@ describe('PosController.procesarVenta (contrato HTTP del fallo)', () => {
     await expect(controller.procesarVenta({} as any, { user })).rejects.toMatchObject({
       status: HttpStatus.BAD_REQUEST,
     });
+  });
+
+  it.each([
+    ['23505', HttpStatus.CONFLICT],
+    ['22023', HttpStatus.BAD_REQUEST],
+    ['23514', HttpStatus.BAD_REQUEST],
+  ])('preserva el rechazo SQL %s como HTTP %i', async (codigo, status) => {
+    const { controller } = crear({ success: false, error: { tipo: 'DATABASE_ERROR', codigo } });
+    await expect(controller.procesarVenta({} as any, { user })).rejects.toMatchObject({ status });
   });
 
   it('nunca responde 2xx cuando success es false', async () => {

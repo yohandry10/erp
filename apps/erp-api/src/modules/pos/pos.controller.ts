@@ -89,7 +89,9 @@ export class PosController {
       case 'CAJA_CERRADA':
         return HttpStatus.CONFLICT;
       case 'DATABASE_ERROR':
-        return HttpStatus.INTERNAL_SERVER_ERROR;
+        if (resultado.error.codigo === '23505') return HttpStatus.CONFLICT;
+        if (['22023','22P02','23503','23514','23502'].includes(resultado.error.codigo)) return HttpStatus.BAD_REQUEST;
+        return HttpStatus.SERVICE_UNAVAILABLE;
       default:
         // Los rechazos de validación temprana (idempotency_key, items, datos del
         // cliente) devuelven `message` sin `error.tipo`: son culpa del request.
@@ -147,7 +149,8 @@ export class PosController {
     return this.posService.configurarCertificado(
       data.certificado_base64,
       data.password,
-      req.user
+      req.user,
+      req.headers?.['idempotency-key'],
     );
   }
 
@@ -171,7 +174,7 @@ export class PosController {
   @UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)
   @RequireFeatureFlag('pos')
   @RequirePermission('pos.read') // HARDENING: consultar estado fiscal de una venta POS.
-  async obtenerEstadoFacturacionVenta(@Param('ventaId') ventaId: string, @Req() req: any) {
+  async obtenerEstadoFacturacionVenta(@Param('ventaId', new ParseUUIDPipe({ version: '4' })) ventaId: string, @Req() req: any) {
     return this.posService.obtenerEstadoFacturacionVenta(ventaId, req.user);
   }
 
@@ -179,7 +182,7 @@ export class PosController {
   @UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)
   @RequireFeatureFlag('pos')
   @RequirePermission('pos.vender') // HARDENING: reintentar facturación requiere permiso de venta.
-  async reintentarFacturacionVenta(@Param('ventaId') ventaId: string, @Req() req: any) {
+  async reintentarFacturacionVenta(@Param('ventaId', new ParseUUIDPipe({ version: '4' })) ventaId: string, @Req() req: any) {
     return this.posService.reintentarFacturacionVenta(ventaId, req.user);
   }
 

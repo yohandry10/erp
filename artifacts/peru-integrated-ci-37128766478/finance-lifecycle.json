@@ -1,0 +1,424 @@
+{
+  "success": true,
+  "local_only": true,
+  "remoteWrites": false,
+  "scope": "Primer ADMIN no demo; banco, CxP, pagos parciales y conciliación por API real",
+  "scenarios": [
+    {
+      "scenario": "Bancos: altas con cuenta contable, replay, edición y rechazo de saldo inventado",
+      "passed": true
+    },
+    {
+      "scenario": "Bancos: abono, cargo y transferencia inseparable; replay, colisión y saldo insuficiente",
+      "passed": true
+    },
+    {
+      "scenario": "CxP y tesorería: factura, dos pagos parciales, replay y exceso rechazado sin duplicar deuda ni banco",
+      "passed": true
+    },
+    {
+      "scenario": "Conciliación: CSV atómico, match automático/manual, ajuste explícito, cierre/replay, inmutabilidad y consultas ajenas",
+      "passed": true
+    },
+    {
+      "scenario": "Finanzas: reporte de diferencias, CSV con filtros, exportación ajena oculta y once mutaciones rechazadas para lector",
+      "passed": true
+    },
+    {
+      "scenario": "Contabilidad: un asiento confirmado y cuadrado por evento bancario/factura/pago",
+      "passed": true
+    },
+    {
+      "scenario": "CSV bancario: fecha fiscal, columnas correctas y fórmulas neutralizadas",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/plan-cuentas",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/cuentas",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/cuentas",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/cuentas",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/cuentas",
+      "status": 400
+    },
+    {
+      "method": "PUT",
+      "endpoint": "finanzas/bancos/cuentas/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/movimientos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/movimientos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/movimientos",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/movimientos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/transferencias",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/transferencias",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/transferencias",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/proveedores",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxp",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/tesoreria/pagos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/tesoreria/pagos",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/tesoreria/pagos",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/tesoreria/pagos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/tesoreria/pagos",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/conciliacion",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/conciliacion/:id/importar-csv",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/conciliacion/:id/importar-csv",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/conciliacion/:id/importar-csv",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/conciliacion/:id/match-automatico",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/conciliacion/:id/match-automatico",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/conciliacion/:id/cerrar",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/movimientos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/conciliacion/:id/marcar-item",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/conciliacion/:id/marcar-item",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/conciliacion/:id/cerrar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/conciliacion/:id/cerrar",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/movimientos",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/conciliacion/:id/diferencias",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas/:id/movimientos/exportar?es_extracto=false&conciliado=true",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas/:id/movimientos/exportar",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "roles",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "users",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/conciliacion/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/cuentas",
+      "status": 403
+    },
+    {
+      "method": "PUT",
+      "endpoint": "finanzas/bancos/cuentas/:id",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/movimientos",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/transferencias",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxp",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/tesoreria/pagos",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/conciliacion",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/conciliacion/:id/importar-csv",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/conciliacion/:id/match-automatico",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/conciliacion/:id/marcar-item",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/conciliacion/:id/cerrar",
+      "status": 403
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas/:id",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/:id",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/conciliacion/:id",
+      "status": 404
+    }
+  ],
+  "csv_checks": {
+    "expected_date": "03/10/2026",
+    "observed_dates": [
+      "03/10/2026"
+    ],
+    "header_columns": 9,
+    "row_columns": [
+      9,
+      9,
+      9,
+      9,
+      9,
+      9
+    ],
+    "unprotected_formula_cells": []
+  },
+  "postings": [
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "banco.movimiento.registrado"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "banco.movimiento.registrado"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "banco.transferencia.registrada"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "factura.proveedor.registrada"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "pago.proveedor.registrado"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "pago.proveedor.registrado"
+    },
+    {
+      "status": "completed",
+      "entries": 1,
+      "balanced": true,
+      "event_type": "banco.movimiento.registrado"
+    }
+  ],
+  "checkedAt": "2026-10-03T14:19:44.096Z"
+}

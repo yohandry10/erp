@@ -1,0 +1,16 @@
+{
+  "dumps_extracted": false,
+  "github_run_id": 37128764296,
+  "github_artifact_id": 11276481157,
+  "head_sha": "4fc2009f0d8253775b1307780380cb13f89b19cb",
+  "selected_prefix": "peru-company-storage-20261003141235549-3403/",
+  "github_run_attempt": 1,
+  "inspected_artifact_ids": [
+    11276481157
+  ],
+  "selected_completed_at": "2026-10-03T14:17:11.975Z",
+  "scope": "company_logo_real_storage_subset",
+  "limits": [
+    "Storage local real; no acredita proveedor remoto ni todas las variantes del logo"
+  ]
+}

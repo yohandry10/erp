@@ -1,0 +1,24 @@
+{
+  "head_sha": "0707be1034f6cdfebf7cb783ba0efd10ee8d4f3a",
+  "github_run_id": 37137711599,
+  "github_job_id": 111245645357,
+  "github_artifact_id": 11279268037,
+  "selected_prefix": "peru-integrated-20261003164147869-3343",
+  "success": false,
+  "phase": "browser",
+  "http_scenarios_passed": 316,
+  "browser_scenarios_passed": 29,
+  "browser_scenarios_failed": 1,
+  "test_retries": 2,
+  "failure": {
+    "operation": "GRE setup/login",
+    "expected_http": 201,
+    "observed_http": 429
+  },
+  "remoteWrites": false,
+  "dumps_extracted": false,
+  "correction": "El helper de login de GRE respeta una espera Retry-After acotada, sin desactivar el guard ni reintentar negocio",
+  "limits": [
+    "CI del PR fallido; no aceptación global ni restauración final de esta ejecución"
+  ]
+}

@@ -111,6 +111,13 @@ Apertura -> Venta -> Pago -> Ticket/CPE -> Movimiento de caja -> Cierre
   contacto, logo, país, moneda, impuesto y series necesarios para venta/ticket;
   nunca PFX, claves SOL, secretos OSE ni credenciales de otras autoridades.
   Una lectura fallida responde con error, no con configuración vacía exitosa.
+- Una empresa Perú nueva recibe el catálogo de referencia de medios de pago
+  al crear su configuración, sin depender de seeds demo. La carga POS de PFX
+  valida contraseña, vigencia y emisor antes de cifrar y exige Idempotency-Key;
+  permiso, actor e intención se comprueban también en su writer SQL.
+- Estado fiscal inexistente o ajeno devuelve 404; conflicto de canje o reintento
+  de ticket puro devuelve 409. El worker admite un contador de intentos NULL
+  como cero para adoptar el canje reservado.
 - El ticket `Txxx` es interno; el comprobante fiscal usa serie `Bxxx/Fxxx`.
 - Pagos mixtos sólo afectan la gaveta por la porción en efectivo.
 - Venta, detalle, stock por almacén, pagos, movimiento de efectivo, documento,

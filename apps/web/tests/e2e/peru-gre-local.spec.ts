@@ -1,3 +1,4 @@
+import {loginPeruLocal} from './helpers/peru-login-local';
 import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';import {execFileSync} from 'node:child_process';
 import {test,expect,type BrowserContext,type Page,type Response} from '@playwright/test';
 interface Proof {success:boolean;remoteWrites:false;scope:string;checks:{check:string;passed:boolean;[key:string]:unknown}[];unexpected_errors:string[]}
@@ -8,8 +9,7 @@ const sql=(query:string)=>execFileSync(process.env.PSQL_BIN!,['-XqAt','-h','127.
 const endpoint=(r:Response)=>new URL(r.url()).pathname.replace(/^\/backend/,'').replace(/\/$/,'');
 async function setup(context:BrowserContext,page:Page){
  await context.route('**/*',route=>['127.0.0.1','localhost','[::1]'].includes(new URL(route.request().url()).hostname)?route.continue():route.abort('blockedbyclient'));
- await page.goto('/login/');await page.locator('#email').fill(first.email);await page.locator('#password').fill('Cliente-Local-2026-Only!');
- const [login]=await Promise.all([page.waitForResponse(r=>endpoint(r)==='/api/auth/login'&&r.request().method()==='POST'),page.getByRole('button',{name:'Iniciar Sesión',exact:true}).click()]);expect(login.status()).toBe(201);await expect(page).toHaveURL(/\/dashboard\//,{timeout:25000});
+ await loginPeruLocal(page,first.email,'Cliente-Local-2026-Only!');
  await page.goto('/dashboard/gre/');await expect(page.getByRole('heading',{name:'Guías de Remisión Electrónica',exact:true})).toBeVisible();
 }
 test('GRE: detalle, descarga PDF e impresión incluyen los bienes persistidos',async({page,context})=>{

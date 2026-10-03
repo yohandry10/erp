@@ -1,0 +1,6 @@
+{
+  "local_source": "artifacts/peru-pos-local-20261003143106428-22128",
+  "scope": "Other candidate fixes active; worker query still canonical .lt and excluded NULL. Local partial defect proof.",
+  "remote_business_writes": false,
+  "dumps_extracted": false
+}
