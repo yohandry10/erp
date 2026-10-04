@@ -32,37 +32,65 @@
   "confirmed_defects": [
     {
       "id": "accounting-new-tenant-no-reconcilable-accounts",
-      "operations": ["GET /api/contabilidad/partidas-abiertas", "POST /api/contabilidad/conciliaciones-partidas"],
+      "operations": [
+        "GET /api/contabilidad/partidas-abiertas",
+        "POST /api/contabilidad/conciliaciones-partidas"
+      ],
       "observed": "La 387 marcó como conciliables las cuentas 12/16/42/46 sólo de los tenants existentes; el plan sembrado después (556) nace sin la marca y no hay API para cambiarla: un cliente nuevo no tiene ninguna cuenta conciliable y la pantalla de partidas queda vacía. El ensayo sobre el respaldo productivo encuentra 401 cuentas PE en esa situación."
     },
     {
       "id": "accounting-reconciliation-list-permission",
-      "operations": ["GET /api/contabilidad/conciliaciones-partidas"],
-      "observed": "Responde 500 'permission denied for table conciliaciones_partidas': ni PROD ni la cadena canónica conceden SELECT a service_role."
+      "operations": [
+        "GET /api/contabilidad/conciliaciones-partidas"
+      ],
+      "observed": "Responde 500 'permission denied for table conciliaciones_partidas' en la reconstrucción local: su bootstrap no emula los privilegios por defecto de Supabase. PROD concede GRANT ALL a service_role (comprobado en el respaldo); la 569 hace explícito el SELECT.",
+      "environment": "local_rebuild_only"
     },
     {
       "id": "accounting-budget-alerts-shadowed",
-      "operations": ["GET /api/contabilidad/presupuestos/alertas"],
+      "operations": [
+        "GET /api/contabilidad/presupuestos/alertas"
+      ],
       "observed": "Responde 400 'invalid input syntax for type uuid: \"alertas\"': la ruta presupuestos/:id se declara antes y la captura."
     },
     {
       "id": "accounting-books-masked-failures",
-      "operations": ["GET /api/contabilidad/libro-diario", "GET /api/contabilidad/libro-mayor/:cuentaCodigo", "GET /api/contabilidad/libro-mayor-completo", "GET /api/contabilidad/plan-cuentas", "GET /api/contabilidad/balance-comprobacion"],
+      "operations": [
+        "GET /api/contabilidad/libro-diario",
+        "GET /api/contabilidad/libro-mayor/:cuentaCodigo",
+        "GET /api/contabilidad/libro-mayor-completo",
+        "GET /api/contabilidad/plan-cuentas",
+        "GET /api/contabilidad/balance-comprobacion"
+      ],
       "observed": "Sin lectura de asientos_contables, detalle_asientos o plan_cuentas, o sin EXECUTE de balance_comprobacion_live, responden 200 con success:false y datos vacíos; la pantalla de contabilidad sólo lo escribía en consola y mostraba la vista vacía."
     },
     {
       "id": "accounting-reads-500",
-      "operations": ["GET /api/contabilidad/asientos", "GET /api/contabilidad/estados/balance-comprobacion"],
+      "operations": [
+        "GET /api/contabilidad/asientos",
+        "GET /api/contabilidad/estados/balance-comprobacion"
+      ],
       "observed": "Una lectura fallida responde 500 en vez de 503."
     },
     {
       "id": "accounting-invalid-period-accepted",
-      "operations": ["GET /api/contabilidad/estados/estado-resultados", "GET /api/contabilidad/estados/balance-comprobacion", "GET /api/contabilidad/balance-general", "GET /api/contabilidad/balance-comprobacion", "GET /api/contabilidad/libro-diario", "GET /api/contabilidad/libro-mayor-completo", "GET /api/contabilidad/registro-ventas"],
+      "operations": [
+        "GET /api/contabilidad/estados/estado-resultados",
+        "GET /api/contabilidad/estados/balance-comprobacion",
+        "GET /api/contabilidad/balance-general",
+        "GET /api/contabilidad/balance-comprobacion",
+        "GET /api/contabilidad/libro-diario",
+        "GET /api/contabilidad/libro-mayor-completo",
+        "GET /api/contabilidad/registro-ventas"
+      ],
       "observed": "mes=13 responde 200: los estados devuelven success:false con 200 y los libros ignoraban anio/mes y entregaban todos los registros."
     },
     {
       "id": "accounting-reconciliation-retry-and-errors",
-      "operations": ["POST /api/contabilidad/conciliaciones-partidas", "DELETE /api/contabilidad/conciliaciones-partidas/:id"],
+      "operations": [
+        "POST /api/contabilidad/conciliaciones-partidas",
+        "DELETE /api/contabilidad/conciliaciones-partidas/:id"
+      ],
       "observed": "Por revisión de código, no reproducido aún por falta de cuenta conciliable: sin Idempotency-Key un reintento tras respuesta perdida falla o, en una conciliación PARCIAL, puede volver a aplicar importe; los errores de negocio del writer (saldo excedido por concurrencia) y las caídas respondían 500 genérico."
     }
   ],

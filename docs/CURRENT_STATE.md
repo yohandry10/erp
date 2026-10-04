@@ -57,8 +57,8 @@ operativo del plan de Render no confirmado.
 
 Compras PE (#138): el diagnóstico
 reprodujo 7 defectos (`artifacts/peru-purchases-defects-baseline-20261004.json`):
-editar una recepción hacía DML directo que la cadena canónica no concede (PROD
-conserva GRANT ALL heredado), y resumen/listado/reporte heredados enmascaraban
+editar una recepción hacía DML directo que la reconstrucción local no concede (PROD
+lo concede por defecto, ver más abajo), y resumen/listado/reporte heredados enmascaraban
 lecturas fallidas como ceros o `success:false` con 200, mientras órdenes,
 cotizaciones y recepciones respondían 500/400. La 568 añade
 `actualizar_recepcion_tx_568`; las fuentes pasaron 14 escenarios API y restore
@@ -70,14 +70,12 @@ pasó y 568 se promovió una sola vez
 (`artifacts/peru-568-promotion-20261004164814362.json`). #138 se integró como
 `624ca0b2`; main 37218136805 (409 HTTP, 32 UI), E2E y seguridad aprobaron y el
 runtime `624ca0b2`/568 pasó al segundo intento tras un timeout de 20 segundos
-(`artifacts/peru-production-verification-after-138-20261004.json`). PROD
-actual: 568; NO reaplicar.
-Contabilidad PE (rama `codex/peru-accounting-first-client-20261004`): el
-diagnóstico reprodujo 7 defectos
+(`artifacts/peru-production-verification-after-138-20261004.json`).
+Contabilidad PE (#139): el diagnóstico reprodujo 7 defectos
 (`artifacts/peru-accounting-defects-baseline-20261004.json`): un cliente nuevo
 no tenía ninguna cuenta conciliable (la 387 sólo marcó a los tenants de
 entonces; el ensayo productivo halla 401 cuentas PE así), el listado de
-conciliaciones respondía 500 por falta de SELECT, `presupuestos/alertas` quedaba
+conciliaciones respondía 500 en la reconstrucción local, `presupuestos/alertas` quedaba
 capturado por `presupuestos/:id`, libros y plan de cuentas enmascaraban lecturas
 fallidas como 200 vacíos, asientos y estados respondían 500, `mes=13` se
 aceptaba y conciliar no era reintentable. La 569 marca las cuentas PE de
@@ -86,9 +84,26 @@ conciliación y el SELECT del listado. Las fuentes pasaron 13 escenarios API y
 restore (`artifacts/peru-accounting-canonical-local-20261004`), la suite API
 301/2917, la reconstrucción fresca de 565 migraciones hasta 569 con 78
 verificadores y el ensayo sobre el respaldo productivo 568
-(`artifacts/erp-peru-569-rehearsal-20261004165609161-17420.json`). 569 no está
-promovida; faltan CI exacto, promoción, main y runtime. El libro diario sigue
-listando asientos de todo estado: observación no cambiada.
+(`artifacts/erp-peru-569-rehearsal-20261004165609161-17420.json`). Los checks de
+`1457c3d0` aprobaron, 569 se promovió una sola vez y marcó 401 cuentas
+(`artifacts/peru-569-promotion-20261004180640341.json`); #139 se integró como
+`0fe3881e`, main 37223140493, E2E y seguridad aprobaron y el runtime
+`0fe3881e`/569 pasó al tercer intento
+(`artifacts/peru-production-verification-after-139-20261004.json`, intentos en
+`...-timeouts-20261004.json`). PROD actual: 569; NO reaplicar. El libro diario
+sigue listando asientos de todo estado: observación no cambiada.
+Privilegios (corrección): el respaldo productivo muestra los privilegios por
+defecto de Supabase (`GRANT ALL` a anon, authenticated y service_role en
+`public`) y RLS en las 254 tablas; las vistas son `security_invoker` salvo tres
+materializadas reservadas a service_role. El bootstrap local/CI no emula esos
+defaults: los permisos de service_role ausentes vistos en local (recepciones,
+`conciliaciones_partidas`, `documento_archivos`) no fallan en PROD ni en un
+proyecto Supabase nuevo; los cambios 567/568/569 siguen siendo correctos y
+explícitos. Con los defaults, los verificadores 554/555 fallan porque PROD sí
+concede escritura de clientes a nivel GRANT (RLS la limita): pendiente alinear
+bootstrap y endurecimiento. Pendiente externo: confirmar en Render que
+`JWT_SECRET` difiere del secreto JWT del proyecto Supabase (el token no lleva
+`role`).
 Usuarios, finanzas y RRHH PE (rama `codex/peru-users-admin-20261004`, sin
 migración): 11 escenarios de alta, edición, permisos efectivos, inactivación
 con revocación de sesión, baja, aislamiento y roles propios reprodujeron un
@@ -106,9 +121,17 @@ lecturas caídas como 500 o 200 vacío. Tras corregir, 32/32 y restore
 (`artifacts/peru-users-finance-hr-canonical-local-20261004`). Ante una caída de
 `usuarios_sistema` el guard responde 403 (falla cerrado); `finanzas.controller`
 (tablero e históricos) no está montado ni ofrecido; CxC notas de crédito y
-reprogramación siguen sin caso propio.
-La matriz registra 717 contratos, 380 observados, 316 con casos funcionales,
-162 casos y 108 defectos; no hay aceptación integral del lanzamiento.
+reprogramación siguen sin caso propio. Centro de Documentos reprodujo tres
+(`artifacts/peru-documents-defects-baseline-20261004.json`): una empresa recién
+configurada no podía crear su primer documento con la serie del asistente
+(F001) y no hay pantalla de series; auditoría ajena 200 y lecturas/writer caídos
+400. La serie configurada se registra ahora con el writer 461 en su primer uso;
+8/8 local con privilegios Supabase emulados
+(`artifacts/peru-documents-fixed-local-20261004`); sin fase CI hasta alinear el
+bootstrap.
+La matriz registra 717 contratos, 421 observados (main 37223140493), 316 con
+casos funcionales, 162 casos y 119 defectos; no hay aceptación integral del
+lanzamiento.
 
 Corte técnico 131/132: el cierre 131 promovió 562 una sola vez con preflight,
 respaldo 560, rollback local y preservación de 29 tablas/funciones/seguridad
