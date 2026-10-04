@@ -1,0 +1,11 @@
+{
+  "scope": "Compras con fuentes canónicas y 568",
+  "complete_acceptance": false,
+  "remoteWrites": false,
+  "passed": 14,
+  "failed": 0,
+  "limits": [
+    "Snapshot local restaurado más DDL hasta 568; la reconstrucción fresca y CI se registran aparte",
+    "Sin UI de compras en este subconjunto"
+  ]
+}

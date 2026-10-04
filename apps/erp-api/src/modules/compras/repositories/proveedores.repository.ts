@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { readUnavailable } from '../compras-errors';
 import { sanitizePostgrestSearch } from '../../../common/util/postgrest.util';
 
 @Injectable()
@@ -64,7 +65,7 @@ export class ProveedoresRepository {
 
     const { data, error } = await query;
 
-    if (error) throw error;
+    if (error) throw readUnavailable('los proveedores');
     return data;
   }
 
@@ -76,7 +77,7 @@ export class ProveedoresRepository {
       .eq('tenant_id', tenantId)
       .maybeSingle();
 
-    if (error) throw error;
+    if (error) throw readUnavailable('el proveedor');
     return data;
   }
 
@@ -88,7 +89,7 @@ export class ProveedoresRepository {
       .eq('tenant_id', tenantId)
       .maybeSingle();
 
-    if (error) throw error;
+    if (error) throw readUnavailable('el proveedor por RUC');
     return data;
   }
 

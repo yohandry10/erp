@@ -1,0 +1,11 @@
+{
+  "scope": "Diagnóstico de compras antes de corregir: defectos reproducidos",
+  "complete_acceptance": false,
+  "remoteWrites": false,
+  "passed": 7,
+  "failed": 7,
+  "limits": [
+    "Snapshot local restaurado más DDL hasta 568; la reconstrucción fresca y CI se registran aparte",
+    "Sin UI de compras en este subconjunto"
+  ]
+}

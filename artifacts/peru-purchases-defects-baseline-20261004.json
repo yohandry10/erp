@@ -1,0 +1,107 @@
+{
+  "scope": "Compras: proveedores, cotizaciones, órdenes, recepciones, devoluciones y rutas heredadas con API/PostgREST/PostgreSQL locales efímeros",
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "runs": [
+    {
+      "output": "artifacts/peru-purchases-local-20261004024355300-23556",
+      "result": "probe_missing_idempotency_header"
+    },
+    {
+      "output": "artifacts/peru-purchases-local-20261004024506180-8312",
+      "result": "diagnostic_with_probe_assumptions"
+    },
+    {
+      "output": "artifacts/peru-purchases-local-20261004024653862-21284",
+      "result": "defects_reproduced",
+      "restore": "passed"
+    }
+  ],
+  "probe_assumptions_corrected": [
+    "configuration/complete exige Idempotency-Key",
+    "Enviar, aprobar y rechazar cotización de compra responden 200 por contrato",
+    "Rechazar o cancelar una OC la deja ANULADA con rechazado_by/cancelado_by (453)"
+  ],
+  "passed": [
+    "Proveedor por RUC sin exposición ajena",
+    "Cotización de compra editada, enviada, aprobada por otro actor y convertida en una sola OC",
+    "Cotización rechazada con motivo no se convierte",
+    "OC en borrador editada y recalculada; listado filtra por proveedor y estado",
+    "OC rechazada o cancelada no admite recepción",
+    "Recepción desde la ruta de la orden con replay sin duplicar",
+    "Órdenes de otra empresa responden 404",
+    "Rutas heredadas de escritura responden 410"
+  ],
+  "confirmed_defects": [
+    {
+      "id": "purchase-receipt-update-direct-dml",
+      "operations": [
+        "PUT /api/compras/recepciones/:id"
+      ],
+      "observed": "La edición hace UPDATE directo y en la cadena canónica service_role no tiene DML sobre recepciones: responde 400 'permission denied'. PROD conserva GRANT ALL heredado, por lo que hoy funciona allí; cualquier reconstrucción la rompe."
+    },
+    {
+      "id": "purchase-legacy-stats-masked",
+      "operations": [
+        "GET /api/compras/stats"
+      ],
+      "observed": "Sin lectura de ordenes_compra responde 200 success:true con todas las cifras en cero"
+    },
+    {
+      "id": "purchase-legacy-list-masked",
+      "operations": [
+        "GET /api/compras"
+      ],
+      "observed": "Sin lectura responde 200 success:false con lista vacía"
+    },
+    {
+      "id": "purchase-legacy-report-masked",
+      "operations": [
+        "GET /api/compras/reporte-compras"
+      ],
+      "observed": "Sin lectura responde 200 success:false con resumen vacío"
+    },
+    {
+      "id": "purchase-orders-read-unavailability-500",
+      "operations": [
+        "GET /api/compras/ordenes"
+      ],
+      "observed": "Sin lectura responde 500 con el mensaje técnico"
+    },
+    {
+      "id": "purchase-quotes-read-unavailability-500",
+      "operations": [
+        "GET /api/compras/cotizaciones"
+      ],
+      "observed": "Sin lectura responde 500 con el mensaje técnico"
+    },
+    {
+      "id": "purchase-receipts-read-unavailability-400",
+      "operations": [
+        "GET /api/compras/recepciones"
+      ],
+      "observed": "Sin lectura responde 400 con el mensaje técnico"
+    }
+  ],
+  "related_finding": "El inventario API registra POST /api/compras/recepciones//ordenes/:ordenId con doble barra y por eso no cuenta como observada esa operación",
+  "pending": [
+    "Corrección canónica con writer 568, regresión, CI, promoción y despliegue",
+    "UI real de compras",
+    "Roles distintos de ADMIN"
+  ],
+  "canonical_proof": "artifacts/peru-purchases-canonical-local-20261004",
+  "code_review_corrections": [
+    {
+      "operations": [
+        "GET /api/compras/devoluciones/:id"
+      ],
+      "observed": "Una devolución inexistente se convertía en 400 «Error al obtener devolución»; ahora 404 y lectura fallida 503. Hallado por revisión de código, sin reproducción en la sonda."
+    },
+    {
+      "operations": [
+        "GET /api/compras/:id"
+      ],
+      "observed": "El detalle heredado devolvía 200 success:false ante inexistencia o fallo; ahora 404/503. Hallado por revisión de código, sin reproducción en la sonda."
+    }
+  ]
+}

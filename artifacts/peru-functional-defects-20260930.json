@@ -2522,7 +2522,7 @@
     },
     {
       "id": "sales-quote-create-not-idempotent",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -2536,13 +2536,22 @@
       },
       "correction": "Ver PR de ventas: intención 567, 503 en lecturas/writers indisponibles, 404 en pedido ajeno, historial con ciclo de vida y lecturas explícitas",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 567, main y runtime."
+        "UI real de ventas, roles distintos de ADMIN y variantes no registradas"
       ],
-      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003",
+      "closure": {
+        "pr": 137,
+        "merge_sha": "0d6df0eed95e0b0622c01c2d56877bb241c1d07b",
+        "schema": 567,
+        "promotion": "artifacts/peru-567-promotion-20261004031647084.json",
+        "main_ci": 37173628882,
+        "runtime": "artifacts/peru-production-verification-after-137-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-137-timeouts-20261004.json"
+      }
     },
     {
       "id": "sales-order-create-not-idempotent",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -2556,13 +2565,22 @@
       },
       "correction": "Ver PR de ventas: intención 567, 503 en lecturas/writers indisponibles, 404 en pedido ajeno, historial con ciclo de vida y lecturas explícitas",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 567, main y runtime."
+        "UI real de ventas, roles distintos de ADMIN y variantes no registradas"
       ],
-      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003",
+      "closure": {
+        "pr": 137,
+        "merge_sha": "0d6df0eed95e0b0622c01c2d56877bb241c1d07b",
+        "schema": 567,
+        "promotion": "artifacts/peru-567-promotion-20261004031647084.json",
+        "main_ci": 37173628882,
+        "runtime": "artifacts/peru-production-verification-after-137-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-137-timeouts-20261004.json"
+      }
     },
     {
       "id": "sales-quote-read-unavailability-400",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -2576,13 +2594,22 @@
       },
       "correction": "Ver PR de ventas: intención 567, 503 en lecturas/writers indisponibles, 404 en pedido ajeno, historial con ciclo de vida y lecturas explícitas",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 567, main y runtime."
+        "UI real de ventas, roles distintos de ADMIN y variantes no registradas"
       ],
-      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003",
+      "closure": {
+        "pr": 137,
+        "merge_sha": "0d6df0eed95e0b0622c01c2d56877bb241c1d07b",
+        "schema": 567,
+        "promotion": "artifacts/peru-567-promotion-20261004031647084.json",
+        "main_ci": 37173628882,
+        "runtime": "artifacts/peru-production-verification-after-137-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-137-timeouts-20261004.json"
+      }
     },
     {
       "id": "sales-order-read-unavailability-400",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -2596,13 +2623,22 @@
       },
       "correction": "Ver PR de ventas: intención 567, 503 en lecturas/writers indisponibles, 404 en pedido ajeno, historial con ciclo de vida y lecturas explícitas",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 567, main y runtime."
+        "UI real de ventas, roles distintos de ADMIN y variantes no registradas"
       ],
-      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003",
+      "closure": {
+        "pr": 137,
+        "merge_sha": "0d6df0eed95e0b0622c01c2d56877bb241c1d07b",
+        "schema": 567,
+        "promotion": "artifacts/peru-567-promotion-20261004031647084.json",
+        "main_ci": 37173628882,
+        "runtime": "artifacts/peru-production-verification-after-137-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-137-timeouts-20261004.json"
+      }
     },
     {
       "id": "sales-quote-writer-unavailability-400",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -2616,13 +2652,22 @@
       },
       "correction": "Ver PR de ventas: intención 567, 503 en lecturas/writers indisponibles, 404 en pedido ajeno, historial con ciclo de vida y lecturas explícitas",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 567, main y runtime."
+        "UI real de ventas, roles distintos de ADMIN y variantes no registradas"
       ],
-      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003",
+      "closure": {
+        "pr": 137,
+        "merge_sha": "0d6df0eed95e0b0622c01c2d56877bb241c1d07b",
+        "schema": 567,
+        "promotion": "artifacts/peru-567-promotion-20261004031647084.json",
+        "main_ci": 37173628882,
+        "runtime": "artifacts/peru-production-verification-after-137-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-137-timeouts-20261004.json"
+      }
     },
     {
       "id": "sales-order-update-not-found-400",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "PUT",
@@ -2636,13 +2681,22 @@
       },
       "correction": "Ver PR de ventas: intención 567, 503 en lecturas/writers indisponibles, 404 en pedido ajeno, historial con ciclo de vida y lecturas explícitas",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 567, main y runtime."
+        "UI real de ventas, roles distintos de ADMIN y variantes no registradas"
       ],
-      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003",
+      "closure": {
+        "pr": 137,
+        "merge_sha": "0d6df0eed95e0b0622c01c2d56877bb241c1d07b",
+        "schema": 567,
+        "promotion": "artifacts/peru-567-promotion-20261004031647084.json",
+        "main_ci": 37173628882,
+        "runtime": "artifacts/peru-production-verification-after-137-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-137-timeouts-20261004.json"
+      }
     },
     {
       "id": "sales-sunat-kpis-rebuild-acl-500",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -2656,13 +2710,22 @@
       },
       "correction": "Ver PR de ventas: intención 567, 503 en lecturas/writers indisponibles, 404 en pedido ajeno, historial con ciclo de vida y lecturas explícitas",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 567, main y runtime."
+        "UI real de ventas, roles distintos de ADMIN y variantes no registradas"
       ],
-      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003",
+      "closure": {
+        "pr": 137,
+        "merge_sha": "0d6df0eed95e0b0622c01c2d56877bb241c1d07b",
+        "schema": 567,
+        "promotion": "artifacts/peru-567-promotion-20261004031647084.json",
+        "main_ci": 37173628882,
+        "runtime": "artifacts/peru-production-verification-after-137-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-137-timeouts-20261004.json"
+      }
     },
     {
       "id": "sales-quote-history-empty",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -2676,13 +2739,22 @@
       },
       "correction": "Ver PR de ventas: intención 567, 503 en lecturas/writers indisponibles, 404 en pedido ajeno, historial con ciclo de vida y lecturas explícitas",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 567, main y runtime."
+        "UI real de ventas, roles distintos de ADMIN y variantes no registradas"
       ],
-      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003",
+      "closure": {
+        "pr": 137,
+        "merge_sha": "0d6df0eed95e0b0622c01c2d56877bb241c1d07b",
+        "schema": 567,
+        "promotion": "artifacts/peru-567-promotion-20261004031647084.json",
+        "main_ci": 37173628882,
+        "runtime": "artifacts/peru-production-verification-after-137-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-137-timeouts-20261004.json"
+      }
     },
     {
       "id": "sales-order-history-incomplete",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -2696,13 +2768,22 @@
       },
       "correction": "Ver PR de ventas: intención 567, 503 en lecturas/writers indisponibles, 404 en pedido ajeno, historial con ciclo de vida y lecturas explícitas",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 567, main y runtime."
+        "UI real de ventas, roles distintos de ADMIN y variantes no registradas"
       ],
-      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003",
+      "closure": {
+        "pr": 137,
+        "merge_sha": "0d6df0eed95e0b0622c01c2d56877bb241c1d07b",
+        "schema": 567,
+        "promotion": "artifacts/peru-567-promotion-20261004031647084.json",
+        "main_ci": 37173628882,
+        "runtime": "artifacts/peru-production-verification-after-137-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-137-timeouts-20261004.json"
+      }
     },
     {
       "id": "sales-order-history-inventory-query-silent-failure",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -2716,9 +2797,158 @@
       },
       "correction": "Ver PR de ventas: intención 567, 503 en lecturas/writers indisponibles, 404 en pedido ajeno, historial con ciclo de vida y lecturas explícitas",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 567, main y runtime."
+        "UI real de ventas, roles distintos de ADMIN y variantes no registradas"
       ],
-      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003",
+      "closure": {
+        "pr": 137,
+        "merge_sha": "0d6df0eed95e0b0622c01c2d56877bb241c1d07b",
+        "schema": 567,
+        "promotion": "artifacts/peru-567-promotion-20261004031647084.json",
+        "main_ci": 37173628882,
+        "runtime": "artifacts/peru-production-verification-after-137-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-137-timeouts-20261004.json"
+      }
+    },
+    {
+      "id": "purchase-receipt-update-direct-dml",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "PUT",
+          "endpoint": "/api/compras/recepciones/:id"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-purchases-baseline-20261004",
+        "observed_error": "La edición hace UPDATE directo y en la cadena canónica service_role no tiene DML sobre recepciones: responde 400 'permission denied'. PROD conserva GRANT ALL heredado, por lo que hoy funciona allí; cualquier reconstrucción la rompe.",
+        "local_only": true
+      },
+      "correction": "Writer 568 para editar recepciones; lecturas de compras indisponibles responden 503 sin enmascarar; inexistente 404",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 568, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-purchases-canonical-local-20261004"
+    },
+    {
+      "id": "purchase-legacy-stats-masked",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/stats"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-purchases-baseline-20261004",
+        "observed_error": "Sin lectura de ordenes_compra responde 200 success:true con todas las cifras en cero",
+        "local_only": true
+      },
+      "correction": "Writer 568 para editar recepciones; lecturas de compras indisponibles responden 503 sin enmascarar; inexistente 404",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 568, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-purchases-canonical-local-20261004"
+    },
+    {
+      "id": "purchase-legacy-list-masked",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/compras"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-purchases-baseline-20261004",
+        "observed_error": "Sin lectura responde 200 success:false con lista vacía",
+        "local_only": true
+      },
+      "correction": "Writer 568 para editar recepciones; lecturas de compras indisponibles responden 503 sin enmascarar; inexistente 404",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 568, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-purchases-canonical-local-20261004"
+    },
+    {
+      "id": "purchase-legacy-report-masked",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/reporte-compras"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-purchases-baseline-20261004",
+        "observed_error": "Sin lectura responde 200 success:false con resumen vacío",
+        "local_only": true
+      },
+      "correction": "Writer 568 para editar recepciones; lecturas de compras indisponibles responden 503 sin enmascarar; inexistente 404",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 568, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-purchases-canonical-local-20261004"
+    },
+    {
+      "id": "purchase-orders-read-unavailability-500",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/ordenes"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-purchases-baseline-20261004",
+        "observed_error": "Sin lectura responde 500 con el mensaje técnico",
+        "local_only": true
+      },
+      "correction": "Writer 568 para editar recepciones; lecturas de compras indisponibles responden 503 sin enmascarar; inexistente 404",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 568, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-purchases-canonical-local-20261004"
+    },
+    {
+      "id": "purchase-quotes-read-unavailability-500",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/cotizaciones"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-purchases-baseline-20261004",
+        "observed_error": "Sin lectura responde 500 con el mensaje técnico",
+        "local_only": true
+      },
+      "correction": "Writer 568 para editar recepciones; lecturas de compras indisponibles responden 503 sin enmascarar; inexistente 404",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 568, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-purchases-canonical-local-20261004"
+    },
+    {
+      "id": "purchase-receipts-read-unavailability-400",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/recepciones"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-purchases-baseline-20261004",
+        "observed_error": "Sin lectura responde 400 con el mensaje técnico",
+        "local_only": true
+      },
+      "correction": "Writer 568 para editar recepciones; lecturas de compras indisponibles responden 503 sin enmascarar; inexistente 404",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 568, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-purchases-canonical-local-20261004"
     }
   ]
 }

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { readUnavailable, rowOrUnavailable } from '../compras-errors';
 
 @Injectable()
 export class OrdenesCompraRepository {
@@ -18,7 +19,7 @@ export class OrdenesCompraRepository {
       .eq('tenant_id', tenantId)
       .single();
 
-    if (ordenError) return null;
+    if (!rowOrUnavailable(orden, ordenError, 'la orden de compra')) return null;
 
     const { data: detalles, error: detallesError } = await supabase
       .from('orden_compra_detalles')
@@ -39,7 +40,7 @@ export class OrdenesCompraRepository {
       .eq('tenant_id', tenantId);
 
     if (detallesError) {
-      throw new Error(`Error al obtener detalles: ${detallesError.message}`);
+      throw readUnavailable('los detalles de la orden de compra');
     }
     return { ...orden, detalles: detalles || [] };
   }
@@ -52,7 +53,7 @@ export class OrdenesCompraRepository {
       .eq('numero', numero)
       .eq('tenant_id', tenantId)
       .single();
-    return error ? null : data;
+    return rowOrUnavailable(data, error, 'la numeración de órdenes de compra');
   }
 
   async findAll(
@@ -100,7 +101,7 @@ export class OrdenesCompraRepository {
     }
 
     const { data, error, count } = await query;
-    if (error) throw new Error(`Error al obtener órdenes de compra: ${error.message}`);
+    if (error) throw readUnavailable('las órdenes de compra');
     return { data: data || [], count: count || 0 };
   }
 
@@ -125,7 +126,7 @@ export class OrdenesCompraRepository {
       .eq('tenant_id', tenantId)
       .order('fecha_recepcion', { ascending: false });
 
-    if (error) throw new Error(`Error al obtener recepciones: ${error.message}`);
+    if (error) throw readUnavailable('las recepciones de la orden');
     return data || [];
   }
 }

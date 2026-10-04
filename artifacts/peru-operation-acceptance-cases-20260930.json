@@ -4051,6 +4051,582 @@
       "pending_checks": [
         "UI real, roles distintos de ADMIN y variantes no registradas"
       ]
+    },
+    {
+      "id": "purchase-supplier-create-read",
+      "source": "scripts/ci/test-peru-integrated-purchases.mjs",
+      "required_scenario_prefixes": [
+        "alta y consulta real de proveedor peruano"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/proveedores"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/proveedores/:id"
+        }
+      ],
+      "verified_checks": [
+        "Alta y lectura de proveedor peruano"
+      ],
+      "pending_checks": [
+        "Indisponibilidad de lecturas/writers, UI real por operación y variantes de moneda/rol no registradas"
+      ]
+    },
+    {
+      "id": "purchase-order-create-replay",
+      "source": "scripts/ci/test-peru-integrated-purchases.mjs",
+      "required_scenario_prefixes": [
+        "orden de compra calculada en PostgreSQL"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/ordenes"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/ordenes/:id"
+        }
+      ],
+      "verified_checks": [
+        "Totales calculados en SQL y reintento idempotente de la orden"
+      ],
+      "pending_checks": [
+        "Indisponibilidad de lecturas/writers, UI real por operación y variantes de moneda/rol no registradas"
+      ]
+    },
+    {
+      "id": "purchase-receipt-close-once",
+      "source": "scripts/ci/test-peru-integrated-purchases.mjs",
+      "required_scenario_prefixes": [
+        "recepción cerrada: stock único"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/recepciones/ordenes/:ordenId"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/recepciones/:id/cerrar"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/ordenes/:id/recepciones"
+        }
+      ],
+      "verified_checks": [
+        "Recepción con replay: stock único, orden recibida y costo sin deuda ni crédito fiscal"
+      ],
+      "pending_checks": [
+        "Indisponibilidad de lecturas/writers, UI real por operación y variantes de moneda/rol no registradas"
+      ]
+    },
+    {
+      "id": "purchase-invoice-debt",
+      "source": "scripts/ci/test-peru-integrated-purchases.mjs",
+      "required_scenario_prefixes": [
+        "factura del proveedor genera deuda real"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/finanzas/cxp"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxp/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxp"
+        }
+      ],
+      "verified_checks": [
+        "Factura de proveedor crea deuda en PEN ligada a la recepción"
+      ],
+      "pending_checks": [
+        "Indisponibilidad de lecturas/writers, UI real por operación y variantes de moneda/rol no registradas"
+      ]
+    },
+    {
+      "id": "purchase-payment-bank-accounting",
+      "source": "scripts/ci/test-peru-integrated-purchases.mjs",
+      "required_scenario_prefixes": [
+        "pago de compra: deuda cancelada"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/finanzas/cxp/:id/aplicar-pago"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/bancos/cuentas/:id"
+        }
+      ],
+      "verified_checks": [
+        "Pago con replay: deuda cancelada, cargo bancario y asiento únicos"
+      ],
+      "pending_checks": [
+        "Indisponibilidad de lecturas/writers, UI real por operación y variantes de moneda/rol no registradas"
+      ]
+    },
+    {
+      "id": "purchase-tenant-isolation",
+      "source": "scripts/ci/test-peru-integrated-purchases.mjs",
+      "required_scenario_prefixes": [
+        "orden, recepción y factura de compra invisibles"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/ordenes/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/recepciones/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxp/:id"
+        }
+      ],
+      "verified_checks": [
+        "Orden, recepción y factura invisibles para otra empresa"
+      ],
+      "pending_checks": [
+        "Indisponibilidad de lecturas/writers, UI real por operación y variantes de moneda/rol no registradas"
+      ]
+    },
+    {
+      "id": "purchase-return-paid-invoice-blocked",
+      "source": "scripts/ci/test-peru-integrated-purchase-variants.mjs",
+      "required_scenario_prefixes": [
+        "devolución incompatible con factura pagada"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/devoluciones"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/devoluciones/:id/emitir"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/devoluciones/:id"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/devoluciones/:id/anular"
+        }
+      ],
+      "verified_checks": [
+        "Devolución contra factura pagada revierte stock/outbox; borrador anulable con replay"
+      ],
+      "pending_checks": [
+        "Indisponibilidad de lecturas/writers, UI real por operación y variantes de moneda/rol no registradas"
+      ]
+    },
+    {
+      "id": "purchase-partial-mixed-receipts",
+      "source": "scripts/ci/test-peru-integrated-purchase-variants.mjs",
+      "required_scenario_prefixes": [
+        "recepción parcial mixta"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/ordenes"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/recepciones/ordenes/:ordenId"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/recepciones/:id/cerrar"
+        }
+      ],
+      "verified_checks": [
+        "Recepciones parciales mixtas: servicios, rechazo sin stock y exceso sin cabecera"
+      ],
+      "pending_checks": [
+        "Indisponibilidad de lecturas/writers, UI real por operación y variantes de moneda/rol no registradas"
+      ]
+    },
+    {
+      "id": "purchase-partial-receipts-accounting",
+      "source": "scripts/ci/test-peru-integrated-purchase-variants.mjs",
+      "required_scenario_prefixes": [
+        "recepciones parciales contabilizadas"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/recepciones/:id/cerrar"
+        }
+      ],
+      "verified_checks": [
+        "Mercadería y servicio contabilizados por separado sin duplicados"
+      ],
+      "pending_checks": [
+        "Indisponibilidad de lecturas/writers, UI real por operación y variantes de moneda/rol no registradas"
+      ]
+    },
+    {
+      "id": "purchase-return-before-invoice",
+      "source": "scripts/ci/test-peru-integrated-purchase-variants.mjs",
+      "required_scenario_prefixes": [
+        "devolución previa a factura"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/devoluciones"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/devoluciones/:id/emitir"
+        }
+      ],
+      "verified_checks": [
+        "Devolución previa a factura revierte sin deuda ni IGV; el rechazo original no es devolvible"
+      ],
+      "pending_checks": [
+        "Indisponibilidad de lecturas/writers, UI real por operación y variantes de moneda/rol no registradas"
+      ]
+    },
+    {
+      "id": "purchase-return-pending-invoice",
+      "source": "scripts/ci/test-peru-integrated-purchase-variants.mjs",
+      "required_scenario_prefixes": [
+        "devolución de compra pendiente"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/devoluciones"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/devoluciones/:id/emitir"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxp/:id"
+        }
+      ],
+      "verified_checks": [
+        "Devolución sobre factura pendiente ajusta saldo, inventario y asiento una vez"
+      ],
+      "pending_checks": [
+        "Indisponibilidad de lecturas/writers, UI real por operación y variantes de moneda/rol no registradas"
+      ]
+    },
+    {
+      "id": "purchase-order-segregated-approval",
+      "source": "scripts/ci/test-peru-integrated-purchases.mjs",
+      "required_scenario_prefixes": [
+        "aprobación por otro usuario y una sola decisión persistida"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/ordenes/:id/aprobar"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/ordenes/:id/aprobaciones"
+        }
+      ],
+      "verified_checks": [
+        "Autoaprobación rechazada; otro actor aprueba con replay y una sola decisión persistida"
+      ],
+      "pending_checks": [
+        "Rechazo y cancelación de OC, indisponibilidad y UI"
+      ]
+    },
+    {
+      "id": "purchase-supplier-ruc-lookup",
+      "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Compras: proveedor se encuentra por RUC"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/proveedores/buscar-ruc/:ruc"
+        }
+      ],
+      "verified_checks": [
+        "Compras: proveedor se encuentra por RUC; RUC ajeno o inexistente no se expone"
+      ],
+      "pending_checks": [
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "purchase-quote-lifecycle-convert-once",
+      "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Compras: cotización editada, enviada, aprobada"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/cotizaciones"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/compras/cotizaciones/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/cotizaciones/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/cotizaciones"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/cotizaciones/:id/enviar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/cotizaciones/:id/aprobar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/cotizaciones/:id/convertir-oc"
+        }
+      ],
+      "verified_checks": [
+        "Compras: cotización editada, enviada, aprobada por otro actor y convertida en una sola OC"
+      ],
+      "pending_checks": [
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "purchase-quote-reject-no-convert",
+      "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Compras: cotización rechazada con motivo"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/cotizaciones/:id/rechazar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/cotizaciones/:id/convertir-oc"
+        }
+      ],
+      "verified_checks": [
+        "Compras: cotización rechazada con motivo no se convierte"
+      ],
+      "pending_checks": [
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "purchase-order-edit-list",
+      "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Compras: OC en borrador se edita"
+      ],
+      "operations": [
+        {
+          "method": "PUT",
+          "endpoint": "/api/compras/ordenes/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/ordenes"
+        }
+      ],
+      "verified_checks": [
+        "Compras: OC en borrador se edita y recalcula; listado filtra por proveedor y estado"
+      ],
+      "pending_checks": [
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "purchase-order-reject-cancel",
+      "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Compras: OC rechazada por otro actor y OC cancelada"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/ordenes/:id/rechazar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/ordenes/:id/cancelar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/recepciones/ordenes/:ordenId"
+        }
+      ],
+      "verified_checks": [
+        "Compras: OC rechazada por otro actor y OC cancelada con motivo no admiten recepción"
+      ],
+      "pending_checks": [
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "purchase-receipt-order-route-edit-list",
+      "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Compras: recepción desde la ruta de la orden"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/ordenes/:id/recepciones"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/compras/recepciones/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/recepciones"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/devoluciones"
+        }
+      ],
+      "verified_checks": [
+        "Compras: recepción desde la ruta de la orden, editada y listada; replay no duplica"
+      ],
+      "pending_checks": [
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "purchase-order-isolation",
+      "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Compras: documentos de otra empresa responden 404"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/ordenes/:id"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/compras/ordenes/:id"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/compras/ordenes/:id/cancelar"
+        }
+      ],
+      "verified_checks": [
+        "Compras: documentos de otra empresa responden 404"
+      ],
+      "pending_checks": [
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "purchase-legacy-reads",
+      "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Compras: resumen, listado y reporte heredados"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/stats"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/reporte-compras"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/next-number"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/productos"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/compras"
+        }
+      ],
+      "verified_checks": [
+        "Compras: resumen, listado y reporte heredados responden con datos de la empresa"
+      ],
+      "pending_checks": [
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "purchase-reads-outage-503",
+      "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Compras: lectura de"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/stats"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/ordenes"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/cotizaciones"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/recepciones"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/reporte-compras"
+        }
+      ],
+      "verified_checks": [
+        "Compras: lectura de compras/stats sin ordenes_compra responde 503",
+        "Compras: lectura de compras sin ordenes_compra responde 503",
+        "Compras: lectura de compras/ordenes sin ordenes_compra responde 503",
+        "Compras: lectura de compras/cotizaciones sin cotizaciones_compra responde 503",
+        "Compras: lectura de compras/recepciones sin recepciones responde 503",
+        "Compras: lectura de compras/reporte-compras sin ordenes_compra responde 503"
+      ],
+      "pending_checks": [
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
+      ]
     }
   ]
 }
