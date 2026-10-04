@@ -25,7 +25,8 @@ import axios from 'axios';
 import { createHash, randomUUID } from 'crypto';
 import { decryptText, encryptText } from '../../shared/utils/secure-config.utils';
 import { fechaHoyDelTenant } from '../../shared/utils/fecha-tenant.util';
-
+import { lecturaRrhhFallida, relanzarLecturaRrhh } from './rrhh-errors';
+
 // Respaldo si normativa_peru_periodos no tiene fila para el periodo consultado.
 const RMV_PERU_FALLBACK = 1130;
 
@@ -760,7 +761,7 @@ export class RrhhService {
       .eq('tenant_id', currentTenantId)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) throw lecturaRrhhFallida('las vacantes');
     return { success: true, data: data || [] };
   }
 
@@ -808,7 +809,7 @@ export class RrhhService {
     }
 
     const { data, error } = await query;
-    if (error) throw error;
+    if (error) throw lecturaRrhhFallida('los candidatos');
 
     return { success: true, data: data || [] };
   }
@@ -991,7 +992,7 @@ export class RrhhService {
     if (fechaHasta) query = query.lte('fecha', fechaHasta);
 
     const { data, error } = await query.limit(100);
-    if (error) throw error;
+    if (error) throw lecturaRrhhFallida('la asistencia');
 
     return { success: true, data: data || [] };
   }
@@ -1911,13 +1912,15 @@ export class RrhhService {
       // Obtener datos de empleados por separado
       const pagosConEmpleados = await Promise.all(
         data.map(async (pago) => {
-          const { data: empleado } = await this.supabaseService
+          const { data: empleado, error: empleadoError } = await this.supabaseService
             .getClient()
             .from('empleados')
             .select('nombres, apellidos, numero_documento')
             .eq('id', pago.empleado_id)
             .eq('tenant_id', currentTenantId)
-            .single();
+            .maybeSingle();
+          // Un empleado ausente se muestra N/A; una lectura fallida no.
+          if (empleadoError) throw lecturaRrhhFallida('los empleados de los pagos');
 
           const resultado = {
             ...pago,
@@ -1950,11 +1953,7 @@ export class RrhhService {
       return { success: true, data: pagosConEmpleados };
     } catch (error: any) {
       this.logger.error('❌ Error completo en getPagos:', error);
-      return {
-        success: false,
-        data: [],
-        error: error?.message || 'Error obteniendo pagos',
-      };
+      relanzarLecturaRrhh(error, 'los pagos de RRHH');
     }
   }
 
@@ -2036,10 +2035,13 @@ export class RrhhService {
           .select('*')
           .eq('id', empleadoId)
           .eq('tenant_id', currentTenantId)
-          .single();
+          .maybeSingle();
 
-      if (empleadoError || !empleado) {
-        throw new Error('Empleado no encontrado');
+      if (empleadoError && empleadoError.code !== '22P02') {
+        throw lecturaRrhhFallida('el empleado');
+      }
+      if (!empleado) {
+        throw new NotFoundException('Empleado no encontrado');
       }
 
       // Obtener pagos del mes
@@ -2054,14 +2056,11 @@ export class RrhhService {
           .order('created_at', { ascending: false });
 
       if (pagosError) {
-        throw new Error('Error obteniendo pagos del empleado');
+        throw lecturaRrhhFallida('los pagos del empleado');
       }
 
       if (!pagos || pagos.length === 0) {
-        return {
-          success: false,
-          message: `No se encontraron pagos para el empleado en ${mes}`,
-        };
+        throw new NotFoundException(`No se encontraron pagos para el empleado en ${mes}`);
       }
       const pais = await this.obtenerPaisLaboral(currentTenantId);
       const moneda = String(
@@ -2105,10 +2104,7 @@ export class RrhhService {
       };
     } catch (error: any) {
       this.logger.error('❌ Error generando boleta de pago:', error);
-      return {
-        success: false,
-        message: 'Error generando boleta de pago: ' + error.message,
-      };
+      relanzarLecturaRrhh(error, 'la boleta de pago');
     }
   }
 

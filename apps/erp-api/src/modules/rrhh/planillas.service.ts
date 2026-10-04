@@ -27,6 +27,7 @@ import {
   NormativaColombiaPeriodo,
 } from './planillas-colombia.util';
 import { RrhhCountryService } from './rrhh-country.service';
+import { lecturaRrhhFallida } from './rrhh-errors';
 
 const CONCEPTOS_PLANILLA_BASE = [
   { codigo: '001', nombre: 'Sueldo basico', tipo: 'ingreso' },
@@ -253,7 +254,7 @@ export class PlanillasService {
     }
     
     const { data, error } = await query;
-    if (error) throw error;
+    if (error) throw lecturaRrhhFallida('las planillas');
     return {
       success: true,
       data: data || []
@@ -2671,28 +2672,32 @@ export class PlanillasService {
    * Obtener historial de pagos de una planilla
    */
   async getHistorialPagos(planillaId: string, tenantId: string) {
-    try {
-      const { data, error } = await this.supabaseService.getClient()
-        .from('historial_pagos_planilla')
-        .select('*')
-        .eq('planilla_id', planillaId)
-        .eq('tenant_id', tenantId)
-        .order('fecha', { ascending: false });
-
-      if (error) {
-        console.warn('Tabla historial_pagos_planilla no existe:', error);
-        return { success: true, data: [] };
-      }
-
-      return {
-        success: true,
-        data: data || []
-      };
-
-    } catch (error) {
-      console.error('❌ Error obteniendo historial de pagos:', error);
-      return { success: true, data: [] };
+    // Una planilla ajena o inexistente es 404 y una lectura fallida 503: antes
+    // ambas respondían 200 con una lista vacía, como si no hubiera pagos.
+    const { data: planilla, error: planillaError } = await this.supabaseService.getClient()
+      .from('planillas')
+      .select('id')
+      .eq('id', planillaId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (planillaError) {
+      if (planillaError.code === '22P02') throw new NotFoundException('Planilla no encontrada para el tenant');
+      throw lecturaRrhhFallida('la planilla');
     }
+    if (!planilla) throw new NotFoundException('Planilla no encontrada para el tenant');
+
+    const { data, error } = await this.supabaseService.getClient()
+      .from('historial_pagos_planilla')
+      .select('*')
+      .eq('planilla_id', planillaId)
+      .eq('tenant_id', tenantId)
+      .order('fecha', { ascending: false });
+    if (error) throw lecturaRrhhFallida('el historial de pagos');
+
+    return {
+      success: true,
+      data: data || []
+    };
   }
 
   private getFechaAsientoPlanilla(periodo: string): string {

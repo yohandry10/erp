@@ -1,0 +1,54 @@
+{
+  "scope": "RRHH usado por la web y no cubierto por las fases previas: planillas (edición, eliminación, aprobación por otro usuario, pago, historial, comprobante, boleta), permisos de remuneraciones, asistencia, reclutamiento, CTS e indisponibilidad con API/PostgREST/PostgreSQL locales efímeros",
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "runs": [
+    {
+      "output": "artifacts/peru-hr-ops-local-20261004175739292-7512",
+      "result": "diagnostic_with_probe_assumptions"
+    },
+    {
+      "output": "artifacts/peru-hr-baseline-20261004",
+      "result": "defects_reproduced",
+      "restore": "passed"
+    }
+  ],
+  "probe_assumptions_corrected": [
+    "El historial de pagos registra el evento de pago de la planilla, no ids de empleado: se comprueba que el pago repetido no lo duplica",
+    "La salida debe ser posterior a la entrada: el fixture adelanta la entrada una hora antes de marcar la salida"
+  ],
+  "passed": [
+    "Borrador de planilla editable, listado sin planillas ajenas y eliminación con intención",
+    "Cálculo, aprobación por otro usuario, pago repetido sin duplicar, historial, listado de pagos, comprobante PDF y boleta mensual",
+    "Entrada y salida con intención; segunda entrada del día 409; entrada sobre empleado ajeno rechazada sin persistir",
+    "Vacante y candidato con intención, edición, cambio de estado y aislamiento",
+    "Listado de depósitos CTS"
+  ],
+  "confirmed_defects": [
+    {
+      "id": "hr-pay-data-only-rrhh-access",
+      "operations": ["GET /api/rrhh/planillas/:id/historial-pagos", "GET /api/rrhh/pagos/:id/comprobante", "GET /api/rrhh/empleados/:id/boleta-pago/:mes"],
+      "observed": "Un usuario con sólo rrhh.access (sin rrhh.planillas.read) obtiene 200 en el historial de pagos, el comprobante PDF y la boleta mensual: lee remuneraciones que el listado de planillas y pagos sí le niega con 403."
+    },
+    {
+      "id": "hr-foreign-reads-200",
+      "operations": ["GET /api/rrhh/planillas/:id/historial-pagos", "GET /api/rrhh/empleados/:id/boleta-pago/:mes"],
+      "observed": "Otra empresa recibe 200 (lista vacía o success:false 'Empleado no encontrado') en vez de 404; no se expusieron datos."
+    },
+    {
+      "id": "hr-candidate-invalid-status-accepted",
+      "operations": ["PUT /api/rrhh/candidatos/:id/estado"],
+      "observed": "Un estado fuera del dominio (estado-inventado) responde 200."
+    },
+    {
+      "id": "hr-reads-unavailability",
+      "operations": ["GET /api/rrhh/planillas", "GET /api/rrhh/pagos", "GET /api/rrhh/asistencia", "GET /api/rrhh/candidatos"],
+      "observed": "Sin lectura, planillas/asistencia/candidatos responden 500 y pagos 200 con una lista vacía; el historial de pagos también devolvía [] ante cualquier error."
+    }
+  ],
+  "observations_not_changed": [
+    "Una entrada sobre un empleado de otra empresa responde 400 RRHH_ATTENDANCE_EMPLOYEE_INVALID (no 404) sin persistir nada.",
+    "POST /api/rrhh/planillas/:id/pagar-empleados no puede completar un pago (su DTO no admite clave ni cuenta) y la web usa /pagar; queda como ruta heredada.",
+    "Solicitudes, beneficios, evaluaciones, capacitaciones, horarios y expediente no tienen pantalla que los use y siguen sin caso."
+  ]
+}
