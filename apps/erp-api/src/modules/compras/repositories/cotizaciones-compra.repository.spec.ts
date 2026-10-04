@@ -44,7 +44,7 @@ describe('CotizacionesCompraRepository de solo lectura', () => {
     const query: any = {
       select: () => query,
       eq: () => query,
-      single: async () => ({ data: null, error: { message: 'not found' } }),
+      single: async () => ({ data: null, error: { code: 'PGRST116', message: 'not found' } }),
     };
     const repository = new CotizacionesCompraRepository({
       getClient: () => ({ from: () => query }),

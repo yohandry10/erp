@@ -1,5 +1,6 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { isNotFoundError, readUnavailable } from '../compras-errors';
 
 @Injectable()
 export class DevolucionesProveedorRepository {
@@ -25,8 +26,11 @@ export class DevolucionesProveedorRepository {
       .eq('id', devolucionId)
       .single();
 
+    if (error && isNotFoundError(error)) {
+      throw new NotFoundException('Devolución no encontrada');
+    }
     if (error) {
-      throw new BadRequestException(`Error al obtener devolución: ${error.message}`);
+      throw readUnavailable('la devolución');
     }
 
     return data;
@@ -70,7 +74,7 @@ export class DevolucionesProveedorRepository {
     const { data, error } = await query;
 
     if (error) {
-      throw new BadRequestException(`Error al listar devoluciones: ${error.message}`);
+      throw readUnavailable('las devoluciones');
     }
 
     return data || [];

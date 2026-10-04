@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Put, Query, Param, UseGuards, ForbiddenException, GoneException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Query, Param, UseGuards, ForbiddenException, GoneException, HttpException, NotFoundException } from '@nestjs/common';
+import { isNotFoundError, readUnavailable } from './compras/compras-errors';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { SupabaseService } from '../shared/supabase/supabase.service';
@@ -106,18 +107,9 @@ export class ComprasController {
         code: error.code || ''
       });
 
-      // Devolver datos por defecto si hay error
-      return {
-        success: true,
-        data: {
-          comprasDelMes: 0,
-          totalCompras: 0,
-          montoTotalMes: 0,
-          ordenesActivas: 0,
-          proveedoresActivos: 0,
-          ordenesVencidas: 0
-        }
-      };
+      // Un fallo de lectura no es una empresa sin compras.
+      if (error instanceof HttpException) throw error;
+      throw readUnavailable('el resumen de compras');
     }
   }
 
@@ -157,11 +149,8 @@ export class ComprasController {
       };
     } catch (error) {
       console.error('❌ Error obteniendo órdenes de compra:', error);
-      return {
-        success: false,
-        error: error.message,
-        data: []
-      };
+      if (error instanceof HttpException) throw error;
+      throw readUnavailable('las órdenes de compra');
     }
   }
 
@@ -203,11 +192,8 @@ export class ComprasController {
       };
     } catch (error) {
       console.error('Error generating next number:', error);
-      return {
-        success: false,
-        message: 'Error al generar número de orden',
-        error: error.message
-      };
+      if (error instanceof HttpException) throw error;
+      throw readUnavailable('la numeración de órdenes de compra');
     }
   }
 
@@ -305,11 +291,8 @@ export class ComprasController {
       };
     } catch (error) {
       console.error('❌ Error generando reporte de compras:', error);
-      return {
-        success: false,
-        error: error.message,
-        data: { ordenes: [], resumen: {} }
-      };
+      if (error instanceof HttpException) throw error;
+      throw readUnavailable('el reporte de compras');
     }
   }
 
@@ -339,8 +322,6 @@ export class ComprasController {
         throw error;
       }
 
-      console.log('✅ PRODUCTOS OBTENIDOS:', JSON.stringify(data, null, 2));
-
       return {
         success: true,
         data:
@@ -351,11 +332,8 @@ export class ComprasController {
       };
     } catch (error) {
       console.error('❌ Error getting productos:', error);
-      return {
-        success: false,
-        message: 'Error al obtener productos',
-        error: error.message
-      };
+      if (error instanceof HttpException) throw error;
+      throw readUnavailable('los productos de compras');
     }
   }
 
@@ -377,6 +355,7 @@ export class ComprasController {
         .eq('id', ordenId)
         .single();
 
+      if (error && isNotFoundError(error)) throw new NotFoundException('Orden de compra no encontrada');
       if (error) throw error;
 
       return {
@@ -385,11 +364,8 @@ export class ComprasController {
       };
     } catch (error) {
       console.error('❌ Error obteniendo orden:', error);
-      return {
-        success: false,
-        error: error.message,
-        data: null
-      };
+      if (error instanceof HttpException) throw error;
+      throw readUnavailable('la orden de compra');
     }
   }
 }

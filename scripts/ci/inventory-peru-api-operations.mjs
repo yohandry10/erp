@@ -33,7 +33,7 @@ for (const file of files) {
       if (!verb) continue;
       for (const base of strings(prefix.args[0])) for (const suffix of strings(verb.args[0])) {
         if (base === 'analytics' || base.startsWith('analytics/')) continue;
-        const endpoint = '/api/' + [base, suffix].filter(Boolean).join('/').replace(/^\/+|\/+$/g, '');
+        const endpoint = '/api/' + [base, suffix].filter(Boolean).join('/').replace(/\/{2,}/g, '/').replace(/^\/+|\/+$/g, '');
         const domain = base.split('/')[0] || 'infraestructura';
         const uiDomain = ['configuration', 'configuration-fiscal', 'configuracion-fiscal'].includes(domain) ? 'configuracion'
           : ['users', 'usuarios', 'usuarios-sistema', 'roles', 'permissions', 'sucursales', 'tenants', 'security'].includes(domain) ? 'administracion'

@@ -2,14 +2,14 @@
 
 No hay aceptación integral de lanzamiento. Los casos se vinculan a operaciones concretas en la matriz API; navegación y controles visibles describen la oferta y no demuestran ejecución. Sólo Analytics excluido; reportes operativos, contables y tributarios incluidos.
 
-Último cierre completo: #136, 4f946dfb/esquema 566: caja con 20 defectos corregidos, 28 checks, 566 promovida una vez, main 37162507679/E2E/seguridad y runtime verificado tras dos timeouts de 20 s por arranque en frío. Ventas: 9 defectos reproducidos, corrección y 567 en curso. Anterior: #135, 8d717bcf/esquema 565: 28 checks, CI 342 API/31 UI sin reintentos, SQL fresco, barridos, restore; main 37152767852, E2E y seguridad aprobados; runtime exacto verificado tras un primer timeout de 20 s. #134 (9e301e2a/564) no cerró main: dos OOM de Next dev. Histórico: #133, 19fa239d/esquema 563. #134 promovió 564 una vez; sus CI de fuente c0f055eb pasaron 316 API/30 UI y su main no cerró por OOM. La 565 se ensayó con rollback y preservación de 42 tablas antes de su promoción única. Render: plan efectivo y continuidad sin confirmar. No hubo datos sintéticos de negocio en PROD.
+Último cierre completo: #137, 0d6df0ee/esquema 567: ventas con 10 defectos corregidos (altas idempotentes, 503, historial), 28 checks, 567 promovida una vez, main 37173628882 y runtime verificado tras dos timeouts de 20 s. Compras: 7 defectos reproducidos, corrección y 568 en curso. Anterior: #136, 4f946dfb/esquema 566: caja con 20 defectos corregidos, 28 checks, 566 promovida una vez, main 37162507679/E2E/seguridad y runtime verificado tras dos timeouts de 20 s por arranque en frío. Anterior: #135, 8d717bcf/esquema 565: 28 checks, CI 342 API/31 UI sin reintentos, SQL fresco, barridos, restore; main 37152767852, E2E y seguridad aprobados; runtime exacto verificado tras un primer timeout de 20 s. #134 (9e301e2a/564) no cerró main: dos OOM de Next dev. Histórico: #133, 19fa239d/esquema 563. #134 promovió 564 una vez; sus CI de fuente c0f055eb pasaron 316 API/30 UI y su main no cerró por OOM. La 565 se ensayó con rollback y preservación de 42 tablas antes de su promoción única. Render: plan efectivo y continuidad sin confirmar. No hubo datos sintéticos de negocio en PROD.
 
 | Dominio de código | Contratos declarados | HTTP observado | Operaciones con casos funcionales | Aceptación completa |
 |---|---:|---:|---:|---|
 | audit-logs | 5 | 4 | 0 | Pendiente |
 | auth | 11 | 5 | 1 | Pendiente |
-| cajas | 28 | 3 | 0 | Pendiente |
-| compras | 43 | 18 | 5 | Pendiente |
+| cajas | 28 | 28 | 28 | Pendiente |
+| compras | 43 | 19 | 17 | Pendiente |
 | configuracion | 13 | 4 | 4 | Pendiente |
 | configuracion-fiscal | 1 | 0 | 0 | Pendiente |
 | configuration | 16 | 8 | 7 | Pendiente |
@@ -18,12 +18,12 @@ No hay aceptación integral de lanzamiento. Los casos se vinculan a operaciones 
 | dashboard | 3 | 0 | 0 | Pendiente |
 | demo | 8 | 1 | 0 | Pendiente |
 | documentos | 15 | 1 | 0 | Pendiente |
-| finanzas | 49 | 23 | 16 | Pendiente |
+| finanzas | 49 | 23 | 21 | Pendiente |
 | gre | 17 | 16 | 16 | Pendiente |
 | help | 2 | 0 | 0 | Pendiente |
 | import-export | 5 | 0 | 0 | Pendiente |
 | infraestructura | 7 | 0 | 0 | Pendiente |
-| inventario | 36 | 24 | 16 | Pendiente |
+| inventario | 36 | 24 | 20 | Pendiente |
 | metrics | 2 | 0 | 0 | Pendiente |
 | migration | 12 | 11 | 4 | Pendiente |
 | notifications | 7 | 0 | 0 | Pendiente |
@@ -43,7 +43,7 @@ No hay aceptación integral de lanzamiento. Los casos se vinculan a operaciones 
 | usuarios | 10 | 0 | 0 | Pendiente |
 | usuarios-sistema | 10 | 0 | 0 | Pendiente |
 | validations | 5 | 0 | 0 | Pendiente |
-| ventas | 68 | 35 | 10 | Pendiente |
+| ventas | 68 | 61 | 51 | Pendiente |
 | webhooks | 1 | 0 | 0 | Pendiente |
 
 Los 11 contratos específicos de Argentina/Colombia identificados en el artefacto de aplicabilidad se conservan como variantes de país; los otros 706 tampoco equivalen automáticamente a oferta comercial Perú, porque incluyen infraestructura y administración. El JSON conserva los pendientes de las 717 operaciones y los enlaces realmente renderizados para ADMIN Perú.

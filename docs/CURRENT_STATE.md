@@ -34,7 +34,7 @@ dos timeouts de 20 segundos por arranque en frío. Readiness informa 7 eventos
 outbox en dead letter, constantes desde #130; falta diagnosticarlos con evidencia
 autorizada. PROD actual: 566; NO reaplicar 565 ni 566.
 
-Ventas PE (rama `codex/peru-sales-first-client-20261003`): el diagnóstico real
+Ventas PE (#137): el diagnóstico real
 reprodujo 10 defectos (`artifacts/peru-sales-defects-baseline-20261003.json`):
 altas de cotización/pedido duplicadas con la misma Idempotency-Key, lecturas y
 writers indisponibles como 400, pedido ajeno 400, historial vacío o incompleto y
@@ -45,10 +45,29 @@ alta con política privada) pasaron 18 escenarios API y restore
 (`artifacts/peru-sales-canonical-local-20261003`), la suite API 300/2908 y la
 reconstrucción fresca de 563 migraciones hasta 567 con 76 verificadores; se
 conserva el primer intento que falló por la política ausente
-(`artifacts/peru-567-fresh-contracts-local-20261004.json`). 567 no está
-promovida; faltan CI exacto, ensayo 566→567, promoción, main y runtime.
-La matriz conserva 717 contratos, 141 casos y 94 defectos con sus pendientes;
-no hay aceptación integral del lanzamiento ni confirmación del plan de Render.
+(`artifacts/peru-567-fresh-contracts-local-20261004.json`). Los 28 checks de
+`d81e5f56` aprobaron; el ensayo del respaldo productivo 566 pasó tras corregir el
+comparador (se conserva el intento fallido) y 567 se promovió una sola vez
+(`artifacts/peru-567-promotion-20261004031647084.json`). #137 se integró como
+`0d6df0ee`; main 37173628882 (395 HTTP, 32 UI), E2E y seguridad aprobaron y el
+runtime `0d6df0ee`/567 pasó al tercer intento
+(`artifacts/peru-production-verification-after-137-20261004.json`). Cada
+despliegue reciente agotó dos lecturas de 20 segundos antes de responder: riesgo
+operativo del plan de Render no confirmado. PROD actual: 567; NO reaplicar.
+
+Compras PE (rama `codex/peru-purchases-first-client-20261004`): el diagnóstico
+reprodujo 7 defectos (`artifacts/peru-purchases-defects-baseline-20261004.json`):
+editar una recepción hacía DML directo que la cadena canónica no concede (PROD
+conserva GRANT ALL heredado), y resumen/listado/reporte heredados enmascaraban
+lecturas fallidas como ceros o `success:false` con 200, mientras órdenes,
+cotizaciones y recepciones respondían 500/400. La 568 añade
+`actualizar_recepcion_tx_568`; las fuentes pasaron 14 escenarios API y restore
+(`artifacts/peru-purchases-canonical-local-20261004`), la suite API 300/2909 y la
+reconstrucción fresca de 564 migraciones hasta 568 con 77 verificadores. El
+inventario API colapsa ya la doble barra que ocultaba una ruta de recepción.
+568 no está promovida; faltan CI exacto, ensayo 567→568, promoción, main y runtime.
+La matriz registra 717 contratos, 359 observados, 293 con casos funcionales,
+162 casos y 101 defectos; no hay aceptación integral del lanzamiento.
 
 Corte técnico 131/132: el cierre 131 promovió 562 una sola vez con preflight,
 respaldo 560, rollback local y preservación de 29 tablas/funciones/seguridad

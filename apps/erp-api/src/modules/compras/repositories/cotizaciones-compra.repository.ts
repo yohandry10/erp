@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { readUnavailable, rowOrUnavailable } from '../compras-errors';
 
 @Injectable()
 export class CotizacionesCompraRepository {
@@ -17,7 +18,7 @@ export class CotizacionesCompraRepository {
       .eq('tenant_id', tenantId)
       .single();
 
-    if (cotizacionError) return null;
+    if (!rowOrUnavailable(cotizacion, cotizacionError, 'la cotización de compra')) return null;
 
     const { data: detalles, error: detallesError } = await supabase
       .from('cotizacion_compra_detalles')
@@ -29,7 +30,7 @@ export class CotizacionesCompraRepository {
       .eq('tenant_id', tenantId);
 
     if (detallesError) {
-      throw new Error(`Error al obtener detalles: ${detallesError.message}`);
+      throw readUnavailable('los detalles de la cotización de compra');
     }
     return { ...cotizacion, detalles: detalles || [] };
   }
@@ -42,7 +43,7 @@ export class CotizacionesCompraRepository {
       .eq('numero', numero)
       .eq('tenant_id', tenantId)
       .single();
-    return error ? null : data;
+    return rowOrUnavailable(data, error, 'la numeración de cotizaciones de compra');
   }
 
   async findAll(
@@ -82,7 +83,7 @@ export class CotizacionesCompraRepository {
     }
 
     const { data, error, count } = await query;
-    if (error) throw new Error(`Error al obtener cotizaciones: ${error.message}`);
+    if (error) throw readUnavailable('las cotizaciones de compra');
     return { data: data || [], count: count || 0 };
   }
 }
