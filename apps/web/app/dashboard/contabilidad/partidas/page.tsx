@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { parseDateLocal } from '@/lib/date-utils'
 import { AlertCircle, Link2, Loader2, RefreshCw } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
@@ -97,16 +97,26 @@ export default function PartidasAbiertasPage() {
   const hayAmbosLados =
     seleccionadas.some((p) => p.pendiente > 0) && seleccionadas.some((p) => p.pendiente < 0)
 
+  // Una misma selección conserva su clave: reenviar tras una respuesta perdida
+  // recupera la conciliación ya registrada en vez de fallar o duplicarla.
+  const intentKeys = useRef<Record<string, string>>({})
+  const keyFor = (payload: { detalle_ids: string[] }) => {
+    const slot = JSON.stringify([...payload.detalle_ids].sort())
+    return (intentKeys.current[slot] ??= `contabilidad-ui:conciliacion:${crypto.randomUUID()}`)
+  }
+
   const conciliar = async () => {
     try {
       setConciliando(true)
       setError(null)
       setAviso(null)
 
-      const response = await post('/api/contabilidad/conciliaciones-partidas', {
-        detalle_ids: seleccion,
+      const payload = { detalle_ids: seleccion }
+      const response = await post('/api/contabilidad/conciliaciones-partidas', payload, {
+        headers: { 'Idempotency-Key': keyFor(payload) },
       })
       if (!response?.success) throw new Error(response?.message || 'No se pudo conciliar')
+      intentKeys.current = {}
 
       setAviso(
         `Conciliación ${response.data.estado} por ${money(response.data.monto_conciliado)}.` +

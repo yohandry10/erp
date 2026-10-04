@@ -131,6 +131,151 @@ export class ContabilidadPresupuestosController {
     }
   }
 
+  // Antes de "presupuestos/:id": Express registra las rutas en orden de
+  // declaración y ":id" capturaba "alertas".
+  @Get("presupuestos/alertas")
+  @RequirePermission("contabilidad.presupuestos.read") // HARDENING: permisos granulares.
+  @ApiOperation({
+    summary: "Obtener todas las alertas de sobregiro presupuestal activas",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Alertas de sobregiro obtenidas exitosamente",
+    schema: {
+      type: "object",
+      properties: {
+        success: { type: "boolean" },
+        data: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              presupuesto_id: { type: "string" },
+              nivel_alerta: {
+                type: "string",
+                enum: ["SOBREGIRO", "ADVERTENCIA"],
+              },
+              severidad: { type: "string", enum: ["CRITICO", "ALTO"] },
+              porcentaje_ejecutado: { type: "number" },
+              monto_presupuestado: { type: "number" },
+              monto_ejecutado: { type: "number" },
+              monto_comprometido: { type: "number" },
+              monto_disponible: { type: "number" },
+              excedente: { type: "number" },
+              centro_costo: { type: "object" },
+              cuenta: { type: "object" },
+              periodo: { type: "object" },
+              mensaje: { type: "string" },
+              fecha_deteccion: { type: "string" },
+            },
+          },
+        },
+        message: { type: "string" },
+      },
+    },
+  })
+  async obtenerAlertasSobregiro(
+    @CurrentTenant() tenantId: string,
+    @Query("periodo_id") periodoContableId?: string,
+  ): Promise<{ success: boolean; data: any[]; message: string }> {
+    try {
+      console.log(
+        `🚨 [Contabilidad] Obteniendo alertas de sobregiro para tenant ${tenantId}`,
+      );
+
+      const alertas = await this.presupuestosService.obtenerAlertasSobregiro(
+        tenantId,
+        periodoContableId,
+      );
+
+      const sobregiros = alertas.filter(
+        (a) => a.nivel_alerta === "SOBREGIRO",
+      ).length;
+      const advertencias = alertas.filter(
+        (a) => a.nivel_alerta === "ADVERTENCIA",
+      ).length;
+
+      return {
+        success: true,
+        data: alertas,
+        message: `${alertas.length} alerta(s) detectada(s): ${sobregiros} sobregiro(s), ${advertencias} advertencia(s)`,
+      };
+    } catch (error) {
+      console.error(
+        "❌ [Contabilidad] Error obteniendo alertas de sobregiro:",
+        error,
+      );
+      throw error;
+    }
+  }
+
+  @Get("presupuestos/alertas/resumen")
+  @RequirePermission("contabilidad.presupuestos.read") // HARDENING: permisos granulares.
+  @ApiOperation({
+    summary: "Obtener resumen de alertas agrupadas por nivel de severidad",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Resumen de alertas obtenido exitosamente",
+    schema: {
+      type: "object",
+      properties: {
+        success: { type: "boolean" },
+        data: {
+          type: "object",
+          properties: {
+            total_alertas: { type: "number" },
+            sobregiros: {
+              type: "object",
+              properties: {
+                cantidad: { type: "number" },
+                total_excedente: { type: "number" },
+                alertas: { type: "array" },
+              },
+            },
+            advertencias: {
+              type: "object",
+              properties: {
+                cantidad: { type: "number" },
+                total_en_riesgo: { type: "number" },
+                alertas: { type: "array" },
+              },
+            },
+            fecha_generacion: { type: "string" },
+          },
+        },
+        message: { type: "string" },
+      },
+    },
+  })
+  async obtenerResumenAlertas(
+    @CurrentTenant() tenantId: string,
+    @Query("periodo_id") periodoContableId?: string,
+  ): Promise<{ success: boolean; data: any; message: string }> {
+    try {
+      console.log(
+        `📊 [Contabilidad] Obteniendo resumen de alertas para tenant ${tenantId}`,
+      );
+
+      const resumen = await this.presupuestosService.obtenerResumenAlertas(
+        tenantId,
+        periodoContableId,
+      );
+
+      return {
+        success: true,
+        data: resumen,
+        message: `Resumen generado: ${resumen.total_alertas} alerta(s) total(es)`,
+      };
+    } catch (error) {
+      console.error(
+        "❌ [Contabilidad] Error obteniendo resumen de alertas:",
+        error,
+      );
+      throw error;
+    }
+  }
+
   @Get("presupuestos/:id")
   @RequirePermission("contabilidad.presupuestos.read") // HARDENING: permisos granulares.
   @ApiOperation({ summary: "Obtener un presupuesto específico por ID" })
@@ -704,149 +849,6 @@ export class ContabilidadPresupuestosController {
     } catch (error) {
       console.error(
         "❌ [Contabilidad] Error actualizando ejecución presupuestal por período:",
-        error,
-      );
-      throw error;
-    }
-  }
-
-  @Get("presupuestos/alertas")
-  @RequirePermission("contabilidad.presupuestos.read") // HARDENING: permisos granulares.
-  @ApiOperation({
-    summary: "Obtener todas las alertas de sobregiro presupuestal activas",
-  })
-  @ApiResponse({
-    status: 200,
-    description: "Alertas de sobregiro obtenidas exitosamente",
-    schema: {
-      type: "object",
-      properties: {
-        success: { type: "boolean" },
-        data: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              presupuesto_id: { type: "string" },
-              nivel_alerta: {
-                type: "string",
-                enum: ["SOBREGIRO", "ADVERTENCIA"],
-              },
-              severidad: { type: "string", enum: ["CRITICO", "ALTO"] },
-              porcentaje_ejecutado: { type: "number" },
-              monto_presupuestado: { type: "number" },
-              monto_ejecutado: { type: "number" },
-              monto_comprometido: { type: "number" },
-              monto_disponible: { type: "number" },
-              excedente: { type: "number" },
-              centro_costo: { type: "object" },
-              cuenta: { type: "object" },
-              periodo: { type: "object" },
-              mensaje: { type: "string" },
-              fecha_deteccion: { type: "string" },
-            },
-          },
-        },
-        message: { type: "string" },
-      },
-    },
-  })
-  async obtenerAlertasSobregiro(
-    @CurrentTenant() tenantId: string,
-    @Query("periodo_id") periodoContableId?: string,
-  ): Promise<{ success: boolean; data: any[]; message: string }> {
-    try {
-      console.log(
-        `🚨 [Contabilidad] Obteniendo alertas de sobregiro para tenant ${tenantId}`,
-      );
-
-      const alertas = await this.presupuestosService.obtenerAlertasSobregiro(
-        tenantId,
-        periodoContableId,
-      );
-
-      const sobregiros = alertas.filter(
-        (a) => a.nivel_alerta === "SOBREGIRO",
-      ).length;
-      const advertencias = alertas.filter(
-        (a) => a.nivel_alerta === "ADVERTENCIA",
-      ).length;
-
-      return {
-        success: true,
-        data: alertas,
-        message: `${alertas.length} alerta(s) detectada(s): ${sobregiros} sobregiro(s), ${advertencias} advertencia(s)`,
-      };
-    } catch (error) {
-      console.error(
-        "❌ [Contabilidad] Error obteniendo alertas de sobregiro:",
-        error,
-      );
-      throw error;
-    }
-  }
-
-  @Get("presupuestos/alertas/resumen")
-  @RequirePermission("contabilidad.presupuestos.read") // HARDENING: permisos granulares.
-  @ApiOperation({
-    summary: "Obtener resumen de alertas agrupadas por nivel de severidad",
-  })
-  @ApiResponse({
-    status: 200,
-    description: "Resumen de alertas obtenido exitosamente",
-    schema: {
-      type: "object",
-      properties: {
-        success: { type: "boolean" },
-        data: {
-          type: "object",
-          properties: {
-            total_alertas: { type: "number" },
-            sobregiros: {
-              type: "object",
-              properties: {
-                cantidad: { type: "number" },
-                total_excedente: { type: "number" },
-                alertas: { type: "array" },
-              },
-            },
-            advertencias: {
-              type: "object",
-              properties: {
-                cantidad: { type: "number" },
-                total_en_riesgo: { type: "number" },
-                alertas: { type: "array" },
-              },
-            },
-            fecha_generacion: { type: "string" },
-          },
-        },
-        message: { type: "string" },
-      },
-    },
-  })
-  async obtenerResumenAlertas(
-    @CurrentTenant() tenantId: string,
-    @Query("periodo_id") periodoContableId?: string,
-  ): Promise<{ success: boolean; data: any; message: string }> {
-    try {
-      console.log(
-        `📊 [Contabilidad] Obteniendo resumen de alertas para tenant ${tenantId}`,
-      );
-
-      const resumen = await this.presupuestosService.obtenerResumenAlertas(
-        tenantId,
-        periodoContableId,
-      );
-
-      return {
-        success: true,
-        data: resumen,
-        message: `Resumen generado: ${resumen.total_alertas} alerta(s) total(es)`,
-      };
-    } catch (error) {
-      console.error(
-        "❌ [Contabilidad] Error obteniendo resumen de alertas:",
         error,
       );
       throw error;
