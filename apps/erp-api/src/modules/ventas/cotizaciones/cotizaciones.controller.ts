@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -89,8 +90,9 @@ export class CotizacionesController {
     @Body() createCotizacionDto: CreateCotizacionDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    const cotizacion = await this.cotizacionesService.create(createCotizacionDto, tenantId, user?.id);
+    const cotizacion = await this.cotizacionesService.create(createCotizacionDto, tenantId, user?.id, idempotencyKey);
     return {
       success: true,
       data: cotizacion,

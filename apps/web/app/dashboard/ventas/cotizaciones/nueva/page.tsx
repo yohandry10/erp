@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import CotizacionForm, { CotizacionFormData } from '@/components/ventas/CotizacionForm'
@@ -10,12 +11,22 @@ import { Button } from '@/components/ui/button'
 export default function NuevaCotizacionPage() {
   const router = useRouter()
   const { post } = useApi()
+  // Una misma intención conserva su clave: reenviar tras una respuesta perdida
+  // recupera la cotización ya creada en vez de duplicarla.
+  const intentKeys = useRef<Record<string, string>>({})
+  const keyFor = (payload: unknown) => {
+    const slot = JSON.stringify(payload)
+    return (intentKeys.current[slot] ??= `ventas-ui:cotizacion:${crypto.randomUUID()}`)
+  }
 
   const handleSubmit = async (data: CotizacionFormData) => {
     try {
-      const response = await post('/api/ventas/cotizaciones', data)
+      const response = await post('/api/ventas/cotizaciones', data, {
+        headers: { 'Idempotency-Key': keyFor(data) },
+      })
 
       if (response?.success) {
+        intentKeys.current = {}
         toast({
           title: 'Éxito',
           description: 'Cotización creada correctamente'
