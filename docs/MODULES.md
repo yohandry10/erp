@@ -601,6 +601,10 @@ Código principal: `apps/erp-api/src/modules/inventario`,
 ## Finanzas y tesorería
 
 - CxC y CxP gestionan saldo, vencimiento, pagos y estados.
+- Las consultas de CxP, bancos y tesorería responden 503 cuando no pueden leer,
+  nunca 400. Editar o anular una CxP inexistente o de otra empresa responde 404;
+  una regla del writer (pagada, anulada, con pagos) responde 400. El pago en
+  lote se aplica una vez por llave y rechaza el exceso sin tocar la deuda.
 - El alta de factura de proveedor conserva destino del crédito fiscal, código
   de detracción y tipo de cambio de origen dentro de la transacción de deuda y
   outbox. Repetir la misma intención devuelve la factura existente; cambiar

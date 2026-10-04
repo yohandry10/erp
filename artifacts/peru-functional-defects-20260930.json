@@ -3231,7 +3231,99 @@
       "pending": [
         "CI exacto, main y runtime. UI real de usuarios y roles distintos de ADMIN."
       ],
-      "canonical_proof": "artifacts/peru-users-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-users-finance-canonical-local-20261004"
+    },
+    {
+      "id": "finance-cxp-foreign-writer-400",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "PUT",
+          "endpoint": "/api/finanzas/cxp/:id"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/finanzas/cxp/:id/anular"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-finance-baseline-20261004",
+        "observed_error": "Editar o anular la CxP de otra empresa o inexistente responde 400 'CXP_NOT_FOUND' en vez de 404; no se modifica nada.",
+        "local_only": true
+      },
+      "correction": "Lecturas de CxP, bancos y tesorería indisponibles responden 503; writers de CxP y cuenta bancaria: inexistente 404, regla 400, caída 503",
+      "pending": [
+        "CI exacto, main y runtime. CxC notas de crédito y reprogramación sin caso propio."
+      ],
+      "canonical_proof": "artifacts/peru-users-finance-canonical-local-20261004"
+    },
+    {
+      "id": "finance-cxp-reads-unavailability-400",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxp"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxp/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxp/aging"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxp/vencimientos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/tesoreria/programacion"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-finance-baseline-20261004",
+        "observed_error": "Sin lectura de cuentas_por_pagar responden 400, como si el cliente hubiera enviado algo inválido, en vez de 503.",
+        "local_only": true
+      },
+      "correction": "Lecturas de CxP, bancos y tesorería indisponibles responden 503; writers de CxP y cuenta bancaria: inexistente 404, regla 400, caída 503",
+      "pending": [
+        "CI exacto, main y runtime. CxC notas de crédito y reprogramación sin caso propio."
+      ],
+      "canonical_proof": "artifacts/peru-users-finance-canonical-local-20261004"
+    },
+    {
+      "id": "finance-bank-reads-unavailability-400",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/bancos/cuentas"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/bancos/saldos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/bancos/cuentas/:id/movimientos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/bancos/movimientos/periodo"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-finance-baseline-20261004",
+        "observed_error": "Sin lectura de cuentas_bancarias o movimientos_bancarios responden 400 en vez de 503.",
+        "local_only": true
+      },
+      "correction": "Lecturas de CxP, bancos y tesorería indisponibles responden 503; writers de CxP y cuenta bancaria: inexistente 404, regla 400, caída 503",
+      "pending": [
+        "CI exacto, main y runtime. CxC notas de crédito y reprogramación sin caso propio."
+      ],
+      "canonical_proof": "artifacts/peru-users-finance-canonical-local-20261004"
     }
   ]
 }
