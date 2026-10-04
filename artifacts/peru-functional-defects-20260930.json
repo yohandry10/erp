@@ -3561,6 +3561,50 @@
         "CI exacto, main y runtime. Fase canónica en CI pendiente de que el bootstrap emule los privilegios por defecto de Supabase."
       ],
       "canonical_proof": "artifacts/peru-documents-fixed-local-20261004"
+    },
+    {
+      "id": "inventory-locations-masked",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/almacenes/:almacenId/ubicaciones"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-inventory-baseline-20261004",
+        "observed_error": "Un almacén de otra empresa y una lectura fallida respondían 200 success:false con lista vacía (el 404 del servicio se enmascaraba).",
+        "local_only": true
+      },
+      "correction": "Ubicaciones: almacén ajeno 404 y lectura fallida 503; movimientos y estadísticas indisponibles 503",
+      "pending": [
+        "CI exacto, main y runtime; fase canónica pendiente de alinear el bootstrap. Logística (backorders, tracking, eventos) e imágenes de producto sin caso."
+      ],
+      "canonical_proof": "artifacts/peru-inventory-fixed-local-20261004"
+    },
+    {
+      "id": "inventory-reads-500",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/movimientos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/stats"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-inventory-baseline-20261004",
+        "observed_error": "Sin lectura de movimientos_inventario o productos respondían 500 en vez de 503.",
+        "local_only": true
+      },
+      "correction": "Ubicaciones: almacén ajeno 404 y lectura fallida 503; movimientos y estadísticas indisponibles 503",
+      "pending": [
+        "CI exacto, main y runtime; fase canónica pendiente de alinear el bootstrap. Logística (backorders, tracking, eventos) e imágenes de producto sin caso."
+      ],
+      "canonical_proof": "artifacts/peru-inventory-fixed-local-20261004"
     }
   ]
 }
