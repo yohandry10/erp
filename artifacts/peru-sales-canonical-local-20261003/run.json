@@ -1,0 +1,17 @@
+{
+  "completedAt": "2026-10-04T02:32:56.055Z",
+  "success": true,
+  "withBrowser": false,
+  "withSurvey": false,
+  "withRecords": false,
+  "candidateCashApi": false,
+  "candidateCashSql": false,
+  "candidateApi": false,
+  "candidateSql": false,
+  "candidateUi": false,
+  "scope": "sales_diagnostic_api_subset",
+  "database": "PostgreSQL 16 efímero",
+  "output": "artifacts/peru-sales-local-20261004023144145-4088",
+  "remoteWrites": false,
+  "complete_acceptance": false
+}

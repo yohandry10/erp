@@ -1206,7 +1206,7 @@
     },
     {
       "id": "pos-certificate-direct-writer-and-invalid-http",
-      "status": "corrected_merged_main_runtime_observed_main_ci_retry",
+      "status": "corrected_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -1221,7 +1221,7 @@
       "correction": "Valida PFX/emisor/vigencia, cifra y utiliza writer con permiso/intención 564; inválido 400 sin cambio.",
       "candidate_proof": "artifacts/peru-pos-first-client-candidate-20261003",
       "pending": [
-        "CI main 37142023714 relanzado tras OOM del servidor Next de pruebas; verificación final del runtime."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
       "limits": [
         "Reproducción local con ACL canónicas. PROD tenía UPDATE heredado; no se ejecutó escritura allí para confirmar su comportamiento. La nueva frontera no modifica esa ACL."
@@ -1231,11 +1231,16 @@
         "artifacts/peru-integrated-ci-37139147587",
         "artifacts/peru-integrated-ci-37139151230"
       ],
-      "promotion_evidence": "artifacts/peru-564-promotion-20261003175006608.json"
+      "promotion_evidence": "artifacts/peru-564-promotion-20261003175006608.json",
+      "closure": {
+        "note": "El main de #134 falló dos veces por heap de Next dev; el main 37152767852 de #135 incluyó estas fuentes y aprobó, y su runtime fue verificado",
+        "main_ci": 37152767852,
+        "runtime": "artifacts/peru-production-verification-after-135-20261003.json"
+      }
     },
     {
       "id": "pos-first-client-missing-payment-catalog",
-      "status": "corrected_merged_main_runtime_observed_main_ci_retry",
+      "status": "corrected_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -1254,18 +1259,23 @@
       "correction": "564 crea cuatro referencias sólo para configuración nueva PE; sin backfill ni datos comerciales.",
       "candidate_proof": "artifacts/peru-pos-first-client-candidate-20261003",
       "pending": [
-        "CI main 37142023714 relanzado tras OOM del servidor Next de pruebas; verificación final del runtime."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
       "merge_sha": "9e301e2ae9f470b56ffc10d775ab09c4a8d6a76b",
       "integration_evidence": [
         "artifacts/peru-integrated-ci-37139147587",
         "artifacts/peru-integrated-ci-37139151230"
       ],
-      "promotion_evidence": "artifacts/peru-564-promotion-20261003175006608.json"
+      "promotion_evidence": "artifacts/peru-564-promotion-20261003175006608.json",
+      "closure": {
+        "note": "El main de #134 falló dos veces por heap de Next dev; el main 37152767852 de #135 incluyó estas fuentes y aprobó, y su runtime fue verificado",
+        "main_ci": 37152767852,
+        "runtime": "artifacts/peru-production-verification-after-135-20261003.json"
+      }
     },
     {
       "id": "pos-fiscal-status-missing-returns-500",
-      "status": "corrected_merged_main_runtime_observed_main_ci_retry",
+      "status": "corrected_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -1280,18 +1290,23 @@
       "correction": "404 inexistente/ajeno y 503 de infraestructura; UUID validado.",
       "candidate_proof": "artifacts/peru-pos-first-client-candidate-20261003",
       "pending": [
-        "CI main 37142023714 relanzado tras OOM del servidor Next de pruebas; verificación final del runtime."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
       "merge_sha": "9e301e2ae9f470b56ffc10d775ab09c4a8d6a76b",
       "integration_evidence": [
         "artifacts/peru-integrated-ci-37139147587",
         "artifacts/peru-integrated-ci-37139151230"
       ],
-      "promotion_evidence": "artifacts/peru-564-promotion-20261003175006608.json"
+      "promotion_evidence": "artifacts/peru-564-promotion-20261003175006608.json",
+      "closure": {
+        "note": "El main de #134 falló dos veces por heap de Next dev; el main 37152767852 de #135 incluyó estas fuentes y aprobó, y su runtime fue verificado",
+        "main_ci": 37152767852,
+        "runtime": "artifacts/peru-production-verification-after-135-20261003.json"
+      }
     },
     {
       "id": "pos-ticket-exchange-rejection-returns-created",
-      "status": "corrected_merged_main_runtime_observed_main_ci_retry",
+      "status": "corrected_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -1306,18 +1321,23 @@
       "correction": "404 inexistente, 409 colisión y 400 de dominio; 503 genérico de infraestructura.",
       "candidate_proof": "artifacts/peru-pos-first-client-candidate-20261003",
       "pending": [
-        "CI main 37142023714 relanzado tras OOM del servidor Next de pruebas; verificación final del runtime."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
       "merge_sha": "9e301e2ae9f470b56ffc10d775ab09c4a8d6a76b",
       "integration_evidence": [
         "artifacts/peru-integrated-ci-37139147587",
         "artifacts/peru-integrated-ci-37139151230"
       ],
-      "promotion_evidence": "artifacts/peru-564-promotion-20261003175006608.json"
+      "promotion_evidence": "artifacts/peru-564-promotion-20261003175006608.json",
+      "closure": {
+        "note": "El main de #134 falló dos veces por heap de Next dev; el main 37152767852 de #135 incluyó estas fuentes y aprobó, y su runtime fue verificado",
+        "main_ci": 37152767852,
+        "runtime": "artifacts/peru-production-verification-after-135-20261003.json"
+      }
     },
     {
       "id": "pos-pure-ticket-retry-returns-created",
-      "status": "corrected_merged_main_runtime_observed_main_ci_retry",
+      "status": "corrected_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -1332,18 +1352,23 @@
       "correction": "409 sin incrementar contador ni alterar impactos; reserva existente se recupera.",
       "candidate_proof": "artifacts/peru-pos-first-client-candidate-20261003",
       "pending": [
-        "CI main 37142023714 relanzado tras OOM del servidor Next de pruebas; verificación final del runtime."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
       "merge_sha": "9e301e2ae9f470b56ffc10d775ab09c4a8d6a76b",
       "integration_evidence": [
         "artifacts/peru-integrated-ci-37139147587",
         "artifacts/peru-integrated-ci-37139151230"
       ],
-      "promotion_evidence": "artifacts/peru-564-promotion-20261003175006608.json"
+      "promotion_evidence": "artifacts/peru-564-promotion-20261003175006608.json",
+      "closure": {
+        "note": "El main de #134 falló dos veces por heap de Next dev; el main 37152767852 de #135 incluyó estas fuentes y aprobó, y su runtime fue verificado",
+        "main_ci": 37152767852,
+        "runtime": "artifacts/peru-production-verification-after-135-20261003.json"
+      }
     },
     {
       "id": "pos-repeated-stock-sku-blocked-by-pricing",
-      "status": "corrected_merged_main_runtime_observed_main_ci_retry",
+      "status": "corrected_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -1358,18 +1383,23 @@
       "correction": "Agrega cantidades e importes de SKU compatible antes del precio comercial; diferencias de precio/descuento 400.",
       "candidate_proof": "artifacts/peru-pos-first-client-candidate-20261003",
       "pending": [
-        "CI main 37142023714 relanzado tras OOM del servidor Next de pruebas; verificación final del runtime."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
       "merge_sha": "9e301e2ae9f470b56ffc10d775ab09c4a8d6a76b",
       "integration_evidence": [
         "artifacts/peru-integrated-ci-37139147587",
         "artifacts/peru-integrated-ci-37139151230"
       ],
-      "promotion_evidence": "artifacts/peru-564-promotion-20261003175006608.json"
+      "promotion_evidence": "artifacts/peru-564-promotion-20261003175006608.json",
+      "closure": {
+        "note": "El main de #134 falló dos veces por heap de Next dev; el main 37152767852 de #135 incluyó estas fuentes y aprobó, y su runtime fue verificado",
+        "main_ci": 37152767852,
+        "runtime": "artifacts/peru-production-verification-after-135-20261003.json"
+      }
     },
     {
       "id": "pos-worker-null-attempts-excludes-exchange",
-      "status": "corrected_merged_main_runtime_observed_main_ci_retry",
+      "status": "corrected_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -1384,18 +1414,23 @@
       "correction": "Incluye NULL como cero y adopta CPE firmado sin repetir pago/stock/CxC/asiento.",
       "candidate_proof": "artifacts/peru-pos-first-client-candidate-20261003",
       "pending": [
-        "CI main 37142023714 relanzado tras OOM del servidor Next de pruebas; verificación final del runtime."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
       "merge_sha": "9e301e2ae9f470b56ffc10d775ab09c4a8d6a76b",
       "integration_evidence": [
         "artifacts/peru-integrated-ci-37139147587",
         "artifacts/peru-integrated-ci-37139151230"
       ],
-      "promotion_evidence": "artifacts/peru-564-promotion-20261003175006608.json"
+      "promotion_evidence": "artifacts/peru-564-promotion-20261003175006608.json",
+      "closure": {
+        "note": "El main de #134 falló dos veces por heap de Next dev; el main 37152767852 de #135 incluyó estas fuentes y aprobó, y su runtime fue verificado",
+        "main_ci": 37152767852,
+        "runtime": "artifacts/peru-production-verification-after-135-20261003.json"
+      }
     },
     {
       "id": "cpe-direct-intent-different-content",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -1410,13 +1445,21 @@
       "correction": "RPC 565 ata contenido y actor a la intención, conflicto 409.",
       "candidate_proof": "artifacts/peru-cpe-restored-candidate-20261003",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003"
+      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003",
+      "closure": {
+        "pr": 135,
+        "merge_sha": "8d717bcfb8e038a5d52abf95c124c99438009080",
+        "schema": 565,
+        "promotion": "artifacts/peru-565-promotion-20261003204614178.json",
+        "main_ci": 37152767852,
+        "runtime": "artifacts/peru-production-verification-after-135-20261003.json"
+      }
     },
     {
       "id": "cpe-ui-credit-client-id-discarded",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -1431,13 +1474,21 @@
       "correction": "Normalizador PE propaga el cliente maestro a la CxC atómica.",
       "candidate_proof": "artifacts/peru-cpe-restored-candidate-20261003",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003"
+      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003",
+      "closure": {
+        "pr": 135,
+        "merge_sha": "8d717bcfb8e038a5d52abf95c124c99438009080",
+        "schema": 565,
+        "promotion": "artifacts/peru-565-promotion-20261003204614178.json",
+        "main_ci": 37152767852,
+        "runtime": "artifacts/peru-production-verification-after-135-20261003.json"
+      }
     },
     {
       "id": "cpe-missing-detail-http-success",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -1464,13 +1515,21 @@
       "correction": "404 para ausencia/aislamiento y 503 para infraestructura.",
       "candidate_proof": "artifacts/peru-cpe-restored-candidate-20261003",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003"
+      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003",
+      "closure": {
+        "pr": 135,
+        "merge_sha": "8d717bcfb8e038a5d52abf95c124c99438009080",
+        "schema": 565,
+        "promotion": "artifacts/peru-565-promotion-20261003204614178.json",
+        "main_ci": 37152767852,
+        "runtime": "artifacts/peru-production-verification-after-135-20261003.json"
+      }
     },
     {
       "id": "cpe-invalid-read-id-http-success",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -1497,13 +1556,21 @@
       "correction": "ParseUUIDPipe antes de leer.",
       "candidate_proof": "artifacts/peru-cpe-restored-candidate-20261003",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003"
+      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003",
+      "closure": {
+        "pr": 135,
+        "merge_sha": "8d717bcfb8e038a5d52abf95c124c99438009080",
+        "schema": 565,
+        "promotion": "artifacts/peru-565-promotion-20261003204614178.json",
+        "main_ci": 37152767852,
+        "runtime": "artifacts/peru-production-verification-after-135-20261003.json"
+      }
     },
     {
       "id": "cpe-invalid-page-and-date-http-success",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -1518,13 +1585,21 @@
       "correction": "Valida enteros, límite y fechas antes de consultar; 400.",
       "candidate_proof": "artifacts/peru-cpe-restored-candidate-20261003",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003"
+      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003",
+      "closure": {
+        "pr": 135,
+        "merge_sha": "8d717bcfb8e038a5d52abf95c124c99438009080",
+        "schema": 565,
+        "promotion": "artifacts/peru-565-promotion-20261003204614178.json",
+        "main_ci": 37152767852,
+        "runtime": "artifacts/peru-production-verification-after-135-20261003.json"
+      }
     },
     {
       "id": "cpe-csv-unescaped-fields",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -1539,13 +1614,21 @@
       "correction": "Cita CSV y neutraliza fórmulas en texto.",
       "candidate_proof": "artifacts/peru-cpe-restored-candidate-20261003",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003"
+      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003",
+      "closure": {
+        "pr": 135,
+        "merge_sha": "8d717bcfb8e038a5d52abf95c124c99438009080",
+        "schema": 565,
+        "promotion": "artifacts/peru-565-promotion-20261003204614178.json",
+        "main_ci": 37152767852,
+        "runtime": "artifacts/peru-production-verification-after-135-20261003.json"
+      }
     },
     {
       "id": "cpe-read-failure-hidden-as-empty-success",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -1580,13 +1663,21 @@
       "correction": "503 explícito en lecturas y errores visibles en UI.",
       "candidate_proof": "artifacts/peru-cpe-restored-candidate-20261003",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003"
+      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003",
+      "closure": {
+        "pr": 135,
+        "merge_sha": "8d717bcfb8e038a5d52abf95c124c99438009080",
+        "schema": 565,
+        "promotion": "artifacts/peru-565-promotion-20261003204614178.json",
+        "main_ci": 37152767852,
+        "runtime": "artifacts/peru-production-verification-after-135-20261003.json"
+      }
     },
     {
       "id": "cpe-fiscal-technical-replay-created-success",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -1601,13 +1692,21 @@
       "correction": "503 también en replay y respuesta pública sin XML/metadata interna.",
       "candidate_proof": "artifacts/peru-cpe-restored-candidate-20261003",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003"
+      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003",
+      "closure": {
+        "pr": 135,
+        "merge_sha": "8d717bcfb8e038a5d52abf95c124c99438009080",
+        "schema": 565,
+        "promotion": "artifacts/peru-565-promotion-20261003204614178.json",
+        "main_ci": 37152767852,
+        "runtime": "artifacts/peru-production-verification-after-135-20261003.json"
+      }
     },
     {
       "id": "cpe-ui-net-price-written-as-gross",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -1626,13 +1725,21 @@
       "correction": "Valor neto prevalece; precio_venta conserva unitario bruto.",
       "candidate_proof": "artifacts/peru-cpe-restored-candidate-20261003",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003"
+      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003",
+      "closure": {
+        "pr": 135,
+        "merge_sha": "8d717bcfb8e038a5d52abf95c124c99438009080",
+        "schema": 565,
+        "promotion": "artifacts/peru-565-promotion-20261003204614178.json",
+        "main_ci": 37152767852,
+        "runtime": "artifacts/peru-production-verification-after-135-20261003.json"
+      }
     },
     {
       "id": "cpe-csv-truncated-at-200",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -1647,13 +1754,21 @@
       "correction": "Exporta todas las páginas, sin límite silencioso.",
       "candidate_proof": "artifacts/peru-cpe-restored-candidate-20261003",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003"
+      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003",
+      "closure": {
+        "pr": 135,
+        "merge_sha": "8d717bcfb8e038a5d52abf95c124c99438009080",
+        "schema": 565,
+        "promotion": "artifacts/peru-565-promotion-20261003204614178.json",
+        "main_ci": 37152767852,
+        "runtime": "artifacts/peru-production-verification-after-135-20261003.json"
+      }
     },
     {
       "id": "cpe-ui-first-page-only",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -1668,13 +1783,21 @@
       "correction": "Paginación visible, total, bloqueo de carga y reset de filtros.",
       "candidate_proof": "artifacts/peru-cpe-restored-candidate-20261003",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003"
+      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003",
+      "closure": {
+        "pr": 135,
+        "merge_sha": "8d717bcfb8e038a5d52abf95c124c99438009080",
+        "schema": 565,
+        "promotion": "artifacts/peru-565-promotion-20261003204614178.json",
+        "main_ci": 37152767852,
+        "runtime": "artifacts/peru-production-verification-after-135-20261003.json"
+      }
     },
     {
       "id": "cpe-peru-credit-controls-missing",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -1689,13 +1812,21 @@
       "correction": "Crédito PE selecciona maestro; persiste CPE y CxC única.",
       "candidate_proof": "artifacts/peru-cpe-restored-candidate-20261003",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003"
+      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003",
+      "closure": {
+        "pr": 135,
+        "merge_sha": "8d717bcfb8e038a5d52abf95c124c99438009080",
+        "schema": 565,
+        "promotion": "artifacts/peru-565-promotion-20261003204614178.json",
+        "main_ci": 37152767852,
+        "runtime": "artifacts/peru-production-verification-after-135-20261003.json"
+      }
     },
     {
       "id": "cpe-emission-date-filter-uses-creation",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -1714,13 +1845,21 @@
       "correction": "Filtro PE consulta fecha_emision; mantiene semántica previa CO/AR.",
       "candidate_proof": "artifacts/peru-cpe-restored-candidate-20261003",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003"
+      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003",
+      "closure": {
+        "pr": 135,
+        "merge_sha": "8d717bcfb8e038a5d52abf95c124c99438009080",
+        "schema": 565,
+        "promotion": "artifacts/peru-565-promotion-20261003204614178.json",
+        "main_ci": 37152767852,
+        "runtime": "artifacts/peru-production-verification-after-135-20261003.json"
+      }
     },
     {
       "id": "cpe-rpc-execute-failure-misclassified",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -1734,13 +1873,21 @@
       },
       "correction": "Sólo PE_DIRECT_CPE_PERMISSION_REQUIRED se clasifica como permiso; pérdida de EXECUTE da 503 recuperable.",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003"
+      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003",
+      "closure": {
+        "pr": 135,
+        "merge_sha": "8d717bcfb8e038a5d52abf95c124c99438009080",
+        "schema": 565,
+        "promotion": "artifacts/peru-565-promotion-20261003204614178.json",
+        "main_ci": 37152767852,
+        "runtime": "artifacts/peru-production-verification-after-135-20261003.json"
+      }
     },
     {
       "id": "cpe-resend-key-conflict-misclassified",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -1754,13 +1901,21 @@
       },
       "correction": "Colisiones y estados no reclamables devuelven 409; ausencia 404 e infraestructura 503.",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 565, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003"
+      "canonical_proof": "artifacts/peru-cpe-canonical-acceptance-20261003",
+      "closure": {
+        "pr": 135,
+        "merge_sha": "8d717bcfb8e038a5d52abf95c124c99438009080",
+        "schema": 565,
+        "promotion": "artifacts/peru-565-promotion-20261003204614178.json",
+        "main_ci": 37152767852,
+        "runtime": "artifacts/peru-production-verification-after-135-20261003.json"
+      }
     },
     {
       "id": "cash-close-amount-alias-rejected",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -1774,13 +1929,21 @@
       },
       "correction": "Validación condicional exige uno de los campos de monto.",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003",
+      "closure": {
+        "pr": 136,
+        "merge_sha": "4f946dfbc2134ff75c17712ab3d50fc5644ab73a",
+        "schema": 566,
+        "promotion": "artifacts/peru-566-promotion-20261003233948436.json",
+        "main_ci": 37162507679,
+        "runtime": "artifacts/peru-production-verification-after-136-20261003.json"
+      }
     },
     {
       "id": "cash-administrative-close-replay-not-found",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -1794,13 +1957,21 @@
       },
       "correction": "Consulta sin excluir sesiones cerradas y deja que SQL valide actor/huella/replay.",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003",
+      "closure": {
+        "pr": 136,
+        "merge_sha": "4f946dfbc2134ff75c17712ab3d50fc5644ab73a",
+        "schema": 566,
+        "promotion": "artifacts/peru-566-promotion-20261003233948436.json",
+        "main_ci": 37162507679,
+        "runtime": "artifacts/peru-production-verification-after-136-20261003.json"
+      }
     },
     {
       "id": "cash-first-client-account-missing",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -1822,13 +1993,21 @@
       },
       "correction": "566 crea la referencia sólo al configurar PE; sin backfill.",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003",
+      "closure": {
+        "pr": 136,
+        "merge_sha": "4f946dfbc2134ff75c17712ab3d50fc5644ab73a",
+        "schema": 566,
+        "promotion": "artifacts/peru-566-promotion-20261003233948436.json",
+        "main_ci": 37162507679,
+        "runtime": "artifacts/peru-production-verification-after-136-20261003.json"
+      }
     },
     {
       "id": "cash-shift-history-read-privilege",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -1842,13 +2021,21 @@
       },
       "correction": "566 concede SELECT exclusivamente al backend.",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003",
+      "closure": {
+        "pr": 136,
+        "merge_sha": "4f946dfbc2134ff75c17712ab3d50fc5644ab73a",
+        "schema": 566,
+        "promotion": "artifacts/peru-566-promotion-20261003233948436.json",
+        "main_ci": 37162507679,
+        "runtime": "artifacts/peru-production-verification-after-136-20261003.json"
+      }
     },
     {
       "id": "cash-withdrawals-report-read-privilege",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -1866,13 +2053,21 @@
       },
       "correction": "566 concede SELECT de retiros al backend; reporte falla explícitamente si no puede leer.",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003",
+      "closure": {
+        "pr": 136,
+        "merge_sha": "4f946dfbc2134ff75c17712ab3d50fc5644ab73a",
+        "schema": 566,
+        "promotion": "artifacts/peru-566-promotion-20261003233948436.json",
+        "main_ci": 37162507679,
+        "runtime": "artifacts/peru-production-verification-after-136-20261003.json"
+      }
     },
     {
       "id": "cash-invalid-date-500",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -1890,13 +2085,21 @@
       },
       "correction": "Valida calendario y rango antes de consultar.",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003",
+      "closure": {
+        "pr": 136,
+        "merge_sha": "4f946dfbc2134ff75c17712ab3d50fc5644ab73a",
+        "schema": 566,
+        "promotion": "artifacts/peru-566-promotion-20261003233948436.json",
+        "main_ci": 37162507679,
+        "runtime": "artifacts/peru-production-verification-after-136-20261003.json"
+      }
     },
     {
       "id": "cash-day-filter-midnight",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -1914,13 +2117,21 @@
       },
       "correction": "Rango desde inicio local, hasta inicio del siguiente día exclusivo.",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003",
+      "closure": {
+        "pr": 136,
+        "merge_sha": "4f946dfbc2134ff75c17712ab3d50fc5644ab73a",
+        "schema": 566,
+        "promotion": "artifacts/peru-566-promotion-20261003233948436.json",
+        "main_ci": 37162507679,
+        "runtime": "artifacts/peru-production-verification-after-136-20261003.json"
+      }
     },
     {
       "id": "cash-session-read-unavailability-masked",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -1942,13 +2153,21 @@
       },
       "correction": "503 en indisponibilidad; ausencia conserva semántica de validación o 404.",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003",
+      "closure": {
+        "pr": 136,
+        "merge_sha": "4f946dfbc2134ff75c17712ab3d50fc5644ab73a",
+        "schema": 566,
+        "promotion": "artifacts/peru-566-promotion-20261003233948436.json",
+        "main_ci": 37162507679,
+        "runtime": "artifacts/peru-production-verification-after-136-20261003.json"
+      }
     },
     {
       "id": "cash-movement-read-unavailability-400",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -1966,13 +2185,21 @@
       },
       "correction": "503 explícito y recuperación con saldo inalterado.",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003",
+      "closure": {
+        "pr": 136,
+        "merge_sha": "4f946dfbc2134ff75c17712ab3d50fc5644ab73a",
+        "schema": 566,
+        "promotion": "artifacts/peru-566-promotion-20261003233948436.json",
+        "main_ci": 37162507679,
+        "runtime": "artifacts/peru-production-verification-after-136-20261003.json"
+      }
     },
     {
       "id": "cash-cut-read-unavailability-masked",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -1994,13 +2221,21 @@
       },
       "correction": "503 para infraestructura; 404 sólo para inexistente/ajeno/ID no válido.",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003",
+      "closure": {
+        "pr": 136,
+        "merge_sha": "4f946dfbc2134ff75c17712ab3d50fc5644ab73a",
+        "schema": 566,
+        "promotion": "artifacts/peru-566-promotion-20261003233948436.json",
+        "main_ci": 37162507679,
+        "runtime": "artifacts/peru-production-verification-after-136-20261003.json"
+      }
     },
     {
       "id": "cash-cut-pdf-layout",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -2014,13 +2249,21 @@
       },
       "correction": "Columnas acotadas, títulos y pie con ancho completo, filas con altura y salto de página.",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003",
+      "closure": {
+        "pr": 136,
+        "merge_sha": "4f946dfbc2134ff75c17712ab3d50fc5644ab73a",
+        "schema": 566,
+        "promotion": "artifacts/peru-566-promotion-20261003233948436.json",
+        "main_ci": 37162507679,
+        "runtime": "artifacts/peru-production-verification-after-136-20261003.json"
+      }
     },
     {
       "id": "cash-manual-infrastructure-400",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -2034,13 +2277,21 @@
       },
       "correction": "503 en infraestructura; rollback y misma intención recuperada una vez.",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003",
+      "closure": {
+        "pr": 136,
+        "merge_sha": "4f946dfbc2134ff75c17712ab3d50fc5644ab73a",
+        "schema": 566,
+        "promotion": "artifacts/peru-566-promotion-20261003233948436.json",
+        "main_ci": 37162507679,
+        "runtime": "artifacts/peru-production-verification-after-136-20261003.json"
+      }
     },
     {
       "id": "cash-preclose-read-validation-false-positive",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -2054,13 +2305,21 @@
       },
       "correction": "Toda lectura requerida falla con 503 y permite recuperación explícita.",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003",
+      "closure": {
+        "pr": 136,
+        "merge_sha": "4f946dfbc2134ff75c17712ab3d50fc5644ab73a",
+        "schema": 566,
+        "promotion": "artifacts/peru-566-promotion-20261003233948436.json",
+        "main_ci": 37162507679,
+        "runtime": "artifacts/peru-production-verification-after-136-20261003.json"
+      }
     },
     {
       "id": "cash-close-preview-infrastructure-400",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -2074,13 +2333,21 @@
       },
       "correction": "503 en configuración, moneda o evidencia inaccesible; conserva arqueo.",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003",
+      "closure": {
+        "pr": 136,
+        "merge_sha": "4f946dfbc2134ff75c17712ab3d50fc5644ab73a",
+        "schema": 566,
+        "promotion": "artifacts/peru-566-promotion-20261003233948436.json",
+        "main_ci": 37162507679,
+        "runtime": "artifacts/peru-production-verification-after-136-20261003.json"
+      }
     },
     {
       "id": "cash-close-preview-false-zero",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -2094,13 +2361,21 @@
       },
       "correction": "La indisponibilidad del ledger bloquea el preview con 503.",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003",
+      "closure": {
+        "pr": 136,
+        "merge_sha": "4f946dfbc2134ff75c17712ab3d50fc5644ab73a",
+        "schema": 566,
+        "promotion": "artifacts/peru-566-promotion-20261003233948436.json",
+        "main_ci": 37162507679,
+        "runtime": "artifacts/peru-production-verification-after-136-20261003.json"
+      }
     },
     {
       "id": "cash-fiscal-payment-report-infrastructure-400",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -2122,13 +2397,21 @@
       },
       "correction": "503 explícito y recuperación de reportes sin efectos financieros.",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003",
+      "closure": {
+        "pr": 136,
+        "merge_sha": "4f946dfbc2134ff75c17712ab3d50fc5644ab73a",
+        "schema": 566,
+        "promotion": "artifacts/peru-566-promotion-20261003233948436.json",
+        "main_ci": 37162507679,
+        "runtime": "artifacts/peru-production-verification-after-136-20261003.json"
+      }
     },
     {
       "id": "cash-csv-free-text-formula",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -2142,13 +2425,21 @@
       },
       "correction": "Neutraliza texto libre y conserva comillas/salto de línea e importes numéricos.",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003",
+      "closure": {
+        "pr": 136,
+        "merge_sha": "4f946dfbc2134ff75c17712ab3d50fc5644ab73a",
+        "schema": 566,
+        "promotion": "artifacts/peru-566-promotion-20261003233948436.json",
+        "main_ci": 37162507679,
+        "runtime": "artifacts/peru-production-verification-after-136-20261003.json"
+      }
     },
     {
       "id": "cash-ui-session-error-sticky",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -2162,13 +2453,21 @@
       },
       "correction": "La carga limpia el error antes de consultar.",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003",
+      "closure": {
+        "pr": 136,
+        "merge_sha": "4f946dfbc2134ff75c17712ab3d50fc5644ab73a",
+        "schema": 566,
+        "promotion": "artifacts/peru-566-promotion-20261003233948436.json",
+        "main_ci": 37162507679,
+        "runtime": "artifacts/peru-production-verification-after-136-20261003.json"
+      }
     },
     {
       "id": "cash-ui-cuts-error-sticky",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -2182,13 +2481,21 @@
       },
       "correction": "La carga limpia el error antes de consultar.",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
+        "Variantes no registradas y aceptación integral del módulo"
       ],
-      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003"
+      "canonical_proof": "artifacts/peru-cash-canonical-local-20261003",
+      "closure": {
+        "pr": 136,
+        "merge_sha": "4f946dfbc2134ff75c17712ab3d50fc5644ab73a",
+        "schema": 566,
+        "promotion": "artifacts/peru-566-promotion-20261003233948436.json",
+        "main_ci": 37162507679,
+        "runtime": "artifacts/peru-production-verification-after-136-20261003.json"
+      }
     },
     {
       "id": "cash-administrative-close-stale-expected-amount",
-      "status": "canonical_correction_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -2202,8 +2509,216 @@
       },
       "correction": "Saldo teórico del ledger por secuencia, igual que el preview y cerrar_caja_tx; lectura fallida 503 sin cerrar; saldo 0 se conserva.",
       "pending": [
-        "CI exacto con SQL fresco y flujo integral, promoción única 566, main y runtime exacto."
-      ]
+        "Variantes no registradas y aceptación integral del módulo"
+      ],
+      "closure": {
+        "pr": 136,
+        "merge_sha": "4f946dfbc2134ff75c17712ab3d50fc5644ab73a",
+        "schema": 566,
+        "promotion": "artifacts/peru-566-promotion-20261003233948436.json",
+        "main_ci": 37162507679,
+        "runtime": "artifacts/peru-production-verification-after-136-20261003.json"
+      }
+    },
+    {
+      "id": "sales-quote-create-not-idempotent",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/cotizaciones"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-sales-baseline-20261003",
+        "observed_error": "Dos POST con el mismo cuerpo e Idempotency-Key crearon dos cotizaciones; la UI no envía clave",
+        "local_only": true
+      },
+      "correction": "Ver PR de ventas: intención 567, 503 en lecturas/writers indisponibles, 404 en pedido ajeno, historial con ciclo de vida y lecturas explícitas",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 567, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003"
+    },
+    {
+      "id": "sales-order-create-not-idempotent",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-sales-baseline-20261003",
+        "observed_error": "Dos POST con el mismo cuerpo e Idempotency-Key crearon dos pedidos; la UI no envía clave",
+        "local_only": true
+      },
+      "correction": "Ver PR de ventas: intención 567, 503 en lecturas/writers indisponibles, 404 en pedido ajeno, historial con ciclo de vida y lecturas explícitas",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 567, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003"
+    },
+    {
+      "id": "sales-quote-read-unavailability-400",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/cotizaciones"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-sales-baseline-20261003",
+        "observed_error": "Sin SELECT de cotizaciones responde 400 'Error al obtener cotizaciones'",
+        "local_only": true
+      },
+      "correction": "Ver PR de ventas: intención 567, 503 en lecturas/writers indisponibles, 404 en pedido ajeno, historial con ciclo de vida y lecturas explícitas",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 567, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003"
+    },
+    {
+      "id": "sales-order-read-unavailability-400",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/pedidos"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-sales-baseline-20261003",
+        "observed_error": "Sin SELECT de pedidos_venta responde 400 'Error al obtener pedidos'",
+        "local_only": true
+      },
+      "correction": "Ver PR de ventas: intención 567, 503 en lecturas/writers indisponibles, 404 en pedido ajeno, historial con ciclo de vida y lecturas explícitas",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 567, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003"
+    },
+    {
+      "id": "sales-quote-writer-unavailability-400",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/cotizaciones"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-sales-baseline-20261003",
+        "observed_error": "Sin EXECUTE del writer responde 400 con el mensaje técnico de PostgreSQL",
+        "local_only": true
+      },
+      "correction": "Ver PR de ventas: intención 567, 503 en lecturas/writers indisponibles, 404 en pedido ajeno, historial con ciclo de vida y lecturas explícitas",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 567, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003"
+    },
+    {
+      "id": "sales-order-update-not-found-400",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "PUT",
+          "endpoint": "/api/ventas/pedidos/:id"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-sales-baseline-20261003",
+        "observed_error": "Pedido ajeno o inexistente responde 400 'Pedido no encontrado' en vez de 404",
+        "local_only": true
+      },
+      "correction": "Ver PR de ventas: intención 567, 503 en lecturas/writers indisponibles, 404 en pedido ajeno, historial con ciclo de vida y lecturas explícitas",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 567, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003"
+    },
+    {
+      "id": "sales-sunat-kpis-rebuild-acl-500",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/reportes/sunat-kpis"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-sales-baseline-20261003",
+        "observed_error": "En la cadena canónica service_role no tiene SELECT sobre v_kpis_sunat_multitenant y el error crudo produce 500. En el respaldo PROD la vista tiene GRANT ALL a service_role: deriva de reconstrucción, no fallo actual de PROD",
+        "local_only": true
+      },
+      "correction": "Ver PR de ventas: intención 567, 503 en lecturas/writers indisponibles, 404 en pedido ajeno, historial con ciclo de vida y lecturas explícitas",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 567, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003"
+    },
+    {
+      "id": "sales-quote-history-empty",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/cotizaciones/:id/historial"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-sales-baseline-20261003",
+        "observed_error": "Tras crear y editar, el historial devuelve timeline vacío: ningún writer de cotizaciones registra audit_log",
+        "local_only": true
+      },
+      "correction": "Ver PR de ventas: intención 567, 503 en lecturas/writers indisponibles, 404 en pedido ajeno, historial con ciclo de vida y lecturas explícitas",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 567, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003"
+    },
+    {
+      "id": "sales-order-history-incomplete",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/pedidos/:id/historial"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-sales-baseline-20261003",
+        "observed_error": "Tras crear, editar, confirmar y cancelar, el historial no llega a dos eventos; sólo algunas acciones escriben auditoría",
+        "local_only": true
+      },
+      "correction": "Ver PR de ventas: intención 567, 503 en lecturas/writers indisponibles, 404 en pedido ajeno, historial con ciclo de vida y lecturas explícitas",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 567, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003"
+    },
+    {
+      "id": "sales-order-history-inventory-query-silent-failure",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/pedidos/:id/historial"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-sales-baseline-20261003",
+        "observed_error": "La consulta de movimientos del historial usaba un embebido productos(...) que PostgREST no resuelve; el error se ignoraba y el historial omitía siempre los movimientos de inventario. Se hizo visible al convertir lecturas fallidas en 503.",
+        "local_only": true
+      },
+      "correction": "Ver PR de ventas: intención 567, 503 en lecturas/writers indisponibles, 404 en pedido ajeno, historial con ciclo de vida y lecturas explícitas",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 567, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-sales-canonical-local-20261003"
     }
   ]
 }

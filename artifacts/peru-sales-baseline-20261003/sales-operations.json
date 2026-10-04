@@ -1,0 +1,460 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Ventas API/DB local diagnóstico; sin aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Ventas: cotización editada recalcula total, conserva líneas y registra historial",
+      "passed": false,
+      "message": "Historial con eventos: {\"cotizacion\":{\"id\":\"c223aedc-63d2-47ba-b22c-3c9838789eb0\",\"numero\":\"COT-2026-0001\",\"estado\":\"BORRADOR\",\"cliente_id\":\"bbf0f043-a3fa-4e6b-b24e-da89c5896bd7\"},\"timeline\":[],\"resumen\":{\"total_eventos\":0,"
+    },
+    {
+      "scenario": "Ventas: cotización rechazada por otro actor no se convierte en pedido",
+      "passed": true
+    },
+    {
+      "scenario": "Ventas: ADMIN no puede autorrechazar y su autoaprobación queda trazada",
+      "passed": true
+    },
+    {
+      "scenario": "Ventas: eliminar cotización borrador la retira; ajena o inexistente responde 404",
+      "passed": true
+    },
+    {
+      "scenario": "Ventas: listado de cotizaciones filtra por estado, cliente y búsqueda dentro de la empresa",
+      "passed": true
+    },
+    {
+      "scenario": "Ventas: alta repetida de cotización con la misma Idempotency-Key no duplica",
+      "passed": false,
+      "message": "Cotizaciones creadas con la misma clave: 2 (ids 34d3a0ef-eb66-4f8b-bddd-0cb5bc5fb842,285239af-dd6d-427b-bb26-a646da9721ce)\n\n2 !== 1\n"
+    },
+    {
+      "scenario": "Ventas: pedido directo editado antes de confirmar recalcula total",
+      "passed": true
+    },
+    {
+      "scenario": "Ventas: alta repetida de pedido con la misma Idempotency-Key no duplica",
+      "passed": false,
+      "message": "Pedidos creados con la misma clave: 2 (ids 736cce4a-13aa-437a-9cef-54b82b54c883,696c622b-8d83-419e-8498-a92b7055f500)\n\n2 !== 1\n"
+    },
+    {
+      "scenario": "Ventas: pedido confirmado y cancelado con replay conserva un único estado e historial",
+      "passed": false,
+      "message": "Historial {\"pedido\":{\"id\":\"71506f4e-0051-4977-9334-8e76439d886c\",\"numero\":\"PV-2026-0001\",\"estado\":\"CANCELADO\",\"cliente_id\":\"bbf0f043-a3fa-4e6b-b24e-da89c5896bd7\"},\"timeline\":[{\"tipo\":\"AUDITORIA\",\"timestamp\":\"20"
+    },
+    {
+      "scenario": "Ventas: pedido ajeno responde 404 y no se modifica",
+      "passed": false,
+      "message": "PUT ventas/pedidos/57e384e6-53c1-42e9-ab72-83509d32d091: {\"statusCode\":400,\"message\":\"Pedido no encontrado\",\"error\":\"Bad Request\",\"timestamp\":\"2026-10-03T22:50:14.076Z\",\"path\":\"/api/ventas/pedidos/57e384e6-53c1-42e9-ab72-83509d32d091\"}\n\n400 !== 404\n"
+    },
+    {
+      "scenario": "Ventas: lectura de cotizaciones indisponible responde 503 y se recupera",
+      "passed": false,
+      "message": "Indisponibilidad: 400 {\"statusCode\":400,\"message\":\"Error al obtener cotizaciones\",\"error\":\"Bad Request\",\"timestamp\":\"2026-10-03T22:50:14.159Z\",\"path\":\"/api/ventas/cotizaciones\"}\n\n400 !== 503\n"
+    },
+    {
+      "scenario": "Ventas: lectura de pedidos_venta indisponible responde 503 y se recupera",
+      "passed": false,
+      "message": "Indisponibilidad: 400 {\"statusCode\":400,\"message\":\"Error al obtener pedidos\",\"error\":\"Bad Request\",\"timestamp\":\"2026-10-03T22:50:14.305Z\",\"path\":\"/api/ventas/pedidos\"}\n\n400 !== 503\n"
+    },
+    {
+      "scenario": "Ventas: writer de cotización sin EXECUTE responde 503 sin crear filas",
+      "passed": false,
+      "message": "Writer indisponible: 400 {\"statusCode\":400,\"message\":\"permission denied for function crear_cotizacion_comercial_tx\",\"error\":\"Bad Request\",\"timestamp\":\"2026-10-03T22:50:14.536Z\",\"path\":\"/api/ventas/cotizaciones\"}\n\n400 !== 503\n"
+    },
+    {
+      "scenario": "Ventas: reportes comerciales restantes responden con datos de la empresa",
+      "passed": false,
+      "message": "{\"statuses\":{\"pipeline\":200,\"fill-rate\":200,\"cxc-aging\":200,\"sunat-kpis\":500,\"cotizaciones-pendientes\":200},\"viewProbe\":\"ERROR ERROR:  permission denied for view v_kpis_sunat_multitenant\\r\"}"
+    },
+    {
+      "scenario": "Ventas: validar RUC acepta dígito correcto y rechaza el incorrecto",
+      "passed": true
+    },
+    {
+      "scenario": "Ventas: lista de precios con intención, replay, conflicto, resolución y desactivación",
+      "passed": true
+    },
+    {
+      "scenario": "Ventas: regla de comisión con intención, replay y desactivación; movimientos consultables",
+      "passed": true
+    },
+    {
+      "scenario": "Ventas: consolidado rechaza fuente inexistente sin efectos y lista candidatos",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/complete",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/almacenes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/categorias",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/productos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/clientes",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "roles",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "users",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "ventas/cotizaciones/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/cotizaciones/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/cotizaciones/:id/historial",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones/:id/enviar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones/:id/rechazar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones/:id/convertir-pedido",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones/:id/enviar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones/:id/rechazar",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/cotizaciones/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones/:id/aprobar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones",
+      "status": 201
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "ventas/cotizaciones/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/cotizaciones/:id",
+      "status": 404
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "ventas/cotizaciones/:id",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/cotizaciones/:id",
+      "status": 404
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "ventas/cotizaciones/:id",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/cotizaciones/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/cotizaciones",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/cotizaciones",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/cotizaciones",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "ventas/pedidos/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/pedidos/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/cancelar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/cancelar",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/pedidos/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/pedidos/:id/historial",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/pedidos/:id",
+      "status": 404
+    },
+    {
+      "method": "PUT",
+      "endpoint": "ventas/pedidos/:id",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/cotizaciones",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/pedidos",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/reportes/pipeline",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/reportes/fill-rate",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/reportes/cxc-aging",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/reportes/sunat-kpis",
+      "status": 500
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/reportes/cotizaciones-pendientes",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/clientes/validar-ruc",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/clientes/validar-ruc",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/comercial/listas-precios",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/comercial/listas-precios",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/comercial/listas-precios",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/comercial/precios/resolver",
+      "status": 201
+    },
+    {
+      "method": "PATCH",
+      "endpoint": "ventas/comercial/listas-precios/:id/estado",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/comercial/precios/resolver",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/comercial/listas-precios",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/comercial/comisiones/reglas",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/comercial/comisiones/reglas",
+      "status": 201
+    },
+    {
+      "method": "PATCH",
+      "endpoint": "ventas/comercial/comisiones/reglas/:id/estado",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/comercial/comisiones/reglas",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/comercial/comisiones/movimientos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/comercial/consolidados/candidatos",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/comercial/consolidados",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/comercial/consolidados",
+      "status": 200
+    }
+  ]
+}

@@ -1,0 +1,111 @@
+{
+  "scope": "Ventas: cotizaciones, pedidos, reportes y comercial con API/PostgREST/PostgreSQL locales efímeros",
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "runs": [
+    {
+      "output": "artifacts/peru-sales-local-20261003224633484-10476",
+      "result": "diagnostic_with_probe_assumptions",
+      "restore": "passed"
+    },
+    {
+      "output": "artifacts/peru-sales-local-20261003224919680-20620",
+      "result": "defects_reproduced",
+      "restore": "passed"
+    }
+  ],
+  "probe_assumptions_corrected": [
+    "Dos líneas del mismo producto: el writer aplica COMMERCIAL_PRICE_DUPLICATE_PRODUCT_LINE",
+    "condicion_pago en pedidos PE: PEDIDO_DIAN_PAYMENT_ONLY_CO restringe esos campos a Colombia",
+    "Autoaprobación de cotización por ADMIN: excepción documentada en 519; se verificó traza y prohibición de autorrechazo"
+  ],
+  "passed": [
+    "Cotización rechazada por otro actor no se convierte en pedido",
+    "ADMIN no puede autorrechazar; su autoaprobación queda trazada con su motivo",
+    "Eliminar borrador; ajena o inexistente 404",
+    "Listado filtra por estado y cliente sin filas de otra empresa",
+    "Pedido directo editado antes de confirmar recalcula total",
+    "Validar RUC local",
+    "Lista de precios con intención, replay, conflicto, resolución y desactivación",
+    "Regla de comisión con intención, replay y desactivación",
+    "Consolidado rechaza fuente inexistente sin efectos"
+  ],
+  "confirmed_defects": [
+    {
+      "id": "sales-quote-create-not-idempotent",
+      "operations": [
+        "POST /api/ventas/cotizaciones"
+      ],
+      "observed": "Dos POST con el mismo cuerpo e Idempotency-Key crearon dos cotizaciones; la UI no envía clave"
+    },
+    {
+      "id": "sales-order-create-not-idempotent",
+      "operations": [
+        "POST /api/ventas/pedidos"
+      ],
+      "observed": "Dos POST con el mismo cuerpo e Idempotency-Key crearon dos pedidos; la UI no envía clave"
+    },
+    {
+      "id": "sales-quote-read-unavailability-400",
+      "operations": [
+        "GET /api/ventas/cotizaciones"
+      ],
+      "observed": "Sin SELECT de cotizaciones responde 400 'Error al obtener cotizaciones'"
+    },
+    {
+      "id": "sales-order-read-unavailability-400",
+      "operations": [
+        "GET /api/ventas/pedidos"
+      ],
+      "observed": "Sin SELECT de pedidos_venta responde 400 'Error al obtener pedidos'"
+    },
+    {
+      "id": "sales-quote-writer-unavailability-400",
+      "operations": [
+        "POST /api/ventas/cotizaciones"
+      ],
+      "observed": "Sin EXECUTE del writer responde 400 con el mensaje técnico de PostgreSQL"
+    },
+    {
+      "id": "sales-order-update-not-found-400",
+      "operations": [
+        "PUT /api/ventas/pedidos/:id"
+      ],
+      "observed": "Pedido ajeno o inexistente responde 400 'Pedido no encontrado' en vez de 404"
+    },
+    {
+      "id": "sales-sunat-kpis-rebuild-acl-500",
+      "operations": [
+        "GET /api/ventas/reportes/sunat-kpis"
+      ],
+      "observed": "En la cadena canónica service_role no tiene SELECT sobre v_kpis_sunat_multitenant y el error crudo produce 500. En el respaldo PROD la vista tiene GRANT ALL a service_role: deriva de reconstrucción, no fallo actual de PROD"
+    },
+    {
+      "id": "sales-quote-history-empty",
+      "operations": [
+        "GET /api/ventas/cotizaciones/:id/historial"
+      ],
+      "observed": "Tras crear y editar, el historial devuelve timeline vacío: ningún writer de cotizaciones registra audit_log"
+    },
+    {
+      "id": "sales-order-history-incomplete",
+      "operations": [
+        "GET /api/ventas/pedidos/:id/historial"
+      ],
+      "observed": "Tras crear, editar, confirmar y cancelar, el historial no llega a dos eventos; sólo algunas acciones escriben auditoría"
+    },
+    {
+      "id": "sales-order-history-inventory-query-silent-failure",
+      "operations": [
+        "GET /api/ventas/pedidos/:id/historial"
+      ],
+      "observed": "La consulta de movimientos del historial usaba un embebido productos(...) que PostgREST no resuelve; el error se ignoraba y el historial omitía siempre los movimientos de inventario. Se hizo visible al convertir lecturas fallidas en 503."
+    }
+  ],
+  "pending": [
+    "Corrección canónica, regresión, UI real, CI, promoción y despliegue",
+    "Permisos negativos con roles reales distintos de ADMIN",
+    "Resto de escritores de ventas bajo indisponibilidad"
+  ],
+  "canonical_proof": "artifacts/peru-sales-canonical-local-20261003"
+}

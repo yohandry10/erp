@@ -487,7 +487,7 @@ describe('CotizacionesService', () => {
 
       mockClient.single.mockResolvedValue({
         data: null,
-        error: { message: 'No encontrado' },
+        error: { code: 'PGRST116', message: 'No encontrado' },
       });
 
       await expect(service.findOne('cotizacion-cross', tenantId)).rejects.toThrow(NotFoundException);
@@ -533,7 +533,7 @@ describe('CotizacionesService', () => {
 
       mockClient.single.mockResolvedValue({
         data: null,
-        error: { message: 'No encontrado' },
+        error: { code: 'PGRST116', message: 'No encontrado' },
       });
 
       await expect(service.create(createDto as any, tenantId, userId)).rejects.toThrow(NotFoundException);

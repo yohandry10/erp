@@ -3613,6 +3613,444 @@
       "pending_checks": [
         "Pipeline, fill-rate, aging, KPIs SUNAT y cotizaciones pendientes; exportación e impresión"
       ]
+    },
+    {
+      "id": "sales-quote-edit-history",
+      "source": "scripts/ci/test-peru-sales-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Ventas: cotización editada recalcula total"
+      ],
+      "operations": [
+        {
+          "method": "PUT",
+          "endpoint": "/api/ventas/cotizaciones/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/cotizaciones/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/cotizaciones/:id/historial"
+        }
+      ],
+      "verified_checks": [
+        "Ventas: cotización editada recalcula total, conserva líneas y registra historial"
+      ],
+      "pending_checks": [
+        "UI real, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "sales-quote-reject-no-convert",
+      "source": "scripts/ci/test-peru-sales-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Ventas: cotización rechazada por otro actor"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/cotizaciones/:id/rechazar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/cotizaciones/:id/convertir-pedido"
+        }
+      ],
+      "verified_checks": [
+        "Ventas: cotización rechazada por otro actor no se convierte en pedido"
+      ],
+      "pending_checks": [
+        "UI real, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "sales-quote-admin-self-approval-traced",
+      "source": "scripts/ci/test-peru-sales-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Ventas: ADMIN no puede autorrechazar"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/cotizaciones/:id/rechazar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/cotizaciones/:id/aprobar"
+        }
+      ],
+      "verified_checks": [
+        "Ventas: ADMIN no puede autorrechazar y su autoaprobación queda trazada"
+      ],
+      "pending_checks": [
+        "UI real, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "sales-quote-delete-isolation",
+      "source": "scripts/ci/test-peru-sales-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Ventas: eliminar cotización borrador"
+      ],
+      "operations": [
+        {
+          "method": "DELETE",
+          "endpoint": "/api/ventas/cotizaciones/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/cotizaciones/:id"
+        }
+      ],
+      "verified_checks": [
+        "Ventas: eliminar cotización borrador la retira; ajena o inexistente responde 404"
+      ],
+      "pending_checks": [
+        "UI real, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "sales-quote-list-filters-isolation",
+      "source": "scripts/ci/test-peru-sales-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Ventas: listado de cotizaciones filtra"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/cotizaciones"
+        }
+      ],
+      "verified_checks": [
+        "Ventas: listado de cotizaciones filtra por estado, cliente y búsqueda dentro de la empresa"
+      ],
+      "pending_checks": [
+        "UI real, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "sales-quote-create-idempotent",
+      "source": "scripts/ci/test-peru-sales-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Ventas: alta repetida de cotización"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/cotizaciones"
+        }
+      ],
+      "verified_checks": [
+        "Ventas: alta repetida de cotización con la misma Idempotency-Key no duplica"
+      ],
+      "pending_checks": [
+        "UI real, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "sales-order-direct-edit",
+      "source": "scripts/ci/test-peru-sales-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Ventas: pedido directo editado"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/ventas/pedidos/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/pedidos/:id"
+        }
+      ],
+      "verified_checks": [
+        "Ventas: pedido directo editado antes de confirmar recalcula total"
+      ],
+      "pending_checks": [
+        "UI real, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "sales-order-create-idempotent",
+      "source": "scripts/ci/test-peru-sales-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Ventas: alta repetida de pedido"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos"
+        }
+      ],
+      "verified_checks": [
+        "Ventas: alta repetida de pedido con la misma Idempotency-Key no duplica"
+      ],
+      "pending_checks": [
+        "UI real, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "sales-order-confirm-cancel-history",
+      "source": "scripts/ci/test-peru-sales-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Ventas: pedido confirmado y cancelado"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/confirmar"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/cancelar"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/pedidos/:id/historial"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/pedidos/:id/gres"
+        }
+      ],
+      "verified_checks": [
+        "Ventas: pedido confirmado y cancelado con replay conserva un único estado e historial"
+      ],
+      "pending_checks": [
+        "UI real, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "sales-order-isolation-404",
+      "source": "scripts/ci/test-peru-sales-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Ventas: pedido ajeno responde 404"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/pedidos/:id"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/ventas/pedidos/:id"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/confirmar"
+        }
+      ],
+      "verified_checks": [
+        "Ventas: pedido ajeno responde 404 y no se modifica"
+      ],
+      "pending_checks": [
+        "UI real, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "sales-quote-read-outage-503",
+      "source": "scripts/ci/test-peru-sales-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Ventas: lectura de cotizaciones indisponible"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/cotizaciones"
+        }
+      ],
+      "verified_checks": [
+        "Ventas: lectura de cotizaciones indisponible responde 503 y se recupera"
+      ],
+      "pending_checks": [
+        "UI real, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "sales-order-read-outage-503",
+      "source": "scripts/ci/test-peru-sales-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Ventas: lectura de pedidos_venta indisponible"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/pedidos"
+        }
+      ],
+      "verified_checks": [
+        "Ventas: lectura de pedidos_venta indisponible responde 503 y se recupera"
+      ],
+      "pending_checks": [
+        "UI real, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "sales-quote-writer-outage-503",
+      "source": "scripts/ci/test-peru-sales-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Ventas: writer de cotización sin EXECUTE"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/cotizaciones"
+        }
+      ],
+      "verified_checks": [
+        "Ventas: writer de cotización sin EXECUTE responde 503 sin crear filas"
+      ],
+      "pending_checks": [
+        "UI real, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "sales-remaining-reports",
+      "source": "scripts/ci/test-peru-sales-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Ventas: reportes comerciales restantes"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/reportes/pipeline"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/reportes/fill-rate"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/reportes/cxc-aging"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/reportes/sunat-kpis"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/reportes/cotizaciones-pendientes"
+        }
+      ],
+      "verified_checks": [
+        "Ventas: reportes comerciales restantes responden con datos de la empresa"
+      ],
+      "pending_checks": [
+        "UI real, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "sales-validate-ruc",
+      "source": "scripts/ci/test-peru-sales-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Ventas: validar RUC"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/clientes/validar-ruc"
+        }
+      ],
+      "verified_checks": [
+        "Ventas: validar RUC acepta dígito correcto y rechaza el incorrecto"
+      ],
+      "pending_checks": [
+        "UI real, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "sales-price-list-lifecycle",
+      "source": "scripts/ci/test-peru-sales-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Ventas: lista de precios con intención"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/comercial/listas-precios"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/comercial/listas-precios"
+        },
+        {
+          "method": "PATCH",
+          "endpoint": "/api/ventas/comercial/listas-precios/:id/estado"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/comercial/precios/resolver"
+        }
+      ],
+      "verified_checks": [
+        "Ventas: lista de precios con intención, replay, conflicto, resolución y desactivación"
+      ],
+      "pending_checks": [
+        "UI real, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "sales-commission-rule-lifecycle",
+      "source": "scripts/ci/test-peru-sales-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Ventas: regla de comisión con intención"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/comercial/comisiones/reglas"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/comercial/comisiones/reglas"
+        },
+        {
+          "method": "PATCH",
+          "endpoint": "/api/ventas/comercial/comisiones/reglas/:id/estado"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/comercial/comisiones/movimientos"
+        }
+      ],
+      "verified_checks": [
+        "Ventas: regla de comisión con intención, replay y desactivación; movimientos consultables"
+      ],
+      "pending_checks": [
+        "UI real, roles distintos de ADMIN y variantes no registradas"
+      ]
+    },
+    {
+      "id": "sales-consolidation-invalid-source",
+      "source": "scripts/ci/test-peru-sales-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "Ventas: consolidado rechaza fuente inexistente"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/comercial/consolidados/candidatos"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/comercial/consolidados"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/comercial/consolidados"
+        }
+      ],
+      "verified_checks": [
+        "Ventas: consolidado rechaza fuente inexistente sin efectos y lista candidatos"
+      ],
+      "pending_checks": [
+        "UI real, roles distintos de ADMIN y variantes no registradas"
+      ]
     }
   ]
 }

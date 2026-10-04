@@ -1,0 +1,12 @@
+{
+  "scope": "Ventas con fuentes canónicas y 567",
+  "complete_acceptance": false,
+  "remoteWrites": false,
+  "passed": 18,
+  "failed": 0,
+  "limits": [
+    "Snapshot local restaurado más DDL 559-567; la reconstrucción fresca y CI se registran aparte",
+    "Sin UI de ventas en este subconjunto",
+    "Sin transmisión fiscal externa"
+  ]
+}

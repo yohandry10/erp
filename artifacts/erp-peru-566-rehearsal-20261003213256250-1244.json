@@ -1,0 +1,579 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "network": "none",
+  "project": "wypnbcptofqdmoynlonq",
+  "archiveSha256": "8bb056aed746030dff2b900c429e704e96b4662164bad287de7ee216f71def02",
+  "migrationSha256": "0bef3ad1a7780b148356777b28429ee806a73b166e18c5066078ccf6cb2cd287",
+  "bundleSha256": "d405019f39eb923af16b0e757f22f26f007c779ce8adc2f3c1f3231089b87035",
+  "limits": [
+    "Sin objetos externos de Storage ni roles globales; tiempo local no acredita RTO."
+  ],
+  "restoreVerified": true,
+  "before": {
+    "project": "wypnbcptofqdmoynlonq",
+    "environment": "PROD",
+    "schema": 565,
+    "ready": true,
+    "directBoundary": {
+      "security": [
+        true,
+        "v",
+        "postgres",
+        [
+          "search_path=pg_catalog, public, app, extensions, pg_temp"
+        ]
+      ],
+      "service": true,
+      "anon": false,
+      "authenticated": false,
+      "public": false,
+      "guarded": true,
+      "hash": "f1d8313e70ac23b11f87eddb18639a7b"
+    },
+    "cashReads": [
+      {
+        "rls": true,
+        "owner": "postgres",
+        "table": "cambios_turno",
+        "forced": true,
+        "anonRead": true,
+        "serviceRead": true,
+        "serviceWrite": false,
+        "authenticatedRead": true,
+        "aclWithoutBackendRead": [
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "DELETE"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "INSERT"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "MAINTAIN"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "REFERENCES"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "SELECT"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "TRIGGER"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "TRUNCATE"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "UPDATE"
+          },
+          {
+            "grantee": "anon",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "MAINTAIN"
+          },
+          {
+            "grantee": "anon",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "SELECT"
+          },
+          {
+            "grantee": "authenticated",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "MAINTAIN"
+          },
+          {
+            "grantee": "authenticated",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "SELECT"
+          },
+          {
+            "grantee": "service_role",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "MAINTAIN"
+          }
+        ]
+      },
+      {
+        "rls": true,
+        "owner": "postgres",
+        "table": "retiros_caja",
+        "forced": true,
+        "anonRead": true,
+        "serviceRead": true,
+        "serviceWrite": false,
+        "authenticatedRead": true,
+        "aclWithoutBackendRead": [
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "DELETE"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "INSERT"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "MAINTAIN"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "REFERENCES"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "SELECT"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "TRIGGER"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "TRUNCATE"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "UPDATE"
+          },
+          {
+            "grantee": "anon",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "MAINTAIN"
+          },
+          {
+            "grantee": "anon",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "SELECT"
+          },
+          {
+            "grantee": "authenticated",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "MAINTAIN"
+          },
+          {
+            "grantee": "authenticated",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "SELECT"
+          },
+          {
+            "grantee": "service_role",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "MAINTAIN"
+          }
+        ]
+      }
+    ],
+    "cashBoundary": null,
+    "posBoundary": {
+      "security": [
+        true,
+        "v",
+        "postgres",
+        [
+          "search_path=pg_catalog, public, app, extensions, pg_temp"
+        ]
+      ],
+      "service": true,
+      "anon": false,
+      "authenticated": false,
+      "public": false,
+      "guarded": true,
+      "hash": "2ef3e1f49ff2f46cdf99ebce4f77e579"
+    },
+    "catalogTrigger": 1,
+    "comparedData": [
+      "ajustes_consolidacion",
+      "almacenes",
+      "asientos_contables",
+      "audit_log",
+      "cajas",
+      "cambios_turno",
+      "centros_costo",
+      "configuration_operation_intents",
+      "cortes_caja",
+      "cpe",
+      "cuentas_bancarias",
+      "cuentas_por_cobrar",
+      "detalle_asientos",
+      "documento_detalles",
+      "documento_series",
+      "documentos",
+      "empresa_config",
+      "grupos_consolidacion",
+      "grupos_consolidacion_miembros",
+      "mapeos_cuentas_consolidacion",
+      "metodos_pago",
+      "movimientos_caja",
+      "movimientos_inventario",
+      "outbox_events",
+      "permisos",
+      "plan_cuentas",
+      "producto_stock_sucursal",
+      "productos",
+      "reportes_contables_configurables",
+      "reportes_contables_lineas",
+      "retiros_caja",
+      "rol_permisos",
+      "roles",
+      "rrhh_peru_fichas_laborales",
+      "rrhh_peru_presentaciones_planilla",
+      "sesiones_caja",
+      "sucursales",
+      "tenants",
+      "tipos_cambio_consolidacion",
+      "tributos_declaraciones_anuales",
+      "tributos_declaraciones_mensuales",
+      "tributos_operaciones_562",
+      "user_roles",
+      "usuario_sucursales",
+      "usuarios_sistema",
+      "ventas_pos"
+    ]
+  },
+  "historyBefore": 565,
+  "atomicRollbackPassed": true,
+  "preservationNegativeControlsPassed": true,
+  "existingDataPreserved": true,
+  "existingFunctionsPreserved": true,
+  "tableSecurityPreserved": true,
+  "onlyApprovedCashBoundaryAdded": true,
+  "after": {
+    "project": "wypnbcptofqdmoynlonq",
+    "environment": "PROD",
+    "schema": 566,
+    "ready": true,
+    "directBoundary": {
+      "security": [
+        true,
+        "v",
+        "postgres",
+        [
+          "search_path=pg_catalog, public, app, extensions, pg_temp"
+        ]
+      ],
+      "service": true,
+      "anon": false,
+      "authenticated": false,
+      "public": false,
+      "guarded": true,
+      "hash": "f1d8313e70ac23b11f87eddb18639a7b"
+    },
+    "cashReads": [
+      {
+        "rls": true,
+        "owner": "postgres",
+        "table": "cambios_turno",
+        "forced": true,
+        "anonRead": true,
+        "serviceRead": true,
+        "serviceWrite": false,
+        "authenticatedRead": true,
+        "aclWithoutBackendRead": [
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "DELETE"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "INSERT"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "MAINTAIN"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "REFERENCES"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "SELECT"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "TRIGGER"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "TRUNCATE"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "UPDATE"
+          },
+          {
+            "grantee": "anon",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "MAINTAIN"
+          },
+          {
+            "grantee": "anon",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "SELECT"
+          },
+          {
+            "grantee": "authenticated",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "MAINTAIN"
+          },
+          {
+            "grantee": "authenticated",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "SELECT"
+          },
+          {
+            "grantee": "service_role",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "MAINTAIN"
+          }
+        ]
+      },
+      {
+        "rls": true,
+        "owner": "postgres",
+        "table": "retiros_caja",
+        "forced": true,
+        "anonRead": true,
+        "serviceRead": true,
+        "serviceWrite": false,
+        "authenticatedRead": true,
+        "aclWithoutBackendRead": [
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "DELETE"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "INSERT"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "MAINTAIN"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "REFERENCES"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "SELECT"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "TRIGGER"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "TRUNCATE"
+          },
+          {
+            "grantee": "postgres",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "UPDATE"
+          },
+          {
+            "grantee": "anon",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "MAINTAIN"
+          },
+          {
+            "grantee": "anon",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "SELECT"
+          },
+          {
+            "grantee": "authenticated",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "MAINTAIN"
+          },
+          {
+            "grantee": "authenticated",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "SELECT"
+          },
+          {
+            "grantee": "service_role",
+            "grantor": "postgres",
+            "grantable": false,
+            "privilege": "MAINTAIN"
+          }
+        ]
+      }
+    ],
+    "cashBoundary": {
+      "security": [
+        true,
+        "v",
+        "postgres",
+        [
+          "search_path=pg_catalog, public, app, pg_temp"
+        ]
+      ],
+      "service": false,
+      "anon": false,
+      "authenticated": false,
+      "public": false,
+      "guarded": true,
+      "trigger": 1,
+      "hash": "692b90d54d36f00de869a777f28ef4e6"
+    },
+    "posBoundary": {
+      "security": [
+        true,
+        "v",
+        "postgres",
+        [
+          "search_path=pg_catalog, public, app, extensions, pg_temp"
+        ]
+      ],
+      "service": true,
+      "anon": false,
+      "authenticated": false,
+      "public": false,
+      "guarded": true,
+      "hash": "2ef3e1f49ff2f46cdf99ebce4f77e579"
+    },
+    "catalogTrigger": 1,
+    "comparedData": [
+      "ajustes_consolidacion",
+      "almacenes",
+      "asientos_contables",
+      "audit_log",
+      "cajas",
+      "cambios_turno",
+      "centros_costo",
+      "configuration_operation_intents",
+      "cortes_caja",
+      "cpe",
+      "cuentas_bancarias",
+      "cuentas_por_cobrar",
+      "detalle_asientos",
+      "documento_detalles",
+      "documento_series",
+      "documentos",
+      "empresa_config",
+      "grupos_consolidacion",
+      "grupos_consolidacion_miembros",
+      "mapeos_cuentas_consolidacion",
+      "metodos_pago",
+      "movimientos_caja",
+      "movimientos_inventario",
+      "outbox_events",
+      "permisos",
+      "plan_cuentas",
+      "producto_stock_sucursal",
+      "productos",
+      "reportes_contables_configurables",
+      "reportes_contables_lineas",
+      "retiros_caja",
+      "rol_permisos",
+      "roles",
+      "rrhh_peru_fichas_laborales",
+      "rrhh_peru_presentaciones_planilla",
+      "sesiones_caja",
+      "sucursales",
+      "tenants",
+      "tipos_cambio_consolidacion",
+      "tributos_declaraciones_anuales",
+      "tributos_declaraciones_mensuales",
+      "tributos_operaciones_562",
+      "user_roles",
+      "usuario_sucursales",
+      "usuarios_sistema",
+      "ventas_pos"
+    ]
+  },
+  "sqlContractsPassed": true,
+  "historyAfter": 566,
+  "completedAt": "2026-10-03T21:33:13.374Z"
+}
