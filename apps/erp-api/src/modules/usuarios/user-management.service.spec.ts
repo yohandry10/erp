@@ -53,7 +53,29 @@ describe('UserManagementService contrato atómico 462', () => {
       p_usuario: expect.objectContaining({ email: 'user@example.com', password_hash: expect.any(String) }),
     }));
     expect(email.sendUserActivationEmail).toHaveBeenCalledTimes(1);
-    expect(result).toMatchObject({ id: 'user-1', temporaryPassword: 'Password1!' });
+    expect(result).toMatchObject({ id: 'user-1' });
+    // La contraseña elegida por el administrador no vuelve en la respuesta.
+    expect(JSON.stringify(result)).not.toContain('Password1!');
+  });
+
+  it('devuelve la contraseña generada sólo en el alta original', async () => {
+    rpc.mockResolvedValueOnce({ data: { id: 'user-1', idempotent: false }, error: null });
+    const created: any = await service.createUser(
+      'tenant-1',
+      { idempotency_key: '11111111-1111-4111-8111-111111111111', nombre: 'Usuario', email: 'user@example.com', roles: [] },
+      'actor-1',
+    );
+    expect(created.temporaryPassword).toMatch(/^.{12}$/);
+    expect(email.sendUserActivationEmail).toHaveBeenCalledWith('user@example.com', 'Usuario', created.temporaryPassword);
+
+    // El reintento genera otra contraseña que no es la guardada: no se devuelve.
+    rpc.mockResolvedValueOnce({ data: { id: 'user-1', idempotent: true }, error: null });
+    const replay: any = await service.createUser(
+      'tenant-1',
+      { idempotency_key: '11111111-1111-4111-8111-111111111111', nombre: 'Usuario', email: 'user@example.com', roles: [] },
+      'actor-1',
+    );
+    expect(replay).toEqual({ id: 'user-1', idempotent: true });
   });
 
   it('un retry idempotente no vuelve a enviar credenciales', async () => {

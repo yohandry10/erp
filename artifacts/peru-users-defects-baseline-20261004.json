@@ -1,0 +1,42 @@
+{
+  "scope": "Usuarios y roles del tenant: listado, métricas, alta, edición, estados, baja, permisos efectivos, aislamiento y roles propios con API/PostgREST/PostgreSQL locales efímeros",
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "runs": [
+    {
+      "output": "artifacts/peru-users-local-20261004172829366-4192",
+      "result": "diagnostic_with_probe_assumptions"
+    },
+    {
+      "output": "artifacts/peru-users-baseline-20261004",
+      "result": "defects_reproduced",
+      "restore": "passed"
+    }
+  ],
+  "probe_assumptions_corrected": [
+    "El alta abortó antes del login y el escenario siguiente reutilizó el token del administrador (parámetro por defecto): se inicia sesión antes de evaluar la respuesta",
+    "Sin lectura de usuarios_sistema el guard de permisos no puede resolver al actor y responde 403: falla cerrado, no es un 200 vacío"
+  ],
+  "passed": [
+    "Listado, métricas y roles del tenant sin datos ajenos ni campos de contraseña",
+    "Alta con rol e Idempotency-Key: el reintento no duplica y el usuario inicia sesión",
+    "Correo repetido 409, contraseña corta 400 y rol de otra empresa rechazado sin persistir",
+    "VENDEDOR no lista, crea ni cambia estados de usuarios",
+    "Edición de datos y reemplazo de rol",
+    "Inactivar revoca la sesión vigente y el login; reactivar lo devuelve",
+    "Otra empresa no ve, edita ni inactiva al usuario; x-tenant-id ajeno no cruza tenants",
+    "El administrador no puede inactivarse a sí mismo",
+    "Baja trazable: INACTIVO sin borrado",
+    "Rol propio con permisos, consulta de permisos y usuarios del rol, aislamiento y baja"
+  ],
+  "confirmed_defects": [
+    {
+      "id": "users-create-echoes-password",
+      "operations": ["POST /api/usuarios-sistema/crear", "POST /api/usuarios/crear", "POST /api/users"],
+      "observed": "La respuesta del alta devuelve en temporaryPassword la contraseña elegida por el administrador, también en el reintento idempotente. Si la contraseña la genera el servidor, el reintento devuelve otra recién generada que no es la guardada."
+    }
+  ],
+  "observations_not_changed": [
+    "Ante una caída de usuarios_sistema el guard responde 403 en vez de 503: falla cerrado; cambiarlo afecta a todos los endpoints protegidos."
+  ]
+}

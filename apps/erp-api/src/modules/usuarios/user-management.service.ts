@@ -74,7 +74,17 @@ export class UserManagementService {
         console.warn('[USER-MGMT] Usuario creado; no se pudo enviar activación:', emailError);
       }
     }
-    return { ...(data as any), temporaryPassword: password };
+    return this.withTemporaryPassword(data, password, !userData.password);
+  }
+
+  /**
+   * La contraseña sólo vuelve en la respuesta si la generó el servidor y el
+   * usuario se acaba de crear: la elegida por el administrador no se repite y
+   * un reintento no tiene la original, sólo su hash.
+   */
+  private withTemporaryPassword(data: any, password: string, generated: boolean) {
+    const { temporaryPassword: _ignored, ...result } = data ?? {};
+    return generated && !result.idempotent ? { ...result, temporaryPassword: password } : result;
   }
 
   async createFirstAdmin(
@@ -105,7 +115,7 @@ export class UserManagementService {
     } catch (emailError) {
       console.warn('[USER-MGMT] Primer admin creado; no se pudo enviar activación:', emailError);
     }
-    return { ...(data as any), temporaryPassword: password };
+    return this.withTemporaryPassword(data, password, !userData.password);
   }
 
   async updateUser(

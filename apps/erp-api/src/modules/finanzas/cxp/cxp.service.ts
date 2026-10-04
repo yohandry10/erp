@@ -11,6 +11,7 @@ import { TesoreriaService } from '../tesoreria/tesoreria.service';
 import { createHash } from 'crypto';
 import { fechaHoyDelTenant } from '../../../shared/utils/fecha-tenant.util';
 import { appendIntegrationLog } from '../../../shared/utils/integration-log';
+import { errorWriterFinanciero, lecturaFinancieraFallida } from '../finanzas-errors';
 
 @Injectable()
 export class CxpService {
@@ -573,7 +574,7 @@ export class CxpService {
 
     if (error) {
       console.error('Error obteniendo cuenta por pagar:', error);
-      throw new BadRequestException('No se pudo obtener la cuenta por pagar');
+      throw lecturaFinancieraFallida('la cuenta por pagar');
     }
 
     if (!cxp) {
@@ -639,7 +640,7 @@ export class CxpService {
 
     if (error) {
       console.error('Error listando cuentas por pagar:', error);
-      throw new BadRequestException('No se pudieron obtener las cuentas por pagar');
+      throw lecturaFinancieraFallida('las cuentas por pagar');
     }
 
     return {
@@ -669,7 +670,7 @@ export class CxpService {
       p_tenant_id: tenantId, p_cxp_id: id, p_actor_id: userId, p_action: 'UPDATE_TERMS',
       p_payload: dto, p_idempotency_key: key,
     });
-    if (rpcError) throw new BadRequestException(rpcError.message || 'No se pudo actualizar la cuenta por pagar');
+    if (rpcError) throw errorWriterFinanciero(rpcError, 'No se pudo actualizar la cuenta por pagar');
     const result: any = Array.isArray(rpcData) ? rpcData[0] : rpcData;
     return { success: true, data: result?.cuenta ?? result };
 
@@ -849,7 +850,7 @@ export class CxpService {
       p_tenant_id: tenantId, p_cxp_id: cxpId, p_actor_id: userId, p_action: 'CANCEL',
       p_payload: dto, p_idempotency_key: key,
     });
-    if (rpcError) throw new BadRequestException(rpcError.message || 'No se pudo anular la cuenta por pagar');
+    if (rpcError) throw errorWriterFinanciero(rpcError, 'No se pudo anular la cuenta por pagar');
     const result: any = Array.isArray(rpcData) ? rpcData[0] : rpcData;
     return { success: true, data: result?.cuenta ?? result };
 
@@ -978,7 +979,7 @@ export class CxpService {
 
     if (error) {
       console.error('Error obteniendo cuentas por pagar para aging:', error);
-      throw new BadRequestException('No se pudo generar el reporte de aging');
+      throw lecturaFinancieraFallida('el reporte de aging');
     }
 
     if (!cxps || cxps.length === 0) {
@@ -1208,7 +1209,7 @@ export class CxpService {
 
     if (error) {
       console.error('Error obteniendo próximos vencimientos:', error);
-      throw new BadRequestException('No se pudieron obtener los próximos vencimientos');
+      throw lecturaFinancieraFallida('los próximos vencimientos');
     }
 
     if (!cxps || cxps.length === 0) {
@@ -1328,7 +1329,7 @@ export class CxpService {
       .order('codigo');
 
     if (error) {
-      throw new BadRequestException(`No se pudo leer el catalogo de detracciones: ${error.message}`);
+      throw lecturaFinancieraFallida('el catalogo de detracciones');
     }
 
     return { success: true, data: data ?? [] };
@@ -1451,7 +1452,7 @@ export class CxpService {
 
     if (errorPagos) {
       console.error('Error obteniendo historial de pagos:', errorPagos);
-      throw new BadRequestException('No se pudo obtener el historial de pagos');
+      throw lecturaFinancieraFallida('el historial de pagos');
     }
 
     return {
@@ -1490,7 +1491,7 @@ export class CxpService {
 
     if (error) {
       console.error('Error obteniendo proveedores con mayor deuda:', error);
-      throw new BadRequestException('No se pudo generar el reporte de proveedores con mayor deuda');
+      throw lecturaFinancieraFallida('el reporte de proveedores con mayor deuda');
     }
 
     if (!cxps || cxps.length === 0) {

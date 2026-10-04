@@ -1,0 +1,16 @@
+{
+  "completedAt": "2026-10-04T17:39:33.150Z",
+  "success": false,
+  "withBrowser": false,
+  "withSurvey": false,
+  "withRecords": false,
+  "candidateCashApi": false,
+  "candidateCashSql": false,
+  "candidateApi": false,
+  "candidateSql": false,
+  "candidateUi": false,
+  "scope": "accounting_diagnostic_api_subset",
+  "database": "PostgreSQL 16 efímero",
+  "output": "C:\\Users\\PC\\Desktop\\erp-peru-users\\artifacts\\peru-finance-ops-local-20261004173818998-18412",
+  "remoteWrites": false
+}

@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { CondicionPago, CreateFacturaDto, TipoDocumento } from '@erp-suite/dtos';
 import { SupabaseService } from '../shared/supabase/supabase.service';
@@ -74,9 +75,60 @@ export class DocumentosService {
       if (error.code === 'P0002' || message.includes('NOT_FOUND')) {
         throw new NotFoundException(message);
       }
+      if (this.esIndisponibilidad(error)) {
+        throw new ServiceUnavailableException('No se pudo completar la operación de documentos; reintente');
+      }
       throw new BadRequestException(message);
     }
     return Array.isArray(data) ? data[0] : data;
+  }
+
+  private lecturaFallida(subject: string): ServiceUnavailableException {
+    return new ServiceUnavailableException(`No se pudo consultar ${subject}; reintente`);
+  }
+
+  private esIndisponibilidad(error: { code?: string; message?: string }): boolean {
+    const code = String(error?.code ?? '');
+    if (!code) return true;
+    if (/^(08|53|57|58|XX)/.test(code) || code.startsWith('PGRST') || code === '42883') return true;
+    return code === '42501' && String(error?.message ?? '').toLowerCase().includes('permission denied');
+  }
+
+  /**
+   * La serie que el administrador configuró en la empresa (asistente) se
+   * registra con el writer auditado 461 la primera vez que se usa en el Centro
+   * de Documentos; antes un cliente nuevo no podía crear su primer documento
+   * y no hay pantalla para registrar series. Cualquier otra serie sigue
+   * exigiendo el alta explícita con su permiso.
+   */
+  private async registrarSerieConfigurada(tenant: string, actor: string, payload: Record<string, any>): Promise<boolean> {
+    const tipo = String(payload.tipo_documento ?? '').trim().toUpperCase();
+    if (tipo !== 'FACTURA' && tipo !== 'BOLETA') return false;
+    const { data: empresa, error } = await this.supabaseService.getClient()
+      .from('empresa_config')
+      .select('serie_factura, serie_boleta')
+      .eq('tenant_id', tenant)
+      .maybeSingle();
+    if (error) throw this.lecturaFallida('la configuración de la empresa');
+    const configurada = String((tipo === 'FACTURA' ? empresa?.serie_factura : empresa?.serie_boleta) ?? '').trim().toUpperCase();
+    const solicitada = String(payload.serie ?? '').trim().toUpperCase() || configurada;
+    if (!configurada || solicitada !== configurada) return false;
+    const { error: serieError } = await this.supabaseService.getClient().rpc('crear_serie_documento_tx', {
+      p_tenant_id: tenant,
+      p_actor_id: actor,
+      p_tipo_documento: tipo,
+      p_serie: configurada,
+      p_correlativo_maximo: 99999999,
+      p_idempotency_key: `configured-series:${tenant}:${tipo}:${configurada}`.toLowerCase(),
+    });
+    // Otra petición pudo registrarla con otra llave: el reintento del alta lo confirma.
+    if (serieError && !String(serieError.message ?? '').includes('DOCUMENT_SERIES_ALREADY_EXISTS')) {
+      if (this.esIndisponibilidad(serieError)) {
+        throw new ServiceUnavailableException('No se pudo registrar la serie configurada; reintente');
+      }
+      throw new BadRequestException(String(serieError.message));
+    }
+    return true;
   }
 
   private async invalidateDocumentoCache(tenantId: string): Promise<void> {
@@ -123,7 +175,7 @@ export class DocumentosService {
     const firstError = [total, facturas, boletas, notasCredito, contratos, pendientes]
       .find((result) => result.error)?.error;
     if (firstError) {
-      throw new BadRequestException(`No se pudieron calcular las estadísticas: ${firstError.message}`);
+      throw this.lecturaFallida('las estadísticas de documentos');
     }
     return {
       success: true,
@@ -155,7 +207,7 @@ export class DocumentosService {
     }
     if (filters.serie) query = query.eq('serie', filters.serie);
     const { data, error } = await query;
-    if (error) throw new BadRequestException(`No se pudieron obtener los documentos: ${error.message}`);
+    if (error) throw this.lecturaFallida('los documentos');
     const documentos = data ?? [];
     const argentinaIds = documentos.filter((doc) => doc.metadata?.pais === 'AR').map((doc) => doc.id);
     if (argentinaIds.length === 0) return { success: true, data: documentos };
@@ -164,7 +216,7 @@ export class DocumentosService {
       .select('id, documento_id, tipo_documento, estado, metadata')
       .eq('tenant_id', tenant)
       .in('documento_id', argentinaIds);
-    if (fiscalError) throw new BadRequestException('No se pudo consultar el historial ARCA de los documentos');
+    if (fiscalError) throw this.lecturaFallida('el historial ARCA de los documentos');
     return {
       success: true,
       data: documentos.map((doc) => {
@@ -207,7 +259,7 @@ export class DocumentosService {
       .eq('id', id)
       .eq('tenant_id', tenant)
       .maybeSingle();
-    if (error) throw new BadRequestException(`No se pudo obtener el documento: ${error.message}`);
+    if (error && error.code !== '22P02') throw this.lecturaFallida('el documento');
     if (!data) throw new NotFoundException('Documento no encontrado');
     return { success: true, data };
   }
@@ -220,13 +272,22 @@ export class DocumentosService {
     const tenant = this.requireTenantId(tenantId);
     const actor = this.requireActorId(userId);
     const { detalles, idempotency_key, ...payload } = documentoData;
-    const result = await this.rpc('crear_documento_manual_tx', {
+    const crear = () => this.rpc('crear_documento_manual_tx', {
       p_tenant_id: tenant,
       p_actor_id: actor,
       p_payload: payload,
       p_detalles: detalles,
       p_idempotency_key: idempotency_key,
     });
+    let result: any;
+    try {
+      result = await crear();
+    } catch (error) {
+      const sinSerie = error instanceof BadRequestException
+        && String(error.message).includes('DOCUMENT_MANUAL_SERIES_NOT_CONFIGURED');
+      if (!sinSerie || !(await this.registrarSerieConfigurada(tenant, actor, payload))) throw error;
+      result = await crear();
+    }
     await this.invalidateDocumentoCache(tenant);
     return {
       success: true,
@@ -630,6 +691,7 @@ export class DocumentosService {
 
   async getAuditoria(documentoId: string, tenantId?: string) {
     const tenant = this.requireTenantId(tenantId);
+    await this.getDocumento(documentoId, tenant);
     const { data, error } = await this.supabaseService
       .getClient()
       .from('documento_auditoria')
@@ -637,7 +699,7 @@ export class DocumentosService {
       .eq('documento_id', documentoId)
       .eq('tenant_id', tenant)
       .order('timestamp', { ascending: false });
-    if (error) throw new BadRequestException(`No se pudo obtener la auditoría: ${error.message}`);
+    if (error) throw this.lecturaFallida('la auditoría del documento');
     return { success: true, data: data ?? [] };
   }
 }

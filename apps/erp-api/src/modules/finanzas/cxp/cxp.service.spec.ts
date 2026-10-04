@@ -414,8 +414,20 @@ describe('CxpService', () => {
 
     it('propaga validaciones transaccionales del writer', async () => {
       const dto = { observaciones: 'Test' };
-      mockSupabaseClient.rpc.mockResolvedValueOnce({ data: null, error: { message: 'CXP_UPDATE_STATE_INVALID:PAGADA' } });
+      mockSupabaseClient.rpc.mockResolvedValueOnce({ data: null, error: { code: 'P0001', message: 'CXP_UPDATE_STATE_INVALID:PAGADA' } });
       await expect(service.actualizarCuentaPorPagar(tenantId, cxpId, dto, userId)).rejects.toThrow(BadRequestException);
+    });
+
+    it('una CxP inexistente o de otra empresa responde 404', async () => {
+      mockSupabaseClient.rpc.mockResolvedValueOnce({ data: null, error: { code: 'P0001', message: 'CXP_NOT_FOUND' } });
+      await expect(service.actualizarCuentaPorPagar(tenantId, cxpId, { observaciones: 'x' }, userId))
+        .rejects.toMatchObject({ status: 404 });
+    });
+
+    it('un writer indisponible responde 503', async () => {
+      mockSupabaseClient.rpc.mockResolvedValueOnce({ data: null, error: { code: '57014', message: 'canceling statement due to statement timeout' } });
+      await expect(service.actualizarCuentaPorPagar(tenantId, cxpId, { observaciones: 'x' }, userId))
+        .rejects.toMatchObject({ status: 503 });
     });
   });
 
@@ -518,7 +530,7 @@ describe('CxpService', () => {
       const dto = {
         motivo: 'Error en factura',
       };
-      mockSupabaseClient.rpc.mockResolvedValueOnce({ data: null, error: { message: 'CXP_ALREADY_CANCELLED' } });
+      mockSupabaseClient.rpc.mockResolvedValueOnce({ data: null, error: { code: 'P0001', message: 'CXP_ALREADY_CANCELLED' } });
       await expect(service.anularCuentaPorPagar(tenantId, cxpId, dto, userId)).rejects.toThrow(BadRequestException);
     });
   });

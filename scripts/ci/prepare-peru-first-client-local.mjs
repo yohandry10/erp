@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { randomUUID } from 'node:crypto';
 assert.equal(process.env.E2E_EPHEMERAL_LOCAL_DB,'1');
 const kind=process.argv[2];
-assert.ok(['wizard','annual','finance','hr','hr-financial','payroll-plame','configuration-admin','company-logo','tax-intents','tax-other','cpe-first','cpe-other','cash-first','cash-other','sales-first','sales-other','purchases-first','purchases-other','accounting-first','accounting-other'].includes(kind));
+assert.ok(['wizard','annual','finance','hr','hr-financial','payroll-plame','configuration-admin','company-logo','tax-intents','tax-other','cpe-first','cpe-other','cash-first','cash-other','sales-first','sales-other','purchases-first','purchases-other','accounting-first','accounting-other','users-first','users-other','finance-ops-first','finance-ops-other','hr-ops-first','hr-ops-other'].includes(kind));
 assert.equal(process.env.PGHOST,'127.0.0.1');
 assert.equal(process.env.PGDATABASE,'erp_e2e');
 const api=process.env.LOCAL_API_URL;
@@ -31,7 +31,7 @@ try {
   token=(await call('auth/login',{email:'peru-integrated-restricted-1@example.test',password:'Local-Peru-2026-Only!'})).access_token;
   const email=`${kind}-nuevo-${randomUUID()}@example.test`;
   // Identidades distintas por caso: el alta protege la unicidad fiscal global.
-  const base={annual:'2019876543',finance:'2019876544',wizard:'2019876545',hr:'2019876546','hr-financial':'2019876547','payroll-plame':'2019876548','configuration-admin':'2019876549','company-logo':'2098765432','tax-intents':'2098765433','tax-other':'2098765434','cpe-first':'2098765435','cpe-other':'2098765436','cash-first':'2098765437','cash-other':'2098765438','sales-first':'2098765439','sales-other':'2098765441','purchases-first':'2098765442','purchases-other':'2098765443','accounting-first':'2098765444','accounting-other':'2098765446'}[kind];
+  const base={annual:'2019876543',finance:'2019876544',wizard:'2019876545',hr:'2019876546','hr-financial':'2019876547','payroll-plame':'2019876548','configuration-admin':'2019876549','company-logo':'2098765432','tax-intents':'2098765433','tax-other':'2098765434','cpe-first':'2098765435','cpe-other':'2098765436','cash-first':'2098765437','cash-other':'2098765438','sales-first':'2098765439','sales-other':'2098765441','purchases-first':'2098765442','purchases-other':'2098765443','accounting-first':'2098765444','accounting-other':'2098765446','users-first':'2098765447','users-other':'2098765448','finance-ops-first':'2098765449','finance-ops-other':'2098765451','hr-ops-first':'2098765452','hr-ops-other':'2098765453'}[kind];
   const weights=[5,4,3,2,7,6,5,4,3,2];
   const candidate=11-weights.reduce((sum,weight,index)=>sum+Number(base[index])*weight,0)%11;
   const ruc=base+String(candidate===10?0:candidate===11?1:candidate);

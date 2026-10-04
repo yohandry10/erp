@@ -1,0 +1,16 @@
+{
+  "completedAt": "2026-10-04T17:35:25.637Z",
+  "success": true,
+  "withBrowser": false,
+  "withSurvey": false,
+  "withRecords": false,
+  "candidateCashApi": false,
+  "candidateCashSql": false,
+  "candidateApi": false,
+  "candidateSql": false,
+  "candidateUi": false,
+  "scope": "accounting_diagnostic_api_subset",
+  "database": "PostgreSQL 16 efímero",
+  "output": "C:\\Users\\PC\\Desktop\\erp-peru-users\\artifacts\\peru-users-canonical-local-20261004173401761-4544",
+  "remoteWrites": false
+}

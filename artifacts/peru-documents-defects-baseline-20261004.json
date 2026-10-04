@@ -1,0 +1,36 @@
+{
+  "scope": "Centro de Documentos (/dashboard/documentos): series, validaciones, alta, edición, XML firmado, descargas, auditoría, envío sin transporte fiscal, anulación, aislamiento e indisponibilidad; API/PostgREST/PostgreSQL locales efímeros",
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "environment_note": "El runner local restaura un snapshot sintético construido con la cadena de migraciones y ejecuta supabase-default-privileges.sql para emular los privilegios por defecto de Supabase (GRANT ALL a anon, authenticated y service_role en tablas sin ACL gestionada), comprobados en el respaldo productivo. Sin esa emulación, documento_archivos aparecía sin SELECT: artefacto local, no defecto de PROD.",
+  "runs": [
+    {"output": "artifacts/peru-documents-local-20261004181420966-1936", "result": "probe_without_registered_series"},
+    {"output": "artifacts/peru-documents-local-20261004181656608-17528", "result": "local_bootstrap_without_supabase_default_privileges"},
+    {"output": "artifacts/peru-documents-baseline-20261004", "result": "defects_reproduced", "restore": "passed"},
+    {"output": "artifacts/peru-documents-fixed-local-20261004", "result": "passed_after_fix", "restore": "passed"}
+  ],
+  "passed": [
+    "Serie registrada con intención sin duplicar; RUC con dígito verificador local; validación de documento",
+    "Alta con intención, total con IGV, edición, listado y estadísticas; documento ajeno no listado",
+    "XML firmado con reintento, descarga de XML (Invoice) y PDF, auditoría",
+    "Envío sin transporte fiscal configurado: error controlado y documento no marcado aceptado",
+    "Anulación con motivo y reintento idéntico"
+  ],
+  "confirmed_defects": [
+    {
+      "id": "documents-configured-series-unusable",
+      "operations": ["POST /api/documentos/crear"],
+      "observed": "Una empresa recién configurada (serie F001 en el asistente) no puede crear su primer documento: 400 DOCUMENT_MANUAL_SERIES_NOT_CONFIGURED. La 461 exige registrar la serie con su writer y no hay pantalla que lo haga; sólo existía tras emitir un CPE desde ventas o POS."
+    },
+    {
+      "id": "documents-foreign-audit-200",
+      "operations": ["GET /api/documentos/:id/auditoria"],
+      "observed": "La auditoría de un documento de otra empresa responde 200 con lista vacía en vez de 404; no expone datos."
+    },
+    {
+      "id": "documents-reads-unavailability-400",
+      "operations": ["GET /api/documentos/lista", "GET /api/documentos/stats", "GET /api/documentos/:id"],
+      "observed": "Sin lectura de documentos responden 400; un writer caído también respondía 400."
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-10-04T17:25:22.471Z",
-  "commit": "fb3aa1ceb010625093ec79eb81571c60456372c0",
+  "generated_at": "2026-10-04T18:50:22.312Z",
+  "commit": "72f34bfdbc2c69f4ec76786103f121fca0f1c4f3",
   "excluded": [
     "Analytics"
   ],
@@ -12107,7 +12107,8 @@
       "line": 396,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
-        "RequirePermission('rrhh.access')"
+        "RequirePermission('rrhh.access')",
+        "RequirePermission('rrhh.planillas.read')"
       ],
       "ui_domain": "rrhh",
       "has_navigation_domain": true,
@@ -12127,10 +12128,11 @@
       "endpoint": "/api/rrhh/pagos/:id/comprobante",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 405,
+      "line": 406,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
-        "RequirePermission('rrhh.access')"
+        "RequirePermission('rrhh.access')",
+        "RequirePermission('rrhh.planillas.read')"
       ],
       "ui_domain": "rrhh",
       "has_navigation_domain": true,
@@ -12150,10 +12152,11 @@
       "endpoint": "/api/rrhh/empleados/:id/boleta-pago/:mes",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 418,
+      "line": 420,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
-        "RequirePermission('rrhh.access')"
+        "RequirePermission('rrhh.access')",
+        "RequirePermission('rrhh.planillas.read')"
       ],
       "ui_domain": "rrhh",
       "has_navigation_domain": true,
@@ -12173,7 +12176,7 @@
       "endpoint": "/api/rrhh/contratos",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 429,
+      "line": 432,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12196,7 +12199,7 @@
       "endpoint": "/api/rrhh/contratos",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 438,
+      "line": 441,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12219,7 +12222,7 @@
       "endpoint": "/api/rrhh/contratos/:id/renovar",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 449,
+      "line": 452,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12242,7 +12245,7 @@
       "endpoint": "/api/rrhh/contratos/:id/finalizar",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 463,
+      "line": 466,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12265,7 +12268,7 @@
       "endpoint": "/api/rrhh/contratos/:id/generar",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 478,
+      "line": 481,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12288,7 +12291,7 @@
       "endpoint": "/api/rrhh/asistencias",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 492,
+      "line": 495,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12311,7 +12314,7 @@
       "endpoint": "/api/rrhh/asistencias/marcar",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 501,
+      "line": 504,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12334,7 +12337,7 @@
       "endpoint": "/api/rrhh/vacantes",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 515,
+      "line": 518,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12357,7 +12360,7 @@
       "endpoint": "/api/rrhh/vacantes",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 521,
+      "line": 524,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12380,7 +12383,7 @@
       "endpoint": "/api/rrhh/candidatos",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 532,
+      "line": 535,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12403,7 +12406,7 @@
       "endpoint": "/api/rrhh/candidatos",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 541,
+      "line": 544,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12426,7 +12429,7 @@
       "endpoint": "/api/rrhh/candidatos/:id",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 552,
+      "line": 555,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12449,7 +12452,7 @@
       "endpoint": "/api/rrhh/candidatos/:id/estado",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 565,
+      "line": 568,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12472,7 +12475,7 @@
       "endpoint": "/api/rrhh/asistencia/entrada/:empleadoId",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 580,
+      "line": 583,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12495,7 +12498,7 @@
       "endpoint": "/api/rrhh/asistencia/salida/:empleadoId",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 593,
+      "line": 596,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12518,7 +12521,7 @@
       "endpoint": "/api/rrhh/asistencia",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 606,
+      "line": 609,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12541,7 +12544,7 @@
       "endpoint": "/api/rrhh/solicitudes",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 618,
+      "line": 621,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12564,7 +12567,7 @@
       "endpoint": "/api/rrhh/solicitudes",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 628,
+      "line": 631,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12587,7 +12590,7 @@
       "endpoint": "/api/rrhh/solicitudes/:id/aprobar",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 639,
+      "line": 642,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12610,7 +12613,7 @@
       "endpoint": "/api/rrhh/solicitudes/:id/rechazar",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 653,
+      "line": 656,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12633,7 +12636,7 @@
       "endpoint": "/api/rrhh/beneficios",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 668,
+      "line": 671,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12656,7 +12659,7 @@
       "endpoint": "/api/rrhh/empleados/:id/beneficios",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 674,
+      "line": 677,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12679,7 +12682,7 @@
       "endpoint": "/api/rrhh/empleados/:id/beneficios",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 683,
+      "line": 686,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12702,7 +12705,7 @@
       "endpoint": "/api/rrhh/evaluaciones",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 698,
+      "line": 701,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12725,7 +12728,7 @@
       "endpoint": "/api/rrhh/evaluaciones",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 707,
+      "line": 710,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12748,7 +12751,7 @@
       "endpoint": "/api/rrhh/evaluaciones/:id",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 720,
+      "line": 723,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12771,7 +12774,7 @@
       "endpoint": "/api/rrhh/capacitaciones",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 735,
+      "line": 738,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12794,7 +12797,7 @@
       "endpoint": "/api/rrhh/empleados/:id/capacitaciones",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 741,
+      "line": 744,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12817,7 +12820,7 @@
       "endpoint": "/api/rrhh/empleados/:id/capacitaciones",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 750,
+      "line": 753,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -12840,7 +12843,7 @@
       "endpoint": "/api/rrhh/liquidaciones",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 765,
+      "line": 768,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')",
@@ -12864,7 +12867,7 @@
       "endpoint": "/api/rrhh/empleados/:id/liquidacion",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 771,
+      "line": 774,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')",
@@ -12888,7 +12891,7 @@
       "endpoint": "/api/rrhh/liquidaciones/:id/confirmar",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 789,
+      "line": 792,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')",
@@ -12912,7 +12915,7 @@
       "endpoint": "/api/rrhh/liquidaciones/:id/pagar",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 800,
+      "line": 803,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')",
@@ -12936,7 +12939,7 @@
       "endpoint": "/api/rrhh/liquidaciones/:id/pago/revertir",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 811,
+      "line": 814,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')",
@@ -12960,7 +12963,7 @@
       "endpoint": "/api/rrhh/cts/depositos",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 829,
+      "line": 832,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')",
@@ -12984,7 +12987,7 @@
       "endpoint": "/api/rrhh/cts/depositos",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 838,
+      "line": 841,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')",
@@ -13008,7 +13011,7 @@
       "endpoint": "/api/rrhh/cts/depositos/:id/depositar",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 849,
+      "line": 852,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')",
@@ -13032,7 +13035,7 @@
       "endpoint": "/api/rrhh/horarios",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 861,
+      "line": 864,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -13055,7 +13058,7 @@
       "endpoint": "/api/rrhh/empleados/:id/horario",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 867,
+      "line": 870,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -13078,7 +13081,7 @@
       "endpoint": "/api/rrhh/empleados/:id/expediente",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 882,
+      "line": 885,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -13101,7 +13104,7 @@
       "endpoint": "/api/rrhh/empleados/:id/expediente",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 891,
+      "line": 894,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
@@ -13124,7 +13127,7 @@
       "endpoint": "/api/rrhh/dashboard",
       "summary": null,
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts",
-      "line": 913,
+      "line": 916,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('rrhh.access')"
