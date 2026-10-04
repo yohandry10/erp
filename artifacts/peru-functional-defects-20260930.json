@@ -3605,6 +3605,62 @@
         "CI exacto, main y runtime; fase canónica pendiente de alinear el bootstrap. Logística (backorders, tracking, eventos) e imágenes de producto sin caso."
       ],
       "canonical_proof": "artifacts/peru-inventory-fixed-local-20261004"
+    },
+    {
+      "id": "logistics-foreign-order-reads-200",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/logistica/:pedidoId/eventos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/logistica/:pedidoId/backorders"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-logistics-baseline-20261004",
+        "observed_error": "Eventos y backorders de un pedido de otra empresa respondían 200 con lista vacía en vez de 404; no exponían datos.",
+        "local_only": true
+      },
+      "correction": "Eventos y backorders de pedido ajeno 404; lecturas de logística indisponibles 503",
+      "pending": [
+        "CI exacto, main y runtime; fase canónica pendiente de alinear el bootstrap."
+      ],
+      "canonical_proof": "artifacts/peru-logistics-fixed-local-20261004"
+    },
+    {
+      "id": "logistics-reads-unavailability-400",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/logistica/:pedidoId/eventos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/logistica/:pedidoId/backorders"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/logistica/ordenes-pendientes"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/logistica/listo-despacho"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-logistics-baseline-20261004",
+        "observed_error": "Las lecturas fallidas respondían 400 en vez de 503.",
+        "local_only": true
+      },
+      "correction": "Eventos y backorders de pedido ajeno 404; lecturas de logística indisponibles 503",
+      "pending": [
+        "CI exacto, main y runtime; fase canónica pendiente de alinear el bootstrap."
+      ],
+      "canonical_proof": "artifacts/peru-logistics-fixed-local-20261004"
     }
   ]
 }

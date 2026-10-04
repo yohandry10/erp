@@ -1,0 +1,167 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Logística API/DB local diagnóstico; sin aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Logística: pedido confirmado pendiente, preparación y listo con intención",
+      "passed": true
+    },
+    {
+      "scenario": "Logística: despacho con intención descuenta stock una vez",
+      "passed": true
+    },
+    {
+      "scenario": "Logística: eventos manuales, tracking y backorders del pedido",
+      "passed": false,
+      "message": "Eventos ajenos visibles"
+    },
+    {
+      "scenario": "Logística: sin lectura de logistica_eventos la consulta responde 503",
+      "passed": false,
+      "message": "{\"inventario/logistica/:id/eventos\":400}"
+    },
+    {
+      "scenario": "Logística: sin lectura de pedido_backorders la consulta responde 503",
+      "passed": false,
+      "message": "{\"inventario/logistica/:id/backorders\":400}"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/almacenes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/categorias",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/productos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/clientes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/logistica/ordenes-pendientes",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/logistica/:id/preparar",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/logistica/:id/preparar",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/logistica/:id/marcar-listo",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/logistica/listo-despacho",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/logistica/listo-despacho",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/logistica/:id/tracking",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/logistica/:id/confirmar-despacho",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/logistica/:id/confirmar-despacho",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/logistica/:id/confirmar-despacho",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/logistica/:id/eventos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/logistica/:id/eventos",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/logistica/:id/eventos",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/logistica/:id/tracking",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/logistica/:id/tracking",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/logistica/:id/backorders",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/logistica/:id/eventos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/logistica/:id/eventos",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/logistica/:id/backorders",
+      "status": 400
+    }
+  ]
+}

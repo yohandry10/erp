@@ -132,10 +132,14 @@ bootstrap. Inventario (ubicaciones, ajustes, movimientos, estadísticas)
 reprodujo dos (`artifacts/peru-inventory-defects-baseline-20261004.json`):
 ubicaciones de almacén ajeno o caídas como 200 vacío y movimientos/estadísticas
 caídos como 500; 5/5 local tras corregir
-(`artifacts/peru-inventory-fixed-local-20261004`). Logística e imágenes de
+(`artifacts/peru-inventory-fixed-local-20261004`). Logística con flujo completo
+(pendientes, preparación, listo, despacho, tracking, eventos, backorders)
+reprodujo dos (`artifacts/peru-logistics-defects-baseline-20261004.json`):
+eventos/backorders de pedido ajeno 200 vacío y lecturas caídas 400; 5/5 local
+tras corregir (`artifacts/peru-logistics-fixed-local-20261004`). Imágenes de
 producto siguen sin caso.
 La matriz registra 717 contratos, 421 observados (main 37223140493), 316 con
-casos funcionales, 162 casos y 121 defectos; no hay aceptación integral del
+casos funcionales, 162 casos y 123 defectos; no hay aceptación integral del
 lanzamiento.
 
 Corte técnico 131/132: el cierre 131 promovió 562 una sola vez con preflight,
