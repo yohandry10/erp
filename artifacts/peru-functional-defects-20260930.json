@@ -3204,6 +3204,34 @@
         "CI exacto con SQL fresco, promoción única 569, main y runtime."
       ],
       "canonical_proof": "artifacts/peru-accounting-canonical-local-20261004"
+    },
+    {
+      "id": "users-create-echoes-password",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/usuarios-sistema/crear"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/usuarios/crear"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/users"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-users-baseline-20261004",
+        "observed_error": "La respuesta del alta devuelve en temporaryPassword la contraseña elegida por el administrador, también en el reintento idempotente. Si la contraseña la genera el servidor, el reintento devuelve otra recién generada que no es la guardada.",
+        "local_only": true
+      },
+      "correction": "temporaryPassword sólo cuando el servidor generó la contraseña y el alta es original; nunca la elegida ni en reintentos",
+      "pending": [
+        "CI exacto, main y runtime. UI real de usuarios y roles distintos de ADMIN."
+      ],
+      "canonical_proof": "artifacts/peru-users-canonical-local-20261004"
     }
   ]
 }

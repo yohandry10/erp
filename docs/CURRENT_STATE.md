@@ -89,6 +89,13 @@ verificadores y el ensayo sobre el respaldo productivo 568
 (`artifacts/erp-peru-569-rehearsal-20261004165609161-17420.json`). 569 no está
 promovida; faltan CI exacto, promoción, main y runtime. El libro diario sigue
 listando asientos de todo estado: observación no cambiada.
+Usuarios PE (rama `codex/peru-users-admin-20261004`): 11 escenarios de alta,
+edición, permisos efectivos, inactivación con revocación de sesión, baja,
+aislamiento y roles propios reprodujeron un defecto
+(`artifacts/peru-users-defects-baseline-20261004.json`): el alta devolvía en
+claro la contraseña elegida, también al reintentar. Corregido sin migración;
+11/11 y restore (`artifacts/peru-users-canonical-local-20261004`). Ante una
+caída de `usuarios_sistema` el guard responde 403 (falla cerrado), no 503.
 La matriz registra 717 contratos, 380 observados, 316 con casos funcionales,
 162 casos y 108 defectos; no hay aceptación integral del lanzamiento.
 
