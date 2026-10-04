@@ -955,6 +955,9 @@ si ese período carece de normativa aplicable.
   transacción. No se crea una segunda cuenta en el proveedor de autenticación.
   `/usuarios-sistema` (pantalla vigente) y `/users` (compatibilidad) delegan al
   mismo writer; creación exige llave idempotente y actor activo del tenant.
+  La respuesta sólo incluye `temporaryPassword` cuando el servidor la generó y
+  el usuario se acaba de crear: la contraseña elegida por el administrador no se
+  devuelve y un reintento no inventa otra distinta de la guardada.
 - Cambiar datos/estado/roles revoca sesiones al inactivar, impide la
   auto-desactivación y protege al último superadministrador. Roles y permisos
   también se crean o reemplazan atómicamente, los roles de sistema son
