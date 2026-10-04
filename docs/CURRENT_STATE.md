@@ -104,8 +104,11 @@ concede escritura de clientes a nivel GRANT (RLS la limita): pendiente alinear
 bootstrap y endurecimiento. Pendiente externo: confirmar en Render que
 `JWT_SECRET` difiere del secreto JWT del proyecto Supabase (el token no lleva
 `role`).
-Usuarios, finanzas y RRHH PE (rama `codex/peru-users-admin-20261004`, sin
-migración): 11 escenarios de alta, edición, permisos efectivos, inactivación
+Usuarios, finanzas, RRHH y documentos PE (#140, sin migración; integrado como
+`42dca2df`, main 37237859234 con 454 HTTP/32 UI, E2E y seguridad aprobados y
+runtime `42dca2df`/569 verificado al cuarto intento tras tres timeouts de 20 s
+durante el despliegue,
+`artifacts/peru-production-verification-after-140-20261004.json`): 11 escenarios de alta, edición, permisos efectivos, inactivación
 con revocación de sesión, baja, aislamiento y roles propios reprodujeron un
 defecto (`artifacts/peru-users-defects-baseline-20261004.json`): el alta
 devolvía en claro la contraseña elegida, también al reintentar. Finanzas
@@ -128,7 +131,8 @@ configurada no podía crear su primer documento con la serie del asistente
 400. La serie configurada se registra ahora con el writer 461 en su primer uso;
 8/8 local con privilegios Supabase emulados
 (`artifacts/peru-documents-fixed-local-20261004`); sin fase CI hasta alinear el
-bootstrap. Inventario (ubicaciones, ajustes, movimientos, estadísticas)
+bootstrap. Inventario y logística (rama `codex/peru-inventory-20261004`, sin
+migración). Inventario (ubicaciones, ajustes, movimientos, estadísticas)
 reprodujo dos (`artifacts/peru-inventory-defects-baseline-20261004.json`):
 ubicaciones de almacén ajeno o caídas como 200 vacío y movimientos/estadísticas
 caídos como 500; 5/5 local tras corregir
@@ -138,7 +142,7 @@ reprodujo dos (`artifacts/peru-logistics-defects-baseline-20261004.json`):
 eventos/backorders de pedido ajeno 200 vacío y lecturas caídas 400; 5/5 local
 tras corregir (`artifacts/peru-logistics-fixed-local-20261004`). Imágenes de
 producto siguen sin caso.
-La matriz registra 717 contratos, 421 observados (main 37223140493), 316 con
+La matriz registra 717 contratos, 467 observados (main 37237859234), 316 con
 casos funcionales, 162 casos y 123 defectos; no hay aceptación integral del
 lanzamiento.
 

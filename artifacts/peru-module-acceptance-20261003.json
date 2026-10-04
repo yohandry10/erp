@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-10-04T18:50:24.500Z",
+  "generated_at": "2026-10-04T22:36:48.745Z",
   "scope": "Inventario y aceptación por módulo/operación; únicamente Analytics excluido",
   "operational_accounting_tax_reports_included": true,
   "complete_acceptance": false,
   "source_api_matrix": "artifacts/peru-api-operation-matrix-20260930.json",
   "source_ui_matrix": "artifacts/peru-ui-operation-matrix-20261002.json",
   "country_applicability": "artifacts/peru-country-applicability-20261003.json",
-  "evidence": "artifacts/peru-integrated-main-37223140493",
+  "evidence": "artifacts/peru-integrated-main-37237859234",
   "additional_evidence": [
     {
       "evidence": "artifacts/peru-storage-ci-37150593171",
@@ -24,11 +24,11 @@
     }
   ],
   "latest_verified_production": {
-    "sha": "0fe3881e6cd6ed5c5e7ec68945ce448c81ec6171",
+    "sha": "42dca2dfbf3c25f397808e06c4ba3e85a4d505df",
     "schema_at_last_runtime_read": 569,
-    "proof": "artifacts/peru-production-verification-after-139-20261004.json",
-    "failed_attempts": "artifacts/peru-production-verification-after-139-timeouts-20261004.json",
-    "main_ci": "37223140493 success"
+    "proof": "artifacts/peru-production-verification-after-140-20261004.json",
+    "failed_attempts": "artifacts/peru-production-verification-after-140-attempts-20261004.json",
+    "main_ci": "37237859234 success"
   },
   "superseded_main": {
     "sha": "9e301e2ae9f470b56ffc10d775ab09c4a8d6a76b",
@@ -3843,7 +3843,7 @@
     {
       "module": "finanzas",
       "declared_contracts": 49,
-      "observed_contracts": 23,
+      "observed_contracts": 39,
       "operations_with_functional_cases": 21,
       "complete_acceptance": false,
       "verified_case_ids": [
@@ -3976,7 +3976,7 @@
         {
           "method": "GET",
           "endpoint": "/api/finanzas/bancos/cuentas/:id/movimientos",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -4008,7 +4008,7 @@
         {
           "method": "GET",
           "endpoint": "/api/finanzas/bancos/saldos",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -4029,7 +4029,7 @@
         {
           "method": "GET",
           "endpoint": "/api/finanzas/bancos/movimientos/periodo",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -4053,7 +4053,7 @@
         {
           "method": "GET",
           "endpoint": "/api/finanzas/conciliacion/pendientes",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -4065,7 +4065,7 @@
         {
           "method": "GET",
           "endpoint": "/api/finanzas/conciliacion/plantillas-csv",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -4227,7 +4227,7 @@
         {
           "method": "GET",
           "endpoint": "/api/finanzas/cxp/aging",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -4239,7 +4239,7 @@
         {
           "method": "GET",
           "endpoint": "/api/finanzas/cxp/vencimientos",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -4251,7 +4251,7 @@
         {
           "method": "GET",
           "endpoint": "/api/finanzas/cxp/proveedores-mayor-deuda",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -4299,7 +4299,7 @@
         {
           "method": "PUT",
           "endpoint": "/api/finanzas/cxp/:id",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -4319,7 +4319,7 @@
         {
           "method": "POST",
           "endpoint": "/api/finanzas/cxp/:id/anular",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -4331,7 +4331,7 @@
         {
           "method": "GET",
           "endpoint": "/api/finanzas/cxp/:id/pagos",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -4354,7 +4354,7 @@
         {
           "method": "GET",
           "endpoint": "/api/finanzas/tesoreria/pagos",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -4366,7 +4366,7 @@
         {
           "method": "GET",
           "endpoint": "/api/finanzas/tesoreria/programacion",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -4378,7 +4378,7 @@
         {
           "method": "POST",
           "endpoint": "/api/finanzas/tesoreria/lote",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -4390,7 +4390,7 @@
         {
           "method": "GET",
           "endpoint": "/api/finanzas/tesoreria/flujo-caja",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -5202,7 +5202,12 @@
           ]
         }
       ],
-      "defects": []
+      "defects": [
+        "inventory-locations-masked",
+        "inventory-reads-500",
+        "logistics-reads-unavailability-400",
+        "logistics-foreign-order-reads-200"
+      ]
     },
     {
       "module": "metrics",
@@ -5657,7 +5662,7 @@
     {
       "module": "permissions",
       "declared_contracts": 1,
-      "observed_contracts": 0,
+      "observed_contracts": 1,
       "operations_with_functional_cases": 0,
       "complete_acceptance": false,
       "verified_case_ids": [],
@@ -5665,7 +5670,7 @@
         {
           "method": "GET",
           "endpoint": "/api/permissions",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -5993,7 +5998,7 @@
     {
       "module": "roles",
       "declared_contracts": 9,
-      "observed_contracts": 5,
+      "observed_contracts": 7,
       "operations_with_functional_cases": 4,
       "complete_acceptance": false,
       "verified_case_ids": [
@@ -6059,7 +6064,7 @@
         {
           "method": "GET",
           "endpoint": "/api/roles/:id/permissions",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -6095,7 +6100,7 @@
         {
           "method": "GET",
           "endpoint": "/api/roles/:id/users",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -6110,7 +6115,7 @@
     {
       "module": "rrhh",
       "declared_contracts": 78,
-      "observed_contracts": 36,
+      "observed_contracts": 53,
       "operations_with_functional_cases": 31,
       "complete_acceptance": false,
       "verified_case_ids": [
@@ -6243,7 +6248,7 @@
         {
           "method": "GET",
           "endpoint": "/api/rrhh/planillas",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -6255,7 +6260,7 @@
         {
           "method": "GET",
           "endpoint": "/api/rrhh/planillas/tesoreria/destinos",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -6307,7 +6312,7 @@
         {
           "method": "PUT",
           "endpoint": "/api/rrhh/planillas/:id",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -6329,7 +6334,7 @@
         {
           "method": "DELETE",
           "endpoint": "/api/rrhh/planillas/:id",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -6365,7 +6370,7 @@
         {
           "method": "GET",
           "endpoint": "/api/rrhh/pagos",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -6399,7 +6404,7 @@
         {
           "method": "POST",
           "endpoint": "/api/rrhh/planillas/:id/pagar-empleados",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -6492,7 +6497,7 @@
         {
           "method": "GET",
           "endpoint": "/api/rrhh/planillas/:id/historial-pagos",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -6504,7 +6509,7 @@
         {
           "method": "GET",
           "endpoint": "/api/rrhh/pagos/:id/comprobante",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -6516,7 +6521,7 @@
         {
           "method": "GET",
           "endpoint": "/api/rrhh/empleados/:id/boleta-pago/:mes",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -6610,7 +6615,7 @@
         {
           "method": "POST",
           "endpoint": "/api/rrhh/vacantes",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -6634,7 +6639,7 @@
         {
           "method": "POST",
           "endpoint": "/api/rrhh/candidatos",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -6646,7 +6651,7 @@
         {
           "method": "PUT",
           "endpoint": "/api/rrhh/candidatos/:id",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -6658,7 +6663,7 @@
         {
           "method": "PUT",
           "endpoint": "/api/rrhh/candidatos/:id/estado",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -6670,7 +6675,7 @@
         {
           "method": "POST",
           "endpoint": "/api/rrhh/asistencia/entrada/:empleadoId",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -6682,7 +6687,7 @@
         {
           "method": "POST",
           "endpoint": "/api/rrhh/asistencia/salida/:empleadoId",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -6694,7 +6699,7 @@
         {
           "method": "GET",
           "endpoint": "/api/rrhh/asistencia",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -6912,7 +6917,7 @@
         {
           "method": "GET",
           "endpoint": "/api/rrhh/cts/depositos",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -7763,7 +7768,7 @@
     {
       "module": "usuarios-sistema",
       "declared_contracts": 10,
-      "observed_contracts": 0,
+      "observed_contracts": 10,
       "operations_with_functional_cases": 0,
       "complete_acceptance": false,
       "verified_case_ids": [],
@@ -7771,7 +7776,7 @@
         {
           "method": "GET",
           "endpoint": "/api/usuarios-sistema",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -7783,7 +7788,7 @@
         {
           "method": "GET",
           "endpoint": "/api/usuarios-sistema/stats",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -7795,7 +7800,7 @@
         {
           "method": "GET",
           "endpoint": "/api/usuarios-sistema/roles",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -7807,7 +7812,7 @@
         {
           "method": "POST",
           "endpoint": "/api/usuarios-sistema/crear",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -7819,7 +7824,7 @@
         {
           "method": "PUT",
           "endpoint": "/api/usuarios-sistema/:id",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -7831,7 +7836,7 @@
         {
           "method": "PUT",
           "endpoint": "/api/usuarios-sistema/:id/estado",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -7843,7 +7848,7 @@
         {
           "method": "DELETE",
           "endpoint": "/api/usuarios-sistema/:id",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -7855,7 +7860,7 @@
         {
           "method": "GET",
           "endpoint": "/api/usuarios-sistema/me/permissions",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -7867,7 +7872,7 @@
         {
           "method": "GET",
           "endpoint": "/api/usuarios-sistema/:id/permissions",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -7879,7 +7884,7 @@
         {
           "method": "GET",
           "endpoint": "/api/usuarios-sistema/:id",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",

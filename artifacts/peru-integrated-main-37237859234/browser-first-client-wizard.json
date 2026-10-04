@@ -1,0 +1,260 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "Primer ADMIN no demo, configuración fiscal local sin transmisión",
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/context/country/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/context/status/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/context/country/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/context/country/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/context/country/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/context/country/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/context/country/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/status/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/status/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/wizard/progress/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/wizard/progress/",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/backend/api/configuration/wizard/step/",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "path": "/backend/api/configuration/wizard/step/",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/backend/api/configuration/wizard/step/",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/backend/api/configuration/wizard/step/",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/context/country/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/context/country/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/context/country/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/wizard/progress/",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/wizard/progress/",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/status/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/status/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/status/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/wizard/progress/",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/backend/api/configuration/wizard/step/",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/backend/api/configuration/wizard/step/",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/backend/api/configuration/wizard/step/",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/backend/api/configuration/wizard/step/",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/backend/api/configuration/wizard/validate-certificate/",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "path": "/backend/api/configuration/wizard/step/",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/backend/api/configuration/wizard/step/",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/backend/api/configuration/wizard/step/",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/backend/api/configuration/wizard/validate-certificate/",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/backend/api/configuration/wizard/step/",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/backend/api/configuration/complete/",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "path": "/backend/api/configuration/wizard/step/",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/backend/api/configuration/complete/",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/empresa/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/empresa/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/context/country/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/context/country/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/context/country/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/context/country/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/status/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/status/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/wizard/progress/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/wizard/progress/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/empresa/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/backend/api/configuration/empresa/",
+      "status": 200
+    }
+  ],
+  "coreReadyBeforeWizard": true,
+  "progressRecovered": true,
+  "invalidRucRejected": true,
+  "invalidPfxRejected": true,
+  "stepReplyLostSameIntent": true,
+  "completionReplyLostSameIntent": true,
+  "singleCompletion": true,
+  "publicSecretsAbsent": true
+}

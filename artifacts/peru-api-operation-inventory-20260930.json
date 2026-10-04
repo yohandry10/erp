@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-10-04T18:50:22.312Z",
-  "commit": "72f34bfdbc2c69f4ec76786103f121fca0f1c4f3",
+  "generated_at": "2026-10-04T22:36:46.903Z",
+  "commit": "5c1a1a4dad6540479978a0844124cdd6ef30e85e",
   "excluded": [
     "Analytics"
   ],
@@ -9170,7 +9170,7 @@
       "endpoint": "/api/inventario/almacenes",
       "summary": "Listar almacenes activos",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 69,
+      "line": 70,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.almacenes.read')"
@@ -9193,7 +9193,7 @@
       "endpoint": "/api/inventario/almacenes",
       "summary": "Crear almacén de inventario",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 98,
+      "line": 99,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.almacenes.create')"
@@ -9216,7 +9216,7 @@
       "endpoint": "/api/inventario/almacenes/:almacenId",
       "summary": "Actualizar almacén de inventario",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 114,
+      "line": 115,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.almacenes.update')"
@@ -9239,7 +9239,7 @@
       "endpoint": "/api/inventario/almacenes/:almacenId",
       "summary": "Desactivar almacén sin stock ni reservas",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 132,
+      "line": 133,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.almacenes.delete')"
@@ -9262,7 +9262,7 @@
       "endpoint": "/api/inventario/almacenes/:almacenId/ubicaciones",
       "summary": "Listar ubicaciones de un almacén",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 153,
+      "line": 154,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.ubicaciones.read')"
@@ -9285,7 +9285,7 @@
       "endpoint": "/api/inventario/almacenes/:almacenId/ubicaciones",
       "summary": "Crear ubicación dentro de un almacén",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 182,
+      "line": 180,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.ubicaciones.create')"
@@ -9308,7 +9308,7 @@
       "endpoint": "/api/inventario/almacenes/:almacenId/ubicaciones/:ubicacionId",
       "summary": "Actualizar ubicación de almacén",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 200,
+      "line": 198,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.ubicaciones.update')"
@@ -9331,7 +9331,7 @@
       "endpoint": "/api/inventario/almacenes/:almacenId/ubicaciones/:ubicacionId",
       "summary": "Desactivar ubicación sin stock ni reservas",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 220,
+      "line": 218,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.ubicaciones.delete')"
@@ -9354,7 +9354,7 @@
       "endpoint": "/api/inventario/recepciones",
       "summary": "Listar recepciones de compra",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 243,
+      "line": 241,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.ingresos.write')"
@@ -9377,7 +9377,7 @@
       "endpoint": "/api/inventario/recepciones/:id",
       "summary": "Detalle de recepción",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 274,
+      "line": 272,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.ingresos.write')"
@@ -9400,7 +9400,7 @@
       "endpoint": "/api/inventario/kardex",
       "summary": "Consultar kardex valorizado",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 288,
+      "line": 286,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.kardex.read')"
@@ -9423,7 +9423,7 @@
       "endpoint": "/api/inventario/stats",
       "summary": "Obtener estadísticas de inventario",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 314,
+      "line": 312,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.stats.read')"
@@ -9446,7 +9446,7 @@
       "endpoint": "/api/inventario/productos",
       "summary": "Listar productos de inventario",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 371,
+      "line": 369,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.productos.read')"
@@ -9469,7 +9469,7 @@
       "endpoint": "/api/inventario/productos",
       "summary": "Crear nuevo producto",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 434,
+      "line": 432,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.productos.create')"
@@ -9492,7 +9492,7 @@
       "endpoint": "/api/inventario/movimientos",
       "summary": "Listar movimientos de inventario",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 456,
+      "line": 454,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.movimientos.read')"
@@ -9515,7 +9515,7 @@
       "endpoint": "/api/inventario/movimientos",
       "summary": "Registrar ajuste manual de inventario",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 542,
+      "line": 540,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.movimientos.create')"
@@ -9538,7 +9538,7 @@
       "endpoint": "/api/inventario/transferencias",
       "summary": "Transferir existencias entre almacenes",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 563,
+      "line": 561,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.movimientos.create')"
@@ -9561,7 +9561,7 @@
       "endpoint": "/api/inventario/productos/:id",
       "summary": "Obtener producto por ID",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 585,
+      "line": 583,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.productos.read')"
@@ -9584,7 +9584,7 @@
       "endpoint": "/api/inventario/productos/:id",
       "summary": "Eliminar producto por ID",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 647,
+      "line": 645,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.productos.delete')"
@@ -9607,7 +9607,7 @@
       "endpoint": "/api/inventario/productos/:id",
       "summary": "Actualizar producto por ID",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 669,
+      "line": 667,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.productos.update')"
@@ -9630,7 +9630,7 @@
       "endpoint": "/api/inventario/productos/:id/imagen",
       "summary": "Subir o reemplazar la imagen de un producto",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 688,
+      "line": 686,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.productos.update')"
@@ -9653,7 +9653,7 @@
       "endpoint": "/api/inventario/productos/:id/imagen",
       "summary": "Quitar de forma segura la imagen de un producto",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 725,
+      "line": 723,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.productos.update')"
@@ -9676,7 +9676,7 @@
       "endpoint": "/api/inventario/categorias",
       "summary": "Listar categorías de producto",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 750,
+      "line": 748,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.productos.read')"
@@ -9699,7 +9699,7 @@
       "endpoint": "/api/inventario/categorias",
       "summary": "Crear categoría de producto",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 776,
+      "line": 774,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.productos.create')"
@@ -9722,7 +9722,7 @@
       "endpoint": "/api/inventario/categorias/:id",
       "summary": "Actualizar categoría de producto",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 796,
+      "line": 794,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.productos.update')"
@@ -9745,7 +9745,7 @@
       "endpoint": "/api/inventario/categorias/:id",
       "summary": "Eliminar categoría de producto",
       "source": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
-      "line": 818,
+      "line": 816,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)",
         "RequirePermission('inventario.productos.delete')"
