@@ -2812,7 +2812,7 @@
     },
     {
       "id": "purchase-receipt-update-direct-dml",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "PUT",
@@ -2826,13 +2826,22 @@
       },
       "correction": "Writer 568 para editar recepciones; lecturas de compras indisponibles responden 503 sin enmascarar; inexistente 404",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 568, main y runtime."
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ],
-      "canonical_proof": "artifacts/peru-purchases-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-purchases-canonical-local-20261004",
+      "closure": {
+        "pr": 138,
+        "merge_sha": "624ca0b21008b707320dd809797adab6853e6b54",
+        "schema": 568,
+        "promotion": "artifacts/peru-568-promotion-20261004164814362.json",
+        "main_ci": 37218136805,
+        "runtime": "artifacts/peru-production-verification-after-138-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-138-timeouts-20261004.json"
+      }
     },
     {
       "id": "purchase-legacy-stats-masked",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -2846,13 +2855,22 @@
       },
       "correction": "Writer 568 para editar recepciones; lecturas de compras indisponibles responden 503 sin enmascarar; inexistente 404",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 568, main y runtime."
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ],
-      "canonical_proof": "artifacts/peru-purchases-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-purchases-canonical-local-20261004",
+      "closure": {
+        "pr": 138,
+        "merge_sha": "624ca0b21008b707320dd809797adab6853e6b54",
+        "schema": 568,
+        "promotion": "artifacts/peru-568-promotion-20261004164814362.json",
+        "main_ci": 37218136805,
+        "runtime": "artifacts/peru-production-verification-after-138-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-138-timeouts-20261004.json"
+      }
     },
     {
       "id": "purchase-legacy-list-masked",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -2866,13 +2884,22 @@
       },
       "correction": "Writer 568 para editar recepciones; lecturas de compras indisponibles responden 503 sin enmascarar; inexistente 404",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 568, main y runtime."
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ],
-      "canonical_proof": "artifacts/peru-purchases-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-purchases-canonical-local-20261004",
+      "closure": {
+        "pr": 138,
+        "merge_sha": "624ca0b21008b707320dd809797adab6853e6b54",
+        "schema": 568,
+        "promotion": "artifacts/peru-568-promotion-20261004164814362.json",
+        "main_ci": 37218136805,
+        "runtime": "artifacts/peru-production-verification-after-138-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-138-timeouts-20261004.json"
+      }
     },
     {
       "id": "purchase-legacy-report-masked",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -2886,13 +2913,22 @@
       },
       "correction": "Writer 568 para editar recepciones; lecturas de compras indisponibles responden 503 sin enmascarar; inexistente 404",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 568, main y runtime."
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ],
-      "canonical_proof": "artifacts/peru-purchases-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-purchases-canonical-local-20261004",
+      "closure": {
+        "pr": 138,
+        "merge_sha": "624ca0b21008b707320dd809797adab6853e6b54",
+        "schema": 568,
+        "promotion": "artifacts/peru-568-promotion-20261004164814362.json",
+        "main_ci": 37218136805,
+        "runtime": "artifacts/peru-production-verification-after-138-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-138-timeouts-20261004.json"
+      }
     },
     {
       "id": "purchase-orders-read-unavailability-500",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -2906,13 +2942,22 @@
       },
       "correction": "Writer 568 para editar recepciones; lecturas de compras indisponibles responden 503 sin enmascarar; inexistente 404",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 568, main y runtime."
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ],
-      "canonical_proof": "artifacts/peru-purchases-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-purchases-canonical-local-20261004",
+      "closure": {
+        "pr": 138,
+        "merge_sha": "624ca0b21008b707320dd809797adab6853e6b54",
+        "schema": 568,
+        "promotion": "artifacts/peru-568-promotion-20261004164814362.json",
+        "main_ci": 37218136805,
+        "runtime": "artifacts/peru-production-verification-after-138-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-138-timeouts-20261004.json"
+      }
     },
     {
       "id": "purchase-quotes-read-unavailability-500",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -2926,13 +2971,22 @@
       },
       "correction": "Writer 568 para editar recepciones; lecturas de compras indisponibles responden 503 sin enmascarar; inexistente 404",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 568, main y runtime."
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ],
-      "canonical_proof": "artifacts/peru-purchases-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-purchases-canonical-local-20261004",
+      "closure": {
+        "pr": 138,
+        "merge_sha": "624ca0b21008b707320dd809797adab6853e6b54",
+        "schema": 568,
+        "promotion": "artifacts/peru-568-promotion-20261004164814362.json",
+        "main_ci": 37218136805,
+        "runtime": "artifacts/peru-production-verification-after-138-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-138-timeouts-20261004.json"
+      }
     },
     {
       "id": "purchase-receipts-read-unavailability-400",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -2946,9 +3000,210 @@
       },
       "correction": "Writer 568 para editar recepciones; lecturas de compras indisponibles responden 503 sin enmascarar; inexistente 404",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 568, main y runtime."
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ],
-      "canonical_proof": "artifacts/peru-purchases-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-purchases-canonical-local-20261004",
+      "closure": {
+        "pr": 138,
+        "merge_sha": "624ca0b21008b707320dd809797adab6853e6b54",
+        "schema": 568,
+        "promotion": "artifacts/peru-568-promotion-20261004164814362.json",
+        "main_ci": 37218136805,
+        "runtime": "artifacts/peru-production-verification-after-138-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-138-timeouts-20261004.json"
+      }
+    },
+    {
+      "id": "accounting-new-tenant-no-reconcilable-accounts",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/partidas-abiertas"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/conciliaciones-partidas"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-accounting-baseline-20261004",
+        "observed_error": "La 387 marcó como conciliables las cuentas 12/16/42/46 sólo de los tenants existentes; el plan sembrado después (556) nace sin la marca y no hay API para cambiarla: un cliente nuevo no tiene ninguna cuenta conciliable y la pantalla de partidas queda vacía. El ensayo sobre el respaldo productivo encuentra 401 cuentas PE en esa situación.",
+        "local_only": true
+      },
+      "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 569, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-accounting-canonical-local-20261004"
+    },
+    {
+      "id": "accounting-reconciliation-list-permission",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/conciliaciones-partidas"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-accounting-baseline-20261004",
+        "observed_error": "Responde 500 'permission denied for table conciliaciones_partidas': ni PROD ni la cadena canónica conceden SELECT a service_role.",
+        "local_only": true
+      },
+      "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 569, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-accounting-canonical-local-20261004"
+    },
+    {
+      "id": "accounting-budget-alerts-shadowed",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/presupuestos/alertas"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-accounting-baseline-20261004",
+        "observed_error": "Responde 400 'invalid input syntax for type uuid: \"alertas\"': la ruta presupuestos/:id se declara antes y la captura.",
+        "local_only": true
+      },
+      "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 569, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-accounting-canonical-local-20261004"
+    },
+    {
+      "id": "accounting-books-masked-failures",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/libro-diario"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/libro-mayor/:cuentaCodigo"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/libro-mayor-completo"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/plan-cuentas"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/balance-comprobacion"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-accounting-baseline-20261004",
+        "observed_error": "Sin lectura de asientos_contables, detalle_asientos o plan_cuentas, o sin EXECUTE de balance_comprobacion_live, responden 200 con success:false y datos vacíos; la pantalla de contabilidad sólo lo escribía en consola y mostraba la vista vacía.",
+        "local_only": true
+      },
+      "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 569, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-accounting-canonical-local-20261004"
+    },
+    {
+      "id": "accounting-reads-500",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/asientos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/estados/balance-comprobacion"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-accounting-baseline-20261004",
+        "observed_error": "Una lectura fallida responde 500 en vez de 503.",
+        "local_only": true
+      },
+      "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 569, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-accounting-canonical-local-20261004"
+    },
+    {
+      "id": "accounting-invalid-period-accepted",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/estados/estado-resultados"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/estados/balance-comprobacion"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/balance-general"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/balance-comprobacion"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/libro-diario"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/libro-mayor-completo"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/registro-ventas"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-accounting-baseline-20261004",
+        "observed_error": "mes=13 responde 200: los estados devuelven success:false con 200 y los libros ignoraban anio/mes y entregaban todos los registros.",
+        "local_only": true
+      },
+      "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 569, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-accounting-canonical-local-20261004"
+    },
+    {
+      "id": "accounting-reconciliation-retry-and-errors",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/conciliaciones-partidas"
+        },
+        {
+          "method": "DELETE",
+          "endpoint": "/api/contabilidad/conciliaciones-partidas/:id"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-accounting-baseline-20261004",
+        "observed_error": "Por revisión de código, no reproducido aún por falta de cuenta conciliable: sin Idempotency-Key un reintento tras respuesta perdida falla o, en una conciliación PARCIAL, puede volver a aplicar importe; los errores de negocio del writer (saldo excedido por concurrencia) y las caídas respondían 500 genérico.",
+        "local_only": true
+      },
+      "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+      "pending": [
+        "CI exacto con SQL fresco, promoción única 569, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-accounting-canonical-local-20261004"
     }
   ]
 }

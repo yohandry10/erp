@@ -1,0 +1,11 @@
+{
+    "attempts":  [
+                     {
+                         "error":  "TimeoutError: 20 s agotados en la primera lectura (jsonRequest)",
+                         "result":  "failed",
+                         "timeoutSeconds":  20,
+                         "at":  "2026-10-04T17:23:29.8028460Z"
+                     }
+                 ],
+    "scope":  "Verificacion runtime 624ca0b2/568"
+}

@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-10-04T03:55:19.685Z",
+  "generated_at": "2026-10-04T17:25:23.965Z",
   "inventory": "artifacts/peru-api-operation-inventory-20260930.json",
-  "evidence": "artifacts/peru-integrated-main-37173628882",
+  "evidence": "artifacts/peru-integrated-main-37218136805",
   "additional_evidence": [
     {
       "evidence": "artifacts/peru-storage-ci-37150593171",
@@ -995,23 +995,35 @@
           "status": 201
         },
         {
-          "trace_index": 1821,
+          "trace_index": 1819,
           "status": 201
         },
         {
-          "trace_index": 1835,
+          "trace_index": 1827,
           "status": 201
         },
         {
-          "trace_index": 1839,
+          "trace_index": 1884,
           "status": 201
         },
         {
-          "trace_index": 1840,
+          "trace_index": 1887,
           "status": 201
         },
         {
-          "trace_index": 1900,
+          "trace_index": 1901,
+          "status": 201
+        },
+        {
+          "trace_index": 1905,
+          "status": 201
+        },
+        {
+          "trace_index": 1906,
+          "status": 201
+        },
+        {
+          "trace_index": 1966,
           "status": 201
         }
       ],
@@ -2998,11 +3010,24 @@
       "method": "GET",
       "endpoint": "/api/compras/stats",
       "source": "apps/erp-api/src/modules/compras.controller.ts:29",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1866,
+          "status": 200
+        },
+        {
+          "trace_index": 1872,
+          "status": 503
+        },
+        {
+          "trace_index": 1873,
+          "status": 200
+        }
+      ],
       "defects": [
         {
           "id": "purchase-legacy-stats-masked",
-          "status": "canonical_local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-purchases-baseline-20261004",
             "observed_error": "Sin lectura de ordenes_compra responde 200 success:true con todas las cifras en cero",
@@ -3010,18 +3035,34 @@
           },
           "correction": "Writer 568 para editar recepciones; lecturas de compras indisponibles responden 503 sin enmascarar; inexistente 404",
           "pending": [
-            "CI exacto con SQL fresco, promoción única 568, main y runtime."
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "purchase-legacy-reads",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: resumen, listado y reporte heredados responden con datos de la empresa"
+          ]
+        },
+        {
+          "id": "purchase-reads-outage-503",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: lectura de compras/stats sin ordenes_compra responde 503",
+            "Compras: lectura de compras sin ordenes_compra responde 503",
+            "Compras: lectura de compras/ordenes sin ordenes_compra responde 503",
+            "Compras: lectura de compras/cotizaciones sin cotizaciones_compra responde 503",
+            "Compras: lectura de compras/recepciones sin recepciones responde 503",
+            "Compras: lectura de compras/reporte-compras sin ordenes_compra responde 503"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -3030,11 +3071,24 @@
       "method": "GET",
       "endpoint": "/api/compras",
       "source": "apps/erp-api/src/modules/compras.controller.ts:116",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1867,
+          "status": 200
+        },
+        {
+          "trace_index": 1874,
+          "status": 503
+        },
+        {
+          "trace_index": 1875,
+          "status": 200
+        }
+      ],
       "defects": [
         {
           "id": "purchase-legacy-list-masked",
-          "status": "canonical_local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-purchases-baseline-20261004",
             "observed_error": "Sin lectura responde 200 success:false con lista vacía",
@@ -3042,18 +3096,34 @@
           },
           "correction": "Writer 568 para editar recepciones; lecturas de compras indisponibles responden 503 sin enmascarar; inexistente 404",
           "pending": [
-            "CI exacto con SQL fresco, promoción única 568, main y runtime."
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "purchase-legacy-reads",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: resumen, listado y reporte heredados responden con datos de la empresa"
+          ]
+        },
+        {
+          "id": "purchase-reads-outage-503",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: lectura de compras/stats sin ordenes_compra responde 503",
+            "Compras: lectura de compras sin ordenes_compra responde 503",
+            "Compras: lectura de compras/ordenes sin ordenes_compra responde 503",
+            "Compras: lectura de compras/cotizaciones sin cotizaciones_compra responde 503",
+            "Compras: lectura de compras/recepciones sin recepciones responde 503",
+            "Compras: lectura de compras/reporte-compras sin ordenes_compra responde 503"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -3062,16 +3132,25 @@
       "method": "GET",
       "endpoint": "/api/compras/next-number",
       "source": "apps/erp-api/src/modules/compras.controller.ts:157",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1869,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "purchase-legacy-reads",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: resumen, listado y reporte heredados responden con datos de la empresa"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -3080,16 +3159,25 @@
       "method": "POST",
       "endpoint": "/api/compras",
       "source": "apps/erp-api/src/modules/compras.controller.ts:200",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1871,
+          "status": 410
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "purchase-legacy-reads",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: resumen, listado y reporte heredados responden con datos de la empresa"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -3134,11 +3222,24 @@
       "method": "GET",
       "endpoint": "/api/compras/reporte-compras",
       "source": "apps/erp-api/src/modules/compras.controller.ts:224",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1868,
+          "status": 200
+        },
+        {
+          "trace_index": 1882,
+          "status": 503
+        },
+        {
+          "trace_index": 1883,
+          "status": 200
+        }
+      ],
       "defects": [
         {
           "id": "purchase-legacy-report-masked",
-          "status": "canonical_local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-purchases-baseline-20261004",
             "observed_error": "Sin lectura responde 200 success:false con resumen vacío",
@@ -3146,18 +3247,34 @@
           },
           "correction": "Writer 568 para editar recepciones; lecturas de compras indisponibles responden 503 sin enmascarar; inexistente 404",
           "pending": [
-            "CI exacto con SQL fresco, promoción única 568, main y runtime."
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "purchase-legacy-reads",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: resumen, listado y reporte heredados responden con datos de la empresa"
+          ]
+        },
+        {
+          "id": "purchase-reads-outage-503",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: lectura de compras/stats sin ordenes_compra responde 503",
+            "Compras: lectura de compras sin ordenes_compra responde 503",
+            "Compras: lectura de compras/ordenes sin ordenes_compra responde 503",
+            "Compras: lectura de compras/cotizaciones sin cotizaciones_compra responde 503",
+            "Compras: lectura de compras/recepciones sin recepciones responde 503",
+            "Compras: lectura de compras/reporte-compras sin ordenes_compra responde 503"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -3166,16 +3283,25 @@
       "method": "GET",
       "endpoint": "/api/compras/productos",
       "source": "apps/erp-api/src/modules/compras.controller.ts:299",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1870,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "purchase-legacy-reads",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: resumen, listado y reporte heredados responden con datos de la empresa"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -3210,17 +3336,33 @@
         {
           "trace_index": 185,
           "status": 201
+        },
+        {
+          "trace_index": 1831,
+          "status": 201
+        },
+        {
+          "trace_index": 1832,
+          "status": 201
+        },
+        {
+          "trace_index": 1840,
+          "status": 201
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "purchase-quote-lifecycle-convert-once",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: cotización editada, enviada, aprobada por otro actor y convertida en una sola OC"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -3229,11 +3371,24 @@
       "method": "GET",
       "endpoint": "/api/compras/cotizaciones",
       "source": "apps/erp-api/src/modules/compras/controllers/cotizaciones-compra.controller.ts:63",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1835,
+          "status": 200
+        },
+        {
+          "trace_index": 1878,
+          "status": 503
+        },
+        {
+          "trace_index": 1879,
+          "status": 200
+        }
+      ],
       "defects": [
         {
           "id": "purchase-quotes-read-unavailability-500",
-          "status": "canonical_local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-purchases-baseline-20261004",
             "observed_error": "Sin lectura responde 500 con el mensaje técnico",
@@ -3241,18 +3396,34 @@
           },
           "correction": "Writer 568 para editar recepciones; lecturas de compras indisponibles responden 503 sin enmascarar; inexistente 404",
           "pending": [
-            "CI exacto con SQL fresco, promoción única 568, main y runtime."
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "purchase-quote-lifecycle-convert-once",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: cotización editada, enviada, aprobada por otro actor y convertida en una sola OC"
+          ]
+        },
+        {
+          "id": "purchase-reads-outage-503",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: lectura de compras/stats sin ordenes_compra responde 503",
+            "Compras: lectura de compras sin ordenes_compra responde 503",
+            "Compras: lectura de compras/ordenes sin ordenes_compra responde 503",
+            "Compras: lectura de compras/cotizaciones sin cotizaciones_compra responde 503",
+            "Compras: lectura de compras/recepciones sin recepciones responde 503",
+            "Compras: lectura de compras/reporte-compras sin ordenes_compra responde 503"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -3265,17 +3436,25 @@
         {
           "trace_index": 186,
           "status": 200
+        },
+        {
+          "trace_index": 1834,
+          "status": 200
         }
       ],
       "defects": [],
-      "verified_cases": [],
-      "result": "http_contract_observed_not_full_acceptance",
+      "verified_cases": [
+        {
+          "id": "purchase-quote-lifecycle-convert-once",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: cotización editada, enviada, aprobada por otro actor y convertida en una sola OC"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -3284,16 +3463,25 @@
       "method": "PUT",
       "endpoint": "/api/compras/cotizaciones/:id",
       "source": "apps/erp-api/src/modules/compras/controllers/cotizaciones-compra.controller.ts:159",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1833,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "purchase-quote-lifecycle-convert-once",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: cotización editada, enviada, aprobada por otro actor y convertida en una sola OC"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -3302,16 +3490,29 @@
       "method": "POST",
       "endpoint": "/api/compras/cotizaciones/:id/enviar",
       "source": "apps/erp-api/src/modules/compras/controllers/cotizaciones-compra.controller.ts:197",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1836,
+          "status": 200
+        },
+        {
+          "trace_index": 1841,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "purchase-quote-lifecycle-convert-once",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: cotización editada, enviada, aprobada por otro actor y convertida en una sola OC"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -3320,16 +3521,25 @@
       "method": "POST",
       "endpoint": "/api/compras/cotizaciones/:id/aprobar",
       "source": "apps/erp-api/src/modules/compras/controllers/cotizaciones-compra.controller.ts:224",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1837,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "purchase-quote-lifecycle-convert-once",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: cotización editada, enviada, aprobada por otro actor y convertida en una sola OC"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -3338,16 +3548,25 @@
       "method": "POST",
       "endpoint": "/api/compras/cotizaciones/:id/rechazar",
       "source": "apps/erp-api/src/modules/compras/controllers/cotizaciones-compra.controller.ts:251",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1842,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "purchase-quote-reject-no-convert",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: cotización rechazada con motivo no se convierte"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -3356,16 +3575,40 @@
       "method": "POST",
       "endpoint": "/api/compras/cotizaciones/:id/convertir-oc",
       "source": "apps/erp-api/src/modules/compras/controllers/cotizaciones-compra.controller.ts:286",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1838,
+          "status": 201
+        },
+        {
+          "trace_index": 1839,
+          "status": 201
+        },
+        {
+          "trace_index": 1843,
+          "status": 400
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "purchase-quote-lifecycle-convert-once",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: cotización editada, enviada, aprobada por otro actor y convertida en una sola OC"
+          ]
+        },
+        {
+          "id": "purchase-quote-reject-no-convert",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: cotización rechazada con motivo no se convierte"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -3431,16 +3674,25 @@
       "method": "GET",
       "endpoint": "/api/compras/devoluciones",
       "source": "apps/erp-api/src/modules/compras/controllers/devoluciones-proveedor.controller.ts:62",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1860,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "purchase-receipt-order-route-edit-list",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: recepción desde la ruta de la orden, editada y listada; replay no duplica"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -3576,6 +3828,26 @@
         {
           "trace_index": 72,
           "status": 201
+        },
+        {
+          "trace_index": 1844,
+          "status": 201
+        },
+        {
+          "trace_index": 1848,
+          "status": 201
+        },
+        {
+          "trace_index": 1850,
+          "status": 201
+        },
+        {
+          "trace_index": 1853,
+          "status": 201
+        },
+        {
+          "trace_index": 1861,
+          "status": 201
         }
       ],
       "defects": [],
@@ -3606,11 +3878,24 @@
       "method": "GET",
       "endpoint": "/api/compras/ordenes",
       "source": "apps/erp-api/src/modules/compras/controllers/ordenes-compra.controller.ts:75",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1847,
+          "status": 200
+        },
+        {
+          "trace_index": 1876,
+          "status": 503
+        },
+        {
+          "trace_index": 1877,
+          "status": 200
+        }
+      ],
       "defects": [
         {
           "id": "purchase-orders-read-unavailability-500",
-          "status": "canonical_local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-purchases-baseline-20261004",
             "observed_error": "Sin lectura responde 500 con el mensaje técnico",
@@ -3618,18 +3903,34 @@
           },
           "correction": "Writer 568 para editar recepciones; lecturas de compras indisponibles responden 503 sin enmascarar; inexistente 404",
           "pending": [
-            "CI exacto con SQL fresco, promoción única 568, main y runtime."
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "purchase-order-edit-list",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: OC en borrador se edita y recalcula; listado filtra por proveedor y estado"
+          ]
+        },
+        {
+          "id": "purchase-reads-outage-503",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: lectura de compras/stats sin ordenes_compra responde 503",
+            "Compras: lectura de compras sin ordenes_compra responde 503",
+            "Compras: lectura de compras/ordenes sin ordenes_compra responde 503",
+            "Compras: lectura de compras/cotizaciones sin cotizaciones_compra responde 503",
+            "Compras: lectura de compras/recepciones sin recepciones responde 503",
+            "Compras: lectura de compras/reporte-compras sin ordenes_compra responde 503"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -3666,6 +3967,22 @@
         {
           "trace_index": 89,
           "status": 200
+        },
+        {
+          "trace_index": 1846,
+          "status": 200
+        },
+        {
+          "trace_index": 1855,
+          "status": 200
+        },
+        {
+          "trace_index": 1862,
+          "status": 404
+        },
+        {
+          "trace_index": 1865,
+          "status": 200
         }
       ],
       "defects": [],
@@ -3683,11 +4000,19 @@
           "verified_checks": [
             "Orden, recepción y factura invisibles para otra empresa"
           ]
+        },
+        {
+          "id": "purchase-order-isolation",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: documentos de otra empresa responden 404"
+          ]
         }
       ],
       "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "Indisponibilidad de lecturas/writers, UI real por operación y variantes de moneda/rol no registradas"
+        "Indisponibilidad de lecturas/writers, UI real por operación y variantes de moneda/rol no registradas",
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -3696,16 +4021,36 @@
       "method": "PUT",
       "endpoint": "/api/compras/ordenes/:id",
       "source": "apps/erp-api/src/modules/compras/controllers/ordenes-compra.controller.ts:167",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1845,
+          "status": 200
+        },
+        {
+          "trace_index": 1863,
+          "status": 404
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "purchase-order-edit-list",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: OC en borrador se edita y recalcula; listado filtra por proveedor y estado"
+          ]
+        },
+        {
+          "id": "purchase-order-isolation",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: documentos de otra empresa responden 404"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -3730,6 +4075,10 @@
         {
           "trace_index": 74,
           "status": 200
+        },
+        {
+          "trace_index": 1854,
+          "status": 200
         }
       ],
       "defects": [],
@@ -3753,16 +4102,25 @@
       "method": "POST",
       "endpoint": "/api/compras/ordenes/:id/rechazar",
       "source": "apps/erp-api/src/modules/compras/controllers/ordenes-compra.controller.ts:250",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1849,
+          "status": 200
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "purchase-order-reject-cancel",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: OC rechazada por otro actor y OC cancelada con motivo no admiten recepción"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -3771,16 +4129,36 @@
       "method": "POST",
       "endpoint": "/api/compras/ordenes/:id/cancelar",
       "source": "apps/erp-api/src/modules/compras/controllers/ordenes-compra.controller.ts:291",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1851,
+          "status": 200
+        },
+        {
+          "trace_index": 1864,
+          "status": 404
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "purchase-order-reject-cancel",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: OC rechazada por otro actor y OC cancelada con motivo no admiten recepción"
+          ]
+        },
+        {
+          "id": "purchase-order-isolation",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: documentos de otra empresa responden 404"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -3789,16 +4167,29 @@
       "method": "POST",
       "endpoint": "/api/compras/ordenes/:id/recepciones",
       "source": "apps/erp-api/src/modules/compras/controllers/ordenes-compra.controller.ts:332",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1856,
+          "status": 201
+        },
+        {
+          "trace_index": 1857,
+          "status": 201
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "purchase-receipt-order-route-edit-list",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: recepción desde la ruta de la orden, editada y listada; replay no duplica"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -3889,6 +4280,10 @@
         {
           "trace_index": 982,
           "status": 201
+        },
+        {
+          "trace_index": 1824,
+          "status": 201
         }
       ],
       "defects": [],
@@ -3967,16 +4362,33 @@
       "method": "GET",
       "endpoint": "/api/compras/proveedores/buscar-ruc/:ruc",
       "source": "apps/erp-api/src/modules/compras/controllers/proveedores.controller.ts:158",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1828,
+          "status": 200
+        },
+        {
+          "trace_index": 1829,
+          "status": 404
+        },
+        {
+          "trace_index": 1830,
+          "status": 404
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "purchase-supplier-ruc-lookup",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: proveedor se encuentra por RUC; RUC ajeno o inexistente no se expone"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -4162,11 +4574,24 @@
       "method": "GET",
       "endpoint": "/api/compras/recepciones",
       "source": "apps/erp-api/src/modules/compras/controllers/recepciones.controller.ts:38",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1859,
+          "status": 200
+        },
+        {
+          "trace_index": 1880,
+          "status": 503
+        },
+        {
+          "trace_index": 1881,
+          "status": 200
+        }
+      ],
       "defects": [
         {
           "id": "purchase-receipts-read-unavailability-400",
-          "status": "canonical_local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-purchases-baseline-20261004",
             "observed_error": "Sin lectura responde 400 con el mensaje técnico",
@@ -4174,18 +4599,34 @@
           },
           "correction": "Writer 568 para editar recepciones; lecturas de compras indisponibles responden 503 sin enmascarar; inexistente 404",
           "pending": [
-            "CI exacto con SQL fresco, promoción única 568, main y runtime."
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "purchase-receipt-order-route-edit-list",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: recepción desde la ruta de la orden, editada y listada; replay no duplica"
+          ]
+        },
+        {
+          "id": "purchase-reads-outage-503",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: lectura de compras/stats sin ordenes_compra responde 503",
+            "Compras: lectura de compras sin ordenes_compra responde 503",
+            "Compras: lectura de compras/ordenes sin ordenes_compra responde 503",
+            "Compras: lectura de compras/cotizaciones sin cotizaciones_compra responde 503",
+            "Compras: lectura de compras/recepciones sin recepciones responde 503",
+            "Compras: lectura de compras/reporte-compras sin ordenes_compra responde 503"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -4245,6 +4686,10 @@
         {
           "trace_index": 86,
           "status": 201
+        },
+        {
+          "trace_index": 1852,
+          "status": 400
         }
       ],
       "defects": [],
@@ -4262,11 +4707,19 @@
           "verified_checks": [
             "Recepciones parciales mixtas: servicios, rechazo sin stock y exceso sin cabecera"
           ]
+        },
+        {
+          "id": "purchase-order-reject-cancel",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: OC rechazada por otro actor y OC cancelada con motivo no admiten recepción"
+          ]
         }
       ],
       "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "Indisponibilidad de lecturas/writers, UI real por operación y variantes de moneda/rol no registradas"
+        "Indisponibilidad de lecturas/writers, UI real por operación y variantes de moneda/rol no registradas",
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -4275,11 +4728,16 @@
       "method": "PUT",
       "endpoint": "/api/compras/recepciones/:id",
       "source": "apps/erp-api/src/modules/compras/controllers/recepciones.controller.ts:101",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 1858,
+          "status": 200
+        }
+      ],
       "defects": [
         {
           "id": "purchase-receipt-update-direct-dml",
-          "status": "canonical_local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_promoted_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-purchases-baseline-20261004",
             "observed_error": "La edición hace UPDATE directo y en la cadena canónica service_role no tiene DML sobre recepciones: responde 400 'permission denied'. PROD conserva GRANT ALL heredado, por lo que hoy funciona allí; cualquier reconstrucción la rompe.",
@@ -4287,18 +4745,22 @@
           },
           "correction": "Writer 568 para editar recepciones; lecturas de compras indisponibles responden 503 sin enmascarar; inexistente 404",
           "pending": [
-            "CI exacto con SQL fresco, promoción única 568, main y runtime."
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "purchase-receipt-order-route-edit-list",
+          "source": "scripts/ci/test-peru-purchases-operations-local.mjs",
+          "verified_checks": [
+            "Compras: recepción desde la ruta de la orden, editada y listada; replay no duplica"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
     },
     {
@@ -5099,7 +5561,11 @@
           "status": 201
         },
         {
-          "trace_index": 1841,
+          "trace_index": 1820,
+          "status": 201
+        },
+        {
+          "trace_index": 1907,
           "status": 201
         }
       ],
@@ -5215,55 +5681,55 @@
       "source": "apps/erp-api/src/modules/configuracion/configuration.controller.ts:795",
       "existing_evidence": [
         {
-          "trace_index": 1822,
+          "trace_index": 1888,
           "status": 201
         },
         {
-          "trace_index": 1823,
+          "trace_index": 1889,
           "status": 201
         },
         {
-          "trace_index": 1824,
+          "trace_index": 1890,
           "status": 201
         },
         {
-          "trace_index": 1825,
+          "trace_index": 1891,
           "status": 409
         },
         {
-          "trace_index": 1826,
+          "trace_index": 1892,
           "status": 400
         },
         {
-          "trace_index": 1827,
+          "trace_index": 1893,
           "status": 400
         },
         {
-          "trace_index": 1828,
+          "trace_index": 1894,
           "status": 400
         },
         {
-          "trace_index": 1829,
+          "trace_index": 1895,
           "status": 413
         },
         {
-          "trace_index": 1830,
+          "trace_index": 1896,
           "status": 201
         },
         {
-          "trace_index": 1831,
+          "trace_index": 1897,
           "status": 403
         },
         {
-          "trace_index": 1833,
+          "trace_index": 1899,
           "status": 400
         },
         {
-          "trace_index": 1834,
+          "trace_index": 1900,
           "status": 201
         },
         {
-          "trace_index": 1836,
+          "trace_index": 1902,
           "status": 201
         }
       ],
@@ -5292,15 +5758,15 @@
       "source": "apps/erp-api/src/modules/configuracion/configuration.controller.ts:837",
       "existing_evidence": [
         {
-          "trace_index": 1832,
+          "trace_index": 1898,
           "status": 403
         },
         {
-          "trace_index": 1837,
+          "trace_index": 1903,
           "status": 200
         },
         {
-          "trace_index": 1838,
+          "trace_index": 1904,
           "status": 200
         }
       ],
@@ -5921,7 +6387,7 @@
       "operation": "crearAsientoContable",
       "method": "POST",
       "endpoint": "/api/contabilidad/asiento-contable",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:35",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:36",
       "existing_evidence": [
         {
           "trace_index": 558,
@@ -6071,7 +6537,7 @@
       "operation": "getAsientosContables",
       "method": "GET",
       "endpoint": "/api/contabilidad/asientos-contables",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:80",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:81",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -6089,7 +6555,7 @@
       "operation": "getAsientoContablePorId",
       "method": "GET",
       "endpoint": "/api/contabilidad/asientos-contables/:id",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:132",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:133",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -6107,9 +6573,23 @@
       "operation": "listarAsientos",
       "method": "GET",
       "endpoint": "/api/contabilidad/asientos",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:168",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:169",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "accounting-reads-500",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-accounting-baseline-20261004",
+            "observed_error": "Una lectura fallida responde 500 en vez de 503.",
+            "local_only": true
+          },
+          "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+          "pending": [
+            "CI exacto con SQL fresco, promoción única 569, main y runtime."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -6125,7 +6605,7 @@
       "operation": "obtenerEstadisticasAsientosPorTipo",
       "method": "GET",
       "endpoint": "/api/contabilidad/asientos/estadisticas/por-tipo",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:232",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:233",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -6143,7 +6623,7 @@
       "operation": "obtenerAsientoPorId",
       "method": "GET",
       "endpoint": "/api/contabilidad/asientos/:id",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:282",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:283",
       "existing_evidence": [
         {
           "trace_index": 565,
@@ -6191,7 +6671,7 @@
       "operation": "actualizarAsiento",
       "method": "PUT",
       "endpoint": "/api/contabilidad/asientos/:id",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:321",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:322",
       "existing_evidence": [
         {
           "trace_index": 566,
@@ -6231,7 +6711,7 @@
       "operation": "eliminarAsiento",
       "method": "DELETE",
       "endpoint": "/api/contabilidad/asientos/:id",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:355",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:356",
       "existing_evidence": [
         {
           "trace_index": 570,
@@ -6272,7 +6752,7 @@
       "operation": "confirmarAsiento",
       "method": "POST",
       "endpoint": "/api/contabilidad/asientos/:id/confirmar",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:376",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:377",
       "existing_evidence": [
         {
           "trace_index": 567,
@@ -6311,7 +6791,7 @@
       "operation": "anularAsiento",
       "method": "POST",
       "endpoint": "/api/contabilidad/asientos/:id/anular",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:407",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:408",
       "existing_evidence": [
         {
           "trace_index": 568,
@@ -6352,7 +6832,7 @@
       "operation": "reversarAsiento",
       "method": "POST",
       "endpoint": "/api/contabilidad/asientos/:id/reversar",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:437",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts:438",
       "existing_evidence": [
         {
           "trace_index": 569,
@@ -6504,9 +6984,23 @@
       "operation": "partidasAbiertas",
       "method": "GET",
       "endpoint": "/api/contabilidad/partidas-abiertas",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-conciliacion.controller.ts:30",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-conciliacion.controller.ts:31",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "accounting-new-tenant-no-reconcilable-accounts",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-accounting-baseline-20261004",
+            "observed_error": "La 387 marcó como conciliables las cuentas 12/16/42/46 sólo de los tenants existentes; el plan sembrado después (556) nace sin la marca y no hay API para cambiarla: un cliente nuevo no tiene ninguna cuenta conciliable y la pantalla de partidas queda vacía. El ensayo sobre el respaldo productivo encuentra 401 cuentas PE en esa situación.",
+            "local_only": true
+          },
+          "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+          "pending": [
+            "CI exacto con SQL fresco, promoción única 569, main y runtime."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -6522,9 +7016,23 @@
       "operation": "listar",
       "method": "GET",
       "endpoint": "/api/contabilidad/conciliaciones-partidas",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-conciliacion.controller.ts:48",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-conciliacion.controller.ts:49",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "accounting-reconciliation-list-permission",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-accounting-baseline-20261004",
+            "observed_error": "Responde 500 'permission denied for table conciliaciones_partidas': ni PROD ni la cadena canónica conceden SELECT a service_role.",
+            "local_only": true
+          },
+          "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+          "pending": [
+            "CI exacto con SQL fresco, promoción única 569, main y runtime."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -6540,9 +7048,36 @@
       "operation": "conciliar",
       "method": "POST",
       "endpoint": "/api/contabilidad/conciliaciones-partidas",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-conciliacion.controller.ts:60",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-conciliacion.controller.ts:61",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "accounting-new-tenant-no-reconcilable-accounts",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-accounting-baseline-20261004",
+            "observed_error": "La 387 marcó como conciliables las cuentas 12/16/42/46 sólo de los tenants existentes; el plan sembrado después (556) nace sin la marca y no hay API para cambiarla: un cliente nuevo no tiene ninguna cuenta conciliable y la pantalla de partidas queda vacía. El ensayo sobre el respaldo productivo encuentra 401 cuentas PE en esa situación.",
+            "local_only": true
+          },
+          "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+          "pending": [
+            "CI exacto con SQL fresco, promoción única 569, main y runtime."
+          ]
+        },
+        {
+          "id": "accounting-reconciliation-retry-and-errors",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-accounting-baseline-20261004",
+            "observed_error": "Por revisión de código, no reproducido aún por falta de cuenta conciliable: sin Idempotency-Key un reintento tras respuesta perdida falla o, en una conciliación PARCIAL, puede volver a aplicar importe; los errores de negocio del writer (saldo excedido por concurrencia) y las caídas respondían 500 genérico.",
+            "local_only": true
+          },
+          "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+          "pending": [
+            "CI exacto con SQL fresco, promoción única 569, main y runtime."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -6558,9 +7093,23 @@
       "operation": "desconciliar",
       "method": "DELETE",
       "endpoint": "/api/contabilidad/conciliaciones-partidas/:id",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-conciliacion.controller.ts:89",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-conciliacion.controller.ts:91",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "accounting-reconciliation-retry-and-errors",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-accounting-baseline-20261004",
+            "observed_error": "Por revisión de código, no reproducido aún por falta de cuenta conciliable: sin Idempotency-Key un reintento tras respuesta perdida falla o, en una conciliación PARCIAL, puede volver a aplicar importe; los errores de negocio del writer (saldo excedido por concurrencia) y las caídas respondían 500 genérico.",
+            "local_only": true
+          },
+          "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+          "pending": [
+            "CI exacto con SQL fresco, promoción única 569, main y runtime."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -7087,7 +7636,34 @@
       "endpoint": "/api/contabilidad/estados/balance-comprobacion",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:36",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "accounting-reads-500",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-accounting-baseline-20261004",
+            "observed_error": "Una lectura fallida responde 500 en vez de 503.",
+            "local_only": true
+          },
+          "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+          "pending": [
+            "CI exacto con SQL fresco, promoción única 569, main y runtime."
+          ]
+        },
+        {
+          "id": "accounting-invalid-period-accepted",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-accounting-baseline-20261004",
+            "observed_error": "mes=13 responde 200: los estados devuelven success:false con 200 y los libros ignoraban anio/mes y entregaban todos los registros.",
+            "local_only": true
+          },
+          "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+          "pending": [
+            "CI exacto con SQL fresco, promoción única 569, main y runtime."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -7103,7 +7679,7 @@
       "operation": "getEstadoResultadosPorPeriodo",
       "method": "GET",
       "endpoint": "/api/contabilidad/estados/estado-resultados",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:125",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:118",
       "existing_evidence": [
         {
           "trace_index": 667,
@@ -7114,7 +7690,21 @@
           "status": 200
         }
       ],
-      "defects": [],
+      "defects": [
+        {
+          "id": "accounting-invalid-period-accepted",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-accounting-baseline-20261004",
+            "observed_error": "mes=13 responde 200: los estados devuelven success:false con 200 y los libros ignoraban anio/mes y entregaban todos los registros.",
+            "local_only": true
+          },
+          "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+          "pending": [
+            "CI exacto con SQL fresco, promoción única 569, main y runtime."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
@@ -7130,7 +7720,7 @@
       "operation": "getBalanceGeneralPorPeriodo",
       "method": "GET",
       "endpoint": "/api/contabilidad/estados/balance-general",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:209",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:195",
       "existing_evidence": [
         {
           "trace_index": 663,
@@ -7191,7 +7781,7 @@
       "operation": "getBalanceComprobacionFormateado",
       "method": "GET",
       "endpoint": "/api/contabilidad/estados/balance-comprobacion/formatted",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:294",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:273",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -7209,7 +7799,7 @@
       "operation": "getEstadoResultadosFormateado",
       "method": "GET",
       "endpoint": "/api/contabilidad/estados/estado-resultados/formatted",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:374",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:346",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -7227,7 +7817,7 @@
       "operation": "getBalanceGeneralFormateado",
       "method": "GET",
       "endpoint": "/api/contabilidad/estados/balance-general/formatted",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:454",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:419",
       "existing_evidence": [],
       "defects": [
         {
@@ -7257,7 +7847,7 @@
       "operation": "refrescarEstadosFinancieros",
       "method": "POST",
       "endpoint": "/api/contabilidad/estados/refrescar",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:533",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:491",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -7275,9 +7865,23 @@
       "operation": "getBalanceGeneral",
       "method": "GET",
       "endpoint": "/api/contabilidad/balance-general",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:724",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:682",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "accounting-invalid-period-accepted",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-accounting-baseline-20261004",
+            "observed_error": "mes=13 responde 200: los estados devuelven success:false con 200 y los libros ignoraban anio/mes y entregaban todos los registros.",
+            "local_only": true
+          },
+          "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+          "pending": [
+            "CI exacto con SQL fresco, promoción única 569, main y runtime."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -7293,7 +7897,7 @@
       "operation": "getFlujoEfectivo",
       "method": "GET",
       "endpoint": "/api/contabilidad/flujo-efectivo",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:806",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:757",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -7311,7 +7915,7 @@
       "operation": "getPlanCuentas",
       "method": "GET",
       "endpoint": "/api/contabilidad/plan-cuentas",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:833",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:784",
       "existing_evidence": [
         {
           "trace_index": 660,
@@ -7346,7 +7950,21 @@
           "status": 200
         }
       ],
-      "defects": [],
+      "defects": [
+        {
+          "id": "accounting-books-masked-failures",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-accounting-baseline-20261004",
+            "observed_error": "Sin lectura de asientos_contables, detalle_asientos o plan_cuentas, o sin EXECUTE de balance_comprobacion_live, responden 200 con success:false y datos vacíos; la pantalla de contabilidad sólo lo escribía en consola y mostraba la vista vacía.",
+            "local_only": true
+          },
+          "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+          "pending": [
+            "CI exacto con SQL fresco, promoción única 569, main y runtime."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
@@ -7362,7 +7980,7 @@
       "operation": "getRatiosFinancieros",
       "method": "GET",
       "endpoint": "/api/contabilidad/ratios-financieros",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:859",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts:806",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -7485,9 +8103,23 @@
       "operation": "getLibroMayor",
       "method": "GET",
       "endpoint": "/api/contabilidad/libro-mayor/:cuentaCodigo",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:83",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:85",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "accounting-books-masked-failures",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-accounting-baseline-20261004",
+            "observed_error": "Sin lectura de asientos_contables, detalle_asientos o plan_cuentas, o sin EXECUTE de balance_comprobacion_live, responden 200 con success:false y datos vacíos; la pantalla de contabilidad sólo lo escribía en consola y mostraba la vista vacía.",
+            "local_only": true
+          },
+          "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+          "pending": [
+            "CI exacto con SQL fresco, promoción única 569, main y runtime."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -7503,9 +8135,36 @@
       "operation": "getLibroMayorCompleto",
       "method": "GET",
       "endpoint": "/api/contabilidad/libro-mayor-completo",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:118",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:117",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "accounting-books-masked-failures",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-accounting-baseline-20261004",
+            "observed_error": "Sin lectura de asientos_contables, detalle_asientos o plan_cuentas, o sin EXECUTE de balance_comprobacion_live, responden 200 con success:false y datos vacíos; la pantalla de contabilidad sólo lo escribía en consola y mostraba la vista vacía.",
+            "local_only": true
+          },
+          "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+          "pending": [
+            "CI exacto con SQL fresco, promoción única 569, main y runtime."
+          ]
+        },
+        {
+          "id": "accounting-invalid-period-accepted",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-accounting-baseline-20261004",
+            "observed_error": "mes=13 responde 200: los estados devuelven success:false con 200 y los libros ignoraban anio/mes y entregaban todos los registros.",
+            "local_only": true
+          },
+          "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+          "pending": [
+            "CI exacto con SQL fresco, promoción única 569, main y runtime."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -7521,9 +8180,36 @@
       "operation": "getBalanceComprobacion",
       "method": "GET",
       "endpoint": "/api/contabilidad/balance-comprobacion",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:148",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:144",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "accounting-books-masked-failures",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-accounting-baseline-20261004",
+            "observed_error": "Sin lectura de asientos_contables, detalle_asientos o plan_cuentas, o sin EXECUTE de balance_comprobacion_live, responden 200 con success:false y datos vacíos; la pantalla de contabilidad sólo lo escribía en consola y mostraba la vista vacía.",
+            "local_only": true
+          },
+          "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+          "pending": [
+            "CI exacto con SQL fresco, promoción única 569, main y runtime."
+          ]
+        },
+        {
+          "id": "accounting-invalid-period-accepted",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-accounting-baseline-20261004",
+            "observed_error": "mes=13 responde 200: los estados devuelven success:false con 200 y los libros ignoraban anio/mes y entregaban todos los registros.",
+            "local_only": true
+          },
+          "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+          "pending": [
+            "CI exacto con SQL fresco, promoción única 569, main y runtime."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -7539,7 +8225,7 @@
       "operation": "getKardexValorizado",
       "method": "GET",
       "endpoint": "/api/contabilidad/kardex-valorizado",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:245",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:234",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -7557,7 +8243,7 @@
       "operation": "getLibroCajaBancos",
       "method": "GET",
       "endpoint": "/api/contabilidad/libro-caja-bancos",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:277",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:263",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -7575,7 +8261,7 @@
       "operation": "getRegistroActivosFijos",
       "method": "GET",
       "endpoint": "/api/contabilidad/registro-activos-fijos",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:305",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:288",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -7593,7 +8279,7 @@
       "operation": "getLibroPlanillas",
       "method": "GET",
       "endpoint": "/api/contabilidad/libro-planillas",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:333",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:313",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -7611,7 +8297,7 @@
       "operation": "getLibroInventariosBalances",
       "method": "GET",
       "endpoint": "/api/contabilidad/libro-inventarios-balances",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:365",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:342",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -7629,7 +8315,7 @@
       "operation": "getRegistroCostos",
       "method": "GET",
       "endpoint": "/api/contabilidad/registro-costos",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:396",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:370",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -7647,7 +8333,7 @@
       "operation": "getLibrosElectronicosSunat",
       "method": "GET",
       "endpoint": "/api/contabilidad/libros-electronicos-sunat",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:424",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:395",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -7665,9 +8351,36 @@
       "operation": "getLibroDiario",
       "method": "GET",
       "endpoint": "/api/contabilidad/libro-diario",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:452",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:420",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "accounting-books-masked-failures",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-accounting-baseline-20261004",
+            "observed_error": "Sin lectura de asientos_contables, detalle_asientos o plan_cuentas, o sin EXECUTE de balance_comprobacion_live, responden 200 con success:false y datos vacíos; la pantalla de contabilidad sólo lo escribía en consola y mostraba la vista vacía.",
+            "local_only": true
+          },
+          "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+          "pending": [
+            "CI exacto con SQL fresco, promoción única 569, main y runtime."
+          ]
+        },
+        {
+          "id": "accounting-invalid-period-accepted",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-accounting-baseline-20261004",
+            "observed_error": "mes=13 responde 200: los estados devuelven success:false con 200 y los libros ignoraban anio/mes y entregaban todos los registros.",
+            "local_only": true
+          },
+          "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+          "pending": [
+            "CI exacto con SQL fresco, promoción única 569, main y runtime."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -7683,9 +8396,23 @@
       "operation": "getRegistroVentas",
       "method": "GET",
       "endpoint": "/api/contabilidad/registro-ventas",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:532",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:497",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "accounting-invalid-period-accepted",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-accounting-baseline-20261004",
+            "observed_error": "mes=13 responde 200: los estados devuelven success:false con 200 y los libros ignoraban anio/mes y entregaban todos los registros.",
+            "local_only": true
+          },
+          "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+          "pending": [
+            "CI exacto con SQL fresco, promoción única 569, main y runtime."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -7701,7 +8428,7 @@
       "operation": "getRegistroCompras",
       "method": "GET",
       "endpoint": "/api/contabilidad/registro-compras",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:562",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:524",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -7719,7 +8446,7 @@
       "operation": "getRegistroConsignaciones",
       "method": "GET",
       "endpoint": "/api/contabilidad/registro-consignaciones",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:590",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:549",
       "existing_evidence": [
         {
           "trace_index": 146,
@@ -7750,7 +8477,7 @@
       "operation": "createConsignacion",
       "method": "POST",
       "endpoint": "/api/contabilidad/registro-consignaciones",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:630",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:589",
       "existing_evidence": [
         {
           "trace_index": 1159,
@@ -7819,7 +8546,7 @@
       "operation": "updateEstadoConsignacion",
       "method": "POST",
       "endpoint": "/api/contabilidad/registro-consignaciones/:id/estado",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:659",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:618",
       "existing_evidence": [
         {
           "trace_index": 1162,
@@ -7887,7 +8614,7 @@
       "operation": "exportarPle",
       "method": "GET",
       "endpoint": "/api/contabilidad/ple/:libro",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:710",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts:669",
       "existing_evidence": [
         {
           "trace_index": 359,
@@ -8834,10 +9561,60 @@
     },
     {
       "module": "contabilidad",
+      "operation": "obtenerAlertasSobregiro",
+      "method": "GET",
+      "endpoint": "/api/contabilidad/presupuestos/alertas",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts:136",
+      "existing_evidence": [],
+      "defects": [
+        {
+          "id": "accounting-budget-alerts-shadowed",
+          "status": "canonical_local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-accounting-baseline-20261004",
+            "observed_error": "Responde 400 'invalid input syntax for type uuid: \"alertas\"': la ruta presupuestos/:id se declara antes y la captura.",
+            "local_only": true
+          },
+          "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
+          "pending": [
+            "CI exacto con SQL fresco, promoción única 569, main y runtime."
+          ]
+        }
+      ],
+      "verified_cases": [],
+      "result": "pending_functional_execution",
+      "pending_checks": [
+        "persistencia y resultado funcional",
+        "permisos",
+        "aislamiento",
+        "validaciones",
+        "recuperación de errores"
+      ]
+    },
+    {
+      "module": "contabilidad",
+      "operation": "obtenerResumenAlertas",
+      "method": "GET",
+      "endpoint": "/api/contabilidad/presupuestos/alertas/resumen",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts:212",
+      "existing_evidence": [],
+      "defects": [],
+      "verified_cases": [],
+      "result": "pending_functional_execution",
+      "pending_checks": [
+        "persistencia y resultado funcional",
+        "permisos",
+        "aislamiento",
+        "validaciones",
+        "recuperación de errores"
+      ]
+    },
+    {
+      "module": "contabilidad",
       "operation": "obtenerPresupuestoPorId",
       "method": "GET",
       "endpoint": "/api/contabilidad/presupuestos/:id",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts:134",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts:279",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8855,7 +9632,7 @@
       "operation": "actualizarPresupuesto",
       "method": "PUT",
       "endpoint": "/api/contabilidad/presupuestos/:id",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts:176",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts:321",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8873,7 +9650,7 @@
       "operation": "eliminarPresupuesto",
       "method": "DELETE",
       "endpoint": "/api/contabilidad/presupuestos/:id",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts:227",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts:372",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8891,7 +9668,7 @@
       "operation": "obtenerPresupuestosPorCentroYPeriodo",
       "method": "GET",
       "endpoint": "/api/contabilidad/presupuestos/centro/:centroId/periodo/:periodoId",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts:276",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts:421",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8909,7 +9686,7 @@
       "operation": "obtenerComparacionPresupuestoVsReal",
       "method": "GET",
       "endpoint": "/api/contabilidad/presupuestos/comparacion/:periodoId",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts:458",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts:603",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8927,7 +9704,7 @@
       "operation": "actualizarEjecucionPresupuestal",
       "method": "POST",
       "endpoint": "/api/contabilidad/presupuestos/:id/actualizar-ejecucion",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts:595",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts:740",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -8945,43 +9722,7 @@
       "operation": "actualizarEjecucionPresupuestalPorPeriodo",
       "method": "POST",
       "endpoint": "/api/contabilidad/presupuestos/periodo/:periodoId/actualizar-ejecucion",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts:651",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
-      "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
-      ]
-    },
-    {
-      "module": "contabilidad",
-      "operation": "obtenerAlertasSobregiro",
-      "method": "GET",
-      "endpoint": "/api/contabilidad/presupuestos/alertas",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts:713",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
-      "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
-      ]
-    },
-    {
-      "module": "contabilidad",
-      "operation": "obtenerResumenAlertas",
-      "method": "GET",
-      "endpoint": "/api/contabilidad/presupuestos/alertas/resumen",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts:789",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts:796",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -9490,7 +10231,7 @@
           "status": 200
         },
         {
-          "trace_index": 1889,
+          "trace_index": 1955,
           "status": 200
         }
       ],
@@ -9530,7 +10271,7 @@
           "status": 200
         },
         {
-          "trace_index": 1890,
+          "trace_index": 1956,
           "status": 200
         }
       ],
@@ -9778,7 +10519,7 @@
           "status": 200
         },
         {
-          "trace_index": 1888,
+          "trace_index": 1954,
           "status": 200
         }
       ],
@@ -9810,7 +10551,7 @@
           "status": 400
         },
         {
-          "trace_index": 1873,
+          "trace_index": 1939,
           "status": 400
         }
       ],
@@ -9860,7 +10601,7 @@
           "status": 503
         },
         {
-          "trace_index": 1896,
+          "trace_index": 1962,
           "status": 503
         }
       ],
@@ -10805,144 +11546,20 @@
           "status": 201
         },
         {
-          "trace_index": 1843,
-          "status": 201
-        },
-        {
-          "trace_index": 1844,
-          "status": 201
-        },
-        {
-          "trace_index": 1845,
-          "status": 201
-        },
-        {
-          "trace_index": 1846,
-          "status": 409
-        },
-        {
-          "trace_index": 1869,
-          "status": 201
-        },
-        {
-          "trace_index": 1870,
-          "status": 400
-        },
-        {
-          "trace_index": 1871,
-          "status": 400
-        },
-        {
-          "trace_index": 1872,
-          "status": 400
-        },
-        {
-          "trace_index": 1874,
-          "status": 201
-        },
-        {
-          "trace_index": 1878,
-          "status": 201
-        },
-        {
-          "trace_index": 1880,
-          "status": 201
-        },
-        {
-          "trace_index": 1901,
-          "status": 403
-        },
-        {
-          "trace_index": 1905,
+          "trace_index": 1909,
           "status": 201
         },
         {
           "trace_index": 1910,
-          "status": 403
+          "status": 201
+        },
+        {
+          "trace_index": 1911,
+          "status": 201
         },
         {
           "trace_index": 1912,
-          "status": 400
-        },
-        {
-          "trace_index": 1913,
-          "status": 400
-        },
-        {
-          "trace_index": 1914,
-          "status": 503
-        },
-        {
-          "trace_index": 1915,
-          "status": 201
-        },
-        {
-          "trace_index": 1916,
-          "status": 201
-        },
-        {
-          "trace_index": 1917,
-          "status": 503
-        },
-        {
-          "trace_index": 1918,
-          "status": 201
-        },
-        {
-          "trace_index": 1919,
-          "status": 201
-        },
-        {
-          "trace_index": 1920,
-          "status": 201
-        },
-        {
-          "trace_index": 1923,
-          "status": 201
-        },
-        {
-          "trace_index": 1924,
-          "status": 201
-        },
-        {
-          "trace_index": 1925,
-          "status": 201
-        },
-        {
-          "trace_index": 1926,
-          "status": 201
-        },
-        {
-          "trace_index": 1927,
-          "status": 201
-        },
-        {
-          "trace_index": 1928,
-          "status": 201
-        },
-        {
-          "trace_index": 1929,
-          "status": 201
-        },
-        {
-          "trace_index": 1930,
-          "status": 201
-        },
-        {
-          "trace_index": 1931,
-          "status": 201
-        },
-        {
-          "trace_index": 1932,
-          "status": 201
-        },
-        {
-          "trace_index": 1933,
-          "status": 201
-        },
-        {
-          "trace_index": 1934,
-          "status": 201
+          "status": 409
         },
         {
           "trace_index": 1935,
@@ -10950,34 +11567,18 @@
         },
         {
           "trace_index": 1936,
-          "status": 201
+          "status": 400
         },
         {
           "trace_index": 1937,
-          "status": 201
+          "status": 400
         },
         {
           "trace_index": 1938,
-          "status": 201
-        },
-        {
-          "trace_index": 1939,
-          "status": 201
+          "status": 400
         },
         {
           "trace_index": 1940,
-          "status": 201
-        },
-        {
-          "trace_index": 1941,
-          "status": 201
-        },
-        {
-          "trace_index": 1942,
-          "status": 201
-        },
-        {
-          "trace_index": 1943,
           "status": 201
         },
         {
@@ -10985,148 +11586,32 @@
           "status": 201
         },
         {
-          "trace_index": 1945,
-          "status": 201
-        },
-        {
           "trace_index": 1946,
           "status": 201
         },
         {
-          "trace_index": 1947,
-          "status": 201
-        },
-        {
-          "trace_index": 1948,
-          "status": 201
-        },
-        {
-          "trace_index": 1949,
-          "status": 201
-        },
-        {
-          "trace_index": 1950,
-          "status": 201
-        },
-        {
-          "trace_index": 1951,
-          "status": 201
-        },
-        {
-          "trace_index": 1952,
-          "status": 201
-        },
-        {
-          "trace_index": 1953,
-          "status": 201
-        },
-        {
-          "trace_index": 1954,
-          "status": 201
-        },
-        {
-          "trace_index": 1955,
-          "status": 201
-        },
-        {
-          "trace_index": 1956,
-          "status": 201
-        },
-        {
-          "trace_index": 1957,
-          "status": 201
-        },
-        {
-          "trace_index": 1958,
-          "status": 201
-        },
-        {
-          "trace_index": 1959,
-          "status": 201
-        },
-        {
-          "trace_index": 1960,
-          "status": 201
-        },
-        {
-          "trace_index": 1961,
-          "status": 201
-        },
-        {
-          "trace_index": 1962,
-          "status": 201
-        },
-        {
-          "trace_index": 1963,
-          "status": 201
-        },
-        {
-          "trace_index": 1964,
-          "status": 201
-        },
-        {
-          "trace_index": 1965,
-          "status": 201
-        },
-        {
-          "trace_index": 1966,
-          "status": 201
-        },
-        {
           "trace_index": 1967,
-          "status": 201
-        },
-        {
-          "trace_index": 1968,
-          "status": 201
-        },
-        {
-          "trace_index": 1969,
-          "status": 201
-        },
-        {
-          "trace_index": 1970,
-          "status": 201
+          "status": 403
         },
         {
           "trace_index": 1971,
           "status": 201
         },
         {
-          "trace_index": 1972,
-          "status": 201
-        },
-        {
-          "trace_index": 1973,
-          "status": 201
-        },
-        {
-          "trace_index": 1974,
-          "status": 201
-        },
-        {
-          "trace_index": 1975,
-          "status": 201
-        },
-        {
           "trace_index": 1976,
-          "status": 201
-        },
-        {
-          "trace_index": 1977,
-          "status": 201
+          "status": 403
         },
         {
           "trace_index": 1978,
-          "status": 201
+          "status": 400
         },
         {
           "trace_index": 1979,
-          "status": 201
+          "status": 400
         },
         {
           "trace_index": 1980,
-          "status": 201
+          "status": 503
         },
         {
           "trace_index": 1981,
@@ -11138,7 +11623,7 @@
         },
         {
           "trace_index": 1983,
-          "status": 201
+          "status": 503
         },
         {
           "trace_index": 1984,
@@ -11150,14 +11635,6 @@
         },
         {
           "trace_index": 1986,
-          "status": 201
-        },
-        {
-          "trace_index": 1987,
-          "status": 201
-        },
-        {
-          "trace_index": 1988,
           "status": 201
         },
         {
@@ -11186,7 +11663,7 @@
         },
         {
           "trace_index": 1995,
-          "status": 429
+          "status": 201
         },
         {
           "trace_index": 1996,
@@ -11450,7 +11927,7 @@
         },
         {
           "trace_index": 2061,
-          "status": 201
+          "status": 429
         },
         {
           "trace_index": 2062,
@@ -11590,7 +12067,7 @@
         },
         {
           "trace_index": 2096,
-          "status": 429
+          "status": 201
         },
         {
           "trace_index": 2097,
@@ -11706,6 +12183,270 @@
         },
         {
           "trace_index": 2125,
+          "status": 201
+        },
+        {
+          "trace_index": 2126,
+          "status": 201
+        },
+        {
+          "trace_index": 2127,
+          "status": 201
+        },
+        {
+          "trace_index": 2128,
+          "status": 201
+        },
+        {
+          "trace_index": 2129,
+          "status": 201
+        },
+        {
+          "trace_index": 2130,
+          "status": 201
+        },
+        {
+          "trace_index": 2131,
+          "status": 201
+        },
+        {
+          "trace_index": 2132,
+          "status": 201
+        },
+        {
+          "trace_index": 2133,
+          "status": 201
+        },
+        {
+          "trace_index": 2134,
+          "status": 201
+        },
+        {
+          "trace_index": 2135,
+          "status": 201
+        },
+        {
+          "trace_index": 2136,
+          "status": 201
+        },
+        {
+          "trace_index": 2137,
+          "status": 201
+        },
+        {
+          "trace_index": 2138,
+          "status": 201
+        },
+        {
+          "trace_index": 2139,
+          "status": 201
+        },
+        {
+          "trace_index": 2140,
+          "status": 201
+        },
+        {
+          "trace_index": 2141,
+          "status": 201
+        },
+        {
+          "trace_index": 2142,
+          "status": 201
+        },
+        {
+          "trace_index": 2143,
+          "status": 201
+        },
+        {
+          "trace_index": 2144,
+          "status": 201
+        },
+        {
+          "trace_index": 2145,
+          "status": 201
+        },
+        {
+          "trace_index": 2146,
+          "status": 201
+        },
+        {
+          "trace_index": 2147,
+          "status": 201
+        },
+        {
+          "trace_index": 2148,
+          "status": 201
+        },
+        {
+          "trace_index": 2149,
+          "status": 201
+        },
+        {
+          "trace_index": 2150,
+          "status": 201
+        },
+        {
+          "trace_index": 2151,
+          "status": 201
+        },
+        {
+          "trace_index": 2152,
+          "status": 201
+        },
+        {
+          "trace_index": 2153,
+          "status": 201
+        },
+        {
+          "trace_index": 2154,
+          "status": 201
+        },
+        {
+          "trace_index": 2155,
+          "status": 201
+        },
+        {
+          "trace_index": 2156,
+          "status": 201
+        },
+        {
+          "trace_index": 2157,
+          "status": 201
+        },
+        {
+          "trace_index": 2158,
+          "status": 201
+        },
+        {
+          "trace_index": 2159,
+          "status": 201
+        },
+        {
+          "trace_index": 2160,
+          "status": 201
+        },
+        {
+          "trace_index": 2161,
+          "status": 201
+        },
+        {
+          "trace_index": 2162,
+          "status": 429
+        },
+        {
+          "trace_index": 2163,
+          "status": 201
+        },
+        {
+          "trace_index": 2164,
+          "status": 201
+        },
+        {
+          "trace_index": 2165,
+          "status": 201
+        },
+        {
+          "trace_index": 2166,
+          "status": 201
+        },
+        {
+          "trace_index": 2167,
+          "status": 201
+        },
+        {
+          "trace_index": 2168,
+          "status": 201
+        },
+        {
+          "trace_index": 2169,
+          "status": 201
+        },
+        {
+          "trace_index": 2170,
+          "status": 201
+        },
+        {
+          "trace_index": 2171,
+          "status": 201
+        },
+        {
+          "trace_index": 2172,
+          "status": 201
+        },
+        {
+          "trace_index": 2173,
+          "status": 201
+        },
+        {
+          "trace_index": 2174,
+          "status": 201
+        },
+        {
+          "trace_index": 2175,
+          "status": 201
+        },
+        {
+          "trace_index": 2176,
+          "status": 201
+        },
+        {
+          "trace_index": 2177,
+          "status": 201
+        },
+        {
+          "trace_index": 2178,
+          "status": 201
+        },
+        {
+          "trace_index": 2179,
+          "status": 201
+        },
+        {
+          "trace_index": 2180,
+          "status": 201
+        },
+        {
+          "trace_index": 2181,
+          "status": 201
+        },
+        {
+          "trace_index": 2182,
+          "status": 201
+        },
+        {
+          "trace_index": 2183,
+          "status": 201
+        },
+        {
+          "trace_index": 2184,
+          "status": 201
+        },
+        {
+          "trace_index": 2185,
+          "status": 201
+        },
+        {
+          "trace_index": 2186,
+          "status": 201
+        },
+        {
+          "trace_index": 2187,
+          "status": 201
+        },
+        {
+          "trace_index": 2188,
+          "status": 201
+        },
+        {
+          "trace_index": 2189,
+          "status": 201
+        },
+        {
+          "trace_index": 2190,
+          "status": 201
+        },
+        {
+          "trace_index": 2191,
           "status": 201
         }
       ],
@@ -11929,35 +12670,35 @@
           "status": 200
         },
         {
-          "trace_index": 1863,
+          "trace_index": 1929,
           "status": 200
         },
         {
-          "trace_index": 1864,
+          "trace_index": 1930,
           "status": 200
         },
         {
-          "trace_index": 1865,
+          "trace_index": 1931,
           "status": 200
         },
         {
-          "trace_index": 1866,
+          "trace_index": 1932,
           "status": 400
         },
         {
-          "trace_index": 1867,
+          "trace_index": 1933,
           "status": 400
         },
         {
-          "trace_index": 1868,
+          "trace_index": 1934,
           "status": 400
         },
         {
-          "trace_index": 1891,
+          "trace_index": 1957,
           "status": 503
         },
         {
-          "trace_index": 1921,
+          "trace_index": 1987,
           "status": 200
         }
       ],
@@ -12071,19 +12812,19 @@
           "status": 200
         },
         {
-          "trace_index": 1875,
+          "trace_index": 1941,
           "status": 200
         },
         {
-          "trace_index": 1876,
+          "trace_index": 1942,
           "status": 200
         },
         {
-          "trace_index": 1877,
+          "trace_index": 1943,
           "status": 200
         },
         {
-          "trace_index": 2126,
+          "trace_index": 2192,
           "status": 200
         }
       ],
@@ -12183,35 +12924,35 @@
           "status": 200
         },
         {
-          "trace_index": 1847,
+          "trace_index": 1913,
           "status": 200
         },
         {
-          "trace_index": 1851,
+          "trace_index": 1917,
           "status": 404
         },
         {
-          "trace_index": 1855,
+          "trace_index": 1921,
           "status": 404
         },
         {
-          "trace_index": 1859,
+          "trace_index": 1925,
           "status": 400
         },
         {
-          "trace_index": 1879,
+          "trace_index": 1945,
           "status": 200
         },
         {
-          "trace_index": 1881,
+          "trace_index": 1947,
           "status": 200
         },
         {
-          "trace_index": 1892,
+          "trace_index": 1958,
           "status": 503
         },
         {
-          "trace_index": 1904,
+          "trace_index": 1970,
           "status": 200
         }
       ],
@@ -12332,31 +13073,31 @@
           "status": 403
         },
         {
-          "trace_index": 1850,
+          "trace_index": 1916,
           "status": 200
         },
         {
-          "trace_index": 1852,
+          "trace_index": 1918,
           "status": 404
         },
         {
-          "trace_index": 1856,
+          "trace_index": 1922,
           "status": 404
         },
         {
-          "trace_index": 1862,
+          "trace_index": 1928,
           "status": 400
         },
         {
-          "trace_index": 1882,
+          "trace_index": 1948,
           "status": 200
         },
         {
-          "trace_index": 1895,
+          "trace_index": 1961,
           "status": 503
         },
         {
-          "trace_index": 1903,
+          "trace_index": 1969,
           "status": 403
         }
       ],
@@ -12671,27 +13412,27 @@
           "status": 200
         },
         {
-          "trace_index": 1848,
+          "trace_index": 1914,
           "status": 200
         },
         {
-          "trace_index": 1853,
+          "trace_index": 1919,
           "status": 404
         },
         {
-          "trace_index": 1857,
+          "trace_index": 1923,
           "status": 404
         },
         {
-          "trace_index": 1860,
+          "trace_index": 1926,
           "status": 400
         },
         {
-          "trace_index": 1893,
+          "trace_index": 1959,
           "status": 503
         },
         {
-          "trace_index": 1897,
+          "trace_index": 1963,
           "status": 200
         }
       ],
@@ -12807,43 +13548,43 @@
           "status": 200
         },
         {
-          "trace_index": 1849,
+          "trace_index": 1915,
           "status": 200
         },
         {
-          "trace_index": 1854,
+          "trace_index": 1920,
           "status": 404
         },
         {
-          "trace_index": 1858,
+          "trace_index": 1924,
           "status": 404
         },
         {
-          "trace_index": 1861,
+          "trace_index": 1927,
           "status": 400
         },
         {
-          "trace_index": 1883,
+          "trace_index": 1949,
           "status": 200
         },
         {
-          "trace_index": 1885,
+          "trace_index": 1951,
           "status": 200
         },
         {
-          "trace_index": 1887,
+          "trace_index": 1953,
           "status": 200
         },
         {
-          "trace_index": 1894,
+          "trace_index": 1960,
           "status": 503
         },
         {
-          "trace_index": 1902,
+          "trace_index": 1968,
           "status": 403
         },
         {
-          "trace_index": 1922,
+          "trace_index": 1988,
           "status": 200
         }
       ],
@@ -12974,27 +13715,27 @@
           "status": 404
         },
         {
-          "trace_index": 1884,
+          "trace_index": 1950,
           "status": 503
         },
         {
-          "trace_index": 1886,
+          "trace_index": 1952,
           "status": 503
         },
         {
-          "trace_index": 1906,
+          "trace_index": 1972,
           "status": 503
         },
         {
-          "trace_index": 1907,
+          "trace_index": 1973,
           "status": 503
         },
         {
-          "trace_index": 1908,
+          "trace_index": 1974,
           "status": 409
         },
         {
-          "trace_index": 1909,
+          "trace_index": 1975,
           "status": 404
         }
       ],
@@ -16391,6 +17132,10 @@
         {
           "trace_index": 1741,
           "status": 201
+        },
+        {
+          "trace_index": 1821,
+          "status": 201
         }
       ],
       "defects": [],
@@ -16794,6 +17539,10 @@
         {
           "trace_index": 1743,
           "status": 201
+        },
+        {
+          "trace_index": 1823,
+          "status": 201
         }
       ],
       "defects": [],
@@ -17186,6 +17935,10 @@
         },
         {
           "trace_index": 1742,
+          "status": 201
+        },
+        {
+          "trace_index": 1822,
           "status": 201
         }
       ],
@@ -18328,6 +19081,10 @@
         {
           "trace_index": 1745,
           "status": 200
+        },
+        {
+          "trace_index": 1825,
+          "status": 200
         }
       ],
       "defects": [],
@@ -18449,11 +19206,11 @@
           "status": 201
         },
         {
-          "trace_index": 1819,
+          "trace_index": 1885,
           "status": 201
         },
         {
-          "trace_index": 1898,
+          "trace_index": 1964,
           "status": 201
         }
       ],
@@ -23471,11 +24228,15 @@
           "status": 201
         },
         {
-          "trace_index": 1820,
+          "trace_index": 1826,
           "status": 201
         },
         {
-          "trace_index": 1899,
+          "trace_index": 1886,
+          "status": 201
+        },
+        {
+          "trace_index": 1965,
           "status": 201
         }
       ],
@@ -23886,11 +24647,11 @@
           "status": 201
         },
         {
-          "trace_index": 1842,
+          "trace_index": 1908,
           "status": 201
         },
         {
-          "trace_index": 1911,
+          "trace_index": 1977,
           "status": 201
         }
       ],
