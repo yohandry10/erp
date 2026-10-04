@@ -1,0 +1,208 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Documentos API/DB local diagnóstico; sin transmisión fiscal",
+  "scenarios": [
+    {
+      "scenario": "Documentos: series, validación de RUC y de documento",
+      "passed": true,
+      "serie": "F062"
+    },
+    {
+      "scenario": "Documentos: un cliente recién configurado crea un documento con la serie del asistente (F001)",
+      "passed": false,
+      "message": "Alta con la serie configurada 400 {\"statusCode\":400,\"message\":\"DOCUMENT_MANUAL_SERIES_NOT_CONFIGURED: FACTURA/F001\",\"error\":\"Bad Request\",\"timestamp\":\"2026-10-04T18:27:18.092Z\",\"path\":\"/api/documentos/crear\"}\n\n400 !== 201\n"
+    },
+    {
+      "scenario": "Documentos: alta con intención, detalle, edición y listado del tenant",
+      "passed": true
+    },
+    {
+      "scenario": "Documentos: XML firmado, descargas PDF/XML y auditoría",
+      "passed": true
+    },
+    {
+      "scenario": "Documentos: envío sin transporte fiscal configurado falla controlado y sin marcar aceptado",
+      "passed": true,
+      "status": 503
+    },
+    {
+      "scenario": "Documentos: otra empresa no ve, edita, descarga ni anula",
+      "passed": false,
+      "message": "GET documentos/:id/auditoria ajeno 200"
+    },
+    {
+      "scenario": "Documentos: anulación con motivo y reintento",
+      "passed": true,
+      "status": 409,
+      "estado": "EMITIDO"
+    },
+    {
+      "scenario": "Documentos: sin lectura de documentos las consultas responden 503",
+      "passed": false,
+      "message": "{\"documentos/lista\":400,\"documentos/stats\":400,\"documentos/:id\":400}"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/complete",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "documentos/config/series",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "documentos/config/series",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "documentos/config/series",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "documentos/validar-ruc",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "documentos/validar-ruc",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "documentos/validar-documento",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "documentos/crear",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "documentos/crear",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "documentos/crear",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "documentos/:id",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "documentos/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "documentos/lista",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "documentos/stats",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "documentos/lista",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "documentos/:id/generar-xml",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "documentos/:id/generar-xml",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "documentos/:id/descargar-xml",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "documentos/:id/descargar-pdf",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "documentos/:id/auditoria",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "documentos/:id/enviar-sunat",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "documentos/:id",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "documentos/:id/descargar-pdf",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "documentos/:id/descargar-xml",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "documentos/:id/auditoria",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "documentos/:id/anular",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "documentos/:id/anular",
+      "status": 409
+    },
+    {
+      "method": "GET",
+      "endpoint": "documentos/lista",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "documentos/stats",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "documentos/:id",
+      "status": 400
+    }
+  ]
+}

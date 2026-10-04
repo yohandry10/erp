@@ -1,0 +1,346 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "RRHH API/DB local diagnóstico; sin aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Planillas: borrador editable, listado y eliminación con intención",
+      "passed": true
+    },
+    {
+      "scenario": "Planillas: cálculo, aprobación por otro usuario, pago y trazas de pago",
+      "passed": true
+    },
+    {
+      "scenario": "RRHH: sólo con rrhh.access no se leen sueldos, pagos ni boletas",
+      "passed": false,
+      "message": "Datos de remuneración visibles con sólo rrhh.access: {\"rrhh/planillas/:id/historial-pagos\":200,\"rrhh/pagos/:id/comprobante\":200,\"rrhh/empleados/:id/boleta-pago/2026-10\":200,\"rrhh/pagos\":403,\"rrhh/planillas\":403,\"rrhh/boleta/:id\":403}"
+    },
+    {
+      "scenario": "RRHH: otra empresa no ve historial, comprobante ni boleta",
+      "passed": false,
+      "message": "rrhh/planillas/cac254e3-0d75-4bc6-9565-b3620d9b8aa2/historial-pagos ajeno 200"
+    },
+    {
+      "scenario": "Asistencia: entrada y salida con intención, orden y listado del tenant",
+      "passed": false,
+      "message": "Entrada ajena aceptada"
+    },
+    {
+      "scenario": "Reclutamiento: vacante y candidato con intención, edición, estado y aislamiento",
+      "passed": false,
+      "message": "Estado inválido 200\n\n200 !== 400\n"
+    },
+    {
+      "scenario": "CTS: el listado de depósitos responde con el tenant",
+      "passed": true
+    },
+    {
+      "scenario": "RRHH: sin lectura de planillas la consulta responde 503",
+      "passed": false,
+      "message": "{\"rrhh/planillas\":500}"
+    },
+    {
+      "scenario": "RRHH: sin lectura de rrhh_pagos la consulta responde 503",
+      "passed": false,
+      "message": "{\"rrhh/pagos\":200}"
+    },
+    {
+      "scenario": "RRHH: sin lectura de asistencia la consulta responde 503",
+      "passed": false,
+      "message": "{\"rrhh/asistencia\":500}"
+    },
+    {
+      "scenario": "RRHH: sin lectura de candidatos la consulta responde 503",
+      "passed": false,
+      "message": "{\"rrhh/candidatos\":500}"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/empleados",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/contratos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/planillas",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/planillas/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/planillas",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/planillas",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/planillas",
+      "status": 201
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "rrhh/planillas/:id",
+      "status": 404
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "rrhh/planillas/:id",
+      "status": 200
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "rrhh/planillas/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/planillas/:id/calcular",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/planillas/:id/detalle",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "roles",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "users",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/planillas/:id/aprobar",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/planillas/tesoreria/destinos",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/cuentas",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/movimientos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/planillas/:id/pagar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/planillas/:id/pagar",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/planillas/:id/historial-pagos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/pagos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/pagos/:id/comprobante",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/empleados/:id/boleta-pago/2026-10",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/planillas/:id/pagar-empleados",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "roles",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "users",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/planillas/:id/historial-pagos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/pagos/:id/comprobante",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/empleados/:id/boleta-pago/2026-10",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/pagos",
+      "status": 403
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/planillas",
+      "status": 403
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/boleta/:id",
+      "status": 403
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/planillas/:id/historial-pagos",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/asistencia/entrada/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/asistencia/entrada/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/asistencia/entrada/:id",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/asistencia/salida/:id",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/asistencia",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/asistencia/entrada/:id",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/vacantes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/vacantes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/candidatos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "rrhh/candidatos",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/candidatos/:id",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/candidatos/:id/estado",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/candidatos",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "rrhh/candidatos/:id/estado",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/cts/depositos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/planillas",
+      "status": 500
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/pagos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/asistencia",
+      "status": 500
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/candidatos",
+      "status": 500
+    }
+  ]
+}

@@ -1,0 +1,329 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Finanzas API/DB local diagnóstico; sin aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "CxP: edición de una factura sin pagos se refleja y conserva saldo coherente",
+      "passed": false,
+      "message": "Edición ajena\n\n400 !== 404\n"
+    },
+    {
+      "scenario": "CxP: aging, vencimientos y mayor deuda reflejan las facturas del tenant",
+      "passed": true
+    },
+    {
+      "scenario": "Tesorería: pago en lote con intención aplica una vez, deja historial y descuenta el banco",
+      "passed": true
+    },
+    {
+      "scenario": "Tesorería: programación y flujo de caja proyectan sólo pendientes del tenant",
+      "passed": true
+    },
+    {
+      "scenario": "CxP: anulación con pagos se rechaza; sin pagos anula y sale de pendientes",
+      "passed": false,
+      "message": "Anulación ajena\n\n400 !== 404\n"
+    },
+    {
+      "scenario": "Bancos: movimientos por cuenta y período, saldos y aislamiento",
+      "passed": true
+    },
+    {
+      "scenario": "Conciliación bancaria: listado, pendientes y plantillas CSV del tenant",
+      "passed": true
+    },
+    {
+      "scenario": "Finanzas: tablero, histórico y flujo proyectado responden con datos del tenant",
+      "passed": false,
+      "message": "finanzas/dashboard 404 {\"statusCode\":404,\"message\":\"Cannot GET /api/finanzas/dashboard\",\"error\":\"Not Found\",\"timestamp\":\"2026-10-04T17:39:20.496Z\",\"path\":\"/api/finanzas/dashboard\"}\n\n404 !== 200\n"
+    },
+    {
+      "scenario": "Finanzas: sin lectura de cuentas_por_pagar las consultas responden 503",
+      "passed": false,
+      "message": "{\"finanzas/cxp\":400,\"finanzas/cxp/aging\":400,\"finanzas/cxp/vencimientos\":400,\"finanzas/tesoreria/programacion\":400,\"finanzas/cxp/:id\":400}"
+    },
+    {
+      "scenario": "Finanzas: sin lectura de cuentas_bancarias las consultas responden 503",
+      "passed": false,
+      "message": "{\"finanzas/bancos/cuentas\":400,\"finanzas/bancos/saldos\":400}"
+    },
+    {
+      "scenario": "Finanzas: sin lectura de movimientos_bancarios las consultas responden 503",
+      "passed": false,
+      "message": "{\"finanzas/bancos/cuentas/:id/movimientos\":400,\"finanzas/bancos/movimientos/periodo\":400}"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/cuentas",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/bancos/movimientos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/proveedores",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxp",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxp",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxp",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "finanzas/cxp/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/:id",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "finanzas/cxp/:id",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/aging",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/vencimientos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/proveedores-mayor-deuda",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/aging",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/vencimientos",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/tesoreria/lote",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/tesoreria/lote",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/:id/pagos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/tesoreria/pagos",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/tesoreria/lote",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/tesoreria/lote",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/tesoreria/programacion",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/tesoreria/flujo-caja",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/tesoreria/programacion",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxp/:id/anular",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxp/:id/anular",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxp/:id/anular",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/tesoreria/programacion",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxp/:id/anular",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas/:id/movimientos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/saldos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/movimientos/periodo",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas/:id/movimientos",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/saldos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/movimientos/periodo",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/conciliacion",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/conciliacion/pendientes",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/conciliacion/plantillas-csv",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/dashboard",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/aging",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/vencimientos",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/tesoreria/programacion",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/:id",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/saldos",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas/:id/movimientos",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/movimientos/periodo",
+      "status": 400
+    }
+  ]
+}

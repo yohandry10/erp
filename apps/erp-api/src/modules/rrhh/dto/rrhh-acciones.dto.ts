@@ -11,6 +11,7 @@ import {
   IsUUID,
   Min,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { IsUuidOpcional } from './uuid-opcional.decorator';
 
 /**
@@ -48,8 +49,13 @@ export class MarcarAsistenciaDto {
   @IsString() @IsNotEmpty() @MaxLength(10) hora!: string;
 }
 
+/** Dominio de ck_candidatos_estado_runtime (255); la base compara en minúsculas. */
+export const ESTADOS_CANDIDATO = ['postulante', 'entrevista', 'seleccionado', 'rechazado', 'contratado', 'descartado'];
+
 export class CambiarEstadoCandidatoDto {
-  @IsString() @IsNotEmpty() @MaxLength(60) estado!: string;
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+  @IsString() @IsNotEmpty() @IsIn(ESTADOS_CANDIDATO, { message: `estado debe ser uno de: ${ESTADOS_CANDIDATO.join(', ')}` })
+  estado!: string;
   @IsOptional() @IsString() @MaxLength(2000) observaciones?: string;
 }
 

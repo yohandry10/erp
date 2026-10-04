@@ -1,0 +1,22 @@
+{
+    "attempts":  [
+                     {
+                         "error":  "TimeoutError: 20 s agotados en la primera lectura (jsonRequest)",
+                         "result":  "failed",
+                         "timeoutSeconds":  20,
+                         "order":  1
+                     },
+                     {
+                         "error":  "Salida con codigo 1; la traza no se conservo (mismo arranque en frio)",
+                         "result":  "failed",
+                         "timeoutSeconds":  20,
+                         "order":  2
+                     },
+                     {
+                         "output":  "artifacts/peru-production-verification-after-139-20261004.json",
+                         "result":  "passed",
+                         "order":  3
+                     }
+                 ],
+    "scope":  "Verificacion runtime 0fe3881e/569"
+}

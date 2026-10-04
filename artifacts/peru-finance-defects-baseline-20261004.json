@@ -1,0 +1,42 @@
+{
+  "scope": "Finanzas no cubiertas por finance-lifecycle: edición, anulación, pagos, aging y vencimientos de CxP; pago en lote, programación y flujo de tesorería; consultas bancarias; listados de conciliación; con API/PostgREST/PostgreSQL locales efímeros",
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "runs": [
+    {
+      "output": "artifacts/peru-finance-baseline-20261004",
+      "result": "defects_reproduced",
+      "restore": "passed"
+    }
+  ],
+  "passed": [
+    "Edición de una CxP sin pagos con saldo coherente",
+    "Aging, vencimientos a 30 días y proveedores con mayor deuda del tenant; dias=0 rechazado",
+    "Pago en lote con intención: un reintento no vuelve a aplicar, exceso rechazado sin tocar la deuda, historial y banco correctos",
+    "Programación y flujo de caja con pendientes propios",
+    "Anulación con pagos rechazada; sin pagos anula con reintento y sale de la programación",
+    "Movimientos por cuenta y período, saldos y aislamiento bancario; fecha inválida 400",
+    "Listado, pendientes y plantillas CSV de conciliación bancaria"
+  ],
+  "confirmed_defects": [
+    {
+      "id": "finance-cxp-foreign-writer-400",
+      "operations": ["PUT /api/finanzas/cxp/:id", "POST /api/finanzas/cxp/:id/anular"],
+      "observed": "Editar o anular la CxP de otra empresa o inexistente responde 400 'CXP_NOT_FOUND' en vez de 404; no se modifica nada."
+    },
+    {
+      "id": "finance-cxp-reads-unavailability-400",
+      "operations": ["GET /api/finanzas/cxp", "GET /api/finanzas/cxp/:id", "GET /api/finanzas/cxp/aging", "GET /api/finanzas/cxp/vencimientos", "GET /api/finanzas/tesoreria/programacion"],
+      "observed": "Sin lectura de cuentas_por_pagar responden 400, como si el cliente hubiera enviado algo inválido, en vez de 503."
+    },
+    {
+      "id": "finance-bank-reads-unavailability-400",
+      "operations": ["GET /api/finanzas/bancos/cuentas", "GET /api/finanzas/bancos/saldos", "GET /api/finanzas/bancos/cuentas/:id/movimientos", "GET /api/finanzas/bancos/movimientos/periodo"],
+      "observed": "Sin lectura de cuentas_bancarias o movimientos_bancarios responden 400 en vez de 503."
+    }
+  ],
+  "observations_not_changed": [
+    "finanzas.controller.ts (dashboard, históricos, flujo proyectado, análisis de crédito) no está registrado en ningún módulo: responde 404 y la web no lo usa; no forma parte de la oferta.",
+    "CxC: notas de crédito y reprogramación siguen sin caso propio; requieren una CxC nacida de una factura emitida."
+  ]
+}

@@ -394,6 +394,7 @@ export class RrhhController {
   }
 
   @Get('planillas/:id/historial-pagos')
+  @RequirePermission('rrhh.planillas.read') // Sueldos y pagos: no basta rrhh.access.
   async getHistorialPagos(
     @CurrentTenant() tenantId: string,
     @Param('id') planillaId: string
@@ -403,6 +404,7 @@ export class RrhhController {
   }
 
   @Get('pagos/:id/comprobante')
+  @RequirePermission('rrhh.planillas.read') // Sueldos y pagos: no basta rrhh.access.
   async generarComprobante(
     @CurrentTenant() tenantId: string,
     @Param('id') pagoId: string,
@@ -416,6 +418,7 @@ export class RrhhController {
   }
 
   @Get('empleados/:id/boleta-pago/:mes')
+  @RequirePermission('rrhh.planillas.read') // Sueldos y pagos: no basta rrhh.access.
   async generarBoletaPago(
     @CurrentTenant() tenantId: string,
     @Param('id') empleadoId: string,

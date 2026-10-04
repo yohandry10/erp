@@ -388,6 +388,11 @@ Código principal: `apps/erp-api/src/modules/pos`,
   configuración pública del emisor quedan congelados y se revalidan antes de
   firmar o entregar; nunca se persisten el PIN ni la contraseña del PFX en una
   huella. Una demo muestra el bloqueo y no precarga una aceptación ficticia.
+- En Perú, la serie FACTURA/BOLETA que el administrador configuró en la empresa
+  se registra con `crear_serie_documento_tx` (461, auditada) la primera vez que
+  el Centro de Documentos la usa; cualquier otra serie exige su alta explícita.
+  La auditoría de un documento ajeno responde 404 y las lecturas o el writer
+  indisponibles responden 503.
 - Para Argentina, `Documentos` consulta clase A/B/C y estado desde el CPE
   vinculado del mismo tenant. Conserva la procedencia demo aunque cambie la
   cuenta; una muestra se identifica sin validez ARCA. `FACTURA` no implica
@@ -601,6 +606,10 @@ Código principal: `apps/erp-api/src/modules/inventario`,
 ## Finanzas y tesorería
 
 - CxC y CxP gestionan saldo, vencimiento, pagos y estados.
+- Las consultas de CxP, bancos y tesorería responden 503 cuando no pueden leer,
+  nunca 400. Editar o anular una CxP inexistente o de otra empresa responde 404;
+  una regla del writer (pagada, anulada, con pagos) responde 400. El pago en
+  lote se aplica una vez por llave y rechaza el exceso sin tocar la deuda.
 - El alta de factura de proveedor conserva destino del crédito fiscal, código
   de detracción y tipo de cambio de origen dentro de la transacción de deuda y
   outbox. Repetir la misma intención devuelve la factura existente; cambiar
@@ -822,6 +831,12 @@ Código principal: `apps/erp-api/src/modules/contabilidad`.
 ## Recursos humanos
 
 - Empleados, contratos, asistencia, vacaciones y conceptos alimentan planillas.
+- Remuneraciones exigen `rrhh.planillas.read`: historial de pagos, comprobante
+  y boleta mensual no se abren sólo con `rrhh.access`. Una planilla o un
+  empleado de otra empresa responden 404 y las consultas de planillas, pagos,
+  asistencia, candidatos y vacantes responden 503 si no pueden leer. El estado
+  de un candidato sólo admite postulante, entrevista, seleccionado, rechazado,
+  contratado o descartado.
   Si falla la lectura de vacaciones, el cálculo devuelve indisponibilidad;
   no interpreta un fallo de permisos o conexión como cero días.
 - Configuración laboral, maestros, reclutamiento, asistencia, solicitudes,
@@ -955,6 +970,9 @@ si ese período carece de normativa aplicable.
   transacción. No se crea una segunda cuenta en el proveedor de autenticación.
   `/usuarios-sistema` (pantalla vigente) y `/users` (compatibilidad) delegan al
   mismo writer; creación exige llave idempotente y actor activo del tenant.
+  La respuesta sólo incluye `temporaryPassword` cuando el servidor la generó y
+  el usuario se acaba de crear: la contraseña elegida por el administrador no se
+  devuelve y un reintento no inventa otra distinta de la guardada.
 - Cambiar datos/estado/roles revoca sesiones al inactivar, impide la
   auto-desactivación y protege al último superadministrador. Roles y permisos
   también se crean o reemplazan atómicamente, los roles de sistema son

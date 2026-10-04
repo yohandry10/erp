@@ -5,6 +5,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { createHash } from 'node:crypto';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CrearCuentaBancariaDto, ActualizarCuentaBancariaDto, ListarMovimientosQueryDto, CrearMovimientoBancarioDto, TransferirCuentasBancariasDto } from './dto';
+import { errorWriterFinanciero, lecturaFinancieraFallida } from '../finanzas-errors';
 
 @Injectable()
 export class BancosService {
@@ -61,7 +62,7 @@ export class BancosService {
         p_idempotency_key: this.bankIntent(`bank-create:${tenantId}`, dto, idempotencyKey),
       },
     );
-    if (atomicError) throw new BadRequestException(atomicError.message || 'No se pudo crear la cuenta bancaria');
+    if (atomicError) throw errorWriterFinanciero(atomicError, 'No se pudo crear la cuenta bancaria');
     return { success: true, data: atomicResult?.cuenta ?? atomicResult };
 
     /* istanbul ignore next -- writer legado inalcanzable, se retira tras ventana de compatibilidad */
@@ -154,7 +155,7 @@ export class BancosService {
 
     if (error) {
       console.error('Error obteniendo cuentas bancarias:', error);
-      throw new BadRequestException('No se pudieron obtener las cuentas bancarias');
+      throw lecturaFinancieraFallida('las cuentas bancarias');
     }
 
     return {
@@ -178,7 +179,7 @@ export class BancosService {
 
     if (error) {
       console.error('Error obteniendo cuenta bancaria:', error);
-      throw new BadRequestException('No se pudo obtener la cuenta bancaria');
+      throw lecturaFinancieraFallida('la cuenta bancaria');
     }
 
     if (!cuenta) {
@@ -209,7 +210,7 @@ export class BancosService {
         p_idempotency_key: this.bankIntent(`bank-update:${tenantId}:${id}`, dto, idempotencyKey),
       },
     );
-    if (atomicError) throw new BadRequestException(atomicError.message || 'No se pudo actualizar la cuenta bancaria');
+    if (atomicError) throw errorWriterFinanciero(atomicError, 'No se pudo actualizar la cuenta bancaria');
     return { success: true, data: atomicResult?.cuenta ?? atomicResult };
 
     /* istanbul ignore next -- writer legado inalcanzable, se retira tras ventana de compatibilidad */
@@ -225,7 +226,7 @@ export class BancosService {
 
     if (errorBusqueda) {
       console.error('Error buscando cuenta bancaria:', errorBusqueda);
-      throw new BadRequestException('No se pudo buscar la cuenta bancaria');
+      throw lecturaFinancieraFallida('la cuenta bancaria');
     }
 
     if (!cuentaExistente) {
@@ -303,7 +304,7 @@ export class BancosService {
 
     if (errorCuenta) {
       console.error('Error verificando cuenta bancaria:', errorCuenta);
-      throw new BadRequestException('No se pudo verificar la cuenta bancaria');
+      throw lecturaFinancieraFallida('la cuenta bancaria');
     }
 
     if (!cuenta) {
@@ -357,7 +358,7 @@ export class BancosService {
 
     if (error) {
       console.error('Error obteniendo movimientos bancarios:', error);
-      throw new BadRequestException('No se pudieron obtener los movimientos bancarios');
+      throw lecturaFinancieraFallida('los movimientos bancarios');
     }
 
     return {
@@ -444,7 +445,7 @@ export class BancosService {
 
     if (error) {
       console.error('Error obteniendo cuentas bancarias para consolidado:', error);
-      throw new BadRequestException('No se pudieron obtener los saldos consolidados');
+      throw lecturaFinancieraFallida('los saldos consolidados');
     }
 
     if (!cuentas || cuentas.length === 0) {
@@ -533,7 +534,7 @@ export class BancosService {
 
     if (errorCuenta) {
       console.error('Error verificando cuenta bancaria:', errorCuenta);
-      throw new BadRequestException('No se pudo verificar la cuenta bancaria');
+      throw lecturaFinancieraFallida('la cuenta bancaria');
     }
 
     if (!cuenta) {
@@ -582,7 +583,7 @@ export class BancosService {
 
     if (error) {
       console.error('Error obteniendo movimientos para exportar:', error);
-      throw new BadRequestException('No se pudieron obtener los movimientos para exportar');
+      throw lecturaFinancieraFallida('los movimientos para exportar');
     }
 
     const country = await paisDelTenant(client, tenantId);
@@ -675,7 +676,7 @@ export class BancosService {
 
     if (error) {
       console.error('Error obteniendo movimientos bancarios por período:', error);
-      throw new BadRequestException('No se pudieron obtener los movimientos bancarios por período');
+      throw lecturaFinancieraFallida('los movimientos bancarios por período');
     }
 
     // Calcular resumen del período (sin paginación)
