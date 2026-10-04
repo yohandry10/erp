@@ -6,6 +6,7 @@ import { RegistrarPagoDto, RegistrarPagoLoteDto, ListarPagosQueryDto, Programaci
 import { TiposCambioService } from '../../contabilidad/services/tipos-cambio.service';
 import { RevaluacionService } from '../../contabilidad/services/revaluacion.service';
 import { LadoTipoCambio } from '@erp-suite/dtos';
+import { lecturaFinancieraFallida } from '../finanzas-errors';
 
 /** Valuación en moneda local de un pago, más la diferencia de cambio realizada. */
 export interface ValuacionPago {
@@ -252,7 +253,7 @@ export class TesoreriaService {
 
     if (error) {
       console.error('Error obteniendo pagos:', error);
-      throw new BadRequestException('No se pudo obtener la lista de pagos');
+      throw lecturaFinancieraFallida('la lista de pagos');
     }
 
     return {
@@ -334,7 +335,7 @@ export class TesoreriaService {
 
     if (error) {
       console.error('Error obteniendo programación de pagos:', error);
-      throw new BadRequestException('No se pudo obtener la programación de pagos');
+      throw lecturaFinancieraFallida('la programación de pagos');
     }
 
     // Calcular días hasta vencimiento y clasificar por urgencia
@@ -493,7 +494,7 @@ export class TesoreriaService {
 
     if (errorCuentas) {
       console.error('Error obteniendo cuentas bancarias:', errorCuentas);
-      throw new BadRequestException('No se pudo obtener las cuentas bancarias');
+      throw lecturaFinancieraFallida('las cuentas bancarias');
     }
 
     if (!cuentas || cuentas.length === 0) {
@@ -541,7 +542,7 @@ export class TesoreriaService {
 
     if (errorCxP) {
       console.error('Error obteniendo CxP pendientes:', errorCxP);
-      throw new BadRequestException('No se pudo obtener las cuentas por pagar');
+      throw lecturaFinancieraFallida('las cuentas por pagar');
     }
 
     // 3. Obtener CxC pendientes (ingresos proyectados) si la tabla existe
