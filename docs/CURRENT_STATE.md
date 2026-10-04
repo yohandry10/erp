@@ -66,6 +66,23 @@ cotizaciones y recepciones respondían 500/400. La 568 añade
 reconstrucción fresca de 564 migraciones hasta 568 con 77 verificadores. El
 inventario API colapsa ya la doble barra que ocultaba una ruta de recepción.
 568 no está promovida; faltan CI exacto, ensayo 567→568, promoción, main y runtime.
+Contabilidad PE (rama `codex/peru-accounting-first-client-20261004`): el
+diagnóstico reprodujo 7 defectos
+(`artifacts/peru-accounting-defects-baseline-20261004.json`): un cliente nuevo
+no tenía ninguna cuenta conciliable (la 387 sólo marcó a los tenants de
+entonces; el ensayo productivo halla 401 cuentas PE así), el listado de
+conciliaciones respondía 500 por falta de SELECT, `presupuestos/alertas` quedaba
+capturado por `presupuestos/:id`, libros y plan de cuentas enmascaraban lecturas
+fallidas como 200 vacíos, asientos y estados respondían 500, `mes=13` se
+aceptaba y conciliar no era reintentable. La 569 marca las cuentas PE de
+terceros (trigger y backfill sólo PE), añade la intención privada de
+conciliación y el SELECT del listado. Las fuentes pasaron 13 escenarios API y
+restore (`artifacts/peru-accounting-canonical-local-20261004`), la suite API
+301/2917, la reconstrucción fresca de 565 migraciones hasta 569 con 78
+verificadores y el ensayo sobre el respaldo productivo 568
+(`artifacts/erp-peru-569-rehearsal-20261004165609161-17420.json`). 569 no está
+promovida; faltan CI exacto, promoción, main y runtime. El libro diario sigue
+listando asientos de todo estado: observación no cambiada.
 La matriz registra 717 contratos, 359 observados, 293 con casos funcionales,
 162 casos y 101 defectos; no hay aceptación integral del lanzamiento.
 

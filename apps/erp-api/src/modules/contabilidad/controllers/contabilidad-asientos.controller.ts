@@ -25,6 +25,7 @@ import {
 } from "@erp-suite/dtos";
 import { AsientosService } from "../services/asientos.service";
 import { randomUUID } from "crypto";
+import { lecturaContableFallida } from "../contabilidad-errors";
 
 @ApiTags("contabilidad")
 @Controller("contabilidad")
@@ -125,7 +126,7 @@ export class ContabilidadAsientosController {
         "❌ [Contabilidad] Error obteniendo asientos contables:",
         error,
       );
-      throw error;
+      throw lecturaContableFallida(error, "los asientos contables");
     }
   }
 
@@ -161,7 +162,7 @@ export class ContabilidadAsientosController {
       };
     } catch (error) {
       console.error("❌ [Contabilidad] Error obteniendo asiento:", error);
-      throw error;
+      throw lecturaContableFallida(error, "el asiento");
     }
   }
 
@@ -225,7 +226,7 @@ export class ContabilidadAsientosController {
       };
     } catch (error) {
       console.error("❌ [Contabilidad] Error listando asientos:", error);
-      throw error;
+      throw lecturaContableFallida(error, "los asientos");
     }
   }
 
@@ -314,7 +315,7 @@ export class ContabilidadAsientosController {
       };
     } catch (error) {
       console.error("❌ [Contabilidad] Error obteniendo asiento:", error);
-      throw error;
+      throw lecturaContableFallida(error, "el asiento");
     }
   }
 

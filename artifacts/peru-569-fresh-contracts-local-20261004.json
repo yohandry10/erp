@@ -1,0 +1,1 @@
+{"scope":"Reconstruccion fresca local con 569","runner":"scripts/ci/verify-database-contracts.mjs","remoteWrites":false,"complete_acceptance":false,"attempts":[{"result":"passed","summary":"OK PostgreSQL 16: 565 migraciones hasta 569, 78 verificadores; 67 historicos y 6 obsoletos enumerados"}],"limits":["No sustituye CI exacto, ensayo sobre respaldo productivo ni promocion 569"]}

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -28,6 +29,7 @@ import { AccountingBooksService } from "../../../shared/integration/accounting-b
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { EstadosFinancierosService } from "../services/estados-financieros.service";
 import { PleExportService } from "../services/ple-export.service";
+import { filtrosConPeriodo, lecturaContableFallida } from "../contabilidad-errors";
 
 class CreateConsignacionDto {
   @IsOptional()
@@ -92,6 +94,7 @@ export class ContabilidadLibrosController {
     @Query() filtros: any,
   ) {
     try {
+      filtros = filtrosConPeriodo(filtros);
       // El codigo de cuenta llega del cliente: va como argumento, no dentro de la
       // plantilla, para que no pueda actuar como cadena de formato.
       console.log('Generando Libro Mayor para cuenta:', cuentaCodigo, filtros);
@@ -107,11 +110,7 @@ export class ContabilidadLibrosController {
       };
     } catch (error) {
       console.error("❌ Error generando Libro Mayor:", error);
-      return {
-        success: false,
-        message: "Error generando Libro Mayor",
-        data: null,
-      };
+      throw lecturaContableFallida(error, "Libro Mayor");
     }
   }
 
@@ -126,6 +125,7 @@ export class ContabilidadLibrosController {
   })
   async getLibroMayorCompleto(@Query() filtros: any) {
     try {
+      filtros = filtrosConPeriodo(filtros);
       console.log("📊 Generando Libro Mayor Completo...", filtros);
 
       const libroMayorCompleto =
@@ -137,11 +137,7 @@ export class ContabilidadLibrosController {
       };
     } catch (error) {
       console.error("❌ Error generando Libro Mayor Completo:", error);
-      return {
-        success: false,
-        message: "Error generando Libro Mayor Completo",
-        data: [],
-      };
+      throw lecturaContableFallida(error, "Libro Mayor Completo");
     }
   }
 
@@ -175,12 +171,9 @@ export class ContabilidadLibrosController {
 
         // Validar rangos
         if (isNaN(anioNum) || isNaN(mesNum) || mesNum < 1 || mesNum > 12) {
-          return {
-            success: false,
-            data: null,
-            message:
-              "Parámetros inválidos: anio debe ser un número y mes debe estar entre 1 y 12",
-          };
+          throw new BadRequestException(
+            "Parámetros inválidos: anio debe ser un número y mes debe estar entre 1 y 12",
+          );
         }
 
         console.log(
@@ -234,11 +227,7 @@ export class ContabilidadLibrosController {
       };
     } catch (error) {
       console.error("❌ Error generando Balance de Comprobación:", error);
-      return {
-        success: false,
-        message: "Error generando Balance de Comprobación",
-        data: null,
-      };
+      throw lecturaContableFallida(error, "Balance de Comprobación");
     }
   }
 
@@ -251,6 +240,7 @@ export class ContabilidadLibrosController {
   })
   async getKardexValorizado(@Query() filtros: any) {
     try {
+      filtros = filtrosConPeriodo(filtros);
       console.log("📦 Generando Kardex Valorizado...", filtros);
 
       const kardexValorizado =
@@ -262,11 +252,7 @@ export class ContabilidadLibrosController {
       };
     } catch (error) {
       console.error("❌ Error generando Kardex Valorizado:", error);
-      return {
-        success: false,
-        message: "Error generando Kardex Valorizado",
-        data: null,
-      };
+      throw lecturaContableFallida(error, "Kardex Valorizado");
     }
   }
 
@@ -283,6 +269,7 @@ export class ContabilidadLibrosController {
   })
   async getLibroCajaBancos(@Query() filtros: any) {
     try {
+      filtros = filtrosConPeriodo(filtros);
       console.log("💰 Generando Libro de Caja y Bancos...", filtros);
 
       const libroCajaBancos =
@@ -294,11 +281,7 @@ export class ContabilidadLibrosController {
       };
     } catch (error) {
       console.error("❌ Error generando Libro de Caja y Bancos:", error);
-      return {
-        success: false,
-        message: "Error generando Libro de Caja y Bancos",
-        data: null,
-      };
+      throw lecturaContableFallida(error, "Libro de Caja y Bancos");
     }
   }
 
@@ -311,6 +294,7 @@ export class ContabilidadLibrosController {
   })
   async getRegistroActivosFijos(@Query() filtros: any) {
     try {
+      filtros = filtrosConPeriodo(filtros);
       console.log("🏦 Generando Registro de Activos Fijos...", filtros);
 
       const registroActivosFijos =
@@ -322,11 +306,7 @@ export class ContabilidadLibrosController {
       };
     } catch (error) {
       console.error("❌ Error generando Registro de Activos Fijos:", error);
-      return {
-        success: false,
-        message: "Error generando Registro de Activos Fijos",
-        data: null,
-      };
+      throw lecturaContableFallida(error, "Registro de Activos Fijos");
     }
   }
 
@@ -339,6 +319,7 @@ export class ContabilidadLibrosController {
   })
   async getLibroPlanillas(@Query() filtros: any) {
     try {
+      filtros = filtrosConPeriodo(filtros);
       console.log("👥 Generando Libro de Planillas...", filtros);
 
       const libroPlanillas =
@@ -350,11 +331,7 @@ export class ContabilidadLibrosController {
       };
     } catch (error) {
       console.error("❌ Error generando Libro de Planillas:", error);
-      return {
-        success: false,
-        message: "Error generando Libro de Planillas",
-        data: null,
-      };
+      throw lecturaContableFallida(error, "Libro de Planillas");
     }
   }
 
@@ -371,6 +348,7 @@ export class ContabilidadLibrosController {
   })
   async getLibroInventariosBalances(@Query() filtros: any) {
     try {
+      filtros = filtrosConPeriodo(filtros);
       console.log("📦 Generando Libro de Inventarios y Balances...", filtros);
 
       const libroInventariosBalances =
@@ -385,11 +363,7 @@ export class ContabilidadLibrosController {
         "❌ Error generando Libro de Inventarios y Balances:",
         error,
       );
-      return {
-        success: false,
-        message: "Error generando Libro de Inventarios y Balances",
-        data: null,
-      };
+      throw lecturaContableFallida(error, "Libro de Inventarios y Balances");
     }
   }
 
@@ -402,6 +376,7 @@ export class ContabilidadLibrosController {
   })
   async getRegistroCostos(@Query() filtros: any) {
     try {
+      filtros = filtrosConPeriodo(filtros);
       console.log("🏭 Generando Registro de Costos...", filtros);
 
       const registroCostos =
@@ -413,11 +388,7 @@ export class ContabilidadLibrosController {
       };
     } catch (error) {
       console.error("❌ Error generando Registro de Costos:", error);
-      return {
-        success: false,
-        message: "Error generando Registro de Costos",
-        data: null,
-      };
+      throw lecturaContableFallida(error, "Registro de Costos");
     }
   }
 
@@ -430,6 +401,7 @@ export class ContabilidadLibrosController {
   })
   async getLibrosElectronicosSunat(@Query() filtros: any) {
     try {
+      filtros = filtrosConPeriodo(filtros);
       console.log("📱 Generando Libros Electrónicos SUNAT...", filtros);
 
       const librosElectronicos =
@@ -441,11 +413,7 @@ export class ContabilidadLibrosController {
       };
     } catch (error) {
       console.error("❌ Error generando Libros Electrónicos SUNAT:", error);
-      return {
-        success: false,
-        message: "Error generando Libros Electrónicos SUNAT",
-        data: null,
-      };
+      throw lecturaContableFallida(error, "Libros Electrónicos SUNAT");
     }
   }
 
@@ -463,6 +431,7 @@ export class ContabilidadLibrosController {
     @Query() filtros: any,
   ) {
     try {
+      filtros = filtrosConPeriodo(filtros);
       console.log("📖 Generando Libro Diario...", filtros);
 
       // HARDENING: forzamos uso del tenant actual para toda consulta.
@@ -521,11 +490,7 @@ export class ContabilidadLibrosController {
       };
     } catch (error) {
       console.error("❌ Error generando Libro Diario:", error);
-      return {
-        success: false,
-        message: "Error generando Libro Diario",
-        data: null,
-      };
+      throw lecturaContableFallida(error, "Libro Diario");
     }
   }
 
@@ -540,6 +505,7 @@ export class ContabilidadLibrosController {
   })
   async getRegistroVentas(@Query() filtros: any) {
     try {
+      filtros = filtrosConPeriodo(filtros);
       console.log("📝 Generando Registro de Ventas...", filtros);
 
       const registroVentas =
@@ -551,11 +517,7 @@ export class ContabilidadLibrosController {
       };
     } catch (error) {
       console.error("❌ Error generando Registro de Ventas:", error);
-      return {
-        success: false,
-        message: "Error generando Registro de Ventas",
-        data: null,
-      };
+      throw lecturaContableFallida(error, "Registro de Ventas");
     }
   }
 
@@ -568,6 +530,7 @@ export class ContabilidadLibrosController {
   })
   async getRegistroCompras(@Query() filtros: any) {
     try {
+      filtros = filtrosConPeriodo(filtros);
       console.log("🛒 Generando Registro de Compras...", filtros);
 
       const registroCompras =
@@ -579,11 +542,7 @@ export class ContabilidadLibrosController {
       };
     } catch (error) {
       console.error("❌ Error generando Registro de Compras:", error);
-      return {
-        success: false,
-        message: "Error generando Registro de Compras",
-        data: null,
-      };
+      throw lecturaContableFallida(error, "Registro de Compras");
     }
   }
 

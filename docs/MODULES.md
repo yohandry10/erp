@@ -701,6 +701,8 @@ Código principal: `apps/erp-api/src/modules/finanzas`,
   vuelve a bloquear el formulario después de recuperar los catálogos.
   El detalle del centro muestra código y nombre de la cuenta desde la relación
   `plan_cuentas` devuelta por la API, junto a los importes presupuestados.
+  `GET presupuestos/alertas` se declara antes que `presupuestos/:id`, que antes
+  lo capturaba y respondía 400.
 - Asientos se originan en eventos de ventas, compras, POS, caja, RRHH y activos.
 - Debe/haber debe cuadrar y el período debe permitir la operación.
 - Libros, estados financieros y materialized views son proyecciones.
@@ -752,7 +754,16 @@ Código principal: `apps/erp-api/src/modules/finanzas`,
   ejecutada absorbe el pendiente sin depreciar por debajo del residual.
   Las partidas de
   terceros pueden conciliarse total o parcialmente y deshacerse sin alterar el
-  asiento.
+  asiento. En Perú, las cuentas 12, 16, 42 y 46 nacen conciliables (569); un
+  tenant CO no se marca. Conciliar acepta `Idempotency-Key`: el reintento
+  devuelve la conciliación registrada, una clave con otra selección responde
+  409 y dos conciliaciones simultáneas de las mismas partidas aplican una sola
+  (la otra, 400/409). El listado de conciliaciones lee la tabla con SELECT de
+  servicio; las intenciones son privadas.
+- Libros, estados, plan de cuentas, asientos y partidas responden 503 cuando no
+  pueden leer sus datos, nunca un 200 vacío; la pantalla de contabilidad muestra
+  el error de la vista activa. `anio`/`mes` inválidos responden 400; en los
+  libros por fechas se traducen al rango del mes salvo fechas explícitas.
 - La distribución analítica reparte una línea por varios ejes independientes.
   Ingresos y gastos diferidos se reconocen por período y la última cuota absorbe
   residuos de redondeo.

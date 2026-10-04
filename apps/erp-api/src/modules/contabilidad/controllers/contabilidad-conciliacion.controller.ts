@@ -6,6 +6,7 @@ import {
   Body,
   Query,
   Param,
+  Headers,
   UseGuards,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
@@ -76,8 +77,9 @@ export class ContabilidadConciliacionController {
     @CurrentTenant() tenantId: string,
     @CurrentUser("id") userId: string,
     @Body() dto: ConciliarPartidasDto,
+    @Headers("idempotency-key") idempotencyKey?: string,
   ) {
-    const data = await this.conciliacionService.conciliar(tenantId, userId, dto);
+    const data = await this.conciliacionService.conciliar(tenantId, userId, dto, idempotencyKey);
 
     return {
       success: true,

@@ -18,7 +18,8 @@ import { RequirePermission } from "../../../common/decorators/require-permission
 import { EstadosFinancierosService } from "../services/estados-financieros.service";
 import { CashflowService } from "../services/cashflow.service";
 import { PeriodoQueryDto } from "../dto/periodo-query.dto";
-
+import { lecturaContableFallida } from "../contabilidad-errors";
+
 import { PeriodoContableDto } from '../dto/periodo-contable.dto';
 
 @ApiTags("contabilidad")
@@ -51,11 +52,7 @@ export class ContabilidadEstadosFinancierosController {
     try {
       // Validar parámetros requeridos
       if (!anio || !mes) {
-        return {
-          success: false,
-          data: null,
-          message: "Los parámetros anio y mes son requeridos",
-        };
+        throw new BadRequestException("Los parámetros anio y mes son requeridos");
       }
 
       const anioNum = parseInt(anio, 10);
@@ -63,12 +60,9 @@ export class ContabilidadEstadosFinancierosController {
 
       // Validar rangos
       if (isNaN(anioNum) || isNaN(mesNum) || mesNum < 1 || mesNum > 12) {
-        return {
-          success: false,
-          data: null,
-          message:
-            "Parámetros inválidos: anio debe ser un número y mes debe estar entre 1 y 12",
-        };
+        throw new BadRequestException(
+          "Parámetros inválidos: anio debe ser un número y mes debe estar entre 1 y 12",
+        );
       }
 
       console.log(
@@ -117,7 +111,7 @@ export class ContabilidadEstadosFinancierosController {
         "❌ [Contabilidad] Error obteniendo Balance de Comprobación:",
         error,
       );
-      throw error;
+      throw lecturaContableFallida(error, "Balance de Comprobación");
     }
   }
 
@@ -140,11 +134,7 @@ export class ContabilidadEstadosFinancierosController {
     try {
       // Validar parámetros requeridos
       if (!anio || !mes) {
-        return {
-          success: false,
-          data: null,
-          message: "Los parámetros anio y mes son requeridos",
-        };
+        throw new BadRequestException("Los parámetros anio y mes son requeridos");
       }
 
       const anioNum = parseInt(anio, 10);
@@ -152,12 +142,9 @@ export class ContabilidadEstadosFinancierosController {
 
       // Validar rangos
       if (isNaN(anioNum) || isNaN(mesNum) || mesNum < 1 || mesNum > 12) {
-        return {
-          success: false,
-          data: null,
-          message:
-            "Parámetros inválidos: anio debe ser un número y mes debe estar entre 1 y 12",
-        };
+        throw new BadRequestException(
+          "Parámetros inválidos: anio debe ser un número y mes debe estar entre 1 y 12",
+        );
       }
 
       console.log(
@@ -201,7 +188,7 @@ export class ContabilidadEstadosFinancierosController {
         "❌ [Contabilidad] Error obteniendo Estado de Resultados:",
         error,
       );
-      throw error;
+      throw lecturaContableFallida(error, "Estado de Resultados");
     }
   }
 
@@ -224,11 +211,7 @@ export class ContabilidadEstadosFinancierosController {
     try {
       // Validar parámetros requeridos
       if (!anio || !mes) {
-        return {
-          success: false,
-          data: null,
-          message: "Los parámetros anio y mes son requeridos",
-        };
+        throw new BadRequestException("Los parámetros anio y mes son requeridos");
       }
 
       const anioNum = parseInt(anio, 10);
@@ -236,12 +219,9 @@ export class ContabilidadEstadosFinancierosController {
 
       // Validar rangos
       if (isNaN(anioNum) || isNaN(mesNum) || mesNum < 1 || mesNum > 12) {
-        return {
-          success: false,
-          data: null,
-          message:
-            "Parámetros inválidos: anio debe ser un número y mes debe estar entre 1 y 12",
-        };
+        throw new BadRequestException(
+          "Parámetros inválidos: anio debe ser un número y mes debe estar entre 1 y 12",
+        );
       }
 
       console.log(
@@ -286,7 +266,7 @@ export class ContabilidadEstadosFinancierosController {
         "❌ [Contabilidad] Error obteniendo Balance General:",
         error,
       );
-      throw error;
+      throw lecturaContableFallida(error, "Balance General");
     }
   }
 
@@ -312,11 +292,7 @@ export class ContabilidadEstadosFinancierosController {
   ): Promise<{ success: boolean; data: any; message?: string }> {
     try {
       if (!anio || !mes) {
-        return {
-          success: false,
-          data: null,
-          message: "Los parámetros anio y mes son requeridos",
-        };
+        throw new BadRequestException("Los parámetros anio y mes son requeridos");
       }
 
       const anioNum = parseInt(anio, 10);
@@ -324,12 +300,9 @@ export class ContabilidadEstadosFinancierosController {
       const mostrarMoneda = showCurrency === "true";
 
       if (isNaN(anioNum) || isNaN(mesNum) || mesNum < 1 || mesNum > 12) {
-        return {
-          success: false,
-          data: null,
-          message:
-            "Parámetros inválidos: anio debe ser un número y mes debe estar entre 1 y 12",
-        };
+        throw new BadRequestException(
+          "Parámetros inválidos: anio debe ser un número y mes debe estar entre 1 y 12",
+        );
       }
 
       console.log(
@@ -366,7 +339,7 @@ export class ContabilidadEstadosFinancierosController {
         "❌ [Contabilidad] Error obteniendo Balance de Comprobación formateado:",
         error,
       );
-      throw error;
+      throw lecturaContableFallida(error, "Balance de Comprobación formateado");
     }
   }
 
@@ -392,11 +365,7 @@ export class ContabilidadEstadosFinancierosController {
   ): Promise<{ success: boolean; data: any; message?: string }> {
     try {
       if (!anio || !mes) {
-        return {
-          success: false,
-          data: null,
-          message: "Los parámetros anio y mes son requeridos",
-        };
+        throw new BadRequestException("Los parámetros anio y mes son requeridos");
       }
 
       const anioNum = parseInt(anio, 10);
@@ -404,12 +373,9 @@ export class ContabilidadEstadosFinancierosController {
       const mostrarMoneda = showCurrency === "true";
 
       if (isNaN(anioNum) || isNaN(mesNum) || mesNum < 1 || mesNum > 12) {
-        return {
-          success: false,
-          data: null,
-          message:
-            "Parámetros inválidos: anio debe ser un número y mes debe estar entre 1 y 12",
-        };
+        throw new BadRequestException(
+          "Parámetros inválidos: anio debe ser un número y mes debe estar entre 1 y 12",
+        );
       }
 
       console.log(
@@ -446,7 +412,7 @@ export class ContabilidadEstadosFinancierosController {
         "❌ [Contabilidad] Error obteniendo Estado de Resultados formateado:",
         error,
       );
-      throw error;
+      throw lecturaContableFallida(error, "Estado de Resultados formateado");
     }
   }
 
@@ -471,11 +437,7 @@ export class ContabilidadEstadosFinancierosController {
   ): Promise<{ success: boolean; data: any; message?: string }> {
     try {
       if (!anio || !mes) {
-        return {
-          success: false,
-          data: null,
-          message: "Los parámetros anio y mes son requeridos",
-        };
+        throw new BadRequestException("Los parámetros anio y mes son requeridos");
       }
 
       const anioNum = parseInt(anio, 10);
@@ -483,12 +445,9 @@ export class ContabilidadEstadosFinancierosController {
       const mostrarMoneda = showCurrency === "true";
 
       if (isNaN(anioNum) || isNaN(mesNum) || mesNum < 1 || mesNum > 12) {
-        return {
-          success: false,
-          data: null,
-          message:
-            "Parámetros inválidos: anio debe ser un número y mes debe estar entre 1 y 12",
-        };
+        throw new BadRequestException(
+          "Parámetros inválidos: anio debe ser un número y mes debe estar entre 1 y 12",
+        );
       }
 
       console.log(
@@ -525,7 +484,7 @@ export class ContabilidadEstadosFinancierosController {
         "❌ [Contabilidad] Error obteniendo Balance General formateado:",
         error,
       );
-      throw error;
+      throw lecturaContableFallida(error, "Balance General formateado");
     }
   }
 
@@ -743,12 +702,9 @@ export class ContabilidadEstadosFinancierosController {
 
         // Validar rangos
         if (isNaN(anioNum) || isNaN(mesNum) || mesNum < 1 || mesNum > 12) {
-          return {
-            success: false,
-            data: null,
-            message:
-              "Parámetros inválidos: anio debe ser un número y mes debe estar entre 1 y 12",
-          };
+          throw new BadRequestException(
+            "Parámetros inválidos: anio debe ser un número y mes debe estar entre 1 y 12",
+          );
         }
 
         console.log(
@@ -791,14 +747,10 @@ export class ContabilidadEstadosFinancierosController {
       }
 
       // Fallback: retornar estructura vacía si no se proporcionan parámetros
-      return {
-        success: false,
-        data: null,
-        message: "Los parámetros anio y mes son requeridos",
-      };
+      throw new BadRequestException("Los parámetros anio y mes son requeridos");
     } catch (error) {
       console.error("❌ Error obteniendo Balance General:", error);
-      throw error;
+      throw lecturaContableFallida(error, "Balance General");
     }
   }
 
@@ -847,11 +799,7 @@ export class ContabilidadEstadosFinancierosController {
       };
     } catch (error) {
       console.error("❌ Error obteniendo plan de cuentas:", error);
-      return {
-        success: false,
-        message: "Error obteniendo plan de cuentas",
-        data: [],
-      };
+      throw lecturaContableFallida(error, "plan de cuentas");
     }
   }
 

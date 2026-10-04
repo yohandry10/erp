@@ -1,0 +1,470 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Contabilidad API/DB local diagnóstico; sin aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Contabilidad: el plan PE de un cliente nuevo trae cuentas de terceros conciliables",
+      "passed": false,
+      "message": "Conciliables: "
+    },
+    {
+      "scenario": "Contabilidad: cada reporte y consulta responde 200 con el período del tenant",
+      "passed": false,
+      "message": "[[\"partidas-abiertas\",404],[\"conciliaciones-partidas\",500],[\"presupuestos/alertas\",400]]\n+ actual - expected\n\n+ [\n+   [\n+     'partidas-abiertas',\n+     404\n+   ],\n+   [\n+     'conciliaciones-partidas',\n+     500\n+   ],\n+   [\n+     'presupuestos/alertas',\n+     400\n+   ]\n+ ]\n- []\n"
+    },
+    {
+      "scenario": "Contabilidad: libro diario, mayor y balance reflejan el asiento confirmado y cuadran",
+      "passed": true
+    },
+    {
+      "scenario": "Contabilidad: otra empresa no ve el asiento en libros ni por id",
+      "passed": true
+    },
+    {
+      "scenario": "Contabilidad: período inválido se rechaza con 400",
+      "passed": false,
+      "message": "{\"estados/estado-resultados\":200,\"estados/balance-comprobacion\":200,\"balance-general\":200,\"balance-comprobacion\":200,\"flujo-efectivo\":400,\"libro-diario\":200,\"libro-mayor-completo\":200,\"registro-ventas\":200}"
+    },
+    {
+      "scenario": "Contabilidad: sin lectura de asientos_contables los reportes responden 503",
+      "passed": false,
+      "message": "{\"libro-diario\":200,\"asientos\":500}"
+    },
+    {
+      "scenario": "Contabilidad: sin lectura de detalle_asientos los reportes responden 503",
+      "passed": false,
+      "message": "{\"libro-mayor/63\":200,\"libro-mayor-completo\":200,\"partidas-abiertas\":404}"
+    },
+    {
+      "scenario": "Contabilidad: sin lectura de plan_cuentas los reportes responden 503",
+      "passed": false,
+      "message": "{\"plan-cuentas\":200}"
+    },
+    {
+      "scenario": "Contabilidad: sin lectura de conciliaciones_partidas los reportes responden 503",
+      "passed": false,
+      "message": "{\"conciliaciones-partidas\":500}"
+    },
+    {
+      "scenario": "Contabilidad: sin ejecutar balance_comprobacion_live los balances responden 503",
+      "passed": false,
+      "message": "{\"estados/balance-comprobacion\":500,\"balance-comprobacion\":200}"
+    },
+    {
+      "scenario": "Contabilidad: conciliación de partidas con intención, listado, concurrencia y reversión",
+      "passed": false,
+      "message": "Sin cuenta conciliable"
+    },
+    {
+      "scenario": "Contabilidad: centro de costo con intención, edición, asientos y reporte de gastos",
+      "passed": true
+    },
+    {
+      "scenario": "Contabilidad: tipo de cambio manual con intención, vigente, listado y baja",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/complete",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/periodos",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/periodos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/asiento-contable",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/asientos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/libro-diario",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/libro-mayor-completo",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/libro-mayor/63",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/balance-comprobacion",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/estados/balance-comprobacion",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/estados/estado-resultados",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/estados/balance-general",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/estados/balance-comprobacion/formatted",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/estados/estado-resultados/formatted",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/estados/balance-general/formatted",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/balance-general",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/flujo-efectivo",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/ratios-financieros",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/kardex-valorizado",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/libro-caja-bancos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/registro-activos-fijos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/libro-planillas",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/libro-inventarios-balances",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/registro-costos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/libros-electronicos-sunat",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/registro-ventas",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/registro-compras",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/asientos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/asientos-contables",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/asientos/estadisticas/por-tipo",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/asientos-contables/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/eventos/estadisticas",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/eventos/fallidos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/eventos/dead-letter",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/eventos/estadisticas-fallidos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/tipos-cambio",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/moneda-local",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/partidas-abiertas",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/conciliaciones-partidas",
+      "status": 500
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/plantillas-asientos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/presupuestos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/presupuestos/alertas",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/presupuestos/alertas/resumen",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/impuestos/anuales",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/centros-costo",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/libro-diario",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/libro-mayor/63",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/estados/balance-comprobacion",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/libro-diario",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/asientos-contables/:id",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/estados/estado-resultados",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/estados/balance-comprobacion",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/balance-general",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/balance-comprobacion",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/flujo-efectivo",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/libro-diario",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/libro-mayor-completo",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/registro-ventas",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/libro-diario",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/asientos",
+      "status": 500
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/libro-mayor/63",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/libro-mayor-completo",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/partidas-abiertas",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/plan-cuentas",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/conciliaciones-partidas",
+      "status": 500
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/estados/balance-comprobacion",
+      "status": 500
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/balance-comprobacion",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/centros-costo",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/centros-costo",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "contabilidad/centros-costo/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/centros-costo/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/centros-costo/:id/asientos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/centros-costo/:id/reporte-gastos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/centros-costo/:id",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/tipos-cambio",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/tipos-cambio",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/tipos-cambio/vigente",
+      "status": 200
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "contabilidad/tipos-cambio/:id",
+      "status": 200
+    }
+  ]
+}
