@@ -2821,7 +2821,7 @@
       ],
       "proof": {
         "source": "artifacts/peru-purchases-baseline-20261004",
-        "observed_error": "La edición hace UPDATE directo y en la cadena canónica service_role no tiene DML sobre recepciones: responde 400 'permission denied'. PROD conserva GRANT ALL heredado, por lo que hoy funciona allí; cualquier reconstrucción la rompe.",
+        "observed_error": "La edición hace UPDATE directo y en la cadena canónica service_role no tiene DML sobre recepciones: responde 400 'permission denied'. PROD conserva GRANT ALL heredado, por lo que hoy funciona allí; cualquier reconstrucción la rompe. Corrección 2026-10-04: el respaldo productivo muestra GRANT ALL a service_role por los privilegios por defecto de Supabase; el fallo sólo aparece en la reconstrucción local, cuyo bootstrap no los emula.",
         "local_only": true
       },
       "correction": "Writer 568 para editar recepciones; lecturas de compras indisponibles responden 503 sin enmascarar; inexistente 404",
@@ -2837,7 +2837,8 @@
         "main_ci": 37218136805,
         "runtime": "artifacts/peru-production-verification-after-138-20261004.json",
         "runtime_failed_attempts": "artifacts/peru-production-verification-after-138-timeouts-20261004.json"
-      }
+      },
+      "environment": "local_rebuild_only"
     },
     {
       "id": "purchase-legacy-stats-masked",
@@ -3015,7 +3016,7 @@
     },
     {
       "id": "accounting-new-tenant-no-reconcilable-accounts",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -3033,13 +3034,22 @@
       },
       "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 569, main y runtime."
+        "UI real de contabilidad y roles distintos de ADMIN; libro diario con asientos de todo estado"
       ],
-      "canonical_proof": "artifacts/peru-accounting-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-accounting-canonical-local-20261004",
+      "closure": {
+        "pr": 139,
+        "merge_sha": "0fe3881e6cd6ed5c5e7ec68945ce448c81ec6171",
+        "schema": 569,
+        "promotion": "artifacts/peru-569-promotion-20261004180640341.json",
+        "main_ci": 37223140493,
+        "runtime": "artifacts/peru-production-verification-after-139-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-139-timeouts-20261004.json"
+      }
     },
     {
       "id": "accounting-reconciliation-list-permission",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -3048,18 +3058,28 @@
       ],
       "proof": {
         "source": "artifacts/peru-accounting-baseline-20261004",
-        "observed_error": "Responde 500 'permission denied for table conciliaciones_partidas': ni PROD ni la cadena canónica conceden SELECT a service_role.",
+        "observed_error": "Responde 500 'permission denied for table conciliaciones_partidas': ni PROD ni la cadena canónica conceden SELECT a service_role. Corrección 2026-10-04: el respaldo productivo muestra GRANT ALL a service_role por los privilegios por defecto de Supabase; el fallo sólo aparece en la reconstrucción local, cuyo bootstrap no los emula.",
         "local_only": true
       },
       "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 569, main y runtime."
+        "UI real de contabilidad y roles distintos de ADMIN; libro diario con asientos de todo estado"
       ],
-      "canonical_proof": "artifacts/peru-accounting-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-accounting-canonical-local-20261004",
+      "environment": "local_rebuild_only",
+      "closure": {
+        "pr": 139,
+        "merge_sha": "0fe3881e6cd6ed5c5e7ec68945ce448c81ec6171",
+        "schema": 569,
+        "promotion": "artifacts/peru-569-promotion-20261004180640341.json",
+        "main_ci": 37223140493,
+        "runtime": "artifacts/peru-production-verification-after-139-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-139-timeouts-20261004.json"
+      }
     },
     {
       "id": "accounting-budget-alerts-shadowed",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -3073,13 +3093,22 @@
       },
       "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 569, main y runtime."
+        "UI real de contabilidad y roles distintos de ADMIN; libro diario con asientos de todo estado"
       ],
-      "canonical_proof": "artifacts/peru-accounting-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-accounting-canonical-local-20261004",
+      "closure": {
+        "pr": 139,
+        "merge_sha": "0fe3881e6cd6ed5c5e7ec68945ce448c81ec6171",
+        "schema": 569,
+        "promotion": "artifacts/peru-569-promotion-20261004180640341.json",
+        "main_ci": 37223140493,
+        "runtime": "artifacts/peru-production-verification-after-139-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-139-timeouts-20261004.json"
+      }
     },
     {
       "id": "accounting-books-masked-failures",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -3109,13 +3138,22 @@
       },
       "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 569, main y runtime."
+        "UI real de contabilidad y roles distintos de ADMIN; libro diario con asientos de todo estado"
       ],
-      "canonical_proof": "artifacts/peru-accounting-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-accounting-canonical-local-20261004",
+      "closure": {
+        "pr": 139,
+        "merge_sha": "0fe3881e6cd6ed5c5e7ec68945ce448c81ec6171",
+        "schema": 569,
+        "promotion": "artifacts/peru-569-promotion-20261004180640341.json",
+        "main_ci": 37223140493,
+        "runtime": "artifacts/peru-production-verification-after-139-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-139-timeouts-20261004.json"
+      }
     },
     {
       "id": "accounting-reads-500",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -3133,13 +3171,22 @@
       },
       "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 569, main y runtime."
+        "UI real de contabilidad y roles distintos de ADMIN; libro diario con asientos de todo estado"
       ],
-      "canonical_proof": "artifacts/peru-accounting-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-accounting-canonical-local-20261004",
+      "closure": {
+        "pr": 139,
+        "merge_sha": "0fe3881e6cd6ed5c5e7ec68945ce448c81ec6171",
+        "schema": 569,
+        "promotion": "artifacts/peru-569-promotion-20261004180640341.json",
+        "main_ci": 37223140493,
+        "runtime": "artifacts/peru-production-verification-after-139-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-139-timeouts-20261004.json"
+      }
     },
     {
       "id": "accounting-invalid-period-accepted",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -3177,13 +3224,22 @@
       },
       "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 569, main y runtime."
+        "UI real de contabilidad y roles distintos de ADMIN; libro diario con asientos de todo estado"
       ],
-      "canonical_proof": "artifacts/peru-accounting-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-accounting-canonical-local-20261004",
+      "closure": {
+        "pr": 139,
+        "merge_sha": "0fe3881e6cd6ed5c5e7ec68945ce448c81ec6171",
+        "schema": 569,
+        "promotion": "artifacts/peru-569-promotion-20261004180640341.json",
+        "main_ci": 37223140493,
+        "runtime": "artifacts/peru-production-verification-after-139-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-139-timeouts-20261004.json"
+      }
     },
     {
       "id": "accounting-reconciliation-retry-and-errors",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_promoted_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -3201,9 +3257,18 @@
       },
       "correction": "Migración 569 (cuentas PE conciliables, intención de conciliación, SELECT del listado); lecturas contables 503, período inválido 400, ruta de alertas reordenada y errores del writer 409/400/503",
       "pending": [
-        "CI exacto con SQL fresco, promoción única 569, main y runtime."
+        "UI real de contabilidad y roles distintos de ADMIN; libro diario con asientos de todo estado"
       ],
-      "canonical_proof": "artifacts/peru-accounting-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-accounting-canonical-local-20261004",
+      "closure": {
+        "pr": 139,
+        "merge_sha": "0fe3881e6cd6ed5c5e7ec68945ce448c81ec6171",
+        "schema": 569,
+        "promotion": "artifacts/peru-569-promotion-20261004180640341.json",
+        "main_ci": 37223140493,
+        "runtime": "artifacts/peru-production-verification-after-139-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-139-timeouts-20261004.json"
+      }
     },
     {
       "id": "users-create-echoes-password",
@@ -3428,6 +3493,74 @@
         "CI exacto, main y runtime. Solicitudes, beneficios, evaluaciones, capacitaciones, horarios y expediente sin pantalla ni caso."
       ],
       "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004"
+    },
+    {
+      "id": "documents-configured-series-unusable",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/documentos/crear"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-documents-baseline-20261004",
+        "observed_error": "Una empresa recién configurada (serie F001 en el asistente) no puede crear su primer documento: 400 DOCUMENT_MANUAL_SERIES_NOT_CONFIGURED. La 461 exige registrar la serie con su writer y no hay pantalla que lo haga; sólo existía tras emitir un CPE desde ventas o POS.",
+        "local_only": true
+      },
+      "correction": "La serie configurada en la empresa se registra con el writer auditado 461 en su primer uso; auditoría ajena 404; lecturas y writer de documentos indisponibles 503",
+      "pending": [
+        "CI exacto, main y runtime. Fase canónica en CI pendiente de que el bootstrap emule los privilegios por defecto de Supabase."
+      ],
+      "canonical_proof": "artifacts/peru-documents-fixed-local-20261004"
+    },
+    {
+      "id": "documents-foreign-audit-200",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/documentos/:id/auditoria"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-documents-baseline-20261004",
+        "observed_error": "La auditoría de un documento de otra empresa responde 200 con lista vacía en vez de 404; no expone datos.",
+        "local_only": true
+      },
+      "correction": "La serie configurada en la empresa se registra con el writer auditado 461 en su primer uso; auditoría ajena 404; lecturas y writer de documentos indisponibles 503",
+      "pending": [
+        "CI exacto, main y runtime. Fase canónica en CI pendiente de que el bootstrap emule los privilegios por defecto de Supabase."
+      ],
+      "canonical_proof": "artifacts/peru-documents-fixed-local-20261004"
+    },
+    {
+      "id": "documents-reads-unavailability-400",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/documentos/lista"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/documentos/stats"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/documentos/:id"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-documents-baseline-20261004",
+        "observed_error": "Sin lectura de documentos responden 400; un writer caído también respondía 400.",
+        "local_only": true
+      },
+      "correction": "La serie configurada en la empresa se registra con el writer auditado 461 en su primer uso; auditoría ajena 404; lecturas y writer de documentos indisponibles 503",
+      "pending": [
+        "CI exacto, main y runtime. Fase canónica en CI pendiente de que el bootstrap emule los privilegios por defecto de Supabase."
+      ],
+      "canonical_proof": "artifacts/peru-documents-fixed-local-20261004"
     }
   ]
 }

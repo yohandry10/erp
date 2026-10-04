@@ -2,7 +2,7 @@
 
 No hay aceptación integral de lanzamiento. Los casos se vinculan a operaciones concretas en la matriz API; navegación y controles visibles describen la oferta y no demuestran ejecución. Sólo Analytics excluido; reportes operativos, contables y tributarios incluidos.
 
-Último cierre completo: #138, 624ca0b2/esquema 568: compras con 7 defectos corregidos (writer de recepción 568, 503 sin enmascarar), 28 checks, 568 promovida una vez, main 37218136805 (409 HTTP, 32 UI) y runtime verificado tras un timeout de 20 s. Contabilidad (#139): 7 defectos reproducidos, corrección y 569 en curso. Anterior: #137, 0d6df0ee/esquema 567: ventas con 10 defectos corregidos. Anterior: #136, 4f946dfb/esquema 566: caja con 20 defectos corregidos, 28 checks, 566 promovida una vez, main 37162507679/E2E/seguridad y runtime verificado tras dos timeouts de 20 s por arranque en frío. Anterior: #135, 8d717bcf/esquema 565: 28 checks, CI 342 API/31 UI sin reintentos, SQL fresco, barridos, restore; main 37152767852, E2E y seguridad aprobados; runtime exacto verificado tras un primer timeout de 20 s. #134 (9e301e2a/564) no cerró main: dos OOM de Next dev. Histórico: #133, 19fa239d/esquema 563. #134 promovió 564 una vez; sus CI de fuente c0f055eb pasaron 316 API/30 UI y su main no cerró por OOM. La 565 se ensayó con rollback y preservación de 42 tablas antes de su promoción única. Render: plan efectivo y continuidad sin confirmar. No hubo datos sintéticos de negocio en PROD.
+Último cierre completo: #139, 0fe3881e/esquema 569: contabilidad con 7 defectos corregidos (cuentas PE conciliables, conciliación reintentable, lecturas 503, período 400), checks completos, 569 promovida una vez, main 37223140493 (422 HTTP, 32 UI) y runtime verificado al tercer intento. Usuarios, finanzas, RRHH y documentos: 11 defectos corregidos en rama, sin migración. Anterior: #138, 624ca0b2/esquema 568: compras con 7 defectos corregidos. Anterior: #137, 0d6df0ee/esquema 567: ventas con 10 defectos corregidos. Anterior: #136, 4f946dfb/esquema 566: caja con 20 defectos corregidos, 28 checks, 566 promovida una vez, main 37162507679/E2E/seguridad y runtime verificado tras dos timeouts de 20 s por arranque en frío. Anterior: #135, 8d717bcf/esquema 565: 28 checks, CI 342 API/31 UI sin reintentos, SQL fresco, barridos, restore; main 37152767852, E2E y seguridad aprobados; runtime exacto verificado tras un primer timeout de 20 s. #134 (9e301e2a/564) no cerró main: dos OOM de Next dev. Histórico: #133, 19fa239d/esquema 563. #134 promovió 564 una vez; sus CI de fuente c0f055eb pasaron 316 API/30 UI y su main no cerró por OOM. La 565 se ensayó con rollback y preservación de 42 tablas antes de su promoción única. Render: plan efectivo y continuidad sin confirmar. No hubo datos sintéticos de negocio en PROD.
 
 | Dominio de código | Contratos declarados | HTTP observado | Operaciones con casos funcionales | Aceptación completa |
 |---|---:|---:|---:|---|
@@ -13,7 +13,7 @@ No hay aceptación integral de lanzamiento. Los casos se vinculan a operaciones 
 | configuracion | 13 | 4 | 4 | Pendiente |
 | configuracion-fiscal | 1 | 0 | 0 | Pendiente |
 | configuration | 16 | 8 | 7 | Pendiente |
-| contabilidad | 124 | 57 | 41 | Pendiente |
+| contabilidad | 124 | 98 | 41 | Pendiente |
 | cpe | 43 | 13 | 13 | Pendiente |
 | dashboard | 3 | 0 | 0 | Pendiente |
 | demo | 8 | 1 | 0 | Pendiente |
@@ -59,6 +59,7 @@ Los 11 contratos específicos de Argentina/Colombia identificados en el artefact
 - `peru-storage-ci-37139151230`: API/UI/DB/blobs locales; proveedor remoto sin aceptación por inferencia.
 - `peru-integrated-main-37152767852`: main exacto de #135, 342 HTTP/31 UI y restore.
 - `peru-integrated-main-37218136805`: main exacto de #138, 409 HTTP/32 UI y restore.
+- `peru-integrated-main-37223140493`: main exacto de #139, 422 HTTP/32 UI y restore.
 - `peru-cash-canonical-local-20261003` y `peru-cash-operation-matrix-20261003.json`: caja canónica local y sus 28 operaciones.
 - `peru-operation-acceptance-cases-20260930.json`: qué se probó y variantes pendientes.
 - `peru-functional-defects-20260930.json`: reproducción, corrección y estado de cada defecto.

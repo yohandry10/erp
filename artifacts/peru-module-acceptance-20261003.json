@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-10-04T17:25:24.119Z",
+  "generated_at": "2026-10-04T18:50:24.500Z",
   "scope": "Inventario y aceptación por módulo/operación; únicamente Analytics excluido",
   "operational_accounting_tax_reports_included": true,
   "complete_acceptance": false,
   "source_api_matrix": "artifacts/peru-api-operation-matrix-20260930.json",
   "source_ui_matrix": "artifacts/peru-ui-operation-matrix-20261002.json",
   "country_applicability": "artifacts/peru-country-applicability-20261003.json",
-  "evidence": "artifacts/peru-integrated-main-37218136805",
+  "evidence": "artifacts/peru-integrated-main-37223140493",
   "additional_evidence": [
     {
       "evidence": "artifacts/peru-storage-ci-37150593171",
@@ -24,11 +24,11 @@
     }
   ],
   "latest_verified_production": {
-    "sha": "624ca0b21008b707320dd809797adab6853e6b54",
-    "schema_at_last_runtime_read": 568,
-    "proof": "artifacts/peru-production-verification-after-138-20261004.json",
-    "failed_attempts": "artifacts/peru-production-verification-after-138-timeouts-20261004.json",
-    "main_ci": "37218136805 success"
+    "sha": "0fe3881e6cd6ed5c5e7ec68945ce448c81ec6171",
+    "schema_at_last_runtime_read": 569,
+    "proof": "artifacts/peru-production-verification-after-139-20261004.json",
+    "failed_attempts": "artifacts/peru-production-verification-after-139-timeouts-20261004.json",
+    "main_ci": "37223140493 success"
   },
   "superseded_main": {
     "sha": "9e301e2ae9f470b56ffc10d775ab09c4a8d6a76b",
@@ -36,14 +36,10 @@
     "proof": "artifacts/peru-main-134-heap-failure-20261003"
   },
   "current_database_schema": {
-    "version": 568,
-    "proof": "artifacts/peru-568-promotion-20261004164814362.json"
-  },
-  "pending_schema": {
     "version": 569,
-    "state": "accounting branch #139; fresh rebuild and production-backup rehearsal passed locally; not promoted",
-    "proof": "artifacts/erp-peru-569-rehearsal-20261004165609161-17420.json"
+    "proof": "artifacts/peru-569-promotion-20261004180640341.json"
   },
+  "pending_schema": null,
   "acceptance_rule": "Contrato observado o control visible no implica ejecutar ni aceptar toda una operación. Se conservan variantes de país, infraestructura y pendientes por operación para no ocultar huecos.",
   "navigation": {
     "country": "PE",
@@ -1500,7 +1496,7 @@
     {
       "module": "contabilidad",
       "declared_contracts": 124,
-      "observed_contracts": 57,
+      "observed_contracts": 98,
       "operations_with_functional_cases": 41,
       "complete_acceptance": false,
       "verified_case_ids": [
@@ -1716,7 +1712,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/asientos-contables",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -1728,7 +1724,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/asientos-contables/:id",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -1740,7 +1736,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/asientos",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -1752,7 +1748,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/asientos/estadisticas/por-tipo",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -1836,7 +1832,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/centros-costo/:id",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -1848,7 +1844,7 @@
         {
           "method": "POST",
           "endpoint": "/api/contabilidad/centros-costo",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -1860,7 +1856,7 @@
         {
           "method": "PUT",
           "endpoint": "/api/contabilidad/centros-costo/:id",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -1872,7 +1868,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/centros-costo/:id/asientos",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -1884,7 +1880,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/centros-costo/:id/reporte-gastos",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -1896,7 +1892,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/partidas-abiertas",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -1908,7 +1904,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/conciliaciones-partidas",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -1920,7 +1916,7 @@
         {
           "method": "POST",
           "endpoint": "/api/contabilidad/conciliaciones-partidas",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -1932,7 +1928,7 @@
         {
           "method": "DELETE",
           "endpoint": "/api/contabilidad/conciliaciones-partidas/:id",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2031,7 +2027,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/estados/balance-comprobacion",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2065,7 +2061,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/estados/balance-comprobacion/formatted",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2077,7 +2073,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/estados/estado-resultados/formatted",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2089,7 +2085,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/estados/balance-general/formatted",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2113,7 +2109,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/balance-general",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2125,7 +2121,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/flujo-efectivo",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2149,7 +2145,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/ratios-financieros",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2209,7 +2205,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/eventos/estadisticas-fallidos",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2221,7 +2217,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/libro-mayor/:cuentaCodigo",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2233,7 +2229,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/libro-mayor-completo",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2245,7 +2241,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/balance-comprobacion",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2257,7 +2253,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/kardex-valorizado",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2269,7 +2265,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/libro-caja-bancos",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2281,7 +2277,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/registro-activos-fijos",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2293,7 +2289,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/libro-planillas",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2305,7 +2301,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/libro-inventarios-balances",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2317,7 +2313,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/registro-costos",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2329,7 +2325,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/libros-electronicos-sunat",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2341,7 +2337,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/libro-diario",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2353,7 +2349,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/registro-ventas",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2365,7 +2361,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/registro-compras",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2427,7 +2423,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/tipos-cambio/vigente",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2439,7 +2435,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/moneda-local",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2451,7 +2447,7 @@
         {
           "method": "POST",
           "endpoint": "/api/contabilidad/tipos-cambio",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2463,7 +2459,7 @@
         {
           "method": "DELETE",
           "endpoint": "/api/contabilidad/tipos-cambio/:id",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2730,7 +2726,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/presupuestos/alertas",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2742,7 +2738,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/presupuestos/alertas/resumen",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -2927,7 +2923,7 @@
         {
           "method": "GET",
           "endpoint": "/api/contabilidad/impuestos/anuales",
-          "result": "pending_functional_execution",
+          "result": "http_contract_observed_not_full_acceptance",
           "pending_checks": [
             "persistencia y resultado funcional",
             "permisos",
@@ -3838,7 +3834,11 @@
           ]
         }
       ],
-      "defects": []
+      "defects": [
+        "documents-reads-unavailability-400",
+        "documents-configured-series-unusable",
+        "documents-foreign-audit-200"
+      ]
     },
     {
       "module": "finanzas",
@@ -4401,7 +4401,10 @@
         }
       ],
       "defects": [
-        "bank-csv-date-columns-formulas"
+        "finance-bank-reads-unavailability-400",
+        "bank-csv-date-columns-formulas",
+        "finance-cxp-reads-unavailability-400",
+        "finance-cxp-foreign-writer-400"
       ]
     },
     {
@@ -7003,8 +7006,12 @@
         "employee-create-replay-prevalidation",
         "employee-modal-clears-before-response",
         "employee-family-allowance-not-cleared",
+        "hr-reads-unavailability",
         "plame-package-duplicates-on-retry",
-        "plame-private-writer-prod-acl-bypass"
+        "plame-private-writer-prod-acl-bypass",
+        "hr-pay-data-only-rrhh-access",
+        "hr-foreign-reads-200",
+        "hr-candidate-invalid-status-accepted"
       ]
     },
     {
@@ -7616,7 +7623,9 @@
           ]
         }
       ],
-      "defects": []
+      "defects": [
+        "users-create-echoes-password"
+      ]
     },
     {
       "module": "usuarios",
@@ -7747,7 +7756,9 @@
           ]
         }
       ],
-      "defects": []
+      "defects": [
+        "users-create-echoes-password"
+      ]
     },
     {
       "module": "usuarios-sistema",
@@ -7878,7 +7889,9 @@
           ]
         }
       ],
-      "defects": []
+      "defects": [
+        "users-create-echoes-password"
+      ]
     },
     {
       "module": "validations",
