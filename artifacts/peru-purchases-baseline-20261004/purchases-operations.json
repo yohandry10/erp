@@ -1,0 +1,362 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Compras API/DB local diagnóstico; sin aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Compras: proveedor se encuentra por RUC; RUC ajeno o inexistente no se expone",
+      "passed": true
+    },
+    {
+      "scenario": "Compras: cotización editada, enviada, aprobada por otro actor y convertida en una sola OC",
+      "passed": true
+    },
+    {
+      "scenario": "Compras: cotización rechazada con motivo no se convierte",
+      "passed": true
+    },
+    {
+      "scenario": "Compras: OC en borrador se edita y recalcula; listado filtra por proveedor y estado",
+      "passed": true
+    },
+    {
+      "scenario": "Compras: OC rechazada por otro actor y OC cancelada con motivo no admiten recepción",
+      "passed": true
+    },
+    {
+      "scenario": "Compras: recepción desde la ruta de la orden, editada y listada; replay no duplica",
+      "passed": false,
+      "message": "PUT compras/recepciones/2d25a5d2-997e-46ff-aee3-bc3dac7e57ad: {\"statusCode\":400,\"message\":\"Error al actualizar recepción: permission denied for table recepciones\",\"error\":\"Bad Request\",\"timestamp\":\"2026-10-04T02:47:48.776Z\",\"path\":\"/api/compras/recepciones/2d25a5d2-997e-46ff-aee3-bc3dac7e57ad\"}\n\n400 !== 200\n"
+    },
+    {
+      "scenario": "Compras: documentos de otra empresa responden 404",
+      "passed": true
+    },
+    {
+      "scenario": "Compras: resumen, listado y reporte heredados responden con datos de la empresa",
+      "passed": true
+    },
+    {
+      "scenario": "Compras: lectura de compras/stats sin ordenes_compra responde 503",
+      "passed": false,
+      "message": "Indisponibilidad: 200 {\"success\":true,\"data\":{\"comprasDelMes\":0,\"totalCompras\":0,\"montoTotalMes\":0,\"ordenesActivas\":0,\"proveedoresActivos\":0,\"ordenesVencidas\":0}}\n\n200 !== 503\n"
+    },
+    {
+      "scenario": "Compras: lectura de compras sin ordenes_compra responde 503",
+      "passed": false,
+      "message": "Indisponibilidad: 200 {\"success\":false,\"error\":\"permission denied for table ordenes_compra\",\"data\":[]}\n\n200 !== 503\n"
+    },
+    {
+      "scenario": "Compras: lectura de compras/ordenes sin ordenes_compra responde 503",
+      "passed": false,
+      "message": "Indisponibilidad: 500 {\"statusCode\":500,\"message\":\"Error al obtener órdenes de compra: permission denied for table ordenes_compra\",\"error\":\"Error\",\"timestamp\":\"2026-10-04T02:47:49.645Z\",\"path\":\"/api/compras/ordenes\"}\n\n500 !== 503\n"
+    },
+    {
+      "scenario": "Compras: lectura de compras/cotizaciones sin cotizaciones_compra responde 503",
+      "passed": false,
+      "message": "Indisponibilidad: 500 {\"statusCode\":500,\"message\":\"Error al obtener cotizaciones: permission denied for table cotizaciones_compra\",\"error\":\"Error\",\"timestamp\":\"2026-10-04T02:47:49.818Z\",\"path\":\"/api/compras/cotizaciones\"}\n\n500 !== 503\n"
+    },
+    {
+      "scenario": "Compras: lectura de compras/recepciones sin recepciones responde 503",
+      "passed": false,
+      "message": "Indisponibilidad: 400 {\"statusCode\":400,\"message\":\"Error al obtener recepciones: permission denied for table recepciones\",\"error\":\"Bad Request\",\"timestamp\":\"2026-10-04T02:47:49.946Z\",\"path\":\"/api/compras/recepciones\"}\n\n400 !== 503\n"
+    },
+    {
+      "scenario": "Compras: lectura de compras/reporte-compras sin ordenes_compra responde 503",
+      "passed": false,
+      "message": "Indisponibilidad: 200 {\"success\":false,\"error\":\"permission denied for table ordenes_compra\",\"data\":{\"ordenes\":[],\"resumen\":{}}}\n\n200 !== 503\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/complete",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/almacenes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/categorias",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/productos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/proveedores",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "roles",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "users",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/proveedores/buscar-ruc/20987654369",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/proveedores/buscar-ruc/20100000000",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/proveedores/buscar-ruc/20987654369",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/cotizaciones",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/cotizaciones",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "compras/cotizaciones/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/cotizaciones/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/cotizaciones",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/cotizaciones/:id/enviar",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/cotizaciones/:id/aprobar",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/cotizaciones/:id/convertir-oc",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/cotizaciones/:id/convertir-oc",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/cotizaciones",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/cotizaciones/:id/enviar",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/cotizaciones/:id/rechazar",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/cotizaciones/:id/convertir-oc",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/ordenes",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "compras/ordenes/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/ordenes/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/ordenes",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/ordenes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/ordenes/:id/rechazar",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/ordenes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/ordenes/:id/cancelar",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/recepciones/ordenes/:id",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/ordenes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/ordenes/:id/aprobar",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/ordenes/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/ordenes/:id/recepciones",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/ordenes/:id/recepciones",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "compras/recepciones/:id",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/ordenes",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/ordenes/:id",
+      "status": 404
+    },
+    {
+      "method": "PUT",
+      "endpoint": "compras/ordenes/:id",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/ordenes/:id/cancelar",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/ordenes/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/stats",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/reporte-compras",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/next-number",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/productos",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras",
+      "status": 410
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/stats",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/ordenes",
+      "status": 500
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/cotizaciones",
+      "status": 500
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/recepciones",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/reporte-compras",
+      "status": 200
+    }
+  ]
+}

@@ -519,6 +519,14 @@ Cotización -> Aprobación -> Orden de compra -> Recepción -> CxP -> Pago
   que faltan para recibir bienes y servicios. Conserva las cuentas existentes,
   incluso si fueron personalizadas o desactivadas; una cuenta no apta sigue
   bloqueando el asiento hasta que se corrija la configuración contable.
+- Editar una recepción en borrador usa `actualizar_recepcion_tx_568`: valida
+  actor, tenant y estado con bloqueo; el backend no tiene DML directo sobre
+  recepciones. Repetir el mismo texto es idempotente; cerrada responde 400.
+- Rechazar o cancelar una OC la deja `ANULADA` con su actor y motivo.
+- Lecturas de compras indisponibles responden 503 (también resumen, listado,
+  reporte, productos y detalle heredados de `/api/compras`); nunca cifras en
+  cero, lista vacía ni `success:false` con HTTP 200. Inexistente es 404. Las
+  rutas heredadas de escritura responden 410.
 
 Código principal: `apps/erp-api/src/modules/compras`.
 

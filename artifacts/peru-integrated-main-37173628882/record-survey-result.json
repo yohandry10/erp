@@ -1,0 +1,1868 @@
+{
+  "remoteWrites": false,
+  "scope": "Carga de rutas con registros; no acredita todas las mutaciones",
+  "missingFixtures": [],
+  "findings": [
+    {
+      "template": "ventas/rma/[id]",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "scriptErrors": [],
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Dashboard",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/",
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Ventas",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/ventas/",
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "RMA y devoluciones",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/ventas/rma/",
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Volver a RMA",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/ventas/rma/",
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Gestionar aplicación o reembolso",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/ventas/rma/",
+          "executed": false
+        }
+      ]
+    },
+    {
+      "template": "ventas/pedidos/[id]",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "scriptErrors": [],
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Dashboard",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/",
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Ventas",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/ventas/",
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Pedidos",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/ventas/pedidos/",
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ver boleta A4",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ]
+    },
+    {
+      "template": "ventas/cotizaciones/[id]",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "scriptErrors": [],
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Dashboard",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/",
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Ventas",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/ventas/",
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Cotizaciones",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/ventas/cotizaciones/",
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ]
+    },
+    {
+      "template": "ventas/clientes/[id]",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "scriptErrors": [],
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Dashboard",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/",
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Ventas",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/ventas/",
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Clientes",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/ventas/clientes/",
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Volver",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Editar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ]
+    },
+    {
+      "template": "ventas/clientes/[id]/editar",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "scriptErrors": [],
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Dashboard",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/",
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Ventas",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/ventas/",
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Clientes",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/ventas/clientes/",
+          "executed": false
+        },
+        {
+          "element": "a",
+          "label": "Detalle",
+          "type": null,
+          "disabled": false,
+          "path": "/dashboard/ventas/clientes/[id]/",
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Volver",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "select",
+          "label": "Tipo de Cliente *",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "select",
+          "label": "Tipo de Documento *",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Número de Documento * (8 dígitos)",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Razón Social / Nombre Completo *",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Nombre Comercial (Opcional)",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "textarea",
+          "label": "Dirección (Opcional)",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Email (Opcional)",
+          "type": "email",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Teléfono (Opcional)",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cancelar",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Actualizar Cliente",
+          "type": "submit",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ]
+    },
+    {
+      "template": "compras/recepciones/[id]",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "scriptErrors": [],
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Volver a Recepciones",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ver Orden",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ]
+    },
+    {
+      "template": "compras/proveedores/[id]",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "scriptErrors": [],
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Volver a Proveedores",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Editar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Desactivar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ]
+    },
+    {
+      "template": "compras/proveedores/[id]/editar",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "scriptErrors": [],
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Volver al Detalle",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "RUC *",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Razón Social *",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Nombre Comercial",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Email *",
+          "type": "email",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Nombre del Contacto",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Teléfono",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "textarea",
+          "label": "Dirección",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "select",
+          "label": "Condiciones de Pago",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Límite de Crédito (PEN)",
+          "type": "number",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Suspensión vigente hasta",
+          "type": "date",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cancelar",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Actualizar Proveedor",
+          "type": "submit",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ]
+    },
+    {
+      "template": "compras/cotizaciones/[id]",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "scriptErrors": [],
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Volver a Cotizaciones",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Enviar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ]
+    },
+    {
+      "template": "compras/ordenes/[id]",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "scriptErrors": [],
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Volver a Órdenes de Compra",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Actualizar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Imprimir / PDF",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ver Recepciones",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ]
+    },
+    {
+      "template": "compras/devoluciones/[id]",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "scriptErrors": [],
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Volver",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ]
+    },
+    {
+      "template": "finanzas/cxp/[id]",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "scriptErrors": [],
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ]
+    },
+    {
+      "template": "finanzas/bancos/[id]",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "scriptErrors": [],
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Transferir",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Nuevo movimiento",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Actualizar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Exportar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Filtros",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ]
+    },
+    {
+      "template": "finanzas/bancos/[id]/editar",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "scriptErrors": [],
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Volver",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Nombre de la Cuenta *",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Banco *",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Número de Cuenta *",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "select",
+          "label": "Tipo de Cuenta *",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "select",
+          "label": "Cuenta contable bancaria *",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Permite SobregiroPermite que el saldo de la cuenta sea negativo",
+          "type": "checkbox",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Cuenta ActivaSolo las cuentas activas pueden recibir movimientos",
+          "type": "checkbox",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cancelar",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Guardar Cambios",
+          "type": "submit",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ]
+    },
+    {
+      "template": "finanzas/conciliacion/[id]",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "scriptErrors": [],
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "🧙 Modo Wizard",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Importar Extracto CSV",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Match Automático",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Match Manual",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Registrar ajuste",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cerrar Conciliación",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ]
+    },
+    {
+      "template": "contabilidad/periodos/[id]",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "scriptErrors": [],
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Volver a Períodos",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cerrar Período",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ]
+    },
+    {
+      "template": "contabilidad/asientos/[id]",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "scriptErrors": [],
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Volver a asientos",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Actualizar",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Reversar",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Descargar PDF",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Distribuir",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Distribuir",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Distribuir",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Distribuir",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Distribuir",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ]
+    },
+    {
+      "template": "contabilidad/asientos/[id]/editar",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "scriptErrors": [],
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Volver al asiento",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Reintentar",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ]
+    },
+    {
+      "template": "inventario/productos/[id]/editar",
+      "tenant": 1,
+      "status": 200,
+      "errors": [],
+      "scriptErrors": [],
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Volver a Productos",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Código *",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Código de Barras",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Nombre *",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Marca",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "select",
+          "label": "Unidad de medida",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "textarea",
+          "label": "Descripción",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "select",
+          "label": "Categoría *",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Elegir imagen",
+          "type": "file",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Precio de Compra (PEN)",
+          "type": "number",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Precio de Venta (PEN) *",
+          "type": "number",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "select",
+          "label": "Afectación IGV",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Abrir ajustes y transferencias",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Stock Mínimo",
+          "type": "number",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cancelar",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Guardar Cambios",
+          "type": "submit",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ]
+    },
+    {
+      "template": "contabilidad/presupuestos/[id]",
+      "tenant": 2,
+      "status": 200,
+      "errors": [],
+      "scriptErrors": [],
+      "controls": []
+    },
+    {
+      "template": "contabilidad/centros-costo/[id]",
+      "tenant": 2,
+      "status": 200,
+      "errors": [],
+      "scriptErrors": [],
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Volver",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Comparacion",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Editar",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "select",
+          "label": "PeriodoSeleccionar periodooctubre de 2026",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Presupuesto",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Gastos",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ]
+    },
+    {
+      "template": "contabilidad/centros-costo/[id]/editar",
+      "tenant": 2,
+      "status": 200,
+      "errors": [],
+      "scriptErrors": [],
+      "controls": [
+        {
+          "element": "button",
+          "label": "Abrir notificaciones",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cambiar a tema claro",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Convertir a cuenta real",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Ocultar aviso de cuenta demo",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Código *",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Nombre *",
+          "type": "text",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "textarea",
+          "label": "Descripción",
+          "type": null,
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "input",
+          "label": "Centro de costo activo",
+          "type": "checkbox",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Cancelar",
+          "type": "button",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        },
+        {
+          "element": "button",
+          "label": "Guardar Cambios",
+          "type": "submit",
+          "disabled": false,
+          "path": null,
+          "executed": false
+        }
+      ]
+    }
+  ]
+}

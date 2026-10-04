@@ -1,0 +1,29 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "Creación manual por UI/API/DB con certificado desechable del primer cliente local",
+  "checks": [
+    {
+      "check": "Peso de 2 kg válido para el DTO también permite enviar el formulario",
+      "passed": true,
+      "validity": {
+        "valid": true,
+        "stepMismatch": false,
+        "step": "0.001",
+        "min": "0.001",
+        "value": "2"
+      }
+    },
+    {
+      "check": "Formulario ofrece documento del destinatario requerido para firmar",
+      "passed": true
+    },
+    {
+      "check": "Guía creada y firmada con certificado configurado; sin transmisión fiscal",
+      "passed": true,
+      "estado": "FIRMADO",
+      "error": null
+    }
+  ],
+  "unexpected_errors": []
+}

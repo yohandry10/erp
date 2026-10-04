@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { readUnavailable } from '../compras-errors';
 
 @Injectable()
 export class OcAprobacionesRepository {
@@ -14,7 +15,7 @@ export class OcAprobacionesRepository {
       .eq('tenant_id', tenantId)
       .order('nivel', { ascending: true });
 
-    if (error) throw new Error(`Error al obtener aprobaciones: ${error.message}`);
+    if (error) throw readUnavailable('las aprobaciones de la orden');
     return data || [];
   }
 }

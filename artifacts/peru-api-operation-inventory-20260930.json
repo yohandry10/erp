@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-10-03T21:25:28.413Z",
-  "commit": "8d717bcfb8e038a5d52abf95c124c99438009080",
+  "generated_at": "2026-10-04T03:55:18.228Z",
+  "commit": "0d6df0eed95e0b0622c01c2d56877bb241c1d07b",
   "excluded": [
     "Analytics"
   ],
@@ -1350,7 +1350,7 @@
       "endpoint": "/api/compras/stats",
       "summary": "Obtener estadísticas de compras",
       "source": "apps/erp-api/src/modules/compras.controller.ts",
-      "line": 28,
+      "line": 29,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('compras.ordenes.ver')"
@@ -1373,7 +1373,7 @@
       "endpoint": "/api/compras",
       "summary": null,
       "source": "apps/erp-api/src/modules/compras.controller.ts",
-      "line": 124,
+      "line": 116,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('compras.ordenes.ver')"
@@ -1396,7 +1396,7 @@
       "endpoint": "/api/compras/next-number",
       "summary": "Obtener siguiente número de orden",
       "source": "apps/erp-api/src/modules/compras.controller.ts",
-      "line": 168,
+      "line": 157,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('compras.ordenes.crear')"
@@ -1419,7 +1419,7 @@
       "endpoint": "/api/compras",
       "summary": null,
       "source": "apps/erp-api/src/modules/compras.controller.ts",
-      "line": 214,
+      "line": 200,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('compras.ordenes.crear')"
@@ -1442,7 +1442,7 @@
       "endpoint": "/api/compras/:id/recibir",
       "summary": null,
       "source": "apps/erp-api/src/modules/compras.controller.ts",
-      "line": 222,
+      "line": 208,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('compras.ordenes.actualizar')"
@@ -1465,7 +1465,7 @@
       "endpoint": "/api/compras/:id/cancelar",
       "summary": null,
       "source": "apps/erp-api/src/modules/compras.controller.ts",
-      "line": 230,
+      "line": 216,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('compras.ordenes.cancelar')"
@@ -1488,7 +1488,7 @@
       "endpoint": "/api/compras/reporte-compras",
       "summary": null,
       "source": "apps/erp-api/src/modules/compras.controller.ts",
-      "line": 238,
+      "line": 224,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('compras.ordenes.ver')"
@@ -1511,7 +1511,7 @@
       "endpoint": "/api/compras/productos",
       "summary": "Obtener lista de productos para compras",
       "source": "apps/erp-api/src/modules/compras.controller.ts",
-      "line": 316,
+      "line": 299,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('compras.ordenes.ver')"
@@ -1534,7 +1534,7 @@
       "endpoint": "/api/compras/:id",
       "summary": "Obtener orden específica por ID",
       "source": "apps/erp-api/src/modules/compras.controller.ts",
-      "line": 363,
+      "line": 341,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('compras.ordenes.ver')"
@@ -2267,7 +2267,7 @@
       "module": "compras",
       "operation": "crearRecepcion",
       "method": "POST",
-      "endpoint": "/api/compras/recepciones//ordenes/:ordenId",
+      "endpoint": "/api/compras/recepciones/ordenes/:ordenId",
       "summary": "Crear recepción",
       "source": "apps/erp-api/src/modules/compras/controllers/recepciones.controller.ts",
       "line": 76,
@@ -11251,7 +11251,7 @@
       "module": "reports",
       "operation": "reporteVentas",
       "method": "GET",
-      "endpoint": "/api/reports//ventas",
+      "endpoint": "/api/reports/ventas",
       "summary": "Reporte de ventas",
       "source": "apps/erp-api/src/modules/reports.controller.ts",
       "line": 22,
@@ -11274,7 +11274,7 @@
       "module": "reports",
       "operation": "exportVentasExcel",
       "method": "GET",
-      "endpoint": "/api/reports//ventas/export/excel",
+      "endpoint": "/api/reports/ventas/export/excel",
       "summary": "Exportar reporte de ventas a Excel",
       "source": "apps/erp-api/src/modules/reports.controller.ts",
       "line": 101,
@@ -11297,7 +11297,7 @@
       "module": "reports",
       "operation": "reporteInventario",
       "method": "GET",
-      "endpoint": "/api/reports//inventario",
+      "endpoint": "/api/reports/inventario",
       "summary": "Reporte de inventario",
       "source": "apps/erp-api/src/modules/reports.controller.ts",
       "line": 196,
@@ -14013,7 +14013,7 @@
       "module": "usuarios-sistema",
       "operation": "getStats",
       "method": "GET",
-      "endpoint": "/api/usuarios-sistema//stats",
+      "endpoint": "/api/usuarios-sistema/stats",
       "summary": "Métricas de usuarios y roles",
       "source": "apps/erp-api/src/modules/usuarios.controller.ts",
       "line": 106,
@@ -14036,7 +14036,7 @@
       "module": "usuarios",
       "operation": "getStats",
       "method": "GET",
-      "endpoint": "/api/usuarios//stats",
+      "endpoint": "/api/usuarios/stats",
       "summary": "Métricas de usuarios y roles",
       "source": "apps/erp-api/src/modules/usuarios.controller.ts",
       "line": 106,
@@ -14059,7 +14059,7 @@
       "module": "usuarios-sistema",
       "operation": "getRoles",
       "method": "GET",
-      "endpoint": "/api/usuarios-sistema//roles",
+      "endpoint": "/api/usuarios-sistema/roles",
       "summary": "Roles activos con usuarios y permisos",
       "source": "apps/erp-api/src/modules/usuarios.controller.ts",
       "line": 130,
@@ -14082,7 +14082,7 @@
       "module": "usuarios",
       "operation": "getRoles",
       "method": "GET",
-      "endpoint": "/api/usuarios//roles",
+      "endpoint": "/api/usuarios/roles",
       "summary": "Roles activos con usuarios y permisos",
       "source": "apps/erp-api/src/modules/usuarios.controller.ts",
       "line": 130,
@@ -14105,7 +14105,7 @@
       "module": "usuarios-sistema",
       "operation": "crearUsuario",
       "method": "POST",
-      "endpoint": "/api/usuarios-sistema//crear",
+      "endpoint": "/api/usuarios-sistema/crear",
       "summary": "Crear usuario mediante el writer RBAC canónico",
       "source": "apps/erp-api/src/modules/usuarios.controller.ts",
       "line": 172,
@@ -14128,7 +14128,7 @@
       "module": "usuarios",
       "operation": "crearUsuario",
       "method": "POST",
-      "endpoint": "/api/usuarios//crear",
+      "endpoint": "/api/usuarios/crear",
       "summary": "Crear usuario mediante el writer RBAC canónico",
       "source": "apps/erp-api/src/modules/usuarios.controller.ts",
       "line": 172,
@@ -14151,7 +14151,7 @@
       "module": "usuarios-sistema",
       "operation": "actualizarUsuario",
       "method": "PUT",
-      "endpoint": "/api/usuarios-sistema//:id",
+      "endpoint": "/api/usuarios-sistema/:id",
       "summary": "Actualizar usuario y rol en una transacción",
       "source": "apps/erp-api/src/modules/usuarios.controller.ts",
       "line": 197,
@@ -14174,7 +14174,7 @@
       "module": "usuarios",
       "operation": "actualizarUsuario",
       "method": "PUT",
-      "endpoint": "/api/usuarios//:id",
+      "endpoint": "/api/usuarios/:id",
       "summary": "Actualizar usuario y rol en una transacción",
       "source": "apps/erp-api/src/modules/usuarios.controller.ts",
       "line": 197,
@@ -14197,7 +14197,7 @@
       "module": "usuarios-sistema",
       "operation": "cambiarEstado",
       "method": "PUT",
-      "endpoint": "/api/usuarios-sistema//:id/estado",
+      "endpoint": "/api/usuarios-sistema/:id/estado",
       "summary": "Cambiar estado y revocar sesiones cuando corresponda",
       "source": "apps/erp-api/src/modules/usuarios.controller.ts",
       "line": 215,
@@ -14220,7 +14220,7 @@
       "module": "usuarios",
       "operation": "cambiarEstado",
       "method": "PUT",
-      "endpoint": "/api/usuarios//:id/estado",
+      "endpoint": "/api/usuarios/:id/estado",
       "summary": "Cambiar estado y revocar sesiones cuando corresponda",
       "source": "apps/erp-api/src/modules/usuarios.controller.ts",
       "line": 215,
@@ -14243,7 +14243,7 @@
       "module": "usuarios-sistema",
       "operation": "eliminarUsuario",
       "method": "DELETE",
-      "endpoint": "/api/usuarios-sistema//:id",
+      "endpoint": "/api/usuarios-sistema/:id",
       "summary": "Inactivar usuario de forma trazable",
       "source": "apps/erp-api/src/modules/usuarios.controller.ts",
       "line": 226,
@@ -14266,7 +14266,7 @@
       "module": "usuarios",
       "operation": "eliminarUsuario",
       "method": "DELETE",
-      "endpoint": "/api/usuarios//:id",
+      "endpoint": "/api/usuarios/:id",
       "summary": "Inactivar usuario de forma trazable",
       "source": "apps/erp-api/src/modules/usuarios.controller.ts",
       "line": 226,
@@ -14289,7 +14289,7 @@
       "module": "usuarios-sistema",
       "operation": "getMyPermissions",
       "method": "GET",
-      "endpoint": "/api/usuarios-sistema//me/permissions",
+      "endpoint": "/api/usuarios-sistema/me/permissions",
       "summary": "Permisos efectivos del usuario autenticado",
       "source": "apps/erp-api/src/modules/usuarios.controller.ts",
       "line": 234,
@@ -14311,7 +14311,7 @@
       "module": "usuarios",
       "operation": "getMyPermissions",
       "method": "GET",
-      "endpoint": "/api/usuarios//me/permissions",
+      "endpoint": "/api/usuarios/me/permissions",
       "summary": "Permisos efectivos del usuario autenticado",
       "source": "apps/erp-api/src/modules/usuarios.controller.ts",
       "line": 234,
@@ -14333,7 +14333,7 @@
       "module": "usuarios-sistema",
       "operation": "getUserPermissions",
       "method": "GET",
-      "endpoint": "/api/usuarios-sistema//:id/permissions",
+      "endpoint": "/api/usuarios-sistema/:id/permissions",
       "summary": "Permisos efectivos de un usuario del tenant",
       "source": "apps/erp-api/src/modules/usuarios.controller.ts",
       "line": 246,
@@ -14356,7 +14356,7 @@
       "module": "usuarios",
       "operation": "getUserPermissions",
       "method": "GET",
-      "endpoint": "/api/usuarios//:id/permissions",
+      "endpoint": "/api/usuarios/:id/permissions",
       "summary": "Permisos efectivos de un usuario del tenant",
       "source": "apps/erp-api/src/modules/usuarios.controller.ts",
       "line": 246,
@@ -14379,7 +14379,7 @@
       "module": "usuarios-sistema",
       "operation": "getUsuario",
       "method": "GET",
-      "endpoint": "/api/usuarios-sistema//:id",
+      "endpoint": "/api/usuarios-sistema/:id",
       "summary": "Detalle seguro de usuario",
       "source": "apps/erp-api/src/modules/usuarios.controller.ts",
       "line": 256,
@@ -14402,7 +14402,7 @@
       "module": "usuarios",
       "operation": "getUsuario",
       "method": "GET",
-      "endpoint": "/api/usuarios//:id",
+      "endpoint": "/api/usuarios/:id",
       "summary": "Detalle seguro de usuario",
       "source": "apps/erp-api/src/modules/usuarios.controller.ts",
       "line": 256,
@@ -15279,7 +15279,7 @@
       "endpoint": "/api/ventas/cotizaciones",
       "summary": "Listar cotizaciones",
       "source": "apps/erp-api/src/modules/ventas/cotizaciones/cotizaciones.controller.ts",
-      "line": 42,
+      "line": 43,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.cotizaciones.ver')"
@@ -15302,7 +15302,7 @@
       "endpoint": "/api/ventas/cotizaciones",
       "summary": "Crear cotización",
       "source": "apps/erp-api/src/modules/ventas/cotizaciones/cotizaciones.controller.ts",
-      "line": 77,
+      "line": 78,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.cotizaciones.crear')"
@@ -15325,7 +15325,7 @@
       "endpoint": "/api/ventas/cotizaciones/:id",
       "summary": "Obtener cotización",
       "source": "apps/erp-api/src/modules/ventas/cotizaciones/cotizaciones.controller.ts",
-      "line": 105,
+      "line": 107,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.cotizaciones.ver')"
@@ -15348,7 +15348,7 @@
       "endpoint": "/api/ventas/cotizaciones/:id",
       "summary": "Actualizar cotización",
       "source": "apps/erp-api/src/modules/ventas/cotizaciones/cotizaciones.controller.ts",
-      "line": 127,
+      "line": 129,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.cotizaciones.editar')"
@@ -15371,7 +15371,7 @@
       "endpoint": "/api/ventas/cotizaciones/:id",
       "summary": "Eliminar cotización",
       "source": "apps/erp-api/src/modules/ventas/cotizaciones/cotizaciones.controller.ts",
-      "line": 151,
+      "line": 153,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.cotizaciones.eliminar')"
@@ -15394,7 +15394,7 @@
       "endpoint": "/api/ventas/cotizaciones/:id/enviar",
       "summary": "Marcar cotización como enviada",
       "source": "apps/erp-api/src/modules/ventas/cotizaciones/cotizaciones.controller.ts",
-      "line": 170,
+      "line": 172,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.cotizaciones.editar')"
@@ -15417,7 +15417,7 @@
       "endpoint": "/api/ventas/cotizaciones/:id/aprobar",
       "summary": "Aprobar cotización con segregación o excepción administrativa trazable",
       "source": "apps/erp-api/src/modules/ventas/cotizaciones/cotizaciones.controller.ts",
-      "line": 184,
+      "line": 186,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.cotizaciones.approve')"
@@ -15440,7 +15440,7 @@
       "endpoint": "/api/ventas/cotizaciones/:id/rechazar",
       "summary": "Rechazar cotización con actor segregado",
       "source": "apps/erp-api/src/modules/ventas/cotizaciones/cotizaciones.controller.ts",
-      "line": 199,
+      "line": 201,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.cotizaciones.approve')"
@@ -15463,7 +15463,7 @@
       "endpoint": "/api/ventas/cotizaciones/:id/convertir-pedido",
       "summary": "Convertir cotización a pedido",
       "source": "apps/erp-api/src/modules/ventas/cotizaciones/cotizaciones.controller.ts",
-      "line": 218,
+      "line": 220,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.cotizaciones.convertir_pedido')"
@@ -15486,7 +15486,7 @@
       "endpoint": "/api/ventas/cotizaciones/:id/historial",
       "summary": "Obtener historial de la cotización",
       "source": "apps/erp-api/src/modules/ventas/cotizaciones/cotizaciones.controller.ts",
-      "line": 247,
+      "line": 249,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.cotizaciones.ver')"
@@ -15555,7 +15555,7 @@
       "endpoint": "/api/ventas/pedidos/aprobaciones/pendientes",
       "summary": "Listar pedidos pendientes de aprobación",
       "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts",
-      "line": 112,
+      "line": 113,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.pedidos_aprobaciones.ver')"
@@ -15578,7 +15578,7 @@
       "endpoint": "/api/ventas/pedidos/:id/aprobaciones",
       "summary": "Historial de aprobaciones",
       "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts",
-      "line": 126,
+      "line": 127,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.pedidos_aprobaciones.ver')"
@@ -15601,7 +15601,7 @@
       "endpoint": "/api/ventas/pedidos/:id/aprobaciones/decision",
       "summary": "Resolver aprobación de pedido",
       "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts",
-      "line": 140,
+      "line": 141,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.pedidos_aprobaciones.resolver')"
@@ -15624,7 +15624,7 @@
       "endpoint": "/api/ventas/pedidos/:id",
       "summary": "Obtener pedido",
       "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts",
-      "line": 168,
+      "line": 169,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.pedidos.ver')"
@@ -15647,7 +15647,7 @@
       "endpoint": "/api/ventas/pedidos/:id",
       "summary": "Actualizar pedido",
       "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts",
-      "line": 190,
+      "line": 191,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.pedidos.editar')"
@@ -15670,7 +15670,7 @@
       "endpoint": "/api/ventas/pedidos/:id/confirmar",
       "summary": "Confirmar pedido",
       "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts",
-      "line": 213,
+      "line": 214,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.pedidos.confirmar')"
@@ -15693,7 +15693,7 @@
       "endpoint": "/api/ventas/pedidos/:id/cancelar",
       "summary": "Cancelar pedido",
       "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts",
-      "line": 244,
+      "line": 245,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.pedidos.cancelar')"
@@ -15716,7 +15716,7 @@
       "endpoint": "/api/ventas/pedidos/:id/generar-factura",
       "summary": "Generar factura",
       "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts",
-      "line": 276,
+      "line": 277,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.pedidos.generar_factura')"
@@ -15739,7 +15739,7 @@
       "endpoint": "/api/ventas/pedidos/:id/historial",
       "summary": "Obtener historial del pedido",
       "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts",
-      "line": 299,
+      "line": 300,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.pedidos.ver_historial')"
@@ -15762,7 +15762,7 @@
       "endpoint": "/api/ventas/pedidos/:id/gres",
       "summary": "Listar GRE asociadas",
       "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts",
-      "line": 316,
+      "line": 317,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.pedidos.ver_gre')"
@@ -15785,7 +15785,7 @@
       "endpoint": "/api/ventas/pedidos/:id/generar-documento",
       "summary": "Generar documento fiscal desde pedido",
       "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts",
-      "line": 330,
+      "line": 331,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.pedidos.generar_factura')"

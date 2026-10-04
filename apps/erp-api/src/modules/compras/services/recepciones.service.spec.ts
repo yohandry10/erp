@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { ServiceUnavailableException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { RecepcionesService } from './recepciones.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
@@ -132,13 +132,13 @@ describe('RecepcionesService', () => {
       expect(mockQueryBuilder.eq).toHaveBeenCalledWith('estado', 'BORRADOR');
     });
 
-    it('should throw BadRequestException on database error', async () => {
+    it('responde 503 cuando no puede leer las recepciones', async () => {
       Object.assign(mockQueryBuilder, {
         data: null,
         error: { message: 'Database error' },
       });
 
-      await expect(service.obtenerRecepciones('tenant-1')).rejects.toThrow(BadRequestException);
+      await expect(service.obtenerRecepciones('tenant-1')).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
   });
 
@@ -207,14 +207,17 @@ describe('RecepcionesService', () => {
     });
 
     it('should throw NotFoundException when recepcion not found', async () => {
-      mockQueryBuilder.maybeSingle.mockResolvedValue({
-        data: null,
-        error: { message: 'Not found' },
-      });
+      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
 
       await expect(service.obtenerRecepcionPorId('invalid-id', 'tenant-1')).rejects.toThrow(
         NotFoundException
       );
+    });
+
+    it('responde 503 cuando no puede leer la recepción', async () => {
+      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: null, error: { message: 'permission denied' } });
+
+      await expect(service.obtenerRecepcionPorId('rec-1', 'tenant-1')).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
   });
 
@@ -569,14 +572,19 @@ describe('RecepcionesService', () => {
       };
 
       jest.spyOn(service, 'obtenerRecepcionPorId').mockResolvedValue(mockRecepcion);
-      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: { id: 'rec-1' }, error: null });
+      mockSupabaseClient.rpc.mockResolvedValueOnce({ data: { id: 'rec-1', estado: 'BORRADOR', idempotent: false }, error: null });
 
       const updateDto = { observaciones: 'Updated observations' };
       const result = await service.actualizarRecepcion('rec-1', 'tenant-1', updateDto, 'user-1');
 
       expect(result).toBeDefined();
-      expect(mockSupabaseClient.from).toHaveBeenCalledWith('recepciones');
-      expect(mockQueryBuilder.eq).toHaveBeenCalledWith('estado', 'BORRADOR');
+      // Sin DML directo: el writer valida actor, tenant y estado.
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('actualizar_recepcion_tx_568', {
+        p_tenant_id: 'tenant-1',
+        p_actor_id: 'user-1',
+        p_recepcion_id: 'rec-1',
+        p_observaciones: 'Updated observations',
+      });
     });
 
     it('should fail safely when the reception closes during an update', async () => {
@@ -584,7 +592,7 @@ describe('RecepcionesService', () => {
         id: 'rec-1',
         estado: 'BORRADOR',
       });
-      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
+      mockSupabaseClient.rpc.mockResolvedValueOnce({ data: null, error: { code: '55000', message: 'RECEPCION_NOT_EDITABLE' } });
 
       await expect(
         service.actualizarRecepcion(
