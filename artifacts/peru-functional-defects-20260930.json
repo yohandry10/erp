@@ -3231,7 +3231,7 @@
       "pending": [
         "CI exacto, main y runtime. UI real de usuarios y roles distintos de ADMIN."
       ],
-      "canonical_proof": "artifacts/peru-users-finance-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004"
     },
     {
       "id": "finance-cxp-foreign-writer-400",
@@ -3255,7 +3255,7 @@
       "pending": [
         "CI exacto, main y runtime. CxC notas de crédito y reprogramación sin caso propio."
       ],
-      "canonical_proof": "artifacts/peru-users-finance-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004"
     },
     {
       "id": "finance-cxp-reads-unavailability-400",
@@ -3291,7 +3291,7 @@
       "pending": [
         "CI exacto, main y runtime. CxC notas de crédito y reprogramación sin caso propio."
       ],
-      "canonical_proof": "artifacts/peru-users-finance-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004"
     },
     {
       "id": "finance-bank-reads-unavailability-400",
@@ -3323,7 +3323,111 @@
       "pending": [
         "CI exacto, main y runtime. CxC notas de crédito y reprogramación sin caso propio."
       ],
-      "canonical_proof": "artifacts/peru-users-finance-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004"
+    },
+    {
+      "id": "hr-pay-data-only-rrhh-access",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/planillas/:id/historial-pagos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/pagos/:id/comprobante"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/empleados/:id/boleta-pago/:mes"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-hr-baseline-20261004",
+        "observed_error": "Un usuario con sólo rrhh.access (sin rrhh.planillas.read) obtiene 200 en el historial de pagos, el comprobante PDF y la boleta mensual: lee remuneraciones que el listado de planillas y pagos sí le niega con 403.",
+        "local_only": true
+      },
+      "correction": "Historial, comprobante y boleta exigen rrhh.planillas.read; planilla o empleado ajeno 404; estado de candidato validado; lecturas de RRHH indisponibles 503",
+      "pending": [
+        "CI exacto, main y runtime. Solicitudes, beneficios, evaluaciones, capacitaciones, horarios y expediente sin pantalla ni caso."
+      ],
+      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004"
+    },
+    {
+      "id": "hr-foreign-reads-200",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/planillas/:id/historial-pagos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/empleados/:id/boleta-pago/:mes"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-hr-baseline-20261004",
+        "observed_error": "Otra empresa recibe 200 (lista vacía o success:false 'Empleado no encontrado') en vez de 404; no se expusieron datos.",
+        "local_only": true
+      },
+      "correction": "Historial, comprobante y boleta exigen rrhh.planillas.read; planilla o empleado ajeno 404; estado de candidato validado; lecturas de RRHH indisponibles 503",
+      "pending": [
+        "CI exacto, main y runtime. Solicitudes, beneficios, evaluaciones, capacitaciones, horarios y expediente sin pantalla ni caso."
+      ],
+      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004"
+    },
+    {
+      "id": "hr-candidate-invalid-status-accepted",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "PUT",
+          "endpoint": "/api/rrhh/candidatos/:id/estado"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-hr-baseline-20261004",
+        "observed_error": "Un estado fuera del dominio (estado-inventado) responde 200.",
+        "local_only": true
+      },
+      "correction": "Historial, comprobante y boleta exigen rrhh.planillas.read; planilla o empleado ajeno 404; estado de candidato validado; lecturas de RRHH indisponibles 503",
+      "pending": [
+        "CI exacto, main y runtime. Solicitudes, beneficios, evaluaciones, capacitaciones, horarios y expediente sin pantalla ni caso."
+      ],
+      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004"
+    },
+    {
+      "id": "hr-reads-unavailability",
+      "status": "canonical_local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/planillas"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/pagos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/asistencia"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/candidatos"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-hr-baseline-20261004",
+        "observed_error": "Sin lectura, planillas/asistencia/candidatos responden 500 y pagos 200 con una lista vacía; el historial de pagos también devolvía [] ante cualquier error.",
+        "local_only": true
+      },
+      "correction": "Historial, comprobante y boleta exigen rrhh.planillas.read; planilla o empleado ajeno 404; estado de candidato validado; lecturas de RRHH indisponibles 503",
+      "pending": [
+        "CI exacto, main y runtime. Solicitudes, beneficios, evaluaciones, capacitaciones, horarios y expediente sin pantalla ni caso."
+      ],
+      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004"
     }
   ]
 }

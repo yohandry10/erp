@@ -89,7 +89,7 @@ verificadores y el ensayo sobre el respaldo productivo 568
 (`artifacts/erp-peru-569-rehearsal-20261004165609161-17420.json`). 569 no está
 promovida; faltan CI exacto, promoción, main y runtime. El libro diario sigue
 listando asientos de todo estado: observación no cambiada.
-Usuarios y finanzas PE (rama `codex/peru-users-admin-20261004`, sin
+Usuarios, finanzas y RRHH PE (rama `codex/peru-users-admin-20261004`, sin
 migración): 11 escenarios de alta, edición, permisos efectivos, inactivación
 con revocación de sesión, baja, aislamiento y roles propios reprodujeron un
 defecto (`artifacts/peru-users-defects-baseline-20261004.json`): el alta
@@ -97,8 +97,13 @@ devolvía en claro la contraseña elegida, también al reintentar. Finanzas
 (edición/anulación/aging/vencimientos de CxP, pago en lote, programación,
 flujo, consultas bancarias y conciliación) reprodujo tres
 (`artifacts/peru-finance-defects-baseline-20261004.json`): CxP ajena 400 en vez
-de 404 y lecturas de CxP/bancos caídas como 400. Tras corregir, 21/21 y restore
-(`artifacts/peru-users-finance-canonical-local-20261004`). Ante una caída de
+de 404 y lecturas de CxP/bancos caídas como 400. RRHH (planillas, pago,
+historial, comprobante, boleta, asistencia, reclutamiento, CTS) reprodujo cuatro
+(`artifacts/peru-hr-defects-baseline-20261004.json`), el más grave: con sólo
+`rrhh.access` se leían historial, comprobante y boleta (remuneraciones); además
+planilla/empleado ajenos 200 en vez de 404, estado de candidato libre y
+lecturas caídas como 500 o 200 vacío. Tras corregir, 32/32 y restore
+(`artifacts/peru-users-finance-hr-canonical-local-20261004`). Ante una caída de
 `usuarios_sistema` el guard responde 403 (falla cerrado); `finanzas.controller`
 (tablero e históricos) no está montado ni ofrecido; CxC notas de crédito y
 reprogramación siguen sin caso propio.

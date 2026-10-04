@@ -826,6 +826,12 @@ Código principal: `apps/erp-api/src/modules/contabilidad`.
 ## Recursos humanos
 
 - Empleados, contratos, asistencia, vacaciones y conceptos alimentan planillas.
+- Remuneraciones exigen `rrhh.planillas.read`: historial de pagos, comprobante
+  y boleta mensual no se abren sólo con `rrhh.access`. Una planilla o un
+  empleado de otra empresa responden 404 y las consultas de planillas, pagos,
+  asistencia, candidatos y vacantes responden 503 si no pueden leer. El estado
+  de un candidato sólo admite postulante, entrevista, seleccionado, rechazado,
+  contratado o descartado.
   Si falla la lectura de vacaciones, el cálculo devuelve indisponibilidad;
   no interpreta un fallo de permisos o conexión como cero días.
 - Configuración laboral, maestros, reclutamiento, asistencia, solicitudes,
