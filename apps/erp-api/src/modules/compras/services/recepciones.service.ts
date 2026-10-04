@@ -4,6 +4,7 @@ import { CreateRecepcionDto, CerrarRecepcionDto, UpdateRecepcionDto } from '../d
 import { AuditService } from '../../audit/audit.service';
 import { CacheInvalidationService } from '../../../shared/cache/cache-invalidation.service';
 import { appendIntegrationLog } from '../../../shared/utils/integration-log';
+import { isNotFoundError, readUnavailable } from '../compras-errors';
 
 @Injectable()
 export class RecepcionesService {
@@ -134,7 +135,7 @@ export class RecepcionesService {
       const { data, error } = await query;
 
       if (error) {
-        throw new BadRequestException(`Error al obtener recepciones: ${error.message}`);
+        throw readUnavailable('las recepciones');
       }
 
       const results = data || [];
@@ -202,10 +203,11 @@ export class RecepcionesService {
         .eq('id', recepcionId)
         .maybeSingle();
 
-      if (error || !data) {
-        if (error) {
-          this.logger.error('❌ Error obteniendo recepción:', error);
-        }
+      if (error && !isNotFoundError(error)) {
+        this.logger.error('❌ Error obteniendo recepción:', error);
+        throw readUnavailable('la recepción');
+      }
+      if (!data) {
         throw new NotFoundException('Recepción no encontrada');
       }
 
@@ -536,27 +538,32 @@ export class RecepcionesService {
         throw new BadRequestException('Solo se pueden actualizar recepciones en estado BORRADOR');
       }
 
-      // Actualizar observaciones si se proporcionan
+      // Actualizar observaciones si se proporcionan. El backend no tiene DML
+      // directo sobre recepciones: el writer valida actor, tenant y estado.
       if (dto.observaciones !== undefined) {
-        const { data: updated, error: updateError } = await this.supabase.getClient()
-          .from('recepciones')
-          .update({
-            observaciones: dto.observaciones,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', recepcionId)
-          .eq('tenant_id', tenantId)
-          .eq('estado', 'BORRADOR')
-          .select('id')
-          .maybeSingle();
+        if (!userId) {
+          throw new BadRequestException('La actualización requiere un usuario autenticado');
+        }
+        const { error: updateError } = await this.supabase.getClient()
+          .rpc('actualizar_recepcion_tx_568', {
+            p_tenant_id: tenantId,
+            p_actor_id: userId,
+            p_recepcion_id: recepcionId,
+            p_observaciones: dto.observaciones,
+          });
 
         if (updateError) {
-          throw new BadRequestException(`Error al actualizar recepción: ${updateError.message}`);
-        }
-        if (!updated) {
-          throw new BadRequestException(
-            'La recepción dejó de estar en BORRADOR antes de completar la actualización',
-          );
+          const code = String(updateError.code ?? '');
+          if (code === 'P0002') throw new NotFoundException('Recepción no encontrada');
+          if (code === '55000') {
+            throw new BadRequestException(
+              'La recepción dejó de estar en BORRADOR antes de completar la actualización',
+            );
+          }
+          if (code === '22023' || code === 'P0001') {
+            throw new BadRequestException(updateError.message || 'Datos de recepción inválidos');
+          }
+          throw readUnavailable('el writer de recepciones');
         }
       }
 

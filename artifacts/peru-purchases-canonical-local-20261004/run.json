@@ -1,0 +1,17 @@
+{
+  "completedAt": "2026-10-04T03:24:38.590Z",
+  "success": true,
+  "withBrowser": false,
+  "withSurvey": false,
+  "withRecords": false,
+  "candidateCashApi": false,
+  "candidateCashSql": false,
+  "candidateApi": false,
+  "candidateSql": false,
+  "candidateUi": false,
+  "scope": "purchases_diagnostic_api_subset",
+  "database": "PostgreSQL 16 efímero",
+  "output": "artifacts/peru-purchases-local-20261004032326511-19504",
+  "remoteWrites": false,
+  "complete_acceptance": false
+}
