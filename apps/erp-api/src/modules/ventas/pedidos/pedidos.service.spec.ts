@@ -463,9 +463,10 @@ describe('PedidosService', () => {
                 },
                 error: null,
             });
-            jest.spyOn(service, 'findOne').mockRejectedValueOnce(
-                new Error('timeout de lectura post-commit'),
-            );
+            // La verificación previa encuentra el pedido; sólo falla la lectura posterior.
+            jest.spyOn(service, 'findOne')
+                .mockResolvedValueOnce({ id: 'pedido-1', tenant_id: 'tenant-123', estado: 'PENDIENTE', detalle: [] } as any)
+                .mockRejectedValueOnce(new Error('timeout de lectura post-commit'));
 
             await expect(
                 service.update('pedido-1', { notas: 'Nota confirmada' }, 'tenant-123'),
@@ -495,7 +496,7 @@ describe('PedidosService', () => {
 
             mockSupabaseClient.single.mockResolvedValue({
                 data: null,
-                error: { message: 'No encontrado' },
+                error: { code: 'PGRST116', message: 'No encontrado' },
             });
 
             await expect(service.create(createDto as any, tenantA, 'actor-a')).rejects.toThrow(NotFoundException);

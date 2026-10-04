@@ -96,6 +96,16 @@ Cotización -> Pedido -> Reserva -> Despacho -> Documento/CPE -> Cobro -> Asient
 - `nota_credito.emitida`, `saldo_favor.aplicado` y
   `saldo_favor.reembolsado` son los únicos dueños contables de esas operaciones;
   la recepción física no vuelve a contabilizar el inventario.
+- El alta de cotización o pedido con `Idempotency-Key` registra su intención
+  (567): repetir la misma clave, actor y contenido devuelve el documento ya
+  creado; otro contenido o actor responde 409. La UI conserva la clave mientras
+  reintenta la misma intención. Sin clave se mantiene el contrato anterior.
+- Lecturas y writers de ventas indisponibles responden 503; un documento ajeno o
+  inexistente, 404; las reglas de negocio, 400. Los reportes comerciales no
+  devuelven el error crudo de PostgREST.
+- El historial de cotización y pedido incluye el ciclo de vida durable del
+  propio registro (alta, aprobación, rechazo, conversión, confirmación) además
+  de auditoría, integraciones y movimientos de inventario.
 
 Código principal: `apps/erp-api/src/modules/ventas`,
 `apps/erp-api/src/modules/documentos`, `apps/erp-api/src/modules/cpe`.

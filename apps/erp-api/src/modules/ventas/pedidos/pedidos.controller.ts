@@ -97,8 +97,9 @@ export class PedidosController {
     @Body() createPedidoDto: CreatePedidoDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    const pedido = await this.pedidosService.create(createPedidoDto, tenantId, user?.id);
+    const pedido = await this.pedidosService.create(createPedidoDto, tenantId, user?.id, idempotencyKey);
     return {
       success: true,
       data: pedido,

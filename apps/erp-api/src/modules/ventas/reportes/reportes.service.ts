@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { readUnavailable } from '../ventas-errors';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { paisDelTenant } from '../../../shared/utils/fecha-tenant.util';
 import { fechaDeDocumentoEnPais, zonaHorariaDePais } from '../../../shared/utils/fecha-peru.util';
@@ -17,7 +18,7 @@ export class ReportesService {
     const ordered = query.order('id');
     for (let offset = 0; ; offset += 1000) {
       const { data, error } = await ordered.range(offset, offset + 999);
-      if (error) throw error;
+      if (error) throw readUnavailable('los datos del reporte');
       rows.push(...(data || []));
       if (!data || data.length < 1000) return rows;
     }
@@ -414,7 +415,7 @@ export class ReportesService {
     const pedidos: any[] = [];
     for (let offset = 0; ; offset += 1000) {
       const { data, error } = await query.range(offset, offset + 999);
-      if (error) throw error;
+      if (error) throw readUnavailable('los datos del reporte');
       pedidos.push(...(data || []));
       if (!data || data.length < 1000) break;
     }
@@ -556,9 +557,9 @@ export class ReportesService {
       { data: facturas, count: totalFacturas, error: facturasError },
     ] = await Promise.all([cotizacionesQuery, pedidosQuery, facturasQuery]);
 
-    if (cotizacionesError) throw cotizacionesError;
-    if (pedidosError) throw pedidosError;
-    if (facturasError) throw facturasError;
+    if (cotizacionesError) throw readUnavailable('las cotizaciones del reporte');
+    if (pedidosError) throw readUnavailable('los pedidos del reporte');
+    if (facturasError) throw readUnavailable('las facturas del reporte');
 
     const sumar = (items: any[] | null | undefined, field: string) =>
       (items || []).reduce((acc, item) => acc + Number(item?.[field] ?? 0), 0);
@@ -676,7 +677,7 @@ export class ReportesService {
     const pedidosResult = fechaHasta ? pedidosFiltrados.lte('fecha', fechaHasta) : pedidosFiltrados;
 
     const { data: pedidos, error: pedidosError } = await pedidosResult;
-    if (pedidosError) throw pedidosError;
+    if (pedidosError) throw readUnavailable('los pedidos del reporte');
 
     const pedidoIds = (pedidos || []).map((pedido) => pedido.id);
     if (pedidoIds.length === 0) {
@@ -944,7 +945,7 @@ export class ReportesService {
       p_limit: 1000,
     });
 
-    if (error) throw error;
+    if (error) throw readUnavailable('los datos del reporte');
     if (!data || typeof data !== 'object' || !Array.isArray((data as any).detalle)) {
       throw new Error('El reporte canónico de CxC devolvió una respuesta inválida');
     }
@@ -995,7 +996,7 @@ export class ReportesService {
 
     const { data: kpis, error: kpiError } = await kpiQuery;
     if (kpiError) {
-      throw kpiError;
+      throw readUnavailable('los indicadores SUNAT');
     }
 
     let total = 0;
@@ -1036,7 +1037,7 @@ export class ReportesService {
 
     const { data: documentos, error: docError } = await documentosQuery;
     if (docError) {
-      throw docError;
+      throw readUnavailable('los comprobantes de los indicadores SUNAT');
     }
 
     const incidencias = (documentos || [])

@@ -1,0 +1,21 @@
+{
+  "scope": "Reconstrucción fresca local de la cadena canónica con 567 y verificadores SQL",
+  "runner": "scripts/ci/verify-database-contracts.mjs",
+  "database": "PostgreSQL 16 efímero local",
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "attempts": [
+    {
+      "result": "failed",
+      "failed_verifier": "434__post_066_tenant_tables_force_rls.sql (histórico)",
+      "error": "rls_tenant_tables_needing_attention count=1: sales_creation_intents tenía RLS forzado pero ninguna política",
+      "classification": "la 567 omitía la política privada explícita que usan las tablas de intención 485/562",
+      "fix": "CREATE POLICY sales_creation_intents_private_567 USING (false) WITH CHECK (false); verificador y comparador lo exigen"
+    },
+    {
+      "result": "passed",
+      "summary": "OK PostgreSQL 16: 563 migraciones hasta 567, 76 verificadores; 67 históricos ejecutados y 6 enumerados como obsoletos"
+    }
+  ],
+  "limits": ["No sustituye CI exacto, ensayo sobre respaldo productivo ni promoción 567"]
+}

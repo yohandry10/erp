@@ -1,5 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { Decimal } from 'decimal.js';
+import { isNotFoundError, readUnavailable, writerFailure } from '../ventas-errors';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { AuditService } from '../../audit/audit.service';
@@ -94,6 +96,7 @@ export class PedidosService {
     createPedidoDto: CreatePedidoDto,
     tenantId: string,
     userId?: string,
+    idempotencyKey?: string,
   ): Promise<PedidoVenta & { detalle: PedidoDetalle[] }> {
     const client = this.supabase.getClient();
 
@@ -109,8 +112,16 @@ export class PedidosService {
       .eq('tenant_id', tenantId)
       .single();
 
-    if (clienteError || !cliente) {
+    if (clienteError && !isNotFoundError(clienteError)) {
+      throw readUnavailable('el cliente del pedido');
+    }
+    if (!cliente) {
       throw new NotFoundException('Cliente no encontrado');
+    }
+
+    const key = idempotencyKey?.trim() || undefined;
+    if (key && (key.length < 8 || key.length > 200)) {
+      throw new BadRequestException('Idempotency-Key debe tener entre 8 y 200 caracteres');
     }
 
     // Calcular totales usando decimal.js
@@ -153,15 +164,27 @@ export class PedidosService {
           fecha_vencimiento: createPedidoDto.fecha_vencimiento,
         }
       : null;
-    const { data: rpcResult, error: rpcError } = await client.rpc('crear_pedido_comercial_pago_tx_531', {
-      p_pedido: pedidoData,
-      p_detalle: detalleData,
-      p_payment_intent: paymentIntent,
-    });
+    // Con clave, la misma intención devuelve el pedido ya creado (567); sin
+    // clave se conserva el contrato de los clientes anteriores.
+    const { data: rpcResult, error: rpcError } = key
+      ? await client.rpc('crear_pedido_idempotente_tx_567', {
+          p_tenant_id: tenantId,
+          p_actor_id: userId,
+          p_idempotency_key: key,
+          p_intent_fingerprint: this.fingerprintPedido(createPedidoDto),
+          p_pedido: pedidoData,
+          p_detalle: detalleData,
+          p_payment_intent: paymentIntent,
+        })
+      : await client.rpc('crear_pedido_comercial_pago_tx_531', {
+          p_pedido: pedidoData,
+          p_detalle: detalleData,
+          p_payment_intent: paymentIntent,
+        });
 
-    if (rpcError) {
+    if (rpcError || !(rpcResult as any)?.pedido_id) {
       console.error('Error creating pedido (RPC):', rpcError);
-      throw new BadRequestException('Error al crear el pedido: ' + rpcError.message);
+      throw writerFailure(rpcError, 'No se pudo crear el pedido');
     }
 
     const pedidoId = (rpcResult as any).pedido_id;
@@ -275,7 +298,7 @@ export class PedidosService {
 
     if (error) {
       console.error('Error fetching pedidos:', error);
-      throw new BadRequestException('Error al obtener pedidos');
+      throw readUnavailable('los pedidos');
     }
 
     return {
@@ -311,7 +334,7 @@ export class PedidosService {
 
     if (error) {
       console.error('Error fetching aprobaciones pendientes:', error);
-      throw new BadRequestException('Error al obtener pedidos pendientes de aprobación');
+      throw readUnavailable('los pedidos pendientes de aprobación');
     }
 
     const pedidos = (data || []) as (PedidoVenta & {
@@ -380,7 +403,7 @@ export class PedidosService {
 
     if (error) {
       console.error('Error fetching historial aprobaciones:', error);
-      throw new BadRequestException('Error al obtener historial de aprobaciones del pedido');
+      throw readUnavailable('el historial de aprobaciones del pedido');
     }
 
     const aprobaciones = data || [];
@@ -557,8 +580,11 @@ export class PedidosService {
       .eq('tenant_id', tenantId)
       .single();
 
-    if (pedidoError || !pedido) {
+    if (pedidoError && !isNotFoundError(pedidoError)) {
       console.error('Error fetching pedido:', pedidoError);
+      throw readUnavailable('el pedido');
+    }
+    if (!pedido) {
       throw new NotFoundException('Pedido no encontrado');
     }
 
@@ -571,7 +597,7 @@ export class PedidosService {
 
     if (detalleError) {
       console.error('Error fetching pedido detalle:', detalleError);
-      throw new BadRequestException('Error al obtener el detalle del pedido');
+      throw readUnavailable('el detalle del pedido');
     }
 
     return {
@@ -590,6 +616,9 @@ export class PedidosService {
     tenantId: string,
   ): Promise<PedidoVenta & { detalle: PedidoDetalle[] }> {
     const client = this.supabase.getClient();
+
+    // Un pedido ajeno o inexistente es 404; una lectura fallida, 503.
+    await this.findOne(id, tenantId);
 
     const updateData: Record<string, unknown> = {};
 
@@ -641,7 +670,7 @@ export class PedidosService {
 
     if (error) {
       console.error('Error updating pedido:', error);
-      throw new BadRequestException(error.message || 'Error al actualizar el pedido');
+      throw writerFailure(error, 'No se pudo actualizar el pedido');
     }
 
     console.log('✅ [PedidosService] Pedido actualizado:', id);
@@ -1613,16 +1642,51 @@ export class PedidosService {
 
     // Obtener movimientos de inventario relacionados
     const client = this.supabase.getClient();
-    const { data: movimientos } = await client
+    // Sin embebido: PostgREST no resuelve una relación única hacia productos.
+    const { data: movimientosBase, error: movimientosError } = await client
       .from('movimientos_inventario')
-      .select('*, productos(nombre, codigo)')
+      .select('id, tipo, tipo_movimiento, cantidad, notas, created_at, producto_id')
       .eq('tenant_id', tenantId)
       .eq('referencia_tipo', 'PEDIDO')
       .eq('referencia_id', id)
       .order('created_at', { ascending: false });
+    if (movimientosError) {
+      throw readUnavailable('los movimientos de inventario del pedido');
+    }
+    const productoIds = [...new Set((movimientosBase || []).map((mov: any) => mov.producto_id).filter(Boolean))];
+    const productosPorId = new Map<string, { nombre: string; codigo: string }>();
+    if (productoIds.length) {
+      const { data: productos, error: productosError } = await client
+        .from('productos')
+        .select('id, nombre, codigo')
+        .eq('tenant_id', tenantId)
+        .in('id', productoIds);
+      if (productosError) {
+        throw readUnavailable('los productos de los movimientos del pedido');
+      }
+      for (const producto of productos || []) productosPorId.set(producto.id, { nombre: producto.nombre, codigo: producto.codigo });
+    }
+    const movimientos = (movimientosBase || []).map((mov: any) => ({
+      ...mov,
+      tipo: mov.tipo ?? mov.tipo_movimiento,
+      productos: productosPorId.get(mov.producto_id) ?? null,
+    }));
 
     // Construir timeline unificado
     const timeline = [];
+
+    // Alta, aprobación y confirmación viven en el propio pedido; no todas esas
+    // transiciones escriben audit_log.
+    const row = pedido as any;
+    const ciclo: Array<[string, unknown, unknown]> = [
+      ['CREADO', row.created_at, row.created_by],
+      ['APROBADO', row.aprobado_en, row.aprobado_por],
+      ['CONFIRMADO', row.confirmado_en, row.confirmado_por],
+    ];
+    for (const [estado, timestamp, usuario] of ciclo) {
+      if (timestamp) timeline.push({ tipo: 'CICLO_VIDA', timestamp, estado, usuario_id: usuario ?? null });
+    }
+    const eventosCiclo = timeline.length;
 
     // Agregar eventos de auditoría
     for (const log of auditLogs) {
@@ -1680,6 +1744,7 @@ export class PedidosService {
       timeline,
       resumen: {
         total_eventos: timeline.length,
+        eventos_ciclo_vida: eventosCiclo,
         eventos_auditoria: auditLogs.length,
         eventos_integracion: integrationLogs.data.length,
         movimientos_inventario: movimientos?.length || 0,
@@ -1801,5 +1866,23 @@ export class PedidosService {
     } catch (error) {
       this.logger.warn('⚠️ [PedidosService] Error enviando notificación:', error);
     }
+  }
+
+  /** Huella de la intención de alta; el actor se compara aparte en SQL. */
+  private fingerprintPedido(dto: CreatePedidoDto): string {
+    return createHash('sha256').update(JSON.stringify({
+      cliente_id: dto.cliente_id,
+      notas: dto.notas ?? null,
+      condicion_pago: dto.condicion_pago ?? null,
+      medio_pago: dto.medio_pago ?? null,
+      plazo_pago_dias: dto.plazo_pago_dias ?? null,
+      fecha_vencimiento: dto.fecha_vencimiento ?? null,
+      detalle: dto.detalle.map((item) => ({
+        producto_id: item.producto_id,
+        descripcion: item.descripcion,
+        cantidad: Number(item.cantidad),
+        precio_unitario: Number(item.precio_unitario),
+      })),
+    })).digest('hex');
   }
 }

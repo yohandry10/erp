@@ -206,9 +206,11 @@ try {
   for(const kind of ['cash-first','cash-other'])await run('prepare-'+kind,process.execPath,['scripts/ci/prepare-peru-first-client-local.mjs',kind]);
   await run('cash-operations-lifecycle',process.execPath,['scripts/ci/test-peru-cash-operations-local.mjs']);
   await run('cash-faults-lifecycle',process.execPath,['scripts/ci/test-peru-cash-faults-local.mjs']);
+  for(const kind of ['sales-first','sales-other'])await run('prepare-'+kind,process.execPath,['scripts/ci/prepare-peru-first-client-local.mjs',kind]);
+  await run('sales-operations-lifecycle',process.execPath,['scripts/ci/test-peru-sales-operations-local.mjs']);
   if(withBrowser) await run('prepare-wizard',process.execPath,['scripts/ci/prepare-peru-first-client-local.mjs','wizard']);
   const httpEvidence=JSON.parse(readFileSync(path.join(output,'http.json'),'utf8'));
-  for(const file of ['annual-acceptance.json','finance-lifecycle.json','hr-lifecycle.json','hr-financial.json','payroll-plame.json','configuration-admin.json','series-lifecycle.json','tax-adjustments.json','monthly-period.json','tax-intents.json','login-office.json','reports-consolidation-expanded.json','gre-operations.json','pos-operations.json','cpe-operations.json','cash-operations.json','cash-faults.json']) {
+  for(const file of ['annual-acceptance.json','finance-lifecycle.json','hr-lifecycle.json','hr-financial.json','payroll-plame.json','configuration-admin.json','series-lifecycle.json','tax-adjustments.json','monthly-period.json','tax-intents.json','login-office.json','reports-consolidation-expanded.json','gre-operations.json','pos-operations.json','cpe-operations.json','cash-operations.json','cash-faults.json','sales-operations.json']) {
     const phase=JSON.parse(readFileSync(path.join(output,file),'utf8'));
     if(phase.success!==true||phase.remoteWrites!==false) throw new Error('Fase funcional incompleta: '+file);
     const offset=httpEvidence.results.length;

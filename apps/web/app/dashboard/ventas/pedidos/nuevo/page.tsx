@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import PedidoForm, { type PedidoFormData } from '@/components/ventas/PedidoForm'
@@ -10,12 +11,22 @@ import { Button } from '@/components/ui/button'
 export default function NuevoPedidoPage() {
   const router = useRouter()
   const { post } = useApi()
+  // Una misma intención conserva su clave: reenviar tras una respuesta perdida
+  // recupera el pedido ya creado en vez de duplicarlo.
+  const intentKeys = useRef<Record<string, string>>({})
+  const keyFor = (payload: unknown) => {
+    const slot = JSON.stringify(payload)
+    return (intentKeys.current[slot] ??= `ventas-ui:pedido:${crypto.randomUUID()}`)
+  }
 
   const handleSubmit = async (data: PedidoFormData) => {
     try {
-      const response = await post('/ventas/pedidos', data)
+      const response = await post('/ventas/pedidos', data, {
+        headers: { 'Idempotency-Key': keyFor(data) },
+      })
 
       if (response?.success) {
+        intentKeys.current = {}
         toast({
           title: 'Pedido creado',
           description: `El pedido ${response.data.numero} ha sido creado exitosamente`,
