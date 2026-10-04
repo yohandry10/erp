@@ -10,7 +10,8 @@ export function peru568StateSql(requiredSchema) {
   const rows=tables.map(name=>`'${name}',(SELECT md5(coalesce(string_agg(md5(to_jsonb(t)::text),'' ORDER BY to_jsonb(t)::text),'')) FROM public.${name} t)`).join(',');
   let sql=peru567StateSql(567);
   sql=replaceOnce(sql,'p_required_schema_version=>567',`p_required_schema_version=>${requiredSchema}`);
-  sql=replaceOnce(sql,"'existingData',jsonb_build_object(",`'existingData',jsonb_build_object(${rows},`);
+  // jsonb_build_object admite 100 argumentos: las tablas nuevas van en otro objeto.
+  sql=replaceOnce(sql,"'existingData',jsonb_build_object(",`'existingData',jsonb_build_object(${rows})||jsonb_build_object(`);
   sql=replaceOnce(sql,"AND p.proname NOT IN('crear_cotizacion_idempotente_tx_567','crear_pedido_idempotente_tx_567','sales_creation_intent_replay_567')",
     "AND p.proname<>'actualizar_recepcion_tx_568'");
   return replaceOnce(sql,"'posBoundary',",`'receiptBoundary',(SELECT jsonb_build_object('secdef',p.prosecdef,'owner',pg_get_userbyid(p.proowner),'config',p.proconfig,
