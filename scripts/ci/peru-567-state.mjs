@@ -27,7 +27,7 @@ export function peru567StateSql(requiredSchema) {
         'serviceRead',has_table_privilege('service_role',c.oid,'SELECT'),'serviceWrite',has_table_privilege('service_role',c.oid,'INSERT') OR has_table_privilege('service_role',c.oid,'UPDATE') OR has_table_privilege('service_role',c.oid,'DELETE'),
         'anonRead',has_table_privilege('anon',c.oid,'SELECT'),'authenticatedRead',has_table_privilege('authenticated',c.oid,'SELECT'),
         'policies',(SELECT jsonb_agg(jsonb_build_object('name',policyname,'qual',qual,'check',with_check) ORDER BY policyname) FROM pg_policies WHERE schemaname='public' AND tablename='sales_creation_intents'))
-        FROM pg_class c WHERE c.oid='public.sales_creation_intents'::regclass)) END),
+        FROM pg_class c WHERE c.oid=to_regclass('public.sales_creation_intents'))) END),
     'kpiRead',has_table_privilege('service_role','public.v_kpis_sunat_multitenant','SELECT'),
     'posBoundary',`);
 }
