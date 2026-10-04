@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-10-04T03:55:18.228Z",
-  "commit": "0d6df0eed95e0b0622c01c2d56877bb241c1d07b",
+  "generated_at": "2026-10-04T17:25:22.471Z",
+  "commit": "fb3aa1ceb010625093ec79eb81571c60456372c0",
   "excluded": [
     "Analytics"
   ],
@@ -3390,7 +3390,7 @@
       "endpoint": "/api/contabilidad/asiento-contable",
       "summary": "Crear nuevo asiento contable manual",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts",
-      "line": 35,
+      "line": 36,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.crear\")"
@@ -3413,7 +3413,7 @@
       "endpoint": "/api/contabilidad/asientos-contables",
       "summary": "Obtener listado de asientos contables con filtros",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts",
-      "line": 80,
+      "line": 81,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.read\")"
@@ -3436,7 +3436,7 @@
       "endpoint": "/api/contabilidad/asientos-contables/:id",
       "summary": "Obtener un asiento contable específico por ID",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts",
-      "line": 132,
+      "line": 133,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.read\")"
@@ -3459,7 +3459,7 @@
       "endpoint": "/api/contabilidad/asientos",
       "summary": "Listar asientos contables con filtros opcionales",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts",
-      "line": 168,
+      "line": 169,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.read\")"
@@ -3482,7 +3482,7 @@
       "endpoint": "/api/contabilidad/asientos/estadisticas/por-tipo",
       "summary": "Obtener estadísticas de asientos generados por tipo de evento",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts",
-      "line": 232,
+      "line": 233,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.read\")"
@@ -3505,7 +3505,7 @@
       "endpoint": "/api/contabilidad/asientos/:id",
       "summary": "Obtener un asiento contable específico por ID con sus detalles",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts",
-      "line": 282,
+      "line": 283,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.read\")"
@@ -3528,7 +3528,7 @@
       "endpoint": "/api/contabilidad/asientos/:id",
       "summary": "Actualizar un asiento en BORRADOR",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts",
-      "line": 321,
+      "line": 322,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.actualizar\")"
@@ -3551,7 +3551,7 @@
       "endpoint": "/api/contabilidad/asientos/:id",
       "summary": "Eliminar un asiento en BORRADOR",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts",
-      "line": 355,
+      "line": 356,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.eliminar\")"
@@ -3574,7 +3574,7 @@
       "endpoint": "/api/contabilidad/asientos/:id/confirmar",
       "summary": "Confirmar un asiento en BORRADOR",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts",
-      "line": 376,
+      "line": 377,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.confirmar\")"
@@ -3597,7 +3597,7 @@
       "endpoint": "/api/contabilidad/asientos/:id/anular",
       "summary": "Anular un asiento en BORRADOR",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts",
-      "line": 407,
+      "line": 408,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.anular\")"
@@ -3620,7 +3620,7 @@
       "endpoint": "/api/contabilidad/asientos/:id/reversar",
       "summary": "Reversar un asiento CONFIRMADO",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-asientos.controller.ts",
-      "line": 437,
+      "line": 438,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.asientos.reversar\")"
@@ -3781,7 +3781,7 @@
       "endpoint": "/api/contabilidad/partidas-abiertas",
       "summary": "Partidas abiertas de una cuenta de terceros",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-conciliacion.controller.ts",
-      "line": 30,
+      "line": 31,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.partidas.read\")"
@@ -3804,7 +3804,7 @@
       "endpoint": "/api/contabilidad/conciliaciones-partidas",
       "summary": "Listar conciliaciones registradas",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-conciliacion.controller.ts",
-      "line": 48,
+      "line": 49,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.partidas.read\")"
@@ -3827,7 +3827,7 @@
       "endpoint": "/api/contabilidad/conciliaciones-partidas",
       "summary": "Casar partidas abiertas entre sí",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-conciliacion.controller.ts",
-      "line": 60,
+      "line": 61,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.partidas.conciliar\")"
@@ -3850,7 +3850,7 @@
       "endpoint": "/api/contabilidad/conciliaciones-partidas/:id",
       "summary": "Deshacer una conciliación",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-conciliacion.controller.ts",
-      "line": 89,
+      "line": 91,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.partidas.desconciliar\")"
@@ -4126,7 +4126,7 @@
       "endpoint": "/api/contabilidad/estados/estado-resultados",
       "summary": "Obtener Estado de Resultados (P&L) por período",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts",
-      "line": 125,
+      "line": 118,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4149,7 +4149,7 @@
       "endpoint": "/api/contabilidad/estados/balance-general",
       "summary": "Obtener Balance General por período",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts",
-      "line": 209,
+      "line": 195,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4172,7 +4172,7 @@
       "endpoint": "/api/contabilidad/estados/balance-comprobacion/formatted",
       "summary": "Obtener Balance de Comprobación formateado según estándares contables",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts",
-      "line": 294,
+      "line": 273,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4195,7 +4195,7 @@
       "endpoint": "/api/contabilidad/estados/estado-resultados/formatted",
       "summary": "Obtener Estado de Resultados formateado según estándares contables",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts",
-      "line": 374,
+      "line": 346,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4218,7 +4218,7 @@
       "endpoint": "/api/contabilidad/estados/balance-general/formatted",
       "summary": "Obtener Balance General formateado según estándares contables",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts",
-      "line": 454,
+      "line": 419,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4241,7 +4241,7 @@
       "endpoint": "/api/contabilidad/estados/refrescar",
       "summary": "Refrescar vistas materializadas de estados financieros",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts",
-      "line": 533,
+      "line": 491,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.actualizar\")"
@@ -4264,7 +4264,7 @@
       "endpoint": "/api/contabilidad/balance-general",
       "summary": "Obtener Balance General (legacy endpoint - usar /estados/balance-general)",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts",
-      "line": 724,
+      "line": 682,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4287,7 +4287,7 @@
       "endpoint": "/api/contabilidad/flujo-efectivo",
       "summary": "Obtener Estado de Flujo de Efectivo",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts",
-      "line": 806,
+      "line": 757,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4310,7 +4310,7 @@
       "endpoint": "/api/contabilidad/plan-cuentas",
       "summary": "Obtener Plan de Cuentas",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts",
-      "line": 833,
+      "line": 784,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4333,7 +4333,7 @@
       "endpoint": "/api/contabilidad/ratios-financieros",
       "summary": "Obtener Ratios Financieros",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-estados-financieros.controller.ts",
-      "line": 859,
+      "line": 806,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4471,7 +4471,7 @@
       "endpoint": "/api/contabilidad/libro-mayor/:cuentaCodigo",
       "summary": "Obtener libro mayor de una cuenta específica",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts",
-      "line": 83,
+      "line": 85,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4494,7 +4494,7 @@
       "endpoint": "/api/contabilidad/libro-mayor-completo",
       "summary": "Obtener libro mayor de todas las cuentas con movimientos",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts",
-      "line": 118,
+      "line": 117,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4517,7 +4517,7 @@
       "endpoint": "/api/contabilidad/balance-comprobacion",
       "summary": "Obtener Balance de Comprobación (legacy endpoint - usar /estados/balance-comprobacion)",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts",
-      "line": 148,
+      "line": 144,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4540,7 +4540,7 @@
       "endpoint": "/api/contabilidad/kardex-valorizado",
       "summary": "Obtener Kardex Valorizado de Inventarios",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts",
-      "line": 245,
+      "line": 234,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4563,7 +4563,7 @@
       "endpoint": "/api/contabilidad/libro-caja-bancos",
       "summary": "Obtener Libro de Caja y Bancos",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts",
-      "line": 277,
+      "line": 263,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4586,7 +4586,7 @@
       "endpoint": "/api/contabilidad/registro-activos-fijos",
       "summary": "Obtener Registro de Activos Fijos",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts",
-      "line": 305,
+      "line": 288,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4609,7 +4609,7 @@
       "endpoint": "/api/contabilidad/libro-planillas",
       "summary": "Obtener Libro de Planillas Oficial",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts",
-      "line": 333,
+      "line": 313,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4632,7 +4632,7 @@
       "endpoint": "/api/contabilidad/libro-inventarios-balances",
       "summary": "Obtener Libro de Inventarios y Balances",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts",
-      "line": 365,
+      "line": 342,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4655,7 +4655,7 @@
       "endpoint": "/api/contabilidad/registro-costos",
       "summary": "Obtener Registro de Costos",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts",
-      "line": 396,
+      "line": 370,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4678,7 +4678,7 @@
       "endpoint": "/api/contabilidad/libros-electronicos-sunat",
       "summary": "Obtener Libros Electrónicos SUNAT",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts",
-      "line": 424,
+      "line": 395,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4701,7 +4701,7 @@
       "endpoint": "/api/contabilidad/libro-diario",
       "summary": "Obtener Libro Diario (Registro cronológico de asientos)",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts",
-      "line": 452,
+      "line": 420,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4724,7 +4724,7 @@
       "endpoint": "/api/contabilidad/registro-ventas",
       "summary": "Obtener Registro de Ventas (Libro de Ventas e Ingresos)",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts",
-      "line": 532,
+      "line": 497,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4747,7 +4747,7 @@
       "endpoint": "/api/contabilidad/registro-compras",
       "summary": "Obtener Registro de Compras",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts",
-      "line": 562,
+      "line": 524,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4770,7 +4770,7 @@
       "endpoint": "/api/contabilidad/registro-consignaciones",
       "summary": "Obtener Registro de Consignaciones",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts",
-      "line": 590,
+      "line": 549,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -4793,7 +4793,7 @@
       "endpoint": "/api/contabilidad/registro-consignaciones",
       "summary": "Crear nueva consignación",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts",
-      "line": 630,
+      "line": 589,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.consignaciones.crear\")"
@@ -4816,7 +4816,7 @@
       "endpoint": "/api/contabilidad/registro-consignaciones/:id/estado",
       "summary": "Actualizar estado de consignación",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts",
-      "line": 659,
+      "line": 618,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.consignaciones.actualizar\")"
@@ -4839,7 +4839,7 @@
       "endpoint": "/api/contabilidad/ple/:libro",
       "summary": "Exportar un libro electrónico PLE del período",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-libros.controller.ts",
-      "line": 710,
+      "line": 669,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.reportes.read\")"
@@ -5455,173 +5455,12 @@
     },
     {
       "module": "contabilidad",
-      "operation": "obtenerPresupuestoPorId",
-      "method": "GET",
-      "endpoint": "/api/contabilidad/presupuestos/:id",
-      "summary": "Obtener un presupuesto específico por ID",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts",
-      "line": 134,
-      "access_declarations": [
-        "UseGuards(JwtAuthGuard, PermissionGuard)",
-        "RequirePermission(\"contabilidad.presupuestos.read\")"
-      ],
-      "ui_domain": "contabilidad",
-      "has_navigation_domain": true,
-      "functional_result": "pending_operation_evidence",
-      "remaining_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
-      ]
-    },
-    {
-      "module": "contabilidad",
-      "operation": "actualizarPresupuesto",
-      "method": "PUT",
-      "endpoint": "/api/contabilidad/presupuestos/:id",
-      "summary": "Actualizar un presupuesto existente",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts",
-      "line": 176,
-      "access_declarations": [
-        "UseGuards(JwtAuthGuard, PermissionGuard)",
-        "RequirePermission(\"contabilidad.presupuestos.actualizar\")"
-      ],
-      "ui_domain": "contabilidad",
-      "has_navigation_domain": true,
-      "functional_result": "pending_operation_evidence",
-      "remaining_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
-      ]
-    },
-    {
-      "module": "contabilidad",
-      "operation": "eliminarPresupuesto",
-      "method": "DELETE",
-      "endpoint": "/api/contabilidad/presupuestos/:id",
-      "summary": "Eliminar un presupuesto existente",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts",
-      "line": 227,
-      "access_declarations": [
-        "UseGuards(JwtAuthGuard, PermissionGuard)",
-        "RequirePermission(\"contabilidad.presupuestos.eliminar\")"
-      ],
-      "ui_domain": "contabilidad",
-      "has_navigation_domain": true,
-      "functional_result": "pending_operation_evidence",
-      "remaining_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
-      ]
-    },
-    {
-      "module": "contabilidad",
-      "operation": "obtenerPresupuestosPorCentroYPeriodo",
-      "method": "GET",
-      "endpoint": "/api/contabilidad/presupuestos/centro/:centroId/periodo/:periodoId",
-      "summary": "Obtener presupuestos por centro de costo y período",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts",
-      "line": 276,
-      "access_declarations": [
-        "UseGuards(JwtAuthGuard, PermissionGuard)",
-        "RequirePermission(\"contabilidad.presupuestos.read\")"
-      ],
-      "ui_domain": "contabilidad",
-      "has_navigation_domain": true,
-      "functional_result": "pending_operation_evidence",
-      "remaining_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
-      ]
-    },
-    {
-      "module": "contabilidad",
-      "operation": "obtenerComparacionPresupuestoVsReal",
-      "method": "GET",
-      "endpoint": "/api/contabilidad/presupuestos/comparacion/:periodoId",
-      "summary": "Obtener comparación de presupuesto vs real para todos los centros de costo en un período",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts",
-      "line": 458,
-      "access_declarations": [
-        "UseGuards(JwtAuthGuard, PermissionGuard)",
-        "RequirePermission(\"contabilidad.presupuestos.read\")"
-      ],
-      "ui_domain": "contabilidad",
-      "has_navigation_domain": true,
-      "functional_result": "pending_operation_evidence",
-      "remaining_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
-      ]
-    },
-    {
-      "module": "contabilidad",
-      "operation": "actualizarEjecucionPresupuestal",
-      "method": "POST",
-      "endpoint": "/api/contabilidad/presupuestos/:id/actualizar-ejecucion",
-      "summary": "Actualizar la ejecución presupuestal de un presupuesto específico",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts",
-      "line": 595,
-      "access_declarations": [
-        "UseGuards(JwtAuthGuard, PermissionGuard)",
-        "RequirePermission(\"contabilidad.presupuestos.ejecucion\")"
-      ],
-      "ui_domain": "contabilidad",
-      "has_navigation_domain": true,
-      "functional_result": "pending_operation_evidence",
-      "remaining_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
-      ]
-    },
-    {
-      "module": "contabilidad",
-      "operation": "actualizarEjecucionPresupuestalPorPeriodo",
-      "method": "POST",
-      "endpoint": "/api/contabilidad/presupuestos/periodo/:periodoId/actualizar-ejecucion",
-      "summary": "Actualizar la ejecución presupuestal de todos los presupuestos de un período",
-      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts",
-      "line": 651,
-      "access_declarations": [
-        "UseGuards(JwtAuthGuard, PermissionGuard)",
-        "RequirePermission(\"contabilidad.presupuestos.ejecucion\")"
-      ],
-      "ui_domain": "contabilidad",
-      "has_navigation_domain": true,
-      "functional_result": "pending_operation_evidence",
-      "remaining_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
-      ]
-    },
-    {
-      "module": "contabilidad",
       "operation": "obtenerAlertasSobregiro",
       "method": "GET",
       "endpoint": "/api/contabilidad/presupuestos/alertas",
       "summary": "Obtener todas las alertas de sobregiro presupuestal activas",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts",
-      "line": 713,
+      "line": 136,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.presupuestos.read\")"
@@ -5644,10 +5483,171 @@
       "endpoint": "/api/contabilidad/presupuestos/alertas/resumen",
       "summary": "Obtener resumen de alertas agrupadas por nivel de severidad",
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts",
-      "line": 789,
+      "line": 212,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission(\"contabilidad.presupuestos.read\")"
+      ],
+      "ui_domain": "contabilidad",
+      "has_navigation_domain": true,
+      "functional_result": "pending_operation_evidence",
+      "remaining_checks": [
+        "persistencia y resultado funcional",
+        "permisos",
+        "aislamiento",
+        "validaciones",
+        "recuperación de errores"
+      ]
+    },
+    {
+      "module": "contabilidad",
+      "operation": "obtenerPresupuestoPorId",
+      "method": "GET",
+      "endpoint": "/api/contabilidad/presupuestos/:id",
+      "summary": "Obtener un presupuesto específico por ID",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts",
+      "line": 279,
+      "access_declarations": [
+        "UseGuards(JwtAuthGuard, PermissionGuard)",
+        "RequirePermission(\"contabilidad.presupuestos.read\")"
+      ],
+      "ui_domain": "contabilidad",
+      "has_navigation_domain": true,
+      "functional_result": "pending_operation_evidence",
+      "remaining_checks": [
+        "persistencia y resultado funcional",
+        "permisos",
+        "aislamiento",
+        "validaciones",
+        "recuperación de errores"
+      ]
+    },
+    {
+      "module": "contabilidad",
+      "operation": "actualizarPresupuesto",
+      "method": "PUT",
+      "endpoint": "/api/contabilidad/presupuestos/:id",
+      "summary": "Actualizar un presupuesto existente",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts",
+      "line": 321,
+      "access_declarations": [
+        "UseGuards(JwtAuthGuard, PermissionGuard)",
+        "RequirePermission(\"contabilidad.presupuestos.actualizar\")"
+      ],
+      "ui_domain": "contabilidad",
+      "has_navigation_domain": true,
+      "functional_result": "pending_operation_evidence",
+      "remaining_checks": [
+        "persistencia y resultado funcional",
+        "permisos",
+        "aislamiento",
+        "validaciones",
+        "recuperación de errores"
+      ]
+    },
+    {
+      "module": "contabilidad",
+      "operation": "eliminarPresupuesto",
+      "method": "DELETE",
+      "endpoint": "/api/contabilidad/presupuestos/:id",
+      "summary": "Eliminar un presupuesto existente",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts",
+      "line": 372,
+      "access_declarations": [
+        "UseGuards(JwtAuthGuard, PermissionGuard)",
+        "RequirePermission(\"contabilidad.presupuestos.eliminar\")"
+      ],
+      "ui_domain": "contabilidad",
+      "has_navigation_domain": true,
+      "functional_result": "pending_operation_evidence",
+      "remaining_checks": [
+        "persistencia y resultado funcional",
+        "permisos",
+        "aislamiento",
+        "validaciones",
+        "recuperación de errores"
+      ]
+    },
+    {
+      "module": "contabilidad",
+      "operation": "obtenerPresupuestosPorCentroYPeriodo",
+      "method": "GET",
+      "endpoint": "/api/contabilidad/presupuestos/centro/:centroId/periodo/:periodoId",
+      "summary": "Obtener presupuestos por centro de costo y período",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts",
+      "line": 421,
+      "access_declarations": [
+        "UseGuards(JwtAuthGuard, PermissionGuard)",
+        "RequirePermission(\"contabilidad.presupuestos.read\")"
+      ],
+      "ui_domain": "contabilidad",
+      "has_navigation_domain": true,
+      "functional_result": "pending_operation_evidence",
+      "remaining_checks": [
+        "persistencia y resultado funcional",
+        "permisos",
+        "aislamiento",
+        "validaciones",
+        "recuperación de errores"
+      ]
+    },
+    {
+      "module": "contabilidad",
+      "operation": "obtenerComparacionPresupuestoVsReal",
+      "method": "GET",
+      "endpoint": "/api/contabilidad/presupuestos/comparacion/:periodoId",
+      "summary": "Obtener comparación de presupuesto vs real para todos los centros de costo en un período",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts",
+      "line": 603,
+      "access_declarations": [
+        "UseGuards(JwtAuthGuard, PermissionGuard)",
+        "RequirePermission(\"contabilidad.presupuestos.read\")"
+      ],
+      "ui_domain": "contabilidad",
+      "has_navigation_domain": true,
+      "functional_result": "pending_operation_evidence",
+      "remaining_checks": [
+        "persistencia y resultado funcional",
+        "permisos",
+        "aislamiento",
+        "validaciones",
+        "recuperación de errores"
+      ]
+    },
+    {
+      "module": "contabilidad",
+      "operation": "actualizarEjecucionPresupuestal",
+      "method": "POST",
+      "endpoint": "/api/contabilidad/presupuestos/:id/actualizar-ejecucion",
+      "summary": "Actualizar la ejecución presupuestal de un presupuesto específico",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts",
+      "line": 740,
+      "access_declarations": [
+        "UseGuards(JwtAuthGuard, PermissionGuard)",
+        "RequirePermission(\"contabilidad.presupuestos.ejecucion\")"
+      ],
+      "ui_domain": "contabilidad",
+      "has_navigation_domain": true,
+      "functional_result": "pending_operation_evidence",
+      "remaining_checks": [
+        "persistencia y resultado funcional",
+        "permisos",
+        "aislamiento",
+        "validaciones",
+        "recuperación de errores"
+      ]
+    },
+    {
+      "module": "contabilidad",
+      "operation": "actualizarEjecucionPresupuestalPorPeriodo",
+      "method": "POST",
+      "endpoint": "/api/contabilidad/presupuestos/periodo/:periodoId/actualizar-ejecucion",
+      "summary": "Actualizar la ejecución presupuestal de todos los presupuestos de un período",
+      "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-presupuestos.controller.ts",
+      "line": 796,
+      "access_declarations": [
+        "UseGuards(JwtAuthGuard, PermissionGuard)",
+        "RequirePermission(\"contabilidad.presupuestos.ejecucion\")"
       ],
       "ui_domain": "contabilidad",
       "has_navigation_domain": true,

@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-10-04T03:55:19.807Z",
+  "generated_at": "2026-10-04T17:25:24.119Z",
   "scope": "Inventario y aceptación por módulo/operación; únicamente Analytics excluido",
   "operational_accounting_tax_reports_included": true,
   "complete_acceptance": false,
   "source_api_matrix": "artifacts/peru-api-operation-matrix-20260930.json",
   "source_ui_matrix": "artifacts/peru-ui-operation-matrix-20261002.json",
   "country_applicability": "artifacts/peru-country-applicability-20261003.json",
-  "evidence": "artifacts/peru-integrated-main-37173628882",
+  "evidence": "artifacts/peru-integrated-main-37218136805",
   "additional_evidence": [
     {
       "evidence": "artifacts/peru-storage-ci-37150593171",
@@ -24,11 +24,11 @@
     }
   ],
   "latest_verified_production": {
-    "sha": "0d6df0eed95e0b0622c01c2d56877bb241c1d07b",
-    "schema_at_last_runtime_read": 567,
-    "proof": "artifacts/peru-production-verification-after-137-20261004.json",
-    "failed_attempts": "artifacts/peru-production-verification-after-137-timeouts-20261004.json",
-    "main_ci": "37173628882 success"
+    "sha": "624ca0b21008b707320dd809797adab6853e6b54",
+    "schema_at_last_runtime_read": 568,
+    "proof": "artifacts/peru-production-verification-after-138-20261004.json",
+    "failed_attempts": "artifacts/peru-production-verification-after-138-timeouts-20261004.json",
+    "main_ci": "37218136805 success"
   },
   "superseded_main": {
     "sha": "9e301e2ae9f470b56ffc10d775ab09c4a8d6a76b",
@@ -36,13 +36,13 @@
     "proof": "artifacts/peru-main-134-heap-failure-20261003"
   },
   "current_database_schema": {
-    "version": 567,
-    "proof": "artifacts/peru-567-promotion-20261004031647084.json"
+    "version": 568,
+    "proof": "artifacts/peru-568-promotion-20261004164814362.json"
   },
   "pending_schema": {
-    "version": 568,
-    "state": "purchases branch; fresh rebuild passed locally; not promoted",
-    "proof": "artifacts/peru-568-fresh-contracts-local-20261004.json"
+    "version": 569,
+    "state": "accounting branch #139; fresh rebuild and production-backup rehearsal passed locally; not promoted",
+    "proof": "artifacts/erp-peru-569-rehearsal-20261004165609161-17420.json"
   },
   "acceptance_rule": "Contrato observado o control visible no implica ejecutar ni aceptar toda una operación. Se conservan variantes de país, infraestructura y pendientes por operación para no ocultar huecos.",
   "navigation": {
@@ -701,70 +701,63 @@
     {
       "module": "compras",
       "declared_contracts": 43,
-      "observed_contracts": 19,
-      "operations_with_functional_cases": 17,
+      "observed_contracts": 40,
+      "operations_with_functional_cases": 40,
       "complete_acceptance": false,
       "verified_case_ids": [
+        "purchase-legacy-reads",
+        "purchase-reads-outage-503",
+        "purchase-quote-lifecycle-convert-once",
+        "purchase-quote-reject-no-convert",
         "purchase-return-paid-invoice-blocked",
         "purchase-return-before-invoice",
         "purchase-return-pending-invoice",
+        "purchase-receipt-order-route-edit-list",
         "purchase-order-create-replay",
         "purchase-partial-mixed-receipts",
+        "purchase-order-edit-list",
         "purchase-tenant-isolation",
+        "purchase-order-isolation",
         "purchase-order-segregated-approval",
+        "purchase-order-reject-cancel",
         "purchase-receipt-close-once",
         "proveedores-master-lifecycle",
         "purchase-supplier-create-read",
         "proveedores-edit-search",
+        "purchase-supplier-ruc-lookup",
         "purchase-partial-receipts-accounting"
       ],
       "pending_operations": [
         {
           "method": "GET",
           "endpoint": "/api/compras/stats",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/compras",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/compras/next-number",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/compras",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
@@ -794,25 +787,17 @@
         {
           "method": "GET",
           "endpoint": "/api/compras/reporte-compras",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/compras/productos",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
@@ -830,97 +815,65 @@
         {
           "method": "POST",
           "endpoint": "/api/compras/cotizaciones",
-          "result": "http_contract_observed_not_full_acceptance",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/compras/cotizaciones",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
           "method": "GET",
           "endpoint": "/api/compras/cotizaciones/:id",
-          "result": "http_contract_observed_not_full_acceptance",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
           "method": "PUT",
           "endpoint": "/api/compras/cotizaciones/:id",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/compras/cotizaciones/:id/enviar",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/compras/cotizaciones/:id/aprobar",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/compras/cotizaciones/:id/rechazar",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/compras/cotizaciones/:id/convertir-oc",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
@@ -934,13 +887,9 @@
         {
           "method": "GET",
           "endpoint": "/api/compras/devoluciones",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
@@ -978,13 +927,9 @@
         {
           "method": "GET",
           "endpoint": "/api/compras/ordenes",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
@@ -992,19 +937,16 @@
           "endpoint": "/api/compras/ordenes/:id",
           "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "Indisponibilidad de lecturas/writers, UI real por operación y variantes de moneda/rol no registradas"
+            "Indisponibilidad de lecturas/writers, UI real por operación y variantes de moneda/rol no registradas",
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
           "method": "PUT",
           "endpoint": "/api/compras/ordenes/:id",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
@@ -1018,37 +960,25 @@
         {
           "method": "POST",
           "endpoint": "/api/compras/ordenes/:id/rechazar",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/compras/ordenes/:id/cancelar",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
           "method": "POST",
           "endpoint": "/api/compras/ordenes/:id/recepciones",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
@@ -1092,13 +1022,9 @@
         {
           "method": "GET",
           "endpoint": "/api/compras/proveedores/buscar-ruc/:ruc",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
@@ -1140,13 +1066,9 @@
         {
           "method": "GET",
           "endpoint": "/api/compras/recepciones",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
@@ -1162,19 +1084,16 @@
           "endpoint": "/api/compras/recepciones/ordenes/:ordenId",
           "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "Indisponibilidad de lecturas/writers, UI real por operación y variantes de moneda/rol no registradas"
+            "Indisponibilidad de lecturas/writers, UI real por operación y variantes de moneda/rol no registradas",
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
           "method": "PUT",
           "endpoint": "/api/compras/recepciones/:id",
-          "result": "pending_functional_execution",
+          "result": "functional_cases_verified_with_remaining_checks",
           "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
+            "UI real de compras, roles distintos de ADMIN y variantes no registradas"
           ]
         },
         {
@@ -2810,6 +2729,30 @@
         },
         {
           "method": "GET",
+          "endpoint": "/api/contabilidad/presupuestos/alertas",
+          "result": "pending_functional_execution",
+          "pending_checks": [
+            "persistencia y resultado funcional",
+            "permisos",
+            "aislamiento",
+            "validaciones",
+            "recuperación de errores"
+          ]
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/presupuestos/alertas/resumen",
+          "result": "pending_functional_execution",
+          "pending_checks": [
+            "persistencia y resultado funcional",
+            "permisos",
+            "aislamiento",
+            "validaciones",
+            "recuperación de errores"
+          ]
+        },
+        {
+          "method": "GET",
           "endpoint": "/api/contabilidad/presupuestos/:id",
           "result": "pending_functional_execution",
           "pending_checks": [
@@ -2883,30 +2826,6 @@
         {
           "method": "POST",
           "endpoint": "/api/contabilidad/presupuestos/periodo/:periodoId/actualizar-ejecucion",
-          "result": "pending_functional_execution",
-          "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
-          ]
-        },
-        {
-          "method": "GET",
-          "endpoint": "/api/contabilidad/presupuestos/alertas",
-          "result": "pending_functional_execution",
-          "pending_checks": [
-            "persistencia y resultado funcional",
-            "permisos",
-            "aislamiento",
-            "validaciones",
-            "recuperación de errores"
-          ]
-        },
-        {
-          "method": "GET",
-          "endpoint": "/api/contabilidad/presupuestos/alertas/resumen",
           "result": "pending_functional_execution",
           "pending_checks": [
             "persistencia y resultado funcional",
@@ -3032,14 +2951,21 @@
         "manual-accounting-retry-duplicates",
         "manual-accounting-lima-boundary",
         "manual-accounting-default-date-utc",
+        "accounting-reads-500",
+        "accounting-new-tenant-no-reconcilable-accounts",
+        "accounting-reconciliation-list-permission",
+        "accounting-reconciliation-retry-and-errors",
         "consolidation-domain-rejections-return-500",
         "consolidation-controller-rate-unavailable-in-ui",
         "consolidation-report-missing-service-select",
+        "accounting-invalid-period-accepted",
         "annual-loss-balance-sign",
+        "accounting-books-masked-failures",
         "consignment-ui-new-identical-delivery-replays-old-record",
         "foreign-accounting-period-http-errors",
         "first-customer-annual-close-accounts",
         "platform-accounting-period-reopen",
+        "accounting-budget-alerts-shadowed",
         "monthly-tax-uses-2026-uit-for-other-exercises",
         "monthly-tax-read-error-becomes-zero-credit",
         "monthly-tax-save-retry-duplicates-version",
