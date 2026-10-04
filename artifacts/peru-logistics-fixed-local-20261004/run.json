@@ -1,0 +1,16 @@
+{
+  "completedAt": "2026-10-04T22:02:04.540Z",
+  "success": true,
+  "withBrowser": false,
+  "withSurvey": false,
+  "withRecords": false,
+  "candidateCashApi": false,
+  "candidateCashSql": false,
+  "candidateApi": false,
+  "candidateSql": false,
+  "candidateUi": false,
+  "scope": "accounting_diagnostic_api_subset",
+  "database": "PostgreSQL 16 efímero",
+  "output": "C:\\Users\\PC\\Desktop\\erp-peru-users\\artifacts\\peru-logistics-local-20261004220051976-2412",
+  "remoteWrites": false
+}

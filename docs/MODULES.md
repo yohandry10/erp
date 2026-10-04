@@ -545,7 +545,8 @@ Código principal: `apps/erp-api/src/modules/compras`.
 - Ajustes, transferencias, recepciones y POS usan el mismo writer.
 - Las ubicaciones de un almacén ajeno responden 404 y las consultas de
   ubicaciones, movimientos y estadísticas responden 503 si no pueden leer,
-  nunca 200 vacío ni 500.
+  nunca 200 vacío ni 500. En logística, eventos y backorders de un pedido
+  ajeno responden 404 y sus lecturas indisponibles 503.
 - El kardex valorizado proyecta todos los movimientos físicos (`ENTRADA`,
   `SALIDA`, `AJUSTE` y `DEVOLUCION`) desde ese ledger único. Producto, almacén
   y fechas se filtran dentro del mismo RPC; el detalle puede limitarse, pero el
