@@ -321,12 +321,77 @@ describe('ConciliacionPartidasService', () => {
         error: { message: 'CONCILIACION_EXCEDE_SALDO:d-factura' }
       };
 
+      // Otra operación casó las partidas entre la lectura y la RPC: conflicto.
       await expect(
         service.conciliar(TENANT, USER, { detalle_ids: ['d-factura', 'd-cobro'] })
-      ).rejects.toThrow(/Error creando la conciliación/);
+      ).rejects.toMatchObject({ status: 409 });
 
       expect(inserciones).toHaveLength(0);
       expect(actualizaciones).toHaveLength(0);
+    });
+
+    it('un fallo de infraestructura de la RPC responde 503', async () => {
+      conPartidas([partidaFactura, partidaCobro]);
+      resultadosRpc['conciliar_partidas_tx'] = {
+        data: null,
+        error: { code: '57014', message: 'canceling statement due to statement timeout' }
+      };
+
+      await expect(
+        service.conciliar(TENANT, USER, { detalle_ids: ['d-factura', 'd-cobro'] })
+      ).rejects.toMatchObject({ status: 503 });
+    });
+
+    it('con llave, un reintento devuelve la conciliación registrada sin volver a casar', async () => {
+      resultadosRpc['conciliacion_partidas_replay_569'] = {
+        data: {
+          id: 'conc-1', cuenta_id: 'cta-12', estado: 'TOTAL', monto_conciliado: 100,
+          fecha: '2026-10-03', observaciones: null, saldo_no_conciliado: 0, idempotent: true,
+          lineas: [{ detalle_asiento_id: 'd-factura', monto_aplicado: 100 }, { detalle_asiento_id: 'd-cobro', monto_aplicado: 100 }]
+        },
+        error: null
+      };
+
+      const respuesta = await service.conciliar(
+        TENANT, USER, { detalle_ids: ['d-cobro', 'd-factura'] }, 'llave-conciliacion-1'
+      );
+
+      expect(respuesta).toMatchObject({ id: 'conc-1', estado: 'TOTAL', monto_conciliado: 100 });
+      expect(respuesta.lineas).toHaveLength(2);
+      expect(rpcs.map(r => r.funcion)).toEqual(['conciliacion_partidas_replay_569']);
+      // La huella no depende del orden de la selección.
+      expect(rpcs[0].parametros.p_intent_fingerprint).toMatch(/^[a-f0-9]{64}$/);
+    });
+
+    it('con llave nueva concilia por el writer idempotente', async () => {
+      conPartidas([partidaFactura, partidaCobro]);
+      resultadosRpc['conciliacion_partidas_replay_569'] = { data: null, error: null };
+      resultadosRpc['conciliar_partidas_idempotente_tx_569'] = {
+        data: { id: 'conc-2', fecha: '2026-10-03', idempotent: false },
+        error: null
+      };
+
+      const respuesta = await service.conciliar(
+        TENANT, USER, { detalle_ids: ['d-factura', 'd-cobro'] }, 'llave-conciliacion-2'
+      );
+
+      expect(respuesta.id).toBe('conc-2');
+      const writer = rpcs.find(r => r.funcion === 'conciliar_partidas_idempotente_tx_569');
+      expect(writer?.parametros).toMatchObject({
+        p_tenant_id: TENANT, p_actor_id: USER, p_idempotency_key: 'llave-conciliacion-2'
+      });
+      expect(rpcs.some(r => r.funcion === 'conciliar_partidas_tx')).toBe(false);
+    });
+
+    it('una llave reutilizada con otra selección responde 409', async () => {
+      resultadosRpc['conciliacion_partidas_replay_569'] = {
+        data: null,
+        error: { code: '23505', message: 'CONCILIACION_IDEMPOTENCIA_CONFLICTO' }
+      };
+
+      await expect(
+        service.conciliar(TENANT, USER, { detalle_ids: ['d-factura', 'd-cobro'] }, 'llave-conciliacion-3')
+      ).rejects.toMatchObject({ status: 409 });
     });
   });
 

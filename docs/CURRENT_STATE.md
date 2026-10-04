@@ -32,7 +32,7 @@ preservación, y 566 se promovió una sola vez con readiness
 (`artifacts/peru-production-verification-after-136-20261003.json`); se conservan
 dos timeouts de 20 segundos por arranque en frío. Readiness informa 7 eventos
 outbox en dead letter, constantes desde #130; falta diagnosticarlos con evidencia
-autorizada. PROD actual: 566; NO reaplicar 565 ni 566.
+autorizada. PROD quedó entonces en 566; NO reaplicar 565 ni 566.
 
 Ventas PE (#137): el diagnóstico real
 reprodujo 10 defectos (`artifacts/peru-sales-defects-baseline-20261003.json`):
@@ -53,9 +53,9 @@ comparador (se conserva el intento fallido) y 567 se promovió una sola vez
 runtime `0d6df0ee`/567 pasó al tercer intento
 (`artifacts/peru-production-verification-after-137-20261004.json`). Cada
 despliegue reciente agotó dos lecturas de 20 segundos antes de responder: riesgo
-operativo del plan de Render no confirmado. PROD actual: 567; NO reaplicar.
+operativo del plan de Render no confirmado.
 
-Compras PE (rama `codex/peru-purchases-first-client-20261004`): el diagnóstico
+Compras PE (#138): el diagnóstico
 reprodujo 7 defectos (`artifacts/peru-purchases-defects-baseline-20261004.json`):
 editar una recepción hacía DML directo que la cadena canónica no concede (PROD
 conserva GRANT ALL heredado), y resumen/listado/reporte heredados enmascaraban
@@ -65,9 +65,32 @@ cotizaciones y recepciones respondían 500/400. La 568 añade
 (`artifacts/peru-purchases-canonical-local-20261004`), la suite API 300/2909 y la
 reconstrucción fresca de 564 migraciones hasta 568 con 77 verificadores. El
 inventario API colapsa ya la doble barra que ocultaba una ruta de recepción.
-568 no está promovida; faltan CI exacto, ensayo 567→568, promoción, main y runtime.
-La matriz registra 717 contratos, 359 observados, 293 con casos funcionales,
-162 casos y 101 defectos; no hay aceptación integral del lanzamiento.
+Los 28 checks de `d21f9690` aprobaron; el ensayo del respaldo productivo 567
+pasó y 568 se promovió una sola vez
+(`artifacts/peru-568-promotion-20261004164814362.json`). #138 se integró como
+`624ca0b2`; main 37218136805 (409 HTTP, 32 UI), E2E y seguridad aprobaron y el
+runtime `624ca0b2`/568 pasó al segundo intento tras un timeout de 20 segundos
+(`artifacts/peru-production-verification-after-138-20261004.json`). PROD
+actual: 568; NO reaplicar.
+Contabilidad PE (rama `codex/peru-accounting-first-client-20261004`): el
+diagnóstico reprodujo 7 defectos
+(`artifacts/peru-accounting-defects-baseline-20261004.json`): un cliente nuevo
+no tenía ninguna cuenta conciliable (la 387 sólo marcó a los tenants de
+entonces; el ensayo productivo halla 401 cuentas PE así), el listado de
+conciliaciones respondía 500 por falta de SELECT, `presupuestos/alertas` quedaba
+capturado por `presupuestos/:id`, libros y plan de cuentas enmascaraban lecturas
+fallidas como 200 vacíos, asientos y estados respondían 500, `mes=13` se
+aceptaba y conciliar no era reintentable. La 569 marca las cuentas PE de
+terceros (trigger y backfill sólo PE), añade la intención privada de
+conciliación y el SELECT del listado. Las fuentes pasaron 13 escenarios API y
+restore (`artifacts/peru-accounting-canonical-local-20261004`), la suite API
+301/2917, la reconstrucción fresca de 565 migraciones hasta 569 con 78
+verificadores y el ensayo sobre el respaldo productivo 568
+(`artifacts/erp-peru-569-rehearsal-20261004165609161-17420.json`). 569 no está
+promovida; faltan CI exacto, promoción, main y runtime. El libro diario sigue
+listando asientos de todo estado: observación no cambiada.
+La matriz registra 717 contratos, 380 observados, 316 con casos funcionales,
+162 casos y 108 defectos; no hay aceptación integral del lanzamiento.
 
 Corte técnico 131/132: el cierre 131 promovió 562 una sola vez con preflight,
 respaldo 560, rollback local y preservación de 29 tablas/funciones/seguridad
@@ -107,7 +130,7 @@ cf868067; main 37125486977, E2E y seguridad aprobaron. El despliegue exacto
 cf868067/esquema 563 pasó preflight, API/web/DB/Redis/CORS
 (artifacts/peru-production-verification-after-132-20261003.json). Se conserva
 el primer timeout de lectura de 20 segundos. Ese corte comprobó el runtime de #132.
-PROD actual: 563;
+PROD quedó entonces en 563;
 NO reaplicar 562 ni 563. La matriz registra 288 contratos HTTP observados de 717,
 77 casos funcionales y 1298 controles visibles; ninguna cifra acredita todas
 las operaciones. Reportes operativos, contables y tributarios siguen incluidos.
@@ -134,7 +157,7 @@ Ambos CI de 4fc2009f aprobaron 298 API/29 UI sin reintentos y 28 checks.
 #133 se integró como 19fa239d; main 37132251731, E2E y seguridad aprobaron.
 El runtime exacto 19fa239d/esquema 563 pasó preflight y lectura API/web/DB/Redis/
 CORS (artifacts/peru-production-verification-after-133-20261003.json). Se conserva
-el primer timeout de 20 segundos. Es el último runtime verificado; sin aceptación
+el primer timeout de 20 segundos. Entonces era el último runtime verificado; sin aceptación
 integral ni confirmación administrativa del plan o continuidad de Render.
 
 POS reprodujo siete defectos locales: certificado sin writer autorizado,

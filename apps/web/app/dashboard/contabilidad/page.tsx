@@ -107,6 +107,13 @@ export default function ContabilidadPage() {
   const [vistaActual, setVistaActual] =
     useState<VistaContable>("registro-compras");
   const [loading, setLoading] = useState(false);
+  const [erroresCarga, setErroresCarga] = useState<Record<string, string>>({});
+  const marcarErrorCarga = useCallback((vista: string, mensaje: string | null) => {
+    setErroresCarga((actual) => {
+      const { [vista]: _anterior, ...resto } = actual;
+      return mensaje ? { ...resto, [vista]: mensaje } : resto;
+    });
+  }, []);
   const { theme } = useDashboardTheme();
   const country = useCountryContext();
   const isArgentina = country.paisCodigo === "AR";
@@ -421,94 +428,109 @@ export default function ContabilidadPage() {
   const cargarEstadoResultados = useCallback(async () => {
     setLoading(true);
     try {
+      marcarErrorCarga("estado-resultados", null);
       const response = await get(
         `/api/contabilidad/estados/estado-resultados?anio=${anioActual}&mes=${mesActual}`,
       );
       if (response?.success) setEstadoResultados(response.data);
     } catch (error) {
       console.error("Error cargando estado de resultados:", error);
+      marcarErrorCarga("estado-resultados", "No se pudo cargar estado de resultados; reintente.");
     } finally {
       setLoading(false);
     }
-  }, [anioActual, get, mesActual]);
+  }, [marcarErrorCarga, anioActual, get, mesActual]);
 
   const cargarRegistroCompras = useCallback(async () => {
     setLoading(true);
     try {
+      marcarErrorCarga("registro-compras", null);
       const response = await get("/api/contabilidad/registro-compras");
       if (response && response.success) setRegistroCompras(response.data);
     } catch (error) {
       console.error("Error cargando registro de compras:", error);
+      marcarErrorCarga("registro-compras", "No se pudo cargar registro de compras; reintente.");
     } finally {
       setLoading(false);
     }
-  }, [get]);
+  }, [marcarErrorCarga, get]);
 
   const cargarBalanceComprobacion = useCallback(async () => {
     setLoading(true);
     try {
+      marcarErrorCarga("balance-comprobacion", null);
       const response = await get(
         `/api/contabilidad/balance-comprobacion?anio=${anioActual}&mes=${mesActual}`,
       );
       if (response && response.success) setBalanceComprobacion(response.data);
     } catch (error) {
       console.error("Error cargando balance de comprobación:", error);
+      marcarErrorCarga("balance-comprobacion", "No se pudo cargar balance de comprobación; reintente.");
     } finally {
       setLoading(false);
     }
-  }, [anioActual, get, mesActual]);
+  }, [marcarErrorCarga, anioActual, get, mesActual]);
 
   const cargarKardexValorizado = useCallback(async () => {
     setLoading(true);
     try {
+      marcarErrorCarga("kardex-valorizado", null);
       const response = await get("/api/contabilidad/kardex-valorizado");
       if (response && response.success) setKardexValorizado(response.data);
     } catch (error) {
       console.error("Error cargando kardex valorizado:", error);
+      marcarErrorCarga("kardex-valorizado", "No se pudo cargar kardex valorizado; reintente.");
     } finally {
       setLoading(false);
     }
-  }, [get]);
+  }, [marcarErrorCarga, get]);
 
   const cargarLibroCajaBancos = useCallback(async () => {
     setLoading(true);
     try {
+      marcarErrorCarga("libro-caja-bancos", null);
       const response = await get("/api/contabilidad/libro-caja-bancos");
       if (response && response.success) setLibroCajaBancos(response.data);
     } catch (error) {
       console.error("Error cargando libro de caja y bancos:", error);
+      marcarErrorCarga("libro-caja-bancos", "No se pudo cargar libro de caja y bancos; reintente.");
     } finally {
       setLoading(false);
     }
-  }, [get]);
+  }, [marcarErrorCarga, get]);
 
   const cargarRegistroActivosFijos = useCallback(async () => {
     setLoading(true);
     try {
+      marcarErrorCarga("registro-activos-fijos", null);
       const response = await get("/api/contabilidad/registro-activos-fijos");
       if (response && response.success) setRegistroActivosFijos(response.data);
     } catch (error) {
       console.error("Error cargando registro de activos fijos:", error);
+      marcarErrorCarga("registro-activos-fijos", "No se pudo cargar registro de activos fijos; reintente.");
     } finally {
       setLoading(false);
     }
-  }, [get]);
+  }, [marcarErrorCarga, get]);
 
   const cargarLibroPlanillas = useCallback(async () => {
     setLoading(true);
     try {
+      marcarErrorCarga("libro-planillas", null);
       const response = await get("/api/contabilidad/libro-planillas");
       if (response && response.success) setLibroPlanillas(response.data);
     } catch (error) {
       console.error("Error cargando libro de planillas:", error);
+      marcarErrorCarga("libro-planillas", "No se pudo cargar libro de planillas; reintente.");
     } finally {
       setLoading(false);
     }
-  }, [get]);
+  }, [marcarErrorCarga, get]);
 
   const cargarLibroInventariosBalances = useCallback(async () => {
     setLoading(true);
     try {
+      marcarErrorCarga("libro-inventarios-balances", null);
       const response = await get(
         "/api/contabilidad/libro-inventarios-balances",
       );
@@ -516,22 +538,25 @@ export default function ContabilidadPage() {
         setLibroInventariosBalances(response.data);
     } catch (error) {
       console.error("Error cargando libro de inventarios y balances:", error);
+      marcarErrorCarga("libro-inventarios-balances", "No se pudo cargar libro de inventarios y balances; reintente.");
     } finally {
       setLoading(false);
     }
-  }, [get]);
+  }, [marcarErrorCarga, get]);
 
   const cargarRegistroCostos = useCallback(async () => {
     setLoading(true);
     try {
+      marcarErrorCarga("registro-costos", null);
       const response = await get("/api/contabilidad/registro-costos");
       if (response && response.success) setRegistroCostos(response.data);
     } catch (error) {
       console.error("Error cargando registro de costos:", error);
+      marcarErrorCarga("registro-costos", "No se pudo cargar registro de costos; reintente.");
     } finally {
       setLoading(false);
     }
-  }, [get]);
+  }, [marcarErrorCarga, get]);
 
   const cargarLibrosElectronicosSunat = useCallback(async () => {
     if (isArgentina || isColombia) {
@@ -545,15 +570,17 @@ export default function ContabilidadPage() {
     }
     setLoading(true);
     try {
+      marcarErrorCarga("libros-electronicos-sunat", null);
       const response = await get("/api/contabilidad/libros-electronicos-sunat");
       if (response && response.success)
         setLibrosElectronicosSunat(response.data);
     } catch (error) {
       console.error("Error cargando libros electrónicos SUNAT:", error);
+      marcarErrorCarga("libros-electronicos-sunat", "No se pudo cargar libros electrónicos SUNAT; reintente.");
     } finally {
       setLoading(false);
     }
-  }, [get, isArgentina, isColombia]);
+  }, [marcarErrorCarga, get, isArgentina, isColombia]);
 
   const cargarDatos = useCallback(async () => {
     if (vistaActual === "estado-resultados") await cargarEstadoResultados();
@@ -1204,6 +1231,12 @@ export default function ContabilidadPage() {
               <div className={valueClass}>Activo</div>
             </div>
           </div>
+
+          {erroresCarga[vistaActual] && (
+            <p role="alert" className="text-sm text-destructive">
+              {erroresCarga[vistaActual]}
+            </p>
+          )}
 
           {renderContent()}
 

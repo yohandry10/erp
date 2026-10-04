@@ -1,5 +1,15 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
-import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  NotFoundException,
+  ServiceUnavailableException
+} from '@nestjs/common';
+import { createHash } from 'crypto';
+import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { lecturaContableFallida } from '../contabilidad-errors';
 import { fechaHoyDelTenant } from '../../../shared/utils/fecha-tenant.util';
 import {
   ConciliarPartidasDto,
@@ -135,7 +145,7 @@ export class ConciliacionPartidasService {
     });
 
     if (error) {
-      throw new Error(`Error obteniendo partidas abiertas: ${error.message}`);
+      throw lecturaContableFallida(error, 'las partidas abiertas');
     }
 
     const partidas: PartidaAbiertaDto[] = [];
@@ -193,7 +203,8 @@ export class ConciliacionPartidasService {
   async conciliar(
     tenantId: string,
     userId: string,
-    dto: ConciliarPartidasDto
+    dto: ConciliarPartidasDto,
+    idempotencyKey?: string
   ): Promise<ConciliacionResponseDto> {
     const ids = [...new Set(dto.detalle_ids)];
 
@@ -201,6 +212,31 @@ export class ConciliacionPartidasService {
       throw new BadRequestException(
         'Hay partidas repetidas en la selección: cada apunte puede aparecer una sola vez.'
       );
+    }
+
+    // Con llave, un reintento devuelve la conciliación ya registrada en vez de
+    // fallar porque sus partidas ya están casadas.
+    const llave = idempotencyKey?.trim() || undefined;
+    const huella = llave
+      ? createHash('sha256')
+          .update(JSON.stringify({
+            detalle_ids: [...ids].sort(),
+            fecha: dto.fecha ?? null,
+            observaciones: dto.observaciones ?? null
+          }))
+          .digest('hex')
+      : undefined;
+    if (llave) {
+      const { data: previa, error: errorPrevia } = await this.supabaseService
+        .getClient()
+        .rpc('conciliacion_partidas_replay_569', {
+          p_tenant_id: tenantId,
+          p_actor_id: userId,
+          p_idempotency_key: llave,
+          p_intent_fingerprint: huella
+        });
+      if (errorPrevia) throw this.errorConciliacion(errorPrevia);
+      if (previa) return this.respuestaRegistrada(previa);
     }
 
     const { data, error } = await this.supabaseService
@@ -214,7 +250,7 @@ export class ConciliacionPartidasService {
       .in('id', ids);
 
     if (error) {
-      throw new Error(`Error obteniendo las partidas a conciliar: ${error.message}`);
+      throw lecturaContableFallida(error, 'las partidas a conciliar');
     }
 
     const filas = data || [];
@@ -271,21 +307,41 @@ export class ConciliacionPartidasService {
     const reparto = ConciliacionPartidasService.repartir(partidas);
 
     const fecha = dto.fecha ?? (await fechaHoyDelTenant(this.supabaseService.getClient(), tenantId));
-    const { data: conciliacion, error: errorConciliacion } = await this.supabaseService
-      .getClient()
-      .rpc('conciliar_partidas_tx', {
-        p_tenant_id: tenantId,
-        p_cuenta_id: cuentaId,
-        p_estado: reparto.estado,
-        p_monto_conciliado: reparto.montoConciliado,
-        p_fecha: fecha,
-        p_observaciones: dto.observaciones ?? null,
-        p_created_by: userId,
-        p_aplicaciones: reparto.aplicaciones
-      });
+    const { data: conciliacion, error: errorConciliacion } = llave
+      ? await this.supabaseService.getClient().rpc('conciliar_partidas_idempotente_tx_569', {
+          p_tenant_id: tenantId,
+          p_actor_id: userId,
+          p_idempotency_key: llave,
+          p_intent_fingerprint: huella,
+          p_cuenta_id: cuentaId,
+          p_estado: reparto.estado,
+          p_monto_conciliado: reparto.montoConciliado,
+          p_fecha: fecha,
+          p_observaciones: dto.observaciones ?? null,
+          p_aplicaciones: reparto.aplicaciones,
+          p_saldo_no_conciliado: reparto.saldoNoConciliado
+        })
+      : await this.supabaseService.getClient().rpc('conciliar_partidas_tx', {
+          p_tenant_id: tenantId,
+          p_cuenta_id: cuentaId,
+          p_estado: reparto.estado,
+          p_monto_conciliado: reparto.montoConciliado,
+          p_fecha: fecha,
+          p_observaciones: dto.observaciones ?? null,
+          p_created_by: userId,
+          p_aplicaciones: reparto.aplicaciones
+        });
 
-    if (errorConciliacion || !conciliacion) {
-      throw new Error(`Error creando la conciliación: ${errorConciliacion?.message}`);
+    if (errorConciliacion) {
+      throw this.errorConciliacion(errorConciliacion);
+    }
+    if (!conciliacion) {
+      throw new ServiceUnavailableException('No se pudo confirmar la conciliación; reintente');
+    }
+    // Dos reintentos simultáneos con la misma llave: el segundo recibe la
+    // conciliación del primero tal como se registró.
+    if (conciliacion.idempotent === true) {
+      return this.respuestaRegistrada(conciliacion);
     }
 
     this.logger.log(
@@ -321,7 +377,7 @@ export class ConciliacionPartidasService {
       if (String(error.message).includes('CONCILIACION_NO_ENCONTRADA')) {
         throw new NotFoundException(`Conciliación ${conciliacionId} no encontrada`);
       }
-      throw new Error(`Error deshaciendo la conciliación: ${error.message}`);
+      throw this.errorConciliacion(error);
     }
 
     this.logger.log(`🔗 Conciliación ${conciliacionId} deshecha`);
@@ -344,7 +400,7 @@ export class ConciliacionPartidasService {
     const { data, error } = await query.order('fecha', { ascending: false });
 
     if (error) {
-      throw new Error(`Error listando conciliaciones: ${error.message}`);
+      throw lecturaContableFallida(error, 'las conciliaciones');
     }
 
     return (data || []) as ConciliacionResponseDto[];
@@ -353,6 +409,46 @@ export class ConciliacionPartidasService {
   // --------------------------------------------------------------------------
   // Internos
   // --------------------------------------------------------------------------
+
+  private respuestaRegistrada(registro: any): ConciliacionResponseDto {
+    return {
+      id: registro.id,
+      cuenta_id: registro.cuenta_id,
+      estado: registro.estado,
+      monto_conciliado: Number(registro.monto_conciliado),
+      fecha: registro.fecha,
+      observaciones: registro.observaciones ?? undefined,
+      lineas: (registro.lineas ?? []).map((l: any) => ({
+        detalle_asiento_id: l.detalle_asiento_id,
+        monto_aplicado: Number(l.monto_aplicado)
+      })),
+      saldo_no_conciliado: Number(registro.saldo_no_conciliado ?? 0)
+    };
+  }
+
+  /** Errores del writer: reglas de negocio 4xx; el resto, indisponibilidad. */
+  private errorConciliacion(error: { code?: string; message?: string }): HttpException {
+    const mensaje = String(error?.message ?? '');
+    if (mensaje.includes('CONCILIACION_IDEMPOTENCIA_CONFLICTO')) {
+      return new ConflictException(
+        'La llave de idempotencia ya se usó con otra selección de partidas.'
+      );
+    }
+    if (mensaje.includes('CONCILIACION_EXCEDE_SALDO')) {
+      return new ConflictException(
+        'Alguna de las partidas ya fue conciliada por otra operación; actualice la selección.'
+      );
+    }
+    if (mensaje.includes('CONCILIACION_PARTIDA_NO_ENCONTRADA') || mensaje.includes('CONCILIACION_NO_ENCONTRADA')) {
+      return new NotFoundException(
+        'Alguna de las partidas seleccionadas no existe o no pertenece a su organización.'
+      );
+    }
+    if (mensaje.startsWith('CONCILIACION_') || mensaje.includes('DOCUMENT_FLOW_ACTOR_NOT_IN_TENANT')) {
+      return new BadRequestException(`No se pudo conciliar: ${mensaje}`);
+    }
+    return new ServiceUnavailableException('No se pudo registrar la conciliación; reintente');
+  }
 
   private async exigirCuentaConciliable(tenantId: string, cuentaId: string): Promise<void> {
     const { data, error } = await this.supabaseService
@@ -363,7 +459,10 @@ export class ConciliacionPartidasService {
       .eq('id', cuentaId)
       .maybeSingle();
 
-    if (error || !data) {
+    if (error) {
+      throw lecturaContableFallida(error, 'la cuenta contable');
+    }
+    if (!data) {
       throw new NotFoundException(`Cuenta contable ${cuentaId} no encontrada`);
     }
 
