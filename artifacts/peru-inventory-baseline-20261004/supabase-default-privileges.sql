@@ -1,0 +1,1 @@
+DO $$ DECLARE r record; BEGIN FOR r IN SELECT c.oid::regclass AS rel FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p','v') AND c.relacl IS NULL LOOP EXECUTE format('GRANT ALL ON %s TO anon, authenticated, service_role', r.rel); END LOOP; END $$;

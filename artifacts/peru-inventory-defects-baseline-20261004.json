@@ -1,0 +1,26 @@
+{
+  "scope": "Inventario usado por la web y no cubierto: ubicaciones de almacén, ajustes de stock, movimientos y estadísticas; API/PostgREST/PostgreSQL locales efímeros con privilegios por defecto de Supabase emulados",
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "runs": [
+    {"output": "artifacts/peru-inventory-baseline-20261004", "result": "defects_reproduced", "restore": "passed"},
+    {"output": "artifacts/peru-inventory-local-20261004185832217-19240", "result": "probe_column_assumption"},
+    {"output": "artifacts/peru-inventory-fixed-local-20261004", "result": "passed_after_fix", "restore": "passed"}
+  ],
+  "passed": [
+    "Ubicación con intención, código repetido rechazado, edición, listado, baja con reintento y edición ajena rechazada",
+    "Sobrante y faltante con intención actualizan existencias una vez; faltante imposible rechazado sin tocar el stock; ajuste ajeno rechazado; movimientos y estadísticas del tenant"
+  ],
+  "confirmed_defects": [
+    {
+      "id": "inventory-locations-masked",
+      "operations": ["GET /api/inventario/almacenes/:almacenId/ubicaciones"],
+      "observed": "Un almacén de otra empresa y una lectura fallida respondían 200 success:false con lista vacía (el 404 del servicio se enmascaraba)."
+    },
+    {
+      "id": "inventory-reads-500",
+      "operations": ["GET /api/inventario/movimientos", "GET /api/inventario/stats"],
+      "observed": "Sin lectura de movimientos_inventario o productos respondían 500 en vez de 503."
+    }
+  ]
+}

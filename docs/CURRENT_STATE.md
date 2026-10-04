@@ -128,9 +128,14 @@ configurada no podía crear su primer documento con la serie del asistente
 400. La serie configurada se registra ahora con el writer 461 en su primer uso;
 8/8 local con privilegios Supabase emulados
 (`artifacts/peru-documents-fixed-local-20261004`); sin fase CI hasta alinear el
-bootstrap.
+bootstrap. Inventario (ubicaciones, ajustes, movimientos, estadísticas)
+reprodujo dos (`artifacts/peru-inventory-defects-baseline-20261004.json`):
+ubicaciones de almacén ajeno o caídas como 200 vacío y movimientos/estadísticas
+caídos como 500; 5/5 local tras corregir
+(`artifacts/peru-inventory-fixed-local-20261004`). Logística e imágenes de
+producto siguen sin caso.
 La matriz registra 717 contratos, 421 observados (main 37223140493), 316 con
-casos funcionales, 162 casos y 119 defectos; no hay aceptación integral del
+casos funcionales, 162 casos y 121 defectos; no hay aceptación integral del
 lanzamiento.
 
 Corte técnico 131/132: el cierre 131 promovió 562 una sola vez con preflight,
