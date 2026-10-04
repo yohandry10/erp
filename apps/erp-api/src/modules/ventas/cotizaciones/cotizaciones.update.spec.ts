@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { CotizacionesService } from './cotizaciones.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { NotificationsService } from '../../notifications/notifications.service';
@@ -64,7 +64,7 @@ describe('CotizacionesService.update', () => {
     const mockClient: any = {
       rpc: jest.fn().mockResolvedValue({
         data: null,
-        error: { message: 'transaction failed' },
+        error: { code: 'P0001', message: 'transaction failed' },
       }),
     };
 
@@ -92,5 +92,17 @@ describe('CotizacionesService.update', () => {
         tenantId,
       ),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('responde 503 si el writer no está disponible', async () => {
+    const mockClient: any = { rpc: jest.fn().mockResolvedValue({ data: null, error: { code: '42501', message: 'permission denied for function actualizar_cotizacion_comercial_tx' } }) };
+    const service = new CotizacionesService(
+      { getClient: () => mockClient } as any as SupabaseService,
+      { createNotification: jest.fn() } as any,
+      { getResourceAuditLogs: jest.fn() } as any,
+      { calcularImpuestos: jest.fn() } as any,
+    );
+    jest.spyOn(service, 'findOne').mockResolvedValue({ id: 'cot-1', estado: EstadoCotizacion.BORRADOR, detalle: [] } as any);
+    await expect(service.update('cot-1', { notas: 'x' } as any, 'tenant-123')).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 });

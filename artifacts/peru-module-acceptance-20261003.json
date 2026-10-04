@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-03T21:25:56.639Z",
+  "generated_at": "2026-10-04T02:20:29.456Z",
   "scope": "Inventario y aceptación por módulo/operación; únicamente Analytics excluido",
   "operational_accounting_tax_reports_included": true,
   "complete_acceptance": false,
@@ -24,11 +24,11 @@
     }
   ],
   "latest_verified_production": {
-    "sha": "8d717bcfb8e038a5d52abf95c124c99438009080",
-    "schema_at_last_runtime_read": 565,
-    "proof": "artifacts/peru-production-verification-after-135-20261003.json",
-    "first_attempt": "artifacts/peru-production-verification-after-135-first-timeout-20261003.json",
-    "main_ci": "37152767852 success"
+    "sha": "4f946dfbc2134ff75c17712ab3d50fc5644ab73a",
+    "schema_at_last_runtime_read": 566,
+    "proof": "artifacts/peru-production-verification-after-136-20261003.json",
+    "failed_attempts": "artifacts/peru-production-verification-after-136-first-timeout-20261003.json",
+    "main_ci": "37162507679 success"
   },
   "superseded_main": {
     "sha": "9e301e2ae9f470b56ffc10d775ab09c4a8d6a76b",
@@ -36,13 +36,13 @@
     "proof": "artifacts/peru-main-134-heap-failure-20261003"
   },
   "current_database_schema": {
-    "version": 565,
-    "proof": "artifacts/peru-565-promotion-20261003204614178.json"
+    "version": 566,
+    "proof": "artifacts/peru-566-promotion-20261003233948436.json"
   },
   "pending_schema": {
-    "version": 566,
-    "state": "canonical in cash branch; fresh rebuild passed locally; not promoted",
-    "proof": "artifacts/peru-566-fresh-contracts-local-20261003.json"
+    "version": 567,
+    "state": "sales branch candidate; not promoted",
+    "proof": "artifacts/peru-sales-defects-baseline-20261003.json"
   },
   "acceptance_rule": "Contrato observado o control visible no implica ejecutar ni aceptar toda una operación. Se conservan variantes de país, infraestructura y pendientes por operación para no ocultar huecos.",
   "navigation": {

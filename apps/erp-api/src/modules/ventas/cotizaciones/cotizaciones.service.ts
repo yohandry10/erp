@@ -1,5 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { isNotFoundError, readUnavailable, writerFailure } from '../ventas-errors';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { AuditService } from '../../audit/audit.service';
 import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
@@ -31,6 +33,7 @@ export class CotizacionesService {
     createCotizacionDto: CreateCotizacionDto,
     tenantId: string,
     userId?: string,
+    idempotencyKey?: string,
   ): Promise<Cotizacion & { detalle: CotizacionDetalle[] }> {
     const client = this.supabase.getClient();
 
@@ -46,17 +49,28 @@ export class CotizacionesService {
       .eq('tenant_id', tenantId)
       .single();
 
-    if (clienteError || !cliente) {
+    if (clienteError && !isNotFoundError(clienteError)) {
+      throw readUnavailable('el cliente de la cotización');
+    }
+    if (!cliente) {
       throw new NotFoundException('Cliente no encontrado');
+    }
+
+    const key = idempotencyKey?.trim() || undefined;
+    if (key && (key.length < 8 || key.length > 200)) {
+      throw new BadRequestException('Idempotency-Key debe tener entre 8 y 200 caracteres');
     }
 
     // Calcular totales
     const { subtotal, igv, total } = await this.calcularTotales(createCotizacionDto.detalle, tenantId);
-    const { data: empresaConfig } = await client
+    const { data: empresaConfig, error: empresaConfigError } = await client
       .from('empresa_config')
       .select('moneda_defecto')
       .eq('tenant_id', tenantId)
       .maybeSingle();
+    if (empresaConfigError) {
+      throw readUnavailable('la moneda de la empresa');
+    }
 
     // Obtener información del usuario para el campo vendedor
     let vendedorNombre = 'Sistema';
@@ -96,9 +110,7 @@ export class CotizacionesService {
       );
     }
 
-    const { data: resultado, error: createError } = await client.rpc('crear_cotizacion_comercial_tx', {
-      p_tenant_id: tenantId,
-      p_created_by: userId,
+    const fields = {
       p_cliente_id: createCotizacionDto.cliente_id,
       p_fecha_vencimiento: createCotizacionDto.fecha_vencimiento || null,
       p_observaciones: createCotizacionDto.notas || null,
@@ -108,11 +120,26 @@ export class CotizacionesService {
       p_igv: igv,
       p_total: total,
       p_detalle: detalleData,
-    });
+    };
+    // Con clave, la misma intención devuelve la cotización ya creada (567); sin
+    // clave se conserva el contrato de los clientes anteriores.
+    const { data: resultado, error: createError } = key
+      ? await client.rpc('crear_cotizacion_idempotente_tx_567', {
+        p_tenant_id: tenantId,
+        p_actor_id: userId,
+        p_idempotency_key: key,
+        p_intent_fingerprint: this.fingerprintCotizacion(createCotizacionDto),
+        ...fields,
+      })
+      : await client.rpc('crear_cotizacion_comercial_tx', {
+        p_tenant_id: tenantId,
+        p_created_by: userId,
+        ...fields,
+      });
 
     if (createError || !(resultado as any)?.cotizacion) {
       console.error('Error creating cotizacion atomically:', createError);
-      throw new BadRequestException(createError?.message || 'Error al crear la cotización');
+      throw writerFailure(createError, 'No se pudo crear la cotización');
     }
 
     const cotizacion = (resultado as any).cotizacion as Cotizacion;
@@ -184,7 +211,7 @@ export class CotizacionesService {
 
     if (error) {
       console.error('❌ [CotizacionesService] Error fetching cotizaciones:', error);
-      throw new BadRequestException('Error al obtener cotizaciones');
+      throw readUnavailable('las cotizaciones');
     }
 
     console.log(`✅ [CotizacionesService] Cotizaciones encontradas: ${data?.length || 0} de ${count || 0} total`);
@@ -225,8 +252,11 @@ export class CotizacionesService {
       .eq('tenant_id', tenantId)
       .single();
 
-    if (cotizacionError || !cotizacion) {
+    if (cotizacionError && !isNotFoundError(cotizacionError)) {
       console.error('❌ [CotizacionesService] Error fetching cotizacion:', cotizacionError);
+      throw readUnavailable('la cotización');
+    }
+    if (!cotizacion) {
       throw new NotFoundException('Cotización no encontrada');
     }
 
@@ -242,7 +272,7 @@ export class CotizacionesService {
 
     if (detalleError) {
       console.error('Error fetching cotizacion detalle:', detalleError);
-      throw new BadRequestException('Error al obtener el detalle de la cotización');
+      throw readUnavailable('el detalle de la cotización');
     }
 
     return {
@@ -318,7 +348,7 @@ export class CotizacionesService {
 
     if (error) {
       console.error('Error updating cotizacion atomically:', error);
-      throw new BadRequestException(error.message || 'Error al actualizar la cotización');
+      throw writerFailure(error, 'No se pudo actualizar la cotización');
     }
 
     console.log('✅ [CotizacionesService] Cotización actualizada:', id);
@@ -347,7 +377,7 @@ export class CotizacionesService {
     });
 
     if (error) {
-      throw new BadRequestException(error.message || 'No se pudo cambiar el estado de la cotización');
+      throw writerFailure(error, 'No se pudo cambiar el estado de la cotización');
     }
 
     try {
@@ -601,6 +631,20 @@ export class CotizacionesService {
     // Construir timeline unificado
     const timeline = [];
 
+    // Las transiciones durables viven en la propia cotización; ningún writer las
+    // escribe en audit_log, así que el historial no puede depender sólo de él.
+    const row = cotizacion as any;
+    const ciclo: Array<[string, unknown, unknown, Record<string, unknown>]> = [
+      ['CREADA', row.created_at, row.created_by, {}],
+      ['APROBADA', row.fecha_aprobacion, row.aprobado_por, { observaciones: row.observaciones_aprobacion ?? null }],
+      ['RECHAZADA', row.fecha_rechazo, row.rechazado_por, { motivo: row.motivo_rechazo ?? null }],
+      ['CONVERTIDA', row.fecha_conversion, row.convertido_por, { pedido_id: row.pedido_id ?? null }],
+    ];
+    for (const [estado, timestamp, usuario, detalle] of ciclo) {
+      if (timestamp) timeline.push({ tipo: 'CICLO_VIDA', timestamp, estado, usuario_id: usuario ?? null, ...detalle });
+    }
+    const eventosCiclo = timeline.length;
+
     // Agregar eventos de auditoría
     for (const log of auditLogs) {
       timeline.push({
@@ -630,6 +674,7 @@ export class CotizacionesService {
       timeline,
       resumen: {
         total_eventos: timeline.length,
+        eventos_ciclo_vida: eventosCiclo,
         eventos_auditoria: auditLogs.length,
       },
     };
@@ -660,9 +705,24 @@ export class CotizacionesService {
 
     if (error) {
       console.error('❌ [CotizacionesService] Error deleting cotizacion atomically:', error);
-      throw new BadRequestException(error.message || 'Error al eliminar la cotización');
+      throw writerFailure(error, 'No se pudo eliminar la cotización');
     }
 
     console.log('✅ [CotizacionesService] Cotización eliminada:', id);
+  }
+
+  /** Huella de la intención de alta; el actor se compara aparte en SQL. */
+  private fingerprintCotizacion(dto: CreateCotizacionDto): string {
+    return createHash('sha256').update(JSON.stringify({
+      cliente_id: dto.cliente_id,
+      fecha_vencimiento: dto.fecha_vencimiento ?? null,
+      notas: dto.notas ?? null,
+      detalle: dto.detalle.map((item) => ({
+        producto_id: item.producto_id,
+        descripcion: item.descripcion,
+        cantidad: Number(item.cantidad),
+        precio_unitario: Number(item.precio_unitario),
+      })),
+    })).digest('hex');
   }
 }

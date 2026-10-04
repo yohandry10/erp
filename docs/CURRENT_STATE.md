@@ -14,9 +14,8 @@ el primer timeout de 20 segundos. #134 (`9e301e2a`, 564) no cerró main: sus dos
 intentos 37142023714 agotaron el heap de Next dev en el barrido con registros
 (`artifacts/peru-main-134-heap-failure-20261003`); #135 reinicia Next entre
 fases y su main sí aprobó. CPE corrigió 15 defectos; no acredita SUNAT.
-PROD actual: 565; NO reaplicar 565.
 
-Caja PE (rama `codex/peru-cash-first-client-20261003`): 20 defectos confirmados,
+Caja PE (#136): 20 defectos confirmados,
 18 de API/SQL y dos de UI (Sesiones y Cortes conservaban el error tras un
 reintento con HTTP 200). El CI del PR destapó el 20: el cierre administrativo
 usaba el `monto_esperado` de apertura y exigía supervisor por una diferencia falsa. Las correcciones son canónicas en la rama: 23 escenarios
@@ -24,9 +23,31 @@ API, 10 comprobaciones UI y restore pasaron sobre snapshot local con 566
 (`artifacts/peru-cash-canonical-local-20261003`). La reconstrucción fresca
 PostgreSQL 16 aprobó 562 migraciones hasta 566 y 75 verificadores tras ajustar
 dos fixtures (492/449) que insertaban una segunda `10111`
-(`artifacts/peru-566-fresh-contracts-local-20261003.json`). **566 no está
-promovida**; faltan CI exacto, respaldo/ensayo 565→566, promoción, main y runtime.
-La matriz conserva 717 contratos, 123 casos y 84 defectos con sus pendientes;
+(`artifacts/peru-566-fresh-contracts-local-20261003.json`). Los 28 checks de
+`9b3657d2` aprobaron; el ensayo del respaldo productivo 565 pasó rollback y
+preservación, y 566 se promovió una sola vez con readiness
+(`artifacts/peru-566-promotion-20261003233948436.json`). #136 se integró como
+`4f946dfb`; main 37162507679, E2E y seguridad aprobaron. El runtime exacto
+`4f946dfb`/566 pasó preflight y lectura API/web/DB/Redis/CORS al tercer intento
+(`artifacts/peru-production-verification-after-136-20261003.json`); se conservan
+dos timeouts de 20 segundos por arranque en frío. Readiness informa 7 eventos
+outbox en dead letter, constantes desde #130; falta diagnosticarlos con evidencia
+autorizada. PROD actual: 566; NO reaplicar 565 ni 566.
+
+Ventas PE (rama `codex/peru-sales-first-client-20261003`): el diagnóstico real
+reprodujo 10 defectos (`artifacts/peru-sales-defects-baseline-20261003.json`):
+altas de cotización/pedido duplicadas con la misma Idempotency-Key, lecturas y
+writers indisponibles como 400, pedido ajeno 400, historial vacío o incompleto y
+`sunat-kpis` 500 tras reconstrucción (PROD sí concede la vista); el décimo
+apareció al corregir: el historial de pedido omitía siempre el inventario porque
+su consulta fallaba en silencio. Las fuentes canónicas y la 567 (intención de
+alta con política privada) pasaron 18 escenarios API y restore
+(`artifacts/peru-sales-canonical-local-20261003`), la suite API 300/2908 y la
+reconstrucción fresca de 563 migraciones hasta 567 con 76 verificadores; se
+conserva el primer intento que falló por la política ausente
+(`artifacts/peru-567-fresh-contracts-local-20261004.json`). 567 no está
+promovida; faltan CI exacto, ensayo 566→567, promoción, main y runtime.
+La matriz conserva 717 contratos, 141 casos y 94 defectos con sus pendientes;
 no hay aceptación integral del lanzamiento ni confirmación del plan de Render.
 
 Corte técnico 131/132: el cierre 131 promovió 562 una sola vez con preflight,
