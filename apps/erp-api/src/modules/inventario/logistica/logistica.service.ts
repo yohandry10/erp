@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { NotificationType, NotificationSeverity } from '../../notifications/notification.types';
@@ -60,7 +60,7 @@ export class LogisticaService {
 
     if (error) {
       console.error('Error fetching ordenes pendientes:', error);
-      throw new BadRequestException('Error al obtener órdenes pendientes');
+      throw new ServiceUnavailableException('No se pudo consultar las órdenes pendientes; reintente');
     }
 
     const pedidosConItems = await Promise.all(
@@ -73,7 +73,7 @@ export class LogisticaService {
 
         if (detalleError) {
           console.error('Error fetching pedido detalle:', detalleError);
-          throw new BadRequestException('No se pudieron cargar las líneas del pedido; vuelve a intentarlo');
+          throw new ServiceUnavailableException('No se pudieron cargar las líneas del pedido; reintente');
         }
 
         return {
@@ -129,7 +129,7 @@ export class LogisticaService {
 
     if (error) {
       console.error('Error fetching órdenes listas despacho:', error);
-      throw new BadRequestException('Error al obtener órdenes listas para despacho');
+      throw new ServiceUnavailableException('No se pudo consultar las órdenes listas para despacho; reintente');
     }
 
     const pedidosConItems = await Promise.all(
@@ -142,7 +142,7 @@ export class LogisticaService {
 
         if (detalleError) {
           console.error('Error fetching pedido detalle:', detalleError);
-          throw new BadRequestException('No se pudieron cargar las líneas del pedido; vuelve a intentarlo');
+          throw new ServiceUnavailableException('No se pudieron cargar las líneas del pedido; reintente');
         }
 
         return {
@@ -283,6 +283,7 @@ export class LogisticaService {
     pedidoId: string,
     tenantId: string,
   ): Promise<any[]> {
+    await this.obtenerPedidoBasico(pedidoId, tenantId);
     const client = this.supabase.getClient();
 
     const { data, error } = await client
@@ -294,7 +295,7 @@ export class LogisticaService {
 
     if (error) {
       console.error('Error obteniendo eventos logísticos:', error);
-      throw new BadRequestException('No se pudieron obtener los eventos logísticos del pedido');
+      throw new ServiceUnavailableException('No se pudo consultar los eventos logísticos del pedido; reintente');
     }
 
     return data || [];
@@ -311,6 +312,7 @@ export class LogisticaService {
     pedidoId: string,
     tenantId: string,
   ): Promise<Array<Record<string, any>>> {
+    await this.obtenerPedidoBasico(pedidoId, tenantId);
     const client = this.supabase.getClient();
 
     const { data, error } = await client
@@ -344,7 +346,7 @@ export class LogisticaService {
 
     if (error) {
       console.error('Error obteniendo backorders:', error);
-      throw new BadRequestException('No se pudieron obtener los backorders del pedido');
+      throw new ServiceUnavailableException('No se pudo consultar los backorders del pedido; reintente');
     }
 
     return (data || []).map((item) => ({
@@ -412,7 +414,7 @@ export class LogisticaService {
 
     if (error) {
       console.error('Error obteniendo configuración de logística:', error);
-      throw new BadRequestException('No se pudo obtener configuración logística');
+      throw new ServiceUnavailableException('No se pudo consultar la configuración logística; reintente');
     }
 
     if (!data) {
@@ -438,7 +440,10 @@ export class LogisticaService {
       .eq('tenant_id', tenantId)
       .single();
 
-    if (error || !data) {
+    if (error && !['PGRST116', '22P02'].includes(String(error.code ?? ''))) {
+      throw new ServiceUnavailableException('No se pudo consultar el pedido; reintente');
+    }
+    if (!data) {
       throw new NotFoundException('Pedido no encontrado');
     }
 

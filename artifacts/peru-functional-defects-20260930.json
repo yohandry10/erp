@@ -3272,7 +3272,7 @@
     },
     {
       "id": "users-create-echoes-password",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -3294,13 +3294,22 @@
       },
       "correction": "temporaryPassword sólo cuando el servidor generó la contraseña y el alta es original; nunca la elegida ni en reintentos",
       "pending": [
-        "CI exacto, main y runtime. UI real de usuarios y roles distintos de ADMIN."
+        "UI real y roles distintos de ADMIN."
       ],
-      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004",
+      "closure": {
+        "pr": 140,
+        "merge_sha": "42dca2dfbf3c25f397808e06c4ba3e85a4d505df",
+        "schema": 569,
+        "migration": null,
+        "main_ci": 37237859234,
+        "runtime": "artifacts/peru-production-verification-after-140-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-140-attempts-20261004.json"
+      }
     },
     {
       "id": "finance-cxp-foreign-writer-400",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_merged_main_deployment_verified",
       "operations": [
         {
           "method": "PUT",
@@ -3318,13 +3327,22 @@
       },
       "correction": "Lecturas de CxP, bancos y tesorería indisponibles responden 503; writers de CxP y cuenta bancaria: inexistente 404, regla 400, caída 503",
       "pending": [
-        "CI exacto, main y runtime. CxC notas de crédito y reprogramación sin caso propio."
+        "UI real y roles distintos de ADMIN."
       ],
-      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004",
+      "closure": {
+        "pr": 140,
+        "merge_sha": "42dca2dfbf3c25f397808e06c4ba3e85a4d505df",
+        "schema": 569,
+        "migration": null,
+        "main_ci": 37237859234,
+        "runtime": "artifacts/peru-production-verification-after-140-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-140-attempts-20261004.json"
+      }
     },
     {
       "id": "finance-cxp-reads-unavailability-400",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -3354,13 +3372,22 @@
       },
       "correction": "Lecturas de CxP, bancos y tesorería indisponibles responden 503; writers de CxP y cuenta bancaria: inexistente 404, regla 400, caída 503",
       "pending": [
-        "CI exacto, main y runtime. CxC notas de crédito y reprogramación sin caso propio."
+        "UI real y roles distintos de ADMIN."
       ],
-      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004",
+      "closure": {
+        "pr": 140,
+        "merge_sha": "42dca2dfbf3c25f397808e06c4ba3e85a4d505df",
+        "schema": 569,
+        "migration": null,
+        "main_ci": 37237859234,
+        "runtime": "artifacts/peru-production-verification-after-140-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-140-attempts-20261004.json"
+      }
     },
     {
       "id": "finance-bank-reads-unavailability-400",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -3386,13 +3413,22 @@
       },
       "correction": "Lecturas de CxP, bancos y tesorería indisponibles responden 503; writers de CxP y cuenta bancaria: inexistente 404, regla 400, caída 503",
       "pending": [
-        "CI exacto, main y runtime. CxC notas de crédito y reprogramación sin caso propio."
+        "UI real y roles distintos de ADMIN."
       ],
-      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004",
+      "closure": {
+        "pr": 140,
+        "merge_sha": "42dca2dfbf3c25f397808e06c4ba3e85a4d505df",
+        "schema": 569,
+        "migration": null,
+        "main_ci": 37237859234,
+        "runtime": "artifacts/peru-production-verification-after-140-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-140-attempts-20261004.json"
+      }
     },
     {
       "id": "hr-pay-data-only-rrhh-access",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -3414,13 +3450,22 @@
       },
       "correction": "Historial, comprobante y boleta exigen rrhh.planillas.read; planilla o empleado ajeno 404; estado de candidato validado; lecturas de RRHH indisponibles 503",
       "pending": [
-        "CI exacto, main y runtime. Solicitudes, beneficios, evaluaciones, capacitaciones, horarios y expediente sin pantalla ni caso."
+        "UI real y roles distintos de ADMIN."
       ],
-      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004",
+      "closure": {
+        "pr": 140,
+        "merge_sha": "42dca2dfbf3c25f397808e06c4ba3e85a4d505df",
+        "schema": 569,
+        "migration": null,
+        "main_ci": 37237859234,
+        "runtime": "artifacts/peru-production-verification-after-140-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-140-attempts-20261004.json"
+      }
     },
     {
       "id": "hr-foreign-reads-200",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -3438,13 +3483,22 @@
       },
       "correction": "Historial, comprobante y boleta exigen rrhh.planillas.read; planilla o empleado ajeno 404; estado de candidato validado; lecturas de RRHH indisponibles 503",
       "pending": [
-        "CI exacto, main y runtime. Solicitudes, beneficios, evaluaciones, capacitaciones, horarios y expediente sin pantalla ni caso."
+        "UI real y roles distintos de ADMIN."
       ],
-      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004",
+      "closure": {
+        "pr": 140,
+        "merge_sha": "42dca2dfbf3c25f397808e06c4ba3e85a4d505df",
+        "schema": 569,
+        "migration": null,
+        "main_ci": 37237859234,
+        "runtime": "artifacts/peru-production-verification-after-140-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-140-attempts-20261004.json"
+      }
     },
     {
       "id": "hr-candidate-invalid-status-accepted",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_merged_main_deployment_verified",
       "operations": [
         {
           "method": "PUT",
@@ -3458,13 +3512,22 @@
       },
       "correction": "Historial, comprobante y boleta exigen rrhh.planillas.read; planilla o empleado ajeno 404; estado de candidato validado; lecturas de RRHH indisponibles 503",
       "pending": [
-        "CI exacto, main y runtime. Solicitudes, beneficios, evaluaciones, capacitaciones, horarios y expediente sin pantalla ni caso."
+        "UI real y roles distintos de ADMIN."
       ],
-      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004",
+      "closure": {
+        "pr": 140,
+        "merge_sha": "42dca2dfbf3c25f397808e06c4ba3e85a4d505df",
+        "schema": 569,
+        "migration": null,
+        "main_ci": 37237859234,
+        "runtime": "artifacts/peru-production-verification-after-140-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-140-attempts-20261004.json"
+      }
     },
     {
       "id": "hr-reads-unavailability",
-      "status": "canonical_local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -3490,13 +3553,22 @@
       },
       "correction": "Historial, comprobante y boleta exigen rrhh.planillas.read; planilla o empleado ajeno 404; estado de candidato validado; lecturas de RRHH indisponibles 503",
       "pending": [
-        "CI exacto, main y runtime. Solicitudes, beneficios, evaluaciones, capacitaciones, horarios y expediente sin pantalla ni caso."
+        "UI real y roles distintos de ADMIN."
       ],
-      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004"
+      "canonical_proof": "artifacts/peru-users-finance-hr-canonical-local-20261004",
+      "closure": {
+        "pr": 140,
+        "merge_sha": "42dca2dfbf3c25f397808e06c4ba3e85a4d505df",
+        "schema": 569,
+        "migration": null,
+        "main_ci": 37237859234,
+        "runtime": "artifacts/peru-production-verification-after-140-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-140-attempts-20261004.json"
+      }
     },
     {
       "id": "documents-configured-series-unusable",
-      "status": "local_acceptance_passed_ci_pending",
+      "status": "corrected_merged_main_deployment_verified_local_acceptance_only",
       "operations": [
         {
           "method": "POST",
@@ -3510,13 +3582,22 @@
       },
       "correction": "La serie configurada en la empresa se registra con el writer auditado 461 en su primer uso; auditoría ajena 404; lecturas y writer de documentos indisponibles 503",
       "pending": [
-        "CI exacto, main y runtime. Fase canónica en CI pendiente de que el bootstrap emule los privilegios por defecto de Supabase."
+        "Fase canónica en CI pendiente de alinear el bootstrap con los privilegios por defecto de Supabase."
       ],
-      "canonical_proof": "artifacts/peru-documents-fixed-local-20261004"
+      "canonical_proof": "artifacts/peru-documents-fixed-local-20261004",
+      "closure": {
+        "pr": 140,
+        "merge_sha": "42dca2dfbf3c25f397808e06c4ba3e85a4d505df",
+        "schema": 569,
+        "migration": null,
+        "main_ci": 37237859234,
+        "runtime": "artifacts/peru-production-verification-after-140-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-140-attempts-20261004.json"
+      }
     },
     {
       "id": "documents-foreign-audit-200",
-      "status": "local_acceptance_passed_ci_pending",
+      "status": "corrected_merged_main_deployment_verified_local_acceptance_only",
       "operations": [
         {
           "method": "GET",
@@ -3530,13 +3611,22 @@
       },
       "correction": "La serie configurada en la empresa se registra con el writer auditado 461 en su primer uso; auditoría ajena 404; lecturas y writer de documentos indisponibles 503",
       "pending": [
-        "CI exacto, main y runtime. Fase canónica en CI pendiente de que el bootstrap emule los privilegios por defecto de Supabase."
+        "Fase canónica en CI pendiente de alinear el bootstrap con los privilegios por defecto de Supabase."
       ],
-      "canonical_proof": "artifacts/peru-documents-fixed-local-20261004"
+      "canonical_proof": "artifacts/peru-documents-fixed-local-20261004",
+      "closure": {
+        "pr": 140,
+        "merge_sha": "42dca2dfbf3c25f397808e06c4ba3e85a4d505df",
+        "schema": 569,
+        "migration": null,
+        "main_ci": 37237859234,
+        "runtime": "artifacts/peru-production-verification-after-140-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-140-attempts-20261004.json"
+      }
     },
     {
       "id": "documents-reads-unavailability-400",
-      "status": "local_acceptance_passed_ci_pending",
+      "status": "corrected_merged_main_deployment_verified_local_acceptance_only",
       "operations": [
         {
           "method": "GET",
@@ -3558,9 +3648,118 @@
       },
       "correction": "La serie configurada en la empresa se registra con el writer auditado 461 en su primer uso; auditoría ajena 404; lecturas y writer de documentos indisponibles 503",
       "pending": [
-        "CI exacto, main y runtime. Fase canónica en CI pendiente de que el bootstrap emule los privilegios por defecto de Supabase."
+        "Fase canónica en CI pendiente de alinear el bootstrap con los privilegios por defecto de Supabase."
       ],
-      "canonical_proof": "artifacts/peru-documents-fixed-local-20261004"
+      "canonical_proof": "artifacts/peru-documents-fixed-local-20261004",
+      "closure": {
+        "pr": 140,
+        "merge_sha": "42dca2dfbf3c25f397808e06c4ba3e85a4d505df",
+        "schema": 569,
+        "migration": null,
+        "main_ci": 37237859234,
+        "runtime": "artifacts/peru-production-verification-after-140-20261004.json",
+        "runtime_failed_attempts": "artifacts/peru-production-verification-after-140-attempts-20261004.json"
+      }
+    },
+    {
+      "id": "inventory-locations-masked",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/almacenes/:almacenId/ubicaciones"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-inventory-baseline-20261004",
+        "observed_error": "Un almacén de otra empresa y una lectura fallida respondían 200 success:false con lista vacía (el 404 del servicio se enmascaraba).",
+        "local_only": true
+      },
+      "correction": "Ubicaciones: almacén ajeno 404 y lectura fallida 503; movimientos y estadísticas indisponibles 503",
+      "pending": [
+        "CI exacto, main y runtime; fase canónica pendiente de alinear el bootstrap. Logística (backorders, tracking, eventos) e imágenes de producto sin caso."
+      ],
+      "canonical_proof": "artifacts/peru-inventory-fixed-local-20261004"
+    },
+    {
+      "id": "inventory-reads-500",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/movimientos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/stats"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-inventory-baseline-20261004",
+        "observed_error": "Sin lectura de movimientos_inventario o productos respondían 500 en vez de 503.",
+        "local_only": true
+      },
+      "correction": "Ubicaciones: almacén ajeno 404 y lectura fallida 503; movimientos y estadísticas indisponibles 503",
+      "pending": [
+        "CI exacto, main y runtime; fase canónica pendiente de alinear el bootstrap. Logística (backorders, tracking, eventos) e imágenes de producto sin caso."
+      ],
+      "canonical_proof": "artifacts/peru-inventory-fixed-local-20261004"
+    },
+    {
+      "id": "logistics-foreign-order-reads-200",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/logistica/:pedidoId/eventos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/logistica/:pedidoId/backorders"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-logistics-baseline-20261004",
+        "observed_error": "Eventos y backorders de un pedido de otra empresa respondían 200 con lista vacía en vez de 404; no exponían datos.",
+        "local_only": true
+      },
+      "correction": "Eventos y backorders de pedido ajeno 404; lecturas de logística indisponibles 503",
+      "pending": [
+        "CI exacto, main y runtime; fase canónica pendiente de alinear el bootstrap."
+      ],
+      "canonical_proof": "artifacts/peru-logistics-fixed-local-20261004"
+    },
+    {
+      "id": "logistics-reads-unavailability-400",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/logistica/:pedidoId/eventos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/logistica/:pedidoId/backorders"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/logistica/ordenes-pendientes"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/logistica/listo-despacho"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-logistics-baseline-20261004",
+        "observed_error": "Las lecturas fallidas respondían 400 en vez de 503.",
+        "local_only": true
+      },
+      "correction": "Eventos y backorders de pedido ajeno 404; lecturas de logística indisponibles 503",
+      "pending": [
+        "CI exacto, main y runtime; fase canónica pendiente de alinear el bootstrap."
+      ],
+      "canonical_proof": "artifacts/peru-logistics-fixed-local-20261004"
     }
   ]
 }

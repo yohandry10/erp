@@ -1,0 +1,145 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Inventario API/DB local diagnóstico; sin aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Ubicaciones: alta con intención, edición, listado, baja y aislamiento",
+      "passed": false,
+      "message": "Ubicaciones ajenas visibles"
+    },
+    {
+      "scenario": "Ajustes: sobrante y faltante con intención actualizan stock y kardex una vez",
+      "passed": true,
+      "before": 10,
+      "after": 11
+    },
+    {
+      "scenario": "Inventario: sin lectura de movimientos_inventario la consulta responde 503",
+      "passed": false,
+      "message": "{\"inventario/movimientos\":500}"
+    },
+    {
+      "scenario": "Inventario: sin lectura de almacen_ubicaciones la consulta responde 503",
+      "passed": false,
+      "message": "{\"inventario/almacenes/:id/ubicaciones\":200}"
+    },
+    {
+      "scenario": "Inventario: sin lectura de productos la consulta responde 503",
+      "passed": false,
+      "message": "{\"inventario/stats\":500}"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/almacenes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/categorias",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/productos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/almacenes/:id/ubicaciones",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/almacenes/:id/ubicaciones",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/almacenes/:id/ubicaciones",
+      "status": 400
+    },
+    {
+      "method": "PUT",
+      "endpoint": "inventario/almacenes/:id/ubicaciones/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/almacenes/:id/ubicaciones",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/almacenes/:id/ubicaciones",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/movimientos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/movimientos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/movimientos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/movimientos",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/movimientos",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/movimientos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/movimientos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/stats",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/movimientos",
+      "status": 500
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/almacenes/:id/ubicaciones",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/stats",
+      "status": 500
+    }
+  ]
+}

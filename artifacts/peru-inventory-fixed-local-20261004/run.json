@@ -1,0 +1,16 @@
+{
+  "completedAt": "2026-10-04T19:01:43.157Z",
+  "success": true,
+  "withBrowser": false,
+  "withSurvey": false,
+  "withRecords": false,
+  "candidateCashApi": false,
+  "candidateCashSql": false,
+  "candidateApi": false,
+  "candidateSql": false,
+  "candidateUi": false,
+  "scope": "accounting_diagnostic_api_subset",
+  "database": "PostgreSQL 16 efímero",
+  "output": "C:\\Users\\PC\\Desktop\\erp-peru-users\\artifacts\\peru-inventory-local-20261004190018316-8828",
+  "remoteWrites": false
+}
