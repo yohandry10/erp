@@ -27,6 +27,7 @@ import {
 import { MAX_PRODUCT_IMAGE_BYTES, ProductImagesService, ProductImageUpload } from './product-images.service';
 import { rangoDelDiaDelTenant } from '../../shared/utils/fecha-tenant.util';
 import { calcularMetricasInventario } from './inventario-metrics.util';
+import { lecturaInventarioFallida } from './inventario-errors';
 
 /**
  * ✅ MULTI-TENANT: Controlador de Inventario con soporte multi-tenant
@@ -171,11 +172,8 @@ export class InventarioController {
       };
     } catch (error) {
       this.logger.error('❌ Error obteniendo ubicaciones', error as Error);
-      return {
-        success: false,
-        message: 'Error al obtener ubicaciones: ' + (error as Error).message,
-        data: []
-      };
+      // Un almacén ajeno es 404 y una lectura fallida 503: antes ambos eran 200 vacío.
+      throw lecturaInventarioFallida(error, 'las ubicaciones');
     }
   }
 
@@ -361,7 +359,7 @@ export class InventarioController {
       };
     } catch (error) {
       this.logger.error('❌ Error obteniendo estadísticas', error as Error);
-      throw new InternalServerErrorException('No fue posible calcular las estadísticas de inventario');
+      throw lecturaInventarioFallida(error, 'las estadísticas de inventario');
     }
   }
 
@@ -534,7 +532,7 @@ export class InventarioController {
       };
     } catch (error) {
       this.logger.error('❌ Error obteniendo movimientos', error as Error);
-      throw error;
+      throw lecturaInventarioFallida(error, 'los movimientos de inventario');
     }
   }
 

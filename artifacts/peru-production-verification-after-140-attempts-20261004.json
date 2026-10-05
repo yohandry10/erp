@@ -1,0 +1,29 @@
+{
+    "scope":  "Verificacion runtime 42dca2df/569",
+    "attempts":  [
+                     {
+                         "error":  "DOMException [TimeoutError]: The operation was aborted due to timeout",
+                         "result":  "failed",
+                         "timeoutSeconds":  20,
+                         "order":  1
+                     },
+                     {
+                         "error":  "DOMException [TimeoutError]: The operation was aborted due to timeout",
+                         "result":  "failed",
+                         "timeoutSeconds":  20,
+                         "order":  2
+                     },
+                     {
+                         "error":  "DOMException [TimeoutError]: The operation was aborted due to timeout",
+                         "result":  "failed",
+                         "timeoutSeconds":  20,
+                         "order":  3
+                     },
+                     {
+                         "order":  4,
+                         "result":  "passed",
+                         "error":  "{\"output\":\"C:\\\\Users\\\\PC\\\\Desktop\\\\erp-peru-users\\\\artifacts\\\\peru-production-verification-after-140-20261004.json\",\"commit\":\"42dca2dfbf3c25f397808e06c4ba3e85a4d505df\",\"schema\":569,\"verification_passed\":true,\"launch_accepted\":false}",
+                         "timeoutSeconds":  20
+                     }
+                 ]
+}

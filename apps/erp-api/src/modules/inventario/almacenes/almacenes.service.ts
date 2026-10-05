@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 
 export interface Almacen {
@@ -64,7 +64,7 @@ export class AlmacenesService {
     if (!includeInactive) query = query.eq('estado', 'ACTIVO');
     const { data, error } = await query;
     if (error) {
-      throw new InternalServerErrorException(`Error al listar ubicaciones: ${error.message}`);
+      throw new ServiceUnavailableException('No se pudo consultar las ubicaciones; reintente');
     }
     return ((data as Array<Omit<UbicacionAlmacen, 'activo'>> | null) ?? []).map((row) => ({
       ...row,

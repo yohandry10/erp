@@ -1,0 +1,32 @@
+{
+  "scope": "Logística de pedidos con flujo completo: pendientes, preparación, listo para despacho, despacho, tracking, eventos manuales y backorders; API/PostgREST/PostgreSQL locales efímeros con privilegios por defecto de Supabase emulados",
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "runs": [
+    {"output": "artifacts/peru-logistics-local-20261004215550336-16208", "result": "probe_assumed_logistics_flow_enabled"},
+    {"output": "artifacts/peru-logistics-baseline-20261004", "result": "defects_reproduced", "restore": "passed"},
+    {"output": "artifacts/peru-logistics-fixed-local-20261004", "result": "passed_after_fix", "restore": "passed"}
+  ],
+  "probe_assumptions_corrected": [
+    "Con usar_flujo_logistica=false la confirmación despacha directo (LISTO_FACTURAR) y el tracking es válido allí por diseño (550); el fixture activa el flujo completo para probar preparación y listo",
+    "Las colas de pendientes y listos no leen pedidos_venta directamente: la indisponibilidad se simula sobre logistica_eventos y pedido_backorders"
+  ],
+  "passed": [
+    "Pedido confirmado en pendientes; preparación y listo con intención; otra empresa no lo ve listo",
+    "Tracking ENTREGADO antes del despacho rechazado sin cambiar el pedido",
+    "Despacho con intención descuenta 3 unidades una sola vez; despacho ajeno rechazado",
+    "Evento TRANSITO con intención sin duplicar, tracking EN_TRANSITO y ENTREGADO, backorders y tipo de evento inválido 400"
+  ],
+  "confirmed_defects": [
+    {
+      "id": "logistics-foreign-order-reads-200",
+      "operations": ["GET /api/inventario/logistica/:pedidoId/eventos", "GET /api/inventario/logistica/:pedidoId/backorders"],
+      "observed": "Eventos y backorders de un pedido de otra empresa respondían 200 con lista vacía en vez de 404; no exponían datos."
+    },
+    {
+      "id": "logistics-reads-unavailability-400",
+      "operations": ["GET /api/inventario/logistica/:pedidoId/eventos", "GET /api/inventario/logistica/:pedidoId/backorders", "GET /api/inventario/logistica/ordenes-pendientes", "GET /api/inventario/logistica/listo-despacho"],
+      "observed": "Las lecturas fallidas respondían 400 en vez de 503."
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "scope": "UI real de caja con API/PostgreSQL locales",
+  "checks": [
+    {
+      "operation": "Open from denomination form",
+      "passed": true
+    },
+    {
+      "operation": "Lost acknowledgement after real commit keeps form and replays same intent once",
+      "passed": true
+    },
+    {
+      "operation": "Manual income with selected posting account",
+      "passed": true
+    },
+    {
+      "operation": "Count, preview and advanced close persist amount/cut",
+      "passed": true
+    },
+    {
+      "operation": "Reload durable closed state",
+      "passed": true
+    },
+    {
+      "operation": "Download CSV from actual durable cut row",
+      "passed": true
+    },
+    {
+      "operation": "Download PDF from actual durable cut row",
+      "passed": true
+    },
+    {
+      "operation": "Real accounting worker confirms balanced browser income exactly once",
+      "passed": true
+    },
+    {
+      "operation": "Retry after real sesiones_caja SELECT outage clears error and shows durable data",
+      "endpoint": "/cajas/sesiones",
+      "retry_http_status": 200,
+      "error_cleared": true,
+      "data_visible": true,
+      "passed": true
+    },
+    {
+      "operation": "Retry after real cortes_caja SELECT outage clears error and shows durable data",
+      "endpoint": "/cajas/cortes",
+      "retry_http_status": 200,
+      "error_cleared": true,
+      "data_visible": true,
+      "passed": true
+    }
+  ]
+}
