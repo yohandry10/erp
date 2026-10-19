@@ -26,6 +26,7 @@ const pgPort = '55456';
 const restPort = '55457';
 const apiPort = '3126';
 const webPort = '3125';
+const smtpPort = '55458';
 const apiUrl = `http://127.0.0.1:${apiPort}`;
 const webUrl = `http://127.0.0.1:${webPort}`;
 const distDir = `.next-peru-integrated-${runId}`;
@@ -43,7 +44,7 @@ for (const key of Object.keys(env)) {
 Object.assign(env, {
   POS_WORKER_JWT_SECRET: 'LOCAL-POS-WORKER-2026-Only-Ephemeral-Secret',
   NODE_ENV: 'development', JWT_SECRET: 'local-api-integration-jwt-key-20260905-never-production',
-  EMAIL_DISABLED: 'true', EMAIL_PROVIDER: 'smtp',
+  EMAIL_DISABLED: 'true', EMAIL_PROVIDER: 'smtp', LOCAL_SMTP_PORT: smtpPort,
   LOCAL_INTEGRATED_FOCUS: focusOnboarding ? 'onboarding' : 'full',
   E2E_EPHEMERAL_LOCAL_DB: '1', E2E_ISOLATED_BROWSER: '0',
   LOCAL_API_URL: apiUrl, LOCAL_API_PORT: apiPort, LOCAL_WEB_URL: webUrl,
@@ -183,6 +184,9 @@ try {
     '--env', 'GHCRTS=-N2',
     'postgrest/postgrest@sha256:85258123312dc496ad4c2ed832154a65e9746f84df0d6d09b44229ff9230c08e']);
   await waitReady('PostgREST', () => httpReady(env.LOCAL_POSTGREST_URL));
+  // Buzón SMTP local: el API envía correos reales sólo a este proceso.
+  const smtp = launch('smtp', process.execPath, ['scripts/ci/peru-local-smtp-sink.mjs']);
+  await waitReady('SMTP', () => readFileSync(path.join(output, 'smtp.log'), 'utf8').includes('LOCAL_SMTP_SINK_READY'), smtp);
   const api = launch('api', process.execPath, [apiRequire.resolve('ts-node/dist/bin.js'), '--transpile-only', 'tests/e2e/helpers/local-api-harness.ts'], apiDirectory);
   await waitReady('API', () => readFileSync(path.join(output, 'api.log'), 'utf8').includes('LOCAL_INTEGRATED_API_READY') && httpReady(`${apiUrl}/api/auth/profile`), api);
   await run('login-office',process.execPath,['scripts/ci/test-peru-login-office-local.mjs']);
@@ -218,9 +222,11 @@ try {
   await run('finance-operations-lifecycle',process.execPath,['scripts/ci/test-peru-finance-operations-local.mjs']);
   for(const kind of ['hr-ops-first','hr-ops-other'])await run('prepare-'+kind,process.execPath,['scripts/ci/prepare-peru-first-client-local.mjs',kind]);
   await run('hr-operations-lifecycle',process.execPath,['scripts/ci/test-peru-hr-operations-local.mjs']);
+  for(const kind of ['auth-first','auth-other',...(withBrowser?['auth-browser']:[])])await run('prepare-'+kind,process.execPath,['scripts/ci/prepare-peru-first-client-local.mjs',kind]);
+  await run('auth-recovery-lifecycle',process.execPath,['scripts/ci/test-peru-auth-recovery-local.mjs']);
   if(withBrowser) await run('prepare-wizard',process.execPath,['scripts/ci/prepare-peru-first-client-local.mjs','wizard']);
   const httpEvidence=JSON.parse(readFileSync(path.join(output,'http.json'),'utf8'));
-  for(const file of ['annual-acceptance.json','finance-lifecycle.json','hr-lifecycle.json','hr-financial.json','payroll-plame.json','configuration-admin.json','series-lifecycle.json','tax-adjustments.json','monthly-period.json','tax-intents.json','login-office.json','reports-consolidation-expanded.json','gre-operations.json','pos-operations.json','cpe-operations.json','cash-operations.json','cash-faults.json','sales-operations.json','purchases-operations.json','accounting-operations.json','users-operations.json','finance-operations.json','hr-operations.json']) {
+  for(const file of ['annual-acceptance.json','finance-lifecycle.json','hr-lifecycle.json','hr-financial.json','payroll-plame.json','configuration-admin.json','series-lifecycle.json','tax-adjustments.json','monthly-period.json','tax-intents.json','login-office.json','reports-consolidation-expanded.json','gre-operations.json','pos-operations.json','cpe-operations.json','cash-operations.json','cash-faults.json','sales-operations.json','purchases-operations.json','accounting-operations.json','users-operations.json','finance-operations.json','hr-operations.json','auth-recovery.json']) {
     const phase=JSON.parse(readFileSync(path.join(output,file),'utf8'));
     if(phase.success!==true||phase.remoteWrites!==false) throw new Error('Fase funcional incompleta: '+file);
     const offset=httpEvidence.results.length;
@@ -235,7 +241,7 @@ try {
       return child;
     };
     let web = await startWeb('web');
-    if (!recordsOnly) await run('browser', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-integrated-local.spec.ts', 'tests/e2e/peru-rrhh-financial-local.spec.ts', 'tests/e2e/peru-configuration-admin-local.spec.ts', 'tests/e2e/peru-tax-adjustments-local.spec.ts', 'tests/e2e/peru-tax-intents-local.spec.ts', 'tests/e2e/peru-reports-consignations-local.spec.ts', 'tests/e2e/peru-gre-local.spec.ts', 'tests/e2e/peru-pos-local.spec.ts', 'tests/e2e/peru-cpe-local.spec.ts', 'tests/e2e/peru-cash-local.spec.ts', '--reporter=list',
+    if (!recordsOnly) await run('browser', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-integrated-local.spec.ts', 'tests/e2e/peru-rrhh-financial-local.spec.ts', 'tests/e2e/peru-configuration-admin-local.spec.ts', 'tests/e2e/peru-tax-adjustments-local.spec.ts', 'tests/e2e/peru-tax-intents-local.spec.ts', 'tests/e2e/peru-reports-consignations-local.spec.ts', 'tests/e2e/peru-gre-local.spec.ts', 'tests/e2e/peru-pos-local.spec.ts', 'tests/e2e/peru-cpe-local.spec.ts', 'tests/e2e/peru-cash-local.spec.ts', 'tests/e2e/peru-auth-recovery-local.spec.ts', '--reporter=list',
       ...(focusOnboarding ? ['--grep', 'primer administrador|ajuste con respuesta perdida'] : [])], webDirectory);
     // Next dev conserva compilaciones en memoria. Cada barrido comienza con
     // un proceso nuevo; un fallo de su fase sigue deteniendo el ensayo.

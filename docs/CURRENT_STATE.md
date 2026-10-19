@@ -1,6 +1,6 @@
 # Estado actual del ERP
 
-Actualizado: 2026-10-03.
+Actualizado: 2026-10-19.
 
 Corte vigente POS/CPE: #135 se integró como `8d717bcf` (fuente `c7e28691`) tras
 28 checks; sus dos CI (37150593171/37150595858) pasaron 342 escenarios HTTP y
@@ -142,9 +142,33 @@ reprodujo dos (`artifacts/peru-logistics-defects-baseline-20261004.json`):
 eventos/backorders de pedido ajeno 200 vacío y lecturas caídas 400; 5/5 local
 tras corregir (`artifacts/peru-logistics-fixed-local-20261004`). Imágenes de
 producto siguen sin caso.
+Corte 2026-10-17/19. #141 (`b3db7582`, sin migración) aprobó en main CI
+37256770454, E2E y seguridad, y el runtime `b3db7582`/569 respondió
+API/web/DB/Redis/CORS; aun así su verificación no pasa
+(`artifacts/peru-production-verification-after-141-20261017.json`: dos timeouts
+de arranque y tres rechazos) porque el Security Scan programado del 2026-10-12
+(38292972826) falló con seis advisories nuevos sin versión corregida instalada:
+proxy-addr y handlebars críticos; compression, sharp y source-map-js altos.
+#142 fija las versiones corregidas (gate local con 0 sin resolver,
+`artifacts/dependency-audit-20261017.json`; API 303/2932, builds API/web) y
+corrige una fecha fija del contrato aislado argentino que caducó el 2026-10-10 y
+dejaba rojo todo PR; sus 17 checks aprobaron y se integró como `e12a9e94`.
+Verificación de main y runtime de `e12a9e94` pendiente en este corte.
+Autenticación PE (#143, sin migración): el UAT de recuperación de contraseña y
+cierre de sesión reprodujo cuatro defectos sobre el código original en un
+worktree aislado (`artifacts/peru-auth-baseline-20261019`, 6/10 API y el
+navegador sin enlace): ningún usuario podía recuperar su contraseña desde la UI
+(el login no la ofrecía, la página llamaba rutas inexistentes y el correo
+enlazaba `http://localhost:3000` a una página que ignoraba el token);
+`EMAIL_DISABLED`/`SMTP_SECURE` con `false` se leían como verdaderos y un SMTP
+sin host se daba por configurado; logout y logout-all respondían éxito con la
+revocación caída y las sesiones vivas. Tras corregir, 10/10 API/DB/SMTP, el
+recorrido de navegador y restore (`artifacts/peru-auth-fixed-local-20261019`);
+la fase entra al CI integrado con un buzón SMTP local. Sin correo productivo la
+solicitud responde 503 y no hay otra vía de recuperación.
 La matriz registra 717 contratos, 467 observados (main 37237859234), 316 con
-casos funcionales, 162 casos y 123 defectos; no hay aceptación integral del
-lanzamiento.
+casos funcionales, 167 casos y 127 defectos; los cinco casos de autenticación
+esperan CI; no hay aceptación integral del lanzamiento.
 
 Corte técnico 131/132: el cierre 131 promovió 562 una sola vez con preflight,
 respaldo 560, rollback local y preservación de 29 tablas/funciones/seguridad
@@ -2810,6 +2834,9 @@ tenants donde tiene los 256 permisos, así que ninguno perdió acceso.
 - Confirmar que no existan colisiones históricas fiscales antes de resincronizar
   series.
 - Completar secretos productivos y ejecutar smoke controlado.
+- Configurar en Render el correo (`SMTP_HOST/PORT/USER/PASS` o SendGrid) y
+  `FRONTEND_URL`: sin ellos la recuperación de contraseña y el reset
+  administrativo responden 503 (ver `OPERATIONS.md`).
 - La promoción coordinada `491..496`, API/worker y Web ya terminó. Queda añadir
   un medio de pago y aprobar el cambio de la instancia Render `free→starter`
   (USD 7/mes) para evitar que los workers internos se duerman; Render no permite
@@ -2847,6 +2874,10 @@ tenants donde tiene los 256 permisos, así que ninguno perdió acceso.
 - Validar impresora física, `.exe` Tauri y carga final.
 
 ### Producto y riesgo residual
+
+- No existe «cambiar mi contraseña» ni restablecimiento desde
+  `/dashboard/usuarios`: la única recuperación es el enlace por correo. Un
+  cliente sin correo productivo configurado no puede recuperar una cuenta.
 
 - `modo_venta_rapida` se retiró de la interfaz. El interruptor «Venta rápida»
   del POS no cambiaba nada: ni la pantalla, ni el servicio, ni el writer lo

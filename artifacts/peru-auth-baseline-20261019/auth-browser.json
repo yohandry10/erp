@@ -1,0 +1,7 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "scope": "UI real de recuperación de contraseña con API/PostgreSQL/SMTP locales",
+  "checks": []
+}

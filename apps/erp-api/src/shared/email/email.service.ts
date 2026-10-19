@@ -58,10 +58,12 @@ export class EmailService {
 
       case EmailProvider.SMTP:
       default:
+        // Sin SMTP_HOST no hay servidor: un 'localhost' por defecto hacía creer
+        // que el correo estaba configurado y los envíos fallaban en silencio.
         config.smtp = {
-          host: this.configService.get<string>('SMTP_HOST', 'localhost'),
-          port: this.configService.get<number>('SMTP_PORT', 587),
-          secure: this.configService.get<boolean>('SMTP_SECURE', false),
+          host: this.configService.get<string>('SMTP_HOST', ''),
+          port: Number(this.configService.get<string>('SMTP_PORT', '587')),
+          secure: this.flag('SMTP_SECURE'),
           auth: {
             user: this.configService.get<string>('SMTP_USER', ''),
             pass: this.configService.get<string>('SMTP_PASS', ''),
@@ -164,8 +166,7 @@ export class EmailService {
    * Envía un email genérico
    */
   async sendEmail(options: SendEmailOptions): Promise<boolean> {
-    const emailDisabled = this.configService.get<boolean>('EMAIL_DISABLED', false);
-    if (emailDisabled) {
+    if (this.flag('EMAIL_DISABLED')) {
       this.logger.warn('Email service disabled by configuration. Email not sent.');
       return false;
     }
@@ -226,12 +227,14 @@ export class EmailService {
     resetToken: string,
     clientIp?: string
   ): Promise<boolean> {
-    const appUrl = this.configService.get<string>('APP_URL', 'http://localhost:3000');
+    const appUrl = this.publicAppUrl();
     const supportEmail = this.configService.get<string>('SUPPORT_EMAIL', 'soporte@erp.com');
     const appName = this.configService.get<string>('APP_NAME', 'ERP System');
 
     // Construir enlace de reset
-    const resetLink = `${appUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(recipientEmail)}`;
+    // La página /reset-password/ lee token y email de la consulta; la barra final
+    // evita una redirección (trailingSlash) y coincide con la exportación de escritorio.
+    const resetLink = `${appUrl}/reset-password/?token=${resetToken}&email=${encodeURIComponent(recipientEmail)}`;
 
     // Generar contenido del email usando la plantilla
     const templateData: PasswordResetTemplateData = {
@@ -281,7 +284,7 @@ export class EmailService {
   ): Promise<boolean> {
     const appName = this.configService.get<string>('APP_NAME', 'ERP System');
     const supportEmail = this.configService.get<string>('SUPPORT_EMAIL', 'soporte@erp.com');
-    const appUrl = this.configService.get<string>('APP_URL', 'http://localhost:3000');
+    const appUrl = this.publicAppUrl();
 
     const subject = `${appName} - Contraseña actualizada exitosamente`;
 
@@ -361,7 +364,7 @@ ${appUrl}
     temporaryPassword: string,
     clientIp?: string
   ): Promise<boolean> {
-    const appUrl = this.configService.get<string>('APP_URL', 'http://localhost:3000');
+    const appUrl = this.publicAppUrl();
     const supportEmail = this.configService.get<string>('SUPPORT_EMAIL', 'soporte@erp.com');
     const appName = this.configService.get<string>('APP_NAME', 'ERP System');
 
@@ -431,7 +434,7 @@ ${appUrl}
    * Más rápido que verifyConfiguration() para validaciones rápidas
    */
   isConfigured(): boolean {
-    return this.transporter !== null;
+    return this.transporter !== null && !this.flag('EMAIL_DISABLED');
   }
 
   /**
@@ -440,9 +443,27 @@ ${appUrl}
   getConfigInfo(): { provider: string; configured: boolean; from: string } {
     return {
       provider: this.config.provider,
-      configured: this.transporter !== null,
+      configured: this.isConfigured(),
       from: `${this.config.from.name} <${this.config.from.email}>`,
     };
+  }
+
+  /**
+   * Variables fuera del esquema Joi llegan como texto: 'false' también es
+   * truthy, así que EMAIL_DISABLED=false apagaba el correo.
+   */
+  private flag(name: string): boolean {
+    const value = this.configService.get<string | boolean>(name, false);
+    return value === true || String(value).trim().toLowerCase() === 'true';
+  }
+
+  /**
+   * Origen de la web para los enlaces. El Blueprint declara FRONTEND_URL con
+   * ese fin; APP_URL no existe en Render y caía en localhost.
+   */
+  private publicAppUrl(): string {
+    const configured = this.configService.get<string>('APP_URL') || this.configService.get<string>('FRONTEND_URL');
+    return (configured || 'http://localhost:3000').trim().replace(/\/+$/, '');
   }
 }
 
