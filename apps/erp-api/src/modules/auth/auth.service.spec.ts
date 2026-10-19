@@ -759,12 +759,32 @@ describe('AuthService', () => {
                     p_reason: 'LOGOUT',
                 });
             });
+
+            it('should not report logout when the revocation RPC fails', async () => {
+                const mockClient = supabaseService.getAdminClient() as any;
+                mockClient.rpc.mockResolvedValueOnce({ data: null, error: { code: '42501', message: 'permission denied' } });
+                await expect(service.revokeSession('session-token', 'user-123'))
+                    .rejects.toBeInstanceOf(ServiceUnavailableException);
+            });
         });
 
         describe('revokeUserSessions', () => {
             it('should revoke all user sessions without throwing', async () => {
                 await expect(service.revokeUserSessions('user-123'))
                     .resolves.not.toThrow();
+            });
+
+            it('should not report logout-all when the revocation RPC fails', async () => {
+                const mockClient = supabaseService.getAdminClient() as any;
+                mockClient.rpc.mockResolvedValueOnce({ data: null, error: { code: 'PGRST301', message: 'unavailable' } });
+                await expect(service.revokeUserSessions('user-123'))
+                    .rejects.toBeInstanceOf(ServiceUnavailableException);
+            });
+
+            it('should expose password reset availability from the email service', () => {
+                (emailService.isConfigured as jest.Mock).mockReturnValueOnce(false);
+                expect(service.isPasswordResetAvailable()).toBe(false);
+                expect(service.isPasswordResetAvailable()).toBe(true);
             });
 
             it('should invalidate cached positive sessions before revoking them', async () => {

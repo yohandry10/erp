@@ -3760,6 +3760,98 @@
         "CI exacto, main y runtime; fase canónica pendiente de alinear el bootstrap."
       ],
       "canonical_proof": "artifacts/peru-logistics-fixed-local-20261004"
+    },
+    {
+      "id": "auth-reset-web-routes-404",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/auth/password-reset/request"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/auth/password-reset/confirm"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-auth-baseline-20261019",
+        "observed_error": "La web llamaba /api/auth/request-password-reset y /api/auth/reset-password (404) y no enviaba el email al confirmar; el login no enlazaba la recuperación.",
+        "local_only": true
+      },
+      "correction": "Login enlaza /reset-password/; la página usa password-reset/request y password-reset/confirm con email, token y la regla del DTO",
+      "pending": [
+        "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
+      ],
+      "canonical_proof": "artifacts/peru-auth-fixed-local-20261019"
+    },
+    {
+      "id": "auth-reset-link-wrong-page",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/auth/password-reset/request"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-auth-baseline-20261019",
+        "observed_error": "El correo enlazaba http://localhost:3000 (APP_URL no está en el Blueprint) y /reset-password?token=, que mostraba el formulario de solicitud: el token nunca se podía usar.",
+        "local_only": true
+      },
+      "correction": "Enlaces con APP_URL o FRONTEND_URL; /reset-password/ procesa token y email de la consulta",
+      "pending": [
+        "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
+      ],
+      "canonical_proof": "artifacts/peru-auth-fixed-local-20261019"
+    },
+    {
+      "id": "auth-email-config-false-flags",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/auth/password-reset/request"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/users/:id/reset-password"
+        }
+      ],
+      "proof": {
+        "source": "apps/erp-api/src/shared/email/email.service.spec.ts",
+        "observed_error": "EMAIL_DISABLED=false y SMTP_SECURE=false (texto) se evaluaban como verdaderos y SMTP_HOST caía en localhost: el servicio se declaraba configurado sin servidor y los envíos fallaban en silencio.",
+        "local_only": true
+      },
+      "correction": "Banderas booleanas interpretadas; sin SMTP_HOST no hay servicio; sin correo la solicitud responde 503 en vez de prometer un enlace",
+      "pending": [
+        "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
+      ],
+      "canonical_proof": "artifacts/peru-auth-fixed-local-20261019"
+    },
+    {
+      "id": "auth-logout-outage-200",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/auth/logout"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/auth/logout-all"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-auth-baseline-20261019",
+        "observed_error": "Si la RPC de revocación fallaba, logout y logout-all respondían 201 de éxito y las sesiones seguían activas.",
+        "local_only": true
+      },
+      "correction": "La falla de revocación responde 503; logout igual retira la cookie del navegador",
+      "pending": [
+        "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
+      ],
+      "canonical_proof": "artifacts/peru-auth-fixed-local-20261019"
     }
   ]
 }

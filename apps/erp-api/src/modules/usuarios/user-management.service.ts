@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
@@ -254,6 +255,10 @@ export class UserManagementService {
 
   async resetPassword(tenantId: string, userId: string, actorId?: string) {
     const actor = this.requireActor(actorId);
+    // El enlace sólo viaja por correo: sin servidor configurado no hay reset que informar.
+    if (!this.emailService.isConfigured()) {
+      throw new ServiceUnavailableException('El correo no está configurado; no se puede enviar el enlace de restablecimiento.');
+    }
     const user = await this.getUserById(tenantId, userId);
     const resetToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = await bcrypt.hash(resetToken, 10);

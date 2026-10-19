@@ -8,6 +8,7 @@ import {
   Response as NestResponse,
   Get,
   UnauthorizedException,
+  ServiceUnavailableException,
   Logger,
   HttpCode,
 } from '@nestjs/common';
@@ -173,7 +174,15 @@ export class AuthController {
   })
   @ApiResponse({ status: 200, description: 'Solicitud procesada. Si el email existe, recibirás un enlace de reset.' })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
+  @ApiResponse({ status: 503, description: 'El correo de recuperación no está configurado' })
   async requestPasswordReset(@Body() dto: RequestPasswordResetDto, @Request() req) {
+    // No depende del email recibido, así que no permite enumerar cuentas; evita
+    // prometer un enlace que nunca llegará.
+    if (!this.authService.isPasswordResetAvailable()) {
+      throw new ServiceUnavailableException(
+        'La recuperación de contraseña por correo no está configurada. Contacta al administrador del sistema.'
+      );
+    }
     const startedAt = Date.now();
     const clientIp = req.ip || req.connection?.remoteAddress || 'unknown';
     const response = {
@@ -259,12 +268,15 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Cerrar sesión' })
   @ApiResponse({ status: 200, description: 'Sesión cerrada' })
+  @ApiResponse({ status: 503, description: 'No se pudo revocar la sesión; sigue activa' })
   async logout(@Request() req, @NestResponse({ passthrough: true }) response: ExpressResponse) {
+    // El navegador olvida la cookie aunque la revocación falle (equipo
+    // compartido); el 503 sigue diciendo que la sesión no se cerró en el servidor.
+    this.clearAuthCookie(response);
     const tokenToRevoke = req.user?.session_token;
     if (tokenToRevoke) {
       await this.authService.revokeSession(tokenToRevoke, req.user.id);
     }
-    this.clearAuthCookie(response);
     return { message: 'Sesión cerrada exitosamente' };
   }
 
@@ -272,6 +284,7 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Cerrar todas las sesiones del usuario' })
   @ApiResponse({ status: 200, description: 'Todas las sesiones cerradas' })
+  @ApiResponse({ status: 503, description: 'No se pudieron revocar las sesiones; siguen activas' })
   async logoutAll(@Request() req) {
     await this.authService.revokeUserSessions(req.user.id);
     return { message: 'Todas las sesiones cerradas exitosamente' };

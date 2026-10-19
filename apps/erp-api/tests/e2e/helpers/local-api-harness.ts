@@ -31,6 +31,13 @@ Object.assign(process.env, {
   OUTBOX_WORKER_CRON_ENABLED: 'false', ACCOUNTING_OUTBOX_WORKER_CRON_ENABLED: 'false',
   DEMO_API_ENABLED: 'false', LOG_LEVEL: 'warn',
 });
+// Con un buzón SMTP local (scripts/ci/peru-local-smtp-sink.mjs) el correo queda
+// activo como en el runtime: EMAIL_DISABLED sin definir y sin TLS ni AUTH.
+if (process.env.LOCAL_SMTP_PORT) {
+  if (!/^\d{4,5}$/.test(process.env.LOCAL_SMTP_PORT)) throw new Error('Puerto SMTP local inválido');
+  delete process.env.EMAIL_DISABLED;
+  Object.assign(process.env, { SMTP_HOST: '127.0.0.1', SMTP_PORT: process.env.LOCAL_SMTP_PORT });
+}
 
 const localHost = (host: string) => ['127.0.0.1', 'localhost', '[::1]', '::1'].includes(host);
 const storageContractOrigin = process.env.LOCAL_STORAGE_PUBLIC_ORIGIN;

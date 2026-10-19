@@ -1,0 +1,25 @@
+{
+  "captured_at": "2026-10-19T06:22:43.016Z",
+  "product_source_commit": "49dce26330a4a822d2744f798d06563068c647bd",
+  "note": "Worktree aislado en ese commit con sólo la infraestructura de prueba nueva (runner, sonda, buzón SMTP, harness LOCAL_SMTP_PORT, fixtures auth-*, spec de navegador); el código de producto es el original.",
+  "browser_failure": "getByRole(link, ¿Olvidaste tu contraseña?) no existe en /login/ (timeout 25 s)",
+  "discarded_attempts": [
+    {
+      "reason": "Docker Desktop dejó de responder antes de crear la red",
+      "product_signal": false
+    },
+    {
+      "reason": "Se detuvo a mano: el API iba a arrancar con las correcciones ya editadas en el checkout",
+      "product_signal": false
+    },
+    {
+      "reason": "Sonda con un regex que no reconocía ${API_URL}/api/auth/...; se corrigió el regex y se repitió",
+      "product_signal": false
+    },
+    {
+      "reason": "POST /tenants del fixture agotó 3x8 s contra PostgREST con la máquina saturada por otras pruebas en paralelo",
+      "product_signal": false
+    }
+  ],
+  "remoteWrites": false
+}

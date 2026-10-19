@@ -1,0 +1,32 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "scope": "UI real de recuperación de contraseña con API/PostgreSQL/SMTP locales",
+  "checks": [
+    {
+      "operation": "El login ofrece la recuperación",
+      "passed": true
+    },
+    {
+      "operation": "La solicitud desde la web entrega un enlace a esta misma web",
+      "passed": true
+    },
+    {
+      "operation": "Validación local igual al API y mostrar/ocultar accesible",
+      "passed": true
+    },
+    {
+      "operation": "Contraseña nueva guardada y usada para entrar",
+      "passed": true
+    },
+    {
+      "operation": "Un enlace usado no vuelve a servir y ofrece pedir otro",
+      "passed": true
+    },
+    {
+      "operation": "Sin desborde horizontal en móvil",
+      "passed": true
+    }
+  ]
+}
