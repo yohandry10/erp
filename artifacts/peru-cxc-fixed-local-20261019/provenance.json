@@ -1,0 +1,18 @@
+{
+  "capturedAt": "2026-10-19T20:52:04.286Z",
+  "capture": "Before launch",
+  "source_hashes": {
+    "artifacts/peru-block-runner-20261019.mjs": "871032472b52da7e181845924413f56a08bd6b55b23fa02cee2a5a2422a151db",
+    "scripts/ci/test-peru-cxc-operations-local.mjs": "375d78878dfab9556ac48eeca12953f4abf35d3cfd3ca9d6c559ca3a3e531641",
+    "scripts/ci/peru-local-smtp-sink.mjs": "af601f15f5beb86aabc65046663fe33779b3b37c18c18365b514f84d056347ff",
+    "scripts/ci/prepare-peru-first-client-local.mjs": "5a9332a9b09cbc2fe1698b40bdd5eb5d8a2bc9d0e069ebfb425c86ed4edcbec5",
+    "apps/erp-api/tests/e2e/helpers/local-api-harness.ts": "b1c4d7c61c10a2b5b0c28c367c8790196d667dd8d03bdd65058bf982efc3e968",
+    "apps/erp-api/src/modules/finanzas/cxc/cxc.service.ts": "c99593b9df8245bd09d241921ce82069d88dcbc2b8632b7d8c44d88632ca10d7",
+    "apps/erp-api/src/modules/finanzas/cxc/cxc.controller.ts": "2da6ec3d3a391fc07d91333e82ffbe95f90e72888daa2b11432b0a5c9ac3bebb",
+    "apps/web/components/finanzas/cxc/ReprogramarModal.tsx": "bc2c46c3ceb9c9102a94e805f0bc384a0cc63bd06a9d212513fd4e8ce61180d7",
+    "apps/web/components/finanzas/cxc/NotaCreditoModal.tsx": "b597076d4045a08ece8d0515701ed29a9a863da15c7596b93798e3606c80af39",
+    "apps/web/tests/e2e/peru-cxc-local.spec.ts": "8a5f5a3ab5586644bc28f4c00bcff9a85da980b0baa6d44943e95c337974e9ab"
+  },
+  "complete_acceptance": false,
+  "remoteWrites": false
+}
