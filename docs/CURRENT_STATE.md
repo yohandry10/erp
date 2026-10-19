@@ -153,7 +153,9 @@ proxy-addr y handlebars críticos; compression, sharp y source-map-js altos.
 `artifacts/dependency-audit-20261017.json`; API 303/2932, builds API/web) y
 corrige una fecha fija del contrato aislado argentino que caducó el 2026-10-10 y
 dejaba rojo todo PR; sus 17 checks aprobaron y se integró como `e12a9e94`.
-Verificación de main y runtime de `e12a9e94` pendiente en este corte.
+Main 39210984576, E2E y seguridad aprobaron y el runtime `e12a9e94`/569 pasó
+al tercer intento tras dos timeouts de arranque
+(`artifacts/peru-production-verification-after-142-20261019.json`).
 Autenticación PE (#143, sin migración): el UAT de recuperación de contraseña y
 cierre de sesión reprodujo cuatro defectos sobre el código original en un
 worktree aislado (`artifacts/peru-auth-baseline-20261019`, 6/10 API y el
@@ -181,9 +183,28 @@ vendedor no puede despejar los avisos compartidos de su campana hasta que haya
 estado leído por usuario (requiere migración). Observación sin
 caso: el alta de empresa es un RPC pesado con timeout de 8 s y el cliente
 reintenta el mismo POST; con la máquina local cargada agotó los tres intentos.
-La matriz registra 717 contratos, 467 observados (main 37237859234), 316 con
-casos funcionales, 171 casos y 130 defectos; los nueve casos de autenticación y
-notificaciones esperan CI; no hay aceptación integral del lanzamiento.
+#143 se integró como `d0470804` y #144 como `334d6cb4` minutos después (el CI y
+E2E de `d0470804` quedaron cancelados por el de `334d6cb4`, que contiene ambos y
+ya había pasado entero en #144). Main 39313892124 (472 HTTP, 34 UI), E2E y
+seguridad aprobaron; el runtime `334d6cb4`/569 pasó al segundo intento
+(`artifacts/peru-production-verification-after-144-20261019.json`). Una
+comprobación de sólo lectura en PROD confirmó el enlace de recuperación en el
+login y que la solicitud responde 503 antes de buscar al usuario: el correo no
+está configurado en Render; además el filtro global convertía todo 5xx en un
+texto genérico en inglés (`artifacts/peru-production-auth-smoke-after-144-20261019.json`).
+CxC PE (#145, sin migración): reprogramación y nota de crédito desde la cuenta
+reprodujeron cuatro defectos (`artifacts/peru-cxc-baseline-20261019`, 2/12 API):
+la pantalla no enviaba `Idempotency-Key` y el API derivaba la clave del
+contenido, así que repetir una fecha ya usada respondía 201 sin aplicarse; todo
+rechazo de reprogramación era 400; la nota devolvía códigos internos con 400 y
+el detalle con lectura caída decía «no encontrada». La regla fiscal es correcta:
+con la venta contabilizada la nota sobre factura sin CDR se bloquea
+(`REFERENCED_NOTE_SOURCE_NOT_FISCALLY_ACCEPTED`). Tras corregir, 12/12 API, 2/2
+navegador y restore (`artifacts/peru-cxc-fixed-local-20261019`); la fase entra
+al CI. En producción los 5xx siguen sin detalles internos pero en español.
+La matriz registra 717 contratos, 479 observados (main 39313892124), 328 con
+casos funcionales, 175 casos y 135 defectos; los cuatro casos de CxC esperan
+CI; no hay aceptación integral del lanzamiento.
 
 Corte técnico 131/132: el cierre 131 promovió 562 una sola vez con preflight,
 respaldo 560, rollback local y preservación de 29 tablas/funciones/seguridad

@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-10-04T22:36:46.903Z",
-  "commit": "5c1a1a4dad6540479978a0844124cdd6ef30e85e",
+  "generated_at": "2026-10-19T20:47:30.097Z",
+  "commit": "334d6cb412378233b27748b1d177e2cf84fcfc3f",
   "excluded": [
     "Analytics"
   ],
@@ -472,7 +472,7 @@
       "endpoint": "/api/auth/login",
       "summary": "Iniciar sesión",
       "source": "apps/erp-api/src/modules/auth/auth.controller.ts",
-      "line": 84,
+      "line": 85,
       "access_declarations": [
         "Public()",
         "UseGuards(AuthRateLimitGuard)"
@@ -495,7 +495,7 @@
       "endpoint": "/api/auth/profile",
       "summary": "Obtener perfil del usuario autenticado",
       "source": "apps/erp-api/src/modules/auth/auth.controller.ts",
-      "line": 105,
+      "line": 106,
       "access_declarations": [],
       "ui_domain": "auth",
       "has_navigation_domain": false,
@@ -515,7 +515,7 @@
       "endpoint": "/api/auth/refresh",
       "summary": "Renovar token de acceso",
       "source": "apps/erp-api/src/modules/auth/auth.controller.ts",
-      "line": 115,
+      "line": 116,
       "access_declarations": [],
       "ui_domain": "auth",
       "has_navigation_domain": false,
@@ -535,7 +535,7 @@
       "endpoint": "/api/auth/validate",
       "summary": "Validar token",
       "source": "apps/erp-api/src/modules/auth/auth.controller.ts",
-      "line": 128,
+      "line": 129,
       "access_declarations": [
         "Public()"
       ],
@@ -557,7 +557,7 @@
       "endpoint": "/api/auth/config-status",
       "summary": null,
       "source": "apps/erp-api/src/modules/auth/auth.controller.ts",
-      "line": 143,
+      "line": 144,
       "access_declarations": [],
       "ui_domain": "auth",
       "has_navigation_domain": false,
@@ -577,7 +577,7 @@
       "endpoint": "/api/auth/password-reset/request",
       "summary": "Solicitar reset de contraseña",
       "source": "apps/erp-api/src/modules/auth/auth.controller.ts",
-      "line": 166,
+      "line": 167,
       "access_declarations": [
         "Public()"
       ],
@@ -599,7 +599,7 @@
       "endpoint": "/api/auth/password-reset/validate",
       "summary": "Validar token de reset",
       "source": "apps/erp-api/src/modules/auth/auth.controller.ts",
-      "line": 192,
+      "line": 201,
       "access_declarations": [
         "Public()"
       ],
@@ -621,7 +621,7 @@
       "endpoint": "/api/auth/password-reset/confirm",
       "summary": "Confirmar reset de contraseña",
       "source": "apps/erp-api/src/modules/auth/auth.controller.ts",
-      "line": 215,
+      "line": 224,
       "access_declarations": [
         "Public()"
       ],
@@ -643,7 +643,7 @@
       "endpoint": "/api/auth/switch-tenant",
       "summary": "Cambiar de tenant (solo super-admins)",
       "source": "apps/erp-api/src/modules/auth/auth.controller.ts",
-      "line": 238,
+      "line": 247,
       "access_declarations": [
         "UseGuards(SuperAdminGuard)",
         "RequirePermission('tenants.manage')"
@@ -666,7 +666,7 @@
       "endpoint": "/api/auth/logout",
       "summary": "Cerrar sesión",
       "source": "apps/erp-api/src/modules/auth/auth.controller.ts",
-      "line": 258,
+      "line": 267,
       "access_declarations": [],
       "ui_domain": "auth",
       "has_navigation_domain": false,
@@ -686,7 +686,7 @@
       "endpoint": "/api/auth/logout-all",
       "summary": "Cerrar todas las sesiones del usuario",
       "source": "apps/erp-api/src/modules/auth/auth.controller.ts",
-      "line": 271,
+      "line": 283,
       "access_declarations": [],
       "ui_domain": "auth",
       "has_navigation_domain": false,
@@ -10318,10 +10318,9 @@
       "endpoint": "/api/notifications",
       "summary": "Get all notifications",
       "source": "apps/erp-api/src/modules/notifications.controller.ts",
-      "line": 56,
+      "line": 39,
       "access_declarations": [
-        "UseGuards(JwtAuthGuard, PermissionGuard)",
-        "RequirePermission('notifications.read')"
+        "UseGuards(JwtAuthGuard, PermissionGuard)"
       ],
       "ui_domain": "notifications",
       "has_navigation_domain": false,
@@ -10341,7 +10340,7 @@
       "endpoint": "/api/notifications/unread",
       "summary": "Get unread notifications",
       "source": "apps/erp-api/src/modules/notifications.controller.ts",
-      "line": 95,
+      "line": 63,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)"
       ],
@@ -10363,7 +10362,7 @@
       "endpoint": "/api/notifications/unread-count",
       "summary": "Get unread notifications count",
       "source": "apps/erp-api/src/modules/notifications.controller.ts",
-      "line": 116,
+      "line": 71,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)"
       ],
@@ -10385,7 +10384,7 @@
       "endpoint": "/api/notifications",
       "summary": "Create new notification",
       "source": "apps/erp-api/src/modules/notifications.controller.ts",
-      "line": 137,
+      "line": 80,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('notifications.create')"
@@ -10408,10 +10407,9 @@
       "endpoint": "/api/notifications/:id/read",
       "summary": "Mark notification as read",
       "source": "apps/erp-api/src/modules/notifications.controller.ts",
-      "line": 163,
+      "line": 95,
       "access_declarations": [
-        "UseGuards(JwtAuthGuard, PermissionGuard)",
-        "RequirePermission('notifications.update')"
+        "UseGuards(JwtAuthGuard, PermissionGuard)"
       ],
       "ui_domain": "notifications",
       "has_navigation_domain": false,
@@ -10431,10 +10429,9 @@
       "endpoint": "/api/notifications/mark-all-read",
       "summary": "Mark all notifications as read",
       "source": "apps/erp-api/src/modules/notifications.controller.ts",
-      "line": 189,
+      "line": 109,
       "access_declarations": [
-        "UseGuards(JwtAuthGuard, PermissionGuard)",
-        "RequirePermission('notifications.update')"
+        "UseGuards(JwtAuthGuard, PermissionGuard)"
       ],
       "ui_domain": "notifications",
       "has_navigation_domain": false,
@@ -10454,7 +10451,7 @@
       "endpoint": "/api/notifications/:id",
       "summary": "Delete notification",
       "source": "apps/erp-api/src/modules/notifications.controller.ts",
-      "line": 211,
+      "line": 118,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('notifications.delete')"
