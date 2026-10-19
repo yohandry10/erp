@@ -1,4 +1,4 @@
-import { ArgumentsHost, BadRequestException, ConflictException } from '@nestjs/common';
+import { ArgumentsHost, BadRequestException, ConflictException, ServiceUnavailableException } from '@nestjs/common';
 import { GlobalExceptionFilter } from './global-exception.filter';
 
 function createHost() {
@@ -70,5 +70,28 @@ describe('GlobalExceptionFilter API contract', () => {
         message: 'fecha_desde debe ser una fecha valida',
       }),
     );
+  });
+
+  describe('en producción', () => {
+    const previous = process.env.NODE_ENV;
+    beforeEach(() => { process.env.NODE_ENV = 'production'; });
+    afterEach(() => { process.env.NODE_ENV = previous; });
+
+    it('oculta el detalle de un 5xx con un texto en español que dice qué hacer', () => {
+      const filter = new GlobalExceptionFilter();
+      const unavailable = createHost();
+      filter.catch(new ServiceUnavailableException('detalle interno de la base'), unavailable.host);
+      expect(unavailable.response.json).toHaveBeenCalledWith(expect.objectContaining({
+        statusCode: 503,
+        message: 'El servicio no está disponible en este momento. Inténtalo de nuevo en unos minutos.',
+      }));
+
+      const crashed = createHost();
+      filter.catch(new Error('relation "x" does not exist'), crashed.host);
+      expect(crashed.response.json).toHaveBeenCalledWith(expect.objectContaining({
+        statusCode: 500,
+        message: 'Ocurrió un error inesperado. Inténtalo de nuevo más tarde.',
+      }));
+    });
   });
 });

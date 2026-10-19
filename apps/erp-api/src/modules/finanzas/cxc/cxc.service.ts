@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, HttpException, NotFoundException, Logger } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { RegistrarPagoCxcDto, TipoMovimientoCxc, AplicarNotaCreditoDto, ReprogramarCxcDto } from './dto';
@@ -9,7 +9,7 @@ import { OutboxEventBuilder } from '../../../shared/outbox/outbox-event.interfac
 import { DocumentoFiscal } from '../../documentos/interfaces/documento-fiscal.interface';
 import { sanitizePostgrestSearch } from '../../../common/util/postgrest.util';
 import Decimal from 'decimal.js';
-import { createHash } from 'crypto';
+import { errorWriterFinanciero, lecturaFinancieraFallida } from '../finanzas-errors';
 import { fechaHoyDelTenant } from '../../../shared/utils/fecha-tenant.util';
 import { appendIntegrationLog } from '../../../shared/utils/integration-log';
 
@@ -661,8 +661,13 @@ export class CxcService {
       .order('fecha_pago', { ascending: false, foreignTable: 'cxc_pagos' })
       .single();
 
-    if (error || !data) {
+    // Sólo "no hay fila" es 404 (inexistente o de otra empresa); una lectura
+    // caída era también 404 y la pantalla decía que la cuenta no existía.
+    if (error && error.code !== 'PGRST116') {
       console.error('Error obteniendo cuenta por cobrar:', error);
+      throw lecturaFinancieraFallida('la cuenta por cobrar');
+    }
+    if (error || !data) {
       throw new NotFoundException('Cuenta por cobrar no encontrada');
     }
 
@@ -768,9 +773,12 @@ export class CxcService {
       .select('pais,is_demo')
       .eq('tenant_id', tenantId)
       .maybeSingle();
-    if (tenantConfigError || !tenantConfig) {
+    if (tenantConfigError) {
+      throw lecturaFinancieraFallida('la jurisdicción fiscal de la empresa');
+    }
+    if (!tenantConfig) {
       throw new BadRequestException(
-        'No se pudo verificar la jurisdicción fiscal antes de emitir la nota de crédito',
+        'Configura los datos fiscales de la empresa antes de emitir una nota de crédito',
       );
     }
     const countryCode = String((tenantConfig as any).pais ?? '').trim().toUpperCase();
@@ -812,7 +820,7 @@ export class CxcService {
     );
     if (error) {
       this.logger.error('Error en crear_nota_referenciada_tx desde CxC:', error);
-      throw new BadRequestException(error.message || 'No se pudo crear la nota de crédito referenciada');
+      throw this.errorNotaCredito(error);
     }
     return { success: true, data: Array.isArray(data) ? data[0] : data };
   }
@@ -824,9 +832,10 @@ export class CxcService {
     idempotencyKey?: string,
   ): Promise<{ success: boolean; data: any }> {
     if (!userId) throw new BadRequestException('Se requiere un usuario autenticado');
-    const key = idempotencyKey?.trim() || `cxc-reprogram:${createHash('sha256')
-      .update(JSON.stringify({ tenantId, cuentaId, dto, userId }))
-      .digest('hex')}`;
+    // Sin Idempotency-Key cada pedido es una intención nueva. Una clave derivada
+    // del contenido convertía volver a una fecha ya usada (mismo motivo) en la
+    // repetición de la primera: 201 sin aplicar nada.
+    const key = idempotencyKey?.trim() || `cxc-reprogram:${uuidv4()}`;
     const { data: rpcData, error: rpcError } = await this.supabase.getClient().rpc(
       'reprogramar_cxc_tx',
       {
@@ -839,7 +848,7 @@ export class CxcService {
         p_idempotency_key: key,
       },
     );
-    if (rpcError) throw new BadRequestException(rpcError.message || 'No se pudo reprogramar la cuenta por cobrar');
+    if (rpcError) throw this.errorReprogramacion(rpcError);
     const result: any = Array.isArray(rpcData) ? rpcData[0] : rpcData;
     return { success: true, data: result?.cuenta ?? result };
 
@@ -904,6 +913,39 @@ export class CxcService {
       success: true,
       data: detalleActualizado,
     };
+  }
+
+  // El writer de notas responde con códigos internos; la pantalla los mostraba
+  // tal cual. Reglas que se resuelven esperando o corrigiendo el origen: 409.
+  private errorNotaCredito(error: { code?: string | null; message?: string | null }): HttpException {
+    const message = String(error?.message ?? '');
+    if (message.includes('ORIGINAL_ACCOUNTING_PENDING_RETRY')) {
+      return new ConflictException('La contabilidad de la factura origen aún se está registrando; reintenta en unos minutos.');
+    }
+    if (/SOURCE_NOT_FISCALLY_ACCEPTED|ACCEPTED_SOURCE/.test(message)) {
+      return new ConflictException('La factura origen todavía no tiene aceptación de SUNAT (CDR): la nota de crédito sólo se emite sobre comprobantes aceptados.');
+    }
+    if (message.includes('IDEMPOTENCY_CONFLICT')) {
+      return new ConflictException('Esta nota ya se registró con otros datos; vuelve a abrir el formulario.');
+    }
+    if (message.includes('EXCEEDS_SOURCE_BALANCE')) {
+      return new BadRequestException('El monto supera el saldo disponible de la factura origen.');
+    }
+    return errorWriterFinanciero(error, 'No se pudo crear la nota de crédito');
+  }
+
+  // Inexistente o ajena 404; la misma intención con otro contenido o una cuenta
+  // cobrada/anulada 409; petición inválida 400; writer caído 503.
+  private errorReprogramacion(error: { code?: string | null; message?: string | null }): HttpException {
+    const message = String(error?.message ?? '');
+    if (message.includes('CXC_REPROGRAM_IDEMPOTENCY_CONFLICT')) {
+      return new ConflictException('Esta reprogramación ya se registró con otros datos; vuelve a abrir el formulario');
+    }
+    if (message.includes('CXC_REPROGRAM_STATE_INVALID')) {
+      return new ConflictException('La cuenta está cobrada o anulada; no se puede reprogramar');
+    }
+    if (message.includes('CXC_NOT_FOUND')) return new NotFoundException('Cuenta por cobrar no encontrada');
+    return errorWriterFinanciero(error, 'No se pudo reprogramar la cuenta por cobrar');
   }
 
   private async obtenerConfiguracionEmpresa(tenantId: string): Promise<any> {

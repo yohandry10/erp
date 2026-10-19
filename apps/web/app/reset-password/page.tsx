@@ -37,7 +37,9 @@ async function postAuth(route: string, body: Record<string, string>): Promise<Ap
 
 function requestErrorMessage(result: Exclude<ApiResult, { ok: true }>) {
   if (result.status === 429) return 'Demasiadas solicitudes seguidas. Espera un minuto y vuelve a intentarlo.'
-  if (result.status === 503 && result.message) return result.message
+  // En producción el servidor no detalla los 5xx: un 503 aquí suele ser el correo
+  // sin configurar o caído, y el usuario necesita saber a quién acudir.
+  if (result.status === 503) return 'No podemos enviar el correo de recuperación en este momento. Si el problema continúa, pide ayuda al administrador del sistema.'
   if (result.status === 400) return 'Revisa el correo: no tiene un formato válido.'
   if (result.status === 0) return 'No hay conexión con el servidor. Revisa tu red y vuelve a intentarlo.'
   return 'No pudimos procesar la solicitud. Vuelve a intentarlo en unos minutos.'

@@ -3763,7 +3763,7 @@
     },
     {
       "id": "auth-reset-web-routes-404",
-      "status": "local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -3780,14 +3780,18 @@
         "local_only": true
       },
       "correction": "Login enlaza /reset-password/; la página usa password-reset/request y password-reset/confirm con email, token y la regla del DTO",
-      "pending": [
-        "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
-      ],
-      "canonical_proof": "artifacts/peru-auth-fixed-local-20261019"
+      "pending": [],
+      "canonical_proof": "artifacts/peru-auth-fixed-local-20261019",
+      "release_verification": {
+        "merge_sha": "334d6cb412378233b27748b1d177e2cf84fcfc3f",
+        "schema": 569,
+        "main_evidence": "artifacts/peru-integrated-main-39313892124",
+        "production_read_only": "artifacts/peru-production-verification-after-144-20261019.json"
+      }
     },
     {
       "id": "auth-reset-link-wrong-page",
-      "status": "local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -3801,13 +3805,19 @@
       },
       "correction": "Enlaces con APP_URL o FRONTEND_URL; /reset-password/ procesa token y email de la consulta",
       "pending": [
-        "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
+        "Configurar SMTP/proveedor y FRONTEND_URL en Render: en PROD la solicitud responde 503 (artifacts/peru-production-auth-smoke-after-144-20261019.json)."
       ],
-      "canonical_proof": "artifacts/peru-auth-fixed-local-20261019"
+      "canonical_proof": "artifacts/peru-auth-fixed-local-20261019",
+      "release_verification": {
+        "merge_sha": "334d6cb412378233b27748b1d177e2cf84fcfc3f",
+        "schema": 569,
+        "main_evidence": "artifacts/peru-integrated-main-39313892124",
+        "production_read_only": "artifacts/peru-production-verification-after-144-20261019.json"
+      }
     },
     {
       "id": "auth-email-config-false-flags",
-      "status": "local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -3825,13 +3835,19 @@
       },
       "correction": "Banderas booleanas interpretadas; sin SMTP_HOST no hay servicio; sin correo la solicitud responde 503 en vez de prometer un enlace",
       "pending": [
-        "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
+        "Configurar SMTP/proveedor y FRONTEND_URL en Render: en PROD la solicitud responde 503 (artifacts/peru-production-auth-smoke-after-144-20261019.json)."
       ],
-      "canonical_proof": "artifacts/peru-auth-fixed-local-20261019"
+      "canonical_proof": "artifacts/peru-auth-fixed-local-20261019",
+      "release_verification": {
+        "merge_sha": "334d6cb412378233b27748b1d177e2cf84fcfc3f",
+        "schema": 569,
+        "main_evidence": "artifacts/peru-integrated-main-39313892124",
+        "production_read_only": "artifacts/peru-production-verification-after-144-20261019.json"
+      }
     },
     {
       "id": "auth-logout-outage-200",
-      "status": "local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -3848,14 +3864,18 @@
         "local_only": true
       },
       "correction": "La falla de revocación responde 503; logout igual retira la cookie del navegador",
-      "pending": [
-        "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
-      ],
-      "canonical_proof": "artifacts/peru-auth-fixed-local-20261019"
+      "pending": [],
+      "canonical_proof": "artifacts/peru-auth-fixed-local-20261019",
+      "release_verification": {
+        "merge_sha": "334d6cb412378233b27748b1d177e2cf84fcfc3f",
+        "schema": 569,
+        "main_evidence": "artifacts/peru-integrated-main-39313892124",
+        "production_read_only": "artifacts/peru-production-verification-after-144-20261019.json"
+      }
     },
     {
       "id": "notifications-list-403-for-operational-roles",
-      "status": "local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -3877,14 +3897,19 @@
       },
       "correction": "Leer la propia lista y marcar los avisos personales no exige permiso; los compartidos (globales o de rol) siguen exigiendo notifications.update porque el estado leído es por aviso; borrar sigue protegido y la UI oculta lo que no se puede hacer",
       "pending": [
-        "CI exacto, main y runtime.",
-        "Estado leído por usuario (migración) para que cada rol pueda despejar su campana."
+        "Estado leído por usuario (migración) para que cada rol despeje sus avisos compartidos."
       ],
-      "canonical_proof": "artifacts/peru-notifications-fixed-local-20261019"
+      "canonical_proof": "artifacts/peru-notifications-fixed-local-20261019",
+      "release_verification": {
+        "merge_sha": "334d6cb412378233b27748b1d177e2cf84fcfc3f",
+        "schema": 569,
+        "main_evidence": "artifacts/peru-integrated-main-39313892124",
+        "production_read_only": "artifacts/peru-production-verification-after-144-20261019.json"
+      }
     },
     {
       "id": "notifications-errors-as-200",
-      "status": "local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -3913,14 +3938,18 @@
         "local_only": true
       },
       "correction": "404 ajena o inexistente, 400 mal formada, 503 indisponible; la UI conserva el aviso y explica el fallo",
-      "pending": [
-        "CI exacto, main y runtime."
-      ],
-      "canonical_proof": "artifacts/peru-notifications-fixed-local-20261019"
+      "pending": [],
+      "canonical_proof": "artifacts/peru-notifications-fixed-local-20261019",
+      "release_verification": {
+        "merge_sha": "334d6cb412378233b27748b1d177e2cf84fcfc3f",
+        "schema": 569,
+        "main_evidence": "artifacts/peru-integrated-main-39313892124",
+        "production_read_only": "artifacts/peru-production-verification-after-144-20261019.json"
+      }
     },
     {
       "id": "notifications-count-and-mark-all-incomplete",
-      "status": "local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -3937,10 +3966,114 @@
         "local_only": true
       },
       "correction": "El contador iguala la lista visible; marcar todas marca lo personal y, con notifications.update, también lo compartido",
+      "pending": [],
+      "canonical_proof": "artifacts/peru-notifications-fixed-local-20261019",
+      "release_verification": {
+        "merge_sha": "334d6cb412378233b27748b1d177e2cf84fcfc3f",
+        "schema": 569,
+        "main_evidence": "artifacts/peru-integrated-main-39313892124",
+        "production_read_only": "artifacts/peru-production-verification-after-144-20261019.json"
+      }
+    },
+    {
+      "id": "cxc-reprogram-derived-key-false-success",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/finanzas/cxc/:id/reprogramar"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cxc-baseline-20261019",
+        "observed_error": "La pantalla no enviaba Idempotency-Key y el API derivaba la clave del contenido: volver a una fecha ya usada con el motivo precargado respondía 201 sin aplicarse.",
+        "local_only": true
+      },
+      "correction": "Sin clave cada pedido es una intención nueva; el modal envía una clave por intento y sólo la reutiliza al reintentar el mismo contenido",
       "pending": [
         "CI exacto, main y runtime."
       ],
-      "canonical_proof": "artifacts/peru-notifications-fixed-local-20261019"
+      "canonical_proof": "artifacts/peru-cxc-fixed-local-20261019"
+    },
+    {
+      "id": "cxc-reprogram-errors-as-400",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/finanzas/cxc/:id/reprogramar"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cxc-baseline-20261019",
+        "observed_error": "Inexistente, ajena, conflicto de intención, cuenta anulada y writer caído respondían 400.",
+        "local_only": true
+      },
+      "correction": "404 / 409 / 503 según la causa",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-cxc-fixed-local-20261019"
+    },
+    {
+      "id": "cxc-credit-note-raw-codes",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/finanzas/cxc/:id/notas-credito"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cxc-baseline-20261019",
+        "observed_error": "Los rechazos llegaban como 400 con el código interno (REFERENCED_NOTE_ORIGINAL_ACCOUNTING_PENDING_RETRY, REFERENCED_NOTE_SOURCE_NOT_FISCALLY_ACCEPTED) y la configuración o el writer caídos también eran 400.",
+        "local_only": true
+      },
+      "correction": "409 con un motivo en español para contabilidad pendiente y falta de aceptación SUNAT; 503 si no se puede leer la configuración o no hay writer",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-cxc-fixed-local-20261019"
+    },
+    {
+      "id": "cxc-detail-outage-404",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxc/:id"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-cxc-baseline-20261019",
+        "observed_error": "Una lectura caída del detalle respondía 404 \"Cuenta por cobrar no encontrada\".",
+        "local_only": true
+      },
+      "correction": "Sólo la ausencia de fila es 404; la lectura caída es 503",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-cxc-fixed-local-20261019"
+    },
+    {
+      "id": "production-5xx-english-generic",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/auth/password-reset/request"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-production-auth-smoke-after-144-20261019.json",
+        "observed_error": "En PROD (verificado en sólo lectura) todo 5xx, incluidos los 503 legibles, llega como \"An unexpected error occurred. Please try again later.\" a una UI en español.",
+        "local_only": false
+      },
+      "correction": "En producción el 5xx sigue sin detalles internos pero en español y distinguiendo 503 reintentable",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "apps/erp-api/src/common/filters/global-exception.filter.spec.ts"
     }
   ]
 }

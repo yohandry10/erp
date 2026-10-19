@@ -1,0 +1,192 @@
+{
+  "success": true,
+  "scenarios": [
+    {
+      "scenario": "Caja: dos ingresos concurrentes de la misma intención producen un único movimiento/evento",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: writer manual sin EXECUTE devuelve 503 y recupera la intención tras restituir permiso",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: fallo interno después de INSERT revierte saldo/ledger/outbox y la intención se recupera una vez",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: precierre no declara validación exitosa cuando no puede leer ventas_pos",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: precierre no declara validación exitosa cuando no puede leer retiros_caja",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: precierre no declara validación exitosa cuando no puede leer cambios_turno",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: RPC de tolerancia indisponible bloquea el preview con 503 y conserva el arqueo",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: preview no sustituye el saldo por el fondo inicial cuando no puede leer movimientos",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: reporte fiscal/pagos indisponible responde 503 para ventas_pos",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: reporte fiscal/pagos indisponible responde 503 para ventas_pos_pagos",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: CSV conserva comillas/salto de línea y neutraliza fórmula del nombre de caja",
+      "passed": true
+    },
+    {
+      "scenario": "Caja: la sesión de la fase de fallos queda cerrada con su saldo esperado",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/:id/apertura",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/saldo-esperado/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/movimientos/manual/:id",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/validar-precierre/:id",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/validar-precierre/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/validar-precierre/:id",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/validar-precierre/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/validar-precierre/:id",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/validar-precierre/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/validar-cierre/:id",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/validar-cierre/:id",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/validar-cierre/:id",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/validar-cierre/:id",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/:id/corte-z?sesionId=:id",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/:id/corte-z?sesionId=:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/:id/corte-z?sesionId=:id",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas/:id/corte-z?sesionId=:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "cajas/sesiones/:id/cierre-administrativo",
+      "status": 201
+    }
+  ],
+  "remoteWrites": false,
+  "complete_acceptance": false
+}
