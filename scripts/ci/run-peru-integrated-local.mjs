@@ -224,9 +224,11 @@ try {
   await run('hr-operations-lifecycle',process.execPath,['scripts/ci/test-peru-hr-operations-local.mjs']);
   for(const kind of ['auth-first','auth-other',...(withBrowser?['auth-browser']:[])])await run('prepare-'+kind,process.execPath,['scripts/ci/prepare-peru-first-client-local.mjs',kind]);
   await run('auth-recovery-lifecycle',process.execPath,['scripts/ci/test-peru-auth-recovery-local.mjs']);
+  for(const kind of ['notif-first','notif-other',...(withBrowser?['notif-browser']:[])])await run('prepare-'+kind,process.execPath,['scripts/ci/prepare-peru-first-client-local.mjs',kind]);
+  await run('notifications-lifecycle',process.execPath,['scripts/ci/test-peru-notifications-local.mjs']);
   if(withBrowser) await run('prepare-wizard',process.execPath,['scripts/ci/prepare-peru-first-client-local.mjs','wizard']);
   const httpEvidence=JSON.parse(readFileSync(path.join(output,'http.json'),'utf8'));
-  for(const file of ['annual-acceptance.json','finance-lifecycle.json','hr-lifecycle.json','hr-financial.json','payroll-plame.json','configuration-admin.json','series-lifecycle.json','tax-adjustments.json','monthly-period.json','tax-intents.json','login-office.json','reports-consolidation-expanded.json','gre-operations.json','pos-operations.json','cpe-operations.json','cash-operations.json','cash-faults.json','sales-operations.json','purchases-operations.json','accounting-operations.json','users-operations.json','finance-operations.json','hr-operations.json','auth-recovery.json']) {
+  for(const file of ['annual-acceptance.json','finance-lifecycle.json','hr-lifecycle.json','hr-financial.json','payroll-plame.json','configuration-admin.json','series-lifecycle.json','tax-adjustments.json','monthly-period.json','tax-intents.json','login-office.json','reports-consolidation-expanded.json','gre-operations.json','pos-operations.json','cpe-operations.json','cash-operations.json','cash-faults.json','sales-operations.json','purchases-operations.json','accounting-operations.json','users-operations.json','finance-operations.json','hr-operations.json','auth-recovery.json','notifications-operations.json']) {
     const phase=JSON.parse(readFileSync(path.join(output,file),'utf8'));
     if(phase.success!==true||phase.remoteWrites!==false) throw new Error('Fase funcional incompleta: '+file);
     const offset=httpEvidence.results.length;
@@ -241,7 +243,7 @@ try {
       return child;
     };
     let web = await startWeb('web');
-    if (!recordsOnly) await run('browser', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-integrated-local.spec.ts', 'tests/e2e/peru-rrhh-financial-local.spec.ts', 'tests/e2e/peru-configuration-admin-local.spec.ts', 'tests/e2e/peru-tax-adjustments-local.spec.ts', 'tests/e2e/peru-tax-intents-local.spec.ts', 'tests/e2e/peru-reports-consignations-local.spec.ts', 'tests/e2e/peru-gre-local.spec.ts', 'tests/e2e/peru-pos-local.spec.ts', 'tests/e2e/peru-cpe-local.spec.ts', 'tests/e2e/peru-cash-local.spec.ts', 'tests/e2e/peru-auth-recovery-local.spec.ts', '--reporter=list',
+    if (!recordsOnly) await run('browser', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-integrated-local.spec.ts', 'tests/e2e/peru-rrhh-financial-local.spec.ts', 'tests/e2e/peru-configuration-admin-local.spec.ts', 'tests/e2e/peru-tax-adjustments-local.spec.ts', 'tests/e2e/peru-tax-intents-local.spec.ts', 'tests/e2e/peru-reports-consignations-local.spec.ts', 'tests/e2e/peru-gre-local.spec.ts', 'tests/e2e/peru-pos-local.spec.ts', 'tests/e2e/peru-cpe-local.spec.ts', 'tests/e2e/peru-cash-local.spec.ts', 'tests/e2e/peru-auth-recovery-local.spec.ts', 'tests/e2e/peru-notifications-local.spec.ts', '--reporter=list',
       ...(focusOnboarding ? ['--grep', 'primer administrador|ajuste con respuesta perdida'] : [])], webDirectory);
     // Next dev conserva compilaciones en memoria. Cada barrido comienza con
     // un proceso nuevo; un fallo de su fase sigue deteniendo el ensayo.

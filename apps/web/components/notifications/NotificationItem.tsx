@@ -24,6 +24,7 @@ interface NotificationItemProps {
   notification: Notification
   onMarkAsRead: (id: string) => void
   onDelete: (id: string) => void
+  canDelete?: boolean
   onClose?: () => void
 }
 
@@ -69,6 +70,7 @@ export function NotificationItem({
   notification,
   onMarkAsRead,
   onDelete,
+  canDelete = true,
   onClose,
 }: NotificationItemProps) {
   const router = useRouter()
@@ -122,16 +124,18 @@ export function NotificationItem({
               <span>{formatDate(notification.created_at)}</span>
             </div>
           </div>
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            aria-label="Eliminar notificación"
-            onClick={handleDelete}
-            className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-cyan-400/10 hover:text-primary group-data-[erp-theme=light]/dashboard:hover:text-cyan-800"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          {canDelete && (
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              aria-label="Eliminar notificación"
+              onClick={handleDelete}
+              className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-cyan-400/10 hover:text-primary group-data-[erp-theme=light]/dashboard:hover:text-cyan-800"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
         </div>
 
         {message && (
