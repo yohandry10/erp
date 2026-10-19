@@ -4627,6 +4627,122 @@
       "pending_checks": [
         "UI real de compras, roles distintos de ADMIN y variantes no registradas"
       ]
+    },
+    {
+      "id": "auth-reset-web-routes",
+      "source": "scripts/ci/test-peru-auth-recovery-local.mjs",
+      "required_scenario_prefixes": [
+        "Recuperación: las rutas que usa la web existen en el API"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/auth/password-reset/request"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/auth/password-reset/confirm"
+        }
+      ],
+      "verified_checks": [
+        "La página /reset-password llama sólo rutas existentes del API"
+      ],
+      "pending_checks": [
+        "Envío real por el proveedor SMTP productivo (no configurado en el Blueprint) y roles distintos de ADMIN"
+      ]
+    },
+    {
+      "id": "auth-reset-request-mail",
+      "source": "scripts/ci/test-peru-auth-recovery-local.mjs",
+      "required_scenario_prefixes": [
+        "Recuperación: correo existente recibe un enlace",
+        "Recuperación: correo inexistente recibe la misma respuesta",
+        "Recuperación: un usuario inactivo no recibe enlace"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/auth/password-reset/request"
+        }
+      ],
+      "verified_checks": [
+        "Respuesta uniforme, un correo con enlace a FRONTEND_URL/reset-password/ para la cuenta activa y ninguno para inexistentes o inactivas"
+      ],
+      "pending_checks": [
+        "Envío real por el proveedor SMTP productivo (no configurado en el Blueprint) y roles distintos de ADMIN"
+      ]
+    },
+    {
+      "id": "auth-reset-token-lifecycle",
+      "source": "scripts/ci/test-peru-auth-recovery-local.mjs",
+      "required_scenario_prefixes": [
+        "Recuperación: validar, rechazar token ajeno o débil",
+        "Recuperación: un token vencido no valida"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/auth/password-reset/validate"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/auth/password-reset/confirm"
+        }
+      ],
+      "verified_checks": [
+        "Token válido una sola vez, ajeno/erróneo/vencido 401, contraseña débil 400, confirmar revoca sesiones y audita"
+      ],
+      "pending_checks": [
+        "Envío real por el proveedor SMTP productivo (no configurado en el Blueprint) y roles distintos de ADMIN"
+      ]
+    },
+    {
+      "id": "auth-logout-sessions",
+      "source": "scripts/ci/test-peru-auth-recovery-local.mjs",
+      "required_scenario_prefixes": [
+        "Sesión: logout revoca sólo la sesión usada",
+        "Sesión: logout-all revoca todas las sesiones"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/auth/logout"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/auth/logout-all"
+        }
+      ],
+      "verified_checks": [
+        "Logout cierra sólo su sesión; logout-all cierra todas las del usuario y ninguna ajena"
+      ],
+      "pending_checks": [
+        "Roles distintos de ADMIN"
+      ]
+    },
+    {
+      "id": "auth-logout-outage-503",
+      "source": "scripts/ci/test-peru-auth-recovery-local.mjs",
+      "required_scenario_prefixes": [
+        "Sesión: si la revocación global no está disponible",
+        "Sesión: si la revocación no está disponible"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/auth/logout"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/auth/logout-all"
+        }
+      ],
+      "verified_checks": [
+        "Sin la RPC de revocación responden 503, la sesión sigue activa y el reintento la revoca"
+      ],
+      "pending_checks": [
+        "Roles distintos de ADMIN"
+      ]
     }
   ]
 }

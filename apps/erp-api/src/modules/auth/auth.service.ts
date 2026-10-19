@@ -482,6 +482,10 @@ export class AuthService {
   }
 
   // Password reset functionality
+  isPasswordResetAvailable(): boolean {
+    return this.emailService.isConfigured();
+  }
+
   async generatePasswordResetToken(email: string, clientIp?: string): Promise<string> {
     try {
       // ✅ A2: Validar que existe proveedor de email configurado
@@ -757,6 +761,8 @@ export class AuthService {
       if (error) throw error;
     } catch (error) {
       console.error('Error revoking session:', error);
+      // La sesión sigue siendo válida en la base: no se informa un cierre que no ocurrió.
+      throw new ServiceUnavailableException('No se pudo cerrar la sesión en el servidor. Inténtalo de nuevo.');
     }
   }
 
@@ -790,6 +796,9 @@ export class AuthService {
       console.log('🔒 [AUTH] Sesiones revocadas - Usuario:', userId, 'Tokens:', sessionTokens.length);
     } catch (error) {
       console.error('Error revoking user sessions:', error);
+      // Cerrar todas las sesiones suele seguir a un robo de credenciales: nunca
+      // responder éxito si las sesiones siguen vigentes.
+      throw new ServiceUnavailableException('No se pudieron cerrar las sesiones. Ninguna se dio por cerrada; inténtalo de nuevo.');
     }
   }
 

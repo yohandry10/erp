@@ -1,0 +1,9 @@
+{
+  "completedAt": "2026-10-19T06:35:09.082Z",
+  "success": true,
+  "withBrowser": true,
+  "scope": "auth_recovery_sessions_subset",
+  "database": "PostgreSQL 16 efímero (migraciones completas)",
+  "output": "artifacts\\peru-auth-local-20261019062955915-22288",
+  "remoteWrites": false
+}

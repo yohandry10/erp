@@ -1,0 +1,19 @@
+{
+  "capturedAt": "2026-10-19T06:29:55.917Z",
+  "capture": "Before launch",
+  "source_hashes": {
+    "artifacts/peru-auth-runner-20261019.mjs": "1ea6bee72018d386668a091d49c941935583768078ca24614a9caf6e78c60147",
+    "scripts/ci/test-peru-auth-recovery-local.mjs": "236119f5da57235352b004ca2a654f388adb616336a7358f7e42f4418e588f77",
+    "scripts/ci/peru-local-smtp-sink.mjs": "af601f15f5beb86aabc65046663fe33779b3b37c18c18365b514f84d056347ff",
+    "scripts/ci/prepare-peru-first-client-local.mjs": "abc2b1b34547db44de2b9f8971685efcbc239319e98a0bbc597b4e547d8bb2b3",
+    "apps/erp-api/tests/e2e/helpers/local-api-harness.ts": "b1c4d7c61c10a2b5b0c28c367c8790196d667dd8d03bdd65058bf982efc3e968",
+    "apps/erp-api/src/modules/auth/auth.controller.ts": "a613718fdbdf54e66c4a7d552048362724361413ed5e2c6efe045db4fdbf4e30",
+    "apps/erp-api/src/modules/auth/auth.service.ts": "9dea8eafb5b813ae1cc955f4d18122203a3212b6a02bb4e78fdf074c11243476",
+    "apps/erp-api/src/shared/email/email.service.ts": "059ac433ba1b8f3967ef63aba010a4fbffc071d240a9eae6a26156e8f035db95",
+    "apps/web/app/reset-password/page.tsx": "bba15e43793b26465da4c47e86535a98f04746d903ef336d14a280d2eb543c4d",
+    "apps/web/app/login/page.tsx": "ab393f8f0d7dd277054e02b1640efdac23fb6e87163a0d63765f59e14842031f",
+    "apps/web/tests/e2e/peru-auth-recovery-local.spec.ts": "66036e8f480b1f8341339a7d408fe441c7fffc21c6ceb1b573b2071f8d1d3406"
+  },
+  "complete_acceptance": false,
+  "remoteWrites": false
+}

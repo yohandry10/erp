@@ -1,0 +1,268 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Recuperación de contraseña y sesiones API/DB/SMTP local; sin aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Recuperación: las rutas que usa la web existen en el API",
+      "passed": false,
+      "message": "Rutas inexistentes: {\"request-password-reset\":404,\"reset-password\":404}"
+    },
+    {
+      "scenario": "Recuperación: correo existente recibe un enlace a la web con token de un solo uso",
+      "passed": false,
+      "message": "El enlace no apunta a la web configurada: http://localhost:3000\n+ actual - expected\n\n+ 'http://localhost:3000'\n- 'http://127.0.0.1:3209'\n          ^\n"
+    },
+    {
+      "scenario": "Recuperación: correo inexistente recibe la misma respuesta y ningún correo",
+      "passed": true
+    },
+    {
+      "scenario": "Recuperación: validar, rechazar token ajeno o débil, confirmar revoca sesiones y no se reutiliza",
+      "passed": true
+    },
+    {
+      "scenario": "Recuperación: un token vencido no valida ni cambia la contraseña",
+      "passed": true
+    },
+    {
+      "scenario": "Recuperación: un usuario inactivo no recibe enlace",
+      "passed": true
+    },
+    {
+      "scenario": "Sesión: logout revoca sólo la sesión usada",
+      "passed": true
+    },
+    {
+      "scenario": "Sesión: logout-all revoca todas las sesiones del usuario y ninguna ajena",
+      "passed": true
+    },
+    {
+      "scenario": "Sesión: si la revocación global no está disponible, logout-all responde 503 y no informa éxito",
+      "passed": false,
+      "message": "Cierre global sin revocar respondió 201\n\n201 !== 503\n"
+    },
+    {
+      "scenario": "Sesión: si la revocación no está disponible, logout responde 503 y la sesión no se da por cerrada",
+      "passed": false,
+      "message": "Logout sin revocar respondió 201\n\n201 !== 503\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/request-password-reset",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/reset-password",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/password-reset/request",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/password-reset/request",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/password-reset/validate",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/password-reset/validate",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/password-reset/validate",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/password-reset/confirm",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/password-reset/confirm",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/password-reset/confirm",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "auth/profile",
+      "status": 401
+    },
+    {
+      "method": "GET",
+      "endpoint": "auth/profile",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "auth/profile",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/password-reset/confirm",
+      "status": 429
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/password-reset/confirm",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/password-reset/validate",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/password-reset/request",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/password-reset/validate",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/password-reset/confirm",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "auth/profile",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/password-reset/request",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/logout",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "auth/profile",
+      "status": 401
+    },
+    {
+      "method": "GET",
+      "endpoint": "auth/profile",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/logout-all",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "auth/profile",
+      "status": 401
+    },
+    {
+      "method": "GET",
+      "endpoint": "auth/profile",
+      "status": 401
+    },
+    {
+      "method": "GET",
+      "endpoint": "auth/profile",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/logout-all",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/logout",
+      "status": 201
+    }
+  ]
+}

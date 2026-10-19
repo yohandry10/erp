@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
@@ -191,6 +192,14 @@ export default function LoginPage() {
                   autoComplete="current-password"
                   className="h-12 border-border bg-card px-4 text-base text-foreground focus-visible:border-blue-500 focus-visible:ring-blue-500/20"
                 />
+                <div className="flex justify-end">
+                  <Link
+                    href="/reset-password/"
+                    className="rounded-sm text-sm font-medium text-blue-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </Link>
+                </div>
               </div>
 
               <button type="submit" className="hidden" aria-hidden="true" />
