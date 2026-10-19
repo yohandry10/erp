@@ -571,7 +571,14 @@ test.describe('Argentina · aislamiento jurisdiccional y factura ARCA', () => {
     await page.getByLabel('Concepto ARCA *').selectOption('2')
     await page.getByLabel('Servicio desde *').fill('2026-09-01')
     await page.getByLabel('Servicio hasta *').fill('2026-09-30')
-    await page.getByLabel('Vencimiento de pago *').fill('2026-10-10')
+    // El formulario exige vencimiento >= emisión (hoy en el navegador); una fecha
+    // fija caduca y deja el envío bloqueado por la validación nativa.
+    const dueDate = await page.evaluate(() => {
+      const date = new Date()
+      date.setDate(date.getDate() + 30)
+      return date.toLocaleDateString('en-CA')
+    })
+    await page.getByLabel('Vencimiento de pago *').fill(dueDate)
     await page.getByRole('button', { name: '+ Agregar tributo' }).click()
     await page.getByLabel('Base').fill('100')
     await page.getByLabel('Alícuota %').fill('3')
@@ -589,7 +596,7 @@ test.describe('Argentina · aislamiento jurisdiccional y factura ARCA', () => {
       arca_concepto: 2,
       arca_fecha_servicio_desde: '2026-09-01',
       arca_fecha_servicio_hasta: '2026-09-30',
-      arca_fecha_vencimiento_pago: '2026-10-10',
+      arca_fecha_vencimiento_pago: dueDate,
       arca_tributos: [
         {
           id: 1,
