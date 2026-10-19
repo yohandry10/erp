@@ -4743,6 +4743,122 @@
       "pending_checks": [
         "Roles distintos de ADMIN"
       ]
+    },
+    {
+      "id": "notifications-visibility",
+      "source": "scripts/ci/test-peru-notifications-local.mjs",
+      "required_scenario_prefixes": [
+        "Notificaciones: alta y visibilidad por destinatario",
+        "Notificaciones: un usuario sin permisos administrativos abre la lista"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/notifications"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/notifications"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/notifications/unread"
+        }
+      ],
+      "verified_checks": [
+        "Cada usuario ve lo suyo, lo global y lo de sus roles; nada de otro usuario ni de otra empresa; un vendedor abre su lista"
+      ],
+      "pending_checks": [
+        "Roles distintos de ADMIN y VENDEDOR; notificaciones generadas por stock, integraciones y logística"
+      ]
+    },
+    {
+      "id": "notifications-unread-count",
+      "source": "scripts/ci/test-peru-notifications-local.mjs",
+      "required_scenario_prefixes": [
+        "Notificaciones: el contador de no leídas coincide con la lista"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/notifications/unread-count"
+        }
+      ],
+      "verified_checks": [
+        "El contador iguala la lista de no leídas, globales incluidas"
+      ],
+      "pending_checks": [
+        "Roles distintos de ADMIN y VENDEDOR; notificaciones generadas por stock, integraciones y logística"
+      ]
+    },
+    {
+      "id": "notifications-mark-delete",
+      "source": "scripts/ci/test-peru-notifications-local.mjs",
+      "required_scenario_prefixes": [
+        "Notificaciones: marcar leída propia",
+        "Notificaciones: marcar todas marca lo personal",
+        "Notificaciones: eliminar propia"
+      ],
+      "operations": [
+        {
+          "method": "PUT",
+          "endpoint": "/api/notifications/:id/read"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/notifications/mark-all-read"
+        },
+        {
+          "method": "DELETE",
+          "endpoint": "/api/notifications/:id"
+        }
+      ],
+      "verified_checks": [
+        "Propia 200; de otro usuario, otra empresa o inexistente 404; mal formada 400; sin notifications.update sólo se marca lo personal (compartido 403); borrar exige permiso"
+      ],
+      "pending_checks": [
+        "Estado leído por usuario (requiere migración); roles distintos de ADMIN y VENDEDOR"
+      ]
+    },
+    {
+      "id": "notifications-outage-503",
+      "source": "scripts/ci/test-peru-notifications-local.mjs",
+      "required_scenario_prefixes": [
+        "Notificaciones: sin lectura de notificaciones",
+        "Notificaciones: sin el writer"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/notifications"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/notifications/unread"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/notifications/unread-count"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/notifications/:id/read"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/notifications/mark-all-read"
+        },
+        {
+          "method": "DELETE",
+          "endpoint": "/api/notifications/:id"
+        }
+      ],
+      "verified_checks": [
+        "Lecturas y writer caídos responden 503 sin cambiar estado"
+      ],
+      "pending_checks": [
+        "Roles distintos de ADMIN y VENDEDOR; notificaciones generadas por stock, integraciones y logística"
+      ]
     }
   ]
 }

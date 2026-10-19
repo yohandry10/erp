@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ForbiddenException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { TenantContextService } from '../../shared/tenant/tenant-context.service';
@@ -281,35 +282,32 @@ describe('NotificationsService', () => {
 
     // ==================== GET UNREAD COUNT ====================
     describe('getUnreadCount', () => {
-        it('should return unread count', async () => {
-            mockDbResponse = { count: 5, error: null };
-
-            const result = await service.getUnreadCount('tenant-123');
-
-            expect(result).toBe(5);
-        });
-
-        it('should return unread count for specific user', async () => {
-            mockDbResponse = { count: 3, error: null };
+        it('should count the same unread notifications the list shows, global included', async () => {
+            mockDbResponse = {
+                data: [
+                    { ...mockNotificationData, id: 'own', usuario_id: 'user-123' },
+                    { ...mockNotificationData, id: 'global', usuario_id: null, roles_destinatarios: [] },
+                    { ...mockNotificationData, id: 'other', usuario_id: 'other-user' },
+                ],
+                error: null,
+            };
 
             const result = await service.getUnreadCount('tenant-123', 'user-123');
 
-            expect(result).toBe(3);
+            expect(result).toBe(2);
         });
 
-        it('should return 0 when count is null', async () => {
-            mockDbResponse = { count: null, error: null };
-
+        it('should return 0 without a user', async () => {
             const result = await service.getUnreadCount('tenant-123');
 
             expect(result).toBe(0);
         });
 
-        it('should throw error on database error', async () => {
-            mockDbResponse = { count: null, error: { message: 'Database error' } };
+        it('should answer 503 on database error', async () => {
+            mockDbResponse = { data: null, error: { message: 'Database error' } };
 
-            await expect(service.getUnreadCount('tenant-123'))
-                .rejects.toThrow();
+            await expect(service.getUnreadCount('tenant-123', 'user-123'))
+                .rejects.toBeInstanceOf(ServiceUnavailableException);
         });
     });
 
@@ -365,7 +363,7 @@ describe('NotificationsService', () => {
                 .rejects.toThrow('Notificación no encontrada');
         });
 
-        it('should deny access for non-owner user', async () => {
+        it('should answer 404 for another user notification without revealing it', async () => {
             mockClient.single.mockResolvedValueOnce({
                 data: { usuario_id: 'other-user', roles_destinatarios: null },
                 error: null,
@@ -375,22 +373,62 @@ describe('NotificationsService', () => {
                 'tenant-123',
                 'notif-123',
                 { id: 'user-123' }
-            )).rejects.toThrow('No tiene permiso para modificar esta notificación');
+            )).rejects.toBeInstanceOf(NotFoundException);
+        });
+
+        it('should answer 503 when the notification cannot be read', async () => {
+            mockClient.single.mockResolvedValueOnce({ data: null, error: { code: '42501', message: 'permission denied' } });
+
+            await expect(service.markAsRead('tenant-123', 'notif-123', { id: 'user-123' }))
+                .rejects.toBeInstanceOf(ServiceUnavailableException);
         });
     });
 
     // ==================== MARK ALL AS READ ====================
     describe('markAllAsRead', () => {
-        it('should mark all notifications as read for user', async () => {
-            mockDbResponse = { data: [{ id: 'notif-1' }, { id: 'notif-2' }], error: null };
+        it('should mark every visible unread notification, global included', async () => {
+            mockDbResponse = {
+                data: [
+                    { ...mockNotificationData, id: 'own', usuario_id: 'user-123' },
+                    { ...mockNotificationData, id: 'global', usuario_id: null, roles_destinatarios: [] },
+                    { ...mockNotificationData, id: 'other', usuario_id: 'other-user' },
+                ],
+                error: null,
+            };
 
             const result = await service.markAllAsRead('tenant-123', 'user-123');
 
             expect(result).toBe(2);
-            expect(mockClient.rpc).toHaveBeenCalledWith(
-                'gestionar_notificacion_tx',
-                expect.objectContaining({ p_operacion: 'MARK_ALL_READ' }),
-            );
+            const marked = mockClient.rpc.mock.calls
+                .filter(([, params]: any[]) => params?.p_operacion === 'MARK_READ')
+                .map(([, params]: any[]) => params.p_payload.notification_id);
+            expect(marked).toEqual(['own', 'global']);
+        });
+
+        it('should leave shared notifications unread without notifications.update', async () => {
+            mockDbResponse = {
+                data: [
+                    { ...mockNotificationData, id: 'own', usuario_id: 'user-123' },
+                    { ...mockNotificationData, id: 'global', usuario_id: null, roles_destinatarios: [] },
+                ],
+                error: null,
+            };
+
+            const result = await service.markAllAsRead('tenant-123', 'user-123', { id: 'user-123' }, false);
+
+            expect(result).toBe(1);
+            const marked = mockClient.rpc.mock.calls
+                .filter(([, params]: any[]) => params?.p_operacion === 'MARK_READ')
+                .map(([, params]: any[]) => params.p_payload.notification_id);
+            expect(marked).toEqual(['own']);
+        });
+
+        it('should refuse to mark a shared notification without notifications.update', async () => {
+            mockClient.single.mockResolvedValueOnce({ data: { usuario_id: null, roles_destinatarios: [] }, error: null });
+
+            await expect(service.markAsRead('tenant-123', 'global', { id: 'user-123' }, false))
+                .rejects.toBeInstanceOf(ForbiddenException);
+            expect(mockClient.rpc).not.toHaveBeenCalledWith('gestionar_notificacion_tx', expect.objectContaining({ p_operacion: 'MARK_READ' }));
         });
 
         it('should return 0 when no notifications to mark', async () => {
@@ -401,11 +439,11 @@ describe('NotificationsService', () => {
             expect(result).toBe(0);
         });
 
-        it('should throw error on database error', async () => {
+        it('should answer 503 on database error', async () => {
             mockDbResponse = { data: null, error: { message: 'Database error' } };
 
             await expect(service.markAllAsRead('tenant-123', 'user-123'))
-                .rejects.toThrow();
+                .rejects.toBeInstanceOf(ServiceUnavailableException);
         });
     });
 
@@ -454,7 +492,7 @@ describe('NotificationsService', () => {
             )).rejects.toThrow('Notificación no encontrada');
         });
 
-        it('should deny deletion for non-owner user', async () => {
+        it('should answer 404 when deleting another user notification', async () => {
             mockClient.single.mockResolvedValueOnce({
                 data: { usuario_id: 'other-user', roles_destinatarios: null },
                 error: null,
@@ -464,7 +502,23 @@ describe('NotificationsService', () => {
                 'tenant-123',
                 'notif-123',
                 { id: 'user-123' }
-            )).rejects.toThrow('No tiene permiso para eliminar esta notificación');
+            )).rejects.toBeInstanceOf(NotFoundException);
+        });
+
+        it('should map a writer without EXECUTE to 503, not 403', async () => {
+            mockClient.single.mockResolvedValueOnce({ data: { usuario_id: 'user-123', roles_destinatarios: null }, error: null });
+            mockDbResponse = { data: null, error: { code: '42501', message: 'permission denied for function gestionar_notificacion_tx' } };
+
+            await expect(service.deleteNotification('tenant-123', 'notif-123', { id: 'user-123' }))
+                .rejects.toBeInstanceOf(ServiceUnavailableException);
+        });
+
+        it('should keep the RPC domain rejection as 403', async () => {
+            mockClient.single.mockResolvedValueOnce({ data: { usuario_id: 'user-123', roles_destinatarios: null }, error: null });
+            mockDbResponse = { data: null, error: { code: '42501', message: 'NOTIFICATION_ACTOR_INVALID' } };
+
+            await expect(service.deleteNotification('tenant-123', 'notif-123', { id: 'user-123' }))
+                .rejects.toBeInstanceOf(ForbiddenException);
         });
     });
 
@@ -486,12 +540,11 @@ describe('NotificationsService', () => {
             expect(result).toEqual([]);
         });
 
-        it('should return empty array on error', async () => {
+        it('should answer 503 instead of hiding role notifications on error', async () => {
             mockDbResponse = { data: null, error: { message: 'Database error' } };
 
-            const result = await service.getUserRoleIds('tenant-123', 'user-123');
-
-            expect(result).toEqual([]);
+            await expect(service.getUserRoleIds('tenant-123', 'user-123'))
+                .rejects.toBeInstanceOf(ServiceUnavailableException);
         });
     });
 

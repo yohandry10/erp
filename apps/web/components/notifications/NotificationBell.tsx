@@ -33,7 +33,8 @@ export function NotificationBell({ className }: NotificationBellProps) {
         return
       }
 
-      setUnreadCount(Array.isArray(response) ? response.length : 0)
+      // Un fallo (null) conserva el último contador: ponerlo en 0 escondía avisos pendientes.
+      if (Array.isArray(response)) setUnreadCount(response.length)
     } catch (error) {
       console.error('Error fetching unread count:', error)
     } finally {

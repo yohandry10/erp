@@ -1,0 +1,20 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "scope": "UI real de notificaciones con API/PostgreSQL locales",
+  "checks": [
+    {
+      "operation": "La vendedora abre su campana y ve global, rol y personal",
+      "passed": true
+    },
+    {
+      "operation": "Marcar todas persiste lo personal y no marca lo compartido sin permiso",
+      "passed": true
+    },
+    {
+      "operation": "Un borrado rechazado por el servidor no desaparece de la lista",
+      "passed": true
+    }
+  ]
+}
