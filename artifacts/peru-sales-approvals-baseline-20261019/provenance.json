@@ -1,0 +1,17 @@
+{
+  "capturedAt": "2026-10-19T21:59:40.421Z",
+  "capture": "Before launch",
+  "source_hashes": {
+    "artifacts/peru-block-runner-20261019.mjs": "d9cc8e4b6817bd928ce981dc364b1f8591b9e51e8833478cee498bd14a8d5588",
+    "scripts/ci/test-peru-sales-approvals-local.mjs": "061d7ab4c7fafb8c12401bb03029193a5111d4c2b20adcedbf6c391180482b9b",
+    "scripts/ci/peru-local-smtp-sink.mjs": "af601f15f5beb86aabc65046663fe33779b3b37c18c18365b514f84d056347ff",
+    "scripts/ci/prepare-peru-first-client-local.mjs": "2754af423997f0ba1f05a3a2137a461681a9fd9f2cc69028e07c891dc6db9c00",
+    "apps/erp-api/tests/e2e/helpers/local-api-harness.ts": "b1c4d7c61c10a2b5b0c28c367c8790196d667dd8d03bdd65058bf982efc3e968",
+    "apps/erp-api/src/modules/ventas/pedidos/pedidos.service.ts": "90557fcdb61dc18e8cce2bfcb1ec7c8b08bc28de60351b367aa587a1fa032983",
+    "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts": "d1170f39ce80a2255a731c7284355a74bda7e4567f47b66b4ab50e02596d8cb6",
+    "apps/web/app/dashboard/ventas/aprobaciones/page.tsx": "a5730ebf9d9ba7d3ced58be9fb4ca47b85b05e428ec0276b0ed2a6c2e47ef1cf",
+    "apps/web/tests/e2e/peru-sales-approvals-local.spec.ts": "b9a2271c2d5a010e42e131a646aaeda86aac675af8d7ed34e92880aa1519d545"
+  },
+  "complete_acceptance": false,
+  "remoteWrites": false
+}

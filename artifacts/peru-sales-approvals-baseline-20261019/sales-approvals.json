@@ -1,0 +1,212 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Aprobación de pedidos de venta API/DB local; sin aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Aprobaciones: un pedido sobre el umbral queda pendiente y aparece en la bandeja con su motivo",
+      "passed": true
+    },
+    {
+      "scenario": "Aprobaciones: el creador no puede aprobar su propio pedido (403) y el pedido no cambia",
+      "passed": false,
+      "message": "Autoaprobación respondió 400\n\n400 !== 403\n"
+    },
+    {
+      "scenario": "Aprobaciones: otro aprobador aprueba y el historial muestra la decisión con su nombre",
+      "passed": true
+    },
+    {
+      "scenario": "Aprobaciones: repetir la misma decisión (respuesta perdida) no falla ni duplica",
+      "passed": false,
+      "message": "Reintento de la misma decisión respondió 400 {\"statusCode\":400,\"message\":\"El pedido no está pendiente de aprobación\",\"error\":\"Bad Request\",\"timestamp\":\"2026-10-19T22:01:34.415Z\",\"path\":\"/api/ventas/pedidos/ea6b8b2c-2a3e-4a78-859d-2a3d071dc1ab/ap"
+    },
+    {
+      "scenario": "Aprobaciones: pedido ajeno o inexistente responde 404 en historial y decisión",
+      "passed": false,
+      "message": "{\"history\":200,\"decision\":404,\"missing\":404}\n+ actual - expected\n\n  {\n    decision: 404,\n+   history: 200,\n-   history: 404,\n    missing: 404\n  }\n"
+    },
+    {
+      "scenario": "Aprobaciones: rechazar cancela el pedido y una decisión distinta posterior responde 409",
+      "passed": false,
+      "message": "Decisión sobre pedido ya resuelto respondió 400\n\n400 !== 409\n"
+    },
+    {
+      "scenario": "Aprobaciones: sin lectura del historial o sin writer de decisión responde 503",
+      "passed": false,
+      "message": "{\"history\":503,\"writer\":400}\n+ actual - expected\n\n  {\n    history: 503,\n+   writer: 400\n-   writer: 503\n  }\n"
+    },
+    {
+      "scenario": "Aprobaciones: la bandeja muestra al aprobador las cuentas vencidas del cliente",
+      "passed": false,
+      "message": "La bandeja dice \"sin morosidad\" con una cuenta vencida: {\"limite\":0,\"pendiente\":118,\"tieneVencidos\":false,\"permiteMorosidad\":false}\n\nfalse !== true\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/complete",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/almacenes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/categorias",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/productos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/clientes",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "roles",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "users",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/pedidos/aprobaciones/pendientes",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/aprobaciones/decision",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/aprobaciones/decision",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/pedidos/:id/aprobaciones",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/aprobaciones/decision",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/pedidos/:id/aprobaciones",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/aprobaciones/decision",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/aprobaciones/decision",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/aprobaciones/decision",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/aprobaciones/decision",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/pedidos/:id/aprobaciones",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/aprobaciones/decision",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/comprobantes",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/pedidos/aprobaciones/pendientes",
+      "status": 200
+    }
+  ]
+}

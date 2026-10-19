@@ -202,9 +202,27 @@ con la venta contabilizada la nota sobre factura sin CDR se bloquea
 (`REFERENCED_NOTE_SOURCE_NOT_FISCALLY_ACCEPTED`). Tras corregir, 12/12 API, 2/2
 navegador y restore (`artifacts/peru-cxc-fixed-local-20261019`); la fase entra
 al CI. En producción los 5xx siguen sin detalles internos pero en español.
+Sus 17 checks aprobaron y se integró como `d6386bea`; main, E2E y seguridad de
+ese commit y la verificación del runtime quedan pendientes en este corte.
+Aprobaciones de pedidos PE (#146, sin migración): la bandeja y la decisión
+reprodujeron siete defectos (`artifacts/peru-sales-approvals-baseline-20261019`,
+2/8 API y 1/5 navegador): sobre un pedido ya resuelto toda decisión respondía
+400, así que repetir la misma tras perder la respuesta fallaba aunque ya estaba
+registrada; la autoaprobación era 400; el historial de un pedido ajeno
+respondía 200 vacío; sin writer volvía 400 con «permission denied»; y el
+aprobador veía «Sin morosidad» con una cuenta vencida (sólo se miraba un estado
+VENCIDO que no se persiste; la política SQL 441 sí mide por fecha). En la
+pantalla una lectura caída se veía como «No hay pedidos pendientes», el aviso
+genérico tapaba el motivo del servidor (sólo cabe un aviso) y un pedido resuelto
+por otro usuario seguía en la bandeja. Tras corregir, 8/8 API, 5/5 navegador y
+restore (`artifacts/peru-sales-approvals-fixed-local-20261019`); la fase entra
+al CI. La segregación del creador y el bloqueo por crédito ya eran correctos;
+confirmar con mora responde 400 «Crédito bloqueado» sin pasar a la bandeja
+(observación: es regla de negocio y no 409). Localmente el historial exige
+emular el SELECT por defecto que Supabase concede a `service_role`.
 La matriz registra 717 contratos, 479 observados (main 39313892124), 328 con
-casos funcionales, 175 casos y 135 defectos; los cuatro casos de CxC esperan
-CI; no hay aceptación integral del lanzamiento.
+casos funcionales, 179 casos y 142 defectos; los ocho casos de CxC y
+aprobaciones esperan CI; no hay aceptación integral del lanzamiento.
 
 Corte técnico 131/132: el cierre 131 promovió 562 una sola vez con preflight,
 respaldo 560, rollback local y preservación de 29 tablas/funciones/seguridad

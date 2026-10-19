@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { PedidosService } from './pedidos.service';
 import { EstadoPedido } from './entities';
 import { DecisionAprobacion } from './dto';
@@ -39,7 +39,7 @@ describe('PedidosService — segregación de funciones en la aprobación', () =>
 
     await expect(
       service.decidirAprobacion('pedido-1', 't1', DecisionAprobacion.APROBADO, [], CREADOR),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).rejects.toBeInstanceOf(ForbiddenException);
 
     expect(client.rpc).not.toHaveBeenCalled();
     expect(service.registrarAuditoriaAccion).not.toHaveBeenCalled();
@@ -50,7 +50,7 @@ describe('PedidosService — segregación de funciones en la aprobación', () =>
 
     await expect(
       service.decidirAprobacion('pedido-1', 't1', DecisionAprobacion.RECHAZADO, [], CREADOR),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).rejects.toBeInstanceOf(ForbiddenException);
 
     expect(client.rpc).not.toHaveBeenCalled();
   });
@@ -118,7 +118,7 @@ describe('PedidosService — segregación de funciones en la aprobación', () =>
     const { service, client } = construirServicio(pedidoPendiente);
     client.rpc.mockResolvedValueOnce({
       data: null,
-      error: { message: 'La aprobación ya fue resuelta por otro usuario' },
+      error: { code: 'P0001', message: 'La aprobación ya fue resuelta por otro usuario' },
     });
 
     await expect(
@@ -168,5 +168,22 @@ describe('PedidosService — segregación de funciones en la aprobación', () =>
     }));
     expect(service.registrarAuditoriaAccion).toHaveBeenCalled();
     expect(service.enviarNotificacion).toHaveBeenCalled();
+  });
+  it('repetir la misma decisión ya registrada devuelve el resultado sin otra RPC', async () => {
+    const resuelto = { ...pedidoPendiente, estado: EstadoPedido.PENDIENTE, requiere_aprobacion: false };
+    const { service, client } = construirServicio(resuelto);
+    const chain: any = { select: jest.fn(() => chain), eq: jest.fn(() => chain), order: jest.fn(() => chain),
+      limit: jest.fn().mockResolvedValue({ data: [{ decision: 'APROBADO', aprobado_por: OTRO }], error: null }) };
+    (client as any).from = jest.fn(() => chain);
+
+    const result = await service.decidirAprobacion('pedido-1', 't1', DecisionAprobacion.APROBADO, [], OTRO);
+
+    expect(result).toEqual(expect.objectContaining({ success: true, idempotent_replay: true }));
+    expect(client.rpc).not.toHaveBeenCalled();
+
+    chain.limit.mockResolvedValueOnce({ data: [{ decision: 'APROBADO', aprobado_por: OTRO }], error: null });
+    service.findOne = jest.fn().mockResolvedValueOnce(resuelto);
+    await expect(service.decidirAprobacion('pedido-1', 't1', DecisionAprobacion.RECHAZADO, [], OTRO))
+      .rejects.toBeInstanceOf(ConflictException);
   });
 });
