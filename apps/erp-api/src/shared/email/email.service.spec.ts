@@ -119,7 +119,7 @@ describe('EmailService', () => {
       );
 
       const callArgs = spy.mock.calls[0][0];
-      expect(callArgs.html).toContain('http://localhost:3000/reset-password?token=');
+      expect(callArgs.html).toContain('http://localhost:3000/reset-password/?token=');
       expect(callArgs.html).toContain('email=user%40example.com');
       expect(callArgs.html).toContain('Test User');
       expect(callArgs.html).toContain('24 horas');
@@ -396,6 +396,42 @@ describe('EmailService', () => {
       });
 
       expect(moduleWithAwsSes).toBeDefined();
+    });
+  });
+
+  describe('Configuración desde el entorno', () => {
+    const build = async (overrides: Record<string, unknown>) => {
+      const values: Record<string, unknown> = { ...baseConfig, ...overrides };
+      for (const [key, value] of Object.entries(values)) if (value === undefined) delete values[key];
+      const config = { get: jest.fn((key: string, fallback?: unknown) => (key in values ? values[key] : fallback)) };
+      const instance = new EmailService(config as any);
+      await new Promise(resolve => setImmediate(resolve));
+      return instance;
+    };
+
+    it('sin SMTP_HOST no se considera configurado', async () => {
+      expect((await build({ SMTP_HOST: undefined })).isConfigured()).toBe(false);
+    });
+
+    it('EMAIL_DISABLED=false (texto) no apaga el correo; true sí', async () => {
+      expect((await build({ EMAIL_DISABLED: 'false' })).isConfigured()).toBe(true);
+      const disabled = await build({ EMAIL_DISABLED: 'true' });
+      expect(disabled.isConfigured()).toBe(false);
+      await expect(disabled.sendEmail({ to: 'a@example.test', subject: 'x', html: 'x' })).resolves.toBe(false);
+    });
+
+    it('SMTP_SECURE=false (texto) no fuerza TLS implícito', async () => {
+      const nodemailer = jest.requireMock('nodemailer');
+      nodemailer.createTransport.mockClear();
+      await build({ SMTP_SECURE: 'false', SMTP_PORT: '587' });
+      expect(nodemailer.createTransport).toHaveBeenCalledWith(expect.objectContaining({ secure: false, port: 587 }));
+    });
+
+    it('sin APP_URL los enlaces usan FRONTEND_URL del Blueprint', async () => {
+      const instance = await build({ APP_URL: undefined, FRONTEND_URL: 'https://erp.example.test/' });
+      const spy = jest.spyOn(instance, 'sendEmail').mockResolvedValue(true);
+      await instance.sendPasswordResetEmail('user@example.com', 'Test User', 'a'.repeat(64));
+      expect(spy.mock.calls[0][0].html).toContain('https://erp.example.test/reset-password/?token=');
     });
   });
 

@@ -103,7 +103,16 @@ Los esquemas de configuración en código son la fuente exacta. Categorías:
   criptográficos antes del deploy. El certificado HTTPS de
   `vpfe.dian.gov.co` sólo autentica el transporte: no es el certificado que
   firma el XML y nunca se usa para calcular este pin.
-- Stripe, correo, observabilidad y almacenamiento.
+- Correo: `SMTP_HOST` es obligatorio (sin él no hay servicio, ya no se asume
+  `localhost`), con `SMTP_PORT`, `SMTP_USER`/`SMTP_PASS` y `SMTP_SECURE=true`
+  sólo para TLS implícito (465); o `EMAIL_PROVIDER=sendgrid` con
+  `SENDGRID_API_KEY`. Remitente en `EMAIL_FROM_ADDRESS`/`EMAIL_FROM_NAME`.
+  Los enlaces de recuperación y activación usan `APP_URL` o, si falta,
+  `FRONTEND_URL`. `EMAIL_DISABLED=true` apaga el envío. Sin correo, la
+  recuperación de contraseña y el reset administrativo responden 503. Los
+  ensayos locales usan `scripts/ci/peru-local-smtp-sink.mjs` con
+  `LOCAL_SMTP_PORT`; nunca un proveedor real.
+- Stripe, observabilidad y almacenamiento.
 
 Reglas:
 
