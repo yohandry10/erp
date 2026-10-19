@@ -1,0 +1,32 @@
+{
+  "recorded_at": "2026-10-19T07:13:27.374Z",
+  "final_run": "run.json de esta carpeta (8/8 API, 3/3 navegador, restore)",
+  "discarded": [
+    {
+      "attempt": 1,
+      "result": "prepare-notif-browser: POST /tenants agotó 3x8 s contra PostgREST con la máquina saturada por tsc en paralelo",
+      "product_signal": "Observación: el alta de empresa es un RPC pesado con timeout de 8 s y reintentos del mismo POST; queda para el bloque de onboarding"
+    },
+    {
+      "attempt": 2,
+      "result": "7/8 API: sin EXECUTE el writer respondía 403 (PostgREST usa 42501 también para permission denied); navegador falló por el selector",
+      "product_signal": "Corregido: sólo NOTIFICATION_* es 403; la falta de privilegio es 503"
+    },
+    {
+      "attempt": 3,
+      "result": "8/8 API; navegador: el panel no mostraba el error porque useApi devuelve null sin throwOnError",
+      "product_signal": "Corregido: el panel usa throwOnError y la campana conserva el contador ante fallos"
+    },
+    {
+      "attempt": 4,
+      "result": "8/8 API; navegador: el selector Eliminar notificación coincidía con el article role=button que lo contiene",
+      "product_signal": false
+    },
+    {
+      "attempt": 5,
+      "result": "8/8 API y 3/3 navegador, pero la revisión de seguridad señaló que un vendedor podía marcar avisos globales para toda la empresa",
+      "product_signal": "Corregido: sin notifications.update sólo se marcan los avisos personales; la línea base se repitió con el escenario nuevo"
+    }
+  ],
+  "remoteWrites": false
+}

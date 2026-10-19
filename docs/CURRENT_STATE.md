@@ -166,9 +166,24 @@ revocación caída y las sesiones vivas. Tras corregir, 10/10 API/DB/SMTP, el
 recorrido de navegador y restore (`artifacts/peru-auth-fixed-local-20261019`);
 la fase entra al CI integrado con un buzón SMTP local. Sin correo productivo la
 solicitud responde 503 y no hay otra vía de recuperación.
+Notificaciones PE (#144, sin migración): la campana reprodujo tres defectos
+(`artifacts/peru-notifications-baseline-20261019`, 1/8 API): vendedores y
+cajeros veían el contador pero la lista y el marcado exigían
+`notifications.read/update` (403 al abrir); toda falla respondía 200 con
+`success:false` y la UI la tomaba por éxito o por «sin avisos»; el contador y
+«marcar todas» ignoraban los avisos globales y de rol, que volvían al recargar.
+Tras corregir, 8/8 API, 3/3 navegador y restore
+(`artifacts/peru-notifications-fixed-local-20261019`); la fase entra al CI. Leer
+la lista y marcar los avisos personales ya no exige permiso; borrar sí. El
+estado leído es una columna por aviso: marcar uno global o de rol lo marcaría
+para toda la empresa, así que eso sigue reservado a `notifications.update` y un
+vendedor no puede despejar los avisos compartidos de su campana hasta que haya
+estado leído por usuario (requiere migración). Observación sin
+caso: el alta de empresa es un RPC pesado con timeout de 8 s y el cliente
+reintenta el mismo POST; con la máquina local cargada agotó los tres intentos.
 La matriz registra 717 contratos, 467 observados (main 37237859234), 316 con
-casos funcionales, 167 casos y 127 defectos; los cinco casos de autenticación
-esperan CI; no hay aceptación integral del lanzamiento.
+casos funcionales, 171 casos y 130 defectos; los nueve casos de autenticación y
+notificaciones esperan CI; no hay aceptación integral del lanzamiento.
 
 Corte técnico 131/132: el cierre 131 promovió 562 una sola vez con preflight,
 respaldo 560, rollback local y preservación de 29 tablas/funciones/seguridad
@@ -2875,6 +2890,9 @@ tenants donde tiene los 256 permisos, así que ninguno perdió acceso.
 
 ### Producto y riesgo residual
 
+- Notificaciones: el estado leído es por aviso, no por usuario. Hasta una
+  migración con lecturas por usuario, los avisos globales o de rol sólo los
+  marca quien tiene `notifications.update`; los demás los ven pendientes.
 - No existe «cambiar mi contraseña» ni restablecimiento desde
   `/dashboard/usuarios`: la única recuperación es el enlace por correo. Un
   cliente sin correo productivo configurado no puede recuperar una cuenta.

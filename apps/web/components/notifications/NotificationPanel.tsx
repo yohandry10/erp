@@ -5,6 +5,7 @@ import { Bell, Loader2, RefreshCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useApi } from '@/hooks/use-api'
+import { usePermission } from '@/hooks/use-permission'
 import { NotificationItem, Notification } from './NotificationItem'
 
 interface NotificationPanelProps {
@@ -16,7 +17,16 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { get, put, delete: del } = useApi({ showErrorToast: false })
+  // Un fallo al marcar o borrar ya no se pinta como éxito: el aviso se queda y se explica.
+  const [actionError, setActionError] = useState<string | null>(null)
+  // throwOnError: sin él useApi devuelve null ante un 4xx/5xx y el panel daba
+  // por hecho el marcado o el borrado.
+  const { get, put, delete: del } = useApi({ showErrorToast: false, throwOnError: true })
+  const { hasPermission: canDelete } = usePermission('notifications', 'delete', '')
+  // Un aviso compartido (global o de rol) marcado como leído queda leído para toda
+  // la empresa; sólo quien tiene notifications.update lo marca (el API lo exige).
+  const { hasPermission: canMarkShared } = usePermission('notifications', 'update', '')
+  const canMark = (item: Notification) => Boolean(item.usuario_id) || canMarkShared
 
   const fetchNotifications = useCallback(async () => {
     setLoading(true)
@@ -46,32 +56,40 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
   }, [fetchNotifications])
 
   const handleMarkAsRead = async (id: string) => {
+    const target = notifications.find((item) => item.id === id)
+    if (target && !canMark(target)) return
     try {
       await put(`/api/notifications/${id}/read`)
+      setActionError(null)
       setNotifications((prev) => prev.map((item) => (item.id === id ? { ...item, leida: true } : item)))
       onNotificationRead?.()
     } catch (error) {
       console.error('Error marking notification as read:', error)
+      setActionError('No se pudo marcar la notificación como leída. Inténtalo de nuevo.')
     }
   }
 
   const handleDelete = async (id: string) => {
     try {
       await del(`/api/notifications/${id}`)
+      setActionError(null)
       setNotifications((prev) => prev.filter((item) => item.id !== id))
       onNotificationRead?.()
     } catch (error) {
       console.error('Error deleting notification:', error)
+      setActionError('No se pudo eliminar la notificación. Inténtalo de nuevo.')
     }
   }
 
   const handleMarkAllAsRead = async () => {
     try {
       await put('/api/notifications/mark-all-read')
-      setNotifications((prev) => prev.map((item) => ({ ...item, leida: true })))
+      setActionError(null)
+      setNotifications((prev) => prev.map((item) => (canMark(item) ? { ...item, leida: true } : item)))
       onNotificationRead?.()
     } catch (error) {
       console.error('Error marking all notifications as read:', error)
+      setActionError('No se pudieron marcar todas como leídas. Inténtalo de nuevo.')
     }
   }
 
@@ -107,6 +125,12 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
           </Button>
         )}
       </header>
+
+      {actionError && (
+        <p role="status" className="shrink-0 border-b border-amber-300/25 bg-amber-400/10 px-5 py-2 text-sm text-amber-100 group-data-[erp-theme=light]/dashboard:border-amber-200 group-data-[erp-theme=light]/dashboard:bg-amber-50 group-data-[erp-theme=light]/dashboard:text-amber-900">
+          {actionError}
+        </p>
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {loading ? (
@@ -151,6 +175,7 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
                 notification={notification}
                 onMarkAsRead={handleMarkAsRead}
                 onDelete={handleDelete}
+                canDelete={canDelete}
                 onClose={onClose}
               />
             ))}

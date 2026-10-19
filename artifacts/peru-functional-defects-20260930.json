@@ -3852,6 +3852,95 @@
         "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
       ],
       "canonical_proof": "artifacts/peru-auth-fixed-local-20261019"
+    },
+    {
+      "id": "notifications-list-403-for-operational-roles",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/notifications"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/notifications/:id/read"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/notifications/mark-all-read"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-notifications-baseline-20261019",
+        "observed_error": "La campana mostraba el contador a cualquier usuario, pero la lista y el marcado exigían notifications.read/update, que vendedores y cajeros no tienen: veían \"3\" y al abrir obtenían 403.",
+        "local_only": true
+      },
+      "correction": "Leer la propia lista y marcar los avisos personales no exige permiso; los compartidos (globales o de rol) siguen exigiendo notifications.update porque el estado leído es por aviso; borrar sigue protegido y la UI oculta lo que no se puede hacer",
+      "pending": [
+        "CI exacto, main y runtime.",
+        "Estado leído por usuario (migración) para que cada rol pueda despejar su campana."
+      ],
+      "canonical_proof": "artifacts/peru-notifications-fixed-local-20261019"
+    },
+    {
+      "id": "notifications-errors-as-200",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/notifications"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/notifications/unread"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/notifications/unread-count"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/notifications/:id/read"
+        },
+        {
+          "method": "DELETE",
+          "endpoint": "/api/notifications/:id"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-notifications-baseline-20261019",
+        "observed_error": "Toda falla (ajena, inexistente, mal formada o base caída) respondía 200 con success:false; la UI la tomaba por éxito o por \"sin notificaciones\".",
+        "local_only": true
+      },
+      "correction": "404 ajena o inexistente, 400 mal formada, 503 indisponible; la UI conserva el aviso y explica el fallo",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-notifications-fixed-local-20261019"
+    },
+    {
+      "id": "notifications-count-and-mark-all-incomplete",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/notifications/unread-count"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/notifications/mark-all-read"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-notifications-baseline-20261019",
+        "observed_error": "El contador sólo contaba avisos personales y \"marcar todas\" sólo marcaba esos: los globales y de rol seguían pendientes y volvían tras recargar.",
+        "local_only": true
+      },
+      "correction": "El contador iguala la lista visible; marcar todas marca lo personal y, con notifications.update, también lo compartido",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-notifications-fixed-local-20261019"
     }
   ]
 }

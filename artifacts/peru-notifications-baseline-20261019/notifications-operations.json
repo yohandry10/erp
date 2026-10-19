@@ -1,0 +1,198 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Notificaciones API/DB local; sin aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Notificaciones: alta y visibilidad por destinatario, rol y empresa",
+      "passed": true
+    },
+    {
+      "scenario": "Notificaciones: un usuario sin permisos administrativos abre la lista de su campana",
+      "passed": false,
+      "message": "La campana muestra avisos pero la lista responde 403\n\n403 !== 200\n"
+    },
+    {
+      "scenario": "Notificaciones: el contador de no leídas coincide con la lista",
+      "passed": false,
+      "message": "Contador del administrador 1 y lista 2\n\n1 !== 2\n"
+    },
+    {
+      "scenario": "Notificaciones: marcar leída propia, de otro usuario, de otra empresa, inexistente y mal formada",
+      "passed": false,
+      "message": "{\"otherUser\":200,\"otherTenant\":200,\"missing\":200,\"malformed\":200}\n+ actual - expected\n\n  {\n+   malformed: 200,\n+   missing: 200,\n+   otherTenant: 200,\n+   otherUser: 200\n-   malformed: 400,\n-   missing: 404,\n-   otherTenant: 404,\n-   otherUser: 404\n  }\n"
+    },
+    {
+      "scenario": "Notificaciones: marcar todas marca lo personal; lo compartido sólo con notifications.update",
+      "passed": false,
+      "message": "PUT notifications/mark-all-read: {\"statusCode\":403,\"message\":\"Permiso requerido: notifications.update\",\"error\":\"Forbidden\",\"timestamp\":\"2026-10-19T07:09:34.990Z\",\"path\":\"/api/notifications/mark-all-read\"}\n\n403 !== 200\n"
+    },
+    {
+      "scenario": "Notificaciones: eliminar propia; ajena 404; sin permiso 403 y la notificación queda",
+      "passed": false,
+      "message": "Borrado de otra empresa\n\n200 !== 404\n"
+    },
+    {
+      "scenario": "Notificaciones: sin lectura de notificaciones la campana responde 503",
+      "passed": false,
+      "message": "{\"notifications\":200,\"notifications/unread\":200,\"notifications/unread-count\":200}"
+    },
+    {
+      "scenario": "Notificaciones: sin el writer, marcar y borrar responden 503 sin cambiar estado",
+      "passed": false,
+      "message": "{\"read\":200,\"all\":200,\"remove\":200}\n+ actual - expected\n\n  {\n+   all: 200,\n+   read: 200,\n+   remove: 200\n-   all: 503,\n-   read: 503,\n-   remove: 503\n  }\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "usuarios-sistema/crear",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "notifications",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "notifications",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "notifications",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "notifications",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "notifications",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "notifications",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "notifications/unread",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "notifications",
+      "status": 403
+    },
+    {
+      "method": "GET",
+      "endpoint": "notifications/unread-count",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "notifications/unread",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "notifications/:id/read",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "notifications/:id/read",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "notifications/:id/read",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "notifications/:id/read",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "notifications/no-es-uuid/read",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "notifications/mark-all-read",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "notifications",
+      "status": 201
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "notifications/:id",
+      "status": 403
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "notifications/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "notifications",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "notifications/unread",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "notifications/unread-count",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "notifications",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "notifications/:id/read",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "notifications/mark-all-read",
+      "status": 200
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "notifications/:id",
+      "status": 200
+    }
+  ]
+}

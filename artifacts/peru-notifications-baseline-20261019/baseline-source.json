@@ -1,0 +1,7 @@
+{
+  "captured_at": "2026-10-19T06:47:51.675Z",
+  "product_source_commit": "49dce26330a4a822d2744f798d06563068c647bd",
+  "note": "Worktree aislado con el código original de notificaciones y sólo la infraestructura de prueba nueva.",
+  "browser_failure": "La vendedora ve 3 en la campana pero la lista responde 403: no aparece ningún aviso",
+  "remoteWrites": false
+}

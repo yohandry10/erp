@@ -1,0 +1,19 @@
+{
+  "capturedAt": "2026-10-19T07:10:24.351Z",
+  "capture": "Before launch",
+  "source_hashes": {
+    "artifacts/peru-block-runner-20261019.mjs": "85af2de26827a1f24e61f89f24616e7a6d892bd32b74b4dba5d8199f26778aca",
+    "scripts/ci/test-peru-notifications-local.mjs": "98abf0bf621f590528a23335e57955caa53e9fd79e962c0fc469932796b73693",
+    "scripts/ci/peru-local-smtp-sink.mjs": "af601f15f5beb86aabc65046663fe33779b3b37c18c18365b514f84d056347ff",
+    "scripts/ci/prepare-peru-first-client-local.mjs": "fe37fded52c8589aff6a974189fc50b82f0e327a81a8a96f9b4bbab9c2d9aa5d",
+    "apps/erp-api/tests/e2e/helpers/local-api-harness.ts": "b1c4d7c61c10a2b5b0c28c367c8790196d667dd8d03bdd65058bf982efc3e968",
+    "apps/erp-api/src/modules/notifications.controller.ts": "2fa13ff3130ff7be15002b3503a7abb3a4e955677f831f36fac942ccb9820fe4",
+    "apps/erp-api/src/modules/notifications/notifications.service.ts": "f63f7d88206a21940945c99d88ab0a9866dd5d654aaa5179899c9705cd0f4d39",
+    "apps/web/components/notifications/NotificationPanel.tsx": "2c5f8dd2a52355c9b48724fb11a84f2a577442888c96f3c2ba7222eb3c3c00bc",
+    "apps/web/components/notifications/NotificationItem.tsx": "75f9df09b27e0d809aa0be9965c424cd58616197659b8145aaf360d2155aa130",
+    "apps/web/components/notifications/NotificationBell.tsx": "96c13060848c2d8899b96003b8a93bd5faa4e981bc016ca8f133e77add550b27",
+    "apps/web/tests/e2e/peru-notifications-local.spec.ts": "6e4f22edc1cb7e799f436be362b6ea81064aac31a4b8c1f6485b459cb6415d8e"
+  },
+  "complete_acceptance": false,
+  "remoteWrites": false
+}
