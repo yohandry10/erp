@@ -4796,7 +4796,7 @@
       "source": "scripts/ci/test-peru-notifications-local.mjs",
       "required_scenario_prefixes": [
         "Notificaciones: marcar leída propia",
-        "Notificaciones: marcar todas deja sin pendientes",
+        "Notificaciones: marcar todas marca lo personal",
         "Notificaciones: eliminar propia"
       ],
       "operations": [
@@ -4814,10 +4814,10 @@
         }
       ],
       "verified_checks": [
-        "Propia 200; de otro usuario, otra empresa o inexistente 404; mal formada 400; marcar todas incluye globales y del rol; borrar exige permiso"
+        "Propia 200; de otro usuario, otra empresa o inexistente 404; mal formada 400; sin notifications.update sólo se marca lo personal (compartido 403); borrar exige permiso"
       ],
       "pending_checks": [
-        "Roles distintos de ADMIN y VENDEDOR; notificaciones generadas por stock, integraciones y logística"
+        "Estado leído por usuario (requiere migración); roles distintos de ADMIN y VENDEDOR"
       ]
     },
     {

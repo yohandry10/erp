@@ -405,6 +405,32 @@ describe('NotificationsService', () => {
             expect(marked).toEqual(['own', 'global']);
         });
 
+        it('should leave shared notifications unread without notifications.update', async () => {
+            mockDbResponse = {
+                data: [
+                    { ...mockNotificationData, id: 'own', usuario_id: 'user-123' },
+                    { ...mockNotificationData, id: 'global', usuario_id: null, roles_destinatarios: [] },
+                ],
+                error: null,
+            };
+
+            const result = await service.markAllAsRead('tenant-123', 'user-123', { id: 'user-123' }, false);
+
+            expect(result).toBe(1);
+            const marked = mockClient.rpc.mock.calls
+                .filter(([, params]: any[]) => params?.p_operacion === 'MARK_READ')
+                .map(([, params]: any[]) => params.p_payload.notification_id);
+            expect(marked).toEqual(['own']);
+        });
+
+        it('should refuse to mark a shared notification without notifications.update', async () => {
+            mockClient.single.mockResolvedValueOnce({ data: { usuario_id: null, roles_destinatarios: [] }, error: null });
+
+            await expect(service.markAsRead('tenant-123', 'global', { id: 'user-123' }, false))
+                .rejects.toBeInstanceOf(ForbiddenException);
+            expect(mockClient.rpc).not.toHaveBeenCalledWith('gestionar_notificacion_tx', expect.objectContaining({ p_operacion: 'MARK_READ' }));
+        });
+
         it('should return 0 when no notifications to mark', async () => {
             mockDbResponse = { data: [], error: null };
 

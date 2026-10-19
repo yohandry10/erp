@@ -1,5 +1,5 @@
 {
-  "recorded_at": "2026-10-19T07:02:20.823Z",
+  "recorded_at": "2026-10-19T07:13:27.374Z",
   "final_run": "run.json de esta carpeta (8/8 API, 3/3 navegador, restore)",
   "discarded": [
     {
@@ -21,6 +21,11 @@
       "attempt": 4,
       "result": "8/8 API; navegador: el selector Eliminar notificación coincidía con el article role=button que lo contiene",
       "product_signal": false
+    },
+    {
+      "attempt": 5,
+      "result": "8/8 API y 3/3 navegador, pero la revisión de seguridad señaló que un vendedor podía marcar avisos globales para toda la empresa",
+      "product_signal": "Corregido: sin notifications.update sólo se marcan los avisos personales; la línea base se repitió con el escenario nuevo"
     }
   ],
   "remoteWrites": false

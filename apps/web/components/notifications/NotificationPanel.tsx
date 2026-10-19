@@ -23,6 +23,10 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
   // por hecho el marcado o el borrado.
   const { get, put, delete: del } = useApi({ showErrorToast: false, throwOnError: true })
   const { hasPermission: canDelete } = usePermission('notifications', 'delete', '')
+  // Un aviso compartido (global o de rol) marcado como leído queda leído para toda
+  // la empresa; sólo quien tiene notifications.update lo marca (el API lo exige).
+  const { hasPermission: canMarkShared } = usePermission('notifications', 'update', '')
+  const canMark = (item: Notification) => Boolean(item.usuario_id) || canMarkShared
 
   const fetchNotifications = useCallback(async () => {
     setLoading(true)
@@ -52,6 +56,8 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
   }, [fetchNotifications])
 
   const handleMarkAsRead = async (id: string) => {
+    const target = notifications.find((item) => item.id === id)
+    if (target && !canMark(target)) return
     try {
       await put(`/api/notifications/${id}/read`)
       setActionError(null)
@@ -79,7 +85,7 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
     try {
       await put('/api/notifications/mark-all-read')
       setActionError(null)
-      setNotifications((prev) => prev.map((item) => ({ ...item, leida: true })))
+      setNotifications((prev) => prev.map((item) => (canMark(item) ? { ...item, leida: true } : item)))
       onNotificationRead?.()
     } catch (error) {
       console.error('Error marking all notifications as read:', error)

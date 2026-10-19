@@ -3875,9 +3875,10 @@
         "observed_error": "La campana mostraba el contador a cualquier usuario, pero la lista y el marcado exigían notifications.read/update, que vendedores y cajeros no tienen: veían \"3\" y al abrir obtenían 403.",
         "local_only": true
       },
-      "correction": "Leer y marcar los propios avisos no exige permiso administrativo; el servicio filtra por usuario, rol y empresa; borrar sigue protegido y la UI oculta el botón sin permiso",
+      "correction": "Leer la propia lista y marcar los avisos personales no exige permiso; los compartidos (globales o de rol) siguen exigiendo notifications.update porque el estado leído es por aviso; borrar sigue protegido y la UI oculta lo que no se puede hacer",
       "pending": [
-        "CI exacto, main y runtime."
+        "CI exacto, main y runtime.",
+        "Estado leído por usuario (migración) para que cada rol pueda despejar su campana."
       ],
       "canonical_proof": "artifacts/peru-notifications-fixed-local-20261019"
     },
@@ -3935,7 +3936,7 @@
         "observed_error": "El contador sólo contaba avisos personales y \"marcar todas\" sólo marcaba esos: los globales y de rol seguían pendientes y volvían tras recargar.",
         "local_only": true
       },
-      "correction": "Contador y marcado masivo operan sobre la misma lista visible del usuario",
+      "correction": "El contador iguala la lista visible; marcar todas marca lo personal y, con notifications.update, también lo compartido",
       "pending": [
         "CI exacto, main y runtime."
       ],

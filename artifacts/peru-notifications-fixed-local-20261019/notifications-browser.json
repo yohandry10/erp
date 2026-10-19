@@ -9,7 +9,7 @@
       "passed": true
     },
     {
-      "operation": "Marcar todas persiste tras recargar",
+      "operation": "Marcar todas persiste lo personal y no marca lo compartido sin permiso",
       "passed": true
     },
     {

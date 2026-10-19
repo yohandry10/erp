@@ -23,9 +23,9 @@
       "message": "{\"otherUser\":200,\"otherTenant\":200,\"missing\":200,\"malformed\":200}\n+ actual - expected\n\n  {\n+   malformed: 200,\n+   missing: 200,\n+   otherTenant: 200,\n+   otherUser: 200\n-   malformed: 400,\n-   missing: 404,\n-   otherTenant: 404,\n-   otherUser: 404\n  }\n"
     },
     {
-      "scenario": "Notificaciones: marcar todas deja sin pendientes lo que el usuario ve, incluidas globales y de su rol",
+      "scenario": "Notificaciones: marcar todas marca lo personal; lo compartido sólo con notifications.update",
       "passed": false,
-      "message": "PUT notifications/mark-all-read: {\"statusCode\":403,\"message\":\"Permiso requerido: notifications.update\",\"error\":\"Forbidden\",\"timestamp\":\"2026-10-19T06:46:26.983Z\",\"path\":\"/api/notifications/mark-all-read\"}\n\n403 !== 200\n"
+      "message": "PUT notifications/mark-all-read: {\"statusCode\":403,\"message\":\"Permiso requerido: notifications.update\",\"error\":\"Forbidden\",\"timestamp\":\"2026-10-19T07:09:34.990Z\",\"path\":\"/api/notifications/mark-all-read\"}\n\n403 !== 200\n"
     },
     {
       "scenario": "Notificaciones: eliminar propia; ajena 404; sin permiso 403 y la notificación queda",

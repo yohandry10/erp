@@ -174,8 +174,11 @@ cajeros veían el contador pero la lista y el marcado exigían
 «marcar todas» ignoraban los avisos globales y de rol, que volvían al recargar.
 Tras corregir, 8/8 API, 3/3 navegador y restore
 (`artifacts/peru-notifications-fixed-local-20261019`); la fase entra al CI. Leer
-y marcar los avisos propios ya no exige permiso; borrar sí. El estado leído es
-por aviso: marcar uno global lo marca para toda la empresa. Observación sin
+la lista y marcar los avisos personales ya no exige permiso; borrar sí. El
+estado leído es una columna por aviso: marcar uno global o de rol lo marcaría
+para toda la empresa, así que eso sigue reservado a `notifications.update` y un
+vendedor no puede despejar los avisos compartidos de su campana hasta que haya
+estado leído por usuario (requiere migración). Observación sin
 caso: el alta de empresa es un RPC pesado con timeout de 8 s y el cliente
 reintenta el mismo POST; con la máquina local cargada agotó los tres intentos.
 La matriz registra 717 contratos, 467 observados (main 37237859234), 316 con
@@ -2887,6 +2890,9 @@ tenants donde tiene los 256 permisos, así que ninguno perdió acceso.
 
 ### Producto y riesgo residual
 
+- Notificaciones: el estado leído es por aviso, no por usuario. Hasta una
+  migración con lecturas por usuario, los avisos globales o de rol sólo los
+  marca quien tiene `notifications.update`; los demás los ven pendientes.
 - No existe «cambiar mi contraseña» ni restablecimiento desde
   `/dashboard/usuarios`: la única recuperación es el enlace por correo. Un
   cliente sin correo productivo configurado no puede recuperar una cuenta.

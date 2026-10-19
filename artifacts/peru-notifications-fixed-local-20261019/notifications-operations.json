@@ -20,7 +20,7 @@
       "passed": true
     },
     {
-      "scenario": "Notificaciones: marcar todas deja sin pendientes lo que el usuario ve, incluidas globales y de su rol",
+      "scenario": "Notificaciones: marcar todas marca lo personal; lo compartido sólo con notifications.update",
       "passed": true
     },
     {
@@ -146,6 +146,21 @@
       "method": "PUT",
       "endpoint": "notifications/no-es-uuid/read",
       "status": 400
+    },
+    {
+      "method": "PUT",
+      "endpoint": "notifications/mark-all-read",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "notifications/unread",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "notifications/:id/read",
+      "status": 403
     },
     {
       "method": "PUT",
