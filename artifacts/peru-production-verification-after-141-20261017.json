@@ -1,0 +1,110 @@
+{
+  "verified_at_utc": "2026-10-17T15:02:22.407Z",
+  "merge_sha": "b3db75821f48713de3da0968b364237bebc8c2ef",
+  "read_only": true,
+  "synthetic_prod_writes": false,
+  "prod_preflight": "passed: authorized project and internal marker",
+  "github_main": [
+    {
+      "conclusion": "failure",
+      "headSha": "b3db75821f48713de3da0968b364237bebc8c2ef",
+      "name": "Security Scan",
+      "status": "completed",
+      "url": "https://github.com/yohandry10/erp/actions/runs/38292972826"
+    },
+    {
+      "conclusion": "success",
+      "headSha": "b3db75821f48713de3da0968b364237bebc8c2ef",
+      "name": "Security Scan",
+      "status": "completed",
+      "url": "https://github.com/yohandry10/erp/actions/runs/37353494697"
+    },
+    {
+      "conclusion": "success",
+      "headSha": "b3db75821f48713de3da0968b364237bebc8c2ef",
+      "name": "E2E web aislado",
+      "status": "completed",
+      "url": "https://github.com/yohandry10/erp/actions/runs/37256770471"
+    },
+    {
+      "conclusion": "success",
+      "headSha": "b3db75821f48713de3da0968b364237bebc8c2ef",
+      "name": "CI",
+      "status": "completed",
+      "url": "https://github.com/yohandry10/erp/actions/runs/37256770454"
+    },
+    {
+      "conclusion": "success",
+      "headSha": "b3db75821f48713de3da0968b364237bebc8c2ef",
+      "name": "Security Scan",
+      "status": "completed",
+      "url": "https://github.com/yohandry10/erp/actions/runs/37256770521"
+    }
+  ],
+  "render": {
+    "version": {
+      "service": "erp-api",
+      "version": "1.0.0",
+      "commit": "b3db75821f48713de3da0968b364237bebc8c2ef",
+      "buildDate": "unknown",
+      "renderServiceId": "srv-d9plnou417fc73e6qbfg",
+      "nodeEnv": "production",
+      "timestamp": "2026-10-17T15:02:18.461Z"
+    },
+    "ready": {
+      "status": "ready",
+      "timestamp": "2026-10-17T15:02:18.524Z",
+      "checks": {
+        "database": {
+          "ready": true,
+          "backlog": {
+            "failed": 0,
+            "limits": {
+              "max_claimable": 5000,
+              "max_dead_letter": 100,
+              "max_oldest_seconds": 900,
+              "processing_stale_seconds": 900
+            },
+            "claimable": 0,
+            "processing": 0,
+            "dead_letter": 7,
+            "stale_processing": 0,
+            "oldest_claimable_seconds": 0
+          },
+          "contract": {
+            "outbox_rpcs": true,
+            "schema_version": 569,
+            "service_role_reads": true,
+            "required_schema_applied": true,
+            "required_schema_version": 569,
+            "schema_history_available": true,
+            "missing_service_role_reads": []
+          },
+          "database": "ok"
+        },
+        "redis": {
+          "ready": true,
+          "required": true,
+          "status": "ready",
+          "mode": "redis"
+        }
+      },
+      "version": "1.0.0"
+    },
+    "health": {
+      "status": "healthy",
+      "timestamp": "2026-10-17T15:02:18.426Z",
+      "uptime": 67.099929305,
+      "version": "1.0.0"
+    },
+    "effective_plan": "not_verified_administratively"
+  },
+  "vercel": {
+    "production_deployment_id": 6850313562,
+    "deployment_state": "success",
+    "login_follow_redirect_http_status": 200
+  },
+  "cors_preflight_http_status": 204,
+  "launch_result": "not_accepted: functional matrix gaps remain",
+  "verification_passed": false
+}
