@@ -1,9 +1,9 @@
 {
-  "capturedAt": "2026-10-19T06:43:56.845Z",
+  "capturedAt": "2026-10-19T07:07:29.941Z",
   "capture": "Before launch",
   "source_hashes": {
     "artifacts/peru-block-runner-20261019.mjs": "85af2de26827a1f24e61f89f24616e7a6d892bd32b74b4dba5d8199f26778aca",
-    "scripts/ci/test-peru-notifications-local.mjs": "0b4e67fc42d334b2ac3dd0c773a36cb1e774eda1df340f21f1f947e5bb5604d0",
+    "scripts/ci/test-peru-notifications-local.mjs": "98abf0bf621f590528a23335e57955caa53e9fd79e962c0fc469932796b73693",
     "scripts/ci/peru-local-smtp-sink.mjs": "af601f15f5beb86aabc65046663fe33779b3b37c18c18365b514f84d056347ff",
     "scripts/ci/prepare-peru-first-client-local.mjs": "fe37fded52c8589aff6a974189fc50b82f0e327a81a8a96f9b4bbab9c2d9aa5d",
     "apps/erp-api/tests/e2e/helpers/local-api-harness.ts": "b1c4d7c61c10a2b5b0c28c367c8790196d667dd8d03bdd65058bf982efc3e968",
@@ -12,7 +12,7 @@
     "apps/web/components/notifications/NotificationPanel.tsx": "527acfb64bd544a213d3efd384b1efad0f50841819ce9cfe1fb397ccaabb87c7",
     "apps/web/components/notifications/NotificationItem.tsx": "f128431bcfcc9d6480b54e7f4687c1330f4dfc348a0d02a106df112c3b154bb4",
     "apps/web/components/notifications/NotificationBell.tsx": "27131d79dfe2707bd5a86d7d46786012a895995614c41278ae507bedbc301398",
-    "apps/web/tests/e2e/peru-notifications-local.spec.ts": "10eef827a79f75a4c602ebcdd12895c37e881b3f4fff5e25fc1309ca590593ca"
+    "apps/web/tests/e2e/peru-notifications-local.spec.ts": "6e4f22edc1cb7e799f436be362b6ea81064aac31a4b8c1f6485b459cb6415d8e"
   },
   "complete_acceptance": false,
   "remoteWrites": false

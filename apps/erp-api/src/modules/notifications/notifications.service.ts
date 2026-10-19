@@ -53,7 +53,7 @@ export class NotificationsService {
     notificationId: string,
     user: AuthenticatedUser | undefined,
     operation: string,
-  ): Promise<void> {
+  ): Promise<{ usuario_id?: string | null; roles_destinatarios?: string[] | null }> {
     const { data: notification, error } = await this.supabaseService
       .getClient()
       .from('notificaciones')
@@ -71,6 +71,19 @@ export class NotificationsService {
       this.logger.warn(`[SECURITY] User ${user?.id} attempted ${operation} on notification ${notificationId} in tenant ${tenantId}`);
       throw new NotFoundException('Notificación no encontrada');
     }
+    return notification;
+  }
+
+  // El estado leído es una columna por aviso: marcar uno global o de rol lo
+  // marca para toda la empresa. Sin notifications.update sólo se marcan los
+  // personales; el estado por usuario exige una migración pendiente.
+  private assertCanMarkShared(
+    notification: { usuario_id?: string | null },
+    user: AuthenticatedUser | undefined,
+    canMarkShared: boolean,
+  ): void {
+    if (notification.usuario_id || user?.is_super_admin || canMarkShared) return;
+    throw new ForbiddenException('Este aviso es compartido con la empresa: sólo un responsable con permiso de notificaciones puede marcarlo como leído');
   }
 
   private async withTenantContext<T>(
@@ -317,10 +330,12 @@ export class NotificationsService {
     tenantId: string,
     notificationId: string,
     user?: AuthenticatedUser,
+    canMarkShared = true,
   ): Promise<Notification> {
     return this.withTenantContext(tenantId, user, async () => {
       // Propia, global o de un rol del usuario; super admin, cualquiera del tenant.
-      await this.findOwnedNotification(tenantId, notificationId, user, 'MARK_READ');
+      const notification = await this.findOwnedNotification(tenantId, notificationId, user, 'MARK_READ');
+      this.assertCanMarkShared(notification, user, canMarkShared);
       return this.markReadUnchecked(tenantId, notificationId, user);
     });
   }
@@ -343,12 +358,15 @@ export class NotificationsService {
     tenantId: string,
     usuarioId?: string,
     user?: AuthenticatedUser,
+    canMarkShared = true,
   ): Promise<number> {
     const effectiveUser = user ?? { id: usuarioId };
     // MARK_ALL_READ sólo tocaba las de usuario_id: las globales y las del rol
     // seguían pendientes y volvían a la campana al recargar. Se marca cada
-    // aviso que el usuario ve; un reintento continúa con los que falten.
-    const unread = await this.getNotifications(tenantId, { leida: false, usuario_id: usuarioId }, effectiveUser);
+    // aviso visible que el usuario puede marcar (los compartidos, sólo con
+    // notifications.update); un reintento continúa con los que falten.
+    const unread = (await this.getNotifications(tenantId, { leida: false, usuario_id: usuarioId }, effectiveUser))
+      .filter(notification => notification.usuario_id || effectiveUser.is_super_admin || canMarkShared);
     return this.withTenantContext(tenantId, effectiveUser, async () => {
       let count = 0;
       for (const notification of unread) {

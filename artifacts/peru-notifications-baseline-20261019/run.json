@@ -1,10 +1,10 @@
 {
-  "completedAt": "2026-10-19T06:47:18.393Z",
+  "completedAt": "2026-10-19T07:10:24.197Z",
   "success": false,
   "withBrowser": true,
   "block": "notifications",
   "scope": "notifications_subset",
   "database": "PostgreSQL 16 efímero (migraciones completas)",
-  "output": "artifacts\\peru-notifications-local-20261019064356843-23248",
+  "output": "artifacts\\peru-notifications-local-20261019070729939-12252",
   "remoteWrites": false
 }

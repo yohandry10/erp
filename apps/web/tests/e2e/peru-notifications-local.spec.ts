@@ -55,11 +55,18 @@ test('Notificaciones: la campana del vendedor lista, marca todas y no finge un b
       page.getByRole('button', { name: 'Marcar todas', exact: true }).click(),
     ])
     expect(allRead.status()).toBe(200)
-    await expect(bell).not.toContainText(/\d/)
+    // Sin notifications.update sólo se marca lo personal: lo compartido sigue pendiente.
+    await expect(bell).toContainText('2')
     await page.reload()
-    await expect(page.getByRole('button', { name: 'Abrir notificaciones' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Abrir notificaciones' })).not.toContainText(/\d/)
-    checks.push({ operation: 'Marcar todas persiste tras recargar', passed: true }); save()
+    await expect(page.getByRole('button', { name: 'Abrir notificaciones' })).toContainText('2')
+    expect(sql(`SELECT count(*) FROM notificaciones WHERE tenant_id='${fixture.tenant}'::uuid AND usuario_id IS NULL AND leida;`)).toBe('0')
+    let sharedMarks = 0
+    page.on('request', r => { if (r.method() === 'PUT' && /\/api\/notifications\/[0-9a-f-]{36}\/read\/?$/.test(new URL(r.url()).pathname)) sharedMarks++ })
+    await page.getByRole('button', { name: 'Abrir notificaciones' }).click()
+    await page.getByRole('heading', { name: 'Aviso global de la empresa' }).click()
+    await expect(page.getByText('No se pudo marcar la notificación como leída. Inténtalo de nuevo.')).toHaveCount(0)
+    expect(sharedMarks).toBe(0)
+    checks.push({ operation: 'Marcar todas persiste lo personal y no marca lo compartido sin permiso', passed: true }); save()
 
     await page.context().clearCookies()
     await loginPeruLocal(page, fixture.email, 'Cliente-Local-2026-Only!')

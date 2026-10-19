@@ -73,10 +73,17 @@ try{
   assert.deepEqual(statuses,{otherUser:404,otherTenant:404,missing:404,malformed:400},JSON.stringify(statuses));
   assert.equal(sql(`SELECT count(*) FROM notificaciones WHERE id IN (${q(n.sellerOwn)},${q(n.foreign)}) AND leida;`),'0','Se marcó una ajena');
  });
- await check('Notificaciones: marcar todas deja sin pendientes lo que el usuario ve, incluidas globales y de su rol',async()=>{
+ await check('Notificaciones: marcar todas marca lo personal; lo compartido sólo con notifications.update',async()=>{
+  // El estado leído es por aviso: un vendedor no puede marcar por toda la empresa.
   await call('notifications/mark-all-read',{},200,seller,'PUT');
-  const left=await call('notifications/unread',undefined,200,seller);
-  assert.deepEqual(left.map(item=>item.title),[],'Siguen pendientes tras marcar todas');
+  assert.equal(sql(`SELECT leida FROM notificaciones WHERE id=${q(n.sellerOwn)};`),'t','No marcó el aviso personal');
+  assert.equal(sql(`SELECT count(*) FROM notificaciones WHERE id IN (${q(n.global)},${q(n.role)}) AND leida;`),'0','Un vendedor marcó avisos compartidos');
+  assert.deepEqual((await call('notifications/unread',undefined,200,seller)).map(item=>item.title).sort(),['Global de la empresa','Para vendedores']);
+  assert.equal((await raw('notifications/'+n.global+'/read',{},seller,'PUT')).status,403,'Vendedor marcó un aviso global');
+  assert.equal(sql(`SELECT leida FROM notificaciones WHERE id=${q(n.global)};`),'f');
+  await call('notifications/mark-all-read',{},200,admin,'PUT');
+  assert.equal(sql(`SELECT leida FROM notificaciones WHERE id=${q(n.global)};`),'t','El administrador no marcó el global');
+  assert.deepEqual(await call('notifications/unread',undefined,200,admin),[],'Siguen pendientes del administrador');
   assert.equal(sql(`SELECT leida FROM notificaciones WHERE id=${q(n.foreign)};`),'f','Marcó una de otra empresa');
  });
  await check('Notificaciones: eliminar propia; ajena 404; sin permiso 403 y la notificación queda',async()=>{
