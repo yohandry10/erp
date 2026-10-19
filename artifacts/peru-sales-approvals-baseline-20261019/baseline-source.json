@@ -1,0 +1,33 @@
+{
+  "captured_at": "2026-10-19T21:59:40.421Z",
+  "product_source_commit": "49dce26330a4a822d2744f798d06563068c647bd",
+  "note": "Worktree aislado con el código original de aprobaciones de pedidos (sin cambios desde ese commit) y sólo la infraestructura de prueba nueva; la sonda y la prueba de navegador son las mismas del ensayo corregido.",
+  "browser_failure": "Con la lectura caída la bandeja afirmaba «No hay pedidos pendientes de aprobación»; el motivo del servidor no aparecía al rechazar la autoaprobación ni con un pedido ya resuelto (el aviso genérico de la pantalla reemplaza al del hook: sólo cabe uno); la aprobadora veía «Sin morosidad» con una cuenta vencida; un pedido resuelto por otro usuario seguía en la bandeja con el diálogo abierto.",
+  "discarded_attempts": [
+    {
+      "reason": "La sonda enviaba limite_credito al crear el cliente y el DTO estricto lo rechaza",
+      "product_signal": false
+    },
+    {
+      "reason": "Reprogramar la cuenta a una fecha pasada viola la restricción de fechas de CxC; la mora se fija con SQL del fixture",
+      "product_signal": false
+    },
+    {
+      "reason": "Dos corridas con «permission denied for table pedido_aprobaciones»: la reconstrucción local no emula el SELECT por defecto que Supabase concede a service_role (ninguna migración lo revoca); la primera emulación dependía de relacl nulo y no se aplicó",
+      "product_signal": false
+    },
+    {
+      "reason": "Navegador: la primera versión se detenía en el primer defecto; se pasó a aserciones blandas por paso",
+      "product_signal": false
+    },
+    {
+      "reason": "Navegador: con el diálogo modal abierto la búsqueda de la tarjeta por rol la daba por desaparecida en ambas versiones; se busca por texto",
+      "product_signal": false
+    },
+    {
+      "reason": "Navegador (ensayo corregido): con la cuenta vencida creada antes, confirmar el pedido responde 400 «Crédito bloqueado» (regla correcta); el fixture crea la mora después de los pedidos",
+      "product_signal": "Observación: el bloqueo de negocio por crédito responde 400 y no 409"
+    }
+  ],
+  "remoteWrites": false
+}
