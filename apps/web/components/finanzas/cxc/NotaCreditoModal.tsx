@@ -39,7 +39,8 @@ const formatCurrency = (value: number, currency: string = 'PEN') =>
   }).format(value || 0)
 
 export function NotaCreditoModal({ isOpen, cuenta, onClose, onSuccess }: NotaCreditoModalProps) {
-  const { post } = useApi({ showSuccessToast: true })
+  // throwOnError: el rechazo (p. ej. factura aún no aceptada) se muestra en el formulario.
+  const { post } = useApi({ showSuccessToast: true, showErrorToast: false, throwOnError: true })
   const country = useCountryContext()
   const isColombia = country.paisCodigo === 'CO'
   const [monto, setMonto] = useState('')

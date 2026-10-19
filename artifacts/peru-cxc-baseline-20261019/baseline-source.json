@@ -1,0 +1,29 @@
+{
+  "captured_at": "2026-10-19T20:52:13.541Z",
+  "product_source_commit": "49dce26330a4a822d2744f798d06563068c647bd",
+  "note": "Worktree aislado con el código original de CxC (sin cambios desde ese commit) y sólo la infraestructura de prueba nueva.",
+  "browser_failure": "La pantalla de CxC reprograma sin enviar Idempotency-Key",
+  "discarded_attempts": [
+    {
+      "reason": "Docker Desktop caído al crear la red",
+      "product_signal": false
+    },
+    {
+      "reason": "API local no arrancó en 90 s tras reiniciar Docker",
+      "product_signal": false
+    },
+    {
+      "reason": "Navegador: compilación en frío de /dashboard (26,9 s) superó el login local de 25 s",
+      "product_signal": false
+    },
+    {
+      "reason": "Navegador: compilación en frío de la página de CxC superó page.goto de 25 s",
+      "product_signal": false
+    },
+    {
+      "reason": "Navegador: el formulario sólo admite fechas >= vencimiento vigente; el recorrido se ajustó a fechas crecientes",
+      "product_signal": "El volver atrás queda cubierto por la sonda API"
+    }
+  ],
+  "remoteWrites": false
+}

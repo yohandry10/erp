@@ -1,0 +1,197 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "CxC reprogramación, nota de crédito y lecturas API/DB local; sin aceptación SUNAT ni integral",
+  "scenarios": [
+    {
+      "scenario": "CxC: reprogramar con intención aplica la fecha una vez y el reintento la recupera",
+      "passed": true
+    },
+    {
+      "scenario": "CxC: sin clave explícita, volver a una fecha ya usada se aplica",
+      "passed": true
+    },
+    {
+      "scenario": "CxC: reprogramar una cuenta inexistente o de otra empresa responde 404",
+      "passed": true
+    },
+    {
+      "scenario": "CxC: fecha ausente o inválida responde 400",
+      "passed": true
+    },
+    {
+      "scenario": "CxC: una cuenta anulada no se reprograma (409) y queda igual",
+      "passed": true
+    },
+    {
+      "scenario": "CxC: sin el writer de reprogramación responde 503",
+      "passed": true
+    },
+    {
+      "scenario": "CxC: nota con la contabilidad de la factura pendiente responde 409 con un motivo legible y sin efectos",
+      "passed": true
+    },
+    {
+      "scenario": "CxC: con la venta contabilizada, la nota sobre factura sin aceptación SUNAT se rechaza (409) sin efectos",
+      "passed": true
+    },
+    {
+      "scenario": "CxC: nota con motivo fuera de catálogo o monto inválido responde 400 sin efectos",
+      "passed": true
+    },
+    {
+      "scenario": "CxC: nota sobre cuenta inexistente o de otra empresa responde 404",
+      "passed": true
+    },
+    {
+      "scenario": "CxC: sin configuración legible o sin writer, la nota responde 503",
+      "passed": true
+    },
+    {
+      "scenario": "CxC: detalle con lectura caída responde 503 y ajeno 404",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/complete",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/clientes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/comprobantes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxc/:id/reprogramar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxc/:id/reprogramar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxc/:id/reprogramar",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxc/:id/reprogramar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxc/:id/reprogramar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxc/:id/reprogramar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxc/:id/reprogramar",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxc/:id/reprogramar",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxc/:id/reprogramar",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxc/:id/reprogramar",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/comprobantes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxc/:id/reprogramar",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxc/:id/reprogramar",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxc/:id/notas-credito",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxc/:id/notas-credito",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxc/:id/notas-credito",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxc/:id/notas-credito",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxc/:id/notas-credito",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxc/:id/notas-credito",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxc/:id/notas-credito",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxc/:id/notas-credito",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxc/:id",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxc/:id",
+      "status": 503
+    }
+  ]
+}

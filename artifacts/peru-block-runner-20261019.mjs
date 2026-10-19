@@ -17,6 +17,10 @@ const blocks = {
     spec: 'tests/e2e/peru-auth-recovery-local.spec.ts', scope: 'auth_recovery_sessions_subset',
     sources: ['apps/erp-api/src/modules/auth/auth.controller.ts', 'apps/erp-api/src/modules/auth/auth.service.ts', 'apps/erp-api/src/shared/email/email.service.ts',
       'apps/web/app/reset-password/page.tsx', 'apps/web/app/login/page.tsx'] },
+  cxc: { kinds: ['cxc-first', 'cxc-other'], browserKind: 'cxc-browser', probe: 'scripts/ci/test-peru-cxc-operations-local.mjs',
+    spec: 'tests/e2e/peru-cxc-local.spec.ts', scope: 'cxc_reprogram_credit_note_subset',
+    sources: ['apps/erp-api/src/modules/finanzas/cxc/cxc.service.ts', 'apps/erp-api/src/modules/finanzas/cxc/cxc.controller.ts',
+      'apps/web/components/finanzas/cxc/ReprogramarModal.tsx', 'apps/web/components/finanzas/cxc/NotaCreditoModal.tsx'] },
   notifications: { kinds: ['notif-first', 'notif-other'], browserKind: 'notif-browser', probe: 'scripts/ci/test-peru-notifications-local.mjs',
     spec: 'tests/e2e/peru-notifications-local.spec.ts', scope: 'notifications_subset',
     sources: ['apps/erp-api/src/modules/notifications.controller.ts', 'apps/erp-api/src/modules/notifications/notifications.service.ts',
@@ -43,7 +47,9 @@ let createdNetwork = false;
 const pgPort = '55470', restPort = '55471', smtpPort = '55472', apiPort = '3270', webPort = '3209';
 const apiUrl = `http://127.0.0.1:${apiPort}`;
 const webUrl = `http://127.0.0.1:${webPort}`;
-const distDir = `.next-peru-integrated-${runId}`;
+// distDir estable: reutiliza la compilación de Next entre ensayos locales (una
+// compilación en frío de /dashboard supera el plazo de 25 s del login local).
+const distDir = `.next-peru-block-local`;
 const apiDirectory = path.join(root, 'apps/erp-api');
 const webDirectory = path.join(root, 'apps/web');
 const apiRequire = createRequire(path.join(apiDirectory, 'package.json'));
@@ -91,7 +97,7 @@ async function run(label, executable, args, cwd) {
   });
 }
 async function waitReady(label, probe, child) {
-  const deadline = Date.now() + 90000;
+  const deadline = Date.now() + 180000;
   while (Date.now() < deadline) {
     if (child && child.exitCode !== null) throw new Error(`${label} terminó antes de estar listo`);
     try { if (await probe()) return; } catch { /* Todavía inicia; el límite es explícito. */ }
