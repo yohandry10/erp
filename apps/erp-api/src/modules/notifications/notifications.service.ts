@@ -1,4 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import {
   Notification,
@@ -19,6 +26,52 @@ export class NotificationsService {
     private readonly supabaseService: SupabaseService,
     private readonly tenantContext: TenantContextService,
   ) { }
+
+  // Antes todo error terminaba en 200 con success:false y la campana lo tomaba
+  // por éxito (o por "sin notificaciones"). Cada causa tiene ahora su estado.
+  private unavailable(operation: string, error: { message?: string }): never {
+    this.logger.error(`Notificaciones no disponibles (${operation}): ${error?.message}`, error as any);
+    throw new ServiceUnavailableException('Las notificaciones no están disponibles en este momento. Inténtalo de nuevo.');
+  }
+
+  private writerError(operation: string, error: { code?: string; message?: string }): never {
+    if (error?.code === 'P0002') throw new NotFoundException('Notificación no encontrada');
+    // 42501 es también "permission denied for function" (writer sin EXECUTE):
+    // sólo el rechazo de dominio del RPC es un 403; lo demás es indisponibilidad.
+    if (error?.code === '42501' && /NOTIFICATION_/.test(error?.message ?? '')) {
+      throw new ForbiddenException('No tiene permiso sobre esta notificación');
+    }
+    if (['22023', '22P02', '23502', '23514'].includes(error?.code ?? '')) {
+      throw new BadRequestException('Datos de notificación inválidos');
+    }
+    return this.unavailable(operation, error);
+  }
+
+  /** Lee una notificación del tenant; ajena o inexistente es 404 y la caída 503. */
+  private async findOwnedNotification(
+    tenantId: string,
+    notificationId: string,
+    user: AuthenticatedUser | undefined,
+    operation: string,
+  ): Promise<void> {
+    const { data: notification, error } = await this.supabaseService
+      .getClient()
+      .from('notificaciones')
+      .select('usuario_id, roles_destinatarios')
+      .eq('id', notificationId)
+      .eq('tenant_id', tenantId)
+      .single();
+    if (error) {
+      if (error.code === 'PGRST116') throw new NotFoundException('Notificación no encontrada');
+      this.unavailable(operation, error);
+    }
+    // Una notificación de otro usuario o de un rol ajeno no existe para quien
+    // la pide: 404 en vez de confirmar que existe.
+    if (!user?.is_super_admin && !(await this.canUserModifyNotification(tenantId, user?.id, notification))) {
+      this.logger.warn(`[SECURITY] User ${user?.id} attempted ${operation} on notification ${notificationId} in tenant ${tenantId}`);
+      throw new NotFoundException('Notificación no encontrada');
+    }
+  }
 
   private async withTenantContext<T>(
     tenantId: string,
@@ -79,10 +132,7 @@ export class NotificationsService {
           p_payload: insertData,
         });
 
-      if (error) {
-        this.logger.error(`Error creating notification: ${error.message}`, error);
-        throw new Error(error.message);
-      }
+      if (error) this.writerError('CREATE', error);
 
       const rolesInfo = notificationData.roles_destinatarios?.length
         ? ` for roles: ${notificationData.roles_destinatarios.join(', ')}`
@@ -144,10 +194,9 @@ export class NotificationsService {
       // roles de un tenant decidían el acceso a notificaciones de otro.
       .eq('tenant_id', tenantId);
 
-    if (error) {
-      this.logger.error(`Error fetching user roles: ${error.message}`, error);
-      return [];
-    }
+    // Sin roles legibles no se puede decidir qué avisos ve el usuario: ocultar
+    // los de su rol como si no existieran sería un falso "sin notificaciones".
+    if (error) this.unavailable('roles', error);
 
     return (data || []).map(r => r.role_id);
   }
@@ -192,10 +241,7 @@ export class NotificationsService {
         if (filters?.usuario_id) query = query.eq('usuario_id', filters.usuario_id);
 
         const { data, error } = await query;
-        if (error) {
-          this.logger.error(`Error fetching notifications: ${error.message}`, error);
-          throw new Error(error.message);
-        }
+        if (error) this.unavailable('lista', error);
         return (data || []).map(item => this.mapToNotification(item));
       }
 
@@ -222,10 +268,7 @@ export class NotificationsService {
       if (filters?.leida !== undefined) query = query.eq('leida', filters.leida);
 
       const { data, error } = await query;
-      if (error) {
-        this.logger.error(`Error fetching notifications: ${error.message}`, error);
-        throw error;
-      }
+      if (error) this.unavailable('lista', error);
 
       // Filtrar notificaciones que el usuario puede ver:
       // 1. Notificaciones dirigidas a este usuario específico
@@ -264,26 +307,10 @@ export class NotificationsService {
     usuarioId?: string,
     user?: AuthenticatedUser,
   ): Promise<number> {
-    return this.withTenantContext(tenantId, user, async () => {
-      let query = this.supabaseService
-        .getClient()
-        .from('notificaciones')
-        .select('*', { count: 'exact', head: true })
-        .eq('tenant_id', tenantId)
-        .eq('leida', false);
-
-      if (usuarioId) {
-        query = query.eq('usuario_id', usuarioId);
-      }
-
-      const { count, error } = await query;
-      if (error) {
-        this.logger.error(`Error fetching unread count: ${error.message}`, error);
-        throw new Error(error.message);
-      }
-
-      return count || 0;
-    });
+    // Cuenta exactamente lo que la lista muestra: contar sólo usuario_id dejaba
+    // fuera los avisos globales y los del rol, que sí aparecen en la campana.
+    const unread = await this.getNotifications(tenantId, { leida: false, usuario_id: usuarioId }, user);
+    return unread.length;
   }
 
   async markAsRead(
@@ -292,52 +319,24 @@ export class NotificationsService {
     user?: AuthenticatedUser,
   ): Promise<Notification> {
     return this.withTenantContext(tenantId, user, async () => {
-      // SECURITY FIX: Verificar que la notificación pertenece al usuario, a sus roles, o es super admin
-      const { data: notification, error: fetchError } = await this.supabaseService
-        .getClient()
-        .from('notificaciones')
-        .select('usuario_id, roles_destinatarios')
-        .eq('id', notificationId)
-        .eq('tenant_id', tenantId)
-        .single();
-
-      if (fetchError) {
-        this.logger.error(`Error fetching notification for markAsRead: ${fetchError.message}`, fetchError);
-        throw new Error('Notificación no encontrada');
-      }
-
-      // Validar permisos:
-      // - Super admin puede modificar cualquier notificación
-      // - Si la notificación tiene usuario_id, solo ese usuario puede modificarla
-      // - Si la notificación tiene roles_destinatarios, solo usuarios con esos roles pueden modificarla
-      // - Si la notificación NO tiene usuario_id ni roles (global), cualquier usuario del tenant puede marcarla
-      if (!user?.is_super_admin) {
-        const canModify = await this.canUserModifyNotification(tenantId, user?.id, notification);
-        if (!canModify) {
-          this.logger.warn(
-            `[SECURITY] User ${user?.id} attempted to mark notification ${notificationId} as read, owned by ${notification.usuario_id} or roles ${notification.roles_destinatarios} in tenant ${tenantId}`,
-          );
-          throw new Error('No tiene permiso para modificar esta notificación');
-        }
-      }
-
-      const { data, error } = await this.supabaseService
-        .getClient()
-        .rpc('gestionar_notificacion_tx', {
-          p_tenant_id: tenantId,
-          p_actor_id: user?.id ?? null,
-          p_operacion: 'MARK_READ',
-          p_payload: { notification_id: notificationId },
-        });
-
-      if (error) {
-        this.logger.error(`Error marking notification as read: ${error.message}`, error);
-        throw new Error(error.message);
-      }
-
-      this.logger.log(`Notification ${notificationId} marked as read by user ${user?.id}`);
-      return this.mapToNotification(data);
+      // Propia, global o de un rol del usuario; super admin, cualquiera del tenant.
+      await this.findOwnedNotification(tenantId, notificationId, user, 'MARK_READ');
+      return this.markReadUnchecked(tenantId, notificationId, user);
     });
+  }
+
+  private async markReadUnchecked(tenantId: string, notificationId: string, user?: AuthenticatedUser): Promise<Notification> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .rpc('gestionar_notificacion_tx', {
+        p_tenant_id: tenantId,
+        p_actor_id: user?.id ?? null,
+        p_operacion: 'MARK_READ',
+        p_payload: { notification_id: notificationId },
+      });
+    if (error) this.writerError('MARK_READ', error);
+    this.logger.log(`Notification ${notificationId} marked as read by user ${user?.id}`);
+    return this.mapToNotification(data);
   }
 
   async markAllAsRead(
@@ -346,21 +345,21 @@ export class NotificationsService {
     user?: AuthenticatedUser,
   ): Promise<number> {
     const effectiveUser = user ?? { id: usuarioId };
+    // MARK_ALL_READ sólo tocaba las de usuario_id: las globales y las del rol
+    // seguían pendientes y volvían a la campana al recargar. Se marca cada
+    // aviso que el usuario ve; un reintento continúa con los que falten.
+    const unread = await this.getNotifications(tenantId, { leida: false, usuario_id: usuarioId }, effectiveUser);
     return this.withTenantContext(tenantId, effectiveUser, async () => {
-      const { data, error } = await this.supabaseService
-        .getClient()
-        .rpc('gestionar_notificacion_tx', {
-          p_tenant_id: tenantId,
-          p_actor_id: effectiveUser?.id ?? null,
-          p_operacion: 'MARK_ALL_READ',
-          p_payload: { usuario_id: usuarioId ?? null },
-        });
-      if (error) {
-        this.logger.error(`Error marking all notifications as read: ${error.message}`, error);
-        throw new Error(error.message);
+      let count = 0;
+      for (const notification of unread) {
+        try {
+          await this.markReadUnchecked(tenantId, notification.id, effectiveUser);
+          count++;
+        } catch (error) {
+          // Borrada por otro usuario entre la lectura y el marcado: ya no está pendiente.
+          if (!(error instanceof NotFoundException)) throw error;
+        }
       }
-
-      const count = Number((data as { updated_count?: number } | null)?.updated_count ?? 0);
       this.logger.log(`${count} notifications marked as read for tenant ${tenantId}`);
       return count;
     });
@@ -372,34 +371,7 @@ export class NotificationsService {
     user?: AuthenticatedUser,
   ): Promise<void> {
     return this.withTenantContext(tenantId, user, async () => {
-      // SECURITY FIX: Verificar que la notificación pertenece al usuario, a sus roles, o es super admin
-      const { data: notification, error: fetchError } = await this.supabaseService
-        .getClient()
-        .from('notificaciones')
-        .select('usuario_id, roles_destinatarios')
-        .eq('id', notificationId)
-        .eq('tenant_id', tenantId)
-        .single();
-
-      if (fetchError) {
-        this.logger.error(`Error fetching notification for delete: ${fetchError.message}`, fetchError);
-        throw new Error('Notificación no encontrada');
-      }
-
-      // Validar permisos:
-      // - Super admin puede eliminar cualquier notificación
-      // - Si la notificación tiene usuario_id, solo ese usuario puede eliminarla
-      // - Si la notificación tiene roles_destinatarios, solo usuarios con esos roles pueden eliminarla
-      // - Si la notificación NO tiene usuario_id ni roles (global), cualquier usuario del tenant puede eliminarla
-      if (!user?.is_super_admin) {
-        const canModify = await this.canUserModifyNotification(tenantId, user?.id, notification);
-        if (!canModify) {
-          this.logger.warn(
-            `[SECURITY] User ${user?.id} attempted to delete notification ${notificationId} owned by ${notification.usuario_id} or roles ${notification.roles_destinatarios} in tenant ${tenantId}`,
-          );
-          throw new Error('No tiene permiso para eliminar esta notificación');
-        }
-      }
+      await this.findOwnedNotification(tenantId, notificationId, user, 'DELETE');
 
       const { error } = await this.supabaseService
         .getClient()
@@ -409,11 +381,7 @@ export class NotificationsService {
           p_operacion: 'DELETE',
           p_payload: { notification_id: notificationId },
         });
-
-      if (error) {
-        this.logger.error(`Error deleting notification: ${error.message}`, error);
-        throw new Error(error.message);
-      }
+      if (error) this.writerError('DELETE', error);
 
       this.logger.log(`Notification ${notificationId} deleted by user ${user?.id}`);
     });

@@ -1,0 +1,226 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "Notificaciones API/DB local; sin aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Notificaciones: alta y visibilidad por destinatario, rol y empresa",
+      "passed": true
+    },
+    {
+      "scenario": "Notificaciones: un usuario sin permisos administrativos abre la lista de su campana",
+      "passed": true
+    },
+    {
+      "scenario": "Notificaciones: el contador de no leídas coincide con la lista",
+      "passed": true
+    },
+    {
+      "scenario": "Notificaciones: marcar leída propia, de otro usuario, de otra empresa, inexistente y mal formada",
+      "passed": true
+    },
+    {
+      "scenario": "Notificaciones: marcar todas deja sin pendientes lo que el usuario ve, incluidas globales y de su rol",
+      "passed": true
+    },
+    {
+      "scenario": "Notificaciones: eliminar propia; ajena 404; sin permiso 403 y la notificación queda",
+      "passed": true
+    },
+    {
+      "scenario": "Notificaciones: sin lectura de notificaciones la campana responde 503",
+      "passed": true
+    },
+    {
+      "scenario": "Notificaciones: sin el writer, marcar y borrar responden 503 sin cambiar estado",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "usuarios-sistema/crear",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "notifications",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "notifications",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "notifications",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "notifications",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "notifications",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "notifications",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "notifications/unread",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "notifications",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "notifications/unread",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "notifications/unread-count",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "notifications/unread",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "notifications/unread-count",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "notifications/unread",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "notifications/:id/read",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "notifications/:id/read",
+      "status": 404
+    },
+    {
+      "method": "PUT",
+      "endpoint": "notifications/:id/read",
+      "status": 404
+    },
+    {
+      "method": "PUT",
+      "endpoint": "notifications/:id/read",
+      "status": 404
+    },
+    {
+      "method": "PUT",
+      "endpoint": "notifications/no-es-uuid/read",
+      "status": 400
+    },
+    {
+      "method": "PUT",
+      "endpoint": "notifications/mark-all-read",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "notifications/unread",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "notifications",
+      "status": 201
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "notifications/:id",
+      "status": 403
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "notifications/:id",
+      "status": 404
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "notifications/:id",
+      "status": 404
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "notifications/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "notifications",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "notifications/unread",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "notifications/unread-count",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "endpoint": "notifications",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "notifications/:id/read",
+      "status": 503
+    },
+    {
+      "method": "PUT",
+      "endpoint": "notifications/mark-all-read",
+      "status": 503
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "notifications/:id",
+      "status": 503
+    },
+    {
+      "method": "PUT",
+      "endpoint": "notifications/:id/read",
+      "status": 200
+    }
+  ]
+}
