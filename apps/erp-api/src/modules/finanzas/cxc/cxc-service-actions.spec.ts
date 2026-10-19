@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CxcService } from './cxc.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
@@ -219,7 +219,7 @@ describe('CxcService - acciones complementarias', () => {
 
     it('lanza excepción cuando la fecha es inválida', async () => {
       mockSupabaseClient.rpc = jest.fn().mockResolvedValue({
-        data: null, error: { message: 'invalid input syntax for type date' },
+        data: null, error: { code: '22007', message: 'invalid input syntax for type date' },
       });
 
       await expect(
@@ -233,6 +233,43 @@ describe('CxcService - acciones complementarias', () => {
 
       expect(mockSupabaseClient.from).not.toHaveBeenCalled();
       expect(auditService.registrarCambio).not.toHaveBeenCalled();
+    });
+
+    it('sin Idempotency-Key cada pedido es una intención nueva', async () => {
+      mockSupabaseClient.rpc = jest.fn().mockResolvedValue({ data: { cuenta: { id: cuentaId } }, error: null });
+      const dto = { nueva_fecha_vencimiento: '2099-12-31', motivo: 'Reprogramación de vencimiento solicitada' };
+
+      await service.reprogramarCuentaPorCobrar(tenantId, cuentaId, dto, 'user-1');
+      await service.reprogramarCuentaPorCobrar(tenantId, cuentaId, dto, 'user-1');
+
+      const keys = mockSupabaseClient.rpc.mock.calls.map(([, params]: any[]) => params.p_idempotency_key);
+      expect(new Set(keys).size).toBe(2);
+    });
+
+    it.each([
+      ['CXC_REPROGRAM_IDEMPOTENCY_CONFLICT', 'P0001', ConflictException],
+      ['CXC_REPROGRAM_STATE_INVALID:ANULADA', 'P0001', ConflictException],
+      ['CXC_NOT_FOUND', 'P0001', NotFoundException],
+      ['permission denied for function reprogramar_cxc_tx', '42501', ServiceUnavailableException],
+    ])('traduce %s al estado HTTP correcto', async (message, code, expected) => {
+      mockSupabaseClient.rpc = jest.fn().mockResolvedValue({ data: null, error: { code, message } });
+
+      await expect(service.reprogramarCuentaPorCobrar(tenantId, cuentaId, { nueva_fecha_vencimiento: '2099-12-31' }, 'user-1', 'clave-001'))
+        .rejects.toBeInstanceOf(expected);
+    });
+  });
+
+  describe('obtenerCuentaPorCobrar', () => {
+    const chain = (result: any) => {
+      const builder: any = { select: jest.fn(() => builder), eq: jest.fn(() => builder), order: jest.fn(() => builder), single: jest.fn().mockResolvedValue(result) };
+      mockSupabaseClient.from = jest.fn(() => builder);
+    };
+
+    it('responde 404 cuando no hay fila y 503 cuando la lectura falla', async () => {
+      chain({ data: null, error: { code: 'PGRST116', message: 'no rows' } });
+      await expect(service.obtenerCuentaPorCobrar('tenant-1', 'cxc-1')).rejects.toBeInstanceOf(NotFoundException);
+      chain({ data: null, error: { code: '42501', message: 'permission denied for table cuentas_por_cobrar' } });
+      await expect(service.obtenerCuentaPorCobrar('tenant-1', 'cxc-1')).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
   });
 });

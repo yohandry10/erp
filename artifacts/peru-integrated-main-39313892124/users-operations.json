@@ -1,0 +1,259 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "Usuarios y roles API/DB local; sin aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Usuarios: listado, métricas y roles del tenant responden 200 sin datos ajenos",
+      "passed": true,
+      "roles": [
+        "ALMACEN",
+        "CAJERO",
+        "COMPRAS",
+        "CONTADOR",
+        "FINANZAS",
+        "GERENCIA",
+        "RRHH",
+        "VENDEDOR",
+        "ADMIN",
+        "AUDITOR"
+      ]
+    },
+    {
+      "scenario": "Usuarios: alta con rol, sin exponer la contraseña y con reintento idempotente",
+      "passed": true
+    },
+    {
+      "scenario": "Usuarios: validaciones de alta (correo repetido, contraseña corta, rol ajeno)",
+      "passed": true
+    },
+    {
+      "scenario": "Usuarios: el rol asignado limita permisos (vendedor no administra usuarios)",
+      "passed": true
+    },
+    {
+      "scenario": "Usuarios: edición de datos y rol se refleja en detalle y permisos",
+      "passed": true
+    },
+    {
+      "scenario": "Usuarios: inactivar revoca la sesión y el acceso; reactivar lo devuelve",
+      "passed": true
+    },
+    {
+      "scenario": "Usuarios: otra empresa no ve, edita ni inactiva al usuario",
+      "passed": true
+    },
+    {
+      "scenario": "Usuarios: el administrador no puede inactivarse a sí mismo",
+      "passed": true
+    },
+    {
+      "scenario": "Usuarios: baja inactiva de forma trazable sin borrar",
+      "passed": true
+    },
+    {
+      "scenario": "Usuarios: sin lectura de usuarios_sistema el acceso falla cerrado (sin 200 vacío)",
+      "passed": true,
+      "statuses": {
+        "usuarios-sistema": 403,
+        "usuarios-sistema/stats": 403
+      }
+    },
+    {
+      "scenario": "Roles: rol propio con permisos, asignación y aislamiento",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "usuarios-sistema",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "usuarios-sistema/stats",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "usuarios-sistema/roles",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "usuarios-sistema/crear",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "usuarios-sistema/crear",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "usuarios-sistema/crear",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "usuarios-sistema/crear",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "usuarios-sistema/crear",
+      "status": 403
+    },
+    {
+      "method": "GET",
+      "endpoint": "usuarios-sistema/me/permissions",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "usuarios-sistema",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "usuarios-sistema/crear",
+      "status": 403
+    },
+    {
+      "method": "PUT",
+      "endpoint": "usuarios-sistema/:id/estado",
+      "status": 403
+    },
+    {
+      "method": "PUT",
+      "endpoint": "usuarios-sistema/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "usuarios-sistema/:id",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "usuarios-sistema/:id/permissions",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "usuarios-sistema/:id/estado",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "usuarios-sistema/me/permissions",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "PUT",
+      "endpoint": "usuarios-sistema/:id/estado",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "usuarios-sistema/:id",
+      "status": 404
+    },
+    {
+      "method": "PUT",
+      "endpoint": "usuarios-sistema/:id",
+      "status": 404
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "usuarios-sistema/:id",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "usuarios-sistema",
+      "status": 403
+    },
+    {
+      "method": "PUT",
+      "endpoint": "usuarios-sistema/:id/estado",
+      "status": 403
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "usuarios-sistema/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "GET",
+      "endpoint": "usuarios-sistema",
+      "status": 403
+    },
+    {
+      "method": "GET",
+      "endpoint": "usuarios-sistema/stats",
+      "status": 403
+    },
+    {
+      "method": "GET",
+      "endpoint": "permissions",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "roles",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "roles/:id/permissions",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "roles/:id",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "roles/:id/users",
+      "status": 200
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "roles/:id",
+      "status": 200
+    }
+  ]
+}

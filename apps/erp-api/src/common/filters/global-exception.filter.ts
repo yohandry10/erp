@@ -122,9 +122,13 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       message = message.join(', ');
     }
 
-    // In production, don't expose internal server error details
+    // En producción un 5xx no expone detalles internos, pero el texto llega a una
+    // UI en español y debe decir qué hacer: un 503 es reintentable. Antes todo
+    // 5xx (incluidos los 503 legibles) se volvía un mensaje genérico en inglés.
     if (process.env.NODE_ENV === 'production' && statusCode >= 500) {
-      return 'An unexpected error occurred. Please try again later.';
+      return statusCode === 503
+        ? 'El servicio no está disponible en este momento. Inténtalo de nuevo en unos minutos.'
+        : 'Ocurrió un error inesperado. Inténtalo de nuevo más tarde.';
     }
 
     // Sanitize database error messages

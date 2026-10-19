@@ -1,0 +1,10 @@
+{
+  "completedAt": "2026-10-19T20:52:04.148Z",
+  "success": false,
+  "withBrowser": true,
+  "block": "cxc",
+  "scope": "cxc_reprogram_credit_note_subset",
+  "database": "PostgreSQL 16 efímero (migraciones completas)",
+  "output": "artifacts\\peru-cxc-local-20261019204412966-15956",
+  "remoteWrites": false
+}

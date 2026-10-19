@@ -2,7 +2,7 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -40,7 +40,11 @@ const formatDate = (iso?: string | null) => {
 }
 
 export function ReprogramarModal({ isOpen, cuenta, onClose, onSuccess }: ReprogramarModalProps) {
-  const { post } = useApi({ showSuccessToast: true })
+  // throwOnError: el rechazo se muestra en el formulario en vez de sólo en un toast.
+  const { post } = useApi({ showSuccessToast: true, showErrorToast: false, throwOnError: true })
+  // Una intención por reprogramación: se reutiliza sólo al reintentar el mismo
+  // contenido tras un error, nunca para un cambio nuevo a una fecha ya usada.
+  const retryIntent = useRef<{ fingerprint: string; key: string } | null>(null)
   const [nuevaFecha, setNuevaFecha] = useState(() => new Date().toISOString().split('T')[0])
   const [motivo, setMotivo] = useState('Reprogramación de vencimiento solicitada')
   const [comentarios, setComentarios] = useState('')
@@ -82,8 +86,15 @@ export function ReprogramarModal({ isOpen, cuenta, onClose, onSuccess }: Reprogr
         comentarios: comentarios || undefined,
       }
 
-      const response = await post(`/api/finanzas/cxc/${cuenta.id}/reprogramar`, payload)
+      const fingerprint = JSON.stringify({ cuenta: cuenta.id, ...payload })
+      if (!retryIntent.current || retryIntent.current.fingerprint !== fingerprint) {
+        retryIntent.current = { fingerprint, key: `cxc-reprogram-ui:${crypto.randomUUID()}` }
+      }
+      const response = await post(`/api/finanzas/cxc/${cuenta.id}/reprogramar`, payload, {
+        headers: { 'Idempotency-Key': retryIntent.current.key },
+      })
       if (response) {
+        retryIntent.current = null
         onSuccess()
         onClose()
       }
