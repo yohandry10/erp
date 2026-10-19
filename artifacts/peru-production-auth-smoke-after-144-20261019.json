@@ -1,0 +1,21 @@
+{
+  "checked_at_utc": "2026-10-19T20:28:23Z",
+  "runtime_commit": "334d6cb412378233b27748b1d177e2cf84fcfc3f",
+  "read_only": true,
+  "synthetic_prod_writes": false,
+  "checks": {
+    "login_page_status": 200,
+    "login_offers_password_recovery": true,
+    "reset_page_status": 200,
+    "reset_request_with_nonexistent_email": {
+      "email": "uat-no-existe-20261019@example.invalid",
+      "status": 503,
+      "message": "An unexpected error occurred. Please try again later."
+    }
+  },
+  "interpretation": [
+    "El 503 llega antes de buscar al usuario: el correo no está configurado en Render (SMTP_HOST/proveedor ausente).",
+    "El texto genérico en inglés lo pone el filtro global en producción para todo 5xx."
+  ],
+  "remoteWrites": false
+}

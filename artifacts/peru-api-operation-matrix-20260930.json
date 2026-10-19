@@ -1,18 +1,11 @@
 {
-  "generated_at": "2026-10-04T22:36:48.589Z",
+  "generated_at": "2026-10-19T20:47:33.643Z",
   "inventory": "artifacts/peru-api-operation-inventory-20260930.json",
-  "evidence": "artifacts/peru-integrated-main-37237859234",
+  "evidence": "artifacts/peru-integrated-main-39313892124",
   "additional_evidence": [
     {
-      "evidence": "artifacts/peru-storage-ci-37150593171",
+      "evidence": "artifacts/peru-storage-ci-39313892124",
       "scope": "company_logo_real_storage_subset",
-      "phase_success": true,
-      "complete_erp_acceptance": false,
-      "ui_included": true
-    },
-    {
-      "evidence": "artifacts/peru-cpe-canonical-acceptance-20261003",
-      "scope": "cpe_canonical_restored_subset",
       "phase_success": true,
       "complete_erp_acceptance": false,
       "ui_included": true
@@ -660,7 +653,7 @@
       "operation": "login",
       "method": "POST",
       "endpoint": "/api/auth/login",
-      "source": "apps/erp-api/src/modules/auth/auth.controller.ts:84",
+      "source": "apps/erp-api/src/modules/auth/auth.controller.ts:85",
       "existing_evidence": [
         {
           "trace_index": 0,
@@ -1011,35 +1004,39 @@
           "status": 201
         },
         {
+          "trace_index": 1979,
+          "status": 201
+        },
+        {
           "trace_index": 1980,
           "status": 201
         },
         {
-          "trace_index": 1981,
+          "trace_index": 1985,
           "status": 201
         },
         {
-          "trace_index": 1986,
-          "status": 201
-        },
-        {
-          "trace_index": 2000,
+          "trace_index": 1999,
           "status": 401
         },
         {
-          "trace_index": 2002,
+          "trace_index": 2001,
           "status": 201
         },
         {
-          "trace_index": 2009,
+          "trace_index": 2008,
           "status": 401
+        },
+        {
+          "trace_index": 2017,
+          "status": 201
         },
         {
           "trace_index": 2018,
           "status": 201
         },
         {
-          "trace_index": 2019,
+          "trace_index": 2070,
           "status": 201
         },
         {
@@ -1047,19 +1044,11 @@
           "status": 201
         },
         {
-          "trace_index": 2072,
+          "trace_index": 2086,
           "status": 201
         },
         {
-          "trace_index": 2087,
-          "status": 201
-        },
-        {
-          "trace_index": 2101,
-          "status": 201
-        },
-        {
-          "trace_index": 2133,
+          "trace_index": 2100,
           "status": 201
         },
         {
@@ -1067,11 +1056,15 @@
           "status": 201
         },
         {
-          "trace_index": 2150,
+          "trace_index": 2137,
           "status": 201
         },
         {
-          "trace_index": 2154,
+          "trace_index": 2147,
+          "status": 401
+        },
+        {
+          "trace_index": 2148,
           "status": 201
         },
         {
@@ -1079,7 +1072,59 @@
           "status": 201
         },
         {
-          "trace_index": 2215,
+          "trace_index": 2158,
+          "status": 201
+        },
+        {
+          "trace_index": 2159,
+          "status": 201
+        },
+        {
+          "trace_index": 2163,
+          "status": 201
+        },
+        {
+          "trace_index": 2164,
+          "status": 201
+        },
+        {
+          "trace_index": 2165,
+          "status": 201
+        },
+        {
+          "trace_index": 2170,
+          "status": 201
+        },
+        {
+          "trace_index": 2171,
+          "status": 201
+        },
+        {
+          "trace_index": 2176,
+          "status": 201
+        },
+        {
+          "trace_index": 2180,
+          "status": 201
+        },
+        {
+          "trace_index": 2181,
+          "status": 201
+        },
+        {
+          "trace_index": 2183,
+          "status": 201
+        },
+        {
+          "trace_index": 2220,
+          "status": 201
+        },
+        {
+          "trace_index": 2223,
+          "status": 201
+        },
+        {
+          "trace_index": 2237,
           "status": 201
         }
       ],
@@ -1113,7 +1158,7 @@
       "operation": "getProfile",
       "method": "GET",
       "endpoint": "/api/auth/profile",
-      "source": "apps/erp-api/src/modules/auth/auth.controller.ts:105",
+      "source": "apps/erp-api/src/modules/auth/auth.controller.ts:106",
       "existing_evidence": [
         {
           "trace_index": 132,
@@ -1129,6 +1174,54 @@
         },
         {
           "trace_index": 486,
+          "status": 401
+        },
+        {
+          "trace_index": 2145,
+          "status": 401
+        },
+        {
+          "trace_index": 2146,
+          "status": 401
+        },
+        {
+          "trace_index": 2149,
+          "status": 200
+        },
+        {
+          "trace_index": 2156,
+          "status": 200
+        },
+        {
+          "trace_index": 2161,
+          "status": 401
+        },
+        {
+          "trace_index": 2162,
+          "status": 200
+        },
+        {
+          "trace_index": 2167,
+          "status": 401
+        },
+        {
+          "trace_index": 2168,
+          "status": 401
+        },
+        {
+          "trace_index": 2169,
+          "status": 200
+        },
+        {
+          "trace_index": 2173,
+          "status": 200
+        },
+        {
+          "trace_index": 2175,
+          "status": 401
+        },
+        {
+          "trace_index": 2179,
           "status": 401
         }
       ],
@@ -1148,7 +1241,7 @@
       "operation": "refresh",
       "method": "POST",
       "endpoint": "/api/auth/refresh",
-      "source": "apps/erp-api/src/modules/auth/auth.controller.ts:115",
+      "source": "apps/erp-api/src/modules/auth/auth.controller.ts:116",
       "existing_evidence": [
         {
           "trace_index": 134,
@@ -1171,7 +1264,7 @@
       "operation": "validateToken",
       "method": "POST",
       "endpoint": "/api/auth/validate",
-      "source": "apps/erp-api/src/modules/auth/auth.controller.ts:128",
+      "source": "apps/erp-api/src/modules/auth/auth.controller.ts:129",
       "existing_evidence": [
         {
           "trace_index": 133,
@@ -1194,7 +1287,7 @@
       "operation": "getConfigStatus",
       "method": "GET",
       "endpoint": "/api/auth/config-status",
-      "source": "apps/erp-api/src/modules/auth/auth.controller.ts:143",
+      "source": "apps/erp-api/src/modules/auth/auth.controller.ts:144",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -1212,17 +1305,102 @@
       "operation": "requestPasswordReset",
       "method": "POST",
       "endpoint": "/api/auth/password-reset/request",
-      "source": "apps/erp-api/src/modules/auth/auth.controller.ts:166",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/auth/auth.controller.ts:167",
+      "existing_evidence": [
+        {
+          "trace_index": 2132,
+          "status": 400
+        },
+        {
+          "trace_index": 2134,
+          "status": 200
+        },
+        {
+          "trace_index": 2135,
+          "status": 200
+        },
+        {
+          "trace_index": 2152,
+          "status": 200
+        },
+        {
+          "trace_index": 2157,
+          "status": 200
+        }
+      ],
+      "defects": [
+        {
+          "id": "auth-reset-web-routes-404",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-auth-baseline-20261019",
+            "observed_error": "La web llamaba /api/auth/request-password-reset y /api/auth/reset-password (404) y no enviaba el email al confirmar; el login no enlazaba la recuperación.",
+            "local_only": true
+          },
+          "correction": "Login enlaza /reset-password/; la página usa password-reset/request y password-reset/confirm con email, token y la regla del DTO",
+          "pending": [
+            "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
+          ]
+        },
+        {
+          "id": "auth-reset-link-wrong-page",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-auth-baseline-20261019",
+            "observed_error": "El correo enlazaba http://localhost:3000 (APP_URL no está en el Blueprint) y /reset-password?token=, que mostraba el formulario de solicitud: el token nunca se podía usar.",
+            "local_only": true
+          },
+          "correction": "Enlaces con APP_URL o FRONTEND_URL; /reset-password/ procesa token y email de la consulta",
+          "pending": [
+            "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
+          ]
+        },
+        {
+          "id": "auth-email-config-false-flags",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "apps/erp-api/src/shared/email/email.service.spec.ts",
+            "observed_error": "EMAIL_DISABLED=false y SMTP_SECURE=false (texto) se evaluaban como verdaderos y SMTP_HOST caía en localhost: el servicio se declaraba configurado sin servidor y los envíos fallaban en silencio.",
+            "local_only": true
+          },
+          "correction": "Banderas booleanas interpretadas; sin SMTP_HOST no hay servicio; sin correo la solicitud responde 503 en vez de prometer un enlace",
+          "pending": [
+            "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
+          ]
+        },
+        {
+          "id": "production-5xx-english-generic",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-production-auth-smoke-after-144-20261019.json",
+            "observed_error": "En PROD (verificado en sólo lectura) todo 5xx, incluidos los 503 legibles, llega como \"An unexpected error occurred. Please try again later.\" a una UI en español.",
+            "local_only": false
+          },
+          "correction": "En producción el 5xx sigue sin detalles internos pero en español y distinguiendo 503 reintentable",
+          "pending": [
+            "CI exacto, main y runtime."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "auth-reset-web-routes",
+          "source": "scripts/ci/test-peru-auth-recovery-local.mjs",
+          "verified_checks": [
+            "La página /reset-password llama sólo rutas existentes del API"
+          ]
+        },
+        {
+          "id": "auth-reset-request-mail",
+          "source": "scripts/ci/test-peru-auth-recovery-local.mjs",
+          "verified_checks": [
+            "Respuesta uniforme, un correo con enlace a FRONTEND_URL/reset-password/ para la cuenta activa y ninguno para inexistentes o inactivas"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Envío real por el proveedor SMTP productivo (no configurado en el Blueprint) y roles distintos de ADMIN"
       ]
     },
     {
@@ -1230,17 +1408,42 @@
       "operation": "validatePasswordResetToken",
       "method": "POST",
       "endpoint": "/api/auth/password-reset/validate",
-      "source": "apps/erp-api/src/modules/auth/auth.controller.ts:192",
-      "existing_evidence": [],
+      "source": "apps/erp-api/src/modules/auth/auth.controller.ts:201",
+      "existing_evidence": [
+        {
+          "trace_index": 2138,
+          "status": 200
+        },
+        {
+          "trace_index": 2139,
+          "status": 401
+        },
+        {
+          "trace_index": 2140,
+          "status": 401
+        },
+        {
+          "trace_index": 2151,
+          "status": 401
+        },
+        {
+          "trace_index": 2153,
+          "status": 401
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "auth-reset-token-lifecycle",
+          "source": "scripts/ci/test-peru-auth-recovery-local.mjs",
+          "verified_checks": [
+            "Token válido una sola vez, ajeno/erróneo/vencido 401, contraseña débil 400, confirmar revoca sesiones y audita"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Envío real por el proveedor SMTP productivo (no configurado en el Blueprint) y roles distintos de ADMIN"
       ]
     },
     {
@@ -1248,17 +1451,71 @@
       "operation": "resetPassword",
       "method": "POST",
       "endpoint": "/api/auth/password-reset/confirm",
-      "source": "apps/erp-api/src/modules/auth/auth.controller.ts:215",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/auth/auth.controller.ts:224",
+      "existing_evidence": [
+        {
+          "trace_index": 2133,
+          "status": 400
+        },
+        {
+          "trace_index": 2141,
+          "status": 400
+        },
+        {
+          "trace_index": 2142,
+          "status": 401
+        },
+        {
+          "trace_index": 2143,
+          "status": 429
+        },
+        {
+          "trace_index": 2144,
+          "status": 200
+        },
+        {
+          "trace_index": 2150,
+          "status": 401
+        },
+        {
+          "trace_index": 2154,
+          "status": 401
+        }
+      ],
+      "defects": [
+        {
+          "id": "auth-reset-web-routes-404",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-auth-baseline-20261019",
+            "observed_error": "La web llamaba /api/auth/request-password-reset y /api/auth/reset-password (404) y no enviaba el email al confirmar; el login no enlazaba la recuperación.",
+            "local_only": true
+          },
+          "correction": "Login enlaza /reset-password/; la página usa password-reset/request y password-reset/confirm con email, token y la regla del DTO",
+          "pending": [
+            "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "auth-reset-web-routes",
+          "source": "scripts/ci/test-peru-auth-recovery-local.mjs",
+          "verified_checks": [
+            "La página /reset-password llama sólo rutas existentes del API"
+          ]
+        },
+        {
+          "id": "auth-reset-token-lifecycle",
+          "source": "scripts/ci/test-peru-auth-recovery-local.mjs",
+          "verified_checks": [
+            "Token válido una sola vez, ajeno/erróneo/vencido 401, contraseña débil 400, confirmar revoca sesiones y audita"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Envío real por el proveedor SMTP productivo (no configurado en el Blueprint) y roles distintos de ADMIN"
       ]
     },
     {
@@ -1266,7 +1523,7 @@
       "operation": "switchTenant",
       "method": "POST",
       "endpoint": "/api/auth/switch-tenant",
-      "source": "apps/erp-api/src/modules/auth/auth.controller.ts:238",
+      "source": "apps/erp-api/src/modules/auth/auth.controller.ts:247",
       "existing_evidence": [
         {
           "trace_index": 130,
@@ -1301,17 +1558,55 @@
       "operation": "logout",
       "method": "POST",
       "endpoint": "/api/auth/logout",
-      "source": "apps/erp-api/src/modules/auth/auth.controller.ts:258",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/auth/auth.controller.ts:267",
+      "existing_evidence": [
+        {
+          "trace_index": 2160,
+          "status": 201
+        },
+        {
+          "trace_index": 2177,
+          "status": 503
+        },
+        {
+          "trace_index": 2178,
+          "status": 201
+        }
+      ],
+      "defects": [
+        {
+          "id": "auth-logout-outage-200",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-auth-baseline-20261019",
+            "observed_error": "Si la RPC de revocación fallaba, logout y logout-all respondían 201 de éxito y las sesiones seguían activas.",
+            "local_only": true
+          },
+          "correction": "La falla de revocación responde 503; logout igual retira la cookie del navegador",
+          "pending": [
+            "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "auth-logout-sessions",
+          "source": "scripts/ci/test-peru-auth-recovery-local.mjs",
+          "verified_checks": [
+            "Logout cierra sólo su sesión; logout-all cierra todas las del usuario y ninguna ajena"
+          ]
+        },
+        {
+          "id": "auth-logout-outage-503",
+          "source": "scripts/ci/test-peru-auth-recovery-local.mjs",
+          "verified_checks": [
+            "Sin la RPC de revocación responden 503, la sesión sigue activa y el reintento la revoca"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Roles distintos de ADMIN"
       ]
     },
     {
@@ -1319,17 +1614,55 @@
       "operation": "logoutAll",
       "method": "POST",
       "endpoint": "/api/auth/logout-all",
-      "source": "apps/erp-api/src/modules/auth/auth.controller.ts:271",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/auth/auth.controller.ts:283",
+      "existing_evidence": [
+        {
+          "trace_index": 2166,
+          "status": 201
+        },
+        {
+          "trace_index": 2172,
+          "status": 503
+        },
+        {
+          "trace_index": 2174,
+          "status": 201
+        }
+      ],
+      "defects": [
+        {
+          "id": "auth-logout-outage-200",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-auth-baseline-20261019",
+            "observed_error": "Si la RPC de revocación fallaba, logout y logout-all respondían 201 de éxito y las sesiones seguían activas.",
+            "local_only": true
+          },
+          "correction": "La falla de revocación responde 503; logout igual retira la cookie del navegador",
+          "pending": [
+            "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "auth-logout-sessions",
+          "source": "scripts/ci/test-peru-auth-recovery-local.mjs",
+          "verified_checks": [
+            "Logout cierra sólo su sesión; logout-all cierra todas las del usuario y ninguna ajena"
+          ]
+        },
+        {
+          "id": "auth-logout-outage-503",
+          "source": "scripts/ci/test-peru-auth-recovery-local.mjs",
+          "verified_checks": [
+            "Sin la RPC de revocación responden 503, la sesión sigue activa y el reintento la revoca"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Roles distintos de ADMIN"
       ]
     },
     {
@@ -4342,7 +4675,7 @@
           "status": 201
         },
         {
-          "trace_index": 2022,
+          "trace_index": 2021,
           "status": 201
         }
       ],
@@ -5627,10 +5960,6 @@
         {
           "trace_index": 1886,
           "status": 201
-        },
-        {
-          "trace_index": 2156,
-          "status": 201
         }
       ],
       "defects": [
@@ -5745,55 +6074,55 @@
       "source": "apps/erp-api/src/modules/configuracion/configuration.controller.ts:795",
       "existing_evidence": [
         {
-          "trace_index": 2137,
+          "trace_index": 2224,
           "status": 201
         },
         {
-          "trace_index": 2138,
+          "trace_index": 2225,
           "status": 201
         },
         {
-          "trace_index": 2139,
+          "trace_index": 2226,
           "status": 201
         },
         {
-          "trace_index": 2140,
+          "trace_index": 2227,
           "status": 409
         },
         {
-          "trace_index": 2141,
+          "trace_index": 2228,
           "status": 400
         },
         {
-          "trace_index": 2142,
+          "trace_index": 2229,
           "status": 400
         },
         {
-          "trace_index": 2143,
+          "trace_index": 2230,
           "status": 400
         },
         {
-          "trace_index": 2144,
+          "trace_index": 2231,
           "status": 413
         },
         {
-          "trace_index": 2145,
+          "trace_index": 2232,
           "status": 201
         },
         {
-          "trace_index": 2146,
+          "trace_index": 2233,
           "status": 403
         },
         {
-          "trace_index": 2148,
+          "trace_index": 2235,
           "status": 400
         },
         {
-          "trace_index": 2149,
+          "trace_index": 2236,
           "status": 201
         },
         {
-          "trace_index": 2151,
+          "trace_index": 2238,
           "status": 201
         }
       ],
@@ -5822,15 +6151,15 @@
       "source": "apps/erp-api/src/modules/configuracion/configuration.controller.ts:837",
       "existing_evidence": [
         {
-          "trace_index": 2147,
+          "trace_index": 2234,
           "status": 403
         },
         {
-          "trace_index": 2152,
+          "trace_index": 2239,
           "status": 200
         },
         {
-          "trace_index": 2153,
+          "trace_index": 2240,
           "status": 200
         }
       ],
@@ -7017,11 +7346,11 @@
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-centros-costo.controller.ts:58",
       "existing_evidence": [
         {
-          "trace_index": 1972,
+          "trace_index": 1971,
           "status": 200
         },
         {
-          "trace_index": 1975,
+          "trace_index": 1974,
           "status": 404
         }
       ],
@@ -7044,11 +7373,11 @@
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-centros-costo.controller.ts:96",
       "existing_evidence": [
         {
-          "trace_index": 1969,
+          "trace_index": 1968,
           "status": 201
         },
         {
-          "trace_index": 1970,
+          "trace_index": 1969,
           "status": 201
         }
       ],
@@ -7071,7 +7400,7 @@
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-centros-costo.controller.ts:138",
       "existing_evidence": [
         {
-          "trace_index": 1971,
+          "trace_index": 1970,
           "status": 200
         }
       ],
@@ -7094,7 +7423,7 @@
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-centros-costo.controller.ts:193",
       "existing_evidence": [
         {
-          "trace_index": 1973,
+          "trace_index": 1972,
           "status": 200
         }
       ],
@@ -7117,7 +7446,7 @@
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-centros-costo.controller.ts:304",
       "existing_evidence": [
         {
-          "trace_index": 1974,
+          "trace_index": 1973,
           "status": 200
         }
       ],
@@ -7152,11 +7481,11 @@
           "status": 200
         },
         {
-          "trace_index": 1964,
+          "trace_index": 1963,
           "status": 200
         },
         {
-          "trace_index": 1967,
+          "trace_index": 1966,
           "status": 200
         }
       ],
@@ -7201,11 +7530,11 @@
           "status": 503
         },
         {
-          "trace_index": 1962,
+          "trace_index": 1961,
           "status": 200
         },
         {
-          "trace_index": 1963,
+          "trace_index": 1962,
           "status": 200
         }
       ],
@@ -7252,10 +7581,6 @@
         {
           "trace_index": 1960,
           "status": 409
-        },
-        {
-          "trace_index": 1961,
-          "status": 201
         }
       ],
       "defects": [
@@ -7304,15 +7629,15 @@
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-conciliacion.controller.ts:91",
       "existing_evidence": [
         {
-          "trace_index": 1965,
+          "trace_index": 1964,
           "status": 404
         },
         {
-          "trace_index": 1966,
+          "trace_index": 1965,
           "status": 200
         },
         {
-          "trace_index": 1968,
+          "trace_index": 1967,
           "status": 404
         }
       ],
@@ -9113,7 +9438,7 @@
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-multimoneda.controller.ts:59",
       "existing_evidence": [
         {
-          "trace_index": 1978,
+          "trace_index": 1977,
           "status": 200
         }
       ],
@@ -9159,11 +9484,11 @@
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-multimoneda.controller.ts:100",
       "existing_evidence": [
         {
-          "trace_index": 1976,
+          "trace_index": 1975,
           "status": 201
         },
         {
-          "trace_index": 1977,
+          "trace_index": 1976,
           "status": 201
         }
       ],
@@ -9186,7 +9511,7 @@
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-multimoneda.controller.ts:124",
       "existing_evidence": [
         {
-          "trace_index": 1979,
+          "trace_index": 1978,
           "status": 200
         }
       ],
@@ -10706,10 +11031,6 @@
         {
           "trace_index": 1356,
           "status": 200
-        },
-        {
-          "trace_index": 2204,
-          "status": 200
         }
       ],
       "defects": [],
@@ -10745,10 +11066,6 @@
         },
         {
           "trace_index": 1357,
-          "status": 200
-        },
-        {
-          "trace_index": 2205,
           "status": 200
         }
       ],
@@ -10994,10 +11311,6 @@
         {
           "trace_index": 1355,
           "status": 200
-        },
-        {
-          "trace_index": 2203,
-          "status": 200
         }
       ],
       "defects": [],
@@ -11025,10 +11338,6 @@
       "existing_evidence": [
         {
           "trace_index": 1340,
-          "status": 400
-        },
-        {
-          "trace_index": 2188,
           "status": 400
         }
       ],
@@ -11075,10 +11384,6 @@
       "existing_evidence": [
         {
           "trace_index": 1363,
-          "status": 503
-        },
-        {
-          "trace_index": 2211,
           "status": 503
         }
       ],
@@ -12021,910 +12326,6 @@
         {
           "trace_index": 1592,
           "status": 201
-        },
-        {
-          "trace_index": 2158,
-          "status": 201
-        },
-        {
-          "trace_index": 2159,
-          "status": 201
-        },
-        {
-          "trace_index": 2160,
-          "status": 201
-        },
-        {
-          "trace_index": 2161,
-          "status": 409
-        },
-        {
-          "trace_index": 2184,
-          "status": 201
-        },
-        {
-          "trace_index": 2185,
-          "status": 400
-        },
-        {
-          "trace_index": 2186,
-          "status": 400
-        },
-        {
-          "trace_index": 2187,
-          "status": 400
-        },
-        {
-          "trace_index": 2189,
-          "status": 201
-        },
-        {
-          "trace_index": 2193,
-          "status": 201
-        },
-        {
-          "trace_index": 2195,
-          "status": 201
-        },
-        {
-          "trace_index": 2216,
-          "status": 403
-        },
-        {
-          "trace_index": 2220,
-          "status": 201
-        },
-        {
-          "trace_index": 2225,
-          "status": 403
-        },
-        {
-          "trace_index": 2227,
-          "status": 400
-        },
-        {
-          "trace_index": 2228,
-          "status": 400
-        },
-        {
-          "trace_index": 2229,
-          "status": 503
-        },
-        {
-          "trace_index": 2230,
-          "status": 201
-        },
-        {
-          "trace_index": 2231,
-          "status": 201
-        },
-        {
-          "trace_index": 2232,
-          "status": 503
-        },
-        {
-          "trace_index": 2233,
-          "status": 201
-        },
-        {
-          "trace_index": 2234,
-          "status": 201
-        },
-        {
-          "trace_index": 2235,
-          "status": 201
-        },
-        {
-          "trace_index": 2238,
-          "status": 201
-        },
-        {
-          "trace_index": 2239,
-          "status": 201
-        },
-        {
-          "trace_index": 2240,
-          "status": 201
-        },
-        {
-          "trace_index": 2241,
-          "status": 201
-        },
-        {
-          "trace_index": 2242,
-          "status": 201
-        },
-        {
-          "trace_index": 2243,
-          "status": 201
-        },
-        {
-          "trace_index": 2244,
-          "status": 201
-        },
-        {
-          "trace_index": 2245,
-          "status": 201
-        },
-        {
-          "trace_index": 2246,
-          "status": 201
-        },
-        {
-          "trace_index": 2247,
-          "status": 201
-        },
-        {
-          "trace_index": 2248,
-          "status": 201
-        },
-        {
-          "trace_index": 2249,
-          "status": 201
-        },
-        {
-          "trace_index": 2250,
-          "status": 201
-        },
-        {
-          "trace_index": 2251,
-          "status": 201
-        },
-        {
-          "trace_index": 2252,
-          "status": 201
-        },
-        {
-          "trace_index": 2253,
-          "status": 201
-        },
-        {
-          "trace_index": 2254,
-          "status": 201
-        },
-        {
-          "trace_index": 2255,
-          "status": 201
-        },
-        {
-          "trace_index": 2256,
-          "status": 201
-        },
-        {
-          "trace_index": 2257,
-          "status": 201
-        },
-        {
-          "trace_index": 2258,
-          "status": 201
-        },
-        {
-          "trace_index": 2259,
-          "status": 201
-        },
-        {
-          "trace_index": 2260,
-          "status": 201
-        },
-        {
-          "trace_index": 2261,
-          "status": 201
-        },
-        {
-          "trace_index": 2262,
-          "status": 201
-        },
-        {
-          "trace_index": 2263,
-          "status": 201
-        },
-        {
-          "trace_index": 2264,
-          "status": 201
-        },
-        {
-          "trace_index": 2265,
-          "status": 201
-        },
-        {
-          "trace_index": 2266,
-          "status": 201
-        },
-        {
-          "trace_index": 2267,
-          "status": 201
-        },
-        {
-          "trace_index": 2268,
-          "status": 201
-        },
-        {
-          "trace_index": 2269,
-          "status": 201
-        },
-        {
-          "trace_index": 2270,
-          "status": 201
-        },
-        {
-          "trace_index": 2271,
-          "status": 201
-        },
-        {
-          "trace_index": 2272,
-          "status": 201
-        },
-        {
-          "trace_index": 2273,
-          "status": 201
-        },
-        {
-          "trace_index": 2274,
-          "status": 201
-        },
-        {
-          "trace_index": 2275,
-          "status": 201
-        },
-        {
-          "trace_index": 2276,
-          "status": 201
-        },
-        {
-          "trace_index": 2277,
-          "status": 201
-        },
-        {
-          "trace_index": 2278,
-          "status": 201
-        },
-        {
-          "trace_index": 2279,
-          "status": 201
-        },
-        {
-          "trace_index": 2280,
-          "status": 201
-        },
-        {
-          "trace_index": 2281,
-          "status": 201
-        },
-        {
-          "trace_index": 2282,
-          "status": 201
-        },
-        {
-          "trace_index": 2283,
-          "status": 201
-        },
-        {
-          "trace_index": 2284,
-          "status": 201
-        },
-        {
-          "trace_index": 2285,
-          "status": 201
-        },
-        {
-          "trace_index": 2286,
-          "status": 201
-        },
-        {
-          "trace_index": 2287,
-          "status": 201
-        },
-        {
-          "trace_index": 2288,
-          "status": 201
-        },
-        {
-          "trace_index": 2289,
-          "status": 201
-        },
-        {
-          "trace_index": 2290,
-          "status": 201
-        },
-        {
-          "trace_index": 2291,
-          "status": 201
-        },
-        {
-          "trace_index": 2292,
-          "status": 201
-        },
-        {
-          "trace_index": 2293,
-          "status": 201
-        },
-        {
-          "trace_index": 2294,
-          "status": 201
-        },
-        {
-          "trace_index": 2295,
-          "status": 201
-        },
-        {
-          "trace_index": 2296,
-          "status": 201
-        },
-        {
-          "trace_index": 2297,
-          "status": 201
-        },
-        {
-          "trace_index": 2298,
-          "status": 201
-        },
-        {
-          "trace_index": 2299,
-          "status": 201
-        },
-        {
-          "trace_index": 2300,
-          "status": 201
-        },
-        {
-          "trace_index": 2301,
-          "status": 201
-        },
-        {
-          "trace_index": 2302,
-          "status": 201
-        },
-        {
-          "trace_index": 2303,
-          "status": 201
-        },
-        {
-          "trace_index": 2304,
-          "status": 201
-        },
-        {
-          "trace_index": 2305,
-          "status": 201
-        },
-        {
-          "trace_index": 2306,
-          "status": 201
-        },
-        {
-          "trace_index": 2307,
-          "status": 201
-        },
-        {
-          "trace_index": 2308,
-          "status": 201
-        },
-        {
-          "trace_index": 2309,
-          "status": 201
-        },
-        {
-          "trace_index": 2310,
-          "status": 429
-        },
-        {
-          "trace_index": 2311,
-          "status": 201
-        },
-        {
-          "trace_index": 2312,
-          "status": 201
-        },
-        {
-          "trace_index": 2313,
-          "status": 201
-        },
-        {
-          "trace_index": 2314,
-          "status": 201
-        },
-        {
-          "trace_index": 2315,
-          "status": 201
-        },
-        {
-          "trace_index": 2316,
-          "status": 201
-        },
-        {
-          "trace_index": 2317,
-          "status": 201
-        },
-        {
-          "trace_index": 2318,
-          "status": 201
-        },
-        {
-          "trace_index": 2319,
-          "status": 201
-        },
-        {
-          "trace_index": 2320,
-          "status": 201
-        },
-        {
-          "trace_index": 2321,
-          "status": 201
-        },
-        {
-          "trace_index": 2322,
-          "status": 201
-        },
-        {
-          "trace_index": 2323,
-          "status": 201
-        },
-        {
-          "trace_index": 2324,
-          "status": 201
-        },
-        {
-          "trace_index": 2325,
-          "status": 201
-        },
-        {
-          "trace_index": 2326,
-          "status": 201
-        },
-        {
-          "trace_index": 2327,
-          "status": 201
-        },
-        {
-          "trace_index": 2328,
-          "status": 201
-        },
-        {
-          "trace_index": 2329,
-          "status": 201
-        },
-        {
-          "trace_index": 2330,
-          "status": 201
-        },
-        {
-          "trace_index": 2331,
-          "status": 201
-        },
-        {
-          "trace_index": 2332,
-          "status": 201
-        },
-        {
-          "trace_index": 2333,
-          "status": 201
-        },
-        {
-          "trace_index": 2334,
-          "status": 201
-        },
-        {
-          "trace_index": 2335,
-          "status": 201
-        },
-        {
-          "trace_index": 2336,
-          "status": 201
-        },
-        {
-          "trace_index": 2337,
-          "status": 201
-        },
-        {
-          "trace_index": 2338,
-          "status": 201
-        },
-        {
-          "trace_index": 2339,
-          "status": 201
-        },
-        {
-          "trace_index": 2340,
-          "status": 201
-        },
-        {
-          "trace_index": 2341,
-          "status": 201
-        },
-        {
-          "trace_index": 2342,
-          "status": 201
-        },
-        {
-          "trace_index": 2343,
-          "status": 201
-        },
-        {
-          "trace_index": 2344,
-          "status": 201
-        },
-        {
-          "trace_index": 2345,
-          "status": 201
-        },
-        {
-          "trace_index": 2346,
-          "status": 201
-        },
-        {
-          "trace_index": 2347,
-          "status": 201
-        },
-        {
-          "trace_index": 2348,
-          "status": 201
-        },
-        {
-          "trace_index": 2349,
-          "status": 201
-        },
-        {
-          "trace_index": 2350,
-          "status": 201
-        },
-        {
-          "trace_index": 2351,
-          "status": 201
-        },
-        {
-          "trace_index": 2352,
-          "status": 201
-        },
-        {
-          "trace_index": 2353,
-          "status": 201
-        },
-        {
-          "trace_index": 2354,
-          "status": 201
-        },
-        {
-          "trace_index": 2355,
-          "status": 201
-        },
-        {
-          "trace_index": 2356,
-          "status": 201
-        },
-        {
-          "trace_index": 2357,
-          "status": 201
-        },
-        {
-          "trace_index": 2358,
-          "status": 201
-        },
-        {
-          "trace_index": 2359,
-          "status": 201
-        },
-        {
-          "trace_index": 2360,
-          "status": 201
-        },
-        {
-          "trace_index": 2361,
-          "status": 201
-        },
-        {
-          "trace_index": 2362,
-          "status": 201
-        },
-        {
-          "trace_index": 2363,
-          "status": 201
-        },
-        {
-          "trace_index": 2364,
-          "status": 201
-        },
-        {
-          "trace_index": 2365,
-          "status": 201
-        },
-        {
-          "trace_index": 2366,
-          "status": 201
-        },
-        {
-          "trace_index": 2367,
-          "status": 201
-        },
-        {
-          "trace_index": 2368,
-          "status": 201
-        },
-        {
-          "trace_index": 2369,
-          "status": 201
-        },
-        {
-          "trace_index": 2370,
-          "status": 201
-        },
-        {
-          "trace_index": 2371,
-          "status": 201
-        },
-        {
-          "trace_index": 2372,
-          "status": 201
-        },
-        {
-          "trace_index": 2373,
-          "status": 201
-        },
-        {
-          "trace_index": 2374,
-          "status": 201
-        },
-        {
-          "trace_index": 2375,
-          "status": 201
-        },
-        {
-          "trace_index": 2376,
-          "status": 201
-        },
-        {
-          "trace_index": 2377,
-          "status": 201
-        },
-        {
-          "trace_index": 2378,
-          "status": 201
-        },
-        {
-          "trace_index": 2379,
-          "status": 201
-        },
-        {
-          "trace_index": 2380,
-          "status": 201
-        },
-        {
-          "trace_index": 2381,
-          "status": 201
-        },
-        {
-          "trace_index": 2382,
-          "status": 201
-        },
-        {
-          "trace_index": 2383,
-          "status": 201
-        },
-        {
-          "trace_index": 2384,
-          "status": 201
-        },
-        {
-          "trace_index": 2385,
-          "status": 201
-        },
-        {
-          "trace_index": 2386,
-          "status": 201
-        },
-        {
-          "trace_index": 2387,
-          "status": 201
-        },
-        {
-          "trace_index": 2388,
-          "status": 201
-        },
-        {
-          "trace_index": 2389,
-          "status": 201
-        },
-        {
-          "trace_index": 2390,
-          "status": 201
-        },
-        {
-          "trace_index": 2391,
-          "status": 201
-        },
-        {
-          "trace_index": 2392,
-          "status": 201
-        },
-        {
-          "trace_index": 2393,
-          "status": 201
-        },
-        {
-          "trace_index": 2394,
-          "status": 201
-        },
-        {
-          "trace_index": 2395,
-          "status": 201
-        },
-        {
-          "trace_index": 2396,
-          "status": 201
-        },
-        {
-          "trace_index": 2397,
-          "status": 201
-        },
-        {
-          "trace_index": 2398,
-          "status": 201
-        },
-        {
-          "trace_index": 2399,
-          "status": 201
-        },
-        {
-          "trace_index": 2400,
-          "status": 201
-        },
-        {
-          "trace_index": 2401,
-          "status": 201
-        },
-        {
-          "trace_index": 2402,
-          "status": 201
-        },
-        {
-          "trace_index": 2403,
-          "status": 201
-        },
-        {
-          "trace_index": 2404,
-          "status": 201
-        },
-        {
-          "trace_index": 2405,
-          "status": 201
-        },
-        {
-          "trace_index": 2406,
-          "status": 201
-        },
-        {
-          "trace_index": 2407,
-          "status": 201
-        },
-        {
-          "trace_index": 2408,
-          "status": 201
-        },
-        {
-          "trace_index": 2409,
-          "status": 201
-        },
-        {
-          "trace_index": 2410,
-          "status": 201
-        },
-        {
-          "trace_index": 2411,
-          "status": 429
-        },
-        {
-          "trace_index": 2412,
-          "status": 201
-        },
-        {
-          "trace_index": 2413,
-          "status": 201
-        },
-        {
-          "trace_index": 2414,
-          "status": 201
-        },
-        {
-          "trace_index": 2415,
-          "status": 201
-        },
-        {
-          "trace_index": 2416,
-          "status": 201
-        },
-        {
-          "trace_index": 2417,
-          "status": 201
-        },
-        {
-          "trace_index": 2418,
-          "status": 201
-        },
-        {
-          "trace_index": 2419,
-          "status": 201
-        },
-        {
-          "trace_index": 2420,
-          "status": 201
-        },
-        {
-          "trace_index": 2421,
-          "status": 201
-        },
-        {
-          "trace_index": 2422,
-          "status": 201
-        },
-        {
-          "trace_index": 2423,
-          "status": 201
-        },
-        {
-          "trace_index": 2424,
-          "status": 201
-        },
-        {
-          "trace_index": 2425,
-          "status": 201
-        },
-        {
-          "trace_index": 2426,
-          "status": 201
-        },
-        {
-          "trace_index": 2427,
-          "status": 201
-        },
-        {
-          "trace_index": 2428,
-          "status": 201
-        },
-        {
-          "trace_index": 2429,
-          "status": 201
-        },
-        {
-          "trace_index": 2430,
-          "status": 201
-        },
-        {
-          "trace_index": 2431,
-          "status": 201
-        },
-        {
-          "trace_index": 2432,
-          "status": 201
-        },
-        {
-          "trace_index": 2433,
-          "status": 201
-        },
-        {
-          "trace_index": 2434,
-          "status": 201
-        },
-        {
-          "trace_index": 2435,
-          "status": 201
-        },
-        {
-          "trace_index": 2436,
-          "status": 201
-        },
-        {
-          "trace_index": 2437,
-          "status": 201
-        },
-        {
-          "trace_index": 2438,
-          "status": 201
-        },
-        {
-          "trace_index": 2439,
-          "status": 201
-        },
-        {
-          "trace_index": 2440,
-          "status": 201
         }
       ],
       "defects": [
@@ -13145,38 +12546,6 @@
         {
           "trace_index": 1388,
           "status": 200
-        },
-        {
-          "trace_index": 2178,
-          "status": 200
-        },
-        {
-          "trace_index": 2179,
-          "status": 200
-        },
-        {
-          "trace_index": 2180,
-          "status": 200
-        },
-        {
-          "trace_index": 2181,
-          "status": 400
-        },
-        {
-          "trace_index": 2182,
-          "status": 400
-        },
-        {
-          "trace_index": 2183,
-          "status": 400
-        },
-        {
-          "trace_index": 2206,
-          "status": 503
-        },
-        {
-          "trace_index": 2236,
-          "status": 200
         }
       ],
       "defects": [
@@ -13287,22 +12656,6 @@
         {
           "trace_index": 1593,
           "status": 200
-        },
-        {
-          "trace_index": 2190,
-          "status": 200
-        },
-        {
-          "trace_index": 2191,
-          "status": 200
-        },
-        {
-          "trace_index": 2192,
-          "status": 200
-        },
-        {
-          "trace_index": 2441,
-          "status": 200
         }
       ],
       "defects": [
@@ -13398,38 +12751,6 @@
         },
         {
           "trace_index": 1371,
-          "status": 200
-        },
-        {
-          "trace_index": 2162,
-          "status": 200
-        },
-        {
-          "trace_index": 2166,
-          "status": 404
-        },
-        {
-          "trace_index": 2170,
-          "status": 404
-        },
-        {
-          "trace_index": 2174,
-          "status": 400
-        },
-        {
-          "trace_index": 2194,
-          "status": 200
-        },
-        {
-          "trace_index": 2196,
-          "status": 200
-        },
-        {
-          "trace_index": 2207,
-          "status": 503
-        },
-        {
-          "trace_index": 2219,
           "status": 200
         }
       ],
@@ -13547,34 +12868,6 @@
         },
         {
           "trace_index": 1370,
-          "status": 403
-        },
-        {
-          "trace_index": 2165,
-          "status": 200
-        },
-        {
-          "trace_index": 2167,
-          "status": 404
-        },
-        {
-          "trace_index": 2171,
-          "status": 404
-        },
-        {
-          "trace_index": 2177,
-          "status": 400
-        },
-        {
-          "trace_index": 2197,
-          "status": 200
-        },
-        {
-          "trace_index": 2210,
-          "status": 503
-        },
-        {
-          "trace_index": 2218,
           "status": 403
         }
       ],
@@ -13887,30 +13180,6 @@
         {
           "trace_index": 1364,
           "status": 200
-        },
-        {
-          "trace_index": 2163,
-          "status": 200
-        },
-        {
-          "trace_index": 2168,
-          "status": 404
-        },
-        {
-          "trace_index": 2172,
-          "status": 404
-        },
-        {
-          "trace_index": 2175,
-          "status": 400
-        },
-        {
-          "trace_index": 2208,
-          "status": 503
-        },
-        {
-          "trace_index": 2212,
-          "status": 200
         }
       ],
       "defects": [
@@ -14022,46 +13291,6 @@
         },
         {
           "trace_index": 1389,
-          "status": 200
-        },
-        {
-          "trace_index": 2164,
-          "status": 200
-        },
-        {
-          "trace_index": 2169,
-          "status": 404
-        },
-        {
-          "trace_index": 2173,
-          "status": 404
-        },
-        {
-          "trace_index": 2176,
-          "status": 400
-        },
-        {
-          "trace_index": 2198,
-          "status": 200
-        },
-        {
-          "trace_index": 2200,
-          "status": 200
-        },
-        {
-          "trace_index": 2202,
-          "status": 200
-        },
-        {
-          "trace_index": 2209,
-          "status": 503
-        },
-        {
-          "trace_index": 2217,
-          "status": 403
-        },
-        {
-          "trace_index": 2237,
           "status": 200
         }
       ],
@@ -14189,30 +13418,6 @@
         },
         {
           "trace_index": 1376,
-          "status": 404
-        },
-        {
-          "trace_index": 2199,
-          "status": 503
-        },
-        {
-          "trace_index": 2201,
-          "status": 503
-        },
-        {
-          "trace_index": 2221,
-          "status": 503
-        },
-        {
-          "trace_index": 2222,
-          "status": 503
-        },
-        {
-          "trace_index": 2223,
-          "status": 409
-        },
-        {
-          "trace_index": 2224,
           "status": 404
         }
       ],
@@ -15041,7 +14246,7 @@
           "status": 200
         },
         {
-          "trace_index": 2067,
+          "trace_index": 2066,
           "status": 503
         }
       ],
@@ -15182,7 +14387,7 @@
           "status": 200
         },
         {
-          "trace_index": 2038,
+          "trace_index": 2037,
           "status": 200
         }
       ],
@@ -15260,11 +14465,11 @@
           "status": 201
         },
         {
-          "trace_index": 2020,
+          "trace_index": 2019,
           "status": 201
         },
         {
-          "trace_index": 2090,
+          "trace_index": 2089,
           "status": 201
         }
       ],
@@ -15336,15 +14541,15 @@
       "source": "apps/erp-api/src/modules/finanzas/bancos/bancos.controller.ts:94",
       "existing_evidence": [
         {
-          "trace_index": 2053,
+          "trace_index": 2052,
           "status": 200
         },
         {
-          "trace_index": 2056,
+          "trace_index": 2055,
           "status": 404
         },
         {
-          "trace_index": 2069,
+          "trace_index": 2068,
           "status": 503
         }
       ],
@@ -15421,11 +14626,11 @@
           "status": 201
         },
         {
-          "trace_index": 2021,
+          "trace_index": 2020,
           "status": 201
         },
         {
-          "trace_index": 2091,
+          "trace_index": 2090,
           "status": 201
         }
       ],
@@ -15505,15 +14710,15 @@
       "source": "apps/erp-api/src/modules/finanzas/bancos/bancos.controller.ts:139",
       "existing_evidence": [
         {
-          "trace_index": 2054,
+          "trace_index": 2053,
           "status": 200
         },
         {
-          "trace_index": 2057,
+          "trace_index": 2056,
           "status": 200
         },
         {
-          "trace_index": 2068,
+          "trace_index": 2067,
           "status": 503
         }
       ],
@@ -15599,15 +14804,15 @@
       "source": "apps/erp-api/src/modules/finanzas/bancos/bancos.controller.ts:170",
       "existing_evidence": [
         {
-          "trace_index": 2055,
+          "trace_index": 2054,
           "status": 200
         },
         {
-          "trace_index": 2058,
+          "trace_index": 2057,
           "status": 400
         },
         {
-          "trace_index": 2070,
+          "trace_index": 2069,
           "status": 503
         }
       ],
@@ -15648,7 +14853,7 @@
           "status": 200
         },
         {
-          "trace_index": 2059,
+          "trace_index": 2058,
           "status": 200
         }
       ],
@@ -15671,7 +14876,7 @@
       "source": "apps/erp-api/src/modules/finanzas/conciliacion/conciliacion.controller.ts:40",
       "existing_evidence": [
         {
-          "trace_index": 2060,
+          "trace_index": 2059,
           "status": 200
         }
       ],
@@ -15694,7 +14899,7 @@
       "source": "apps/erp-api/src/modules/finanzas/conciliacion/conciliacion.controller.ts:53",
       "existing_evidence": [
         {
-          "trace_index": 2061,
+          "trace_index": 2060,
           "status": 200
         }
       ],
@@ -16137,7 +15342,21 @@
           "status": 200
         }
       ],
-      "defects": [],
+      "defects": [
+        {
+          "id": "cxc-detail-outage-404",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cxc-baseline-20261019",
+            "observed_error": "Una lectura caída del detalle respondía 404 \"Cuenta por cobrar no encontrada\".",
+            "local_only": true
+          },
+          "correction": "Sólo la ausencia de fila es 404; la lectura caída es 503",
+          "pending": [
+            "CI exacto, main y runtime."
+          ]
+        }
+      ],
       "verified_cases": [
         {
           "id": "sales-order-document-cxc-collection-cash-accounting",
@@ -16210,7 +15429,21 @@
       "endpoint": "/api/finanzas/cxc/:id/notas-credito",
       "source": "apps/erp-api/src/modules/finanzas/cxc/cxc.controller.ts:90",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "cxc-credit-note-raw-codes",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cxc-baseline-20261019",
+            "observed_error": "Los rechazos llegaban como 400 con el código interno (REFERENCED_NOTE_ORIGINAL_ACCOUNTING_PENDING_RETRY, REFERENCED_NOTE_SOURCE_NOT_FISCALLY_ACCEPTED) y la configuración o el writer caídos también eran 400.",
+            "local_only": true
+          },
+          "correction": "409 con un motivo en español para contabilidad pendiente y falta de aceptación SUNAT; 503 si no se puede leer la configuración o no hay writer",
+          "pending": [
+            "CI exacto, main y runtime."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -16228,7 +15461,34 @@
       "endpoint": "/api/finanzas/cxc/:id/reprogramar",
       "source": "apps/erp-api/src/modules/finanzas/cxc/cxc.controller.ts:106",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "cxc-reprogram-derived-key-false-success",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cxc-baseline-20261019",
+            "observed_error": "La pantalla no enviaba Idempotency-Key y el API derivaba la clave del contenido: volver a una fecha ya usada con el motivo precargado respondía 201 sin aplicarse.",
+            "local_only": true
+          },
+          "correction": "Sin clave cada pedido es una intención nueva; el modal envía una clave por intento y sólo la reutiliza al reintentar el mismo contenido",
+          "pending": [
+            "CI exacto, main y runtime."
+          ]
+        },
+        {
+          "id": "cxc-reprogram-errors-as-400",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-cxc-baseline-20261019",
+            "observed_error": "Inexistente, ajena, conflicto de intención, cuenta anulada y writer caído respondían 400.",
+            "local_only": true
+          },
+          "correction": "404 / 409 / 503 según la causa",
+          "pending": [
+            "CI exacto, main y runtime."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -16247,7 +15507,7 @@
       "source": "apps/erp-api/src/modules/finanzas/cxp/cxp.controller.ts:28",
       "existing_evidence": [
         {
-          "trace_index": 2062,
+          "trace_index": 2061,
           "status": 503
         }
       ],
@@ -16288,15 +15548,15 @@
       "source": "apps/erp-api/src/modules/finanzas/cxp/cxp.controller.ts:43",
       "existing_evidence": [
         {
-          "trace_index": 2029,
+          "trace_index": 2028,
           "status": 200
         },
         {
-          "trace_index": 2032,
+          "trace_index": 2031,
           "status": 200
         },
         {
-          "trace_index": 2063,
+          "trace_index": 2062,
           "status": 503
         }
       ],
@@ -16333,15 +15593,15 @@
       "source": "apps/erp-api/src/modules/finanzas/cxp/cxp.controller.ts:58",
       "existing_evidence": [
         {
-          "trace_index": 2030,
+          "trace_index": 2029,
           "status": 200
         },
         {
-          "trace_index": 2033,
+          "trace_index": 2032,
           "status": 400
         },
         {
-          "trace_index": 2064,
+          "trace_index": 2063,
           "status": 503
         }
       ],
@@ -16378,7 +15638,7 @@
       "source": "apps/erp-api/src/modules/finanzas/cxp/cxp.controller.ts:73",
       "existing_evidence": [
         {
-          "trace_index": 2031,
+          "trace_index": 2030,
           "status": 200
         }
       ],
@@ -16480,7 +15740,11 @@
           "status": 200
         },
         {
-          "trace_index": 2027,
+          "trace_index": 2026,
+          "status": 200
+        },
+        {
+          "trace_index": 2035,
           "status": 200
         },
         {
@@ -16488,19 +15752,15 @@
           "status": 200
         },
         {
-          "trace_index": 2037,
+          "trace_index": 2041,
           "status": 200
         },
         {
-          "trace_index": 2042,
+          "trace_index": 2049,
           "status": 200
         },
         {
-          "trace_index": 2050,
-          "status": 200
-        },
-        {
-          "trace_index": 2066,
+          "trace_index": 2065,
           "status": 503
         }
       ],
@@ -16623,15 +15883,15 @@
           "status": 201
         },
         {
+          "trace_index": 2022,
+          "status": 201
+        },
+        {
           "trace_index": 2023,
           "status": 201
         },
         {
           "trace_index": 2024,
-          "status": 201
-        },
-        {
-          "trace_index": 2025,
           "status": 201
         }
       ],
@@ -16674,11 +15934,11 @@
       "source": "apps/erp-api/src/modules/finanzas/cxp/cxp.controller.ts:137",
       "existing_evidence": [
         {
-          "trace_index": 2026,
+          "trace_index": 2025,
           "status": 200
         },
         {
-          "trace_index": 2028,
+          "trace_index": 2027,
           "status": 404
         }
       ],
@@ -16746,19 +16006,19 @@
       "source": "apps/erp-api/src/modules/finanzas/cxp/cxp.controller.ts:174",
       "existing_evidence": [
         {
-          "trace_index": 2047,
+          "trace_index": 2046,
           "status": 400
+        },
+        {
+          "trace_index": 2047,
+          "status": 201
         },
         {
           "trace_index": 2048,
           "status": 201
         },
         {
-          "trace_index": 2049,
-          "status": 201
-        },
-        {
-          "trace_index": 2052,
+          "trace_index": 2051,
           "status": 404
         }
       ],
@@ -16795,7 +16055,7 @@
       "source": "apps/erp-api/src/modules/finanzas/cxp/cxp.controller.ts:193",
       "existing_evidence": [
         {
-          "trace_index": 2039,
+          "trace_index": 2038,
           "status": 200
         }
       ],
@@ -16881,7 +16141,7 @@
       "source": "apps/erp-api/src/modules/finanzas/tesoreria/tesoreria.controller.ts:102",
       "existing_evidence": [
         {
-          "trace_index": 2040,
+          "trace_index": 2039,
           "status": 200
         }
       ],
@@ -16904,19 +16164,19 @@
       "source": "apps/erp-api/src/modules/finanzas/tesoreria/tesoreria.controller.ts:174",
       "existing_evidence": [
         {
-          "trace_index": 2044,
+          "trace_index": 2043,
           "status": 200
         },
         {
-          "trace_index": 2046,
+          "trace_index": 2045,
           "status": 200
         },
         {
-          "trace_index": 2051,
+          "trace_index": 2050,
           "status": 200
         },
         {
-          "trace_index": 2065,
+          "trace_index": 2064,
           "status": 503
         }
       ],
@@ -16953,19 +16213,19 @@
       "source": "apps/erp-api/src/modules/finanzas/tesoreria/tesoreria.controller.ts:275",
       "existing_evidence": [
         {
+          "trace_index": 2033,
+          "status": 201
+        },
+        {
           "trace_index": 2034,
           "status": 201
         },
         {
-          "trace_index": 2035,
-          "status": 201
-        },
-        {
-          "trace_index": 2041,
+          "trace_index": 2040,
           "status": 400
         },
         {
-          "trace_index": 2043,
+          "trace_index": 2042,
           "status": 400
         }
       ],
@@ -16988,7 +16248,7 @@
       "source": "apps/erp-api/src/modules/finanzas/tesoreria/tesoreria.controller.ts:376",
       "existing_evidence": [
         {
-          "trace_index": 2045,
+          "trace_index": 2044,
           "status": 200
         }
       ],
@@ -19839,17 +19099,69 @@
       "operation": "getNotifications",
       "method": "GET",
       "endpoint": "/api/notifications",
-      "source": "apps/erp-api/src/modules/notifications.controller.ts:56",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/notifications.controller.ts:39",
+      "existing_evidence": [
+        {
+          "trace_index": 2189,
+          "status": 200
+        },
+        {
+          "trace_index": 2191,
+          "status": 200
+        },
+        {
+          "trace_index": 2212,
+          "status": 503
+        }
+      ],
+      "defects": [
+        {
+          "id": "notifications-list-403-for-operational-roles",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-notifications-baseline-20261019",
+            "observed_error": "La campana mostraba el contador a cualquier usuario, pero la lista y el marcado exigían notifications.read/update, que vendedores y cajeros no tienen: veían \"3\" y al abrir obtenían 403.",
+            "local_only": true
+          },
+          "correction": "Leer la propia lista y marcar los avisos personales no exige permiso; los compartidos (globales o de rol) siguen exigiendo notifications.update porque el estado leído es por aviso; borrar sigue protegido y la UI oculta lo que no se puede hacer",
+          "pending": [
+            "CI exacto, main y runtime.",
+            "Estado leído por usuario (migración) para que cada rol pueda despejar su campana."
+          ]
+        },
+        {
+          "id": "notifications-errors-as-200",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-notifications-baseline-20261019",
+            "observed_error": "Toda falla (ajena, inexistente, mal formada o base caída) respondía 200 con success:false; la UI la tomaba por éxito o por \"sin notificaciones\".",
+            "local_only": true
+          },
+          "correction": "404 ajena o inexistente, 400 mal formada, 503 indisponible; la UI conserva el aviso y explica el fallo",
+          "pending": [
+            "CI exacto, main y runtime."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "notifications-visibility",
+          "source": "scripts/ci/test-peru-notifications-local.mjs",
+          "verified_checks": [
+            "Cada usuario ve lo suyo, lo global y lo de sus roles; nada de otro usuario ni de otra empresa; un vendedor abre su lista"
+          ]
+        },
+        {
+          "id": "notifications-outage-503",
+          "source": "scripts/ci/test-peru-notifications-local.mjs",
+          "verified_checks": [
+            "Lecturas y writer caídos responden 503 sin cambiar estado"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Roles distintos de ADMIN y VENDEDOR; notificaciones generadas por stock, integraciones y logística"
       ]
     },
     {
@@ -19857,17 +19169,71 @@
       "operation": "getUnreadNotifications",
       "method": "GET",
       "endpoint": "/api/notifications/unread",
-      "source": "apps/erp-api/src/modules/notifications.controller.ts:95",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/notifications.controller.ts:63",
+      "existing_evidence": [
+        {
+          "trace_index": 2190,
+          "status": 200
+        },
+        {
+          "trace_index": 2192,
+          "status": 200
+        },
+        {
+          "trace_index": 2194,
+          "status": 200
+        },
+        {
+          "trace_index": 2196,
+          "status": 200
+        },
+        {
+          "trace_index": 2203,
+          "status": 200
+        },
+        {
+          "trace_index": 2206,
+          "status": 200
+        },
+        {
+          "trace_index": 2213,
+          "status": 503
+        }
+      ],
+      "defects": [
+        {
+          "id": "notifications-errors-as-200",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-notifications-baseline-20261019",
+            "observed_error": "Toda falla (ajena, inexistente, mal formada o base caída) respondía 200 con success:false; la UI la tomaba por éxito o por \"sin notificaciones\".",
+            "local_only": true
+          },
+          "correction": "404 ajena o inexistente, 400 mal formada, 503 indisponible; la UI conserva el aviso y explica el fallo",
+          "pending": [
+            "CI exacto, main y runtime."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "notifications-visibility",
+          "source": "scripts/ci/test-peru-notifications-local.mjs",
+          "verified_checks": [
+            "Cada usuario ve lo suyo, lo global y lo de sus roles; nada de otro usuario ni de otra empresa; un vendedor abre su lista"
+          ]
+        },
+        {
+          "id": "notifications-outage-503",
+          "source": "scripts/ci/test-peru-notifications-local.mjs",
+          "verified_checks": [
+            "Lecturas y writer caídos responden 503 sin cambiar estado"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Roles distintos de ADMIN y VENDEDOR; notificaciones generadas por stock, integraciones y logística"
       ]
     },
     {
@@ -19875,17 +19241,68 @@
       "operation": "getUnreadCount",
       "method": "GET",
       "endpoint": "/api/notifications/unread-count",
-      "source": "apps/erp-api/src/modules/notifications.controller.ts:116",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/notifications.controller.ts:71",
+      "existing_evidence": [
+        {
+          "trace_index": 2193,
+          "status": 200
+        },
+        {
+          "trace_index": 2195,
+          "status": 200
+        },
+        {
+          "trace_index": 2214,
+          "status": 503
+        }
+      ],
+      "defects": [
+        {
+          "id": "notifications-errors-as-200",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-notifications-baseline-20261019",
+            "observed_error": "Toda falla (ajena, inexistente, mal formada o base caída) respondía 200 con success:false; la UI la tomaba por éxito o por \"sin notificaciones\".",
+            "local_only": true
+          },
+          "correction": "404 ajena o inexistente, 400 mal formada, 503 indisponible; la UI conserva el aviso y explica el fallo",
+          "pending": [
+            "CI exacto, main y runtime."
+          ]
+        },
+        {
+          "id": "notifications-count-and-mark-all-incomplete",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-notifications-baseline-20261019",
+            "observed_error": "El contador sólo contaba avisos personales y \"marcar todas\" sólo marcaba esos: los globales y de rol seguían pendientes y volvían tras recargar.",
+            "local_only": true
+          },
+          "correction": "El contador iguala la lista visible; marcar todas marca lo personal y, con notifications.update, también lo compartido",
+          "pending": [
+            "CI exacto, main y runtime."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "notifications-unread-count",
+          "source": "scripts/ci/test-peru-notifications-local.mjs",
+          "verified_checks": [
+            "El contador iguala la lista de no leídas, globales incluidas"
+          ]
+        },
+        {
+          "id": "notifications-outage-503",
+          "source": "scripts/ci/test-peru-notifications-local.mjs",
+          "verified_checks": [
+            "Lecturas y writer caídos responden 503 sin cambiar estado"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Roles distintos de ADMIN y VENDEDOR; notificaciones generadas por stock, integraciones y logística"
       ]
     },
     {
@@ -19893,17 +19310,50 @@
       "operation": "createNotification",
       "method": "POST",
       "endpoint": "/api/notifications",
-      "source": "apps/erp-api/src/modules/notifications.controller.ts:137",
-      "existing_evidence": [],
+      "source": "apps/erp-api/src/modules/notifications.controller.ts:80",
+      "existing_evidence": [
+        {
+          "trace_index": 2184,
+          "status": 201
+        },
+        {
+          "trace_index": 2185,
+          "status": 201
+        },
+        {
+          "trace_index": 2186,
+          "status": 201
+        },
+        {
+          "trace_index": 2187,
+          "status": 201
+        },
+        {
+          "trace_index": 2188,
+          "status": 201
+        },
+        {
+          "trace_index": 2207,
+          "status": 201
+        },
+        {
+          "trace_index": 2215,
+          "status": 201
+        }
+      ],
       "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "notifications-visibility",
+          "source": "scripts/ci/test-peru-notifications-local.mjs",
+          "verified_checks": [
+            "Cada usuario ve lo suyo, lo global y lo de sus roles; nada de otro usuario ni de otra empresa; un vendedor abre su lista"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Roles distintos de ADMIN y VENDEDOR; notificaciones generadas por stock, integraciones y logística"
       ]
     },
     {
@@ -19911,17 +19361,90 @@
       "operation": "markAsRead",
       "method": "PUT",
       "endpoint": "/api/notifications/:id/read",
-      "source": "apps/erp-api/src/modules/notifications.controller.ts:163",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/notifications.controller.ts:95",
+      "existing_evidence": [
+        {
+          "trace_index": 2197,
+          "status": 200
+        },
+        {
+          "trace_index": 2198,
+          "status": 404
+        },
+        {
+          "trace_index": 2199,
+          "status": 404
+        },
+        {
+          "trace_index": 2200,
+          "status": 404
+        },
+        {
+          "trace_index": 2201,
+          "status": 400
+        },
+        {
+          "trace_index": 2204,
+          "status": 403
+        },
+        {
+          "trace_index": 2216,
+          "status": 503
+        },
+        {
+          "trace_index": 2219,
+          "status": 200
+        }
+      ],
+      "defects": [
+        {
+          "id": "notifications-list-403-for-operational-roles",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-notifications-baseline-20261019",
+            "observed_error": "La campana mostraba el contador a cualquier usuario, pero la lista y el marcado exigían notifications.read/update, que vendedores y cajeros no tienen: veían \"3\" y al abrir obtenían 403.",
+            "local_only": true
+          },
+          "correction": "Leer la propia lista y marcar los avisos personales no exige permiso; los compartidos (globales o de rol) siguen exigiendo notifications.update porque el estado leído es por aviso; borrar sigue protegido y la UI oculta lo que no se puede hacer",
+          "pending": [
+            "CI exacto, main y runtime.",
+            "Estado leído por usuario (migración) para que cada rol pueda despejar su campana."
+          ]
+        },
+        {
+          "id": "notifications-errors-as-200",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-notifications-baseline-20261019",
+            "observed_error": "Toda falla (ajena, inexistente, mal formada o base caída) respondía 200 con success:false; la UI la tomaba por éxito o por \"sin notificaciones\".",
+            "local_only": true
+          },
+          "correction": "404 ajena o inexistente, 400 mal formada, 503 indisponible; la UI conserva el aviso y explica el fallo",
+          "pending": [
+            "CI exacto, main y runtime."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "notifications-mark-delete",
+          "source": "scripts/ci/test-peru-notifications-local.mjs",
+          "verified_checks": [
+            "Propia 200; de otro usuario, otra empresa o inexistente 404; mal formada 400; sin notifications.update sólo se marca lo personal (compartido 403); borrar exige permiso"
+          ]
+        },
+        {
+          "id": "notifications-outage-503",
+          "source": "scripts/ci/test-peru-notifications-local.mjs",
+          "verified_checks": [
+            "Lecturas y writer caídos responden 503 sin cambiar estado"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Estado leído por usuario (requiere migración); roles distintos de ADMIN y VENDEDOR",
+        "Roles distintos de ADMIN y VENDEDOR; notificaciones generadas por stock, integraciones y logística"
       ]
     },
     {
@@ -19929,17 +19452,70 @@
       "operation": "markAllAsRead",
       "method": "PUT",
       "endpoint": "/api/notifications/mark-all-read",
-      "source": "apps/erp-api/src/modules/notifications.controller.ts:189",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/notifications.controller.ts:109",
+      "existing_evidence": [
+        {
+          "trace_index": 2202,
+          "status": 200
+        },
+        {
+          "trace_index": 2205,
+          "status": 200
+        },
+        {
+          "trace_index": 2217,
+          "status": 503
+        }
+      ],
+      "defects": [
+        {
+          "id": "notifications-list-403-for-operational-roles",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-notifications-baseline-20261019",
+            "observed_error": "La campana mostraba el contador a cualquier usuario, pero la lista y el marcado exigían notifications.read/update, que vendedores y cajeros no tienen: veían \"3\" y al abrir obtenían 403.",
+            "local_only": true
+          },
+          "correction": "Leer la propia lista y marcar los avisos personales no exige permiso; los compartidos (globales o de rol) siguen exigiendo notifications.update porque el estado leído es por aviso; borrar sigue protegido y la UI oculta lo que no se puede hacer",
+          "pending": [
+            "CI exacto, main y runtime.",
+            "Estado leído por usuario (migración) para que cada rol pueda despejar su campana."
+          ]
+        },
+        {
+          "id": "notifications-count-and-mark-all-incomplete",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-notifications-baseline-20261019",
+            "observed_error": "El contador sólo contaba avisos personales y \"marcar todas\" sólo marcaba esos: los globales y de rol seguían pendientes y volvían tras recargar.",
+            "local_only": true
+          },
+          "correction": "El contador iguala la lista visible; marcar todas marca lo personal y, con notifications.update, también lo compartido",
+          "pending": [
+            "CI exacto, main y runtime."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "notifications-mark-delete",
+          "source": "scripts/ci/test-peru-notifications-local.mjs",
+          "verified_checks": [
+            "Propia 200; de otro usuario, otra empresa o inexistente 404; mal formada 400; sin notifications.update sólo se marca lo personal (compartido 403); borrar exige permiso"
+          ]
+        },
+        {
+          "id": "notifications-outage-503",
+          "source": "scripts/ci/test-peru-notifications-local.mjs",
+          "verified_checks": [
+            "Lecturas y writer caídos responden 503 sin cambiar estado"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Estado leído por usuario (requiere migración); roles distintos de ADMIN y VENDEDOR",
+        "Roles distintos de ADMIN y VENDEDOR; notificaciones generadas por stock, integraciones y logística"
       ]
     },
     {
@@ -19947,17 +19523,64 @@
       "operation": "deleteNotification",
       "method": "DELETE",
       "endpoint": "/api/notifications/:id",
-      "source": "apps/erp-api/src/modules/notifications.controller.ts:211",
-      "existing_evidence": [],
-      "defects": [],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "source": "apps/erp-api/src/modules/notifications.controller.ts:118",
+      "existing_evidence": [
+        {
+          "trace_index": 2208,
+          "status": 403
+        },
+        {
+          "trace_index": 2209,
+          "status": 404
+        },
+        {
+          "trace_index": 2210,
+          "status": 404
+        },
+        {
+          "trace_index": 2211,
+          "status": 200
+        },
+        {
+          "trace_index": 2218,
+          "status": 503
+        }
+      ],
+      "defects": [
+        {
+          "id": "notifications-errors-as-200",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-notifications-baseline-20261019",
+            "observed_error": "Toda falla (ajena, inexistente, mal formada o base caída) respondía 200 con success:false; la UI la tomaba por éxito o por \"sin notificaciones\".",
+            "local_only": true
+          },
+          "correction": "404 ajena o inexistente, 400 mal formada, 503 indisponible; la UI conserva el aviso y explica el fallo",
+          "pending": [
+            "CI exacto, main y runtime."
+          ]
+        }
+      ],
+      "verified_cases": [
+        {
+          "id": "notifications-mark-delete",
+          "source": "scripts/ci/test-peru-notifications-local.mjs",
+          "verified_checks": [
+            "Propia 200; de otro usuario, otra empresa o inexistente 404; mal formada 400; sin notifications.update sólo se marca lo personal (compartido 403); borrar exige permiso"
+          ]
+        },
+        {
+          "id": "notifications-outage-503",
+          "source": "scripts/ci/test-peru-notifications-local.mjs",
+          "verified_checks": [
+            "Lecturas y writer caídos responden 503 sin cambiar estado"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Estado leído por usuario (requiere migración); roles distintos de ADMIN y VENDEDOR",
+        "Roles distintos de ADMIN y VENDEDOR; notificaciones generadas por stock, integraciones y logística"
       ]
     },
     {
@@ -20094,7 +19717,7 @@
       "source": "apps/erp-api/src/modules/permissions/permission.controller.ts:26",
       "existing_evidence": [
         {
-          "trace_index": 2012,
+          "trace_index": 2011,
           "status": 200
         }
       ],
@@ -20172,7 +19795,7 @@
           "status": 404
         },
         {
-          "trace_index": 2015,
+          "trace_index": 2014,
           "status": 404
         }
       ],
@@ -20264,23 +19887,19 @@
           "status": 201
         },
         {
-          "trace_index": 2013,
+          "trace_index": 2012,
           "status": 201
         },
         {
-          "trace_index": 2085,
+          "trace_index": 2084,
           "status": 201
         },
         {
-          "trace_index": 2099,
+          "trace_index": 2098,
           "status": 201
         },
         {
-          "trace_index": 2134,
-          "status": 201
-        },
-        {
-          "trace_index": 2213,
+          "trace_index": 2221,
           "status": 201
         }
       ],
@@ -20360,7 +19979,7 @@
           "status": 200
         },
         {
-          "trace_index": 2017,
+          "trace_index": 2016,
           "status": 200
         }
       ],
@@ -20396,7 +20015,7 @@
       "source": "apps/erp-api/src/modules/permissions/role.controller.ts:127",
       "existing_evidence": [
         {
-          "trace_index": 2014,
+          "trace_index": 2013,
           "status": 200
         }
       ],
@@ -20455,7 +20074,7 @@
       "source": "apps/erp-api/src/modules/permissions/role.controller.ts:195",
       "existing_evidence": [
         {
-          "trace_index": 2016,
+          "trace_index": 2015,
           "status": 200
         }
       ],
@@ -21578,7 +21197,7 @@
           "status": 201
         },
         {
-          "trace_index": 2073,
+          "trace_index": 2072,
           "status": 201
         }
       ],
@@ -21784,19 +21403,19 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:140",
       "existing_evidence": [
         {
+          "trace_index": 2076,
+          "status": 200
+        },
+        {
           "trace_index": 2077,
           "status": 200
         },
         {
-          "trace_index": 2078,
-          "status": 200
-        },
-        {
-          "trace_index": 2106,
+          "trace_index": 2105,
           "status": 403
         },
         {
-          "trace_index": 2129,
+          "trace_index": 2128,
           "status": 503
         }
       ],
@@ -21833,7 +21452,7 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:147",
       "existing_evidence": [
         {
-          "trace_index": 2089,
+          "trace_index": 2088,
           "status": 200
         }
       ],
@@ -21872,11 +21491,11 @@
           "status": 201
         },
         {
-          "trace_index": 2075,
+          "trace_index": 2074,
           "status": 201
         },
         {
-          "trace_index": 2079,
+          "trace_index": 2078,
           "status": 201
         }
       ],
@@ -21919,7 +21538,7 @@
           "status": 201
         },
         {
-          "trace_index": 2083,
+          "trace_index": 2082,
           "status": 201
         }
       ],
@@ -21954,7 +21573,7 @@
           "status": 200
         },
         {
-          "trace_index": 2084,
+          "trace_index": 2083,
           "status": 200
         }
       ],
@@ -21989,7 +21608,7 @@
           "status": 200
         },
         {
-          "trace_index": 2107,
+          "trace_index": 2106,
           "status": 403
         }
       ],
@@ -22020,7 +21639,7 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:198",
       "existing_evidence": [
         {
-          "trace_index": 2076,
+          "trace_index": 2075,
           "status": 200
         }
       ],
@@ -22063,7 +21682,7 @@
           "status": 201
         },
         {
-          "trace_index": 2088,
+          "trace_index": 2087,
           "status": 201
         }
       ],
@@ -22094,15 +21713,15 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:221",
       "existing_evidence": [
         {
-          "trace_index": 2080,
+          "trace_index": 2079,
           "status": 404
         },
         {
-          "trace_index": 2081,
+          "trace_index": 2080,
           "status": 200
         },
         {
-          "trace_index": 2082,
+          "trace_index": 2081,
           "status": 200
         }
       ],
@@ -22161,15 +21780,15 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:257",
       "existing_evidence": [
         {
-          "trace_index": 2095,
+          "trace_index": 2094,
           "status": 200
         },
         {
-          "trace_index": 2105,
+          "trace_index": 2104,
           "status": 403
         },
         {
-          "trace_index": 2130,
+          "trace_index": 2129,
           "status": 503
         }
       ],
@@ -22244,11 +21863,11 @@
           "status": 201
         },
         {
-          "trace_index": 2092,
+          "trace_index": 2091,
           "status": 201
         },
         {
-          "trace_index": 2093,
+          "trace_index": 2092,
           "status": 201
         }
       ],
@@ -22279,7 +21898,7 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:291",
       "existing_evidence": [
         {
-          "trace_index": 2098,
+          "trace_index": 2097,
           "status": 400
         }
       ],
@@ -22669,15 +22288,15 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:396",
       "existing_evidence": [
         {
-          "trace_index": 2094,
+          "trace_index": 2093,
           "status": 200
         },
         {
-          "trace_index": 2102,
+          "trace_index": 2101,
           "status": 403
         },
         {
-          "trace_index": 2108,
+          "trace_index": 2107,
           "status": 404
         }
       ],
@@ -22727,15 +22346,15 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:406",
       "existing_evidence": [
         {
-          "trace_index": 2096,
+          "trace_index": 2095,
           "status": 200
         },
         {
-          "trace_index": 2103,
+          "trace_index": 2102,
           "status": 403
         },
         {
-          "trace_index": 2109,
+          "trace_index": 2108,
           "status": 404
         }
       ],
@@ -22772,15 +22391,15 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:420",
       "existing_evidence": [
         {
-          "trace_index": 2097,
+          "trace_index": 2096,
           "status": 200
         },
         {
-          "trace_index": 2104,
+          "trace_index": 2103,
           "status": 403
         },
         {
-          "trace_index": 2110,
+          "trace_index": 2109,
           "status": 404
         }
       ],
@@ -22891,7 +22510,7 @@
           "status": 201
         },
         {
-          "trace_index": 2074,
+          "trace_index": 2073,
           "status": 201
         }
       ],
@@ -23138,11 +22757,11 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:524",
       "existing_evidence": [
         {
-          "trace_index": 2118,
+          "trace_index": 2117,
           "status": 201
         },
         {
-          "trace_index": 2119,
+          "trace_index": 2118,
           "status": 201
         }
       ],
@@ -23169,15 +22788,15 @@
           "status": 200
         },
         {
-          "trace_index": 2124,
+          "trace_index": 2123,
           "status": 200
         },
         {
-          "trace_index": 2127,
+          "trace_index": 2126,
           "status": 200
         },
         {
-          "trace_index": 2132,
+          "trace_index": 2131,
           "status": 503
         }
       ],
@@ -23214,11 +22833,11 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:544",
       "existing_evidence": [
         {
-          "trace_index": 2120,
+          "trace_index": 2119,
           "status": 201
         },
         {
-          "trace_index": 2121,
+          "trace_index": 2120,
           "status": 201
         }
       ],
@@ -23241,11 +22860,11 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:555",
       "existing_evidence": [
         {
-          "trace_index": 2122,
+          "trace_index": 2121,
           "status": 200
         },
         {
-          "trace_index": 2126,
+          "trace_index": 2125,
           "status": 404
         }
       ],
@@ -23268,11 +22887,11 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:568",
       "existing_evidence": [
         {
-          "trace_index": 2123,
+          "trace_index": 2122,
           "status": 200
         },
         {
-          "trace_index": 2125,
+          "trace_index": 2124,
           "status": 400
         }
       ],
@@ -23309,19 +22928,19 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:583",
       "existing_evidence": [
         {
+          "trace_index": 2110,
+          "status": 201
+        },
+        {
           "trace_index": 2111,
           "status": 201
         },
         {
           "trace_index": 2112,
-          "status": 201
-        },
-        {
-          "trace_index": 2113,
           "status": 409
         },
         {
-          "trace_index": 2116,
+          "trace_index": 2115,
           "status": 400
         }
       ],
@@ -23344,7 +22963,7 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:596",
       "existing_evidence": [
         {
-          "trace_index": 2114,
+          "trace_index": 2113,
           "status": 201
         }
       ],
@@ -23367,15 +22986,15 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:609",
       "existing_evidence": [
         {
-          "trace_index": 2115,
+          "trace_index": 2114,
           "status": 200
         },
         {
-          "trace_index": 2117,
+          "trace_index": 2116,
           "status": 200
         },
         {
-          "trace_index": 2131,
+          "trace_index": 2130,
           "status": 503
         }
       ],
@@ -23855,7 +23474,7 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:832",
       "existing_evidence": [
         {
-          "trace_index": 2128,
+          "trace_index": 2127,
           "status": 200
         }
       ],
@@ -25155,19 +24774,19 @@
       "source": "apps/erp-api/src/modules/usuarios.controller.ts:78",
       "existing_evidence": [
         {
-          "trace_index": 1982,
+          "trace_index": 1981,
           "status": 200
         },
         {
-          "trace_index": 1992,
+          "trace_index": 1991,
           "status": 403
         },
         {
-          "trace_index": 2006,
+          "trace_index": 2005,
           "status": 403
         },
         {
-          "trace_index": 2010,
+          "trace_index": 2009,
           "status": 403
         }
       ],
@@ -25208,11 +24827,11 @@
       "source": "apps/erp-api/src/modules/usuarios.controller.ts:106",
       "existing_evidence": [
         {
-          "trace_index": 1983,
+          "trace_index": 1982,
           "status": 200
         },
         {
-          "trace_index": 2011,
+          "trace_index": 2010,
           "status": 403
         }
       ],
@@ -25253,7 +24872,7 @@
       "source": "apps/erp-api/src/modules/usuarios.controller.ts:130",
       "existing_evidence": [
         {
-          "trace_index": 1984,
+          "trace_index": 1983,
           "status": 200
         }
       ],
@@ -25294,28 +24913,32 @@
       "source": "apps/erp-api/src/modules/usuarios.controller.ts:172",
       "existing_evidence": [
         {
-          "trace_index": 1985,
+          "trace_index": 1984,
+          "status": 201
+        },
+        {
+          "trace_index": 1986,
           "status": 201
         },
         {
           "trace_index": 1987,
-          "status": 201
-        },
-        {
-          "trace_index": 1988,
           "status": 409
         },
         {
-          "trace_index": 1989,
+          "trace_index": 1988,
           "status": 400
         },
         {
-          "trace_index": 1990,
+          "trace_index": 1989,
           "status": 403
         },
         {
-          "trace_index": 1993,
+          "trace_index": 1992,
           "status": 403
+        },
+        {
+          "trace_index": 2182,
+          "status": 201
         }
       ],
       "defects": [
@@ -25383,11 +25006,11 @@
       "source": "apps/erp-api/src/modules/usuarios.controller.ts:197",
       "existing_evidence": [
         {
-          "trace_index": 1995,
+          "trace_index": 1994,
           "status": 200
         },
         {
-          "trace_index": 2004,
+          "trace_index": 2003,
           "status": 404
         }
       ],
@@ -25428,19 +25051,19 @@
       "source": "apps/erp-api/src/modules/usuarios.controller.ts:215",
       "existing_evidence": [
         {
-          "trace_index": 1994,
+          "trace_index": 1993,
           "status": 403
         },
         {
-          "trace_index": 1998,
+          "trace_index": 1997,
           "status": 200
         },
         {
-          "trace_index": 2001,
+          "trace_index": 2000,
           "status": 200
         },
         {
-          "trace_index": 2007,
+          "trace_index": 2006,
           "status": 403
         }
       ],
@@ -25481,11 +25104,11 @@
       "source": "apps/erp-api/src/modules/usuarios.controller.ts:226",
       "existing_evidence": [
         {
-          "trace_index": 2005,
+          "trace_index": 2004,
           "status": 404
         },
         {
-          "trace_index": 2008,
+          "trace_index": 2007,
           "status": 200
         }
       ],
@@ -25526,11 +25149,11 @@
       "source": "apps/erp-api/src/modules/usuarios.controller.ts:234",
       "existing_evidence": [
         {
-          "trace_index": 1991,
+          "trace_index": 1990,
           "status": 200
         },
         {
-          "trace_index": 1999,
+          "trace_index": 1998,
           "status": 401
         }
       ],
@@ -25571,7 +25194,7 @@
       "source": "apps/erp-api/src/modules/usuarios.controller.ts:246",
       "existing_evidence": [
         {
-          "trace_index": 1997,
+          "trace_index": 1996,
           "status": 200
         }
       ],
@@ -25612,11 +25235,11 @@
       "source": "apps/erp-api/src/modules/usuarios.controller.ts:256",
       "existing_evidence": [
         {
-          "trace_index": 1996,
+          "trace_index": 1995,
           "status": 200
         },
         {
-          "trace_index": 2003,
+          "trace_index": 2002,
           "status": 404
         }
       ],
@@ -25821,19 +25444,15 @@
           "status": 201
         },
         {
-          "trace_index": 2086,
+          "trace_index": 2085,
           "status": 201
         },
         {
-          "trace_index": 2100,
+          "trace_index": 2099,
           "status": 201
         },
         {
-          "trace_index": 2135,
-          "status": 201
-        },
-        {
-          "trace_index": 2214,
+          "trace_index": 2222,
           "status": 201
         }
       ],
@@ -25990,7 +25609,21 @@
       "endpoint": "/api/users/:id/reset-password",
       "source": "apps/erp-api/src/modules/usuarios/user-management.controller.ts:167",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "auth-email-config-false-flags",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "apps/erp-api/src/shared/email/email.service.spec.ts",
+            "observed_error": "EMAIL_DISABLED=false y SMTP_SECURE=false (texto) se evaluaban como verdaderos y SMTP_HOST caía en localhost: el servicio se declaraba configurado sin servidor y los envíos fallaban en silencio.",
+            "local_only": true
+          },
+          "correction": "Banderas booleanas interpretadas; sin SMTP_HOST no hay servicio; sin correo la solicitud responde 503 en vez de prometer un enlace",
+          "pending": [
+            "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -26255,14 +25888,6 @@
         },
         {
           "trace_index": 1744,
-          "status": 201
-        },
-        {
-          "trace_index": 2157,
-          "status": 201
-        },
-        {
-          "trace_index": 2226,
           "status": 201
         }
       ],

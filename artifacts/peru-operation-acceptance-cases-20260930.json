@@ -4859,6 +4859,90 @@
       "pending_checks": [
         "Roles distintos de ADMIN y VENDEDOR; notificaciones generadas por stock, integraciones y logística"
       ]
+    },
+    {
+      "id": "cxc-reprogram-intents",
+      "source": "scripts/ci/test-peru-cxc-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "CxC: reprogramar con intención",
+        "CxC: sin clave explícita, volver a una fecha ya usada"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/finanzas/cxc/:id/reprogramar"
+        }
+      ],
+      "verified_checks": [
+        "Una intención aplica una vez y su reintento la recupera; otra fecha con la misma clave 409; sin clave cada pedido es nuevo"
+      ],
+      "pending_checks": [
+        "Cobro previo desde la UI, roles distintos de ADMIN y CxC en moneda extranjera"
+      ]
+    },
+    {
+      "id": "cxc-reprogram-rejections",
+      "source": "scripts/ci/test-peru-cxc-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "CxC: reprogramar una cuenta inexistente",
+        "CxC: fecha ausente o inválida",
+        "CxC: una cuenta anulada no se reprograma",
+        "CxC: sin el writer de reprogramación"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/finanzas/cxc/:id/reprogramar"
+        }
+      ],
+      "verified_checks": [
+        "Inexistente o ajena 404, fecha inválida 400, anulada 409, writer caído 503; ninguna cambia la cuenta"
+      ],
+      "pending_checks": [
+        "Cobro previo desde la UI, roles distintos de ADMIN y CxC en moneda extranjera"
+      ]
+    },
+    {
+      "id": "cxc-credit-note-gates",
+      "source": "scripts/ci/test-peru-cxc-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "CxC: nota con la contabilidad de la factura pendiente",
+        "CxC: con la venta contabilizada",
+        "CxC: nota con motivo fuera de catálogo",
+        "CxC: nota sobre cuenta inexistente",
+        "CxC: sin configuración legible o sin writer"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/finanzas/cxc/:id/notas-credito"
+        }
+      ],
+      "verified_checks": [
+        "Sin contabilidad de origen o sin aceptación SUNAT 409 legible y sin efectos; catálogo/monto 400; ajena 404; configuración o writer caídos 503"
+      ],
+      "pending_checks": [
+        "Nota sobre factura aceptada por SUNAT real (requiere CDR del contribuyente)"
+      ]
+    },
+    {
+      "id": "cxc-detail-reads",
+      "source": "scripts/ci/test-peru-cxc-operations-local.mjs",
+      "required_scenario_prefixes": [
+        "CxC: detalle con lectura caída"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxc/:id"
+        }
+      ],
+      "verified_checks": [
+        "Detalle ajeno 404 y lectura caída 503"
+      ],
+      "pending_checks": [
+        "Cobro previo desde la UI, roles distintos de ADMIN y CxC en moneda extranjera"
+      ]
     }
   ]
 }
