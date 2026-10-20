@@ -321,7 +321,7 @@ export class DashboardMetricsService implements OnModuleDestroy {
       ultimaActualizacion: new Date().toISOString(),
       periodoCalculado: {
         inicio: `${hoyLocal.slice(0, 7)}-01`,
-        fin: new Date(Date.UTC(anio, mes, 0)).toISOString().slice(0, 10)
+        fin: `${hoyLocal.slice(0, 7)}-${String(new Date(Date.UTC(anio, mes, 0)).getUTCDate()).padStart(2, '0')}`
       }
     };
 
