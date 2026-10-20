@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import {
@@ -593,9 +594,9 @@ export class RmaService {
   }
 
   private throwReadError(error: any, operation: string): never {
-    throw new BadRequestException(
-      `No se pudo ${operation}: ${String(error?.message ?? error ?? 'error desconocido')}`,
-    );
+    // Una lectura caída no es un error del usuario: 503 sin el texto de PostgreSQL.
+    if (error?.code === 'PGRST116') throw new NotFoundException(`No se encontró el recurso al ${operation}`);
+    throw new ServiceUnavailableException(`No se pudo ${operation}; reintente`);
   }
 
   private throwRpcError(error: any, operation: string): never {

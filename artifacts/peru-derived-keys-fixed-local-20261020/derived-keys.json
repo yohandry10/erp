@@ -1,0 +1,86 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "Ediciones sin Idempotency-Key API/DB local; sin aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Claves: tipo de cambio 3.75, 3.80 y otra vez 3.75 el mismo día queda en 3.75",
+      "passed": true
+    },
+    {
+      "scenario": "Claves: renombrar un centro de costo B→C→B deja B",
+      "passed": true
+    },
+    {
+      "scenario": "Claves: cambiar el vencimiento de una CxP A→B→A deja A",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/tipos-cambio",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/tipos-cambio",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/tipos-cambio",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/centros-costo",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "contabilidad/centros-costo/:id",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "contabilidad/centros-costo/:id",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "contabilidad/centros-costo/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/proveedores",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxp",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "finanzas/cxp/:id",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "finanzas/cxp/:id",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "finanzas/cxp/:id",
+      "status": 200
+    }
+  ]
+}

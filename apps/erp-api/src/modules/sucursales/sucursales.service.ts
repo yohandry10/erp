@@ -5,6 +5,7 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { SupabaseService } from "../../shared/supabase/supabase.service";
 import {
@@ -49,8 +50,8 @@ export class SucursalesService {
       });
 
     if (error) {
-      throw new InternalServerErrorException(
-        `Error al resolver las sucursales visibles: ${error.message}`,
+      throw new ServiceUnavailableException(
+        'No se pudieron resolver las sucursales visibles; reintente',
       );
     }
 

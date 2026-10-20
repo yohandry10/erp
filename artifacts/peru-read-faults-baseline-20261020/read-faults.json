@@ -1,0 +1,315 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Barrido de lecturas caídas API/DB local; sin aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Lecturas: sin lectura de almacenes GET /api/inventario/almacenes responde 503 legible",
+      "passed": false,
+      "message": "{\"status\":200,\"success\":false,\"message\":\"Error al obtener almacenes: Error al listar almacenes: permission denied for table almacenes\"}\n\n200 !== 503\n"
+    },
+    {
+      "scenario": "Lecturas: sin lectura de categorias_producto GET /api/inventario/categorias responde 503 legible",
+      "passed": false,
+      "message": "{\"status\":500,\"message\":\"No se pudieron cargar las categorías de producto\"}\n\n500 !== 503\n"
+    },
+    {
+      "scenario": "Lecturas: sin lectura de productos GET /api/inventario/productos responde 503 legible",
+      "passed": false,
+      "message": "{\"status\":200,\"success\":false,\"message\":\"Error al obtener productos: permission denied for table productos\"}\n\n200 !== 503\n"
+    },
+    {
+      "scenario": "Lecturas: sin lectura de recepciones GET /api/inventario/recepciones responde 503 legible",
+      "passed": false,
+      "message": "{\"status\":400,\"message\":\"No se pudieron obtener las recepciones\"}\n\n400 !== 503\n"
+    },
+    {
+      "scenario": "Lecturas: sin lectura de clientes GET /api/ventas/clientes responde 503 legible",
+      "passed": false,
+      "message": "{\"status\":400,\"message\":\"Error al obtener clientes\"}\n\n400 !== 503\n"
+    },
+    {
+      "scenario": "Lecturas: sin lectura de rma_solicitudes GET /api/ventas/rma responde 503 legible",
+      "passed": false,
+      "message": "{\"status\":400,\"message\":\"No se pudo listar las RMA: permission denied for table rma_solicitudes\"}\n\n400 !== 503\n"
+    },
+    {
+      "scenario": "Lecturas: sin lectura de proveedores GET /api/compras/proveedores responde 503 legible",
+      "passed": true
+    },
+    {
+      "scenario": "Lecturas: sin lectura de ordenes_compra GET /api/compras/ordenes responde 503 legible",
+      "passed": true
+    },
+    {
+      "scenario": "Lecturas: sin lectura de cuentas_por_pagar GET /api/finanzas/cxp responde 503 legible",
+      "passed": true
+    },
+    {
+      "scenario": "Lecturas: sin lectura de cuentas_por_cobrar GET /api/finanzas/cxc responde 503 legible",
+      "passed": false,
+      "message": "{\"status\":400,\"message\":\"No se pudieron obtener las cuentas por cobrar\"}\n\n400 !== 503\n"
+    },
+    {
+      "scenario": "Lecturas: sin lectura de cuentas_bancarias GET /api/finanzas/bancos/cuentas responde 503 legible",
+      "passed": true
+    },
+    {
+      "scenario": "Lecturas: sin lectura de cajas GET /api/cajas responde 503 legible",
+      "passed": true
+    },
+    {
+      "scenario": "Lecturas: sin lectura de empleados GET /api/rrhh/empleados responde 503 legible",
+      "passed": false,
+      "message": "{\"status\":500,\"message\":\"Internal server error\"}\n\n500 !== 503\n"
+    },
+    {
+      "scenario": "Lecturas: sin lectura de departamentos GET /api/rrhh/departamentos responde 503 legible",
+      "passed": false,
+      "message": "{\"status\":500,\"message\":\"Internal server error\"}\n\n500 !== 503\n"
+    },
+    {
+      "scenario": "Lecturas: sin lectura de planillas GET /api/rrhh/planillas responde 503 legible",
+      "passed": true
+    },
+    {
+      "scenario": "Lecturas: sin lectura de plan_cuentas GET /api/contabilidad/plan-cuentas responde 503 legible",
+      "passed": true
+    },
+    {
+      "scenario": "Lecturas: sin lectura de asientos_contables GET /api/contabilidad/asientos responde 503 legible",
+      "passed": true
+    },
+    {
+      "scenario": "Lecturas: sin lectura de centros_costo GET /api/contabilidad/centros-costo responde 503 legible",
+      "passed": false,
+      "message": "{\"status\":400,\"message\":\"Error al listar centros de costo: permission denied for table centros_costo\"}\n\n400 !== 503\n"
+    },
+    {
+      "scenario": "Lecturas: sin lectura de gre_guias GET /api/gre/guias responde 503 legible",
+      "passed": false,
+      "message": "{\"status\":400,\"message\":\"Error al consultar las GRE: permission denied for table gre_guias\"}\n\n400 !== 503\n"
+    },
+    {
+      "scenario": "Lecturas: sin lectura de sucursales GET /api/sucursales responde 503 legible",
+      "passed": false,
+      "message": "{\"status\":500,\"message\":\"Error al resolver las sucursales visibles: permission denied for table sucursales\"}\n\n500 !== 503\n"
+    },
+    {
+      "scenario": "Lecturas: sin lectura de audit_log GET /api/audit-logs responde 503 legible",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "endpoint": "inventario/almacenes",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/almacenes",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/categorias",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/categorias",
+      "status": 500
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/productos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/productos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/recepciones",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "inventario/recepciones",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/clientes",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/clientes",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/rma",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/rma",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/proveedores",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/proveedores",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/ordenes",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "compras/ordenes",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxc",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxc",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/bancos/cuentas",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "cajas",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/empleados",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/empleados",
+      "status": 500
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/departamentos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/departamentos",
+      "status": 500
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/planillas",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "rrhh/planillas",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/plan-cuentas",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/plan-cuentas",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/asientos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/asientos",
+      "status": 503
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/centros-costo",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/centros-costo",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "gre/guias",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "sucursales",
+      "status": 500
+    },
+    {
+      "method": "GET",
+      "endpoint": "audit-logs",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "audit-logs",
+      "status": 503
+    }
+  ]
+}

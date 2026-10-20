@@ -162,7 +162,7 @@ export class CxcService {
 
     if (error) {
       console.error('Error listando cuentas por cobrar:', error);
-      throw new BadRequestException('No se pudieron obtener las cuentas por cobrar');
+      throw lecturaFinancieraFallida('las cuentas por cobrar');
     }
 
     return {

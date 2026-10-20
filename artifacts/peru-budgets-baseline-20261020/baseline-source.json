@@ -1,0 +1,8 @@
+{
+  "captured_at": "2026-10-20T08:43:56.364Z",
+  "product_source_commit": "49dce26330a4a822d2744f798d06563068c647bd",
+  "note": "Worktree aislado con el código original de producto (sin cambios desde ese commit) y sólo la infraestructura de prueba nueva; sonda y prueba de navegador iguales a las del ensayo corregido.",
+  "browser_failure": "Editar el monto 2000→3000→2000 desde el formulario dejó 3000 en la base con respuesta de éxito.",
+  "discarded_attempts": [],
+  "remoteWrites": false
+}

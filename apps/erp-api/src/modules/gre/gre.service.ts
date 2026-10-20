@@ -268,7 +268,7 @@ export class GreService {
 
     const { data, error } = await query;
     if (error) {
-      throw new BadRequestException(`Error al consultar las GRE: ${error.message}`);
+      throw new ServiceUnavailableException('No se pudieron consultar las guías de remisión; reintente');
     }
     return (data || []).map((gre: any) => this.mapGreRecordToResponse(gre));
   }

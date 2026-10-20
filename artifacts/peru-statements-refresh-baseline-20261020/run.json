@@ -1,0 +1,10 @@
+{
+  "completedAt": "2026-10-20T09:02:06.830Z",
+  "success": false,
+  "withBrowser": true,
+  "block": "statements",
+  "scope": "statements_refresh_subset",
+  "database": "PostgreSQL 16 efímero (migraciones completas)",
+  "output": "artifacts\\peru-statements-local-20261020085932719-16812",
+  "remoteWrites": false
+}

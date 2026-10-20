@@ -259,10 +259,32 @@ Corregido 4/4 con el servidor en Honolulu
 falta repetir la sonda con UTC en esa franja. Observaciones sin caso: `PUT /finanzas/cxp/:id` deriva la clave
 del contenido sin `Idempotency-Key` (la UI no lo usa) y el cliente Supabase
 reintenta escrituras tras un timeout.
+Barrido de lecturas (#148): sin SELECT sobre su tabla, 12 de 21 listados de
+uso diario fallaban mal (`artifacts/peru-read-faults-baseline-20261020`):
+productos y almacenes respondían 200 con lista vacía y el catálogo decía «No se
+encontraron productos»; categorías, recepciones, clientes, RMA, CxC, empleados,
+departamentos, centros de costo, GRE y sucursales daban 400/500, varios con el
+texto de PostgreSQL. Ahora 21/21 responden 503 legible y el catálogo avisa
+(`artifacts/peru-read-faults-fixed-local-20261020`); las demás pantallas siguen
+mostrando su estado vacío ante un 503 (con el aviso del hook).
+Claves derivadas del contenido (#148): sin `Idempotency-Key` (ninguna de estas
+pantallas la envía) la tercera de A→B→A reproducía la primera: el tipo de
+cambio registrado otra vez en 3.75 quedaba en 3.80, el vencimiento de una CxP y
+el nombre de un centro de costo no volvían, un presupuesto editado
+2000→3000→2000 quedaba en 3000 y recrearlo tras borrarlo devolvía el borrado
+(`artifacts/peru-derived-keys-baseline-20261020`, 0/3;
+`artifacts/peru-budgets-baseline-20261020`, 0/5 y navegador rojo). Ediciones y
+altas-upsert usan ahora una intención por petición (como CxC en #145); las altas
+conservan la clave derivada contra el doble clic salvo presupuestos. Presupuestos
+responde además 409/404/503 legibles (`artifacts/peru-budgets-fixed-local-20261020`,
+5/5 y navegador; `artifacts/peru-derived-keys-fixed-local-20261020`, 3/3).
+Estados financieros (#148): «Refrescar vistas» enviaba el periodo en la URL y
+cada clic terminaba en 400 de validación; ahora va en el cuerpo
+(`artifacts/peru-statements-refresh-fixed-local-20261020`).
 La matriz registra 717 contratos, 481 observados (main 39328687047), 330 con
-casos funcionales, 187 casos y 152 defectos; los casos de aprobaciones,
-facturación, alta, dashboard y fechas esperan CI; no hay aceptación integral
-del lanzamiento.
+casos funcionales, 191 casos y 158 defectos; los casos de aprobaciones,
+facturación, alta, dashboard, fechas, lecturas, presupuestos, claves y estados
+esperan CI; no hay aceptación integral del lanzamiento.
 
 Corte técnico 131/132: el cierre 131 promovió 562 una sola vez con preflight,
 respaldo 560, rollback local y preservación de 29 tablas/funciones/seguridad

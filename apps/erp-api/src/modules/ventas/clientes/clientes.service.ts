@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
+import { readUnavailable } from '../ventas-errors';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CreateClienteDto, UpdateClienteDto, ValidarRucDto } from './dto';
 import { Cliente } from './entities/cliente.entity';
@@ -161,7 +162,7 @@ export class ClientesService {
 
     if (error) {
       console.error('❌ [ClientesService] Error fetching clientes:', error);
-      throw new BadRequestException('Error al obtener clientes');
+      throw readUnavailable('los clientes');
     }
 
     console.log(`✅ [ClientesService] Clientes encontrados: ${data?.length || 0} de ${count || 0} total`);
