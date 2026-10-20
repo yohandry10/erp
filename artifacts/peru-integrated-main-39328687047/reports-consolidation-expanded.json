@@ -1,0 +1,555 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "API real local de reportes y consolidación; sin aceptación global",
+  "scenarios": [
+    {
+      "scenario": "Reportes: fuentes reales confirmadas, borrador, mes previo y futuro persistidos en dos empresas",
+      "passed": true
+    },
+    {
+      "scenario": "Reportes: período/acumulado y fórmula excluyen borradores, futuro y empresa ajena",
+      "passed": true
+    },
+    {
+      "scenario": "Reportes: código duplicado no inserta otra definición",
+      "passed": true
+    },
+    {
+      "scenario": "Reportes: ciclo rechazada sin perder líneas vigentes",
+      "passed": true
+    },
+    {
+      "scenario": "Reportes: referencia ausente rechazada sin perder líneas vigentes",
+      "passed": true
+    },
+    {
+      "scenario": "Reportes: orden repetido rechazada sin perder líneas vigentes",
+      "passed": true
+    },
+    {
+      "scenario": "Reportes: otra empresa no reemplaza una definición ajena",
+      "passed": true
+    },
+    {
+      "scenario": "Reportes: consulta ajena y rango invertido rechazados",
+      "passed": true
+    },
+    {
+      "scenario": "Consolidación: invitación pendiente no comparte saldos de la segunda empresa",
+      "passed": true
+    },
+    {
+      "scenario": "Consolidación: rechazo retira acceso y conserva únicamente saldos autorizados",
+      "passed": true
+    },
+    {
+      "scenario": "Consolidación: aceptación incorpora 100 y 200 de fuentes reales por empresa",
+      "passed": true
+    },
+    {
+      "scenario": "Consolidación: no permite invitar a su propia controladora",
+      "passed": true
+    },
+    {
+      "scenario": "Consolidación: moneda de presentación distinta exige tasa explícita",
+      "passed": true
+    },
+    {
+      "scenario": "Consolidación: tasas propias y del miembro convierten 100×0.25 + 200×0.50",
+      "passed": true
+    },
+    {
+      "scenario": "Consolidación: tasa futura no altera corte anterior",
+      "passed": true
+    },
+    {
+      "scenario": "Consolidación: colisión de intención de tasa devuelve 409 sin reemplazar tasa",
+      "passed": true
+    },
+    {
+      "scenario": "Consolidación: miembro no controlador recibe 403 al escribir tasa",
+      "passed": true
+    },
+    {
+      "scenario": "Consolidación: tasa para miembro inexistente devuelve 400",
+      "passed": true
+    },
+    {
+      "scenario": "Consolidación: tasa innecesaria devuelve 400",
+      "passed": true
+    },
+    {
+      "scenario": "Consolidación: mapeo real 70→20 separa prefijo, persiste y recupera mismo ID",
+      "passed": true
+    },
+    {
+      "scenario": "Consolidación: cuenta inexistente no se homologa",
+      "passed": true
+    },
+    {
+      "scenario": "Consolidación: ajuste y replay afectan reporte una vez sin alterar libros legales",
+      "passed": true
+    },
+    {
+      "scenario": "Consolidación: colisión de ajuste devuelve 409 sin duplicar",
+      "passed": true
+    },
+    {
+      "scenario": "Consolidación: debe/haber simultáneos rechazados",
+      "passed": true
+    },
+    {
+      "scenario": "Consolidación: cuenta de ajuste inexistente devuelve 400",
+      "passed": true
+    },
+    {
+      "scenario": "Permisos: lector genera el reporte y no guarda definición ni ajustes",
+      "passed": true
+    },
+    {
+      "scenario": "Seguridad: servicio sólo obtiene SELECT; no hay DML directo ni lectura anon/authenticated nueva",
+      "passed": true
+    },
+    {
+      "scenario": "Consignaciones: alta y replay conservan una entrega y total calculado por servidor",
+      "passed": true
+    },
+    {
+      "scenario": "Consignaciones: nueva intención idéntica crea otro registro",
+      "passed": true
+    },
+    {
+      "scenario": "Consignaciones: venta, replay y cierre persisten con estados válidos",
+      "passed": true
+    },
+    {
+      "scenario": "Consignaciones: devolución de entrega pendiente persiste",
+      "passed": true
+    },
+    {
+      "scenario": "Consignaciones: anulación de entrega pendiente persiste",
+      "passed": true
+    },
+    {
+      "scenario": "Consignaciones: estado terminal y mutación ajena/inexistente rechazados sin alterar entrega",
+      "passed": true
+    },
+    {
+      "scenario": "Consignaciones: cantidad y valor inválidos no insertan registros",
+      "passed": true
+    },
+    {
+      "scenario": "Consignaciones: lector consulta y no crea/transiciona; el registro no altera libros legales",
+      "passed": true
+    }
+  ],
+  "defects": [],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/plan-cuentas",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/plan-cuentas",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/periodos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/periodos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/periodos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/periodos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/asiento-contable",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/asiento-contable",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/asiento-contable",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/asiento-contable",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/asiento-contable",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/reportes-configurables",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/reportes-configurables/:id/generar",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/reportes-configurables",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/reportes-configurables",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/reportes-configurables",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/reportes-configurables",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/reportes-configurables",
+      "status": 403
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/reportes-configurables/:id/generar",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/reportes-configurables/:id/generar",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/invitaciones",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/reportes-configurables/:id/generar",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/respuesta",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/consolidacion/grupos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/reportes-configurables/:id/generar",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/invitaciones",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/respuesta",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/reportes-configurables/:id/generar",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/invitaciones",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/invitaciones",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/respuesta",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/reportes-configurables/:id/generar",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/tasas",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/tasas",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/tasas",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/reportes-configurables/:id/generar",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/tasas",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/reportes-configurables/:id/generar",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/tasas",
+      "status": 409
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/reportes-configurables/:id/generar",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/tasas",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/tasas",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/tasas",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/mapeos-cuentas",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/mapeos-cuentas",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/reportes-configurables/:id/generar",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/mapeos-cuentas",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/ajustes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/ajustes",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/reportes-configurables/:id/generar",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/ajustes",
+      "status": 409
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/reportes-configurables/:id/generar",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/ajustes",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/ajustes",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "roles",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "users",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/reportes-configurables/:id/generar",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/consolidacion/grupos/:id/ajustes",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/reportes-configurables",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/registro-consignaciones",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/registro-consignaciones",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/registro-consignaciones",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/registro-consignaciones/:id/estado",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/registro-consignaciones/:id/estado",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/registro-consignaciones/:id/estado",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/registro-consignaciones/:id/estado",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/registro-consignaciones",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/registro-consignaciones/:id/estado",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/registro-consignaciones/:id/estado",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/registro-consignaciones/:id/estado",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/registro-consignaciones/:id/estado",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/registro-consignaciones",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/registro-consignaciones",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/registro-consignaciones",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/registro-consignaciones",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/registro-consignaciones/:id/estado",
+      "status": 403
+    }
+  ]
+}

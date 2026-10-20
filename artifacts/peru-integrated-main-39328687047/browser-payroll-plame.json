@@ -1,0 +1,9 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "Paquete local: commit con respuesta perdida, replay, intención nueva, recarga y descarga ZIP; sin PVS/SOL",
+  "same_retry_intent": true,
+  "versions_before": 5,
+  "versions_after": 7,
+  "scriptErrors": []
+}
