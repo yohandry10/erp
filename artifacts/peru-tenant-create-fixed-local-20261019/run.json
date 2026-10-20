@@ -1,0 +1,10 @@
+{
+  "completedAt": "2026-10-20T08:15:28.805Z",
+  "success": true,
+  "withBrowser": true,
+  "block": "tenants",
+  "scope": "tenant_create_subset",
+  "database": "PostgreSQL 16 efímero (migraciones completas)",
+  "output": "artifacts\\peru-tenants-local-20261020081205847-5284",
+  "remoteWrites": false
+}

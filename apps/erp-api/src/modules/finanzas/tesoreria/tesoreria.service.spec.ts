@@ -5,6 +5,11 @@ import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { TiposCambioService } from '../../contabilidad/services/tipos-cambio.service';
 
+// El día del contribuyente se resuelve fuera de las colas de `from()` simuladas.
+jest.mock('../../../shared/utils/fecha-tenant.util', () => ({
+  fechaHoyDelTenant: jest.fn(async () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date())),
+}));
+
 describe('TesoreriaService', () => {
   let service: TesoreriaService;
   let supabaseService: jest.Mocked<SupabaseService>;

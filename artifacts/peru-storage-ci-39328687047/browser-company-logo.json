@@ -1,0 +1,11 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "UI y Storage real local; sólo el origen público contractual se adapta al gateway loopback",
+  "checks": [
+    "Carga perdida y replay preservan intención/asset; empresa e imagen sobreviven recarga",
+    "Reemplazo real conserva un objeto activo y limpia el anterior",
+    "Borrado perdido y replay conservan intención; configuración/objeto eliminados tras recarga"
+  ],
+  "unexpected_errors": []
+}

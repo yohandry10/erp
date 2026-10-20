@@ -1,0 +1,19 @@
+{
+  "checked_at_utc": "2026-10-19T22:25:04Z",
+  "runtime_commit": "d6386beaf8af02420360656056169be08795715f",
+  "read_only": true,
+  "synthetic_prod_writes": false,
+  "checks": {
+    "reset_request_with_nonexistent_email": {
+      "email": "uat-no-existe-20261019@example.invalid",
+      "status": 503,
+      "message": "El servicio no está disponible en este momento. Inténtalo de nuevo en unos minutos."
+    }
+  },
+  "interpretation": [
+    "El correo sigue sin configurarse en Render (503 antes de buscar al usuario).",
+    "Tras #145 el filtro global entrega el 503 en español y sin detalles internos."
+  ],
+  "remoteWrites": false,
+  "runtime_source": "artifacts/peru-production-verification-after-145-20261019.json"
+}

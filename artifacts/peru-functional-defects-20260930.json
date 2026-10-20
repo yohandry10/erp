@@ -3977,7 +3977,7 @@
     },
     {
       "id": "cxc-reprogram-derived-key-false-success",
-      "status": "local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -3990,14 +3990,18 @@
         "local_only": true
       },
       "correction": "Sin clave cada pedido es una intención nueva; el modal envía una clave por intento y sólo la reutiliza al reintentar el mismo contenido",
-      "pending": [
-        "CI exacto, main y runtime."
-      ],
-      "canonical_proof": "artifacts/peru-cxc-fixed-local-20261019"
+      "pending": [],
+      "canonical_proof": "artifacts/peru-cxc-fixed-local-20261019",
+      "release_verification": {
+        "merge_sha": "d6386beaf8af02420360656056169be08795715f",
+        "schema": 569,
+        "main_evidence": "artifacts/peru-integrated-main-39328687047",
+        "production_read_only": "artifacts/peru-production-verification-after-145-20261019.json"
+      }
     },
     {
       "id": "cxc-reprogram-errors-as-400",
-      "status": "local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -4010,14 +4014,18 @@
         "local_only": true
       },
       "correction": "404 / 409 / 503 según la causa",
-      "pending": [
-        "CI exacto, main y runtime."
-      ],
-      "canonical_proof": "artifacts/peru-cxc-fixed-local-20261019"
+      "pending": [],
+      "canonical_proof": "artifacts/peru-cxc-fixed-local-20261019",
+      "release_verification": {
+        "merge_sha": "d6386beaf8af02420360656056169be08795715f",
+        "schema": 569,
+        "main_evidence": "artifacts/peru-integrated-main-39328687047",
+        "production_read_only": "artifacts/peru-production-verification-after-145-20261019.json"
+      }
     },
     {
       "id": "cxc-credit-note-raw-codes",
-      "status": "local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -4030,14 +4038,18 @@
         "local_only": true
       },
       "correction": "409 con un motivo en español para contabilidad pendiente y falta de aceptación SUNAT; 503 si no se puede leer la configuración o no hay writer",
-      "pending": [
-        "CI exacto, main y runtime."
-      ],
-      "canonical_proof": "artifacts/peru-cxc-fixed-local-20261019"
+      "pending": [],
+      "canonical_proof": "artifacts/peru-cxc-fixed-local-20261019",
+      "release_verification": {
+        "merge_sha": "d6386beaf8af02420360656056169be08795715f",
+        "schema": 569,
+        "main_evidence": "artifacts/peru-integrated-main-39328687047",
+        "production_read_only": "artifacts/peru-production-verification-after-145-20261019.json"
+      }
     },
     {
       "id": "cxc-detail-outage-404",
-      "status": "local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_merged_main_deployment_verified",
       "operations": [
         {
           "method": "GET",
@@ -4050,14 +4062,18 @@
         "local_only": true
       },
       "correction": "Sólo la ausencia de fila es 404; la lectura caída es 503",
-      "pending": [
-        "CI exacto, main y runtime."
-      ],
-      "canonical_proof": "artifacts/peru-cxc-fixed-local-20261019"
+      "pending": [],
+      "canonical_proof": "artifacts/peru-cxc-fixed-local-20261019",
+      "release_verification": {
+        "merge_sha": "d6386beaf8af02420360656056169be08795715f",
+        "schema": 569,
+        "main_evidence": "artifacts/peru-integrated-main-39328687047",
+        "production_read_only": "artifacts/peru-production-verification-after-145-20261019.json"
+      }
     },
     {
       "id": "production-5xx-english-generic",
-      "status": "local_acceptance_passed_ci_pending",
+      "status": "corrected_ci_merged_main_deployment_verified",
       "operations": [
         {
           "method": "POST",
@@ -4070,10 +4086,15 @@
         "local_only": false
       },
       "correction": "En producción el 5xx sigue sin detalles internos pero en español y distinguiendo 503 reintentable",
-      "pending": [
-        "CI exacto, main y runtime."
-      ],
-      "canonical_proof": "apps/erp-api/src/common/filters/global-exception.filter.spec.ts"
+      "pending": [],
+      "canonical_proof": "apps/erp-api/src/common/filters/global-exception.filter.spec.ts",
+      "release_verification": {
+        "merge_sha": "d6386beaf8af02420360656056169be08795715f",
+        "schema": 569,
+        "main_evidence": "artifacts/peru-integrated-main-39328687047",
+        "production_read_only": "artifacts/peru-production-verification-after-145-20261019.json",
+        "production_smoke": "artifacts/peru-production-error-language-after-145-20261019.json"
+      }
     },
     {
       "id": "sales-approval-self-decision-400",
@@ -4214,6 +4235,222 @@
         "CI exacto, main y runtime."
       ],
       "canonical_proof": "artifacts/peru-sales-approvals-fixed-local-20261019"
+    },
+    {
+      "id": "sales-invoice-lost-response-400",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/generar-factura"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-sales-invoice-baseline-20261019",
+        "observed_error": "Reintentar «Generar factura» tras perder la respuesta respondía 400 «pedido en estado FACTURADO» aunque la factura existía: el control de estado corría antes del retorno idempotente.",
+        "local_only": true
+      },
+      "correction": "Un pedido con factura devuelve su comprobante antes de mirar el estado",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-sales-invoice-fixed-local-20261019"
+    },
+    {
+      "id": "sales-invoice-state-and-config-400",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/generar-factura"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-sales-invoice-baseline-20261019",
+        "observed_error": "Pedido sin confirmar o cancelado y empresa sin certificado respondían 400; un pedido ajeno con la empresa sin certificado respondía 400 «faltan datos» en vez de 404.",
+        "local_only": true
+      },
+      "correction": "Estado o configuración incompletos 409; el pedido se resuelve primero (404)",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-sales-invoice-fixed-local-20261019"
+    },
+    {
+      "id": "sales-invoice-outage-400-raw",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/generar-factura"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-sales-invoice-baseline-20261019",
+        "observed_error": "Con la configuración ilegible pedía completar el wizard (400) y sin writer devolvía 400 con «permission denied for function facturar_pedido_venta_tx».",
+        "local_only": true
+      },
+      "correction": "503 legible; errores de dominio del RPC 404/409",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-sales-invoice-fixed-local-20261019"
+    },
+    {
+      "id": "tenant-create-timeout-400-abort",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/tenants"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-tenant-create-baseline-20261019",
+        "observed_error": "El RPC de alta tarda más que el timeout general de 8 s del cliente Supabase (en local, 25-30 s con la máquina cargada): tras tres intentos respondía 400 «No se pudo crear el tenant: AbortError: This operation was aborted» aunque la base terminaba el alta.",
+        "local_only": true
+      },
+      "correction": "El alta usa un plazo propio de 60 s sin reintentos superpuestos y el modal espera 70 s; si aun así no hay confirmación responde 503 «reintenta con el mismo formulario» y la misma Idempotency-Key confirma el alta",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-tenant-create-fixed-local-20261019"
+    },
+    {
+      "id": "tenant-create-raw-conflict-code",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/tenants"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-tenant-create-baseline-20261019",
+        "observed_error": "Un RUC o correo ya registrados devolvían 409 con el código interno TENANT_CREATE_ID_TAX_OR_EMAIL_CONFLICT.",
+        "local_only": true
+      },
+      "correction": "Mensajes legibles para conflicto, datos faltantes, país y actor",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-tenant-create-fixed-local-20261019"
+    },
+    {
+      "id": "dashboard-quotes-nonexistent-states",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/dashboard/stats"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-dashboard-baseline-20261019",
+        "observed_error": "Cotizaciones pendientes y tasa de conversión siempre 0: se consultaban los estados PENDIENTE y aceptada, que no existen.",
+        "local_only": true
+      },
+      "correction": "Pendientes = BORRADOR/ENVIADA; conversión = APROBADA/CONVERTIDA",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-dashboard-fixed-local-20261019"
+    },
+    {
+      "id": "dashboard-sales-utc-day-and-annulled",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/dashboard/stats"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-dashboard-baseline-20261019",
+        "observed_error": "«Ventas de hoy» con el API en UTC sumaba la venta de las 22:00 de ayer en Lima y también la factura anulada (S/ 1 357 en vez de S/ 118).",
+        "local_only": true
+      },
+      "correction": "Día y mes del contribuyente; anulados/rechazados fuera y notas de crédito restan",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-dashboard-fixed-local-20261019"
+    },
+    {
+      "id": "dashboard-read-failure-zero",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/dashboard/stats"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/dashboard/activities"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-dashboard-baseline-20261019",
+        "observed_error": "Con la tabla de comprobantes ilegible stats respondía 200 con ventas 0 y las actividades 200 con la lista sin comprobantes.",
+        "local_only": true
+      },
+      "correction": "503 y la pantalla avisa en vez de mostrar ceros",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-dashboard-fixed-local-20261019"
+    },
+    {
+      "id": "payables-dates-utc-day",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxp/vencimientos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/tesoreria/programacion"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxp/aging"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/tesoreria/flujo-caja"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-payables-dates-baseline-20261019",
+        "observed_error": "Con el servidor en UTC, desde las 19:00 de Lima la deuda que vence hoy salía de los próximos vencimientos, la programación de tesorería la marcaba VENCIDA, la antigüedad sumaba un día y el flujo de caja empezaba mañana.",
+        "local_only": true
+      },
+      "correction": "Las tres lecturas usan el día del contribuyente",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-payables-dates-fixed-local-20261019"
+    },
+    {
+      "id": "tenant-create-offline-queued-false-success",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/tenants"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-tenant-create-baseline-20261019",
+        "observed_error": "Con un fallo de red el cliente encolaba el alta en la cola offline y respondía 202 success:true: el modal se cerraba como si la empresa existiera, sin credenciales, y el envío quedaba para la sincronización.",
+        "local_only": true
+      },
+      "correction": "El alta y edición de empresas nunca se encolan: el modal muestra el error, el reintento con la misma clave confirma y, en una respuesta idempotente, muestra las credenciales escritas",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-tenant-create-fixed-local-20261019"
     }
   ]
 }

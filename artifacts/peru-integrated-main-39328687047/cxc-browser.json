@@ -1,0 +1,16 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "scope": "UI real de reprogramación CxC con API/PostgreSQL locales",
+  "checks": [
+    {
+      "operation": "Cada reprogramación desde la pantalla lleva su propia intención y se aplica",
+      "passed": true
+    },
+    {
+      "operation": "Un rechazo del servidor deja el formulario abierto con el motivo",
+      "passed": true
+    }
+  ]
+}

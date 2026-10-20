@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, ConflictException, ForbiddenException, HttpException, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, ForbiddenException, HttpException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { createHash, randomUUID } from 'crypto';
 import { DOMParser } from '@xmldom/xmldom';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
@@ -2142,6 +2142,14 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
             `No se pudo emitir la factura atómica ${idempotencyKey}: ${atomicError.message}`,
             atomicError,
           );
+          if (pedidoId) {
+            // Factura de pedido (446): estado, reserva o regla de negocio (409), el
+            // pedido no existe (404) o la base no respondió (503; reintentar con la
+            // misma llave es seguro). El texto crudo de PostgreSQL no llega a la UI.
+            if (atomicError.code === 'P0002') throw new NotFoundException('Pedido no encontrado');
+            if (['23514', '23505', 'P0001'].includes(atomicError.code)) throw new ConflictException(`No se pudo emitir la factura del pedido: ${atomicError.message}`);
+            if (!['22023', '23503', '22P02'].includes(atomicError.code)) throw new ServiceUnavailableException('No se pudo emitir la factura del pedido; el pedido conserva su estado y puede reintentarse');
+          }
           throw new BadRequestException(
             `No se pudo emitir la factura de forma transaccional: ${atomicError.message}`,
           );

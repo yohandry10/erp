@@ -1,0 +1,128 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "Límite agregado y recuperación de login real local; no cambia límites",
+  "scenarios": [
+    {
+      "scenario": "Login oficina: rotación de cuentas produce 429 con Retry-After estándar y específico iguales",
+      "passed": true,
+      "retry_after_seconds": 60
+    },
+    {
+      "scenario": "Login oficina: respetar Retry-After recupera autenticación real sin desactivar limitador",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 401
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 429
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    }
+  ]
+}

@@ -99,7 +99,8 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
     temporaryPassword: string
   } | null>(null)
 
-  const api = useApiCall()
+  // El alta tarda más que los 12 s por defecto del hook: el API le da 60 s.
+  const api = useApiCall({ timeoutMs: 70000 })
   const { paises } = usePaises()
 
   const documentoConfigMap: Record<string, {
@@ -221,17 +222,20 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
 
       if (result && result.success) {
         window.sessionStorage.removeItem(intentStorageKey)
-        // Mostrar credenciales del usuario administrador
+        // Mostrar credenciales del usuario administrador. Si se perdió la primera
+        // respuesta, el reintento idempotente ya no trae la contraseña: es la que
+        // se escribió en el formulario. Antes el modal se cerraba sin confirmar.
         const adminUser = result.data?.adminUser
-        if (adminUser?.email && adminUser?.temporaryPassword) {
+        const temporaryPassword = adminUser?.temporaryPassword || (isEditing ? '' : formData.admin_password)
+        if (adminUser?.email && temporaryPassword) {
           setCredentials({
             email: adminUser.email,
-            temporaryPassword: adminUser.temporaryPassword,
+            temporaryPassword,
           })
         }
 
         onSuccess()
-        if (!adminUser?.email || !adminUser?.temporaryPassword) {
+        if (!adminUser?.email || !temporaryPassword) {
           onClose()
           setFormData({ ...defaultTenantFormData })
         }

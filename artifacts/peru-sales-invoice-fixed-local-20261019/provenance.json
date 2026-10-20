@@ -1,0 +1,17 @@
+{
+  "capturedAt": "2026-10-20T08:05:46.015Z",
+  "capture": "Before launch",
+  "source_hashes": {
+    "artifacts/peru-block-runner-20261019.mjs": "9bdd21cb8d838fd2d635a95b27855cf63636627f9026f7fa8fab03d52e808bb9",
+    "scripts/ci/test-peru-sales-invoice-local.mjs": "0e0e036917e0ca4f794794ebcd01b3f9dc9fca5ac0de0754af2ce6c978585d75",
+    "scripts/ci/peru-local-smtp-sink.mjs": "af601f15f5beb86aabc65046663fe33779b3b37c18c18365b514f84d056347ff",
+    "scripts/ci/prepare-peru-first-client-local.mjs": "aa066de4808c3370b7bd18c2538f1fd82b6b136b8a5e2e1ca67ef579f8a14306",
+    "apps/erp-api/tests/e2e/helpers/local-api-harness.ts": "b1c4d7c61c10a2b5b0c28c367c8790196d667dd8d03bdd65058bf982efc3e968",
+    "apps/erp-api/src/modules/ventas/pedidos/pedidos.service.ts": "f4c92cb3b10c98e91ad3f7b3874738ceb3776f7175aaffafd4741dd42aec61a3",
+    "apps/erp-api/src/modules/ventas/pedidos/cpe-integration.service.ts": "5075fa300873d8fa28169db7a4e7a52dc00f39c89252fd2d785380471455416a",
+    "apps/web/components/ventas/GenerarFacturaButton.tsx": "8aa303d4bf76b0350124af51363b7a2264394d0144bc779865489484f56de61b",
+    "apps/web/tests/e2e/peru-sales-invoice-local.spec.ts": "74adcf22bbcf58b10b19f03c7ea26b35add7af3031f6c17c2fbe84388f57e833"
+  },
+  "complete_acceptance": false,
+  "remoteWrites": false
+}

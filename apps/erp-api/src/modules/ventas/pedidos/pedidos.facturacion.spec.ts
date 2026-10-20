@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PedidosService } from './pedidos.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
@@ -214,12 +214,60 @@ describe('PedidosService (facturación)', () => {
       },
     });
     (moduleRefSupabase(service) as any).getClient.mockReturnValue(mockSupabaseClient);
-    const findOne = jest.spyOn(service as any, 'findOne');
+    jest.spyOn(service as any, 'findOne').mockResolvedValue({
+      id: 'pedido-real', estado: 'LISTO_FACTURAR', numero: 'PV-0001', detalle: [], factura_id: null,
+    });
 
-    await expect(service.generarFactura('pedido-real', 'tenant-real')).rejects.toThrow(
-      /Certificado Digital/,
-    );
-    expect(findOne).not.toHaveBeenCalled();
+    const attempt = service.generarFactura('pedido-real', 'tenant-real');
+    await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+    await expect(attempt).rejects.toThrow(/Certificado Digital/);
+    expect(cpeIntegrationService.generarFacturaDesdePedido).not.toHaveBeenCalled();
+  });
+
+  it('responde 404 por un pedido ajeno antes de exigir la configuración fiscal', async () => {
+    mockSupabaseClient = createMockSupabaseClient({
+      empresa_config: { single: [{ data: { ruc: '20123456786', certificado_pfx: null }, error: null }] },
+    });
+    (moduleRefSupabase(service) as any).getClient.mockReturnValue(mockSupabaseClient);
+    jest.spyOn(service as any, 'findOne').mockRejectedValue(new NotFoundException('Pedido no encontrado'));
+
+    await expect(service.generarFactura('pedido-ajeno', 'tenant-1')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('una lectura caída de la configuración responde 503 y no pide el wizard', async () => {
+    mockSupabaseClient = createMockSupabaseClient({
+      empresa_config: { single: [{ data: null, error: { code: '42501', message: 'permission denied for table empresa_config' } }] },
+    });
+    (moduleRefSupabase(service) as any).getClient.mockReturnValue(mockSupabaseClient);
+    jest.spyOn(service as any, 'findOne').mockResolvedValue({
+      id: 'pedido-1', estado: 'LISTO_FACTURAR', numero: 'PV-0001', detalle: [], factura_id: null,
+    });
+
+    await expect(service.generarFactura('pedido-1', 'tenant-1')).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(cpeIntegrationService.generarFacturaDesdePedido).not.toHaveBeenCalled();
+  });
+
+  it('un pedido sin confirmar responde 409', async () => {
+    jest.spyOn(service as any, 'obtenerConfiguracionEmpresa').mockResolvedValue({ usar_flujo_logistica: false });
+    jest.spyOn(service as any, 'findOne').mockResolvedValue({
+      id: 'pedido-1', estado: 'PENDIENTE', numero: 'PV-0001', detalle: [], factura_id: null,
+    });
+
+    await expect(service.generarFactura('pedido-1', 'tenant-1')).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('tras perder la respuesta devuelve la factura de un pedido ya FACTURADO', async () => {
+    jest.spyOn(service as any, 'findOne').mockResolvedValue({
+      id: 'pedido-1', estado: 'FACTURADO', numero: 'PV-0001', detalle: [], factura_id: 'cpe-1',
+    });
+    jest.spyOn(service as any, 'obtenerRepresentacionDemoCpePersistida').mockResolvedValue({ isDemo: false, authority: 'SUNAT' });
+    jest.spyOn(service as any, 'repararDetalleFacturadoSiEsNecesario').mockResolvedValue(undefined);
+    (service as any).greIntegrationService.verificarSugerenciaGRE.mockResolvedValue({ sugerir: false });
+
+    await expect(service.generarFactura('pedido-1', 'tenant-1', 'user-1')).resolves.toEqual({
+      success: true, factura_id: 'cpe-1', sugerir_gre: false, is_demo_representation: false,
+    });
+    expect(cpeIntegrationService.generarFacturaDesdePedido).not.toHaveBeenCalled();
   });
 
   it('permite cerrar un pedido demo CO sin exigir un certificado fiscal real', async () => {
