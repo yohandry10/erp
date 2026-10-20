@@ -8,7 +8,7 @@ import { OutboxEventBuilder } from '../../../shared/outbox/outbox-event.interfac
 import Decimal from 'decimal.js';
 import { DevolucionProveedorEmitidaEvent } from '../../../shared/events/event-bus.service';
 import { TesoreriaService } from '../tesoreria/tesoreria.service';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { fechaHoyDelTenant } from '../../../shared/utils/fecha-tenant.util';
 import { appendIntegrationLog } from '../../../shared/utils/integration-log';
 import { errorWriterFinanciero, lecturaFinancieraFallida } from '../finanzas-errors';
@@ -663,9 +663,7 @@ export class CxpService {
     idempotencyKey?: string,
   ): Promise<{ success: boolean; data: any }> {
     if (!userId) throw new BadRequestException('Se requiere un usuario autenticado');
-    const key = idempotencyKey?.trim() || `cxp-update:${createHash('sha256')
-      .update(JSON.stringify({ tenantId, id, dto, userId }))
-      .digest('hex')}`;
+    const key = idempotencyKey?.trim() || `cxp-update:${randomUUID()}`;
     const { data: rpcData, error: rpcError } = await this.supabase.getClient().rpc('gestionar_cxp_tx', {
       p_tenant_id: tenantId, p_cxp_id: id, p_actor_id: userId, p_action: 'UPDATE_TERMS',
       p_payload: dto, p_idempotency_key: key,

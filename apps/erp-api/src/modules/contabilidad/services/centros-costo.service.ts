@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { lecturaContableFallida } from '../contabilidad-errors';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { fechaHoyDelTenant } from '../../../shared/utils/fecha-tenant.util';
 
 export interface CentroCosto {
@@ -31,7 +32,7 @@ export class CentrosCostoService {
 
       if (error) {
         console.error('❌ [CentrosCosto] Error listando centros de costo:', error);
-        throw new BadRequestException(`Error al listar centros de costo: ${error.message}`);
+        throw lecturaContableFallida(error, 'los centros de costo');
       }
 
       console.log(`✅ [CentrosCosto] ${data?.length || 0} centros de costo encontrados`);
@@ -101,7 +102,7 @@ export class CentrosCostoService {
     idempotencyKey?:string,
   ): Promise<CentroCosto> {
     if(!userId) throw new BadRequestException('Se requiere un usuario autenticado');
-    const key=idempotencyKey?.trim()||`cost-center-update:${createHash('sha256').update(JSON.stringify({tenantId,id,userId,updates})).digest('hex')}`;
+    const key=idempotencyKey?.trim()||`cost-center-update:${randomUUID()}`;
     const {data:rpcData,error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_maestro_contable_tx',{
       p_tenant_id:tenantId,p_actor_id:userId,p_entity:'COST_CENTER',p_action:'UPDATE',p_record_id:id,p_payload:updates,p_idempotency_key:key,
     });

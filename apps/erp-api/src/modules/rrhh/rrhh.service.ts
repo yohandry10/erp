@@ -116,7 +116,7 @@ export class RrhhService {
       `)
       .eq('tenant_id', currentTenantId); // ✅ Filtro de tenant
 
-    if (error) throw error;
+    if (error) throw lecturaRrhhFallida('los empleados');
 
     return {
       success: true,
@@ -137,7 +137,7 @@ export class RrhhService {
       .select('*')
       .eq('tenant_id', currentTenantId); // ✅ Filtro de tenant
 
-    if (error) throw error;
+    if (error) throw lecturaRrhhFallida('los departamentos');
     return data;
   }
 

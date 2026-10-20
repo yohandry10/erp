@@ -1,0 +1,16 @@
+{
+  "capturedAt": "2026-10-20T08:28:56.232Z",
+  "capture": "Before launch",
+  "source_hashes": {
+    "artifacts/peru-block-runner-20261019.mjs": "7e1e3a2fe3a0ed026bd06b15e37a15979c83546b6f7f2f435bcf992d883e0037",
+    "scripts/ci/test-peru-read-faults-local.mjs": "4831b6fe05a03dc90f98d1a09898be9f62382c8de56edd6789ec75780c44c42f",
+    "scripts/ci/peru-local-smtp-sink.mjs": "af601f15f5beb86aabc65046663fe33779b3b37c18c18365b514f84d056347ff",
+    "scripts/ci/prepare-peru-first-client-local.mjs": "c12f2707c06dc305a74c8535d98528531b518bdbba0ba3f102c119ed40c6da5d",
+    "apps/erp-api/tests/e2e/helpers/local-api-harness.ts": "b1c4d7c61c10a2b5b0c28c367c8790196d667dd8d03bdd65058bf982efc3e968",
+    "apps/erp-api/src/modules/inventario/inventario.controller.ts": "83c17efd645e9539ab1b516cebf9cc402c777155144197aeecd65eaa6ea6d747",
+    "apps/web/app/dashboard/inventario/productos/page.tsx": "35304590c93841ca19dc8e988257049da3cab9a555ade703ad88b1b47960156a",
+    "apps/web/tests/e2e/peru-read-faults-local.spec.ts": "1f09c3b28ed801b7446138b186c0078f24ee8e5ba597456cf84ab1fe84ba8ba6"
+  },
+  "complete_acceptance": false,
+  "remoteWrites": false
+}

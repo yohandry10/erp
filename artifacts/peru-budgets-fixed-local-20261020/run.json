@@ -1,0 +1,10 @@
+{
+  "completedAt": "2026-10-20T08:43:56.271Z",
+  "success": true,
+  "withBrowser": true,
+  "block": "budgets",
+  "scope": "accounting_budgets_subset",
+  "database": "PostgreSQL 16 efímero (migraciones completas)",
+  "output": "artifacts\\peru-budgets-local-20261020084016834-22128",
+  "remoteWrites": false
+}

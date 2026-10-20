@@ -1,0 +1,18 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "Contrato de refresco de estados financieros API local",
+  "scenarios": [
+    {
+      "scenario": "Estados: refrescar con el periodo en el cuerpo responde 2xx",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/estados/refrescar",
+      "status": 201
+    }
+  ]
+}

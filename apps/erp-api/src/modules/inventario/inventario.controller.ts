@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Post, Put, Body, Param, Query, UseGuards, Delete, Headers, InternalServerErrorException, Logger, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Post, Put, Body, Param, Query, UseGuards, Delete, Headers, Logger, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiConsumes } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -88,11 +88,8 @@ export class InventarioController {
       };
     } catch (error) {
       this.logger.error('❌ Error obteniendo almacenes', error as Error); // HARDENING: utiliza Logger Nest para errores.
-      return {
-        success: false,
-        message: 'Error al obtener almacenes: ' + (error as Error).message,
-        data: []
-      };
+      // Antes 200 con lista vacía: la pantalla decía que no había almacenes.
+      throw lecturaInventarioFallida(error, 'los almacenes');
     }
   }
 
@@ -401,6 +398,7 @@ export class InventarioController {
           client.from('producto_precios_sucursal').select('*').in('producto_id', ids),
           client.from('producto_stock_sucursal').select('*').in('producto_id', ids),
         ]);
+        if (preciosResp.error || stockResp.error) throw preciosResp.error ?? stockResp.error;
         const precios = preciosResp.data || [];
         const stocks = stockResp.data || [];
         enriched = enriched.map((p: any) => ({
@@ -418,11 +416,8 @@ export class InventarioController {
       };
     } catch (error) {
       this.logger.error('❌ Error obteniendo productos', error as Error);
-      return { 
-        success: false, 
-        message: 'Error al obtener productos: ' + (error as Error).message,
-        data: [] 
-      };
+      // Antes 200 con lista vacía y el texto de PostgreSQL: «no hay productos».
+      throw lecturaInventarioFallida(error, 'los productos');
     }
   }
 
@@ -764,7 +759,7 @@ export class InventarioController {
       return { success: true, data: data || [] };
     } catch (error) {
       this.logger.error('❌ Error obteniendo categorías', error as Error);
-      throw new InternalServerErrorException('No se pudieron cargar las categorías de producto');
+      throw lecturaInventarioFallida(error, 'las categorías de producto');
     }
   }
 

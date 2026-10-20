@@ -14,7 +14,7 @@ import {
   EstadoAsiento
 } from '@erp-suite/dtos';
 import { buildDeterministicUuid } from '../../../common/util/deterministic-uuid.util';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 
 /** Cuentas PCGE del ciclo de vida del activo. */
 const CUENTA_ACTIVO = '33';
@@ -219,7 +219,7 @@ export class ActivosFijosService {
     idempotencyKey?: string,
   ): Promise<ActivoFijoResponseDto> {
     if(!userId) throw new BadRequestException('Se requiere un usuario autenticado');
-    const key=idempotencyKey?.trim()||`asset-update:${createHash('sha256').update(JSON.stringify({tenantId,activoId,userId,dto})).digest('hex')}`;
+    const key=idempotencyKey?.trim()||`asset-update:${randomUUID()}`;
     const {data:rpcData,error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_activo_diferido_tx',{
       p_tenant_id:tenantId,p_actor_id:userId,p_entity:'ASSET',p_action:'UPDATE',p_record_id:activoId,p_payload:dto,p_idempotency_key:key,
     });

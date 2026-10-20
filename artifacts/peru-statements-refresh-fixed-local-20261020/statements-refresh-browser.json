@@ -1,0 +1,12 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "scope": "UI real de estados financieros con API/PostgreSQL locales",
+  "checks": [
+    {
+      "operation": "Refrescar vistas envía el periodo en el cuerpo y responde 2xx",
+      "passed": true
+    }
+  ]
+}
