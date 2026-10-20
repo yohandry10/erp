@@ -1,0 +1,10 @@
+{
+  "completedAt": "2026-10-19T22:03:40.397Z",
+  "success": false,
+  "withBrowser": true,
+  "block": "approvals",
+  "scope": "sales_approvals_subset",
+  "database": "PostgreSQL 16 efímero (migraciones completas)",
+  "output": "artifacts\\peru-approvals-local-20261019215940419-22652",
+  "remoteWrites": false
+}

@@ -4943,6 +4943,96 @@
       "pending_checks": [
         "Cobro previo desde la UI, roles distintos de ADMIN y CxC en moneda extranjera"
       ]
+    },
+    {
+      "id": "sales-approval-segregated-decision",
+      "source": "scripts/ci/test-peru-sales-approvals-local.mjs",
+      "required_scenario_prefixes": [
+        "Aprobaciones: un pedido sobre el umbral",
+        "Aprobaciones: el creador no puede aprobar",
+        "Aprobaciones: otro aprobador aprueba"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/pedidos/aprobaciones/pendientes"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/aprobaciones/decision"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/pedidos/:id/aprobaciones"
+        }
+      ],
+      "verified_checks": [
+        "Pedido sobre umbral pendiente con motivo en la bandeja; el creador recibe 403 sin efectos; otro aprobador aprueba y el historial muestra su nombre"
+      ],
+      "pending_checks": [
+        "Roles distintos de ADMIN con ventas.pedidos_aprobaciones.resolver y aprobación por crédito bloqueado"
+      ]
+    },
+    {
+      "id": "sales-approval-replay-and-conflict",
+      "source": "scripts/ci/test-peru-sales-approvals-local.mjs",
+      "required_scenario_prefixes": [
+        "Aprobaciones: repetir la misma decisión",
+        "Aprobaciones: rechazar cancela el pedido"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/aprobaciones/decision"
+        }
+      ],
+      "verified_checks": [
+        "La misma decisión repetida devuelve el resultado sin otra fila; rechazar cancela y una decisión distinta posterior responde 409"
+      ],
+      "pending_checks": [
+        "Dos aprobadores simultáneos sobre el mismo pedido"
+      ]
+    },
+    {
+      "id": "sales-approval-isolation-outages",
+      "source": "scripts/ci/test-peru-sales-approvals-local.mjs",
+      "required_scenario_prefixes": [
+        "Aprobaciones: pedido ajeno o inexistente",
+        "Aprobaciones: sin lectura del historial"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/pedidos/:id/aprobaciones"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/aprobaciones/decision"
+        }
+      ],
+      "verified_checks": [
+        "Historial y decisión ajenos o inexistentes 404; historial sin lectura y writer caído 503 sin cambiar el pedido"
+      ],
+      "pending_checks": []
+    },
+    {
+      "id": "sales-approval-credit-summary",
+      "source": "scripts/ci/test-peru-sales-approvals-local.mjs",
+      "required_scenario_prefixes": [
+        "Aprobaciones: la bandeja muestra al aprobador las cuentas vencidas"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/pedidos/aprobaciones/pendientes"
+        }
+      ],
+      "verified_checks": [
+        "Con una cuenta vencida por fecha la bandeja informa morosidad y el saldo pendiente"
+      ],
+      "pending_checks": [
+        "Límite de crédito configurado y cuentas en moneda extranjera"
+      ]
     }
   ]
 }

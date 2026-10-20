@@ -80,8 +80,11 @@ export default function AprobacionesPage() {
       style: 'currency',
       currency: country.moneda || 'PEN',
     }).format(toNumber(value))
-  const { get, post } = useApi()
+  // La pantalla muestra los errores con el texto del servidor: el aviso genérico
+  // del hook lo duplicaba y una carga fallida se veía como bandeja vacía.
+  const { get, post } = useApi({ throwOnError: true, showErrorToast: false })
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [decidingId, setDecidingId] = useState<string | null>(null)
   const [data, setData] = useState<PedidoPendiente[]>([])
   const [ultimaActualizacion, setUltimaActualizacion] = useState<Date | null>(null)
@@ -108,15 +111,12 @@ export default function AprobacionesPage() {
       } else {
         setData([])
       }
+      setLoadError(null)
+      setUltimaActualizacion(new Date())
     } catch (error) {
       console.error('Error al cargar aprobaciones pendientes:', error)
-      toast({
-        title: 'No se pudieron cargar las aprobaciones',
-        description: 'Actualiza la bandeja o inténtalo nuevamente.',
-        variant: 'destructive',
-      })
+      setLoadError(error instanceof Error && error.message ? error.message : 'Inténtalo nuevamente en unos minutos.')
     } finally {
-      setUltimaActualizacion(new Date())
       setLoading(false)
     }
   }, [get])
@@ -166,9 +166,16 @@ export default function AprobacionesPage() {
       console.error('Error registrando decisión:', error)
       toast({
         title: 'No se pudo registrar la decisión',
-        description: 'Verifica el estado del pedido e inténtalo nuevamente.',
+        description: error instanceof Error && error.message ? error.message : 'Inténtalo nuevamente.',
         variant: 'destructive',
       })
+      // Otro usuario ya resolvió o retiró el pedido: la bandeja quedó desfasada.
+      const status = (error as { data?: { statusCode?: number } })?.data?.statusCode
+      if (status === 404 || status === 409) {
+        setPendingDecision(null)
+        setObservaciones('')
+        await loadPendientes()
+      }
     } finally {
       setDecidingId(null)
     }
@@ -264,12 +271,18 @@ export default function AprobacionesPage() {
 
       {/* Pedidos Pendientes */}
       <div className="relative rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl">
+        {loadError && (
+          <div id="aprobaciones-load-error" role="alert" className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <strong className="block font-semibold">No se pudo cargar la bandeja de aprobaciones.</strong>
+            <span>{loadError}</span>
+          </div>
+        )}
         {loading ? (
           <div className="flex min-h-48 items-center justify-center">
             <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
             <p>Cargando pedidos pendientes...</p>
           </div>
-        ) : data.length === 0 ? (
+        ) : loadError && data.length === 0 ? null : data.length === 0 ? (
           <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
             <div className="text-center p-12 text-muted-foreground">
               <CheckCircle2 size={48} className="text-[#10b981]" />

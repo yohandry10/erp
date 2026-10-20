@@ -1,0 +1,206 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "Aprobación de pedidos de venta API/DB local; sin aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Aprobaciones: un pedido sobre el umbral queda pendiente y aparece en la bandeja con su motivo",
+      "passed": true
+    },
+    {
+      "scenario": "Aprobaciones: el creador no puede aprobar su propio pedido (403) y el pedido no cambia",
+      "passed": true
+    },
+    {
+      "scenario": "Aprobaciones: otro aprobador aprueba y el historial muestra la decisión con su nombre",
+      "passed": true
+    },
+    {
+      "scenario": "Aprobaciones: repetir la misma decisión (respuesta perdida) no falla ni duplica",
+      "passed": true
+    },
+    {
+      "scenario": "Aprobaciones: pedido ajeno o inexistente responde 404 en historial y decisión",
+      "passed": true
+    },
+    {
+      "scenario": "Aprobaciones: rechazar cancela el pedido y una decisión distinta posterior responde 409",
+      "passed": true
+    },
+    {
+      "scenario": "Aprobaciones: sin lectura del historial o sin writer de decisión responde 503",
+      "passed": true
+    },
+    {
+      "scenario": "Aprobaciones: la bandeja muestra al aprobador las cuentas vencidas del cliente",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/complete",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/almacenes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/categorias",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/productos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/clientes",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "roles",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "users",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/pedidos/aprobaciones/pendientes",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/aprobaciones/decision",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/aprobaciones/decision",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/pedidos/:id/aprobaciones",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/aprobaciones/decision",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/pedidos/:id/aprobaciones",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/aprobaciones/decision",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/aprobaciones/decision",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/aprobaciones/decision",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/aprobaciones/decision",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/pedidos/:id/aprobaciones",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/aprobaciones/decision",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/comprobantes",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "ventas/pedidos/aprobaciones/pendientes",
+      "status": 200
+    }
+  ]
+}

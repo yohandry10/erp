@@ -1,0 +1,28 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "scope": "UI real de la bandeja de aprobaciones con API/PostgreSQL locales",
+  "checks": [
+    {
+      "operation": "Bandeja sin lectura muestra el error y no \"sin pendientes\"; Actualizar la recupera",
+      "passed": true
+    },
+    {
+      "operation": "Autoaprobación rechazada muestra el motivo del servidor",
+      "passed": true
+    },
+    {
+      "operation": "La aprobadora ve la morosidad del cliente con cuenta vencida",
+      "passed": true
+    },
+    {
+      "operation": "La aprobadora aprueba desde la bandeja y el pedido sale de ella",
+      "passed": true
+    },
+    {
+      "operation": "Decidir un pedido ya resuelto muestra el motivo y la bandeja se actualiza",
+      "passed": true
+    }
+  ]
+}
