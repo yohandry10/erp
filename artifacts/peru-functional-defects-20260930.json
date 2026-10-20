@@ -4074,6 +4074,146 @@
         "CI exacto, main y runtime."
       ],
       "canonical_proof": "apps/erp-api/src/common/filters/global-exception.filter.spec.ts"
+    },
+    {
+      "id": "sales-approval-self-decision-400",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/aprobaciones/decision"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-sales-approvals-baseline-20261019",
+        "observed_error": "El creador que decidía su propio pedido recibía 400, como si la petición estuviera mal formada.",
+        "local_only": true
+      },
+      "correction": "403 con el motivo; el pedido no cambia",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-sales-approvals-fixed-local-20261019"
+    },
+    {
+      "id": "sales-approval-lost-response-400",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/aprobaciones/decision"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-sales-approvals-baseline-20261019",
+        "observed_error": "Sobre un pedido ya resuelto toda decisión respondía 400 «no está pendiente»: repetir la misma tras perder la respuesta fallaba aunque ya estaba registrada y una distinta no se distinguía como conflicto.",
+        "local_only": true
+      },
+      "correction": "Si la última decisión es la misma del mismo aprobador se devuelve con idempotent_replay; una distinta responde 409",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-sales-approvals-fixed-local-20261019"
+    },
+    {
+      "id": "sales-approval-foreign-history-200",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/pedidos/:id/aprobaciones"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-sales-approvals-baseline-20261019",
+        "observed_error": "El historial de un pedido ajeno o inexistente respondía 200 vacío.",
+        "local_only": true
+      },
+      "correction": "Comprueba el pedido del tenant antes de leer: 404",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-sales-approvals-fixed-local-20261019"
+    },
+    {
+      "id": "sales-approval-writer-raw-400",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/aprobaciones/decision"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-sales-approvals-baseline-20261019",
+        "observed_error": "Sin writer la decisión respondía 400 con el texto crudo «permission denied for function decidir_aprobacion_pedido_tx».",
+        "local_only": true
+      },
+      "correction": "503 legible; errores de dominio del RPC con su código propio (404/403/409)",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-sales-approvals-fixed-local-20261019"
+    },
+    {
+      "id": "sales-approval-overdue-summary-hidden",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/pedidos/aprobaciones/pendientes"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-sales-approvals-baseline-20261019",
+        "observed_error": "La bandeja decía «Sin morosidad» con una cuenta vencida: sólo miraba un estado VENCIDO que no se persiste.",
+        "local_only": true
+      },
+      "correction": "Mora por fecha de vencimiento (como la política SQL 441), sin cuentas anuladas; con la lectura del cliente o de sus cuentas caída no se muestra resumen (cambio de código sin escenario propio)",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-sales-approvals-fixed-local-20261019"
+    },
+    {
+      "id": "sales-approval-ui-failed-load-empty",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/pedidos/aprobaciones/pendientes"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-sales-approvals-baseline-20261019",
+        "observed_error": "Con la lectura caída la pantalla afirmaba «No hay pedidos pendientes de aprobación».",
+        "local_only": true
+      },
+      "correction": "La bandeja muestra el error del servidor y Actualizar la recupera",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-sales-approvals-fixed-local-20261019"
+    },
+    {
+      "id": "sales-approval-ui-reason-hidden",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/aprobaciones/decision"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-sales-approvals-baseline-20261019",
+        "observed_error": "El motivo del servidor no aparecía al rechazar la autoaprobación ni ante un pedido ya resuelto (el aviso genérico de la pantalla reemplaza al del hook: sólo cabe uno), y ese pedido seguía en la bandeja con el diálogo abierto.",
+        "local_only": true
+      },
+      "correction": "Un único aviso con el motivo del servidor; con 404/409 cierra el diálogo y recarga la bandeja",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-sales-approvals-fixed-local-20261019"
     }
   ]
 }

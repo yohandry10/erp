@@ -145,7 +145,8 @@ export class PedidosController {
     description: 'Registra una decisión de aprobación o rechazo para el pedido pendiente',
   })
   @ApiResponse({ status: 200, description: 'Decisión registrada exitosamente' })
-  @ApiResponse({ status: 400, description: 'El pedido no está pendiente de aprobación' })
+  @ApiResponse({ status: 403, description: 'El creador no puede decidir su propio pedido' })
+  @ApiResponse({ status: 409, description: 'El pedido ya no está pendiente de aprobación' })
   async decidirAprobacion(
     @Param('id') id: string,
     @Body() decidirAprobacionDto: DecidirAprobacionDto,

@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { Decimal } from 'decimal.js';
 import { isNotFoundError, readUnavailable, writerFailure } from '../ventas-errors';
@@ -14,6 +14,7 @@ import { calcularDesgloseIgv } from '../../../shared/utils/igv-afectacion.util';
 import { canUseRuntimeDemoCertificate } from '../../../shared/utils/demo-certificate.utils';
 import { TenantContextService } from '../../../shared/tenant/tenant-context.service';
 import { tieneEntradaPagoPedido } from './pedido-payment.util';
+import { fechaHoyDelTenant } from '../../../shared/utils/fecha-tenant.util';
 import {
   isFiscalDemoRepresentation,
   resolveHistoricalCpeCountry,
@@ -393,6 +394,8 @@ export class PedidosService {
     }>
   > {
     const client = this.supabase.getClient();
+    // Un pedido ajeno o inexistente no tiene historial "vacío": no existe (404).
+    await this.findOne(pedidoId, tenantId);
 
     const { data, error } = await client
       .from('pedido_aprobaciones')
@@ -452,12 +455,16 @@ export class PedidosService {
     motivosEntrada: string[] = [],
     userId?: string,
     observaciones?: string,
-  ): Promise<{ success: boolean; decision: DecisionAprobacion; pedido: PedidoVenta & { detalle: PedidoDetalle[] } }> {
+  ): Promise<{ success: boolean; decision: DecisionAprobacion; pedido: PedidoVenta & { detalle: PedidoDetalle[] }; idempotent_replay?: boolean }> {
     const client = this.supabase.getClient();
     const pedido = await this.findOne(pedidoId, tenantId);
 
     if (pedido.estado !== EstadoPedido.PENDIENTE_APROBACION && !pedido.requiere_aprobacion) {
-      throw new BadRequestException('El pedido no está pendiente de aprobación');
+      // Respuesta perdida: el mismo aprobador repite la misma decisión ya registrada.
+      if (await this.decisionRegistrada(pedidoId, tenantId, userId, decision)) {
+        return { success: true, decision, pedido, idempotent_replay: true };
+      }
+      throw new ConflictException('El pedido ya no está pendiente de aprobación');
     }
 
     if (String(pedido.estado_credito ?? '').toUpperCase() === 'BLOQUEADO') {
@@ -477,7 +484,7 @@ export class PedidosService {
     // Si el creador puede aprobarse a sí mismo, el control no controla nada.
     // Compras ya aplica esta misma regla a las órdenes de compra.
     if ((pedido as any).created_by && userId === (pedido as any).created_by) {
-      throw new BadRequestException(
+      throw new ForbiddenException(
         'El creador del pedido no puede aprobar su propio pedido. Se requiere aprobación de otro usuario autorizado.',
       );
     }
@@ -503,7 +510,16 @@ export class PedidosService {
 
     if (decisionError) {
       console.error('Error resolviendo aprobación de pedido:', decisionError);
-      throw new BadRequestException(decisionError.message || 'No se pudo resolver la aprobación del pedido');
+      const message = String(decisionError.message ?? '');
+      if (message.includes('no está pendiente de aprobación')) {
+        if (await this.decisionRegistrada(pedidoId, tenantId, userId, decision)) {
+          return { success: true, decision, pedido, idempotent_replay: true };
+        }
+        throw new ConflictException('El pedido ya no está pendiente de aprobación');
+      }
+      if (message.includes('Pedido no encontrado')) throw new NotFoundException('Pedido no encontrado');
+      if (/propio pedido|no pertenece al tenant/.test(message)) throw new ForbiddenException(message);
+      throw writerFailure(decisionError, 'No se pudo resolver la aprobación del pedido');
     }
 
     let pedidoActualizado: PedidoVenta & { detalle: PedidoDetalle[] };
@@ -853,6 +869,27 @@ export class PedidosService {
     };
   }
 
+  /** La última decisión registrada del pedido coincide con la de este aprobador. */
+  private async decisionRegistrada(
+    pedidoId: string,
+    tenantId: string,
+    userId: string | undefined,
+    decision: DecisionAprobacion,
+  ): Promise<boolean> {
+    if (!userId) return false;
+    const { data, error } = await this.supabase.getClient()
+      .from('pedido_aprobaciones')
+      .select('decision, aprobado_por')
+      .eq('tenant_id', tenantId)
+      .eq('pedido_id', pedidoId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (error) throw readUnavailable('las decisiones del pedido');
+    const ultima = data?.[0];
+    return Boolean(ultima && ultima.aprobado_por === userId
+      && String(ultima.decision).toUpperCase() === String(decision).toUpperCase());
+  }
+
   private async obtenerResumenCredito(clienteId: string, tenantId: string): Promise<ResumenCredito> {
     const client = this.supabase.getClient();
 
@@ -863,26 +900,33 @@ export class PedidosService {
       .eq('id', clienteId)
       .single();
 
-    if (clienteError) {
-      console.error('Error obteniendo información del cliente:', clienteError);
-    }
+    // Este resumen se muestra al aprobador: sin datos es mejor no mostrar nada que
+    // mostrar límite 0 y "sin morosidad".
+    if (clienteError) throw readUnavailable('el crédito del cliente');
 
     const limite = cliente?.limite_credito != null ? Number(cliente.limite_credito) : 0;
     const permiteMorosidad = cliente?.permite_morosidad ?? false;
 
-    const { data: cuentas } = await client
+    const { data: cuentas, error: cuentasError } = await client
       .from('cuentas_por_cobrar')
-      .select('monto_pendiente, estado')
+      .select('monto_pendiente, estado, fecha_vencimiento')
       .eq('tenant_id', tenantId)
       .eq('cliente_id', clienteId);
+    if (cuentasError) throw readUnavailable('las cuentas por cobrar del cliente');
+    const hoy = await fechaHoyDelTenant(client, tenantId);
 
     let pendiente = 0;
     let tieneVencidos = false;
 
     (cuentas || []).forEach((cuenta) => {
+      const estadoCuenta = String(cuenta.estado ?? '').toUpperCase();
+      if (['ANULADA', 'ANULADO', 'CANCELADO', 'CANCELADA', 'REVERTIDA'].includes(estadoCuenta)) return;
       const monto = Number(cuenta.monto_pendiente || 0);
       pendiente += monto;
-      if (cuenta.estado === 'VENCIDO') {
+      // El estado VENCIDA casi nunca se persiste (el trigger normaliza y nadie lo
+      // fija): la mora se mide por fecha, igual que la política SQL 441.
+      if (monto > 0 && (['VENCIDA', 'VENCIDO'].includes(estadoCuenta)
+        || (cuenta.fecha_vencimiento && String(cuenta.fecha_vencimiento) < hoy))) {
         tieneVencidos = true;
       }
     });
