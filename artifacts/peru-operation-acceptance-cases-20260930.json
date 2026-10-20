@@ -5033,6 +5033,177 @@
       "pending_checks": [
         "Límite de crédito configurado y cuentas en moneda extranjera"
       ]
+    },
+    {
+      "id": "sales-order-invoice-emission",
+      "source": "scripts/ci/test-peru-sales-invoice-local.mjs",
+      "required_scenario_prefixes": [
+        "Facturar pedido: confirmado se factura",
+        "Facturar pedido: cliente con DNI recibe boleta"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/generar-factura"
+        }
+      ],
+      "verified_checks": [
+        "Pedido listo se factura una vez con CPE, salida de stock y FACTURADO; cliente con DNI recibe boleta"
+      ],
+      "pending_checks": [
+        "Flujo con logística activa (LISTO_FACTURAR tras despacho) y SUNAT real"
+      ]
+    },
+    {
+      "id": "sales-order-invoice-retry-and-states",
+      "source": "scripts/ci/test-peru-sales-invoice-local.mjs",
+      "required_scenario_prefixes": [
+        "Facturar pedido: repetir tras perder la respuesta",
+        "Facturar pedido: sin confirmar o cancelado",
+        "Facturar pedido: ajeno o inexistente"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/generar-factura"
+        }
+      ],
+      "verified_checks": [
+        "Reintento tras respuesta perdida devuelve la misma factura sin otro CPE ni salida; sin confirmar/cancelado 409; ajeno/inexistente 404"
+      ],
+      "pending_checks": []
+    },
+    {
+      "id": "sales-order-invoice-preconditions-outages",
+      "source": "scripts/ci/test-peru-sales-invoice-local.mjs",
+      "required_scenario_prefixes": [
+        "Facturar pedido: sin certificado configurado",
+        "Facturar pedido: sin lectura de configuración"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/generar-factura"
+        }
+      ],
+      "verified_checks": [
+        "Sin certificado 409 legible; configuración ilegible o writer caído 503 sin efectos y luego se recupera"
+      ],
+      "pending_checks": []
+    },
+    {
+      "id": "tenant-create-superadmin",
+      "source": "scripts/ci/test-peru-tenant-create-local.mjs",
+      "required_scenario_prefixes": [
+        "Alta de empresa: crea empresa y administrador",
+        "Alta de empresa: RUC ya registrado"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/tenants"
+        }
+      ],
+      "verified_checks": [
+        "Alta con administrador que entra con su contraseña; RUC repetido 409 con motivo legible"
+      ],
+      "pending_checks": []
+    },
+    {
+      "id": "tenant-create-unconfirmed-retry",
+      "source": "scripts/ci/test-peru-tenant-create-local.mjs",
+      "required_scenario_prefixes": [
+        "Alta de empresa: sin confirmación de la base"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/tenants"
+        }
+      ],
+      "verified_checks": [
+        "RPC retenido más allá del timeout: 503 legible y el reintento con la misma clave confirma sin duplicar"
+      ],
+      "pending_checks": []
+    },
+    {
+      "id": "dashboard-home-metrics",
+      "source": "scripts/ci/test-peru-dashboard-local.mjs",
+      "required_scenario_prefixes": [
+        "Dashboard: cotizaciones pendientes y conversión",
+        "Dashboard: ventas de hoy y del mes",
+        "Dashboard: otra empresa no ve"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/dashboard/stats"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/dashboard/activities"
+        }
+      ],
+      "verified_checks": [
+        "Cotizaciones pendientes/conversión con estados reales; ventas de hoy y mes en el día de Lima sin anulados (API en TZ=UTC); aislamiento por empresa"
+      ],
+      "pending_checks": [
+        "Notas de crédito reales (exigen CDR) y comprobantes en moneda extranjera"
+      ]
+    },
+    {
+      "id": "dashboard-home-outages",
+      "source": "scripts/ci/test-peru-dashboard-local.mjs",
+      "required_scenario_prefixes": [
+        "Dashboard: sin lectura de comprobantes",
+        "Dashboard: actividades muestran lo emitido"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/dashboard/stats"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/dashboard/activities"
+        }
+      ],
+      "verified_checks": [
+        "Sin lectura de comprobantes stats y actividades 503 en vez de ceros o lista parcial"
+      ],
+      "pending_checks": []
+    },
+    {
+      "id": "payables-dates-lima-day",
+      "source": "scripts/ci/test-peru-payables-dates-local.mjs",
+      "required_scenario_prefixes": [
+        "Fechas CxP: la deuda que vence hoy",
+        "Fechas tesorería: la programación",
+        "Fechas CxP: la antigüedad",
+        "Fechas tesorería: el flujo de caja"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxp/vencimientos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/tesoreria/programacion"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxp/aging"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/tesoreria/flujo-caja"
+        }
+      ],
+      "verified_checks": [
+        "Con el API en TZ=UTC y Lima pasadas las 19:00: vencimientos, programación, antigüedad y flujo de caja usan el día de Lima"
+      ],
+      "pending_checks": []
     }
   ]
 }

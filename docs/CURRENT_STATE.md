@@ -202,8 +202,11 @@ con la venta contabilizada la nota sobre factura sin CDR se bloquea
 (`REFERENCED_NOTE_SOURCE_NOT_FISCALLY_ACCEPTED`). Tras corregir, 12/12 API, 2/2
 navegador y restore (`artifacts/peru-cxc-fixed-local-20261019`); la fase entra
 al CI. En producción los 5xx siguen sin detalles internos pero en español.
-Sus 17 checks aprobaron y se integró como `d6386bea`; main, E2E y seguridad de
-ese commit y la verificación del runtime quedan pendientes en este corte.
+Sus 17 checks aprobaron y se integró como `d6386bea`; main 39328687047 (484
+HTTP, 35 UI), E2E y seguridad aprobaron y el runtime `d6386bea`/569 pasó al
+tercer intento tras dos timeouts de arranque
+(`artifacts/peru-production-verification-after-145-20261019.json`); en PROD el
+503 ya llega en español (`artifacts/peru-production-error-language-after-145-20261019.json`).
 Aprobaciones de pedidos PE (#146, sin migración): la bandeja y la decisión
 reprodujeron siete defectos (`artifacts/peru-sales-approvals-baseline-20261019`,
 2/8 API y 1/5 navegador): sobre un pedido ya resuelto toda decisión respondía
@@ -220,9 +223,46 @@ al CI. La segregación del creador y el bloqueo por crédito ya eran correctos;
 confirmar con mora responde 400 «Crédito bloqueado» sin pasar a la bandeja
 (observación: es regla de negocio y no 409). Localmente el historial exige
 emular el SELECT por defecto que Supabase concede a `service_role`.
-La matriz registra 717 contratos, 479 observados (main 39313892124), 328 con
-casos funcionales, 179 casos y 142 defectos; los ocho casos de CxC y
-aprobaciones esperan CI; no hay aceptación integral del lanzamiento.
+Facturar desde el pedido (#147, sin migración): el botón de la pantalla usa
+`/generar-factura`, que ningún caso ejecutaba; la línea base
+(`artifacts/peru-sales-invoice-baseline-20261019`, 2/7) mostró que reintentar
+tras perder la respuesta respondía 400 «pedido en estado FACTURADO» aunque la
+factura existía (el RPC 446 sí es idempotente; el control de estado del API
+corría antes), estado y configuración incompletos eran 400, un pedido ajeno con
+la empresa sin certificado daba 400 en vez de 404 y las caídas devolvían 400 con
+texto de PostgreSQL. Tras corregir, 7/7 (`artifacts/peru-sales-invoice-fixed-local-20261019`).
+Alta de empresa (#147): el RPC tarda más que el plazo general de 8 s del cliente
+Supabase (25-30 s en local cargado) y respondía 400 «AbortError» aunque la base
+terminaba el alta; el conflicto mostraba el código interno y, con un fallo de
+red, la cola offline encolaba el alta y el modal se cerraba como si hubiera
+terminado (`artifacts/peru-tenant-create-baseline-20261019`, 1/3 y navegador
+rojo). Ahora el RPC tiene 60 s propios (una señal del llamador fija el plazo en
+`SupabaseService`), el modal espera 70 s, sin confirmación responde 503 legible
+y la misma clave confirma, el alta nunca se encola y el reintento muestra las
+credenciales (`artifacts/peru-tenant-create-fixed-local-20261019`). En PROD el
+primer alta del cliente es justo esta operación.
+Inicio del dashboard (#147): con el API en TZ=UTC como Render, «ventas de hoy»
+sumaba la venta de las 22:00 de ayer en Lima y la factura anulada (S/ 1 357 en
+vez de 118); cotizaciones pendientes y conversión eran siempre 0 (estados
+inexistentes); y una lectura caída daba 200 con ventas 0 y actividades sin
+comprobantes (`artifacts/peru-dashboard-baseline-20261019`, 1/5). Ahora usa el
+día y el mes del contribuyente, excluye anulados/rechazados, resta notas de
+crédito y responde 503; la pantalla avisa (`artifacts/peru-dashboard-fixed-local-20261019`).
+Fechas de CxP y tesorería (#147): con el servidor en otra zona, la alerta de
+próximos vencimientos omitía la deuda que vence hoy, la programación la marcaba
+VENCIDA, la antigüedad sumaba un día y el flujo de caja empezaba mañana; en UTC
+ocurre cada noche entre las 19:00 y la medianoche de Lima
+(`artifacts/peru-payables-dates-baseline-20261019`, 0/4 en UTC y en Honolulu).
+Corregido 4/4 con el servidor en Honolulu
+(`artifacts/peru-payables-dates-fixed-local-20261019`); en CI lo prueba
+`fechas-contribuyente.spec.ts` con reloj fijo en UTC (el original falla 4/4);
+falta repetir la sonda con UTC en esa franja. Observaciones sin caso: `PUT /finanzas/cxp/:id` deriva la clave
+del contenido sin `Idempotency-Key` (la UI no lo usa) y el cliente Supabase
+reintenta escrituras tras un timeout.
+La matriz registra 717 contratos, 481 observados (main 39328687047), 330 con
+casos funcionales, 187 casos y 152 defectos; los casos de aprobaciones,
+facturación, alta, dashboard y fechas esperan CI; no hay aceptación integral
+del lanzamiento.
 
 Corte técnico 131/132: el cierre 131 promovió 562 una sola vez con preflight,
 respaldo 560, rollback local y preservación de 29 tablas/funciones/seguridad
