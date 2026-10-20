@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { CacheService } from '../../shared/cache/cache.service';
 import Decimal from 'decimal.js';
@@ -6,6 +6,15 @@ import {
   calcularMetricasInventario,
   InventarioMetrics,
 } from '../inventario/inventario-metrics.util';
+import { paisDelTenant } from '../../shared/utils/fecha-tenant.util';
+import { fechaHoyEnPais, rangoDelDiaEnPais } from '../../shared/utils/fecha-peru.util';
+
+// Comprobantes que no son venta: anulados por baja, rechazados o fallidos.
+const CPE_SIN_VENTA = new Set(['ANULADO', 'RECHAZADO', 'ERROR']);
+// Una cotización espera decisión mientras es borrador o está enviada; la
+// conversión cuenta las aprobadas y las ya convertidas en pedido.
+const COTIZACION_PENDIENTE = ['BORRADOR', 'ENVIADA'];
+const COTIZACION_ACEPTADA = new Set(['APROBADA', 'CONVERTIDA']);
 
 export interface DashboardStats {
   totalCpe: number;
@@ -183,14 +192,19 @@ export class DashboardMetricsService implements OnModuleDestroy {
 
     this.logger.log(`📊 [DashboardMetricsService] Calculando estadísticas para tenant: ${tenantId}`);
 
-    // Obtener fechas para filtros
-    const hoy = new Date();
-    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    inicioMes.setHours(0, 0, 0, 0);
-    const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
-    finMes.setHours(23, 59, 59, 999);
-    const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
-    inicioHoy.setHours(0, 0, 0, 0);
+    // Día y mes del contribuyente, no del servidor: Render corre en UTC y a las
+    // 19:00 de Lima ya contaba «hoy» con las ventas de la noche anterior.
+    const pais = await paisDelTenant(client, tenantId);
+    const hoyLocal = fechaHoyEnPais(pais);
+    const [anio, mes] = hoyLocal.split('-').map(Number);
+    const primerDia = (y: number, m: number) =>
+      new Date(Date.UTC(y, m - 1, 1, 12));
+    const inicioHoy = new Date(rangoDelDiaEnPais(pais).desde);
+    const inicioMes = new Date(rangoDelDiaEnPais(pais, primerDia(anio, mes)).desde);
+    const inicioMesSiguiente = new Date(
+      rangoDelDiaEnPais(pais, primerDia(mes === 12 ? anio + 1 : anio, mes === 12 ? 1 : mes + 1)).desde,
+    );
+    const finMes = new Date(inicioMesSiguiente.getTime() - 1);
 
     // Consultas en paralelo para obtener datos reales
     const [
@@ -205,13 +219,13 @@ export class DashboardMetricsService implements OnModuleDestroy {
       ventasPosResult
     ] = await Promise.allSettled([
       client.from('cpe')
-        .select('total_venta, total, created_at, tenant_id')
+        .select('total_venta, total, tipo_documento, estado, created_at, tenant_id')
         .eq('tenant_id', tenantId)
         .gte('created_at', inicioMes.toISOString())
         .lte('created_at', finMes.toISOString())
         .order('created_at', { ascending: false }),
       client.from('cpe')
-        .select('total_venta, total')
+        .select('total_venta, total, tipo_documento, estado')
         .eq('tenant_id', tenantId)
         .gte('created_at', inicioHoy.toISOString()),
       client.from('gre_guias')
@@ -234,7 +248,7 @@ export class DashboardMetricsService implements OnModuleDestroy {
       client.from('cotizaciones')
         .select('id')
         .eq('tenant_id', tenantId)
-        .eq('estado', 'PENDIENTE'),
+        .in('estado', COTIZACION_PENDIENTE),
       client.from('sire_files')
         .select('id')
         .eq('tenant_id', tenantId)
@@ -250,16 +264,24 @@ export class DashboardMetricsService implements OnModuleDestroy {
         .lte('created_at', finMes.toISOString())
     ]);
 
-    // Procesar resultados de forma segura
-    const cpeData = cpeResult.status === 'fulfilled' ? cpeResult.value.data : [];
-    const cpeHoyData = cpeHoyResult.status === 'fulfilled' ? cpeHoyResult.value.data : [];
-    const greData = greResult.status === 'fulfilled' ? greResult.value.data : [];
-    const comprasData = comprasTodasResult.status === 'fulfilled' ? comprasTodasResult.value.data : [];
-    const usuariosData = usuariosResult.status === 'fulfilled' ? usuariosResult.value.data : [];
-    const cotizacionesData = cotizacionesResult.status === 'fulfilled' ? cotizacionesResult.value.data : [];
-    const cotizacionesPendientesData = cotizacionesPendientesResult.status === 'fulfilled' ? cotizacionesPendientesResult.value.data : [];
-    const sireData = sireResult.status === 'fulfilled' ? sireResult.value.data : [];
-    const ventasPosData = ventasPosResult.status === 'fulfilled' ? ventasPosResult.value.data : [];
+    // Una lectura caída no es «cero»: antes el inicio decía S/ 0 en ventas con la
+    // tabla de comprobantes ilegible. Falla entera y la pantalla lo informa.
+    const leer = (resultado: PromiseSettledResult<any>, fuente: string): any[] => {
+      if (resultado.status === 'rejected' || resultado.value?.error) {
+        this.logger.error(`Dashboard: no se pudo leer ${fuente} del tenant ${tenantId}`);
+        throw new ServiceUnavailableException('No se pudieron calcular las métricas del inicio; reintenta en unos minutos');
+      }
+      return resultado.value.data ?? [];
+    };
+    const cpeData = leer(cpeResult, 'cpe');
+    const cpeHoyData = leer(cpeHoyResult, 'cpe');
+    const greData = leer(greResult, 'gre_guias');
+    const comprasData = leer(comprasTodasResult, 'ordenes_compra');
+    const usuariosData = leer(usuariosResult, 'usuarios_sistema');
+    const cotizacionesData = leer(cotizacionesResult, 'cotizaciones');
+    const cotizacionesPendientesData = leer(cotizacionesPendientesResult, 'cotizaciones');
+    const sireData = leer(sireResult, 'sire_files');
+    const ventasPosData = leer(ventasPosResult, 'ventas_pos');
 
     // Calcular métricas reales. Las ventas POS con CPE emitido ya están
     // contadas en `cpe`; solo se suman las que siguen pendientes de emisión.
@@ -274,12 +296,12 @@ export class DashboardMetricsService implements OnModuleDestroy {
 
     // Calcular tasa de conversión de cotizaciones
     const totalCotizaciones = cotizacionesData?.length || 0;
-    const cotizacionesAceptadas = cotizacionesData?.filter(c => this.estadoNormalizado(c.estado) === 'aceptada').length || 0;
+    const cotizacionesAceptadas = cotizacionesData?.filter(c => COTIZACION_ACEPTADA.has(String(c.estado ?? '').toUpperCase())).length || 0;
     const tasaConversion = totalCotizaciones > 0 ?
       ((cotizacionesAceptadas / totalCotizaciones) * 100) : 0;
 
     const estadisticas: DashboardStats = {
-      totalCpe: cpeData?.length || 0,
+      totalCpe: cpeData?.filter(c => !CPE_SIN_VENTA.has(String(c.estado ?? '').toUpperCase())).length || 0,
       totalGre: greData?.length || 0,
       totalSire: sireData?.length || 0,
       totalUsers: usuariosData?.length || 0,
@@ -298,8 +320,8 @@ export class DashboardMetricsService implements OnModuleDestroy {
       crecimientoVentas: 0,
       ultimaActualizacion: new Date().toISOString(),
       periodoCalculado: {
-        inicio: this.formatDateOnly(inicioMes),
-        fin: this.formatDateOnly(finMes)
+        inicio: `${hoyLocal.slice(0, 7)}-01`,
+        fin: new Date(Date.UTC(anio, mes, 0)).toISOString().slice(0, 10)
       }
     };
 
@@ -356,6 +378,14 @@ export class DashboardMetricsService implements OnModuleDestroy {
         .order('created_at', { ascending: false })
         .limit(10)
     ]);
+
+    // Igual que las métricas: una fuente ilegible no se convierte en «sin actividad».
+    for (const [resultado, fuente] of [[cpeResult, 'cpe'], [greResult, 'gre_guias'], [comprasResult, 'ordenes_compra'], [cotizacionesResult, 'cotizaciones']] as const) {
+      if (resultado.status === 'rejected' || (resultado.value as any)?.error) {
+        this.logger.error(`Dashboard: no se pudo leer ${fuente} del tenant ${tenantId}`);
+        throw new ServiceUnavailableException('No se pudieron cargar las actividades recientes; reintenta en unos minutos');
+      }
+    }
 
     const actividades: Activity[] = [];
 
@@ -438,10 +468,13 @@ export class DashboardMetricsService implements OnModuleDestroy {
 
   private sumarTotalesCpe(data: any[]): number {
     if (!Array.isArray(data)) return 0;
-    return data.reduce(
-      (sum, item) => sum.plus(item.total_venta ?? item.total ?? 0),
-      new Decimal(0)
-    ).toDecimalPlaces(2).toNumber();
+    // Una nota de crédito (07) descuenta la venta que corrige; anulados,
+    // rechazados y fallidos no son venta.
+    return data.reduce((sum, item) => {
+      if (CPE_SIN_VENTA.has(String(item.estado ?? '').toUpperCase())) return sum;
+      const importe = new Decimal(item.total_venta ?? item.total ?? 0);
+      return String(item.tipo_documento ?? '') === '07' ? sum.minus(importe) : sum.plus(importe);
+    }, new Decimal(0)).toDecimalPlaces(2).toNumber();
   }
 
   private async getInventarioActual(client: any, tenantId: string): Promise<InventarioMetrics> {
@@ -475,13 +508,6 @@ export class DashboardMetricsService implements OnModuleDestroy {
 
   private estadoNormalizado(estado: unknown): string {
     return String(estado ?? '').trim().toLowerCase();
-  }
-
-  private formatDateOnly(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
   }
 
   private mapearEstado(estado: string): 'success' | 'warning' | 'error' | 'pending' {

@@ -846,7 +846,9 @@ export default function Dashboard() {
       if (activitiesResult.status === 'fulfilled' && activitiesResult.value?.success) {
         setActivities(activitiesResult.value.data || [])
       } else {
+        // Sin lectura no hay «actividad vacía»: se avisa junto a las métricas.
         setActivities([])
+        setError((actual) => actual ?? 'No se pudieron cargar las actividades recientes. Actualiza en unos minutos.')
       }
 
       setLastUpdate(new Date().toLocaleTimeString('es-PE'))

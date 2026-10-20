@@ -1,0 +1,183 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Inicio del dashboard API/DB local con TZ=UTC; sin aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Dashboard: cotizaciones pendientes y conversión cuentan los estados reales",
+      "passed": false,
+      "message": "{\"pendientes\":0,\"conversion\":0,\"total\":3}\n+ actual - expected\n\n  {\n+   conversion: 0,\n+   pendientes: 0,\n-   conversion: 33.3,\n-   pendientes: 2,\n    total: 3\n  }\n"
+    },
+    {
+      "scenario": "Dashboard: ventas de hoy y del mes usan el día de Lima y no suman anulados",
+      "passed": false,
+      "message": "{\"hoy\":1357,\"mes\":1357} (hora Lima 18, anulado 1180)\n+ actual - expected\n\n  {\n+   hoy: 1357,\n+   mes: 1357\n-   hoy: 118,\n-   mes: 177\n  }\n"
+    },
+    {
+      "scenario": "Dashboard: sin lectura de comprobantes responde 503 y no informa ventas en cero",
+      "passed": false,
+      "message": "Stats sin lectura respondió {\"status\":200,\"ventasMes\":0}\n\n200 !== 503\n"
+    },
+    {
+      "scenario": "Dashboard: actividades muestran lo emitido y sin lectura responden 503",
+      "passed": false,
+      "message": "Actividades sin lectura respondió {\"status\":200,\"success\":true,\"items\":3}\n\n200 !== 503\n"
+    },
+    {
+      "scenario": "Dashboard: otra empresa no ve las ventas ni las actividades de la primera",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/complete",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/clientes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/almacenes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/categorias",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/productos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones/:id/enviar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones/:id/enviar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones/:id/aprobar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "dashboard/cache/invalidate",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "dashboard/stats",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/comprobantes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/comprobantes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/comprobantes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "dashboard/cache/invalidate",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "dashboard/stats",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "dashboard/cache/invalidate",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "dashboard/stats",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "dashboard/cache/invalidate",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "dashboard/activities",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "dashboard/cache/invalidate",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "dashboard/activities",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "dashboard/cache/invalidate",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "dashboard/stats",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "dashboard/cache/invalidate",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "dashboard/activities",
+      "status": 200
+    }
+  ]
+}

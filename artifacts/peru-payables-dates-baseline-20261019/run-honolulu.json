@@ -1,0 +1,10 @@
+{
+  "completedAt": "2026-10-20T07:59:30.717Z",
+  "success": false,
+  "withBrowser": false,
+  "block": "payables_dates",
+  "scope": "payables_dates_subset",
+  "database": "PostgreSQL 16 efímero (migraciones completas)",
+  "output": "artifacts\\peru-payables_dates-local-20261020075327282-26468",
+  "remoteWrites": false
+}

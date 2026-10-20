@@ -21,6 +21,21 @@ const blocks = {
     spec: 'tests/e2e/peru-sales-approvals-local.spec.ts', scope: 'sales_approvals_subset',
     sources: ['apps/erp-api/src/modules/ventas/pedidos/pedidos.service.ts', 'apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts',
       'apps/web/app/dashboard/ventas/aprobaciones/page.tsx'] },
+  invoice: { kinds: ['fact-first', 'fact-other'], browserKind: 'fact-browser', probe: 'scripts/ci/test-peru-sales-invoice-local.mjs',
+    spec: 'tests/e2e/peru-sales-invoice-local.spec.ts', scope: 'sales_order_invoice_subset',
+    sources: ['apps/erp-api/src/modules/ventas/pedidos/pedidos.service.ts', 'apps/erp-api/src/modules/ventas/pedidos/cpe-integration.service.ts',
+      'apps/web/components/ventas/GenerarFacturaButton.tsx'] },
+  tenants: { kinds: [], probe: 'scripts/ci/test-peru-tenant-create-local.mjs',
+    spec: 'tests/e2e/peru-tenant-create-local.spec.ts', scope: 'tenant_create_subset',
+    sources: ['apps/erp-api/src/modules/tenants/tenant-management.service.ts', 'apps/web/components/superadmin/components/CrearTenantModal.tsx'] },
+  dashboard: { kinds: ['dash-first', 'dash-other'], probe: 'scripts/ci/test-peru-dashboard-local.mjs', env: { TZ: 'UTC' },
+    spec: 'tests/e2e/peru-dashboard-local.spec.ts', scope: 'dashboard_home_subset',
+    sources: ['apps/erp-api/src/modules/dashboard/dashboard-metrics.service.ts', 'apps/erp-api/src/modules/dashboard.controller.ts', 'apps/web/app/dashboard/page.tsx'] },
+  payables_dates: { kinds: ['tz-first'], probe: 'scripts/ci/test-peru-payables-dates-local.mjs',
+    // Render corre en UTC; PERU_BLOCK_TZ permite otra zona cuando UTC y Lima coinciden de día.
+    env: { TZ: process.env.PERU_BLOCK_TZ || 'UTC' },
+    spec: 'tests/e2e/peru-payables-dates-local.spec.ts', scope: 'payables_dates_subset',
+    sources: ['apps/erp-api/src/modules/finanzas/cxp/cxp.service.ts', 'apps/erp-api/src/modules/finanzas/tesoreria/tesoreria.service.ts'] },
   cxc: { kinds: ['cxc-first', 'cxc-other'], browserKind: 'cxc-browser', probe: 'scripts/ci/test-peru-cxc-operations-local.mjs',
     spec: 'tests/e2e/peru-cxc-local.spec.ts', scope: 'cxc_reprogram_credit_note_subset',
     sources: ['apps/erp-api/src/modules/finanzas/cxc/cxc.service.ts', 'apps/erp-api/src/modules/finanzas/cxc/cxc.controller.ts',
@@ -65,6 +80,8 @@ const env = { ...process.env };
 for (const key of Object.keys(env)) {
   if (/^(SUPABASE_|NEXT_PUBLIC_SUPABASE_|EXPECTED_SUPABASE_|SUNAT_|OSE_|SMTP_|PFX_|CERT_|CERTIFICATE_|STRIPE_|SIRE_|DIAN_|ARCA_|REDIS_|PG|APP_URL)/.test(key)) delete env[key];
 }
+// Un bloque puede fijar el entorno del runtime que emula (p. ej. TZ=UTC de Render).
+Object.assign(env, block.env ?? {});
 Object.assign(env, {
   POS_WORKER_JWT_SECRET: 'LOCAL-POS-WORKER-2026-Only-Ephemeral-Secret',
   NODE_ENV: 'development', JWT_SECRET: 'local-api-integration-jwt-key-20260905-never-production',
@@ -182,7 +199,7 @@ try {
   await waitReady('SMTP', () => readFileSync(path.join(output, 'smtp.log'), 'utf8').includes('LOCAL_SMTP_SINK_READY'), smtp);
   const api = launch('api', process.execPath, [apiRequire.resolve('ts-node/dist/bin.js'), '--transpile-only', 'tests/e2e/helpers/local-api-harness.ts'], apiDirectory);
   await waitReady('API', () => readFileSync(path.join(output, 'api.log'), 'utf8').includes('LOCAL_INTEGRATED_API_READY') && httpReady(`${apiUrl}/api/auth/profile`), api);
-  for (const kind of [...block.kinds, ...(withBrowser ? [block.browserKind] : [])]) await run('prepare-' + kind, process.execPath, ['scripts/ci/prepare-peru-first-client-local.mjs', kind]);
+  for (const kind of [...block.kinds, ...(withBrowser && block.browserKind ? [block.browserKind] : [])]) await run('prepare-' + kind, process.execPath, ['scripts/ci/prepare-peru-first-client-local.mjs', kind]);
   try { await run(blockName + '-lifecycle', process.execPath, [block.probe]); } catch (error) { probeFailure = error; }
   if (withBrowser) {
     const web = launch('web', process.execPath, [webRequire.resolve('next/dist/bin/next'), 'dev', '-p', webPort, '--hostname', '127.0.0.1'], webDirectory);

@@ -1,0 +1,222 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "Facturación desde pedido API/DB local; sin SUNAT ni aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Facturar pedido: confirmado se factura con CPE, salida de stock y estado FACTURADO",
+      "passed": true
+    },
+    {
+      "scenario": "Facturar pedido: repetir tras perder la respuesta devuelve la misma factura sin otro CPE ni otra salida",
+      "passed": true
+    },
+    {
+      "scenario": "Facturar pedido: sin confirmar o cancelado responde 409 sin comprobante",
+      "passed": true
+    },
+    {
+      "scenario": "Facturar pedido: ajeno o inexistente responde 404",
+      "passed": true
+    },
+    {
+      "scenario": "Facturar pedido: sin certificado configurado responde 409 legible sin efectos",
+      "passed": true
+    },
+    {
+      "scenario": "Facturar pedido: sin lectura de configuración o sin writer responde 503 sin efectos",
+      "passed": true
+    },
+    {
+      "scenario": "Facturar pedido: cliente con DNI recibe boleta",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/complete",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/almacenes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/categorias",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/productos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/clientes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/clientes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/generar-factura",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/generar-factura",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/cancelar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/generar-factura",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/generar-factura",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/generar-factura",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/generar-factura",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/almacenes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/categorias",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/productos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/clientes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/generar-factura",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/generar-factura",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/generar-factura",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/generar-factura",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/generar-factura",
+      "status": 201
+    }
+  ]
+}

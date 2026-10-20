@@ -354,6 +354,11 @@ function isSensitiveNonQueueableEndpoint(endpoint: string, method: string) {
     || new RegExp(`${absolutePrefix}/api/auth(?:/|$)`).test(normalized)
     || new RegExp(`${absolutePrefix}/auth(?:/|$)`).test(normalized)
     || /\/demo\/convert-to-real(?:\/|$)/.test(normalized)
+    // El alta y la edición de empresas son de plataforma: encoladas, el modal se
+    // cerraba como si hubieran terminado, sin credenciales, y el envío real quedaba
+    // para cuando la cola se sincronizara.
+    || new RegExp(`${absolutePrefix}/api/tenants(?:/|$)`).test(normalized)
+    || new RegExp(`${absolutePrefix}/tenants(?:/|$)`).test(normalized)
     || hasSensitiveSegment
 }
 

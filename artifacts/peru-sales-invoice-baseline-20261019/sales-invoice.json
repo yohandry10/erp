@@ -1,0 +1,222 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Facturación desde pedido API/DB local; sin SUNAT ni aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Facturar pedido: confirmado se factura con CPE, salida de stock y estado FACTURADO",
+      "passed": true
+    },
+    {
+      "scenario": "Facturar pedido: repetir tras perder la respuesta devuelve la misma factura sin otro CPE ni otra salida",
+      "passed": false,
+      "message": "Reintento respondió 400 {\"statusCode\":400,\"message\":\"No se puede generar factura para un pedido en estado FACTURADO\",\"error\":\"Bad Request\",\"timestamp\":\"2026-10-19T23:35:58.656Z\",\"path\":\"/api/ventas/pedidos/a07e0cbb-44a2-438a-98e8-fb25ef5dbccf/generar-factura\"}"
+    },
+    {
+      "scenario": "Facturar pedido: sin confirmar o cancelado responde 409 sin comprobante",
+      "passed": false,
+      "message": "{\"draft\":400,\"cancelled\":400}\n+ actual - expected\n\n  {\n+   cancelled: 400,\n+   draft: 400\n-   cancelled: 409,\n-   draft: 409\n  }\n"
+    },
+    {
+      "scenario": "Facturar pedido: ajeno o inexistente responde 404",
+      "passed": false,
+      "message": "{\"foreign\":400,\"missing\":404}\n+ actual - expected\n\n  {\n+   foreign: 400,\n-   foreign: 404,\n    missing: 404\n  }\n"
+    },
+    {
+      "scenario": "Facturar pedido: sin certificado configurado responde 409 legible sin efectos",
+      "passed": false,
+      "message": "Sin certificado respondió 400 {\"statusCode\":400,\"message\":\"No se puede generar factura: Faltan los siguientes datos de configuración: Certificado Digital, Contraseña del Certificado. Por favor, complete el wizard de configuración inicial.\",\"error\":\"Bad Request\",\"timestamp\":\"2026-10-19T23:36:00.302Z\",\"path\":\"/api/ventas/pedidos/4\n\n400 !== 409\n"
+    },
+    {
+      "scenario": "Facturar pedido: sin lectura de configuración o sin writer responde 503 sin efectos",
+      "passed": false,
+      "message": "{\"config\":400,\"writer\":400}\n+ actual - expected\n\n  {\n+   config: 400,\n+   writer: 400\n-   config: 503,\n-   writer: 503\n  }\n"
+    },
+    {
+      "scenario": "Facturar pedido: cliente con DNI recibe boleta",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/complete",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/almacenes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/categorias",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/productos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/clientes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/clientes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/generar-factura",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/generar-factura",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/cancelar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/generar-factura",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/generar-factura",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/generar-factura",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/generar-factura",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/almacenes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/categorias",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/productos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/clientes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/generar-factura",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/generar-factura",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/generar-factura",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/confirmar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/pedidos/:id/generar-factura",
+      "status": 201
+    }
+  ]
+}

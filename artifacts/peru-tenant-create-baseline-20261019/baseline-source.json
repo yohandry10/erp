@@ -1,0 +1,13 @@
+{
+  "captured_at": "2026-10-19T23:37:08.952Z",
+  "product_source_commit": "49dce26330a4a822d2744f798d06563068c647bd",
+  "note": "Worktree aislado con el código original de producto (sin cambios desde ese commit) y sólo la infraestructura de prueba nueva; sonda y prueba de navegador iguales a las del ensayo corregido.",
+  "browser_failure": "Tras perder la respuesta del alta (fallo de red) la cola offline del cliente devolvió 202 success:true: el modal se cerró como si la empresa estuviera creada, sin credenciales y con el envío encolado.",
+  "discarded_attempts": [
+    {
+      "reason": "Navegador: el formulario exige «Contraseña Inicial»; la primera versión de la prueba la dejaba vacía",
+      "product_signal": "El superadministrador siempre conoce la contraseña escrita: el riesgo de quedar sin ella sólo existe vía API"
+    }
+  ],
+  "remoteWrites": false
+}

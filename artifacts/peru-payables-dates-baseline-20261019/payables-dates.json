@@ -1,0 +1,69 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Fechas de CxP y tesorería con API en TZ=UTC; sin aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Fechas CxP: la deuda que vence hoy en Lima aparece en próximos vencimientos con 0 días",
+      "passed": false,
+      "message": "La deuda que vence hoy no aparece (consulta desde 2026-10-20)"
+    },
+    {
+      "scenario": "Fechas tesorería: la programación no marca vencida la deuda de hoy y la de ayer lleva 1 día",
+      "passed": false,
+      "message": "Expected values to be strictly deep-equal:\n+ actual - expected\n\n  {\n    ayer: [\n      'VENCIDA',\n+     -2\n-     -1\n    ],\n    hoy: [\n+     'VENCIDA',\n+     -1\n-     'HOY',\n-     0\n    ]\n  }\n"
+    },
+    {
+      "scenario": "Fechas CxP: la antigüedad cuenta 1 día para la deuda vencida ayer y 0 para la de hoy",
+      "passed": false,
+      "message": "Expected values to be strictly deep-equal:\n+ actual - expected\n\n  {\n+   ayer: 2,\n+   hoy: 1\n-   ayer: 1,\n-   hoy: 0\n  }\n"
+    },
+    {
+      "scenario": "Fechas tesorería: el flujo de caja proyectado empieza hoy en Lima",
+      "passed": false,
+      "message": "Proyección desde 2026-10-20\n+ actual - expected\n\n+ '2026-10-20'\n- '2026-10-19'\n           ^\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/proveedores",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxp",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxp",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/vencimientos",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/tesoreria/programacion",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/cxp/aging",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "finanzas/tesoreria/flujo-caja",
+      "status": 200
+    }
+  ]
+}
