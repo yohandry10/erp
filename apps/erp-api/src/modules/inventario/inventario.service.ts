@@ -21,6 +21,7 @@ import {
   CreateCategoriaProductoDto,
   UpdateCategoriaProductoDto,
 } from './dto/categoria-producto.dto';
+import { lecturaInventarioFallida } from './inventario-errors';
 
 export enum TipoMovimiento {
   ENTRADA = 'ENTRADA',
@@ -1808,7 +1809,7 @@ export class InventarioService {
         durationMs: Date.now() - startedAt,
       });
       this.logger.error('❌ [Inventario] Error listando recepciones:', error);
-      throw new BadRequestException('No se pudieron obtener las recepciones');
+      throw lecturaInventarioFallida(error, 'las recepciones');
     }
   }
 

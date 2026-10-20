@@ -4451,6 +4451,186 @@
         "CI exacto, main y runtime."
       ],
       "canonical_proof": "artifacts/peru-tenant-create-fixed-local-20261019"
+    },
+    {
+      "id": "read-fault-200-empty-lists",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/almacenes"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/productos"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-read-faults-baseline-20261020",
+        "observed_error": "Con la lectura caída almacenes y productos respondían 200 success:false con lista vacía y el texto «permission denied for table…»: el catálogo decía «No se encontraron productos».",
+        "local_only": true
+      },
+      "correction": "503 legible y la pantalla de productos muestra el error",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-read-faults-fixed-local-20261020"
+    },
+    {
+      "id": "read-fault-400-500-raw",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/categorias"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/recepciones"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/clientes"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/rma"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxc"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/empleados"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/departamentos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/centros-costo"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/sucursales"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-read-faults-baseline-20261020",
+        "observed_error": "Categorías, recepciones, clientes, RMA, CxC, empleados, departamentos, centros de costo, GRE y sucursales respondían 400 o 500 ante una lectura caída, varios con el texto de PostgreSQL.",
+        "local_only": true
+      },
+      "correction": "Cada lectura usa el helper 503 de su módulo",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-read-faults-fixed-local-20261020"
+    },
+    {
+      "id": "budgets-derived-key-false-success",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "PUT",
+          "endpoint": "/api/contabilidad/presupuestos/:id"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/presupuestos"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-budgets-baseline-20261020",
+        "observed_error": "Sin Idempotency-Key (el formulario no la envía) la clave salía del contenido: editar 2000→3000→2000 dejaba 3000 con éxito y recrear tras borrar devolvía el presupuesto borrado.",
+        "local_only": true
+      },
+      "correction": "Sin clave cada petición es una intención nueva",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-budgets-fixed-local-20261020"
+    },
+    {
+      "id": "budgets-errors-raw",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/presupuestos"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/contabilidad/presupuestos/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/presupuestos"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-budgets-baseline-20261020",
+        "observed_error": "Duplicado 400 en inglés («A record with this information already exists»), edición ajena 400 «BUDGET_NOT_FOUND» y lectura caída 500 con texto de PostgreSQL.",
+        "local_only": true
+      },
+      "correction": "409/404/503 con texto para el contador",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-budgets-fixed-local-20261020"
+    },
+    {
+      "id": "edits-derived-key-false-success",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/tipos-cambio"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/finanzas/cxp/:id"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/contabilidad/centros-costo/:id"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-derived-keys-baseline-20261020",
+        "observed_error": "Registrar 3.75, 3.80 y otra vez 3.75 el mismo día dejaba el tipo de cambio en 3.80, y volver un vencimiento de CxP a su fecha anterior no se aplicaba: la tercera petición reproducía la primera.",
+        "local_only": true
+      },
+      "correction": "Las ediciones y altas-upsert sin clave son una intención nueva por petición",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-derived-keys-fixed-local-20261020"
+    },
+    {
+      "id": "statements-refresh-period-in-url",
+      "status": "local_acceptance_passed_ci_pending",
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/estados/refrescar"
+        }
+      ],
+      "proof": {
+        "source": "artifacts/peru-statements-refresh-baseline-20261020",
+        "observed_error": "«Refrescar vistas» en Estados financieros enviaba anio y mes en la URL con el cuerpo vacío; el API los lee del cuerpo y cada clic terminaba en 400 de validación.",
+        "local_only": true
+      },
+      "correction": "La pantalla envía el periodo en el cuerpo",
+      "pending": [
+        "CI exacto, main y runtime."
+      ],
+      "canonical_proof": "artifacts/peru-statements-refresh-fixed-local-20261020"
     }
   ]
 }
