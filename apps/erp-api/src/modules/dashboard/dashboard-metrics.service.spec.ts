@@ -1,3 +1,4 @@
+import { ServiceUnavailableException } from '@nestjs/common';
 import { DashboardMetricsService } from './dashboard-metrics.service';
 
 type TableData = Record<string, any[]>;
@@ -21,6 +22,10 @@ function createQueryBuilder(rows: any[]) {
     },
     eq(column: string, value: any) {
       filters.push((row) => String(row[column]) === String(value));
+      return builder;
+    },
+    in(column: string, values: any[]) {
+      filters.push((row) => values.map(String).includes(String(row[column])));
       return builder;
     },
     neq(column: string, value: any) {
@@ -102,8 +107,8 @@ describe('DashboardMetricsService', () => {
       ],
       usuarios_sistema: [{ tenant_id: tenantId }, { tenant_id: otherTenantId }],
       cotizaciones: [
-        { tenant_id: tenantId, estado: 'aceptada', created_at: currentMonth },
-        { tenant_id: tenantId, estado: 'PENDIENTE', created_at: currentMonth },
+        { tenant_id: tenantId, estado: 'CONVERTIDA', created_at: currentMonth },
+        { tenant_id: tenantId, estado: 'ENVIADA', created_at: currentMonth },
       ],
       sire_files: [{ tenant_id: tenantId, created_at: currentMonth }, { tenant_id: otherTenantId, created_at: currentMonth }],
     });
@@ -122,6 +127,42 @@ describe('DashboardMetricsService', () => {
     expect(stats.totalSire).toBe(1);
     expect(stats.totalUsers).toBe(1);
     expect(stats.tasaConversionCotizaciones).toBe(50);
+    expect(stats.cotizacionesPendientes).toBe(1);
+  });
+
+  it('descuenta notas de crédito y no cuenta comprobantes anulados o rechazados', async () => {
+    const currentMonth = new Date().toISOString();
+    const service = createService({
+      cpe: [
+        { tenant_id: tenantId, tipo_documento: '01', estado: 'ACEPTADO', total_venta: 118, created_at: currentMonth },
+        { tenant_id: tenantId, tipo_documento: '07', estado: 'ACEPTADO', total_venta: 18, created_at: currentMonth },
+        { tenant_id: tenantId, tipo_documento: '01', estado: 'ANULADO', total_venta: 1180, created_at: currentMonth },
+        { tenant_id: tenantId, tipo_documento: '03', estado: 'RECHAZADO', total_venta: 59, created_at: currentMonth },
+      ],
+      productos: [],
+    });
+
+    const stats = await service.getStats(tenantId);
+
+    expect(stats.ventasMes).toBe(100);
+    expect(stats.totalCpe).toBe(2);
+  });
+
+  it('una lectura caída responde 503 y no informa ventas en cero', async () => {
+    const supabase = createSupabaseMock({ productos: [] }) as any;
+    const original = supabase.getClient();
+    const client = {
+      ...original,
+      from: (table: string) => table === 'cpe'
+        ? { select: () => ({ eq: () => ({ gte: () => ({ lte: () => ({ order: () => Promise.resolve({ data: null, error: { code: '42501' } }) }), then: (resolve: any) => resolve({ data: null, error: { code: '42501' } }) }) }) }) }
+        : original.from(table),
+    };
+    supabase.getClient = () => client;
+    const cache = { get: jest.fn().mockResolvedValue(null), set: jest.fn(), del: jest.fn(), delPattern: jest.fn(), cleanExpired: jest.fn() };
+    const service = new DashboardMetricsService(supabase, cache as any);
+    service.onModuleDestroy();
+
+    await expect(service.getStats(tenantId)).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
   it('superpone el inventario vivo al snapshot cacheado usando la misma valorización a costo', async () => {

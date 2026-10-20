@@ -176,12 +176,16 @@ export class SupabaseService {
   private async fetchWithRetry(input: any, init: any, context: string): Promise<Response> {
     const maxRetries = Math.max(0, this.fetchMaxRetries);
     let lastError: any;
+    // Con señal propia (`.abortSignal()`) quien llama fija el plazo: una operación
+    // pesada e idempotente, como el alta de empresa, no se corta a los 8 s ni se
+    // reintenta mientras la primera sigue en curso.
+    const callerSignal: AbortSignal | undefined = init?.signal;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), this.fetchTimeoutMs);
-      const signal = init?.signal
-        ? this.mergeAbortSignals(init.signal, controller.signal)
+      const timeout = callerSignal ? null : setTimeout(() => controller.abort(), this.fetchTimeoutMs);
+      const signal = callerSignal
+        ? this.mergeAbortSignals(callerSignal, controller.signal)
         : controller.signal;
 
       try {
@@ -190,7 +194,7 @@ export class SupabaseService {
         return response;
       } catch (error) {
         lastError = error;
-        if (attempt < maxRetries && this.isRetryableFetchError(error)) {
+        if (!callerSignal?.aborted && attempt < maxRetries && this.isRetryableFetchError(error)) {
           const delay = this.fetchRetryBaseMs * Math.pow(2, attempt);
           this.logger.warn(
             `Supabase fetch fallo (${context}) intento ${attempt + 1}/${maxRetries + 1}: ${error?.message || error}`,
@@ -201,7 +205,7 @@ export class SupabaseService {
         this.recordNetworkFailure(error);
         throw error;
       } finally {
-        clearTimeout(timeout);
+        if (timeout) clearTimeout(timeout);
       }
     }
 

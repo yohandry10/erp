@@ -1000,8 +1000,9 @@ export class CxpService {
     }
 
     // Fecha actual para calcular días vencidos
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
+    // «Hoy» del contribuyente y no del servidor: en Render (UTC), desde las 19:00
+    // de Lima toda la antigüedad sumaba un día de mora.
+    const hoy = this.parseFechaLocal(await fechaHoyDelTenant(client, tenantId));
 
     // Inicializar contadores
     const resumen = {
@@ -1157,12 +1158,14 @@ export class CxpService {
     // Días por defecto: 30
     const dias = filtros.dias ?? 30;
 
-    // Calcular fecha límite (hoy + días)
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-
+    // Calcular fecha límite (hoy + días). «Hoy» es el del contribuyente: con el
+    // servidor en UTC, desde las 19:00 de Lima la deuda que vence hoy salía de la
+    // alerta porque la consulta empezaba en el día siguiente.
+    const hoyLocal = await fechaHoyDelTenant(client, tenantId);
+    const hoy = this.parseFechaLocal(hoyLocal);
     const fechaLimite = new Date(hoy);
     fechaLimite.setDate(fechaLimite.getDate() + dias);
+    const fechaLimiteLocal = `${fechaLimite.getFullYear()}-${String(fechaLimite.getMonth() + 1).padStart(2, '0')}-${String(fechaLimite.getDate()).padStart(2, '0')}`;
 
     // Construir query base - solo CxP pendientes o parciales
     let query = client
@@ -1196,8 +1199,8 @@ export class CxpService {
       `)
       .eq('tenant_id', tenantId)
       .in('estado', ['PENDIENTE', 'PARCIAL'])
-      .gte('fecha_vencimiento', hoy.toISOString().split('T')[0])
-      .lte('fecha_vencimiento', fechaLimite.toISOString().split('T')[0])
+      .gte('fecha_vencimiento', hoyLocal)
+      .lte('fecha_vencimiento', fechaLimiteLocal)
       .order('fecha_vencimiento', { ascending: true });
 
     // Filtrar por proveedor si se especifica
@@ -1216,9 +1219,9 @@ export class CxpService {
       return {
         success: true,
         data: {
-          fecha_consulta: hoy.toISOString().split('T')[0],
+          fecha_consulta: hoyLocal,
           dias_adelante: dias,
-          fecha_limite: fechaLimite.toISOString().split('T')[0],
+          fecha_limite: fechaLimiteLocal,
           resumen: {
             cantidad_total: 0,
             monto_total: 0,
@@ -1287,9 +1290,9 @@ export class CxpService {
     return {
       success: true,
       data: {
-        fecha_consulta: hoy.toISOString().split('T')[0],
+        fecha_consulta: hoyLocal,
         dias_adelante: dias,
-        fecha_limite: fechaLimite.toISOString().split('T')[0],
+        fecha_limite: fechaLimiteLocal,
         resumen: {
           cantidad_total: cantidadTotal,
           monto_total: this.round2(montoTotal),

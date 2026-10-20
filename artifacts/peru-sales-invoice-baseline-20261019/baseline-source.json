@@ -1,0 +1,21 @@
+{
+  "captured_at": "2026-10-19T23:33:04.067Z",
+  "product_source_commit": "49dce26330a4a822d2744f798d06563068c647bd",
+  "note": "Worktree aislado con el código original de producto (sin cambios desde ese commit) y sólo la infraestructura de prueba nueva; sonda y prueba de navegador iguales a las del ensayo corregido.",
+  "browser_result": "El recorrido de navegador pasó también en el original: tras perder la respuesta la pantalla recarga el pedido y muestra FACTURADO, así que el defecto de reintento queda en el API (2/7).",
+  "discarded_attempts": [
+    {
+      "reason": "La sonda esperaba CONFIRMADO tras confirmar; en flujo simplificado el pedido pasa a LISTO_FACTURAR",
+      "product_signal": false
+    },
+    {
+      "reason": "Fixture: alta de empresa agotó el timeout del cliente Supabase con la máquina cargada",
+      "product_signal": "Es el defecto del alta de empresa (bloque propio)"
+    },
+    {
+      "reason": "Navegador: la primera versión exigía reintentar aunque la pantalla ya mostraba la factura",
+      "product_signal": false
+    }
+  ],
+  "remoteWrites": false
+}

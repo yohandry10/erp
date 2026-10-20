@@ -1,0 +1,179 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "Inicio del dashboard API/DB local con TZ=UTC; sin aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Dashboard: cotizaciones pendientes y conversión cuentan los estados reales",
+      "passed": true
+    },
+    {
+      "scenario": "Dashboard: ventas de hoy y del mes usan el día de Lima y no suman anulados",
+      "passed": true
+    },
+    {
+      "scenario": "Dashboard: sin lectura de comprobantes responde 503 y no informa ventas en cero",
+      "passed": true
+    },
+    {
+      "scenario": "Dashboard: actividades muestran lo emitido y sin lectura responden 503",
+      "passed": true
+    },
+    {
+      "scenario": "Dashboard: otra empresa no ve las ventas ni las actividades de la primera",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "configuration/complete",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/clientes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/almacenes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/categorias",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "inventario/productos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones/:id/enviar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones/:id/enviar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "ventas/cotizaciones/:id/aprobar",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "dashboard/cache/invalidate",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "dashboard/stats",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/comprobantes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/comprobantes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "cpe/comprobantes",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "dashboard/cache/invalidate",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "dashboard/stats",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "dashboard/cache/invalidate",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "dashboard/stats",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "endpoint": "dashboard/cache/invalidate",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "dashboard/activities",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "dashboard/cache/invalidate",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "dashboard/activities",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "endpoint": "dashboard/cache/invalidate",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "dashboard/stats",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "dashboard/cache/invalidate",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "dashboard/activities",
+      "status": 200
+    }
+  ]
+}

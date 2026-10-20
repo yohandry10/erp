@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ConflictException, ForbiddenException, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { TenantContextService } from '../../shared/tenant/tenant-context.service';
 import { CreateTenantDto, UpdateTenantDto, TenantFiltersDto, ActivateDemoTenantDto } from './dto';
@@ -120,10 +120,29 @@ export class TenantManagementService {
           password_hash: passwordHash,
         },
       },
-    );
+    // El alta crea empresa, roles, permisos y catálogos en una transacción que
+    // tarda más que el plazo general de 8 s del cliente: con ese plazo el primer
+    // intento casi siempre «fallaba» aunque la base terminaba el alta.
+    ).abortSignal(AbortSignal.timeout(60_000));
     if (atomicError) {
-      if (atomicError.code === '23505') throw new ConflictException(atomicError.message);
-      throw new BadRequestException(`No se pudo crear el tenant: ${atomicError.message}`);
+      // Los códigos del RPC no llegan a la pantalla. Sin confirmación de la base
+      // (timeout o caída) el alta pudo completarse: 503, y reintentar con la misma
+      // Idempotency-Key la recupera sin duplicar. Antes era 400 «AbortError».
+      const motivo = String(atomicError.message ?? '');
+      if (atomicError.code === '42501' && motivo.includes('CONFIGURATION_ACTOR')) {
+        throw new ForbiddenException('Sólo un superadministrador activo puede crear empresas');
+      }
+      if (atomicError.code === '23505') {
+        throw new ConflictException(motivo.includes('IDEMPOTENCY')
+          ? 'Este intento de alta ya se usó con otros datos; vuelve a abrir el formulario'
+          : 'Ya existe una empresa con ese RUC o un usuario con ese correo');
+      }
+      if (atomicError.code === '22023' || atomicError.code === '23514') {
+        throw new BadRequestException(motivo.includes('COUNTRY')
+          ? 'El país seleccionado no coincide con un país activo'
+          : 'Faltan datos obligatorios de la empresa o del administrador');
+      }
+      throw new ServiceUnavailableException('No se pudo confirmar el alta de la empresa; reintenta con el mismo formulario, no se duplicará');
     }
     const result = atomicResult as any;
     return {

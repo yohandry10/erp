@@ -1,0 +1,17 @@
+{
+  "capturedAt": "2026-10-20T08:09:15.830Z",
+  "capture": "Before launch",
+  "source_hashes": {
+    "artifacts/peru-block-runner-20261019.mjs": "9bdd21cb8d838fd2d635a95b27855cf63636627f9026f7fa8fab03d52e808bb9",
+    "scripts/ci/test-peru-dashboard-local.mjs": "775709b28ce0712f0a7b180d1c7bffa2f28a43d72c37343cffd058107c5ab0f4",
+    "scripts/ci/peru-local-smtp-sink.mjs": "af601f15f5beb86aabc65046663fe33779b3b37c18c18365b514f84d056347ff",
+    "scripts/ci/prepare-peru-first-client-local.mjs": "aa066de4808c3370b7bd18c2538f1fd82b6b136b8a5e2e1ca67ef579f8a14306",
+    "apps/erp-api/tests/e2e/helpers/local-api-harness.ts": "b1c4d7c61c10a2b5b0c28c367c8790196d667dd8d03bdd65058bf982efc3e968",
+    "apps/erp-api/src/modules/dashboard/dashboard-metrics.service.ts": "494a6080c8c81576e017162e18f1b728a66ab0015f27fa8b94f94adce5615a00",
+    "apps/erp-api/src/modules/dashboard.controller.ts": "c15d37f16841d37029f3c3bdff684806e41dd66109fd2c4d82e7ea36791725c9",
+    "apps/web/app/dashboard/page.tsx": "8fc74318f4b4b6f8e697f23388563188a7236b57646120ad2ad27451278e572b",
+    "apps/web/tests/e2e/peru-dashboard-local.spec.ts": "5da30aef20a722df05816948dc8f2f412db7b44c2264f1a77a665eaab33fd468"
+  },
+  "complete_acceptance": false,
+  "remoteWrites": false
+}
