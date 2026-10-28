@@ -6,15 +6,19 @@ Suministro ALKHOFAR F01–F10 (rama `claude/alkhofar-supply-20261027`, commit
 local sin push): contratos, OC y cronogramas (570–573), lotes y vencimientos
 (574), entregas y conformidad (575), facturación contra conformidad y estado de
 cuenta (576), alertas (577), penalidades (578), tablero, cortes, Excel y Power BI
-(579), migración FOX por saldos abiertos (580) y perfiles y segregación (581),
-más respaldo y restauración de Storage, exportación integral por empresa y
-capacitación por función en Ayuda. Sólo se verificó en infraestructura local
-efímera: la cadena PostgreSQL 16 fresca aplicó 577 migraciones hasta 581 con
-90 verificadores y 67 históricos; Storage y exportación se ensayaron en
-contenedores y base efímeros; HTTP y Playwright usan dobles
-(`artifacts/alkhofar-*`). Nada se aplicó en PROD; `render.yaml` y CI exigen 581,
-así que el API no debe desplegarse antes de promover 570–581 DB-first con
-preflight y respaldo. El piloto, la aceptación y los anexos comerciales son de
+(579), migración FOX por saldos abiertos (580), perfiles y segregación (581) y
+migración integral desde FOX (582: archivo íntegro, maestros y saldos abiertos
+que faltaban, ensayo y conciliación de toda la migración), más respaldo y
+restauración de Storage, exportación integral por empresa y capacitación por
+función en Ayuda. Sólo se verificó en infraestructura local efímera: la cadena
+PostgreSQL 16 fresca aplicó 578 migraciones hasta 582 con 91 verificadores y
+67 históricos; Storage y exportación se ensayaron en contenedores y base
+efímeros; la pantalla usa dobles en Playwright. La simulación FOX corrió contra
+el API Nest real, PostgREST y PostgreSQL efímeros con un ERP FOX sintético de
+27 tablas y 88438 filas: archivó 88443 filas, importó 9469 filas de 16 plantillas y
+concilió sin diferencias (`artifacts/alkhofar-fox-simulacion/evidence.json`).
+Nada se aplicó en PROD; `render.yaml` y CI exigen 582, así que el API no debe
+desplegarse antes de promover 570–582 DB-first con preflight y respaldo. El piloto, la aceptación y los anexos comerciales son de
 ALKHOFAR (`RELEASE.md`).
 
 Corte vigente POS/CPE: #135 se integró como `8d717bcf` (fuente `c7e28691`) tras
@@ -1879,15 +1883,20 @@ Cambios recientes principales:
   verificadores vigentes y 67 históricos. PR/CI, preflight, respaldo, promoción
   DB-first y despliegues están cerrados; el retest visible de la muestra CPE CO
   quedó cerrado en el hotfix #99 sobre `dd813ab`.
-- `570..581`: suministro ALKHOFAR F01–F10, NO aplicadas en PROD. Verificadas
-  sólo en PostgreSQL 16 efímero (577 migraciones hasta 581, 90 verificadores).
+- `570..582`: suministro ALKHOFAR F01–F10 y migración integral FOX, NO
+  aplicadas en PROD. Verificadas sólo en PostgreSQL 16 efímero (578
+  migraciones hasta 582, 91 verificadores).
   574 redefine `aplicar_movimiento_inventario_tx` y el despacho para asignar
   lotes (FEFO); 575 redefine el sembrado operativo para no conceder a VENDEDOR
   gestión ni conformidad de contratos, y 578 lo extiende a penalidades. 580
   amplía `migration_runs.run_type` y redefine `importar_stock_inicial_tx` con
   lote y vencimiento. 581 crea el perfil SUMINISTRO y redefine
-  `app.seed_rbac_comercial_469` para que GERENCIA no calcule penalidades. Su
-  promoción exige preflight, respaldo, ensayo con `ROLLBACK` y readiness 581.
+  `app.seed_rbac_comercial_469` para que GERENCIA no calcule penalidades. 582
+  amplía otra vez `migration_runs.run_type` y la entidad de
+  `migracion_correspondencias`, crea el archivo íntegro (RLS forzada, sin
+  privilegios de tabla) y siembra `migration.fox.import`,
+  `migration.archivo.import` y `migration.archivo.read`. Su promoción exige
+  preflight, respaldo, ensayo con `ROLLBACK` y readiness 582.
 
 ## Flujos cerrados técnicamente
 
@@ -2953,10 +2962,15 @@ tenants donde tiene los 256 permisos, así que ninguno perdió acceso.
 
 ### Suministro ALKHOFAR
 
-- Promover 570–581 a PROD (DB-first) antes de desplegar el API que exige 581.
-- FOX: perfilar el extracto real, completar el mapeo y cerrar el ensayo con
-  conciliación cuadrada antes del corte; las herramientas sólo se probaron con
-  tablas sintéticas.
+- Promover 570–582 a PROD (DB-first) antes de desplegar el API que exige 582.
+- FOX: recibir el extracto real, perfilarlo, adaptar el mapeo y archivarlo;
+  cerrar el ensayo integral con cero errores, conciliación y cruce bancario
+  cuadrados antes del corte. Todo se probó sólo con un FOX sintético.
+- Medir en PROD la duración del ensayo integral con el volumen real: corre en
+  una transacción con `SUPABASE_LONG_FETCH_TIMEOUT_MS` (10 min por defecto). Si
+  la supera, ensayar por etapas en el orden de importación.
+- Activos fijos, empleados e historia contable o de ventas no tienen
+  importador: quedan en el archivo íntegro, consultables.
 - Aprobar con ALKHOFAR RPO, RTO y retención propuestos y programar el respaldo
   diario de Storage; el RTO de PROD no está medido.
 - Piloto con usuarios de ALKHOFAR, aceptación firmada y anexos comerciales

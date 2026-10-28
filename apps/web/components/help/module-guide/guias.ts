@@ -419,13 +419,14 @@ export const guias: Record<string, GuiaModulo> = {
 
   '/dashboard/migracion-fox': {
     titulo: 'Migración desde FOX',
-    queEs: 'La carga de contratos, OC, cronogramas y stock con lotes desde el sistema anterior, con ensayo y conciliación.',
+    queEs: 'El paso desde el sistema anterior en dos capas: el archivo íntegro de cada tabla de FOX y la migración de terceros, maestros y saldos abiertos.',
     quePuedesHacer: [
-      'Descargar plantillas y ensayar todo sin escribir',
+      'Descargar plantillas y ensayar toda la migración junta sin escribir',
       'Importar archivo por archivo en orden y repetir sin duplicar',
-      'Conciliar cantidades y valores contra los totales del extracto',
+      'Conciliar contra los totales del extracto y cruzar bancos con el asiento de apertura',
+      'Buscar en el archivo íntegro la historia que no se migra',
     ],
-    conectaCon: ['Contratos e Inventario: se migran sólo saldos abiertos; la historia queda en FOX'],
+    conectaCon: ['Clientes, Inventario, Compras, Ventas, Bancos y Contabilidad: se migran saldos abiertos; la historia queda en el archivo'],
   },
 
   '/dashboard/offline': {

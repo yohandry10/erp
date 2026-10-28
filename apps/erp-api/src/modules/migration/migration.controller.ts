@@ -1,4 +1,6 @@
-import { Body, Controller, Get, NotFoundException, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException, Body, Controller, Get, Headers, NotFoundException, Param, ParseUUIDPipe, Post, Query, Res, UseGuards,
+} from '@nestjs/common';
 import { Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -8,9 +10,17 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { MigrationService } from './migration.service';
+import { FoxArchivoService } from './fox-archivo.service';
 import {
+  FoxArchivoCierreDto,
+  FoxArchivoConsultaDto,
+  FoxArchivoDescarteDto,
+  FoxArchivoFilasDto,
+  FoxArchivoLoteDto,
   FoxConciliacionDto,
   FoxEnsayoDto,
+  MIGRATION_FOX_MAESTRO_RUN_TYPES,
+  MigrationFoxMaestroRunType,
   MigrationImportDto,
   MigrationPreviewDto,
   MigrationRunType,
@@ -25,7 +35,10 @@ import {
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @Throttle({ default: { limit: 20, ttl: 60000 } })
 export class MigrationController {
-  constructor(private readonly service: MigrationService) {}
+  constructor(
+    private readonly service: MigrationService,
+    private readonly archivo: FoxArchivoService,
+  ) {}
 
   @Get('templates/:runType')
   @RequirePermission('migration.templates.read')
@@ -156,8 +169,82 @@ export class MigrationController {
     return this.service.import('cronograma_suministro', body, tenantId, userId);
   }
 
+  /** Maestros y saldos abiertos FOX: almacenes, plan de cuentas, productos, bancos, listas, OC y pedidos. */
+  @Post('fox/:runType/import')
+  @RequirePermission('migration.fox.import')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  async importMaestroFox(
+    @Param('runType') runType: string,
+    @Body() body: MigrationImportDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    if (!MIGRATION_FOX_MAESTRO_RUN_TYPES.includes(runType as MigrationFoxMaestroRunType))
+      throw new BadRequestException(`Maestro FOX no soportado: ${runType}`);
+    return this.service.import(runType as MigrationFoxMaestroRunType, body, tenantId, userId);
+  }
+
+  @Post('fox/archivo/lotes')
+  @RequirePermission('migration.archivo.import')
+  async crearLoteArchivo(
+    @Body() body: FoxArchivoLoteDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+    @Headers('idempotency-key') key?: string,
+  ) {
+    return this.archivo.crearLote(tenantId, userId, body, key);
+  }
+
+  /** Tandas de hasta 2000 filas: un extracto grande llega en muchas llamadas. */
+  @Post('fox/archivo/lotes/:id/filas')
+  @RequirePermission('migration.archivo.import')
+  @Throttle({ default: { limit: 600, ttl: 60000 } })
+  async archivarFilas(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: FoxArchivoFilasDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.archivo.archivarFilas(tenantId, userId, id, body);
+  }
+
+  @Post('fox/archivo/lotes/:id/cerrar')
+  @RequirePermission('migration.archivo.import')
+  async cerrarLoteArchivo(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: FoxArchivoCierreDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+    @Headers('idempotency-key') key?: string,
+  ) {
+    return this.archivo.cerrarLote(tenantId, userId, id, body, key);
+  }
+
+  @Post('fox/archivo/lotes/:id/descartar')
+  @RequirePermission('migration.archivo.import')
+  async descartarLoteArchivo(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: FoxArchivoDescarteDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+    @Headers('idempotency-key') key?: string,
+  ) {
+    return this.archivo.descartarLote(tenantId, userId, id, body, key);
+  }
+
+  @Get('fox/archivo')
+  @RequirePermission('migration.archivo.read')
+  @Throttle({ default: { limit: 120, ttl: 60000 } })
+  async consultarArchivo(
+    @Query() query: FoxArchivoConsultaDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.archivo.consultar(tenantId, userId, query);
+  }
+
   @Post('fox/ensayo')
-  @RequirePermission('migration.suministro.import')
+  @RequirePermission('migration.fox.import')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async ensayoFox(
     @Body() body: FoxEnsayoDto,

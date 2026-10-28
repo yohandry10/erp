@@ -192,6 +192,26 @@ un reintento idéntico no duplica y un cambio en el origen se rechaza. El
 ensayo completo corre en la base y se revierte, de modo que puede repetirse
 sin escribir.
 
+La 582 completa la sustitución en dos capas:
+
+- Archivo íntegro: un lote inmutable por extracto, que cierra sólo si lo
+  cargado coincide con lo leído, para que nada del FOX se pierda aunque no
+  tenga equivalente operativo. Es consulta pura y sin efectos; las credenciales
+  se redactan antes de cargar porque el archivo lo leen auditoría y gerencia.
+- Migración operativa: entra sólo por los writers vigentes, y el ERP adopta lo
+  que ya tiene antes de crear. Nunca adivina: un código ambiguo o dos registros
+  FOX sobre un mismo registro del ERP son errores del registro.
+
+Reglas de cada saldo migrado:
+
+- Bancos: el saldo de apertura es un movimiento migrado sin asiento, porque la
+  contabilidad llega en el balance de apertura. Lleva su valor en moneda local
+  y se cruza por cuenta contable con ese asiento.
+- Pedidos de venta: se crean con el writer base y no con el comercial, para
+  conservar el precio pactado en FOX.
+- OC de compra: llegan en borrador para respetar la segregación de
+  aprobación.
+
 ## Reglas para cambios arquitectónicos
 
 1. Buscar primero el contrato existente en código y pruebas.

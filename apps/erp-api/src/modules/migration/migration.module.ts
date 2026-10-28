@@ -5,6 +5,8 @@ import { PermissionsModule } from '../permissions/permissions.module';
 import { MigrationController } from './migration.controller';
 import { MigrationService } from './migration.service';
 import { MigrationRunsService } from './migration-runs.service';
+import { FoxArchivoService } from './fox-archivo.service';
+import { MaestrosFoxImporters } from './importers/maestros-fox.importer';
 import { ClientesImporter } from './importers/clientes.importer';
 import { ProveedoresImporter } from './importers/proveedores.importer';
 import { CxcAbiertasImporter } from './importers/cxc-abiertas.importer';
@@ -34,6 +36,8 @@ import {
     ContratosSuministroImporter,
     OcSuministroImporter,
     CronogramaSuministroImporter,
+    MaestrosFoxImporters,
+    FoxArchivoService,
   ],
   exports: [MigrationService],
 })

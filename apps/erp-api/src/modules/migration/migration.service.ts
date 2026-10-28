@@ -15,22 +15,25 @@ import {
   MigrationPreviewDto,
   MigrationRunType,
 } from './dto/import.dto';
-import { CsvFormatError, parseCsv } from './util/csv-parser.util';
+import { CsvFormatError, nonEmpty, parseCsv, toNumber } from './util/csv-parser.util';
 import { Importer, ImporterContext } from './importers/importer.interface';
-import { ClientesImporter } from './importers/clientes.importer';
-import { ProveedoresImporter } from './importers/proveedores.importer';
-import { CxcAbiertasImporter } from './importers/cxc-abiertas.importer';
+import { ClientesImporter, payloadCliente } from './importers/clientes.importer';
+import { ProveedoresImporter, payloadProveedor } from './importers/proveedores.importer';
+import { CxcAbiertasImporter, payloadDocumentoApertura } from './importers/cxc-abiertas.importer';
 import { CxpAbiertasImporter } from './importers/cxp-abiertas.importer';
 import { BalanceAperturaImporter } from './importers/balance-apertura.importer';
 import { filasEnsayoStock, StockInicialImporter } from './importers/stock-inicial.importer';
 import { ComprobantesHistoricoImporter } from './importers/comprobantes-historico.importer';
 import {
-  construirLoteFox,
   mensajeFox,
   ContratosSuministroImporter,
   CronogramaSuministroImporter,
   OcSuministroImporter,
+  SPECS,
+  SpecFox,
+  construirLote,
 } from './importers/suministro-fox.importer';
+import { MaestrosFoxImporters, SPECS_MAESTROS } from './importers/maestros-fox.importer';
 
 @Injectable()
 export class MigrationService {
@@ -50,6 +53,7 @@ export class MigrationService {
     contratosImporter: ContratosSuministroImporter,
     ocImporter: OcSuministroImporter,
     cronogramaImporter: CronogramaSuministroImporter,
+    maestrosFox: MaestrosFoxImporters,
   ) {
     this.importers = new Map<MigrationRunType, Importer>();
     [
@@ -63,6 +67,7 @@ export class MigrationService {
       contratosImporter,
       ocImporter,
       cronogramaImporter,
+      ...maestrosFox.todos,
     ].forEach((imp) => this.importers.set(imp.runType, imp));
   }
 
@@ -189,40 +194,77 @@ export class MigrationService {
   }
 
   /**
-   * Ensayo FOX completo en la base y revertido: contratos, OC, cronograma y
-   * stock en orden, errores por registro y conciliación contra el control.
+   * Ensayo FOX integral en la base y revertido: terceros, maestros, saldos
+   * abiertos, balance, suministro y stock en el orden real, con las mismas
+   * validaciones y payloads de cada importador, errores por registro y
+   * conciliación contra el control.
    */
   async ensayoFox(dto: FoxEnsayoDto, tenantId: string, userId: string) {
     const lote: Record<string, unknown[]> = {};
     const errores: Array<ImporterRowError & { archivo: string }> = [];
-    const archivos = [
-      ['contratos', 'CONTRATO', 'contratos'],
-      ['oc', 'OC', 'oc'],
-      ['cronograma', 'ENTREGA', 'entregas'],
-    ] as const;
-    for (const [archivo, entidad, clave] of archivos) {
-      const contenido = dto[archivo];
-      if (!contenido) continue;
-      const { registros, errores: e } = construirLoteFox(entidad, this.parseCsvFile(this.decodeCsv(contenido)));
+    const leer = (archivo: keyof FoxEnsayoDto) => this.parseCsvFile(this.decodeCsv(dto[archivo] as string));
+    const anotar = (archivo: string, e: ImporterRowError[]) => {
       errores.push(...e.map((x) => ({ ...x, archivo })));
-      lote[clave] = registros.map((r) => ({ id_origen: r.id_origen, fila: r.fila, payload: r.payload }));
+      return new Set(e.map((x) => x.rowIndex));
+    };
+    const fechaCorte = dto.fechaCorte?.slice(0, 10) ?? null;
+    if ((dto.cxc || dto.cxp || dto.balance || dto.stock) && !fechaCorte)
+      throw new BadRequestException('fechaCorte es obligatoria para saldos abiertos, balance y stock inicial');
+
+    const terceros = [['clientes', 'clientes', payloadCliente], ['proveedores', 'proveedores', payloadProveedor]] as const;
+    for (const [archivo, runType, armar] of terceros) {
+      if (!dto[archivo]) continue;
+      const parsed = leer(archivo);
+      const conError = anotar(archivo, this.getImporter(runType).validate(parsed));
+      lote[archivo] = conError.has(1) ? [] : parsed.rows
+        .map((row, i) => ({ id_origen: nonEmpty(row.external_id), fila: i + 2, payload: armar(row) }))
+        .filter((r) => !conError.has(r.fila));
     }
-    if (dto.stock) {
-      if (!dto.fechaCorte) throw new BadRequestException('fechaCorte es obligatoria para el stock inicial');
-      const parsed = this.parseCsvFile(this.decodeCsv(dto.stock));
-      const e = this.getImporter('stock_inicial').validate(parsed);
-      errores.push(...e.map((x) => ({ ...x, archivo: 'stock' })));
-      const conError = new Set(e.map((x) => x.rowIndex));
+    const documentos = [['cxc', 'cxc_abiertas', 'external_id_cliente'], ['cxp', 'cxp_abiertas', 'external_id_proveedor']] as const;
+    for (const [archivo, runType, tercero] of documentos) {
+      if (!dto[archivo]) continue;
+      const parsed = leer(archivo);
+      const conError = anotar(archivo, this.getImporter(runType).validate(parsed));
+      lote[archivo] = conError.has(1) ? [] : parsed.rows
+        .map((row, i) => ({ id_origen: nonEmpty(row.external_id), fila: i + 2,
+          payload: { ...payloadDocumentoApertura(row), codigo_tercero: (row[tercero] ?? '').trim() } }))
+        .filter((r) => !conError.has(r.fila));
+    }
+    if (dto.balance) {
+      // Un solo asiento: una fila inválida invalida el balance completo.
+      const parsed = leer('balance');
+      const conError = anotar('balance', this.getImporter('balance_apertura').validate(parsed));
+      lote.balance = conError.size ? [] : parsed.rows.map((row, i) => ({ fila: i + 2, payload: {
+        cuenta_contable_codigo: row.cuenta_contable_codigo.trim(), debe: toNumber(row.debe), haber: toNumber(row.haber),
+        centro_costo_codigo: nonEmpty(row.centro_costo_codigo), descripcion: nonEmpty(row.descripcion),
+      } }));
+    }
+    const fox: Array<[keyof FoxEnsayoDto, SpecFox]> = [
+      ['almacenes', SPECS_MAESTROS.ALMACEN], ['plan_cuentas', SPECS_MAESTROS.CUENTA_CONTABLE], ['productos', SPECS_MAESTROS.PRODUCTO],
+      ['cuentas_bancarias', SPECS_MAESTROS.CUENTA_BANCARIA], ['listas_precios', SPECS_MAESTROS.LISTA_PRECIOS],
+      ['contratos', SPECS.CONTRATO], ['oc', SPECS.OC], ['cronograma', SPECS.ENTREGA],
+      ['oc_compra', SPECS_MAESTROS.OC_COMPRA], ['pedidos_venta', SPECS_MAESTROS.PEDIDO_VENTA],
+    ];
+    for (const [archivo, spec] of fox) {
+      if (!dto[archivo]) continue;
+      const { registros, errores: e } = construirLote(spec, leer(archivo));
+      anotar(archivo, e);
+      lote[spec.claveLote] = registros.map((r) => ({ id_origen: r.id_origen, fila: r.fila, payload: r.payload }));
+    }
+    if (dto.stock && fechaCorte) {
+      const parsed = leer('stock');
+      const conError = anotar('stock', this.getImporter('stock_inicial').validate(parsed));
       lote.stock = conError.has(1)
         ? []
-        : filasEnsayoStock(parsed, dto.fechaCorte.slice(0, 10)).filter((f) => !conError.has(f.fila));
+        : filasEnsayoStock(parsed, fechaCorte).filter((f) => !conError.has(f.fila));
     }
     if (!Object.keys(lote).length) throw new BadRequestException('Adjunte al menos un archivo para ensayar');
-    const { data, error } = await this.supabase.getClient().rpc('ensayar_migracion_fox_580', {
+    const { data, error } = await this.supabase.getLongRunningClient().rpc('ensayar_migracion_fox_582', {
       p_tenant_id: tenantId,
       p_actor_id: userId,
       p_lote: lote,
       p_control: dto.control ?? null,
+      p_fecha_corte: fechaCorte,
     });
     if (error) foxFailure(error);
     if (!Array.isArray(data?.registros)) throw new ServiceUnavailableException('El ensayo no devolvió resultados. Reintente.');
@@ -231,7 +273,7 @@ export class MigrationService {
   }
 
   async conciliarFox(control: Record<string, unknown>, tenantId: string, userId: string) {
-    const { data, error } = await this.supabase.getClient().rpc('conciliar_migracion_fox_580', {
+    const { data, error } = await this.supabase.getLongRunningClient().rpc('conciliar_migracion_fox_582', {
       p_tenant_id: tenantId,
       p_actor_id: userId,
       p_control: control,
@@ -281,12 +323,16 @@ export class MigrationService {
   }
 }
 
+/** Entidades que la conciliación 582 compara contra el extracto. */
+export const CONTROL_FOX = ['clientes', 'proveedores', 'almacenes', 'cuentas_contables', 'productos', 'cuentas_bancarias',
+  'listas_precios', 'cxc', 'cxp', 'balance', 'stock', 'contratos', 'oc', 'entregas', 'oc_compra', 'pedidos_venta'];
+
 function foxFailure(error: { code?: string; message?: string }): never {
-  if (error.code === '42501') throw new ForbiddenException('No tiene permiso para migrar o conciliar contratos FOX.');
+  if (error.code === '42501') throw new ForbiddenException('No tiene permiso para migrar o conciliar desde FOX.');
   if (error.code === '22023') {
     const codigo = (error.message || '').split(':')[0].trim();
     throw new BadRequestException(codigo === 'MIGRATION_FOX_CONTROL_INVALID'
-      ? 'Los totales de control sólo admiten contratos, oc, entregas y stock.'
+      ? `Los totales de control sólo admiten: ${CONTROL_FOX.join(', ')}.`
       : 'Revise el lote: entidades y archivos válidos.');
   }
   throw new ServiceUnavailableException('El servicio de migración no está disponible. Reintente.');

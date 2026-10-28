@@ -31,6 +31,7 @@ export interface AppEnvironment {
   SUPABASE_FETCH_TIMEOUT_MS: number;
   SUPABASE_FETCH_MAX_RETRIES: number;
   SUPABASE_FETCH_RETRY_BASE_MS: number;
+  SUPABASE_LONG_FETCH_TIMEOUT_MS: number;
   SUPABASE_NETWORK_BACKOFF_MS: number;
   HASH_SALT_ROUNDS: number;
   POS_WORKER_JWT_SECRET?: string;
@@ -146,6 +147,7 @@ export const envSchema = Joi.object({
   SUPABASE_FETCH_TIMEOUT_MS: Joi.number().integer().min(500).max(60000).default(8000),
   SUPABASE_FETCH_MAX_RETRIES: Joi.number().integer().min(0).max(10).default(2),
   SUPABASE_FETCH_RETRY_BASE_MS: Joi.number().integer().min(25).default(250),
+  SUPABASE_LONG_FETCH_TIMEOUT_MS: Joi.number().integer().min(60000).max(1800000).default(600000),
   SUPABASE_NETWORK_BACKOFF_MS: Joi.number().integer().min(1000).default(30000),
   ALLOWED_ORIGINS: Joi.string().optional(),
   POS_WORKER_JWT_SECRET: Joi.string().min(24).optional(),

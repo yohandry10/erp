@@ -354,23 +354,60 @@ procedimiento de operaciones destructivas.
 
 ## Migración desde FOX
 
+Dos capas con la misma fecha de corte (580–582): el archivo íntegro guarda cada
+tabla del extracto tal cual; la migración operativa carga terceros, maestros y
+saldos abiertos por los writers del ERP.
+
 1. Perfil del extracto, sólo lectura: `node scripts/fox/perfilar-fox.mjs <carpeta>`
    lee tablas FoxPro/Visual FoxPro (.dbf con memo .fpt) y CSV y escribe
    `perfil-fox.json` y `perfil-fox.md`: formato y página de códigos, volumen y
-   borrados, campos, vacíos, claves candidatas, rango histórico y alertas. Si el
-   byte de página de códigos no es confiable, forzar `--codificacion cp850`.
-2. Mapeo: copiar `scripts/fox/mapeo-fox.ejemplo.json` y reemplazar tablas,
-   uniones, filtros y campos por los del perfil, incluidos los UUID de almacén y
-   sucursal del ERP.
+   borrados, campos, vacíos, claves candidatas, rango histórico y alertas,
+   incluidas las columnas sensibles (claves, PIN, tarjetas). Si el byte de
+   página de códigos no es confiable, forzar `--codificacion cp850`.
+2. Mapeo: partir de `scripts/fox/simulacion/mapeo-simulacion.json` (las 16
+   salidas) y reemplazar tablas, uniones, filtros y campos por los del perfil.
+   Las unidades se homologan a NIU, KGM, LTR, MTR o ZZ sin convertir
+   cantidades; un valor sin correspondencia detiene la transformación con el
+   valor exacto. El stock usa `almacen_codigo` del almacén migrado y toma su
+   sucursal o la principal.
 3. Transformación: `node scripts/fox/transformar-fox.mjs <mapeo> <extracto> <salida>`
-   produce las cuatro plantillas, `control.json` (totales con las reglas de la
-   conciliación) y `extracto.json` (filas leídas, descartadas y por qué).
-4. Ensayo: en `/dashboard/migracion-fox`, adjuntar las plantillas y
-   `control.json`. Corre en la base y se revierte; repetir hasta cero errores y
-   conciliación cuadrada.
-5. Importación en orden (clientes y productos, contratos, OC, cronograma,
-   stock) y conciliación con el mismo `control.json`. Un reintento con los
-   mismos archivos no duplica.
+   produce las plantillas en el orden de importación, `control.json` (totales
+   con las reglas de la conciliación 582) y `extracto.json` (filas leídas,
+   descartadas y por qué).
+4. Archivo íntegro: `ERP_API_TOKEN=<token de un ADMIN> node scripts/fox/archivar-fox.mjs
+   <extracto> --api <url>/api --lote <clave estable> [--fecha-corte AAAA-MM-DD]`
+   carga todas las tablas, también los registros borrados, en tandas
+   idempotentes de hasta 2000 filas; las columnas sensibles se redactan. El lote
+   cierra sólo si lo cargado coincide con lo leído y queda inmutable; repetir
+   con la misma `--lote` reanuda una carga cortada y una fila que cambió se
+   rechaza. Un extracto que no sirve se descarta con motivo
+   (`POST /api/migration/fox/archivo/lotes/:id/descartar`). Se consulta en la
+   pantalla por texto, tabla y página con `migration.archivo.read`.
+5. Ensayo integral en `/dashboard/migracion-fox`: adjuntar las plantillas, la
+   fecha de corte y `control.json`. Corre todo en la base en el orden real y
+   se revierte. Repetir hasta cero errores, conciliación cuadrada y cruce de
+   bancos con el asiento de apertura cuadrado en moneda local; los errores se
+   devuelven al cliente para corregir FOX y reentregar el extracto.
+6. Importación en orden: clientes, proveedores, almacenes, plan de cuentas,
+   productos, cuentas bancarias, listas de precios, CxC, CxP, balance de
+   apertura, contratos, OC del cliente, cronograma, OC de compra, pedidos de
+   venta y stock; después, conciliación con el mismo `control.json`. Un
+   reintento no duplica y un dato cambiado en FOX se rechaza por registro. Las
+   OC de compra quedan en borrador y las aprueba alguien distinto de quien
+   migró.
+
+Simulación local completa (Docker, sin nada remoto):
+`PSQL_BIN=<psql> node scripts/fox/simulacion/simular-migracion-fox-local.mjs`.
+Levanta PostgreSQL 16 con la cadena, PostgREST y el API Nest real; un ERP FOX
+sintético entrega un extracto con errores sembrados y se recorre perfil,
+archivo, ensayo, reentrega, importación, conciliación, reintento, origen
+cambiado, aprobación y aislamiento. Evidencia en
+`artifacts/alkhofar-fox-simulacion/evidence.json`; también `pnpm simulate:fox`.
+
+El ensayo integral, la conciliación y el archivo usan un cliente de datos sin
+reintentos con `SUPABASE_LONG_FETCH_TIMEOUT_MS` (10 minutos por defecto, entre 1
+y 30); el resto del API conserva `SUPABASE_FETCH_TIMEOUT_MS`. La pantalla espera
+hasta 15 minutos por operación.
 
 El extracto y sus salidas pueden contener datos del cliente: se procesan fuera
 del repositorio y no se versionan. `pnpm test:fox` prueba las herramientas con
