@@ -157,6 +157,9 @@ test('archiva el extracto completo en tandas, con borrados, redacción y cierre 
   assert.equal(r.tablas.CONTRATO, 3);
   assert.equal(r.borrados.CONTRATO, 1);
   assert.deepEqual(r.redactados, { USUARIOS: ['CLAVE'] });
+  const { CAMPO_SENSIBLE } = await import('./archivar-fox.mjs');
+  assert.deepEqual(['USR_CLAVE', 'PASSWD2', 'PIN', 'API_KEY', 'NROTARJETA', 'SPINNER', 'KEYWORD', 'CODPRO'].filter((c) => CAMPO_SENSIBLE.test(c)),
+    ['USR_CLAVE', 'PASSWD2', 'PIN', 'API_KEY', 'NROTARJETA']);
   const contrato = llamadas.filter((l) => l.cuerpo?.tabla === 'CONTRATO').flatMap((l) => l.cuerpo.filas);
   assert.deepEqual(contrato.map((f) => f.clave), ['1', '2', '3']);
   assert.equal(contrato[2].fila._borrado, true);

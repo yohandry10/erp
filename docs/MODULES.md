@@ -182,7 +182,8 @@ se gestiona como feature independiente de la matriz de aceptación existente.
 - Migración integral desde FOX (migración 582), en la misma pantalla:
   - Archivo íntegro: cada tabla del extracto tal cual, con los registros
     borrados en FOX, en lotes inmutables que cierran por conteo y se consultan
-    por texto, tabla y página. Las credenciales se redactan al cargar. Leer
+    por texto, tabla y página. La base redacta credenciales y medios de pago
+    al cargar, llegue la tanda por la CLI o directo al API. Leer
     exige `migration.archivo.read` (ADMIN, GERENCIA, CONTADOR, AUDITOR) y
     cargar `migration.archivo.import` (ADMIN).
   - Maestros y saldos abiertos que faltaban, con `migration.fox.import`

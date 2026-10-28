@@ -153,10 +153,23 @@ BEGIN
   RETURN v_result;
 END $fn$;
 
+-- Credenciales y medios de pago no se archivan, llegue la tanda por la CLI o
+-- directo al API: el archivo lo leen auditoría y gerencia. El patrón no se
+-- ancla (USR_CLAVE, PASSWD2); PIN y KEY sólo como palabra, para no tocar
+-- columnas como SPINNER o KEYWORD. La misma regla usan la CLI y el perfil.
+CREATE FUNCTION app.campo_sensible_582(p_campo text) RETURNS boolean LANGUAGE sql IMMUTABLE AS $fn$
+  SELECT p_campo ~* '(pass|pwd|clave|contras|secret|token|cvv|tarj|ccnum)' OR p_campo ~* '(^|_)(pin|key|apikey)(_|$)'
+$fn$;
+CREATE FUNCTION app.redactar_fila_582(p_fila jsonb) RETURNS jsonb LANGUAGE sql IMMUTABLE AS $fn$
+  SELECT coalesce(jsonb_object_agg(e.k, CASE WHEN app.campo_sensible_582(e.k) AND e.v NOT IN ('null'::jsonb, '""'::jsonb)
+      THEN '"[REDACTADO]"'::jsonb ELSE e.v END), '{}'::jsonb)
+  FROM jsonb_each(p_fila) e(k, v)
+$fn$;
+
 -- Carga por tandas: idempotente por fila; una fila que cambió en el mismo lote se rechaza.
 CREATE FUNCTION public.archivar_filas_fox_582(p_tenant_id uuid, p_actor_id uuid, p_lote_id uuid, p_tabla text, p_filas jsonb)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, app, extensions, pg_temp AS $fn$
-DECLARE v_lote public.migracion_archivo_lotes; v_n integer; v_nuevas integer; v_cambiadas integer;
+DECLARE v_lote public.migracion_archivo_lotes; v_n integer; v_nuevas integer; v_cambiadas integer; v_redactados jsonb;
 BEGIN
   PERFORM app.assert_actor_permission_466(p_tenant_id, p_actor_id, 'migration.archivo.import');
   SELECT * INTO v_lote FROM public.migracion_archivo_lotes WHERE tenant_id = p_tenant_id AND id = p_lote_id;
@@ -174,7 +187,8 @@ BEGIN
     TRUNCATE pg_temp.archivo_tanda_582;
   END IF;
   INSERT INTO pg_temp.archivo_tanda_582
-  SELECT x.n, x.e->>'clave', x.e->'fila', encode(extensions.digest(convert_to((x.e->'fila')::text, 'UTF8'), 'sha256'), 'hex')
+  SELECT x.n, x.e->>'clave', app.redactar_fila_582(x.e->'fila'),
+    encode(extensions.digest(convert_to(app.redactar_fila_582(x.e->'fila')::text, 'UTF8'), 'sha256'), 'hex')
   FROM jsonb_array_elements(p_filas) WITH ORDINALITY x(e, n);
   GET DIAGNOSTICS v_n = ROW_COUNT;
   IF (SELECT count(DISTINCT clave) FROM pg_temp.archivo_tanda_582) <> v_n THEN
@@ -188,7 +202,10 @@ BEGIN
   SELECT p_tenant_id, p_lote_id, p_tabla, clave, fila, huella FROM pg_temp.archivo_tanda_582 ORDER BY orden
   ON CONFLICT (lote_id, tabla, clave) DO NOTHING;
   GET DIAGNOSTICS v_nuevas = ROW_COUNT;
-  RETURN jsonb_build_object('lote_id', p_lote_id, 'tabla', p_tabla, 'recibidas', v_n, 'nuevas', v_nuevas, 'existentes', v_n - v_nuevas);
+  SELECT coalesce(jsonb_agg(DISTINCT k ORDER BY k), '[]'::jsonb) INTO v_redactados
+  FROM pg_temp.archivo_tanda_582 t, jsonb_object_keys(t.fila) k WHERE app.campo_sensible_582(k);
+  RETURN jsonb_build_object('lote_id', p_lote_id, 'tabla', p_tabla, 'recibidas', v_n, 'nuevas', v_nuevas, 'existentes', v_n - v_nuevas,
+    'campos_redactados', v_redactados);
 END $fn$;
 
 CREATE FUNCTION public.consultar_archivo_fox_582(p_tenant_id uuid, p_actor_id uuid, p_filtros jsonb)
@@ -723,7 +740,8 @@ DO $seed$ DECLARE t uuid; BEGIN
   FOR t IN SELECT id FROM public.tenants LOOP PERFORM app.seed_migracion_fox_582(t); END LOOP;
 END $seed$;
 
-REVOKE ALL ON FUNCTION app.archivo_inmutable_582(), app.fox_unico_582(uuid, text, text), app.fox_ref_582(uuid, text, text), app.seed_migracion_fox_582(uuid),
+REVOKE ALL ON FUNCTION app.archivo_inmutable_582(), app.campo_sensible_582(text), app.redactar_fila_582(jsonb),
+  app.fox_unico_582(uuid, text, text), app.fox_ref_582(uuid, text, text), app.seed_migracion_fox_582(uuid),
   app.seed_migracion_fox_role_582() FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.operar_archivo_fox_582(uuid, uuid, text, jsonb, text), public.archivar_filas_fox_582(uuid, uuid, uuid, text, jsonb),
   public.consultar_archivo_fox_582(uuid, uuid, jsonb), public.importar_maestro_fox_582(uuid, uuid, uuid, text, text, jsonb),

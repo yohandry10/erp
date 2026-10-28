@@ -377,7 +377,8 @@ saldos abiertos por los writers del ERP.
 4. Archivo íntegro: `ERP_API_TOKEN=<token de un ADMIN> node scripts/fox/archivar-fox.mjs
    <extracto> --api <url>/api --lote <clave estable> [--fecha-corte AAAA-MM-DD]`
    carga todas las tablas, también los registros borrados, en tandas
-   idempotentes de hasta 2000 filas; las columnas sensibles se redactan. El lote
+   idempotentes de hasta 2000 filas; la base redacta las columnas de
+   credenciales y medios de pago aunque la tanda llegue directo al API. El lote
    cierra sólo si lo cargado coincide con lo leído y queda inmutable; repetir
    con la misma `--lote` reanuda una carga cortada y una fila que cambió se
    rechaza. Un extracto que no sirve se descarta con motivo

@@ -110,6 +110,21 @@ BEGIN
     FROM generate_series(1,12) g));
   IF (SELECT string_agg(clave, ',' ORDER BY id) FROM public.migracion_archivo WHERE lote_id=lote2 AND tabla='ORDEN')<>'1,2,3,4,5,6,7,8,9,10,11,12'
   THEN RAISE EXCEPTION 'VERIFY582_ARCHIVE_ORDER'; END IF;
+  -- La base redacta credenciales aunque la tanda llegue sin pasar por la CLI.
+  j:=public.archivar_filas_fox_582(t,a,lote2,'USUARIOS',jsonb_build_array(jsonb_build_object('clave','1','fila',jsonb_build_object(
+    'USR_PASSWD','s3creta','PIN','1234','CLAVEACCESO','x9','API_KEY','k','NROTARJETA','4111','SPINNER','queda','KEYWORD','queda',
+    'CLAVE','','USUARIO','ADMIN'))));
+  IF (SELECT fila FROM public.migracion_archivo WHERE lote_id=lote2 AND tabla='USUARIOS')<>jsonb_build_object('USR_PASSWD','[REDACTADO]',
+      'PIN','[REDACTADO]','CLAVEACCESO','[REDACTADO]','API_KEY','[REDACTADO]','NROTARJETA','[REDACTADO]','SPINNER','queda','KEYWORD','queda',
+      'CLAVE','','USUARIO','ADMIN')
+    OR j->'campos_redactados'<>'["API_KEY", "CLAVE", "CLAVEACCESO", "NROTARJETA", "PIN", "USR_PASSWD"]'::jsonb
+    OR EXISTS (SELECT 1 FROM public.migracion_archivo WHERE lote_id=lote2 AND fila::text LIKE '%s3creta%')
+  THEN RAISE EXCEPTION 'VERIFY582_ARCHIVE_REDACTION %', j; END IF;
+  -- La misma fila ya redactada por la CLI tiene la misma huella: el reintento no choca.
+  j:=public.archivar_filas_fox_582(t,a,lote2,'USUARIOS',jsonb_build_array(jsonb_build_object('clave','1','fila',jsonb_build_object(
+    'USR_PASSWD','[REDACTADO]','PIN','[REDACTADO]','CLAVEACCESO','[REDACTADO]','API_KEY','[REDACTADO]','NROTARJETA','[REDACTADO]',
+    'SPINNER','queda','KEYWORD','queda','CLAVE','','USUARIO','ADMIN'))));
+  IF (j->>'existentes')::integer<>1 THEN RAISE EXCEPTION 'VERIFY582_ARCHIVE_REDACTION_REPLAY %', j; END IF;
   IF ((public.consultar_archivo_fox_582(t,b,jsonb_build_object('texto','hospital -salida')))->>'total')::integer<>0
     OR ((public.consultar_archivo_fox_582(t,b,jsonb_build_object('texto','"ingreso por compra"')))->>'total')::integer<>1
   THEN RAISE EXCEPTION 'VERIFY582_ARCHIVE_WEBSEARCH'; END IF;
