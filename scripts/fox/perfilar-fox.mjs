@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { leerTabla } from './fox-dbf.mjs';
+import { CAMPO_SENSIBLE } from './archivar-fox.mjs';
 
 const MAX_DISTINTOS = 50000;
 
@@ -59,6 +60,8 @@ export function perfilarTabla(tabla) {
   }
   if (!campos.some((c) => c.clave_candidata)) alertas.push('Sin campo único y completo: la clave del origen será compuesta o no confiable');
   if (tabla.borrados) alertas.push(`${tabla.borrados} registros marcados como borrados (no se migran)`);
+  for (const c of campos.filter((x) => CAMPO_SENSIBLE.test(x.nombre)))
+    alertas.push(`${c.nombre}: dato sensible (credencial o medio de pago); se redacta en el archivo y no se migra`);
   const fechas = campos.filter((c) => c.tipos_observados.includes('fecha') && c.minimo);
   return {
     archivo: tabla.archivo,

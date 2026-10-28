@@ -4,6 +4,7 @@ import { ImporterResult, ImporterRowError } from '../dto/import.dto';
 import { ParsedCsv, nonEmpty, toDateOrNull, toNumber, validateHeaders } from '../util/csv-parser.util';
 import { Importer, ImporterContext, emptyResult } from './importer.interface';
 import { MigrationRunsService } from '../migration-runs.service';
+import { payloadDocumentoApertura } from './cxc-abiertas.importer';
 
 const REQUIRED = [
   'external_id',
@@ -206,22 +207,12 @@ export class CxpAbiertasImporter implements Importer {
         continue;
       }
 
-      const monto = toNumber(row['monto_total']);
-      const saldo = toNumber(row['saldo_pendiente']);
-      const moneda = String(row['moneda']).toUpperCase().trim();
-      sumaTotal += saldo;
+      const documento = payloadDocumentoApertura(row);
+      sumaTotal += documento.saldo_pendiente;
 
       const payload: Record<string, any> = {
         proveedor_id: proveedorId,
-        tipo_documento: String(row['tipo_documento']).toUpperCase().trim(),
-        serie: row['serie'],
-        numero: String(row['numero']).trim(),
-        fecha_emision: toDateOrNull(row['fecha_emision']),
-        fecha_vencimiento: toDateOrNull(row['fecha_vencimiento']),
-        moneda,
-        monto_total: monto,
-        saldo_pendiente: saldo,
-        observaciones: nonEmpty(row['observaciones']),
+        ...documento,
         fecha_corte: ctx.fechaCorte ?? null,
       };
 

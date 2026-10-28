@@ -21,6 +21,21 @@ const REQUIRED = [
 const TIPOS_DOC = new Set(['FACTURA', 'BOLETA', 'NOTA_CREDITO', 'NOTA_DEBITO', 'NC', 'ND', 'RECIBO', 'OTRO']);
 const MONEDAS = new Set(['PEN', 'USD', 'EUR']);
 
+/** Documento abierto sin tercero ni corte; CxP y el ensayo FOX integral lo reutilizan. */
+export function payloadDocumentoApertura(row: Record<string, string>) {
+  return {
+    tipo_documento: String(row['tipo_documento']).toUpperCase().trim(),
+    serie: row['serie'],
+    numero: String(row['numero']).trim(),
+    fecha_emision: toDateOrNull(row['fecha_emision']),
+    fecha_vencimiento: toDateOrNull(row['fecha_vencimiento']),
+    moneda: String(row['moneda']).toUpperCase().trim(),
+    monto_total: toNumber(row['monto_total']),
+    saldo_pendiente: toNumber(row['saldo_pendiente']),
+    observaciones: nonEmpty(row['observaciones']),
+  };
+}
+
 @Injectable()
 export class CxcAbiertasImporter implements Importer {
   readonly runType = 'cxc_abiertas' as const;
@@ -207,22 +222,12 @@ export class CxcAbiertasImporter implements Importer {
         continue;
       }
 
-      const monto = toNumber(row['monto_total']);
-      const saldo = toNumber(row['saldo_pendiente']);
-      const moneda = String(row['moneda']).toUpperCase().trim();
-      sumaTotal += saldo;
+      const documento = payloadDocumentoApertura(row);
+      sumaTotal += documento.saldo_pendiente;
 
       const payload: Record<string, any> = {
         cliente_id: clienteId,
-        tipo_documento: String(row['tipo_documento']).toUpperCase().trim(),
-        serie: row['serie'],
-        numero: String(row['numero']).trim(),
-        fecha_emision: toDateOrNull(row['fecha_emision']),
-        fecha_vencimiento: toDateOrNull(row['fecha_vencimiento']),
-        moneda,
-        monto_total: monto,
-        saldo_pendiente: saldo,
-        observaciones: nonEmpty(row['observaciones']),
+        ...documento,
         fecha_corte: ctx.fechaCorte ?? null,
       };
 

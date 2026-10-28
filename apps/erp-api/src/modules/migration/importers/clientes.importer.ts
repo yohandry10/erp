@@ -11,6 +11,29 @@ const REQUIRED = ['external_id', 'tipo', 'tipo_documento', 'numero_documento', '
 const TIPOS = new Set(['PERSONA', 'EMPRESA']);
 const TIPOS_DOC = new Set(['DNI', 'RUC', 'CE', 'CEX', 'PASAPORTE', 'PAS']);
 
+/** Payload de importar_cliente_historico_tx; el ensayo FOX integral usa el mismo. */
+export function payloadCliente(row: Record<string, string>): Record<string, any> {
+  const tipoDoc = String(row['tipo_documento']).toUpperCase().trim();
+  const numDocTexto = String(row['numero_documento']).trim();
+  const payload: Record<string, any> = {
+    tipo: String(row['tipo']).toUpperCase().trim(),
+    documento_tipo: tipoDoc,
+    documento_identidad: numDocTexto,
+    documento_numero: numDocTexto,
+    razon_social: row['razon_social'],
+    direccion: nonEmpty(row['direccion']),
+    email: nonEmpty(row['email']),
+    pais: nonEmpty(row['pais']) ?? 'PE',
+    telefono: nonEmpty(row['telefono']),
+  };
+
+  const lc = toNumber(row['limite_credito']);
+  if (Number.isFinite(lc) && lc > 0) {
+    payload.limite_credito = lc;
+  }
+  return payload;
+}
+
 @Injectable()
 export class ClientesImporter implements Importer {
   readonly runType = 'clientes' as const;
@@ -152,24 +175,7 @@ export class ClientesImporter implements Importer {
         continue;
       }
 
-      const tipoDoc = String(row['tipo_documento']).toUpperCase().trim();
-      const numDocTexto = String(row['numero_documento']).trim();
-      const payload: Record<string, any> = {
-        tipo: String(row['tipo']).toUpperCase().trim(),
-        documento_tipo: tipoDoc,
-        documento_identidad: numDocTexto,
-        documento_numero: numDocTexto,
-        razon_social: row['razon_social'],
-        direccion: nonEmpty(row['direccion']),
-        email: nonEmpty(row['email']),
-        pais: nonEmpty(row['pais']) ?? 'PE',
-        telefono: nonEmpty(row['telefono']),
-      };
-
-      const lc = toNumber(row['limite_credito']);
-      if (Number.isFinite(lc) && lc > 0) {
-        payload.limite_credito = lc;
-      }
+      const payload = payloadCliente(row);
 
       if (ctx.dryRun) {
         result.okRows++;

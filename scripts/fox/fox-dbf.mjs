@@ -57,8 +57,13 @@ function leerMemo(fpt, puntero) {
   return fpt.subarray(inicio + 8, Math.min(inicio + 8 + largo, fpt.length));
 }
 
-/** Lee una tabla DBF. `codificacion` fuerza la página de códigos si el byte 29 no es confiable. */
-export function leerDbf(archivo, { codificacion } = {}) {
+/**
+ * Lee una tabla DBF. `codificacion` fuerza la página de códigos si el byte 29
+ * no es confiable; `incluirBorrados` devuelve también los marcados con "*"
+ * (para el archivo íntegro). Cada fila lleva su número de registro físico en
+ * `_registro` y su marca en `_borrado`, no enumerables.
+ */
+export function leerDbf(archivo, { codificacion, incluirBorrados = false } = {}) {
   const buf = fs.readFileSync(archivo);
   if (buf.length < 32) throw new Error(`${archivo}: no es una tabla DBF (muy corta)`);
   const version = buf[0];
@@ -86,13 +91,15 @@ export function leerDbf(archivo, { codificacion } = {}) {
   for (let i = 0; i < registros; i++) {
     const base = largoCabecera + i * largoRegistro;
     if (base + largoRegistro > buf.length) break;
-    if (buf[base] === 0x2a) { borrados++; continue; }
+    const borrado = buf[base] === 0x2a;
+    if (borrado) { borrados++; if (!incluirBorrados) continue; }
     const fila = {};
     for (const c of campos) {
       if (c.sistema || c.tipo === '0') continue;
       const raw = buf.subarray(base + c.desplazamiento, base + c.desplazamiento + c.largo);
       fila[c.nombre] = valorCampo(c, raw, dec, fpt);
     }
+    marcar(fila, i + 1, borrado);
     filas.push(fila);
   }
   return {
@@ -107,6 +114,12 @@ export function leerDbf(archivo, { codificacion } = {}) {
     campos: campos.filter((c) => !c.sistema && c.tipo !== '0').map(({ desplazamiento, sistema, ...c }) => c),
     filas,
   };
+}
+
+function marcar(fila, registro, borrado) {
+  Object.defineProperty(fila, '_registro', { value: registro, enumerable: false });
+  Object.defineProperty(fila, '_borrado', { value: borrado, enumerable: false });
+  return fila;
 }
 
 function valorCampo(c, raw, dec, fpt) {
@@ -184,7 +197,7 @@ export function leerCsv(archivo, { separador, codificacion = 'utf-8' } = {}) {
     registros_declarados: datos.length,
     borrados: 0,
     campos: nombres.map((nombre) => ({ nombre, tipo: 'C' })),
-    filas: datos.map((v) => Object.fromEntries(nombres.map((n, i) => [n, (v[i] ?? '').trim()]))),
+    filas: datos.map((v, r) => marcar(Object.fromEntries(nombres.map((n, i) => [n, (v[i] ?? '').trim()])), r + 1, false)),
   };
 }
 

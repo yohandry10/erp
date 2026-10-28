@@ -179,6 +179,25 @@ se gestiona como feature independiente de la matriz de aceptación existente.
   importan antes con los importadores existentes (`external_id` = código FOX).
   Importar exige `migration.suministro.import` (ADMIN) y conciliar
   `migration.validar.read`.
+- Migración integral desde FOX (migración 582), en la misma pantalla:
+  - Archivo íntegro: cada tabla del extracto tal cual, con los registros
+    borrados en FOX, en lotes inmutables que cierran por conteo y se consultan
+    por texto, tabla y página. Las credenciales se redactan al cargar. Leer
+    exige `migration.archivo.read` (ADMIN, GERENCIA, CONTADOR, AUDITOR) y
+    cargar `migration.archivo.import` (ADMIN).
+  - Maestros y saldos abiertos que faltaban, con `migration.fox.import`
+    (ADMIN): almacenes, plan de cuentas (lo existente se enlaza; lo nuevo cuelga
+    de la cuenta con el prefijo más largo), productos con política de lote,
+    cuentas bancarias con saldo de apertura, listas de precios, OC de compra
+    (sólo lo pendiente de recibir, en borrador) y pedidos de venta (sólo lo
+    pendiente de despachar, al precio pactado en FOX).
+  - Lo que ya existe en el ERP se adopta por código; un código que coincide con
+    dos registros o un registro del ERP ya enlazado a otro código FOX se
+    rechazan en vez de adivinar.
+  - El ensayo integral recorre terceros, maestros, saldos, balance, suministro
+    y stock en el orden real. La conciliación compara todo contra el extracto y
+    cruza, por cuenta contable, los saldos bancarios en moneda local con el
+    asiento de apertura.
 - Perfiles de suministro (F09/F10, migración 581). SUMINISTRO (responsable de
   contratos): contratos (ver, gestionar, conformar), pedidos (ver, editar),
   penalidades (ver, gestionar), lotes (leer), alertas (ver, gestionar) y

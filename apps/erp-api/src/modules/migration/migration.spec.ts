@@ -479,6 +479,7 @@ describe('MigrationService.decodeCsv', () => {
       fakeImporter('contratos_suministro'),
       fakeImporter('oc_suministro'),
       fakeImporter('cronograma_suministro'),
+      { todos: [] } as any,
     );
   }
 

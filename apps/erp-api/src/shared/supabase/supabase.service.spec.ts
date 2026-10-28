@@ -177,4 +177,30 @@ describe('SupabaseService', () => {
       expect(filterBuilder.in).not.toHaveBeenCalled();
     });
   });
+
+  describe('cliente para operaciones largas', () => {
+    const nativo = globalThis.fetch;
+    afterEach(() => { globalThis.fetch = nativo; });
+
+    it('usa su propio límite, no reintenta y conserva el contexto tenant', async () => {
+      buildService({ SUPABASE_FETCH_TIMEOUT_MS: '40', SUPABASE_FETCH_MAX_RETRIES: '2', SUPABASE_FETCH_RETRY_BASE_MS: '1',
+        SUPABASE_LONG_FETCH_TIMEOUT_MS: '250' });
+      const opciones = (cliente: string) => createClientMock.mock.calls.find((c) => c[2]?.global?.headers?.['X-Client-Info'] === cliente)![2];
+      (tenantContext.getContext as jest.Mock).mockReturnValue({ tenantId: 't-1', userId: 'u-1' });
+      const llamadas: Array<{ headers: any }> = [];
+      globalThis.fetch = jest.fn((_url: any, init: any) => new Promise((_ok, mal) => {
+        llamadas.push({ headers: init.headers });
+        init.signal.addEventListener('abort', () => mal(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+      })) as any;
+      const t0 = Date.now();
+      await expect(opciones('erp-api-largo').global.fetch('http://x/rpc/ensayar', {})).rejects.toThrow('aborted');
+      expect(llamadas).toHaveLength(1);
+      expect(Date.now() - t0).toBeGreaterThanOrEqual(200);
+      expect(llamadas[0].headers.get('x-tenant-id')).toBe('t-1');
+      llamadas.length = 0;
+      // El cliente normal conserva su límite corto y sus reintentos.
+      await expect(opciones('erp-api').global.fetch('http://x/rpc/corta', {})).rejects.toThrow('aborted');
+      expect(llamadas).toHaveLength(3);
+    });
+  });
 });

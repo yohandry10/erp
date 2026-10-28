@@ -10,6 +10,7 @@ import {
   CronogramaSuministroImporter,
   OcSuministroImporter,
 } from './suministro-fox.importer';
+import { MaestrosFoxImporters } from './maestros-fox.importer';
 
 const TENANT = '58000000-0000-4000-8000-000000000001';
 const ACTOR = '58000000-0000-4000-8000-000000000002';
@@ -26,7 +27,7 @@ const CONTRATOS = [
 
 function servicios(rpc: jest.Mock) {
   const recordRow = jest.fn().mockResolvedValue(undefined);
-  const supabase = { getClient: () => ({ rpc }) } as any;
+  const supabase = { getClient: () => ({ rpc }), getLongRunningClient: () => ({ rpc }) } as any;
   return { supabase, runs: { recordRow } as any, recordRow };
 }
 
@@ -163,11 +164,11 @@ describe('Ensayo y conciliación FOX en el servicio', () => {
   const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
   function servicio(rpc: jest.Mock) {
     const fake = (runType: string) => ({ runType, requiredHeaders: [], getTemplate: jest.fn(), validate: jest.fn(() => []), run: jest.fn() }) as any;
-    const supabase = { getClient: () => ({ rpc }) } as any;
+    const supabase = { getClient: () => ({ rpc }), getLongRunningClient: () => ({ rpc }) } as any;
     return new MigrationService(supabase, {} as any, fake('clientes'), fake('proveedores'), fake('cxc_abiertas'), fake('cxp_abiertas'),
       fake('balance_apertura'), new StockInicialImporter(supabase, {} as any), fake('comprobantes_historico'),
       new ContratosSuministroImporter(supabase, {} as any), new OcSuministroImporter(supabase, {} as any),
-      new CronogramaSuministroImporter(supabase, {} as any));
+      new CronogramaSuministroImporter(supabase, {} as any), new MaestrosFoxImporters(supabase, {} as any));
   }
 
   it('ensaya todos los archivos juntos con su control y devuelve los errores de archivo', async () => {
@@ -180,10 +181,11 @@ describe('Ensayo y conciliación FOX en el servicio', () => {
       control,
     }, TENANT, ACTOR);
     const args = rpc.mock.calls[0][1];
-    expect(rpc.mock.calls[0][0]).toBe('ensayar_migracion_fox_580');
+    expect(rpc.mock.calls[0][0]).toBe('ensayar_migracion_fox_582');
     expect(args.p_lote.contratos.map((r: any) => r.id_origen)).toEqual(['C-100']);
     expect(args.p_lote.stock).toHaveLength(1);
     expect(args.p_control).toEqual(control);
+    expect(args.p_fecha_corte).toBe('2026-10-28');
     expect(res.data.errores_archivo).toEqual([expect.objectContaining({ archivo: 'contratos', rowIndex: 4 })]);
   });
 
@@ -201,7 +203,8 @@ describe('Ensayo y conciliación FOX en el servicio', () => {
     const s = servicio(rpc);
     expect((await s.conciliarFox({ oc: {} }, TENANT, ACTOR)).data.cuadra).toBe(false);
     await expect(s.conciliarFox({}, TENANT, ACTOR)).rejects.toBeInstanceOf(ForbiddenException);
-    await expect(s.conciliarFox({ nomina: {} }, TENANT, ACTOR)).rejects.toThrow('sólo admiten contratos, oc, entregas y stock');
+    await expect(s.conciliarFox({ nomina: {} }, TENANT, ACTOR)).rejects.toThrow('sólo admiten: clientes, proveedores');
+    expect(rpc.mock.calls[0][0]).toBe('conciliar_migracion_fox_582');
   });
 
   it('cada ruta FOX exige su permiso', () => {
@@ -209,7 +212,7 @@ describe('Ensayo y conciliación FOX en el servicio', () => {
       importContratosSuministro: 'migration.suministro.import',
       importOcSuministro: 'migration.suministro.import',
       importCronogramaSuministro: 'migration.suministro.import',
-      ensayoFox: 'migration.suministro.import',
+      ensayoFox: 'migration.fox.import',
       conciliacionFox: 'migration.validar.read',
     };
     for (const [method, codigo] of Object.entries(esperado))

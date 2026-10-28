@@ -29,6 +29,7 @@
     "test:quality": "node scripts/audit-test-quality.mjs",
     "test:dian-contract": "node scripts/ci/verify-dian-official-contract.mjs",
     "test:fox": "node --test scripts/fox/fox.test.mjs",
+    "simulate:fox": "node scripts/fox/simulacion/simular-migracion-fox-local.mjs",
     "test:storage-backup": "node scripts/ci/test-storage-backup-local.mjs",
     "test:tenant-export": "node scripts/datos/test-exportar-tenant-local.mjs",
     "format": "prettier --write \"apps/**/*.{ts,tsx,js,mjs,cjs,json,css,md}\" \"libs/**/*.{ts,tsx,js,mjs,cjs,json,md}\" \"scripts/**/*.{ts,js,mjs,cjs,json,md}\"",
