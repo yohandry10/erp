@@ -222,6 +222,18 @@ export const INVENTARIO_CORE_PERMISSIONS: PermissionDefinition[] = [
     accion: 'read',
     descripcion: 'Visualizar estadísticas de inventario',
   },
+  {
+    modulo: 'inventario',
+    recurso: 'lotes',
+    accion: 'read',
+    descripcion: 'Consultar lotes, vencimientos y reservas por lote',
+  },
+  {
+    modulo: 'inventario',
+    recurso: 'lotes',
+    accion: 'manage',
+    descripcion: 'Configurar control de lote, regularizar stock sin lote y reasignar reservas',
+  },
 ];
 
 export const VENTAS_RMA_PERMISSIONS: PermissionDefinition[] = [
@@ -300,6 +312,12 @@ export const VENTAS_COMERCIAL_PERMISSIONS: PermissionDefinition[] = [
  * Todos los permisos del módulo de Ventas
  */
 export const ALL_VENTAS_PERMISSIONS: PermissionDefinition[] = [
+  { modulo: 'ventas', recurso: 'contratos', accion: 'ver', descripcion: 'Consultar contratos de suministro y cronogramas' },
+  { modulo: 'ventas', recurso: 'contratos', accion: 'gestionar', descripcion: 'Gestionar contratos de suministro, OC del cliente y cronogramas' },
+  { modulo: 'ventas', recurso: 'contratos', accion: 'conformar', descripcion: 'Registrar recepciones y conformidades del cliente sobre entregas contractuales' },
+  { modulo: 'ventas', recurso: 'penalidades', accion: 'ver', descripcion: 'Consultar reglas, cálculos y revisiones de penalidades contractuales' },
+  { modulo: 'ventas', recurso: 'penalidades', accion: 'gestionar', descripcion: 'Configurar reglas y excepciones y calcular penalidades contractuales' },
+  { modulo: 'ventas', recurso: 'penalidades', accion: 'aprobar', descripcion: 'Revisar, aprobar o descartar cálculos de penalidad registrados por otro usuario' },
   ...VENTAS_CLIENTES_PERMISSIONS,
   ...VENTAS_COTIZACIONES_PERMISSIONS,
   ...VENTAS_PEDIDOS_PERMISSIONS,

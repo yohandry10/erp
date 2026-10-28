@@ -219,7 +219,8 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
               throw new Error('Tu demo ha expirado. Crea una nueva demo o convierte tu cuenta.')
             }
             const errorMessage = errorData.message || 'You do not have permission to perform this action'
-            throw new Error(errorMessage)
+            const permissionError = Object.assign(new Error(errorMessage), { status: 403, data: errorData })
+            throw permissionError
           }
 
           if (!response.ok) {
@@ -237,6 +238,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
               `HTTP error! status: ${response.status}`
 
             const err = new Error(errorMessage) as any
+            err.status = response.status
             if (errorData) {
               err.data = errorData
             }

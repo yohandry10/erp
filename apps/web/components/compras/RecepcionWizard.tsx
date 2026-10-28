@@ -878,7 +878,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                         </div>
 
                         <div className="mt-3 rounded-md border border-blue-300 bg-primary/10 p-3 text-xs text-primary">
-                          <strong>Nota:</strong> El almacén es obligatorio para este bien físico. Ubicación, lote y serie son opcionales.
+                          <strong>Nota:</strong> El almacén es obligatorio para este bien físico. Si el producto controla lote, indique lote y vencimiento; si no, ubicación, lote y serie son opcionales.
                         </div>
                       </>
                     ) : (

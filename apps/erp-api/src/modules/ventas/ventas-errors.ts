@@ -24,6 +24,9 @@ export function readUnavailable(subject: string): ServiceUnavailableException {
  * intención 409, permiso de dominio 403 e infraestructura 503 recuperable.
  */
 export function writerFailure(error: DbError, fallback: string): HttpException {
+  if (error?.message === 'SUPPLY_LINKED_ORDER_IMMUTABLE') {
+    return new BadRequestException('El pedido está vinculado a un contrato. Desvincúlelo mientras esté pendiente antes de modificar sus líneas.');
+  }
   const code = String(error?.code ?? '');
   const message = String(error?.message ?? '').trim();
   if (code === '23505') return new ConflictException(message || fallback);

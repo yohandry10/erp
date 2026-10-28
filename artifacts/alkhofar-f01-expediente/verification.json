@@ -1,0 +1,53 @@
+{
+  "feature": "ALKHOFAR F01: pedidos operativos y expediente privado",
+  "remoteWrites": false,
+  "productionOperations": false,
+  "acceptanceMatrixModified": false,
+  "requiredSchemaVersion": 573,
+  "api": {
+    "passed": true,
+    "tests": 93,
+    "suites": 6,
+    "log": "api-final.log",
+    "build": true
+  },
+  "web": {
+    "passed": true,
+    "browserTests": 5,
+    "log": "browser-confirmed.log",
+    "build": true,
+    "buildLog": "web-build-no-cache.log",
+    "buildCacheDisabledOnlyForVerification": true,
+    "typeCheck": true,
+    "programmaticLabels": 1033,
+    "offlinePolicy": true
+  },
+  "storage": {
+    "passed": true,
+    "scenarios": 4,
+    "log": "storage-real.json"
+  },
+  "concurrency": {
+    "passed": true,
+    "scenarios": 12,
+    "log": "concurrency.json",
+    "note": "Primer ensayo en Docker; repetición final nativa pendiente"
+  },
+  "sql": {
+    "log": "fresh-native-final.log",
+    "state": "En ejecución; verificadores 572/573 aprobados, históricos en curso"
+  },
+  "documentationContract": {
+    "passed": true,
+    "canonicalFiles": 6
+  },
+  "localCleanup": {
+    "nativeCluster": "Se detendrá tras verificar",
+    "dockerContainerIds": [
+      "bf3d7b2ff1a9ed0582c1853a1bbfad5c3c8f36bd1215ffb05c06414f5e906d26",
+      "6843ca28f02e8a105bffedc77d3dab6b4575d1c2ef7a0590506316327c851a74"
+    ],
+    "dockerStatus": "No responde; pendientes de limpieza"
+  },
+  "checkedAt": "2026-10-27T22:30:13.429Z"
+}

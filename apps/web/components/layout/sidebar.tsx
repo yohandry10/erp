@@ -160,6 +160,12 @@ const menuItems: MenuItem[] = [
         }
       },
       {
+        title: 'Lotes y vencimientos',
+        href: '/dashboard/inventario/lotes',
+        icon: Package,
+        permission: { modulo: 'inventario', accion: 'read', recurso: 'lotes' }
+      },
+      {
         title: 'Ajustes y transferencias',
         href: '/dashboard/inventario/operaciones',
         icon: FileSpreadsheet,
@@ -234,11 +240,6 @@ const menuItems: MenuItem[] = [
   {
     title: 'Ventas',
     icon: FileSpreadsheet,
-    permission: {
-      modulo: 'ventas',
-      accion: 'ver',
-      recurso: 'cotizaciones'
-    },
     submenu: [
       {
         title: 'Clientes',
@@ -269,6 +270,24 @@ const menuItems: MenuItem[] = [
           accion: 'ver',
           recurso: 'pedidos'
         }
+      },
+      {
+        title: 'Contratos de suministro',
+        href: '/dashboard/ventas/contratos',
+        icon: FileText,
+        permission: { modulo: 'ventas', accion: 'ver', recurso: 'contratos' }
+      },
+      {
+        // Sin permiso propio: cada usuario ve las alertas que le llegaron.
+        title: 'Alertas de suministro',
+        href: '/dashboard/alertas',
+        icon: CheckCircle
+      },
+      {
+        title: 'Tablero de suministro',
+        href: '/dashboard/tablero-suministro',
+        icon: FileSpreadsheet,
+        permission: { modulo: 'reports', accion: 'read', recurso: 'suministro' }
       },
       {
         title: 'Aprobaciones',

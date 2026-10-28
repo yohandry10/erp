@@ -1,0 +1,24 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "Concurrencia real de RPCs F01 en PostgreSQL 16 efímero",
+  "checks": [
+    {
+      "scenario": "Dos OC simultáneas de 60 contra contrato de 100: sólo una confirma, sin cabecera huérfana",
+      "passed": true
+    },
+    {
+      "scenario": "Cuatro reintentos concurrentes confirman una sola entrega y un solo historial",
+      "passed": true
+    },
+    {
+      "scenario": "Dos reprogramaciones sobre versión 1: una confirma, otra devuelve conflicto; fecha original intacta",
+      "passed": true
+    },
+    {
+      "scenario": "Programaciones concurrentes consumen el remanente una sola vez y no exceden la OC",
+      "passed": true
+    }
+  ],
+  "checkedAt": "2026-10-27T18:33:57.172Z"
+}

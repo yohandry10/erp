@@ -5,6 +5,7 @@ import { AuditService } from '../../audit/audit.service';
 import { CacheInvalidationService } from '../../../shared/cache/cache-invalidation.service';
 import { appendIntegrationLog } from '../../../shared/utils/integration-log';
 import { isNotFoundError, readUnavailable } from '../compras-errors';
+import { mensajeErrorLote } from '../../inventario/inventario-errors';
 
 @Injectable()
 export class RecepcionesService {
@@ -415,7 +416,9 @@ export class RecepcionesService {
         });
 
       if (rpcError) {
-        throw new BadRequestException(`Error al cerrar recepción: ${rpcError.message}`);
+        throw new BadRequestException(
+          mensajeErrorLote(rpcError.message) ?? `Error al cerrar recepción: ${rpcError.message}`,
+        );
       }
 
       const movimientosCreados = ((rpcResult as any)?.movimientos ?? []) as Array<{

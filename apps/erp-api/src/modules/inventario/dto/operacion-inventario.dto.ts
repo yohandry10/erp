@@ -39,6 +39,17 @@ export class RegistrarAjusteInventarioDto {
   @MaxLength(500)
   motivo!: string;
 
+  /** Obligatorio para productos con control de lote (574). */
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  lote?: string;
+
+  @IsOptional()
+  @IsDateString()
+  fecha_expiracion?: string;
+
   @IsString()
   @MinLength(8)
   @MaxLength(180)

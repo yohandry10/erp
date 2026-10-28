@@ -18,6 +18,7 @@ import CpeA4PreviewModal from '@/components/cpe/CpeA4PreviewModal'
 import { Button } from '@/components/ui/button'
 import { Eye } from 'lucide-react'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { SupplyOrderOrigin } from '@/components/ventas/SupplyOrderOrigin'
 
 const ESTADO_COLORS: Record<EstadoPedido, { bg: string; text: string }> = {
   [EstadoPedido.PENDIENTE]: { bg: '#fef3c7', text: '#92400e' },
@@ -364,6 +365,8 @@ export default function PedidoDetailPage() {
           </Button>
         </div>
       )}
+
+      <SupplyOrderOrigin pedidoId={pedido.id} estado={pedido.estado} />
 
       {/* Cliente Info */}
       <div className="p-6 shadow border">
