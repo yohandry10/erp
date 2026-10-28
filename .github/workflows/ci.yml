@@ -189,7 +189,7 @@ jobs:
           --health-retries 20
     env:
       E2E_EPHEMERAL_LOCAL_DB: "1"
-      REQUIRED_DATABASE_SCHEMA_VERSION: "579"
+      REQUIRED_DATABASE_SCHEMA_VERSION: "581"
       PGPASSWORD: postgres
       PGHOST: 127.0.0.1
       PGPORT: 5442
@@ -214,6 +214,14 @@ jobs:
 
       - name: Rebuild and verify the required database contract
         run: node scripts/ci/verify-database-contracts.mjs
+
+      - name: Verify FOX migration tooling
+        run: node --test scripts/fox/fox.test.mjs
+
+      - name: Verify tenant data export
+        env:
+          PSQL_BIN: psql
+        run: node scripts/datos/test-exportar-tenant-local.mjs
 
       - name: Database contract summary
         if: always()
@@ -284,6 +292,8 @@ jobs:
         run: pnpm --filter @erp-suite/web exec playwright install --with-deps chromium
       - name: Verify company logo API, browser and Storage
         run: node scripts/ci/run-peru-company-storage-local.mjs --browser
+      - name: Verify Storage backup and restore
+        run: node scripts/ci/test-storage-backup-local.mjs
       - name: Preserve selected local evidence
         if: always()
         uses: actions/upload-artifact@v4

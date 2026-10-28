@@ -182,6 +182,16 @@ conservan el fallo cerrado por falta de handler.
 - Integraciones externas usan adaptadores y fallan cerrado en operaciones
   fiscales o financieras.
 
+Migración desde FOX (580): sustitución con fecha de corte, no convivencia. FOX
+no expone una API transaccional y mantener ambos sistemas exigiría definir
+dueño por dato, dirección de intercambio y resolución de conflictos sobre
+saldos que cambian a diario. Se migran saldos abiertos por los writers vigentes
+(contratos 570 e inventario) y la historia queda consultable en FOX. Cada
+registro de origen se enlaza a su par del ERP con la huella de su contenido;
+un reintento idéntico no duplica y un cambio en el origen se rechaza. El
+ensayo completo corre en la base y se revierte, de modo que puede repetirse
+sin escribir.
+
 ## Reglas para cambios arquitectónicos
 
 1. Buscar primero el contrato existente en código y pruebas.

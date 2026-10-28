@@ -308,6 +308,74 @@ dashboard con navegador y API reales. Sus resultados y capturas quedan en
 `module-survey/` dentro de la evidencia del ensayo; no acreditan todas las
 operaciones de cada módulo ni las páginas que requieren un identificador.
 
+## Respaldo, recuperación y devolución de datos
+
+Alcance del respaldo productivo:
+
+- Base: `scripts/backup-peru-prod.mjs` (public, app, auth, storage y
+  supabase_migrations; sin roles globales).
+- Archivos: `node scripts/datos/respaldar-storage.mjs --env-file .env.production`
+  descarga, sólo lectura, todos los buckets y objetos de Storage con su
+  configuración y un manifiesto SHA-256 en `artifacts/storage-backups/`
+  (ignorada por Git); el informe sin datos queda en
+  `artifacts/storage-backup-<run>.json`.
+- Configuración: `render.yaml`, migraciones y código están en Git; los
+  secretos viven en Render, Vercel y `.env.production` fuera del repositorio,
+  y su custodia es del responsable de la cuenta. Los certificados digitales
+  que guarda la aplicación viajan con el respaldo de la base.
+
+Objetivos propuestos, pendientes de aprobación de ALKHOFAR en la implantación:
+respaldo diario de base y archivos (RPO 24 horas; menor sólo con PITR del
+proveedor, que no está contratado), restauración completa en un proyecto
+nuevo en 8 horas (RTO) y retención de 35 copias diarias y 12 mensuales,
+cifradas y fuera del proveedor. El RTO de PROD no está acreditado: los ensayos
+miden volúmenes locales.
+
+Ensayos locales:
+
+- `pnpm test:storage-backup` levanta dos Storage efímeros en Docker, respalda,
+  rechaza un respaldo alterado, restaura una empresa y luego todo, verifica
+  cada objeto por SHA-256 y rechaza destinos remotos.
+  `scripts/datos/restaurar-storage.mjs` sólo escribe en Storage local:
+  recuperar PROD sigue el procedimiento de operaciones destructivas.
+- `pnpm test:tenant-export` (base efímera) exporta una empresa y comprueba que
+  no aparecen datos de otra, que los conteos salen de la misma instantánea y
+  que los secretos van vacíos.
+- La restauración de la base se ensaya con `scripts/rehearse-peru-prod-local.mjs`.
+
+Devolución al terminar el servicio: `node scripts/datos/exportar-tenant.mjs
+--tenant <uuid> --env-file .env.production --pg-bin <PostgreSQL 17> --con-archivos`
+genera en `artifacts/exportaciones/` un CSV por tabla de la empresa (las 280
+con `tenant_id` y las hijas por clave foránea obligatoria), sus archivos de
+Storage y un manifiesto con conteos y SHA-256, desde una instantánea de sólo
+lectura. Las columnas de credenciales y secretos se entregan vacías. Borrar
+la empresa después de confirmar la entrega exige autorización explícita y el
+procedimiento de operaciones destructivas.
+
+## Migración desde FOX
+
+1. Perfil del extracto, sólo lectura: `node scripts/fox/perfilar-fox.mjs <carpeta>`
+   lee tablas FoxPro/Visual FoxPro (.dbf con memo .fpt) y CSV y escribe
+   `perfil-fox.json` y `perfil-fox.md`: formato y página de códigos, volumen y
+   borrados, campos, vacíos, claves candidatas, rango histórico y alertas. Si el
+   byte de página de códigos no es confiable, forzar `--codificacion cp850`.
+2. Mapeo: copiar `scripts/fox/mapeo-fox.ejemplo.json` y reemplazar tablas,
+   uniones, filtros y campos por los del perfil, incluidos los UUID de almacén y
+   sucursal del ERP.
+3. Transformación: `node scripts/fox/transformar-fox.mjs <mapeo> <extracto> <salida>`
+   produce las cuatro plantillas, `control.json` (totales con las reglas de la
+   conciliación) y `extracto.json` (filas leídas, descartadas y por qué).
+4. Ensayo: en `/dashboard/migracion-fox`, adjuntar las plantillas y
+   `control.json`. Corre en la base y se revierte; repetir hasta cero errores y
+   conciliación cuadrada.
+5. Importación en orden (clientes y productos, contratos, OC, cronograma,
+   stock) y conciliación con el mismo `control.json`. Un reintento con los
+   mismos archivos no duplica.
+
+El extracto y sus salidas pueden contener datos del cliente: se procesan fuera
+del repositorio y no se versionan. `pnpm test:fox` prueba las herramientas con
+tablas sintéticas.
+
 ## Operaciones destructivas en PROD
 
 Requisitos obligatorios:

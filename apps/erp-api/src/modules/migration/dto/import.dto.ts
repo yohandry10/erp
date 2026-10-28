@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsIn, MaxLength, IsDateString, IsNumber, Min, IsBoolean } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsIn, MaxLength, IsDateString, IsNumber, Min, IsBoolean, IsObject } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export const MIGRATION_RUN_TYPES = [
@@ -12,6 +12,9 @@ export const MIGRATION_RUN_TYPES = [
   'balance_apertura',
   'stock_inicial',
   'comprobantes_historico',
+  'contratos_suministro',
+  'oc_suministro',
+  'cronograma_suministro',
 ] as const;
 
 export type MigrationRunType = (typeof MIGRATION_RUN_TYPES)[number];
@@ -24,6 +27,9 @@ export const MIGRATION_IMPORTER_RUN_TYPES = [
   'balance_apertura',
   'stock_inicial',
   'comprobantes_historico',
+  'contratos_suministro',
+  'oc_suministro',
+  'cronograma_suministro',
 ] as const satisfies readonly MigrationRunType[];
 
 export type MigrationImporterRunType = (typeof MIGRATION_IMPORTER_RUN_TYPES)[number];
@@ -70,6 +76,23 @@ export class MigrationPreviewDto {
   @IsNotEmpty()
   @IsIn(MIGRATION_IMPORTER_RUN_TYPES as unknown as string[])
   runType: MigrationImporterRunType;
+}
+
+/** Ensayo FOX completo: archivos CSV en base64; nada se escribe. */
+export class FoxEnsayoDto {
+  @IsOptional() @IsString() @MaxLength(20 * 1024 * 1024) contratos?: string;
+  @IsOptional() @IsString() @MaxLength(20 * 1024 * 1024) oc?: string;
+  @IsOptional() @IsString() @MaxLength(20 * 1024 * 1024) cronograma?: string;
+  @IsOptional() @IsString() @MaxLength(20 * 1024 * 1024) stock?: string;
+  @ApiProperty({ description: 'Fecha de corte del stock inicial (YYYY-MM-DD)', required: false })
+  @IsOptional() @IsDateString() fechaCorte?: string;
+  @ApiProperty({ description: 'Totales de control del extracto FOX por entidad', required: false })
+  @IsOptional() @IsObject() control?: Record<string, unknown>;
+}
+
+export class FoxConciliacionDto {
+  @ApiProperty({ description: 'Totales de control del extracto FOX por entidad' })
+  @IsObject() control!: Record<string, unknown>;
 }
 
 export interface ImporterRowError {

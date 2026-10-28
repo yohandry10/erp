@@ -295,7 +295,7 @@ const assert = (condition, message) => {
   }
   assert((await mod.listOfflineRequests()).length === queueBeforeSensitiveAttempts, 'Las decisiones por lote offline no deben entrar al outbox')
 
-  for (const [method, endpoint] of [['POST', '/api/reportes/suministro/cortes'], ['POST', '/api/integraciones/bi/credenciales'], ['POST', '/api/integraciones/bi/credenciales/cred-1/revocar']]) {
+  for (const [method, endpoint] of [['POST', '/api/reportes/suministro/cortes'], ['POST', '/api/integraciones/bi/credenciales'], ['POST', '/api/integraciones/bi/credenciales/cred-1/revocar'], ['POST', '/api/migration/contratos-suministro/import'], ['POST', '/api/migration/fox/ensayo']]) {
     let rejected = false
     try {
       await mod.fetchWithOfflineSupport('http://api.test' + endpoint,

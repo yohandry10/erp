@@ -1,0 +1,34 @@
+{
+  "alcance": "Suministro ALKHOFAR F08-F10: migración FOX (580), perfiles y segregación (581), respaldo de Storage, exportación integral y capacitación por función",
+  "fecha": "2026-10-28",
+  "entorno": "Sólo infraestructura local efímera; nada se aplicó en PROD",
+  "sql": {
+    "comando": "E2E_EPHEMERAL_LOCAL_DB=1 REQUIRED_DATABASE_SCHEMA_VERSION=581 node scripts/ci/verify-database-contracts.mjs",
+    "resultado": "OK: 577 migraciones hasta 581, 90 verificadores vigentes y 67 históricos",
+    "verificadores_nuevos": [
+      "580: saldos abiertos FOX, correspondencias e idempotencia, errores por registro, ensayo revertido sin persistencia, lotes y vencimientos, conciliación, sin efectos operativos ni contables, permisos y aislamiento",
+      "581: perfil SUMINISTRO exacto, segregación por rol y en uso, auditoría de decisiones y barrido de aislamiento sobre 27 RPC de suministro"
+    ],
+    "ajuste_historico": "554 exige al menos los 14 permisos migration.* originales y ADMIN con todos (580 añadió migration.suministro.import)"
+  },
+  "api": {
+    "jest": "89 suites, 1070 pruebas aprobadas (inventario, ventas, compras, cpe, alertas, tableros, permisos, rutas, logística y migración)",
+    "tipos": "tsc --noEmit sin errores"
+  },
+  "web": {
+    "tipos": "tsc --noEmit sin errores",
+    "offline": "verify-offline-store aprobado; migración, cortes y credenciales BI nunca se encolan",
+    "playwright": "28 aprobadas con dobles locales: lotes, contratos, expediente, entregas, estado de cuenta, alertas, penalidades, tablero, migración FOX y capacitación"
+  },
+  "fox": "node --test scripts/fox/fox.test.mjs: 4 aprobadas con tablas Visual FoxPro sintéticas (CP850, memo FPT, moneda, fecha-hora, borrados)",
+  "storage": "artifacts/alkhofar-f09-recuperacion/storage-restore-local.json: respaldo, respaldo alterado rechazado, restauración por empresa y completa verificadas por SHA-256, destino remoto rechazado (Docker efímero)",
+  "exportacion": "artifacts/alkhofar-f09-recuperacion/exportacion-tenant-local.json: 282 tablas de una empresa sin filas de otra, conteos de una instantánea, hashes y secretos vacíos",
+  "documentos": "scripts/check-docs-contract.mjs: 6 archivos canónicos, sin subdirectorios",
+  "no_verificado": [
+    "Promoción de 570-581 a PROD",
+    "Extracto FOX real (sólo tablas sintéticas)",
+    "RTO de PROD y respaldo de Storage contra el proyecto real",
+    "Piloto y aceptación con usuarios de ALKHOFAR",
+    "Anexos comerciales: equipo, licencias, costos, exclusiones y SLA"
+  ]
+}
