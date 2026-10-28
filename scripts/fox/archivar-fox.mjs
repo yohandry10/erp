@@ -15,7 +15,8 @@ import { leerTabla } from './fox-dbf.mjs';
 
 const NOMBRE_TABLA = /^[A-Za-z0-9_.$-]{1,80}$/;
 // Credenciales y medios de pago del FOX no se archivan: el archivo lo leen auditoría y gerencia.
-export const CAMPO_SENSIBLE = /^(clave|claves|pass|passw|password|pwd|contras|contrasena|pin|token|secreto|cvv|tarjeta|nrotarj|numtarj)/i;
+// Misma regla que app.campo_sensible_582, que la aplica también en la base.
+export const CAMPO_SENSIBLE = /(pass|pwd|clave|contras|secret|token|cvv|tarj|ccnum)|(^|_)(pin|key|apikey)(_|$)/i;
 const MAX_TANDA = 2000;
 
 /** Columnas que se redactan en el archivo. */
