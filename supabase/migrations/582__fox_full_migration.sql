@@ -178,7 +178,10 @@ BEGIN
   IF p_tabla IS NULL OR p_tabla !~ '^[A-Za-z0-9_.$-]{1,80}$' OR jsonb_typeof(p_filas) IS DISTINCT FROM 'array'
      OR jsonb_array_length(p_filas) NOT BETWEEN 1 AND 2000
      OR EXISTS (SELECT 1 FROM jsonb_array_elements(p_filas) x
-       WHERE jsonb_typeof(x->'fila') IS DISTINCT FROM 'object' OR length(coalesce(x->>'clave', '')) NOT BETWEEN 1 AND 250) THEN
+       WHERE jsonb_typeof(x->'fila') IS DISTINCT FROM 'object' OR length(coalesce(x->>'clave', '')) NOT BETWEEN 1 AND 250)
+     -- Una fila de FOX es plana: un valor anidado escondería claves de la redacción.
+     OR EXISTS (SELECT 1 FROM jsonb_array_elements(p_filas) x, jsonb_each(x->'fila') c
+       WHERE jsonb_typeof(x->'fila') = 'object' AND jsonb_typeof(c.value) NOT IN ('string', 'number', 'boolean', 'null')) THEN
     RAISE EXCEPTION 'MIGRATION_ARCHIVE_INPUT_INVALID' USING ERRCODE = '22023';
   END IF;
   IF to_regclass('pg_temp.archivo_tanda_582') IS NULL THEN

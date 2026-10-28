@@ -10,7 +10,7 @@ import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { FoxArchivoCierreDto, FoxArchivoConsultaDto, FoxArchivoDescarteDto, FoxArchivoFilasDto, FoxArchivoLoteDto } from './dto/import.dto';
 
 const MENSAJES: Record<string, string> = {
-  MIGRATION_ARCHIVE_INPUT_INVALID: 'Revise el lote: tabla, claves (1 a 250 caracteres) y filas (1 a 2000 objetos).',
+  MIGRATION_ARCHIVE_INPUT_INVALID: 'Revise el lote: tabla, claves (1 a 250 caracteres) y filas (1 a 2000 objetos planos, con valores simples).',
   MIGRATION_ARCHIVE_DUPLICATE_KEY: 'La tanda repite una clave de la misma tabla.',
   MIGRATION_ARCHIVE_ROW_CHANGED: 'Una fila ya archivada llegó con otro contenido: el extracto cambió durante la carga.',
   MIGRATION_ARCHIVE_COUNT_MISMATCH: 'Lo cargado no coincide con lo declarado por tabla; el lote sigue abierto.',
