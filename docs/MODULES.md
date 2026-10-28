@@ -5,6 +5,170 @@ exactos se consultan en código, OpenAPI y migraciones.
 
 ## Ventas
 
+### Contratos de suministro y OC del cliente
+
+La feature F01 para ALKHOFAR vive en `/dashboard/ventas/contratos`
+y `ventas/contratos` del API. Requiere las migraciones 570–573; su presencia en la
+rama no acredita promoción ni disponibilidad en producción. Este desarrollo
+se gestiona como feature independiente de la matriz de aceptación existente.
+
+- El contrato conserva cliente, moneda, vigencia, responsable y líneas con
+  producto, unidad, cantidad y precio unitario sin impuestos. Código,
+  descripción y unidad se congelan desde el maestro. La edición directa y la
+  anulación del contrato sólo operan en borrador. Un contrato activo admite
+  adendas con referencia, motivo y versión: asunto, fin de vigencia, responsable,
+  observaciones, cantidades, precios y productos adicionales. Cliente, número,
+  moneda e inicio de vigencia permanecen fijos. Las cantidades no pueden bajar
+  de lo asignado a OC vigentes; la vigencia debe cubrir sus fechas y las entregas
+  programadas vigentes. Las líneas con OC históricas se conservan. Registrar una
+  adenda no firma ni aprueba legalmente el documento asociado.
+- Una OC recibida del cliente pertenece a un contrato activo y distribuye sus
+  cantidades por línea. No se confunde con una OC emitida a proveedores. La
+  modificación exige referencia, motivo y versión, mantiene las identidades de
+  sus líneas y no reduce cantidades por debajo de lo programado. Una línea con
+  entregas históricas, incluso anuladas, debe conservarse. La anulación exige
+  cancelar primero todas sus programaciones vigentes; conserva la OC y libera
+  sus cantidades para nuevas órdenes. No se programan OC anuladas.
+- Cada línea de OC congela el precio unitario del contrato al incorporarse.
+  Las adendas no revalorizan OC anteriores y modificar la cantidad de una línea
+  conserva su precio. Las líneas nuevas toman el precio contractual vigente.
+  El historial registra referencia, motivo, actor y valores anteriores y nuevos;
+  una misma referencia no puede duplicar la misma clase de revisión del recurso.
+- Cada línea de OC admite varias entregas programadas con cantidad, fecha y
+  destino. La suma de OC no supera la línea contratada y la suma programada
+  vigente no supera la línea de OC. Todas las escrituras se serializan por
+  contrato para preservar estos límites frente a concurrencia.
+- Reprogramar exige versión vigente y motivo; mantiene fecha original, fecha
+  anterior, destino, actor e historial. Anular una programación exige motivo
+  y libera su cantidad programable. Las fechas deben estar dentro de la
+  vigencia y no preceder la emisión de la OC. No se interpreta una programación
+  como reserva física, despacho, conformidad ni facturación.
+- Las RPCs de consulta y escritura comprueban usuario activo, tenant y permisos
+  `ventas.contratos.ver/gestionar`. Las diez tablas permanecen privadas, con
+  RLS forzado y sin lectura o DML directo para roles de aplicación. Permisos
+  iniciales: ADMIN, ADMIN_DEMO y GERENCIA consultan y gestionan; VENDEDOR,
+  AUDITOR y CONTADOR sólo consultan. Las concesiones existentes no se reescriben.
+- Cada escritura exige Idempotency-Key: mismo actor y contenido recuperan el
+  resultado; otra intención devuelve conflicto. Cambio de versión responde
+  409, recurso ajeno 404 y servicio indisponible 503. Historial y auditoría se
+  confirman junto con la operación. Las mutaciones requieren conexión y no
+  entran en la cola offline; ante respuesta incierta la pantalla conserva
+  solicitud y clave para reintentar mientras permanece abierta.
+- Un pedido pendiente del mismo cliente y moneda se vincula completo a un
+  contrato: cada línea se asigna a una programación con producto y precio de OC
+  coincidentes. Varias parcialidades pueden consumir una programación sin
+  excederla. Un snapshot del pedido evita confirmar una selección obsoleta.
+  Consultar exige también `ventas.pedidos.ver`; vincular o desvincular requiere
+  además `ventas.pedidos.editar` y `ventas.contratos.gestionar`.
+- Los pedidos vinculados conservan líneas, cliente, moneda, número y totales;
+  las programaciones con pedidos vigentes no se modifican ni anulan. Se puede
+  desvincular mientras el pedido siga pendiente. Confirmación, reservas, despacho,
+  facturación y cancelación usan sus writers operativos existentes. Cancelar
+  libera la asignación contractual y conserva el vínculo histórico; no permite
+  reactivar el pedido cancelado. El expediente muestra contadores operativos,
+  y la ficha del pedido permite volver a su contrato, OC y programación.
+- Los adjuntos privados se asocian a contrato, OC o adenda: PDF, DOCX sin macros,
+  PNG y JPG, hasta 10 MiB, con validación de contenido, tamaño y extensión. Una
+  reserva durable precede a la subida sin sobrescritura; confirmar exige objeto
+  almacenado. Reintentos recuperan el mismo objeto y verifican su huella si ya
+  existe. Ningún adjunto pendiente se ofrece como confirmado.
+- El bucket `supply-contract-files` es privado y una política restrictiva impide
+  acceso directo anónimo/autenticado. Descargar exige lectura del expediente y
+  emite un enlace válido por 60 segundos. Retirar exige motivo, conserva objeto
+  e historial y bloquea nuevos enlaces; los ya emitidos vencen normalmente.
+  El retiro no es borrado físico ni un servicio de retención/exportación F09.
+- Entregas y conformidades (F03, migración 575): la recepción del cliente se
+  registra por pedido vinculado, con líneas por despacho y lote: recibido,
+  aceptado y rechazado (con motivo), fecha, receptor, guía, PECOSA, número de
+  conformidad e incidencias. Lo recibido acumulado no supera lo despachado de
+  cada lote y la fecha no es futura ni anterior al despacho. Sólo lo aceptado
+  cuenta como cumplido: marcar el tracking como entregado no acredita
+  conformidad. Lo rechazado vuelve a quedar por aceptar y libera saldo de la
+  programación para vincular un pedido de reposición; la devolución física del
+  rechazo sigue el flujo RMA. Anular una recepción exige versión y motivo, la
+  conserva en el historial y se rechaza si su rechazo ya fue repuesto. Un
+  despacho con aceptación registrada no se anula cancelando el pedido.
+- Registrar recepciones requiere `ventas.contratos.conformar` (ADMIN,
+  ADMIN_DEMO, GERENCIA y ALMACEN; ALMACEN también consulta contratos). Ese
+  permiso adjunta guía, PECOSA o conformidad firmada a la recepción sin
+  gestionar el contrato. La siembra de roles de empresas nuevas ya no concede a
+  VENDEDOR gestionar contratos ni conformar por el patrón genérico de ventas.
+- El ERP no emite PECOSAS: registra su número y su documento.
+- Facturación y conciliación (F04, migración 576): cada pedido vinculado se
+  factura una sola vez con el writer de pedidos, su CxC, sus cobros y notas;
+  facturar por entrega es facturar el pedido de esa entrega, y cada línea de
+  pedido pertenece a una sola programación. El contrato define su base de
+  facturación con versión y motivo: por despacho completo (actual) o contra
+  conformidad, que impide asignar comprobante a un pedido vinculado mientras
+  lo aceptado no cubra todas sus líneas. Facturar por hito queda pendiente de
+  definición con el cliente.
+- El estado de cuenta contractual muestra por línea contratado, en OC,
+  programado, en pedidos, despachado, aceptado, facturado y por facturar a
+  precio de OC sin impuestos, y por comprobante total, notas de crédito,
+  cobrado y saldo de la CxC, con totales por moneda. Señala el comprobante cuyo
+  total menos notas y cobros no coincide con el saldo de la CxC. No crea
+  efectos contables ni de inventario: lee los documentos existentes.
+- Alertas de suministro (F05, migración 577) en `/dashboard/alertas`: una regla
+  por tipo y empresa para entregas próximas sin despachar, atrasadas o
+  incompletas (rechazo o aceptación parcial), lotes con stock por vencer o
+  vencidos y cobranza contractual por vencer o vencida. Cada regla define
+  anticipación, destinatarios, responsable del contrato, escalamiento (días y
+  a quién) y correo. La evaluación corre cada hora para las empresas con reglas
+  activas y bajo demanda; serializa por empresa y mantiene una sola alerta
+  abierta por condición, sin duplicar avisos ni correos al reintentarse. Si
+  la condición desaparece se resuelve (superada, reprogramada o regla
+  desactivada) y una reprogramación abre la alerta de la nueva fecha,
+  conservando ambas. Cada destinatario recibe una notificación personal y
+  reconoce por sí mismo; sólo se escala una vez si nadie reconoce a tiempo.
+  El correo se encola en el outbox (`email.send`); enviarlo exige el servicio
+  de correo productivo configurado y comprobado. Las propias se consultan sin
+  permiso especial; ver todas exige `alertas.suministro.ver` y configurar
+  `alertas.suministro.gestionar`. `ALERTAS_SUMINISTRO_CRON=off` apaga la tarea.
+- Penalidades contractuales (F06, migración 578) en la sección Penalidades del
+  expediente: reglas por contrato con método (mora 0.10 × base / (F × plazo),
+  porcentaje diario, importe diario o único), base (valor de la entrega o lo
+  no aceptado al límite), plazo fijo o de la OC a la entrega, tolerancia, días
+  calendario o hábiles (lunes a viernes, sin feriados) y tope porcentual sobre
+  el contrato o la entrega, descontando lo ya aprobado del mismo grupo de
+  reglas. Editar crea una versión nueva y la anterior queda reemplazada; las
+  versiones no se modifican. Los días excluidos (ampliaciones de plazo) se
+  registran por entrega, para todas las reglas o una. Calcular a una fecha de
+  corte (nunca futura) guarda una instantánea inmutable por versión de regla,
+  entrega y corte con sus entradas y la explicación del cálculo; repetir el
+  corte no duplica. El atraso cuenta desde la fecha programada más la
+  tolerancia hasta la recepción que completa lo aceptado, o hasta el corte.
+  La revisión (en revisión, observado, controversia, descartado, aprobado) es
+  un historial aparte; aprobar exige otra persona que quien calculó y un monto
+  entre 0 y el estimado, y no genera asientos, notas ni descuentos en la
+  cobranza. Permisos `ventas.penalidades.ver`, `ventas.penalidades.gestionar`
+  (reglas, excepciones y cálculo) y `ventas.penalidades.aprobar`.
+- Tablero de suministro (F07, migración 579) en `/dashboard/tablero-suministro`:
+  cumplimiento por OC, entregas a tiempo y completas (aceptación total hasta la
+  fecha programada vigente), atrasos, cobertura de stock (stock no vencido
+  frente a lo pendiente de despachar en 30 días), lotes vencidos y por vencer
+  (90 días, con la política de vida útil), por facturar, cobranza y
+  penalidades (último corte de 578). Cada indicador abre su detalle y cada fila
+  enlaza al expediente del contrato o a Lotes. Filtros por contrato, cliente y
+  rango de fecha (programada, de OC o de emisión). Un corte es la instantánea
+  inmutable de todos los conjuntos de la empresa con su hash SHA-256: exportar
+  registra un corte y descarga su Excel (hoja de corte con hash y filtros,
+  resumen y un detalle por conjunto); una tarea horaria registra un corte
+  automático por día para empresas con contratos activos
+  (`TABLEROS_SUMINISTRO_CRON=off` la apaga). La pantalla, el Excel y Power BI
+  leen el mismo corte y concilian por construcción. Cada conjunto exige el
+  permiso de su módulo origen (contratos, lotes, CxC, penalidades); el tablero
+  exige `reports.suministro.read` y exportar `reports.suministro.export`.
+- Power BI lee `GET /api/bi/v1/suministro/{conjunto}/?corte=ultimo|<id>` con
+  `Authorization: Bearer erpbi_…`: credencial de lectura de la empresa, no de un
+  usuario, creada con `integraciones.bi.gestionar` (sólo ADMIN), limitada a los
+  conjuntos que su creador puede ver, con vencimiento de hasta un año y
+  revocable. El token se muestra una sola vez y la base guarda su hash. Cada
+  lectura, también las rechazadas, queda registrada con corte, hash, filas y
+  origen; cada fila lleva `corte_id` y `fecha_corte`.
+
+Código: `apps/erp-api/src/modules/ventas/contratos`,
+`apps/web/app/dashboard/ventas/contratos`.
+
 Clientes y Proveedores permiten importar CSV UTF-8 desde sus listados: plantilla,
 vista previa sin escritura, validación por registro y confirmación explícita.
 El importador masivo valida documentos peruanos y requiere los permisos
@@ -603,6 +767,29 @@ Código principal: `apps/erp-api/src/modules/compras`.
   anterior en limpieza segura; quitarla despeja primero la referencia visible y
   luego confirma el borrado del objeto. Reintentar completa la misma operación
   sin duplicar metadata ni aceptar otra huella.
+
+- Lotes y vencimientos (F02, migración 574): un producto puede activar control
+  de lote con vencimiento obligatorio y vida útil mínima. Activarlo exige que
+  no haya reservas y el stock existente queda sin lote, visible y pendiente de
+  regularización explícita con motivo; la regularización no mueve el kardex
+  físico. Desactivarlo exige que no haya stock ni reservas por lote.
+- Con control de lote, el writer único reparte cada movimiento entre saldos
+  por lote y ubicación y deja el detalle en un ledger por lote. Por almacén,
+  la suma por lote nunca supera el físico y lo reservado por lote coincide con
+  lo reservado. El stock sin lote no se reserva ni despacha. Los productos sin
+  política conservan el comportamiento previo.
+- Recepción y ajuste manual exigen lote. Reservas y salidas sin lote indicado
+  eligen FEFO entre lotes vigentes con la vida útil mínima medida contra la
+  entrega programada del contrato (o hoy). Ajustes, transferencias y
+  devoluciones pueden mover lotes vencidos. El despacho libera y descuenta
+  exactamente los lotes reservados por el pedido; anulaciones, RMA,
+  transferencias y notas de crédito con un único lote de origen vuelven a ese
+  lote, y lo no atribuible queda sin lote. Una liberación sin documento de
+  referencia se rechaza.
+- La reserva de un pedido puede reasignarse o dividirse entre lotes con
+  motivo, conservando la cantidad. `/dashboard/inventario/lotes` muestra
+  saldos, reservas por documento, stock sin lote, kardex por lote y lotes por
+  vencer. Permisos `inventario.lotes.read` y `inventario.lotes.manage`.
 
 Código principal: `apps/erp-api/src/modules/inventario`,
 `apps/erp-api/src/modules/logistica`.

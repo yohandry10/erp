@@ -1,0 +1,222 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - complementary [ref=e5]:
+          - link "N NEON ERP SUITE" [ref=e7] [cursor=pointer]:
+            - /url: /dashboard/
+            - generic [ref=e8]: "N"
+            - generic [ref=e9]:
+              - generic [ref=e10]: NEON
+              - generic [ref=e11]: ERP SUITE
+          - navigation [ref=e12]:
+            - link "Dashboard" [ref=e13] [cursor=pointer]:
+              - /url: /dashboard/
+              - img [ref=e14]
+              - generic [ref=e19]: Dashboard
+            - link "POS" [ref=e20] [cursor=pointer]:
+              - /url: /dashboard/pos/
+              - img [ref=e21]
+              - generic [ref=e25]: POS
+            - link "Documentos" [ref=e26] [cursor=pointer]:
+              - /url: /dashboard/documentos/
+              - img [ref=e27]
+              - generic [ref=e30]: Documentos
+            - link "Contabilidad" [ref=e31] [cursor=pointer]:
+              - /url: /dashboard/contabilidad/
+              - img [ref=e32]
+              - generic [ref=e35]: Contabilidad
+            - link "Analytics" [ref=e36] [cursor=pointer]:
+              - /url: /dashboard/analytics/
+              - img [ref=e37]
+              - generic [ref=e40]: Analytics
+            - button "Productos" [ref=e42] [cursor=pointer]:
+              - generic [ref=e43]:
+                - img [ref=e44]
+                - generic [ref=e48]: Productos
+              - img [ref=e49]
+            - link "CPE" [ref=e51] [cursor=pointer]:
+              - /url: /dashboard/cpe/
+              - img [ref=e52]
+              - generic [ref=e55]: CPE
+            - link "GRE" [ref=e56] [cursor=pointer]:
+              - /url: /dashboard/gre/
+              - img [ref=e57]
+              - generic [ref=e62]: GRE
+            - link "Reportes SIRE" [ref=e63] [cursor=pointer]:
+              - /url: /dashboard/sire/
+              - img [ref=e64]
+              - generic [ref=e67]: Reportes SIRE
+            - link "Compras" [ref=e68] [cursor=pointer]:
+              - /url: /dashboard/compras/
+              - img [ref=e69]
+              - generic [ref=e73]: Compras
+            - button "Ventas" [ref=e75] [cursor=pointer]:
+              - generic [ref=e76]:
+                - img [ref=e77]
+                - generic [ref=e80]: Ventas
+              - img [ref=e81]
+            - button "Finanzas" [ref=e84] [cursor=pointer]:
+              - generic [ref=e85]:
+                - img [ref=e86]
+                - generic [ref=e88]: Finanzas
+              - img [ref=e89]
+            - link "Usuarios" [ref=e91] [cursor=pointer]:
+              - /url: /dashboard/usuarios/
+              - img [ref=e92]
+              - generic [ref=e97]: Usuarios
+            - link "RRHH" [ref=e98] [cursor=pointer]:
+              - /url: /dashboard/rrhh/
+              - img [ref=e99]
+              - generic [ref=e104]: RRHH
+            - link "PLAME / T-Registro" [ref=e105] [cursor=pointer]:
+              - /url: /dashboard/rrhh/planilla-electronica/
+              - img [ref=e106]
+              - generic [ref=e109]: PLAME / T-Registro
+            - link "Liquidaciones y CTS" [ref=e110] [cursor=pointer]:
+              - /url: /dashboard/rrhh/liquidaciones/
+              - img [ref=e111]
+              - generic [ref=e114]: Liquidaciones y CTS
+            - link "Configuración" [ref=e115] [cursor=pointer]:
+              - /url: /dashboard/configuracion/
+              - img [ref=e116]
+              - generic [ref=e119]: Configuración
+            - link "Offline" [ref=e120] [cursor=pointer]:
+              - /url: /dashboard/offline/
+              - img [ref=e121]
+              - generic [ref=e128]: Offline
+            - link "Ayuda" [ref=e129] [cursor=pointer]:
+              - /url: /dashboard/ayuda/
+              - img [ref=e130]
+              - generic [ref=e133]: Ayuda
+          - generic [ref=e134]:
+            - generic [ref=e135]:
+              - generic [ref=e136]: Responsable
+              - generic [ref=e137]: supply-feature@erp.local
+            - button "Cerrar Sesión" [ref=e138] [cursor=pointer]:
+              - img [ref=e139]
+              - generic [ref=e142]: Cerrar Sesión
+        - main [ref=e143]:
+          - generic [ref=e145]:
+            - button "Abrir notificaciones" [ref=e146] [cursor=pointer]:
+              - img [ref=e147]
+            - button "Cambiar a tema claro" [ref=e150] [cursor=pointer]:
+              - img [ref=e151]
+              - generic [ref=e157]: Claro
+          - generic [ref=e158]:
+            - navigation [ref=e160]:
+              - link "Dashboard" [ref=e162] [cursor=pointer]:
+                - /url: /dashboard/
+                - img [ref=e163]
+                - text: Dashboard
+              - generic [ref=e166]:
+                - img [ref=e167]
+                - link "Ventas" [ref=e169] [cursor=pointer]:
+                  - /url: /dashboard/ventas/
+                  - img [ref=e170]
+                  - text: Ventas
+              - generic [ref=e174]:
+                - img [ref=e175]
+                - generic [ref=e177]: Contratos
+            - generic [ref=e179]:
+              - generic [ref=e180]:
+                - generic [ref=e181]:
+                  - heading "Contratos de suministro" [level=1] [ref=e182]
+                  - paragraph [ref=e183]: Organice las OC del cliente y sus entregas programadas por producto, cantidad, fecha y destino.
+                - generic [ref=e184]:
+                  - button "Actualizar" [ref=e185] [cursor=pointer]:
+                    - img [ref=e186]
+                    - text: Actualizar
+                  - button "Nuevo contrato" [ref=e191] [cursor=pointer]:
+                    - img [ref=e192]
+                    - text: Nuevo contrato
+              - generic [ref=e193]:
+                - complementary "Lista de contratos" [ref=e194]:
+                  - generic [ref=e195]:
+                    - textbox "Buscar contrato por número u objeto" [ref=e196]
+                    - button "Buscar" [ref=e197] [cursor=pointer]
+                  - list [ref=e198]:
+                    - listitem [ref=e199]:
+                      - button "SUP-001 Activo Suministro programado local Cliente local · PEN" [ref=e200] [cursor=pointer]:
+                        - generic [ref=e201]:
+                          - generic [ref=e202]: SUP-001
+                          - generic [ref=e203]: Activo
+                        - generic [ref=e204]: Suministro programado local
+                        - generic [ref=e205]: Cliente local · PEN
+                  - generic [ref=e206]:
+                    - button "Página anterior" [disabled]:
+                      - img
+                    - generic [ref=e207]: Página 1 · 1 contratos
+                    - button "Página siguiente" [disabled]:
+                      - img
+                - region "Expediente del contrato" [ref=e208]:
+                  - generic [ref=e210]:
+                    - heading "SUP-001 · Suministro programado local" [level=2] [ref=e211]
+                    - paragraph [ref=e212]: Cliente local · PEN · 01/01/2026 al 31/12/2026
+                    - paragraph [ref=e213]: "Estado: Activo"
+                  - generic [ref=e214]:
+                    - heading "Programar entrega" [level=3] [ref=e215]
+                    - group [ref=e216]:
+                      - generic [ref=e218]:
+                        - text: Línea de OC
+                        - combobox "Línea de OC" [ref=e219]:
+                          - option "Seleccionar línea…" [selected]
+                          - option "OC-001 · Producto de suministro · 60 por programar"
+                      - generic [ref=e220]:
+                        - text: Cantidad a programar
+                        - spinbutton "Cantidad a programar" [ref=e221]
+                      - generic [ref=e222]:
+                        - text: Fecha programada
+                        - textbox "Fecha programada" [ref=e223]
+                      - generic [ref=e225]:
+                        - text: Destino de entrega
+                        - textbox "Destino de entrega" [ref=e226]
+                    - generic [ref=e227]:
+                      - button "Guardar entrega" [ref=e228] [cursor=pointer]
+                      - button "Cancelar" [ref=e229] [cursor=pointer]
+                  - generic [ref=e230]:
+                    - heading "Cantidades del contrato" [level=3] [ref=e231]
+                    - paragraph [ref=e232]: Los saldos muestran cantidades pendientes de asignar a OC. Los precios unitarios no incluyen impuestos.
+                    - table [ref=e234]:
+                      - rowgroup [ref=e235]:
+                        - row "Producto Contratado En OC Sin asignar Precio (PEN)" [ref=e236]:
+                          - cell "Producto" [ref=e237]
+                          - cell "Contratado" [ref=e238]
+                          - cell "En OC" [ref=e239]
+                          - cell "Sin asignar" [ref=e240]
+                          - cell "Precio (PEN)" [ref=e241]
+                      - rowgroup [ref=e242]:
+                        - row "SKU-1 Producto de suministro NIU 100 60 40 12.345678" [ref=e243]:
+                          - cell "SKU-1 Producto de suministro NIU" [ref=e244]:
+                            - generic [ref=e245]: SKU-1
+                            - text: Producto de suministro
+                            - generic [ref=e246]: NIU
+                          - cell "100" [ref=e247]
+                          - cell "60" [ref=e248]
+                          - cell "40" [ref=e249]
+                          - cell "12.345678" [ref=e250]
+                  - generic [ref=e251]:
+                    - heading "OC del cliente" [level=3] [ref=e252]
+                    - generic [ref=e253]:
+                      - heading "OC-001 · 27/10/2026" [level=4] [ref=e254]
+                      - list [ref=e255]:
+                        - listitem [ref=e256]:
+                          - generic [ref=e257]: Producto de suministro
+                          - generic [ref=e258]: 60 en OC · 60 por programar
+                  - generic [ref=e259]:
+                    - heading "Cronograma de entregas" [level=3] [ref=e260]
+                    - paragraph [ref=e261]: La programación organiza compromisos. El despacho y la conformidad se registrarán en su flujo operativo.
+                    - paragraph [ref=e262]: No hay entregas programadas.
+                  - group [ref=e263]:
+                    - generic "Historial del contrato (3)" [ref=e264] [cursor=pointer]
+      - button "Abrir ayuda" [ref=e265] [cursor=pointer]:
+        - img [ref=e266]
+    - region "Notifications (F8)":
+      - list
+  - button "Open Next.js Dev Tools" [ref=e274] [cursor=pointer]:
+    - img [ref=e275]
+  - alert [ref=e278]
+```

@@ -273,6 +273,39 @@ const assert = (condition, message) => {
   assert(sensitiveOfflineRejected, 'certificado/PIN offline debe fallar cerrado con mensaje explicito')
   assert((await mod.listOfflineRequests()).length === queueBeforeSensitiveAttempts, 'certificado/PIN no debe entrar al outbox')
 
+  for (const [method, endpoint] of [['POST', '/api/ventas/contratos'], ['PUT', '/api/ventas/contratos/contract-1'], ['POST', '/api/ventas/contratos/entregas/delivery-1/reprogramar']]) {
+    let rejected = false
+    try {
+      await mod.fetchWithOfflineSupport('http://api.test' + endpoint,
+        { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cantidad: 10 }) },
+        { endpoint, tenantId: 'tenant-1', userId: 'user-1' })
+    } catch (error) { rejected = String(error?.message || error).includes('nunca se guarda en la cola offline') }
+    assert(rejected, 'El contrato o cronograma exige conexión y no puede encolarse: ' + endpoint)
+  }
+  assert((await mod.listOfflineRequests()).length === queueBeforeSensitiveAttempts, 'Las decisiones contractuales offline no deben entrar al outbox')
+
+  for (const [method, endpoint] of [['PUT', '/api/inventario/lotes/productos/product-1/politica'], ['POST', '/api/inventario/lotes/productos/product-1/regularizaciones'], ['POST', '/api/inventario/lotes/productos/product-1/reservas/reasignar']]) {
+    let rejected = false
+    try {
+      await mod.fetchWithOfflineSupport('http://api.test' + endpoint,
+        { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cantidad: 10 }) },
+        { endpoint, tenantId: 'tenant-1', userId: 'user-1' })
+    } catch (error) { rejected = String(error?.message || error).includes('nunca se guarda en la cola offline') }
+    assert(rejected, 'Las decisiones por lote exigen conexión y no pueden encolarse: ' + endpoint)
+  }
+  assert((await mod.listOfflineRequests()).length === queueBeforeSensitiveAttempts, 'Las decisiones por lote offline no deben entrar al outbox')
+
+  for (const [method, endpoint] of [['POST', '/api/reportes/suministro/cortes'], ['POST', '/api/integraciones/bi/credenciales'], ['POST', '/api/integraciones/bi/credenciales/cred-1/revocar']]) {
+    let rejected = false
+    try {
+      await mod.fetchWithOfflineSupport('http://api.test' + endpoint,
+        { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ motivo: 'Rotación' }) },
+        { endpoint, tenantId: 'tenant-1', userId: 'user-1' })
+    } catch (error) { rejected = String(error?.message || error).includes('nunca se guarda en la cola offline') }
+    assert(rejected, 'Cortes y credenciales BI exigen conexión y no pueden encolarse: ' + endpoint)
+  }
+  assert((await mod.listOfflineRequests()).length === queueBeforeSensitiveAttempts, 'Cortes y credenciales BI offline no deben entrar al outbox')
+
   let fiscalOfflineRejected = false
   try {
     await mod.fetchWithOfflineSupport(

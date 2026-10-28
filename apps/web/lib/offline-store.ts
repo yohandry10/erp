@@ -353,6 +353,14 @@ function isSensitiveNonQueueableEndpoint(endpoint: string, method: string) {
     || new RegExp(`${absolutePrefix}/configuracion(?:[-/]|$)`).test(normalized)
     || new RegExp(`${absolutePrefix}/api/auth(?:/|$)`).test(normalized)
     || new RegExp(`${absolutePrefix}/auth(?:/|$)`).test(normalized)
+    // Los compromisos contractuales se validan contra saldos y versiones vivos.
+    // Nunca sincronizar una decisión de cronograma después, fuera de su contexto.
+    || /\/(?:api\/)?ventas\/contratos(?:\/|$)/.test(normalized)
+    // Reservas y regularizaciones por lote dependen de saldos vivos.
+    || /\/(?:api\/)?inventario\/lotes(?:\/|$)/.test(normalized)
+    || /\/(?:api\/)?alertas(?:\/|$)/.test(normalized)
+    // Un corte del tablero y una credencial BI se registran en línea o no se registran.
+    || /\/(?:api\/)?(?:reportes\/suministro|integraciones\/bi)(?:\/|$)/.test(normalized)
     || /\/demo\/convert-to-real(?:\/|$)/.test(normalized)
     || hasSensitiveSegment
 }

@@ -9,6 +9,7 @@ import {
   RegistrarAjusteInventarioDto,
   TransferirInventarioDto,
 } from './dto/operacion-inventario.dto';
+import { mensajeErrorLote } from './inventario-errors';
 import {
   CreateAlmacenDto,
   CreateProductoMaestroDto,
@@ -296,7 +297,8 @@ export class InventarioService {
 
     if (error) {
       throw new BadRequestException(
-        `No se pudo registrar el ajuste de inventario: ${error.message}`,
+        mensajeErrorLote(error.message)
+          ?? `No se pudo registrar el ajuste de inventario: ${error.message}`,
       );
     }
 
@@ -325,7 +327,8 @@ export class InventarioService {
 
     if (error) {
       throw new BadRequestException(
-        `No se pudo transferir el inventario: ${error.message}`,
+        mensajeErrorLote(error.message)
+          ?? `No se pudo transferir el inventario: ${error.message}`,
       );
     }
 

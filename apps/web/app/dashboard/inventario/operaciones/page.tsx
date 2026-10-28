@@ -24,6 +24,8 @@ type AjusteForm = {
   almacen_id: string
   delta: string
   motivo: string
+  lote: string
+  fecha_expiracion: string
 }
 
 type TransferenciaForm = {
@@ -39,6 +41,8 @@ const EMPTY_AJUSTE: AjusteForm = {
   almacen_id: '',
   delta: '',
   motivo: '',
+  lote: '',
+  fecha_expiracion: '',
 }
 
 const EMPTY_TRANSFERENCIA: TransferenciaForm = {
@@ -115,6 +119,9 @@ export default function OperacionesInventarioPage() {
       almacen_id: ajuste.almacen_id,
       delta,
       motivo: ajuste.motivo.trim(),
+      // Obligatorio cuando el producto controla lote; la base lo exige.
+      ...(ajuste.lote.trim() ? { lote: ajuste.lote.trim() } : {}),
+      ...(ajuste.lote.trim() && ajuste.fecha_expiracion ? { fecha_expiracion: ajuste.fecha_expiracion } : {}),
     }
     if (payload.motivo.length < 3) {
       setError('Explica el motivo del ajuste con al menos 3 caracteres.')
@@ -133,7 +140,7 @@ export default function OperacionesInventarioPage() {
         ).toLocaleString('es-PE', { maximumFractionDigits: 6 })}.`,
       )
       attemptRef.current = null
-      setAjuste((actual) => ({ ...actual, delta: '', motivo: '' }))
+      setAjuste((actual) => ({ ...actual, delta: '', motivo: '', lote: '', fecha_expiracion: '' }))
     } catch (err: any) {
       setError(err?.message || 'No se pudo registrar el ajuste.')
     } finally {
@@ -266,6 +273,14 @@ export default function OperacionesInventarioPage() {
               <label className={labelClass}>
                 Motivo
                 <input aria-label="Motivo del ajuste" required minLength={3} maxLength={500} value={ajuste.motivo} onChange={(e) => setAjuste({ ...ajuste, motivo: e.target.value })} className={inputClass} />
+              </label>
+              <label className={labelClass}>
+                Lote (si el producto controla lote)
+                <input aria-label="Lote del ajuste" maxLength={80} value={ajuste.lote} onChange={(e) => setAjuste({ ...ajuste, lote: e.target.value })} className={inputClass} />
+              </label>
+              <label className={labelClass}>
+                Vencimiento del lote (solo para un lote nuevo)
+                <input aria-label="Vencimiento del lote del ajuste" type="date" disabled={!ajuste.lote.trim()} value={ajuste.fecha_expiracion} onChange={(e) => setAjuste({ ...ajuste, fecha_expiracion: e.target.value })} className={inputClass} />
               </label>
               <div className="md:col-span-2">
                 <button disabled={submitting || loading || productos.length === 0} className="rounded-xl bg-primary px-5 py-2.5 font-semibold text-primary-foreground disabled:opacity-50">

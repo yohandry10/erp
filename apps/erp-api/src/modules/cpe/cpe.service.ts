@@ -29,6 +29,7 @@ import {
   DocumentoElectronico,
 } from '../../shared/integration/fiscal.interfaces';
 import type { DianTaxInput } from '../fiscal/colombia/dian-xml-builder.service';
+import { mensajeErrorLote } from '../inventario/inventario-errors';
 
 @Injectable()
 export class CpeService {
@@ -2142,8 +2143,14 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
             `No se pudo emitir la factura atómica ${idempotencyKey}: ${atomicError.message}`,
             atomicError,
           );
+          if (String(atomicError.message).startsWith('SUPPLY_INVOICE_REQUIRES_CONFORMITY')) {
+            throw new BadRequestException(
+              'El contrato de suministro factura contra conformidad: registre la aceptación total del cliente de este pedido antes de facturarlo.',
+            );
+          }
           throw new BadRequestException(
-            `No se pudo emitir la factura de forma transaccional: ${atomicError.message}`,
+            mensajeErrorLote(atomicError.message) ??
+              `No se pudo emitir la factura de forma transaccional: ${atomicError.message}`,
           );
         }
 

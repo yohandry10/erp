@@ -1,0 +1,61 @@
+{
+  "feature": "ALKHOFAR F01 - segundo incremento: adendas y revisiones de OC",
+  "verifiedAt": "2026-10-27T19:00:42.062477+00:00",
+  "productionOperations": false,
+  "acceptanceMatrixModified": false,
+  "deployment": "Pendiente; migraciones propuestas 570-571",
+  "sql": {
+    "engine": "PostgreSQL 16 efímero local",
+    "migrations": 567,
+    "latest": 571,
+    "verifiers": 80,
+    "historicalVerifiers": 67,
+    "passed": true,
+    "log": "fresh-sql.log"
+  },
+  "concurrency": {
+    "passed": true,
+    "scenarios": 8,
+    "log": "concurrency.json"
+  },
+  "api": {
+    "passed": true,
+    "tests": 48,
+    "suites": 3,
+    "log": "api-tests.log",
+    "typeCheck": true,
+    "build": true
+  },
+  "web": {
+    "passed": true,
+    "browserTests": 3,
+    "log": "browser-final.log",
+    "typeCheck": true,
+    "build": true,
+    "programmaticLabels": 1025,
+    "offlinePolicy": true,
+    "visualReview": [
+      "formulario escritorio claro",
+      "formulario móvil oscuro",
+      "historial móvil oscuro"
+    ],
+    "mechanicalDesignFindings": 0,
+    "buildWarnings": "Advertencias ESLint: refs de invalidación de consultas de contratos, hooks de otras pantallas e imágenes CPE. No impiden compilar."
+  },
+  "documentationContract": {
+    "passed": true,
+    "canonicalFiles": 6,
+    "changedCanonicalFile": "docs/MODULES.md"
+  },
+  "sha256": {
+    "supabase/migrations/570__supply_contracts_customer_orders_schedules.sql": "a508620a1535476fbc1674e87fdeee95b54d85127254b8a17ada3f07a5e55fea",
+    "supabase/migrations/571__supply_contract_amendments.sql": "73a9a395f79c06519fd0740867fe70f7eb728f9c689a0c55646b1d63a8b399b9",
+    "supabase/verify/571__supply_contract_amendments.sql": "c2945c4592224820c1935bad1a763c7fa30a28a4a2fc074cb41f4de4cd9d9ade"
+  },
+  "pending": [
+    "Vínculo pedido/OC/contrato/programación",
+    "Adjuntos del expediente",
+    "F02-F10",
+    "Promoción coordinada PROD"
+  ]
+}

@@ -5,6 +5,7 @@ import { NotificationType, NotificationSeverity } from '../../notifications/noti
 import { AuditService } from '../../audit/audit.service';
 import { PedidoLockService } from '../../../shared/locks/pedido-lock.service';
 import { EstadoPedido } from '../../ventas/pedidos/entities';
+import { mensajeErrorLote } from '../inventario-errors';
 import {
   PrepararPedidoDto,
   ConfirmarDespachoDto,
@@ -230,7 +231,7 @@ export class LogisticaService {
       if (error || !data) {
         console.error('Error en despacho atómico:', error);
         throw new BadRequestException(
-          error?.message || 'No se pudo confirmar el despacho',
+          mensajeErrorLote(error?.message) || error?.message || 'No se pudo confirmar el despacho',
         );
       }
 

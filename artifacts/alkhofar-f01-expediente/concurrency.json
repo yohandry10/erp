@@ -1,0 +1,7 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Concurrencia real de RPCs F01 en PostgreSQL 16 efímero",
+  "checks": [],
+  "checkedAt": "2026-10-27T22:31:03.468Z"
+}

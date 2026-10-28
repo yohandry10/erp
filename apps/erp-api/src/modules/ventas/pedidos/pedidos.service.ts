@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, ConflictException, ForbiddenException,
 import { createHash } from 'crypto';
 import { Decimal } from 'decimal.js';
 import { isNotFoundError, readUnavailable, writerFailure } from '../ventas-errors';
+import { mensajeErrorLote } from '../../inventario/inventario-errors';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { AuditService } from '../../audit/audit.service';
@@ -1214,6 +1215,8 @@ export class PedidosService {
 
     if (confirmacionError) {
       const msg = confirmacionError.message ?? '';
+      const loteMsg = mensajeErrorLote(msg);
+      if (loteMsg) throw new BadRequestException(`No se pudo reservar por lote: ${loteMsg}`);
       if (msg.includes('Stock insuficiente') || msg.includes('insufficient')) {
         throw new BadRequestException(`Stock insuficiente para confirmar el pedido. ${msg}`);
       }

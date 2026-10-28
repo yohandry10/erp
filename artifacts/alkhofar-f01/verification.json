@@ -1,0 +1,49 @@
+{
+  "checkedAt": "2026-10-27T18:40:34.271Z",
+  "feature": "ALKHOFAR F01 primera entrega de planificación",
+  "baseCommit": "57987d715ff998c2ba9dbe6c1dcb6bf9e4b016f4",
+  "deployed": false,
+  "remoteWrites": false,
+  "migration": {
+    "version": 570,
+    "sha256": "a508620a1535476fbc1674e87fdeee95b54d85127254b8a17ada3f07a5e55fea",
+    "promoted": false
+  },
+  "checks": {
+    "api_http_and_permissions": {
+      "passed": 35,
+      "suites": 3,
+      "source": "Jest con dobles de Supabase"
+    },
+    "database": {
+      "engine": "PostgreSQL 16 local efímero",
+      "migrations": 566,
+      "latest": 570,
+      "verifiers": 79,
+      "historicalVerifiers": 67,
+      "success": true,
+      "note": "Proyección final de nombre de actor recompilada y verificador 570 repetido después de la cadena completa"
+    },
+    "concurrency": {
+      "passed": 4,
+      "source": "PostgreSQL real, concurrency.json"
+    },
+    "browser": {
+      "passed": 3,
+      "source": "Playwright aislado con API simulada, browser-final-refresh",
+      "coverage": "Contrato, OC, programación, respuesta perdida, replay, reprogramación, versión tras actualización, permisos de lector y lectura caída"
+    },
+    "apiBuild": true,
+    "webBuild": true,
+    "apiTypecheck": true,
+    "webTypecheck": true,
+    "offlinePolicy": true,
+    "labels": 1018,
+    "docsContract": true
+  },
+  "limits": [
+    "Sin aceptación con ALKHOFAR ni transmisión fiscal",
+    "Sin adendas ni vínculo con pedidos, stock, despachos o cobranza",
+    "Sin promoción a PROD"
+  ]
+}
