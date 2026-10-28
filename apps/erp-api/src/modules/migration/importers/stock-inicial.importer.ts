@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { ImporterResult, ImporterRowError } from '../dto/import.dto';
-import { ParsedCsv, nonEmpty, toNumber, validateHeaders } from '../util/csv-parser.util';
+import { ParsedCsv, nonEmpty, toDateOrNull, toNumber, validateHeaders } from '../util/csv-parser.util';
 import { Importer, ImporterContext, emptyResult } from './importer.interface';
 import { MigrationRunsService } from '../migration-runs.service';
+import { mensajeFox } from './suministro-fox.importer';
 
 const REQUIRED = [
   'external_id_producto',
@@ -12,6 +13,34 @@ const REQUIRED = [
   'cantidad',
   'costo_unitario',
 ];
+
+/** Identidad de la fila: con lote, una apertura por lote en el mismo almacén. */
+function externalIdStock(producto: string, almacenId: string, fechaCorte: string, lote: string | null) {
+  return lote ? `stock:${producto}:${lote}:${almacenId}:${fechaCorte}` : `stock:${producto}:${almacenId}:${fechaCorte}`;
+}
+const loteDe = (row: Record<string, string>) => nonEmpty(row['lote'])?.toUpperCase() ?? null;
+
+/** Filas del ensayo FOX: el producto se resuelve por código en la base. */
+export function filasEnsayoStock(parsed: ParsedCsv, fechaCorte: string) {
+  return parsed.rows.map((row, idx) => {
+    const producto = nonEmpty(row['external_id_producto']) ?? '';
+    const lote = loteDe(row);
+    return {
+      external_id: externalIdStock(producto, (row['almacen_id'] ?? '').trim(), fechaCorte, lote),
+      fila: idx + 2,
+      stock: {
+        producto_codigo: producto,
+        almacen_id: (row['almacen_id'] ?? '').trim(),
+        sucursal_id: (row['sucursal_id'] ?? '').trim(),
+        fecha_corte: fechaCorte,
+        cantidad: toNumber(row['cantidad']),
+        costo_unitario: toNumber(row['costo_unitario']),
+        ...(lote ? { lote, fecha_vencimiento: toDateOrNull(row['fecha_vencimiento']) } : {}),
+        ...(nonEmpty(row['descripcion']) ? { notas: row['descripcion'].trim() } : {}),
+      },
+    };
+  });
+}
 
 @Injectable()
 export class StockInicialImporter implements Importer {
@@ -25,10 +54,11 @@ export class StockInicialImporter implements Importer {
   ) {}
 
   getTemplate() {
-    const headers = [...REQUIRED, 'descripcion'];
+    // lote y fecha_vencimiento son obligatorios para productos con control de lote.
+    const headers = [...REQUIRED, 'descripcion', 'lote', 'fecha_vencimiento'];
     const sample = [
-      ['PROD-00001', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000', '120', '8.50', 'Stock inicial laboratorio'],
-      ['PROD-00002', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000', '50', '120.00', 'Stock inicial farmacia'],
+      ['PROD-00001', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000', '120', '8.50', 'Stock inicial laboratorio', '', ''],
+      ['PROD-00002', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000', '50', '120.00', 'Stock inicial farmacia', 'L2405A', '2027-05-31'],
     ];
     return {
       filename: 'plantilla_migracion_stock_inicial.csv',
@@ -63,6 +93,14 @@ export class StockInicialImporter implements Importer {
       const almacenId = nonEmpty(row['almacen_id']);
       if (!almacenId || !/^[0-9a-f-]{36}$/i.test(almacenId)) {
         errs.push({ rowIndex, externalId: externalProd, field: 'almacen_id', message: 'almacen_id requerido y debe ser UUID válido' });
+      }
+      const lote = loteDe(row);
+      const vence = nonEmpty(row['fecha_vencimiento']);
+      if (lote && lote.length > 80) {
+        errs.push({ rowIndex, externalId: externalProd, field: 'lote', message: 'lote: hasta 80 caracteres' });
+      }
+      if (vence && (!lote || !/^\d{4}-\d{2}-\d{2}$/.test(vence) || Number.isNaN(Date.parse(vence)))) {
+        errs.push({ rowIndex, externalId: externalProd, field: 'fecha_vencimiento', message: 'fecha_vencimiento exige lote y formato AAAA-MM-DD' });
       }
     });
     return errs;
@@ -190,7 +228,7 @@ export class StockInicialImporter implements Importer {
           p_tenant_id: ctx.tenantId,
           p_actor_id: ctx.startedBy,
           p_run_id: ctx.runCtx?.runId ?? null,
-          p_external_id: `stock:${externalProd}:${almacenId}:${ctx.fechaCorte}`,
+          p_external_id: externalIdStock(externalProd, almacenId, ctx.fechaCorte, loteDe(row)),
           p_stock: {
             producto_id: productoId,
             almacen_id: almacenId,
@@ -200,6 +238,7 @@ export class StockInicialImporter implements Importer {
             costo_unitario: costo,
             external_id_producto: externalProd,
             notas: nonEmpty(row['descripcion']) ?? `Apertura migración al ${ctx.fechaCorte}`,
+            ...(loteDe(row) ? { lote: loteDe(row), fecha_vencimiento: toDateOrNull(row['fecha_vencimiento']) } : {}),
           },
         });
         if (movErr) throw movErr;
@@ -223,7 +262,7 @@ export class StockInicialImporter implements Importer {
           });
         }
       } catch (err: any) {
-        const msg = err?.message || String(err);
+        const msg = mensajeFox(err?.message || String(err));
         this.logger.warn(`Error stock fila ${rowIndex} (${externalProd}): ${msg}`);
         result.errorRows++;
         result.errors.push({ rowIndex, externalId: externalProd, message: msg });

@@ -165,6 +165,29 @@ se gestiona como feature independiente de la matriz de aceptación existente.
   revocable. El token se muestra una sola vez y la base guarda su hash. Cada
   lectura, también las rechazadas, queda registrada con corte, hash, filas y
   origen; cada fila lleva `corte_id` y `fecha_corte`.
+- Migración desde FOX (F08, migración 580) en `/dashboard/migracion-fox`:
+  plantillas de contratos, OC, cronograma y stock inicial; ensayo completo que
+  importa todo en orden en la base y lo revierte, con error por registro y
+  conciliación; importación por archivo con lote y fila registrados, e
+  idempotente por registro de origen; conciliación de registros, líneas,
+  cantidades y valores contra los totales de control. Se migra lo abierto al
+  corte: del contrato lo no ejecutado (las líneas agotadas no se migran), de la
+  OC lo pendiente de entregar y del cronograma las entregas pendientes. El
+  stock inicial acepta lote y vencimiento y los exige si el producto controla
+  lotes; un lote vencido también se registra. Nada migrado crea pedidos,
+  despachos, comprobantes, cobranza ni asientos. Los clientes y productos se
+  importan antes con los importadores existentes (`external_id` = código FOX).
+  Importar exige `migration.suministro.import` (ADMIN) y conciliar
+  `migration.validar.read`.
+- Perfiles de suministro (F09/F10, migración 581). SUMINISTRO (responsable de
+  contratos): contratos (ver, gestionar, conformar), pedidos (ver, editar),
+  penalidades (ver, gestionar), lotes (leer), alertas (ver, gestionar) y
+  tablero (leer, exportar). GERENCIA aprueba penalidades pero no las calcula;
+  ALMACÉN registra conformidades y gestiona lotes; FINANZAS, CONTADOR y
+  AUDITOR sólo consultan; VENDEDOR sólo ve contratos y lotes. Credenciales BI y
+  migración son de ADMIN. Calcular y aprobar una misma penalidad exige dos
+  personas distintas aun para ADMIN. Ninguna RPC de suministro acepta un
+  actor de otra empresa.
 
 Código: `apps/erp-api/src/modules/ventas/contratos`,
 `apps/web/app/dashboard/ventas/contratos`.

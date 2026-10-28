@@ -12,6 +12,11 @@ import { CxpAbiertasImporter } from './importers/cxp-abiertas.importer';
 import { BalanceAperturaImporter } from './importers/balance-apertura.importer';
 import { StockInicialImporter } from './importers/stock-inicial.importer';
 import { ComprobantesHistoricoImporter } from './importers/comprobantes-historico.importer';
+import {
+  ContratosSuministroImporter,
+  CronogramaSuministroImporter,
+  OcSuministroImporter,
+} from './importers/suministro-fox.importer';
 
 @Module({
   imports: [SupabaseModule, AuthModule, PermissionsModule],
@@ -26,6 +31,9 @@ import { ComprobantesHistoricoImporter } from './importers/comprobantes-historic
     BalanceAperturaImporter,
     StockInicialImporter,
     ComprobantesHistoricoImporter,
+    ContratosSuministroImporter,
+    OcSuministroImporter,
+    CronogramaSuministroImporter,
   ],
   exports: [MigrationService],
 })

@@ -1,0 +1,47 @@
+{
+  "ensayo": "exportación integral de una empresa sobre PostgreSQL 16 efímero",
+  "totales": {
+    "tablas": 282,
+    "filas": 1553,
+    "archivos": 0
+  },
+  "tablas_hijas": [
+    "rol_permisos (permiso_id -> permisos.id)"
+  ],
+  "fuera_de_alcance": [
+    "padron_ruc",
+    "tasas_detraccion"
+  ],
+  "columnas_redactadas": [
+    "certificado_password",
+    "certificado_pfx",
+    "claim_token",
+    "current_secret_hash",
+    "dian_password",
+    "envio_token",
+    "ose_api_key",
+    "ose_bearer_token",
+    "ose_password",
+    "password_hash",
+    "password_reset_expires",
+    "password_reset_token",
+    "pfx_encrypted",
+    "pfx_password_encrypted",
+    "pila_api_token",
+    "previous_secret_hash",
+    "secret_key",
+    "session_token",
+    "sunat_gre_client_secret",
+    "sunat_password",
+    "token_digest"
+  ],
+  "sha256_manifiesto": "fc6d783f37ccf5b437d0689909501fb571853ec714620f48a2ed23dabbecaeb2",
+  "duracion_ms": 2547,
+  "controles": [
+    "sin filas de otra empresa en ningún archivo",
+    "conteos de la misma instantánea",
+    "hash por archivo y del manifiesto",
+    "secretos vacíos",
+    "sesión de sólo lectura"
+  ]
+}

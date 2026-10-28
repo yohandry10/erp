@@ -138,7 +138,7 @@ function areaDeRuta(ruta: string): string {
   if (['/dashboard/cpe', '/dashboard/gre', '/dashboard/sire', '/dashboard/documentos'].includes(ruta)) {
     return 'Facturación y fiscal'
   }
-  if (['/dashboard/configuracion', '/dashboard/usuarios', '/dashboard/offline', '/dashboard/ayuda', '/dashboard/audit-logs'].includes(ruta)) {
+  if (['/dashboard/configuracion', '/dashboard/usuarios', '/dashboard/offline', '/dashboard/ayuda', '/dashboard/audit-logs', '/dashboard/migracion-fox'].includes(ruta)) {
     return 'Sistema'
   }
   return 'General'

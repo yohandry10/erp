@@ -1,7 +1,20 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { MigrationRunsService } from './migration-runs.service';
-import { MigrationImportDto, MigrationPreviewDto, MigrationRunType, ImporterResult } from './dto/import.dto';
+import {
+  FoxEnsayoDto,
+  ImporterResult,
+  ImporterRowError,
+  MigrationImportDto,
+  MigrationPreviewDto,
+  MigrationRunType,
+} from './dto/import.dto';
 import { CsvFormatError, parseCsv } from './util/csv-parser.util';
 import { Importer, ImporterContext } from './importers/importer.interface';
 import { ClientesImporter } from './importers/clientes.importer';
@@ -9,8 +22,15 @@ import { ProveedoresImporter } from './importers/proveedores.importer';
 import { CxcAbiertasImporter } from './importers/cxc-abiertas.importer';
 import { CxpAbiertasImporter } from './importers/cxp-abiertas.importer';
 import { BalanceAperturaImporter } from './importers/balance-apertura.importer';
-import { StockInicialImporter } from './importers/stock-inicial.importer';
+import { filasEnsayoStock, StockInicialImporter } from './importers/stock-inicial.importer';
 import { ComprobantesHistoricoImporter } from './importers/comprobantes-historico.importer';
+import {
+  construirLoteFox,
+  mensajeFox,
+  ContratosSuministroImporter,
+  CronogramaSuministroImporter,
+  OcSuministroImporter,
+} from './importers/suministro-fox.importer';
 
 @Injectable()
 export class MigrationService {
@@ -27,6 +47,9 @@ export class MigrationService {
     balanceImporter: BalanceAperturaImporter,
     stockImporter: StockInicialImporter,
     comprobantesImporter: ComprobantesHistoricoImporter,
+    contratosImporter: ContratosSuministroImporter,
+    ocImporter: OcSuministroImporter,
+    cronogramaImporter: CronogramaSuministroImporter,
   ) {
     this.importers = new Map<MigrationRunType, Importer>();
     [
@@ -37,6 +60,9 @@ export class MigrationService {
       balanceImporter,
       stockImporter,
       comprobantesImporter,
+      contratosImporter,
+      ocImporter,
+      cronogramaImporter,
     ].forEach((imp) => this.importers.set(imp.runType, imp));
   }
 
@@ -162,6 +188,59 @@ export class MigrationService {
     return { summary, checks };
   }
 
+  /**
+   * Ensayo FOX completo en la base y revertido: contratos, OC, cronograma y
+   * stock en orden, errores por registro y conciliación contra el control.
+   */
+  async ensayoFox(dto: FoxEnsayoDto, tenantId: string, userId: string) {
+    const lote: Record<string, unknown[]> = {};
+    const errores: Array<ImporterRowError & { archivo: string }> = [];
+    const archivos = [
+      ['contratos', 'CONTRATO', 'contratos'],
+      ['oc', 'OC', 'oc'],
+      ['cronograma', 'ENTREGA', 'entregas'],
+    ] as const;
+    for (const [archivo, entidad, clave] of archivos) {
+      const contenido = dto[archivo];
+      if (!contenido) continue;
+      const { registros, errores: e } = construirLoteFox(entidad, this.parseCsvFile(this.decodeCsv(contenido)));
+      errores.push(...e.map((x) => ({ ...x, archivo })));
+      lote[clave] = registros.map((r) => ({ id_origen: r.id_origen, fila: r.fila, payload: r.payload }));
+    }
+    if (dto.stock) {
+      if (!dto.fechaCorte) throw new BadRequestException('fechaCorte es obligatoria para el stock inicial');
+      const parsed = this.parseCsvFile(this.decodeCsv(dto.stock));
+      const e = this.getImporter('stock_inicial').validate(parsed);
+      errores.push(...e.map((x) => ({ ...x, archivo: 'stock' })));
+      const conError = new Set(e.map((x) => x.rowIndex));
+      lote.stock = conError.has(1)
+        ? []
+        : filasEnsayoStock(parsed, dto.fechaCorte.slice(0, 10)).filter((f) => !conError.has(f.fila));
+    }
+    if (!Object.keys(lote).length) throw new BadRequestException('Adjunte al menos un archivo para ensayar');
+    const { data, error } = await this.supabase.getClient().rpc('ensayar_migracion_fox_580', {
+      p_tenant_id: tenantId,
+      p_actor_id: userId,
+      p_lote: lote,
+      p_control: dto.control ?? null,
+    });
+    if (error) foxFailure(error);
+    if (!Array.isArray(data?.registros)) throw new ServiceUnavailableException('El ensayo no devolvió resultados. Reintente.');
+    const registros = data.registros.map((r: { error?: string }) => (r.error ? { ...r, error: mensajeFox(r.error) } : r));
+    return { success: true, data: { ...data, registros, errores_archivo: errores } };
+  }
+
+  async conciliarFox(control: Record<string, unknown>, tenantId: string, userId: string) {
+    const { data, error } = await this.supabase.getClient().rpc('conciliar_migracion_fox_580', {
+      p_tenant_id: tenantId,
+      p_actor_id: userId,
+      p_control: control,
+    });
+    if (error) foxFailure(error);
+    if (!Array.isArray(data?.entidades)) throw new ServiceUnavailableException('La conciliación no devolvió resultados. Reintente.');
+    return { success: true, data };
+  }
+
   listRuns(tenantId: string, runType?: MigrationRunType, limit = 50) {
     return this.runs.listRuns(tenantId, runType, limit);
   }
@@ -200,4 +279,15 @@ export class MigrationService {
       throw new BadRequestException('fileBase64 inválido (debe contener CSV UTF-8)');
     }
   }
+}
+
+function foxFailure(error: { code?: string; message?: string }): never {
+  if (error.code === '42501') throw new ForbiddenException('No tiene permiso para migrar o conciliar contratos FOX.');
+  if (error.code === '22023') {
+    const codigo = (error.message || '').split(':')[0].trim();
+    throw new BadRequestException(codigo === 'MIGRATION_FOX_CONTROL_INVALID'
+      ? 'Los totales de control sólo admiten contratos, oc, entregas y stock.'
+      : 'Revise el lote: entidades y archivos válidos.');
+  }
+  throw new ServiceUnavailableException('El servicio de migración no está disponible. Reintente.');
 }

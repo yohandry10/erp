@@ -428,6 +428,12 @@ const menuItems: MenuItem[] = [
     }
   },
   {
+    title: 'Migración FOX',
+    href: '/dashboard/migracion-fox',
+    icon: Download,
+    permission: { modulo: 'migration', accion: 'import', recurso: 'suministro' }
+  },
+  {
     title: 'Offline',
     href: '/dashboard/offline',
     icon: WifiOff

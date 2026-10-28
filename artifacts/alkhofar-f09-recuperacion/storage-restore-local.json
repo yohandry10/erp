@@ -1,0 +1,39 @@
+{
+  "ensayo": "respaldo y restauración de Storage en contenedores efímeros",
+  "imagenes": {
+    "pg": "postgres:16",
+    "rest": "postgrest/postgrest@sha256:85258123312dc496ad4c2ed832154a65e9746f84df0d6d09b44229ff9230c08e",
+    "storage": "supabase/storage-api@sha256:f1546fac6d1c7e345428ac904bfaa7be7cecd50a1f549fe1cf38c628a7b15c85"
+  },
+  "sha256_manifiesto": "84051ee94276a6d583536d0b9b06629a6c54aa5a57862fc0acfdbe52a67d0eeb",
+  "totales": {
+    "buckets": 2,
+    "objetos": 4,
+    "bytes": 117
+  },
+  "restauracion_por_empresa": {
+    "restaurados": 1,
+    "ya_presentes": 0,
+    "verificados": 1,
+    "objetos": 1,
+    "buckets": 1
+  },
+  "restauracion_completa": {
+    "restaurados": 3,
+    "ya_presentes": 1,
+    "verificados": 4,
+    "objetos": 4,
+    "buckets": 2
+  },
+  "tiempos_ms": {
+    "respaldo": 104,
+    "restauracion_y_verificacion": 78
+  },
+  "controles": [
+    "respaldo alterado rechazado antes de escribir",
+    "destino remoto rechazado",
+    "visibilidad de buckets conservada",
+    "nombres con espacios y paréntesis"
+  ],
+  "alcance": "Tiempos de un ensayo local con 4 objetos; no acreditan el RTO de PROD."
+}

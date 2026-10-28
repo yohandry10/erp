@@ -46,15 +46,17 @@ BEGIN
       'password_hash','$2b$12$verify554hash'));
   admin_id := (created->'adminUser'->>'id')::uuid;
   IF admin_id IS NULL THEN RAISE EXCEPTION 'VERIFY_554_ADMIN_MISSING'; END IF;
+  -- 580 amplió el catálogo con migration.suministro.import: al menos los 14 originales.
   IF (SELECT count(*) FROM public.permisos p
-      WHERE p.tenant_id=tenant AND p.codigo LIKE 'migration.%') <> 14 THEN
+      WHERE p.tenant_id=tenant AND p.codigo LIKE 'migration.%') < 14 THEN
     RAISE EXCEPTION 'VERIFY_554_PERMISSION_CATALOG_INCOMPLETE';
   END IF;
   IF (SELECT count(*) FROM public.rol_permisos rp
       JOIN public.roles r ON r.id=rp.role_id
       JOIN public.permisos p ON p.id=rp.permiso_id
       WHERE r.tenant_id=tenant AND upper(r.nombre)='ADMIN'
-        AND p.codigo LIKE 'migration.%' AND rp.concedido) <> 14 THEN
+        AND p.codigo LIKE 'migration.%' AND rp.concedido) <> (SELECT count(*) FROM public.permisos p
+      WHERE p.tenant_id=tenant AND p.codigo LIKE 'migration.%') THEN
     RAISE EXCEPTION 'VERIFY_554_ADMIN_GRANTS_INCOMPLETE';
   END IF;
   -- El seeder histórico puede haber concedido migration.* a ADMIN_DEMO.

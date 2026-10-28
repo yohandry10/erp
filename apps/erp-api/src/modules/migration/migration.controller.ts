@@ -9,6 +9,8 @@ import { CurrentTenant } from '../../common/decorators/current-tenant.decorator'
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { MigrationService } from './migration.service';
 import {
+  FoxConciliacionDto,
+  FoxEnsayoDto,
   MigrationImportDto,
   MigrationPreviewDto,
   MigrationRunType,
@@ -119,6 +121,60 @@ export class MigrationController {
     @CurrentUser('id') userId: string,
   ) {
     return this.service.import('comprobantes_historico', body, tenantId, userId);
+  }
+
+  @Post('contratos-suministro/import')
+  @RequirePermission('migration.suministro.import')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async importContratosSuministro(
+    @Body() body: MigrationImportDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.service.import('contratos_suministro', body, tenantId, userId);
+  }
+
+  @Post('oc-suministro/import')
+  @RequirePermission('migration.suministro.import')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async importOcSuministro(
+    @Body() body: MigrationImportDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.service.import('oc_suministro', body, tenantId, userId);
+  }
+
+  @Post('cronograma-suministro/import')
+  @RequirePermission('migration.suministro.import')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async importCronogramaSuministro(
+    @Body() body: MigrationImportDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.service.import('cronograma_suministro', body, tenantId, userId);
+  }
+
+  @Post('fox/ensayo')
+  @RequirePermission('migration.suministro.import')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async ensayoFox(
+    @Body() body: FoxEnsayoDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.service.ensayoFox(body, tenantId, userId);
+  }
+
+  @Post('fox/conciliacion')
+  @RequirePermission('migration.validar.read')
+  async conciliacionFox(
+    @Body() body: FoxConciliacionDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.service.conciliarFox(body.control, tenantId, userId);
   }
 
   @Get('runs')

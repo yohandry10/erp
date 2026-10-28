@@ -361,6 +361,8 @@ function isSensitiveNonQueueableEndpoint(endpoint: string, method: string) {
     || /\/(?:api\/)?alertas(?:\/|$)/.test(normalized)
     // Un corte del tablero y una credencial BI se registran en línea o no se registran.
     || /\/(?:api\/)?(?:reportes\/suministro|integraciones\/bi)(?:\/|$)/.test(normalized)
+    // Una migración se ensaya e importa en línea, con su lote y conciliación.
+    || /\/(?:api\/)?migration(?:\/|$)/.test(normalized)
     || /\/demo\/convert-to-real(?:\/|$)/.test(normalized)
     || hasSensitiveSegment
 }

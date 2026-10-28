@@ -476,6 +476,9 @@ describe('MigrationService.decodeCsv', () => {
       fakeImporter('balance_apertura'),
       fakeImporter('stock_inicial'),
       fakeImporter('comprobantes_historico'),
+      fakeImporter('contratos_suministro'),
+      fakeImporter('oc_suministro'),
+      fakeImporter('cronograma_suministro'),
     );
   }
 

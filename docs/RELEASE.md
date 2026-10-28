@@ -314,6 +314,38 @@ Reglas:
 - El rollback se prueba localmente o en una transacción revertida antes de usar
   datos reales; DEV no es un destino permitido.
 
+## Puesta en marcha ALKHOFAR
+
+1. Promoción DB-first de 570..581 con el procedimiento de esta guía: ensayo
+   sobre el respaldo PROD restaurado, preflight, respaldo de base y de Storage,
+   lote transaccional y readiness 581. El API y la web se despliegan después;
+   `render.yaml` ya exige 581.
+2. Parametrización acordada con ALKHOFAR: base de facturación de cada contrato,
+   reglas de penalidad según sus cláusulas, política de lote y vida útil por
+   producto, reglas y destinatarios de alertas, correo productivo y el perfil
+   de cada usuario (SUMINISTRO, ALMACEN, FINANZAS, GERENCIA, ADMIN).
+3. Capacitación por función con Ayuda › Ciclo de suministro por función y las
+   fichas de cada pantalla; una sesión por perfil.
+4. Piloto con contratos reales elegidos por ALKHOFAR antes del corte: uno con
+   lotes y facturación contra conformidad, uno con entregas parciales y
+   rechazo, uno con penalidad y uno migrado de FOX. Facturar en el piloto exige
+   la emisión fiscal del contribuyente configurada y acreditada.
+5. Ensayo de migración: ensayo FOX completo (no escribe) hasta cero errores y
+   conciliación cuadrada. El día del corte: FOX en sólo lectura, extracción,
+   transformación, ensayo, importación en orden y conciliación con el mismo
+   `control.json`.
+6. Soporte: nivel 1, usuario clave de ALKHOFAR por función; nivel 2, soporte del
+   ERP; nivel 3, desarrollo. Contingencia: FOX queda consultable en sólo
+   lectura; sin conciliación cuadrada no se libera el corte; un error posterior
+   se corrige hacia delante (anulación, adenda o regularización), sin borrar.
+7. Aceptación: ALKHOFAR ejecuta el ciclo completo con sus usuarios y firma la
+   validación de saldos de apertura (contratos, OC, entregas, stock por lote y
+   CxC), documentos y reportes (tablero, Excel y Power BI al mismo corte).
+
+Pendiente de datos del negocio, que no se suponen: equipo y responsables
+reales, licenciamiento, costos desglosados, exclusiones, SLA, condiciones
+comerciales y la aprobación de RPO, RTO y retención (`OPERATIONS.md`).
+
 ## Rollback
 
 Preparar antes del despliegue:

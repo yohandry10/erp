@@ -2,15 +2,20 @@
 
 Actualizado: 2026-10-28.
 
-Suministro ALKHOFAR F01–F07 (rama `claude/alkhofar-supply-20261027`, sin commit):
-contratos, OC y cronogramas (570–573), lotes y vencimientos (574), entregas y
-conformidad (575), facturación contra conformidad y estado de cuenta (576),
-alertas (577), penalidades (578) y tablero, cortes, Excel y Power BI (579).
-Sólo se verificó en infraestructura local efímera: la cadena PostgreSQL 16
-fresca aplicó 575 migraciones hasta 579 con 88 verificadores, las pruebas HTTP
-y Playwright usan dobles (`artifacts/alkhofar-f0*`). Nada se aplicó en PROD;
-`render.yaml` y CI ya exigen 579, así que el API no debe desplegarse antes de
-promover 570–579 DB-first con preflight y respaldo. F08–F10 siguen pendientes.
+Suministro ALKHOFAR F01–F10 (rama `claude/alkhofar-supply-20261027`, commit
+local sin push): contratos, OC y cronogramas (570–573), lotes y vencimientos
+(574), entregas y conformidad (575), facturación contra conformidad y estado de
+cuenta (576), alertas (577), penalidades (578), tablero, cortes, Excel y Power BI
+(579), migración FOX por saldos abiertos (580) y perfiles y segregación (581),
+más respaldo y restauración de Storage, exportación integral por empresa y
+capacitación por función en Ayuda. Sólo se verificó en infraestructura local
+efímera: la cadena PostgreSQL 16 fresca aplicó 577 migraciones hasta 581 con
+90 verificadores y 67 históricos; Storage y exportación se ensayaron en
+contenedores y base efímeros; HTTP y Playwright usan dobles
+(`artifacts/alkhofar-*`). Nada se aplicó en PROD; `render.yaml` y CI exigen 581,
+así que el API no debe desplegarse antes de promover 570–581 DB-first con
+preflight y respaldo. El piloto, la aceptación y los anexos comerciales son de
+ALKHOFAR (`RELEASE.md`).
 
 Corte vigente POS/CPE: #135 se integró como `8d717bcf` (fuente `c7e28691`) tras
 28 checks; sus dos CI (37150593171/37150595858) pasaron 342 escenarios HTTP y
@@ -1874,12 +1879,15 @@ Cambios recientes principales:
   verificadores vigentes y 67 históricos. PR/CI, preflight, respaldo, promoción
   DB-first y despliegues están cerrados; el retest visible de la muestra CPE CO
   quedó cerrado en el hotfix #99 sobre `dd813ab`.
-- `570..579`: suministro ALKHOFAR F01–F07, NO aplicadas en PROD. Verificadas
-  sólo en PostgreSQL 16 efímero (575 migraciones hasta 579, 88 verificadores).
+- `570..581`: suministro ALKHOFAR F01–F10, NO aplicadas en PROD. Verificadas
+  sólo en PostgreSQL 16 efímero (577 migraciones hasta 581, 90 verificadores).
   574 redefine `aplicar_movimiento_inventario_tx` y el despacho para asignar
   lotes (FEFO); 575 redefine el sembrado operativo para no conceder a VENDEDOR
-  gestión ni conformidad de contratos, y 578 lo extiende a penalidades. Su
-  promoción exige preflight, respaldo, ensayo con `ROLLBACK` y readiness 579.
+  gestión ni conformidad de contratos, y 578 lo extiende a penalidades. 580
+  amplía `migration_runs.run_type` y redefine `importar_stock_inicial_tx` con
+  lote y vencimiento. 581 crea el perfil SUMINISTRO y redefine
+  `app.seed_rbac_comercial_469` para que GERENCIA no calcule penalidades. Su
+  promoción exige preflight, respaldo, ensayo con `ROLLBACK` y readiness 581.
 
 ## Flujos cerrados técnicamente
 
@@ -2945,16 +2953,21 @@ tenants donde tiene los 256 permisos, así que ninguno perdió acceso.
 
 ### Suministro ALKHOFAR
 
-- Promover 570–579 a PROD (DB-first) antes de desplegar el API que exige 579.
-- F08 (FOX), F09 (accesos, recuperación y devolución de datos) y F10
-  (implantación) no empezaron.
+- Promover 570–581 a PROD (DB-first) antes de desplegar el API que exige 581.
+- FOX: perfilar el extracto real, completar el mapeo y cerrar el ensayo con
+  conciliación cuadrada antes del corte; las herramientas sólo se probaron con
+  tablas sintéticas.
+- Aprobar con ALKHOFAR RPO, RTO y retención propuestos y programar el respaldo
+  diario de Storage; el RTO de PROD no está medido.
+- Piloto con usuarios de ALKHOFAR, aceptación firmada y anexos comerciales
+  (equipo, licencias, costos, exclusiones, SLA) con datos reales del negocio.
 - El correo de alertas (577) se encola en el outbox; enviarlo exige el correo
   productivo configurado y comprobado.
 - Power BI: la lectura por API y su registro están probados con dobles; falta
   una actualización programada real en Power BI Service con el token en la
   cabecera `Authorization` (acceso anónimo).
-- Reprogramar una entrega sin `destino` (570) responde con el error crudo de
-  NOT NULL en vez de un mensaje de dominio.
+- Reprogramar una entrega sin `destino` llamando a la RPC 570 directamente
+  responde con el error crudo de NOT NULL; la API exige `destino`.
 
 ### Producto y riesgo residual
 
