@@ -85,6 +85,13 @@ BEGIN
     jsonb_build_array(jsonb_build_object('clave','PRV-9','fila','{}'::jsonb),jsonb_build_object('clave','PRV-9','fila','{}'::jsonb))),
     'MIGRATION_ARCHIVE_DUPLICATE_KEY');
   PERFORM pg_temp.reject582(format('SELECT public.archivar_filas_fox_582(%L,%L,%L,''PRO VEED;'',%L)',t,a,lote,filas),'MIGRATION_ARCHIVE_INPUT_INVALID');
+  -- Valores anidados se rechazan: no pueden esconder credenciales de la redacción.
+  PERFORM pg_temp.reject582(format('SELECT public.archivar_filas_fox_582(%L,%L,%L,''PROVEED'',%L)',t,a,lote,
+    jsonb_build_array(jsonb_build_object('clave','PRV-8','fila',jsonb_build_object('DATOS',jsonb_build_object('CLAVE','s3creta'))))),
+    'MIGRATION_ARCHIVE_INPUT_INVALID');
+  PERFORM pg_temp.reject582(format('SELECT public.archivar_filas_fox_582(%L,%L,%L,''PROVEED'',%L)',t,a,lote,
+    jsonb_build_array(jsonb_build_object('clave','PRV-8','fila',jsonb_build_object('LISTA',jsonb_build_array('CLAVE','s3creta'))))),
+    'MIGRATION_ARCHIVE_INPUT_INVALID');
   PERFORM pg_temp.reject582(format('SELECT public.operar_archivo_fox_582(%L,%L,''CERRAR_LOTE'',%L,''verify582-cierre-x'')',t,a,
     jsonb_build_object('lote_id',lote,'tablas',jsonb_build_object('PROVEED',3,'KARDEX_2019',2))),'MIGRATION_ARCHIVE_COUNT_MISMATCH');
   -- La búsqueda no ve un lote incompleto por defecto.
