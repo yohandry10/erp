@@ -316,10 +316,12 @@ Reglas:
 
 ## Puesta en marcha ALKHOFAR
 
-1. Promoción DB-first de 570..581 con el procedimiento de esta guía: ensayo
+1. Promoción DB-first de 570..582 con el procedimiento de esta guía: ensayo
    sobre el respaldo PROD restaurado, preflight, respaldo de base y de Storage,
-   lote transaccional y readiness 581. El API y la web se despliegan después;
-   `render.yaml` ya exige 581.
+   lote transaccional y readiness 582. El API y la web se despliegan después;
+   `render.yaml` ya exige 582. Esta promoción va antes de fusionar a `main`:
+   Render despliega `main` en cuanto pasan los checks (`autoDeployTrigger:
+   checksPass`), y ese API no arranca sano contra un esquema anterior.
 2. Parametrización acordada con ALKHOFAR: base de facturación de cada contrato,
    reglas de penalidad según sus cláusulas, política de lote y vida útil por
    producto, reglas y destinatarios de alertas, correo productivo y el perfil
@@ -330,10 +332,10 @@ Reglas:
    lotes y facturación contra conformidad, uno con entregas parciales y
    rechazo, uno con penalidad y uno migrado de FOX. Facturar en el piloto exige
    la emisión fiscal del contribuyente configurada y acreditada.
-5. Ensayo de migración: ensayo FOX completo (no escribe) hasta cero errores y
-   conciliación cuadrada. El día del corte: FOX en sólo lectura, extracción,
-   transformación, ensayo, importación en orden y conciliación con el mismo
-   `control.json`.
+5. Ensayo de migración: ensayo FOX integral (no escribe) hasta cero errores,
+   conciliación y cruce de bancos cuadrados. El día del corte: FOX en sólo
+   lectura, extracción, transformación, archivo íntegro, ensayo, importación en
+   orden y conciliación con el mismo `control.json` (`OPERATIONS.md`).
 6. Soporte: nivel 1, usuario clave de ALKHOFAR por función; nivel 2, soporte del
    ERP; nivel 3, desarrollo. Contingencia: FOX queda consultable en sólo
    lectura; sin conciliación cuadrada no se libera el corte; un error posterior
