@@ -419,6 +419,7 @@ function RecepcionForm({
   };
   const campo = (k: keyof typeof cabecera, label: string, max: number, type = "text") => (
     <Campo label={label}>
+      {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
       <input
         className={control}
         type={type}
@@ -485,6 +486,7 @@ function RecepcionForm({
           </table>
         </div>
         <Campo label="Incidencias">
+          {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
           <textarea className={`${control} min-h-16`} maxLength={2000} value={cabecera.incidencias}
             onChange={(e) => setCabecera((c) => ({ ...c, incidencias: e.target.value }))} />
         </Campo>
@@ -511,6 +513,7 @@ function AnularForm({ busy, onCancel, onSubmit }: { busy: boolean; onCancel: () 
       }}
     >
       <Campo label="Motivo de la anulación">
+        {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
         <Input value={motivo} maxLength={1000} disabled={busy} onChange={(e) => setMotivo(e.target.value)} />
       </Campo>
       <div className="flex flex-wrap gap-2">

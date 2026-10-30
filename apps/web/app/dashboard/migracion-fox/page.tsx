@@ -232,6 +232,7 @@ function EnsayoCompleto({ busy, correr, post }: Acciones) {
             <legend className="mb-2 text-sm font-medium">{etapa.titulo}</legend>
             {etapa.archivos.map((a) => (
               <Campo key={a.clave} label={a.titulo}>
+                {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
                 <input
                   type="file"
                   accept=".csv,text/csv"
@@ -247,6 +248,7 @@ function EnsayoCompleto({ busy, correr, post }: Acciones) {
             <Input type="date" value={fechaCorte} onChange={(e) => setFechaCorte(e.target.value)} aria-describedby="corte-ayuda" />
           </Campo>
           <Campo label="Totales de control (control.json)">
+            {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
             <input type="file" accept=".json,application/json" className={control} onChange={(e) => setControlFile(e.target.files?.[0] ?? null)} />
           </Campo>
         </div>
@@ -306,6 +308,7 @@ function ImportarArchivo({ busy, correr, post }: Acciones) {
       </div>
       <form className="grid gap-3 sm:grid-cols-3" aria-label="Archivo a importar" onSubmit={(e) => e.preventDefault()}>
         <Campo label="Tipo">
+          {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
           <select
             className={control}
             value={tipo}
@@ -328,6 +331,7 @@ function ImportarArchivo({ busy, correr, post }: Acciones) {
           </select>
         </Campo>
         <Campo label="Archivo CSV">
+          {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
           <input key={tipo} type="file" accept=".csv,text/csv" className={control} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
         </Campo>
         {def.corte && (
@@ -386,6 +390,7 @@ function ConciliarMigracion({ busy, correr, post }: Acciones) {
       >
         <div className="min-w-[260px] flex-1">
           <Campo label="Totales de control (control.json)">
+            {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
             <input type="file" accept=".json,application/json" className={control} onChange={(e) => setControlFile(e.target.files?.[0] ?? null)} />
           </Campo>
         </div>
@@ -525,6 +530,7 @@ function ArchivoIntegro({ get }: { get: ReturnType<typeof useApi>["get"] }) {
           }}
         >
           <Campo label="Extracto">
+            {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
             <select className={control} value={filtros.loteId || datos?.lote_id || ""}
               onChange={(e) => setFiltros({ loteId: e.target.value, tabla: "", texto: filtros.texto, pagina: 1 })}>
               {(datos?.lotes ?? []).map((l) => (
@@ -547,6 +553,7 @@ function ArchivoIntegro({ get }: { get: ReturnType<typeof useApi>["get"] }) {
           <div className="sm:col-span-2">
             <Campo label="Buscar texto">
               <div className="flex gap-2">
+                {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
                 <Input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder='p. ej. "orden 457" -anulada' maxLength={200} />
                 <Button type="submit" disabled={cargando}>Buscar</Button>
               </div>

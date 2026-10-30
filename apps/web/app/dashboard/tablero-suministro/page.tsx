@@ -155,6 +155,7 @@ export default function TableroSuministroPage() {
         onSubmit={(e) => e.preventDefault()}
       >
         <Campo label="Corte">
+          {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
           <select className={control} value={corteId} onChange={(e) => setCorteId(e.target.value)}>
             <option value="">En vivo (hoy)</option>
             {(data?.cortes ?? []).map((c) => (
@@ -168,6 +169,7 @@ export default function TableroSuministroPage() {
           </select>
         </Campo>
         <Campo label="Contrato">
+          {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
           <select
             className={control}
             value={filtros.contrato_id ?? ""}
@@ -182,6 +184,7 @@ export default function TableroSuministroPage() {
           </select>
         </Campo>
         <Campo label="Cliente">
+          {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
           <select
             className={control}
             value={filtros.cliente_id ?? ""}
@@ -196,6 +199,7 @@ export default function TableroSuministroPage() {
           </select>
         </Campo>
         <Campo label="Desde">
+          {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
           <Input type="date" value={filtros.desde ?? ""} onChange={(e) => setFiltros({ ...filtros, desde: e.target.value || undefined })} />
         </Campo>
         <Campo label="Hasta">

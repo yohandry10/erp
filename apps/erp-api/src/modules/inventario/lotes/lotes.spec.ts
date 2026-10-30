@@ -129,8 +129,7 @@ describe("Lotes de inventario: frontera HTTP sin acceso remoto", () => {
       },
     ],
   ])("envía %s con clave, actor y producto de la ruta", async (_, method, path, accion, body) => {
-    await (request(app.getHttpServer()) as any)
-      [method](`/api/inventario/lotes/${path}`)
+    await (request(app.getHttpServer()) as any)[method](`/api/inventario/lotes/${path}`)
       .set("Idempotency-Key", "lotes-http-574")
       .send(body)
       .expect(method === "put" ? 200 : 201);

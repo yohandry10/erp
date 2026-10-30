@@ -226,6 +226,7 @@ function CredencialForm({
     >
       <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2">
         <Campo label="Nombre (para quién o qué informe)">
+          {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
           <Input value={nombre} maxLength={120} onChange={(e) => setNombre(e.target.value)} />
         </Campo>
         <Campo label="Vence">
@@ -320,6 +321,7 @@ function RevocarForm({
     >
       <p className="text-sm font-medium">Revocar «{credencial.nombre}»</p>
       <Campo label="Motivo">
+        {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
         <Input value={motivo} maxLength={1000} disabled={busy} onChange={(e) => setMotivo(e.target.value)} />
       </Campo>
       <p className="text-xs text-muted-foreground">Power BI dejará de leer con este token de inmediato; las lecturas registradas se conservan.</p>
