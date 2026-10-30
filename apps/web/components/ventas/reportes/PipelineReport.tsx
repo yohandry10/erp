@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { useApi } from '@/hooks/use-api'
+import { useMemo } from 'react'
+import { useSalesReport, ReportReadError } from './use-sales-report'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from '@/components/ui/use-toast'
 import { ArrowDownRight, ArrowRight, ArrowUpRight, BarChart2, Loader2 } from 'lucide-react'
@@ -43,43 +43,13 @@ interface Props {
 }
 
 export default function PipelineReport({ filters }: Props) {
-  const { get } = useApi()
+  const { data: reportData, loading, error, retry } = useSalesReport<PipelineResponse>('/ventas/reportes/pipeline', filters, 'object')
+  const data = reportData
   const country = useCountryContext()
   const currencyFormatter = useMemo(() => new Intl.NumberFormat(
     country.locale || 'es-PE',
     { style: 'currency', currency: country.moneda, maximumFractionDigits: 2 }
   ), [country.locale, country.moneda])
-  const [data, setData] = useState<PipelineResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    loadData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters])
-
-  const loadData = async () => {
-    try {
-      setLoading(true)
-      const response = await get('/ventas/reportes/pipeline', {
-        params: filters
-      })
-
-      if (response?.success) {
-        setData(response.data)
-      } else {
-        throw new Error('Respuesta inválida del servidor')
-      }
-    } catch (error) {
-      console.error('Error cargando pipeline:', error)
-      toast({
-        title: 'Error al cargar pipeline',
-        description: 'No se pudieron obtener las métricas del pipeline comercial.',
-        variant: 'destructive'
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const conversionCards = useMemo(() => {
     if (!data) return []
@@ -112,6 +82,8 @@ export default function PipelineReport({ filters }: Props) {
       .slice()
       .sort((a, b) => (a.periodo < b.periodo ? -1 : 1))
   }, [data])
+
+  if (error) return <ReportReadError error={error} retry={retry} />
 
   if (loading) {
     return (

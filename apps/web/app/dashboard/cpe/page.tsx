@@ -10,38 +10,18 @@ import { ComprobantesTable } from '@/components/cpe/ComprobantesTable'
 import { AnulacionFinancieraModal } from '@/components/cpe/AnulacionFinancieraModal'
 import { ReferencedNoteModal } from '@/components/cpe/ReferencedNoteModal'
 import { DianEventsPanel } from '@/components/cpe/DianEventsPanel'
+import { VincularCobroCpeModal } from '@/components/cpe/VincularCobroCpeModal'
+import { usePermission } from '@/hooks/use-permission'
 import { useCountryContext } from '@/hooks/use-country-context'
-import { apiSucceeded, unwrapApiArray, unwrapApiObject } from '@/lib/api-contract'
+import { apiSucceeded, unwrapApiObject } from '@/lib/api-contract'
 import { fetchApi } from '@/lib/api-fetch'
 import { formatFiscalDocumentNumber } from '@/lib/fiscal-document-number'
+import { cpeList, cpeStats, type CpeDocument } from '@/lib/cpe-read-contract'
+import { useCpeRead } from '@/hooks/use-cpe-read'
+import { liveCpeFile, saveCpeFile } from '@/lib/cpe-download'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { FileText, Plus, ShieldCheck } from 'lucide-react'
-
-interface CpeDocument {
-  id: string
-  tipoDocumento?: string
-  tipoComprobante: string
-  serie: string
-  numero: number
-  fechaEmision: string
-  cliente: string
-  clienteRuc: string
-  total: number
-  moneda: string
-  estado: 'BORRADOR' | 'FIRMADO' | 'ENVIADO' | 'ACEPTADO' | 'ERROR' | 'RECHAZADO' | 'ANULADO'
-  estadoSunat?: string
-  isDemoRepresentation?: boolean
-  observaciones?: string
-  fechaCreacion: string
-}
-
-interface CpeStats {
-  cpeEmitidosHoy: number
-  cpeDelMes: number
-  montoFacturado: number
-  rechazados: number
-}
 
 interface FiscalConfigurationStatus {
   isDemo?: boolean
@@ -67,8 +47,6 @@ export default function CPEPage() {
     currency: country.moneda || 'PEN',
   })
 
-  const [documents, setDocuments] = useState<CpeDocument[]>([])
-  const [stats, setStats] = useState<CpeStats | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
@@ -79,6 +57,9 @@ export default function CPEPage() {
   const [selectedDocumentNumber, setSelectedDocumentNumber] = useState<string | number>('')
   const [selectedCpeForGre, setSelectedCpeForGre] = useState<CpeDocument | null>(null)
   const [selectedCpeForCancellation, setSelectedCpeForCancellation] = useState<CpeDocument | null>(null)
+  const [selectedCpeForLink, setSelectedCpeForLink] = useState<CpeDocument | null>(null)
+  const { hasPermission: canManageReceivables, loading: receivablePermissionLoading } = usePermission('finanzas', 'write', 'cxc.cobros')
+  const { hasPermission: canSendCpe, loading: sendPermissionLoading } = usePermission('cpe', 'enviar', 'comprobantes')
   const [fiscalConfiguration, setFiscalConfiguration] = useState<FiscalConfigurationStatus | null>(null)
   const [fiscalConfigurationLoading, setFiscalConfigurationLoading] = useState(false)
   const [fiscalConfigurationError, setFiscalConfigurationError] = useState<string | null>(null)
@@ -113,72 +94,34 @@ export default function CPEPage() {
   })
   const [page, setPage] = useState(1)
   const pageSize = 50
-  const [totalDocuments, setTotalDocuments] = useState(0)
-  const [documentsLoading, setDocumentsLoading] = useState(false)
-  const [documentsError, setDocumentsError] = useState<string | null>(null)
-  const [statsError, setStatsError] = useState<string | null>(null)
-  const documentsRequest = useRef(0)
+  const { post } = useApiCall<CpeDocument[]>()
+  const queryParams = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+  Object.entries(filters).forEach(([key, value]) => { if (value) queryParams.set(key, value) })
+  const listEndpoint = `/api/cpe/comprobantes?${queryParams}`
+  const validateList = useCallback((response: any) => cpeList(response, page, pageSize), [page])
+  const list = useCpeRead(listEndpoint, validateList)
+  const totals = useCpeRead('/api/cpe/stats', cpeStats)
+  const documents = list.data?.documents ?? []
+  const totalDocuments = list.data?.total ?? 0
+  const documentsLoading = list.loading
+  const documentsError = list.error
+  const stats = totals.data
+  const statsError = totals.error
+  const loadDocuments = list.reload
+  const loadStats = totals.reload
+  const downloadScope = `${list.actor}:${listEndpoint}`
+  const activeDownloadScope = useRef(downloadScope)
+  activeDownloadScope.current = downloadScope
+  const [downloadState, setDownloadState] = useState<{ scope: string; pending: boolean; error: string | null; endpoint: string; filename: string; type: 'pdf' | 'csv' } | null>(null)
+  const download = downloadState?.scope === downloadScope ? downloadState : null
+  const previousActor = useRef(list.actor)
 
-  const { get, post } = useApiCall<CpeDocument[]>()
-  const { get: getStats } = useApiCall<CpeStats>()
-
-  const loadDocuments = useCallback(async () => {
-    const request = ++documentsRequest.current
-    setDocumentsLoading(true)
-    setDocumentsError(null)
-    const queryParams = new URLSearchParams()
-    queryParams.set('page', String(page))
-    queryParams.set('pageSize', String(pageSize))
-    if (filters.tipoComprobante) queryParams.append('tipoComprobante', filters.tipoComprobante)
-    if (filters.estado) queryParams.append('estado', filters.estado)
-    if (filters.serie) queryParams.append('serie', filters.serie)
-    if (filters.moneda) queryParams.append('moneda', filters.moneda)
-    if (filters.fechaDesde) queryParams.append('fechaDesde', filters.fechaDesde)
-    if (filters.fechaHasta) queryParams.append('fechaHasta', filters.fechaHasta)
-    if (filters.cliente) queryParams.append('cliente', filters.cliente)
-
-    console.log('📄 CPE: Cargando comprobantes...', { filters, queryParams: queryParams.toString() })
-    const response = await get(`/api/cpe/comprobantes?${queryParams}`)
-    if (request !== documentsRequest.current) return
-    setDocumentsLoading(false)
-    console.log('📄 CPE: Respuesta completa de comprobantes:', response)
-
-    const documents = unwrapApiArray<CpeDocument>(response)
-    if (apiSucceeded(response)) {
-      console.log('📄 CPE: Datos de comprobantes recibidos:', documents.length)
-      setDocuments(documents)
-      const metadata = response as typeof response & { meta?: { total?: number } }
-      const total = Number(metadata?.meta?.total)
-      setTotalDocuments(Number.isSafeInteger(total) && total >= 0 ? total : documents.length)
-    } else {
-      console.warn('⚠️ CPE: No se recibieron datos de comprobantes o hay error:', response?.message)
-      setDocuments([])
-      setTotalDocuments(0)
-      setDocumentsError(response?.message || 'No se pudieron cargar los comprobantes. Vuelve a intentar.')
+  useEffect(() => {
+    if (previousActor.current !== ':' && previousActor.current !== list.actor) {
+      setSelectedCpeForCancellation(null); setSelectedCpeForLink(null); setIsViewModalOpen(false); setIsGreModalOpen(false)
     }
-  }, [get, filters, page])
-
-  const loadStats = useCallback(async () => {
-    console.log('📊 CPE: Cargando estadísticas...')
-    const response = await getStats('/api/cpe/stats')
-    console.log('📊 CPE: Respuesta completa de estadísticas:', response)
-
-    if (apiSucceeded(response)) {
-      setStatsError(null)
-      const stats = unwrapApiObject<CpeStats>(response, {
-        cpeEmitidosHoy: 0,
-        cpeDelMes: 0,
-        montoFacturado: 0,
-        rechazados: 0,
-      })
-      console.log('📊 CPE: Estadísticas recibidas:', stats)
-      setStats(stats)
-    } else {
-      console.warn('⚠️ CPE: No se recibieron estadísticas o hay error:', response?.message)
-      setStats(null)
-      setStatsError('No se pudieron cargar los totales de comprobantes. Vuelve a intentar.')
-    }
-  }, [getStats])
+    previousActor.current = list.actor
+  }, [list.actor])
 
   const loadFiscalConfiguration = useCallback(async () => {
     if (!isColombia) {
@@ -213,10 +156,6 @@ export default function CPEPage() {
       loadStats()
     ])
   }, [loadDocuments, loadStats])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
 
   useEffect(() => {
     void loadFiscalConfiguration()
@@ -262,47 +201,24 @@ export default function CPEPage() {
     }
   }
 
-  const signReferencedNote = async (documentId: string) => {
-    const storageKey = `cpe-note-sign:${documentId}`
-    let idempotencyKey = window.sessionStorage.getItem(storageKey)
-    if (!idempotencyKey) {
-      idempotencyKey = `note-sign-ui:${crypto.randomUUID()}`
-      window.sessionStorage.setItem(storageKey, idempotencyKey)
-    }
-    const response = await post(
-      `/api/cpe/notas-referenciadas/${encodeURIComponent(documentId)}/firmar`,
-      {},
-      { headers: { 'Idempotency-Key': idempotencyKey } },
-    )
-    if (apiSucceeded(response)) {
-      window.sessionStorage.removeItem(storageKey)
-      await loadDocuments()
-      alert('✅ Nota firmada. Ya puede enviarse cuando corresponda.')
+  const openDownloadedBlob = async (endpoint: string, filename: string, type: 'pdf' | 'csv') => {
+    if (!list.data || download?.pending) return
+    const scope = downloadScope
+    setDownloadState({ scope, pending: true, error: null, endpoint, filename, type })
+    try {
+      const blob = await liveCpeFile(endpoint, type, totalDocuments)
+      if (activeDownloadScope.current !== scope) return
+      saveCpeFile(blob, filename)
+      setDownloadState(null)
+    } catch (error) {
+      if (activeDownloadScope.current === scope) setDownloadState({ scope, pending: false, error: error instanceof Error ? error.message : 'No se pudo descargar el archivo. Reintente.', endpoint, filename, type })
     }
   }
 
-  const openDownloadedBlob = async (endpoint: string, fallbackName: string) => {
-    const response = await fetchApi(endpoint, { method: 'GET' })
-    if (!response.ok) {
-      alert('No se pudo descargar el archivo')
-      return
-    }
-
-    const blob = await response.blob()
-    const url = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.target = '_blank'
-    link.rel = 'noopener noreferrer'
-    link.download = fallbackName
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    window.URL.revokeObjectURL(url)
-  }
+  useEffect(() => () => { activeDownloadScope.current = '' }, [])
 
   const downloadPdf = async (documentId: string) => {
-    await openDownloadedBlob(`/api/cpe/comprobantes/${encodeURIComponent(documentId)}/pdf`, `cpe-${documentId}.pdf`)
+    await openDownloadedBlob(`/api/cpe/comprobantes/${encodeURIComponent(documentId)}/pdf`, `cpe-${documentId}.pdf`, 'pdf')
   }
 
   const openGreModal = (cpe: CpeDocument) => {
@@ -467,12 +383,15 @@ export default function CPEPage() {
           ))}
         </section>
 
-        {statsError && <p role="alert">{statsError}</p>}
+        {statsError && <div role="alert" data-testid="cpe-stats-error" className="flex items-center gap-3"><span>{statsError}</span><Button type="button" onClick={() => void loadStats()}>Reintentar indicadores</Button></div>}
+        {download?.error && <div role="alert" data-testid="cpe-download-error" className="flex items-center gap-3"><span>{download.error}</span><Button type="button" onClick={() => void openDownloadedBlob(download.endpoint, download.filename, download.type)}>Reintentar descarga</Button></div>}
+        {download?.pending && <p role="status">Descargando archivo…</p>}
 
         <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardContent className="p-4">
             <ComprobantesFilters
               filters={{ ...filters }}
+              disabledExport={!list.data || Boolean(download?.pending)}
               onChange={(next) => { setPage(1); setFilters((prev) => ({ ...prev, ...next })) }}
               onExport={(f) => {
                 const params = new URLSearchParams()
@@ -483,7 +402,7 @@ export default function CPEPage() {
                 if (f.fechaDesde) params.append('fechaDesde', f.fechaDesde)
                 if (f.fechaHasta) params.append('fechaHasta', f.fechaHasta)
                 if (f.cliente) params.append('cliente', f.cliente)
-                openDownloadedBlob(`/api/cpe/comprobantes/export?${params.toString()}`, 'cpe-export.csv')
+                void openDownloadedBlob(`/api/cpe/comprobantes/export?${params.toString()}`, 'cpe-export.csv', 'csv')
               }}
             />
           </CardContent>
@@ -491,24 +410,27 @@ export default function CPEPage() {
 
         <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardContent className="p-4">
-            {documentsError && <div role="alert" className="mb-3 flex items-center gap-3"><span>{documentsError}</span><Button type="button" onClick={() => { void loadData() }}>Reintentar</Button></div>}
-            <ComprobantesTable
+            {documentsError && <div role="alert" data-testid="cpe-list-error" className="mb-3 flex items-center gap-3"><span>{documentsError}</span><Button type="button" onClick={() => { void loadDocuments() }}>Reintentar comprobantes</Button></div>}
+            {list.data && <ComprobantesTable
               documents={documents}
               onView={viewDocument}
               onPdf={downloadPdf}
               onSend={sendToFiscal}
-              onSign={signReferencedNote}
+              onSent={loadDocuments}
+              onSigned={loadDocuments}
               onCancel={paisCodigo === 'PE' ? setSelectedCpeForCancellation : undefined}
               onGre={paisCodigo === 'PE' ? openGreModal : undefined}
               fiscalLabel={fiscalLabel}
-              canSend={canSendToFiscal}
+              canSend={canSendToFiscal && (paisCodigo !== 'PE' || !sendPermissionLoading && canSendCpe)}
               countryCode={paisCodigo}
-            />
+              onLinkReceivable={setSelectedCpeForLink}
+              canManageReceivables={!receivablePermissionLoading && canManageReceivables}
+            />}
             <nav aria-label="Paginación de comprobantes" className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              <span>{documentsLoading ? 'Cargando comprobantes…' : `${totalDocuments} comprobantes · Página ${page} de ${Math.max(1, Math.ceil(totalDocuments / pageSize))}`}</span>
+              <span>{documentsLoading ? 'Cargando comprobantes…' : list.data ? `${totalDocuments} comprobantes · Página ${page} de ${Math.max(1, Math.ceil(totalDocuments / pageSize))}` : 'Listado no disponible'}</span>
               <div className="flex gap-2">
                 <Button type="button" variant="outline" disabled={documentsLoading || page <= 1} onClick={() => setPage(current => current - 1)}>Anterior</Button>
-                <Button type="button" variant="outline" disabled={documentsLoading || page * pageSize >= totalDocuments} onClick={() => setPage(current => current + 1)}>Siguiente</Button>
+                <Button type="button" variant="outline" disabled={!list.data || page * pageSize >= totalDocuments} onClick={() => setPage(current => current + 1)}>Siguiente</Button>
               </div>
             </nav>
           </CardContent>
@@ -516,6 +438,7 @@ export default function CPEPage() {
       </div>
 
       {/* CPE Modal */}
+      {selectedCpeForLink && <VincularCobroCpeModal cpeId={selectedCpeForLink.id} receptor={selectedCpeForLink.clienteRuc} documento={`${selectedCpeForLink.serie}-${selectedCpeForLink.numero}`} onClose={() => { setSelectedCpeForLink(null); void loadData() }} />}
       <CpeModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

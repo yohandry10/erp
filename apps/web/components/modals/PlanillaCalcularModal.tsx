@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useApi } from "@/hooks/use-api";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,16 +10,25 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useCountryContext } from "@/hooks/use-country-context";
+import { EpsCoberturaForm, emptyEpsCobertura, epsCoberturaPayload } from "@/components/rrhh/EpsCoberturaForm";
+import { BasesGratificacionForm, BasesGratificacionValue, basesGratificacionPayload } from "@/components/rrhh/BasesGratificacionForm";
+import { useTenant } from "@/contexts/TenantContext";
+import { usePermission } from "@/hooks/use-permission";
+import { readPayrollCalculationSources } from "@/lib/rrhh/payroll-calculation-source";
+import { payrollCalculationRequest } from "@/lib/rrhh/payroll-calculation-operation";
+import type { PayrollCalculationOperation } from "@/hooks/use-payroll-calculation-operation";
 
 interface PlanillaCalcularModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
   planilla: any;
+  operation: PayrollCalculationOperation;
 }
 
 interface EmpleadoPlanilla {
   id: string;
+  incluir: boolean;
   nombres: string;
   apellidos: string;
   numero_documento: string;
@@ -51,30 +60,52 @@ export default function PlanillaCalcularModal({
   onClose,
   onSuccess,
   planilla,
+  operation,
 }: PlanillaCalcularModalProps) {
-  const { get, post } = useApi();
+  const { get } = useApi({ throwOnError: true, requireLive: true });
   const country = useCountryContext();
+  const {tenant,user}=useTenant();
+  const {hasPermission:canCalculate,loading:checkingCalculate}=usePermission('rrhh','calculate','planillas');
+  const readScope=`${tenant?.id||''}:${user?.id||''}:${planilla?.id||''}:${planilla?.periodo||''}`;
+  const currentScope=useRef(readScope);currentScope.current=readScope;
+  const restoredScope=useRef('');
+  const [sourceReady,setSourceReady]=useState(false);
   const isArgentina = country.paisCodigo === "AR";
   const isColombia = country.paisCodigo === "CO";
   const currencySymbol = country.simboloMoneda || "S/";
   const [loading, setLoading] = useState(false);
   const [empleados, setEmpleados] = useState<EmpleadoPlanilla[]>([]);
   const [calculando, setCalculando] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const loadGeneration = useRef(0);
+  const [epsCobertura, setEpsCobertura] = useState(emptyEpsCobertura);
+  const [epsReadReady, setEpsReadReady] = useState(true);
+  const [basesGratificacion, setBasesGratificacion] = useState<BasesGratificacionValue>({});
+  useEffect(() => { if (isOpen) setBasesGratificacion({}); }, [isOpen, planilla?.id, planilla?.periodo]);
+  useEffect(() => { if (isOpen) setEpsCobertura(emptyEpsCobertura()); }, [isOpen, planilla?.id]);
 
   const loadEmpleados = useCallback(async () => {
+    if (operation.pending) {setLoading(false);setSourceReady(false);return;}
+    const generation = ++loadGeneration.current;
+    const scope=readScope;
+    const sameScope=restoredScope.current===scope;
+    if(!sameScope)setEmpleados([]);
+    setLoadError(null);setSourceReady(false);
     try {
       setLoading(true);
-      const response = await get("/api/rrhh/empleados");
+      if(!tenant?.id||!user?.id||planilla?.tenant_id!==tenant.id||planilla?.estado!=='borrador')throw new Error('No se pudo confirmar el ámbito y el borrador de la planilla.');
+      const [response,contractsResponse]=await Promise.all([get("/api/rrhh/empleados"),get("/api/rrhh/contratos")]);
+      if (generation !== loadGeneration.current||scope!==currentScope.current) return;
+      const verified=readPayrollCalculationSources(response,contractsResponse,tenant.id,planilla.periodo);
 
-      if (response?.success && response.data) {
-        const empleadosActivos = response.data.filter(
-          (emp: any) => String(emp.estado || "").toLowerCase() === "activo",
-        );
+      {
+        const empleadosActivos = verified;
 
         const empleadosConCalculos = empleadosActivos.map((emp: any) => {
-          const sueldoBase = emp.contratos?.[0]?.sueldo_bruto || 0;
+          const sueldoBase = emp.sueldo_base_confirmado;
           return calcularEmpleado({
             id: emp.id,
+            incluir: true,
             nombres: emp.nombres,
             apellidos: emp.apellidos,
             numero_documento: emp.numero_documento,
@@ -101,18 +132,25 @@ export default function PlanillaCalcularModal({
           });
         });
 
-        setEmpleados(empleadosConCalculos);
+        setEmpleados(previous=>empleadosConCalculos.map(next=>{
+          const old=sameScope?previous.find(p=>p.id===next.id):undefined;
+          if(!old)return next;
+          return calcularEmpleado({...next,incluir:old.incluir,dias_trabajados:old.dias_trabajados,horas_extras_25:old.horas_extras_25,horas_extras_35:old.horas_extras_35,horas_recargo_nocturno:old.horas_recargo_nocturno,horas_dominicales_festivas:old.horas_dominicales_festivas,tardanzas_minutos:old.tardanzas_minutos,faltas:old.faltas,bonos_adicionales:old.bonos_adicionales});
+        }));
+        restoredScope.current=scope;setSourceReady(true);
       }
     } catch (error) {
-      console.error("Error cargando empleados:", error);
+      if (generation !== loadGeneration.current||scope!==currentScope.current) return;
+      if(!sameScope)setEmpleados([]);
+      setLoadError(error instanceof Error ? error.message : 'No se pudieron consultar los empleados.');
     } finally {
-      setLoading(false);
+      if (generation === loadGeneration.current&&scope===currentScope.current) setLoading(false);
     }
   // calcularEmpleado se ejecuta únicamente al invocar este callback y usa el
   // país vigente del mismo render; se mantiene aquí para evitar recrear toda
   // la carga por cada edición manual de una fila.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [get, isArgentina, isColombia]);
+  }, [get, isArgentina, isColombia,readScope,tenant?.id,user?.id,planilla?.tenant_id,planilla?.estado,planilla?.periodo,operation.pending]);
 
   useEffect(() => {
     if (isOpen && planilla) {
@@ -123,6 +161,7 @@ export default function PlanillaCalcularModal({
     }
 
     return () => {
+      loadGeneration.current++;
       document.body.style.overflow = "unset";
     };
   }, [isOpen, loadEmpleados, planilla]);
@@ -202,6 +241,9 @@ export default function PlanillaCalcularModal({
   };
 
   const calcularPlanillaCompleta = async () => {
+    if(!sourceReady||loading||loadError||checkingCalculate||!canCalculate||!operation.ready||operation.pending||operation.recoveryError||restoredScope.current!==readScope||planilla?.tenant_id!==tenant?.id||planilla?.estado!=='borrador')return;
+    const seleccionados = empleados.filter(empleado => empleado.incluir);
+    if (loading || loadError || !seleccionados.length || (epsCobertura.enabled && !epsReadReady)) return;
     try {
       setCalculando(true);
 
@@ -209,8 +251,10 @@ export default function PlanillaCalcularModal({
       // régimen pensionario, tasas y totales se vuelven a resolver y calcular
       // en el backend tenant-scoped; nunca se confían importes del preview.
       const datosCalculados = {
-        empleados: empleados.map((emp) => ({
+        ...(country.paisCodigo === 'PE' && epsCobertura.enabled ? { eps_cobertura: epsCoberturaPayload(epsCobertura, planilla.periodo) } : {}),
+        empleados: seleccionados.map((emp) => ({
           empleado_id: emp.id,
+          ...(country.paisCodigo === 'PE' ? { remuneracion_gratificacion_previa: basesGratificacionPayload(basesGratificacion, planilla.periodo, emp.id) } : {}),
           dias_trabajados: emp.dias_trabajados,
           horas_extras_25: emp.horas_extras_25,
           horas_extras_35: emp.horas_extras_35,
@@ -230,16 +274,10 @@ export default function PlanillaCalcularModal({
         })),
       };
 
-      const response = await post(
-        `/api/rrhh/planillas/${planilla.id}/calcular-personalizada`,
-        datosCalculados,
-      );
-
-      if (response?.success) {
+      const result = await operation.perform(datosCalculados,planilla,seleccionados);
+      if (result === 'CALCULATE') {
         onSuccess();
         onClose();
-      } else {
-        throw new Error("Error calculando planilla");
       }
     } catch (error: any) {
       console.error("Error calculando planilla:", error);
@@ -250,17 +288,41 @@ export default function PlanillaCalcularModal({
   };
 
   // Cálculos totales
-  const totalIngresos = empleados.reduce(
+  const visibles=restoredScope.current===readScope?empleados:[];
+  const seleccionados = visibles.filter(empleado => empleado.incluir);
+  const totalIngresos = seleccionados.reduce(
     (sum, emp) => sum + emp.total_ingresos,
     0,
   );
-  const totalDescuentos = empleados.reduce(
+  const totalDescuentos = seleccionados.reduce(
     (sum, emp) => sum + emp.total_descuentos,
     0,
   );
-  const totalNeto = empleados.reduce((sum, emp) => sum + emp.neto_pagar, 0);
+  const totalNeto = seleccionados.reduce((sum, emp) => sum + emp.neto_pagar, 0);
 
-  if (!isOpen) return null;
+  if (!isOpen || !planilla || planilla.tenant_id!==tenant?.id) return null;
+
+  if (operation.pending && operation.pending.payroll.id === planilla.id) {
+    const intent=operation.pending,request=payrollCalculationRequest(intent);
+    const resume=async(resolve: boolean)=>{
+      const result=await (resolve ? operation.resolve() : operation.perform());
+      if (result) {onSuccess();onClose();}
+    };
+    return <Dialog open={isOpen} onOpenChange={(open)=>{if(!open)onClose();}}>
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+        <DialogHeader><DialogTitle>Cálculo pendiente de confirmación · {intent.payroll.period}</DialogTitle></DialogHeader>
+        <p className="text-sm">Se conserva la solicitud original de {intent.employees.length} empleados. El reintento utiliza sus mismos datos. La conciliación recupera un cálculo ya confirmado o abandona de forma segura una solicitud que no se confirmó.</p>
+        <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr><th className="text-left">Empleado</th><th>Días trabajados</th><th>Horas extras 25%</th><th>Horas extras 35%</th><th>Tardanzas</th><th>Faltas</th><th>Bonos</th></tr></thead><tbody>
+          {request.empleados.map((input:any)=>{const employee=intent.employees.find(row=>row.id.toLowerCase()===input.empleado_id.toLowerCase())!;return <tr key={input.empleado_id}><td>{employee.name}<br/>{employee.document}</td><td>{input.dias_trabajados}</td><td>{input.horas_extras_25}</td><td>{input.horas_extras_35}</td><td>{input.tardanzas_minutos}</td><td>{input.faltas}</td><td>{input.bonos_adicionales ?? 0}</td></tr>;})}
+        </tbody></table></div>
+        {request.eps_cobertura && <p className="text-sm">Cobertura EPS original: {request.eps_cobertura.periodo_cobertura} · {request.eps_cobertura.referencia} · {intent.payroll.currency} {request.eps_cobertura.monto_pagado}</p>}
+        {(operation.error || operation.recoveryError) && <div role="alert" className="text-sm text-destructive">{operation.error || operation.recoveryError}</div>}
+        <div className="flex flex-wrap gap-2"><Button disabled={operation.busy || !operation.ready || !canCalculate || checkingCalculate || !!operation.recoveryError} onClick={()=>{void resume(false);}}>Reintentar solicitud original</Button>
+          <Button variant="outline" disabled={operation.busy || !operation.ready || !canCalculate || checkingCalculate || !!operation.recoveryError} onClick={()=>{void resume(true);}}>Conciliar o abandonar solicitud</Button>
+          <Button variant="outline" onClick={onClose}>Cerrar y conservar solicitud</Button></div>
+      </DialogContent>
+    </Dialog>;
+  }
 
   return (
     <Dialog
@@ -271,6 +333,7 @@ export default function PlanillaCalcularModal({
         <DialogHeader className="shrink-0 border-b border-border px-6 py-5">
           <DialogTitle>🧮 Calcular Planilla {planilla?.periodo}</DialogTitle>
         </DialogHeader>
+        {(operation.error || operation.recoveryError) && <div role="alert" className="text-sm text-destructive">{operation.error || operation.recoveryError}</div>}
 
         <div className="flex flex-1 flex-col overflow-hidden px-6">
           {/* Información de la planilla */}
@@ -306,7 +369,7 @@ export default function PlanillaCalcularModal({
           <div className="grid grid-cols-[repeat(4,_1fr)] gap-4 mb-4 shrink-0">
             <div className="bg-[var(--emerald-50)] p-4 text-center border">
               <div className="text-2xl font-bold text-[var(--emerald-600)]">
-                {empleados.length}
+                {seleccionados.length}
               </div>
               <div className="text-[0.875rem] text-[var(--emerald-700)]">
                 Empleados
@@ -336,11 +399,14 @@ export default function PlanillaCalcularModal({
             </div>
           </div>
 
+          <p className="my-2 text-sm text-muted-foreground">Los importes de esta vista son estimados. Al calcular se resolverán la normativa, los contratos, la gratificación y el crédito EPS aplicables; revisa los totales definitivos en la planilla calculada antes de aprobarla.</p>
+          {loadError && <div role="alert" className="my-2 text-destructive">{loadError} <Button variant="outline" onClick={loadEmpleados} disabled={loading}>Reintentar lectura</Button></div>}
           {/* Tabla de empleados estilo Excel */}
           <div className="flex-[1] overflow-auto border">
             <table className="w-[100%] text-[0.875rem] bg-card">
               <thead className="sticky top-0 bg-[var(--primary-100)] z-[10]">
                 <tr>
+                  <th className="p-3 border">Incluir</th>
                   <th className="p-3 border min-w-[200px]">👤 EMPLEADO</th>
                   <th className="p-3 border min-w-[120px]">💰 SUELDO BASE</th>
                   <th className="p-3 border min-w-[80px]">📅 DÍAS</th>
@@ -361,8 +427,9 @@ export default function PlanillaCalcularModal({
                 </tr>
               </thead>
               <tbody>
-                {empleados.map((empleado, index) => (
+                {visibles.map((empleado, index) => (
                   <tr key={empleado.id}>
+                    <td className="p-3 border"><input type="checkbox" aria-label={`Incluir ${empleado.nombres} ${empleado.apellidos}`} checked={empleado.incluir} disabled={calculando} onChange={event => setEmpleados(current => current.map(item => item.id === empleado.id ? {...item,incluir:event.target.checked} : item))}/></td>
                     <td className="p-3 border sticky left-0 font-semibold">
                       <div>
                         {empleado.nombres} {empleado.apellidos}
@@ -528,9 +595,10 @@ export default function PlanillaCalcularModal({
         </div>
 
         <div className="flex shrink-0 flex-wrap justify-end gap-3 border-t border-border p-6">
+          {country.paisCodigo === 'PE' && <div className="w-full max-h-64 overflow-y-auto space-y-3"><BasesGratificacionForm periodo={planilla.periodo} empleados={seleccionados} value={basesGratificacion} onChange={setBasesGratificacion}/><EpsCoberturaForm periodo={planilla.periodo} value={epsCobertura} onChange={setEpsCobertura} onReadReadyChange={setEpsReadReady}/></div>}
           <Button
             onClick={calcularPlanillaCompleta}
-            disabled={loading || calculando}
+            disabled={loading || calculando || !!loadError || !sourceReady || checkingCalculate || !canCalculate || !operation.ready || !!operation.pending || !!operation.recoveryError || restoredScope.current!==readScope || !seleccionados.length || (epsCobertura.enabled && !epsReadReady)}
           >
             {calculando ? "⏳ Calculando..." : "🧮 Calcular Planilla"}
           </Button>

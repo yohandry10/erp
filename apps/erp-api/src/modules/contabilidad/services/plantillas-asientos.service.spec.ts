@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { PlantillasAsientosService } from './plantillas-asientos.service';
 import { AsientosService } from './asientos.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
@@ -49,6 +49,19 @@ describe('PlantillasAsientosService', () => {
     { cuenta_id: 'cuenta-63', debe: 500, haber: 0, concepto: 'Alquiler' },
     { cuenta_id: 'cuenta-42', debe: 0, haber: 500, concepto: 'Arrendador' }
   ];
+
+  it('rechaza la consulta de detalle indisponible con 503 sin exponer el error interno', async () => {
+    tablas.plantillas_asientos = { data: { id: 'plantilla-1' }, error: null };
+    tablas.plantillas_asientos_detalle = { data: null, error: { code: '42501', message: 'permission denied for table private_detail' } };
+    await expect(service.obtener(TENANT, 'plantilla-1')).rejects.toBeInstanceOf(ServiceUnavailableException);
+    await expect(service.obtener(TENANT, 'plantilla-1')).rejects.toThrow('No se pudo consultar el detalle');
+  });
+
+  it('no transforma una fuente indisponible en plantilla ausente o lista vacía', async () => {
+    tablas.plantillas_asientos = { data: null, error: { code: '08006', message: 'private connection failure' } };
+    await expect(service.obtener(TENANT, 'plantilla-1')).rejects.toBeInstanceOf(ServiceUnavailableException);
+    await expect(service.listar(TENANT)).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
 
   beforeEach(async () => {
     tablas = {};

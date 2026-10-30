@@ -92,20 +92,23 @@ export function SaldoFavorMovimientosModal({ saldoId, onClose, onUpdated }: Prop
       toast({ variant: 'destructive', title: 'Selecciona una sesión propia abierta', description: 'La reposición de caja debe ingresar a una sesión explícita de la misma moneda.' })
       return
     }
-    keys.current[movimiento.id] ??= newKey(movimiento.id)
+    const payload = {
+      motivo: motivo.trim(),
+      ...(cash ? { sesion_caja_id: sesionId } : {}),
+    }
+    const fingerprint = JSON.stringify([movimiento.id, payload])
+    keys.current[fingerprint] ??= newKey(movimiento.id)
     setSaving(movimiento.id)
     try {
       await post(
         `/api/ventas/rma/saldos-favor/${saldoId}/reembolsos/${movimiento.id}/revertir`,
-        {
-          motivo: motivo.trim(),
-          ...(cash ? { sesion_caja_id: sesionId } : {}),
-        },
-        { headers: { 'Idempotency-Key': keys.current[movimiento.id] } },
+        payload,
+        { headers: { 'Idempotency-Key': keys.current[fingerprint] } },
       )
       toast({ title: 'Reembolso revertido', description: 'El saldo a favor y la tesorería fueron repuestos con asiento inverso trazable.' })
       await load()
       await onUpdated()
+      delete keys.current[fingerprint]
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'No se pudo revertir el reembolso', description: error?.message ?? 'Error inesperado' })
     } finally {

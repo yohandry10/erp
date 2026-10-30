@@ -10,12 +10,20 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useCountryContext } from "@/hooks/use-country-context";
+import { customAuth } from "@/lib/auth-service";
+import { fetchApi } from "@/lib/api-fetch";
+import { isOfflineCachedResponse } from "@/lib/offline-store";
+import { readLivePayroll, readPayrollList, readPayrollDetail, readPayrollPaymentDestinations } from "@/lib/rrhh/payroll-read-contract";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePermission } from "@/hooks/use-permission";
+import { payrollPaymentIntentKey, readPayrollPaymentIntent, createPayrollPaymentIntent, confirmPayrollPayment, type PayrollPaymentIntent, type PayrollPaymentPayload } from "@/lib/rrhh/payroll-payment-operation";
 
 interface PlanillaPagarModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
   planilla: any;
+  onPendingChange?: () => void;
 }
 
 interface EmpleadoPago {
@@ -55,8 +63,25 @@ export default function PlanillaPagarModal({
   onClose,
   onSuccess,
   planilla,
+  onPendingChange,
 }: PlanillaPagarModalProps) {
-  const { get, post } = useApi();
+  // El pago se rechaza con motivos que el usuario debe leer (por ejemplo, la
+  // segregación aprobador/pagador); sin throwOnError llegaba null y un texto genérico.
+  const { post } = useApi({ requireLive: true, retries: 0, throwOnError: true, showErrorToast: false });
+  const { session } = useAuth();
+  const { hasPermission: canPay, loading: permissionsLoading } = usePermission('rrhh', 'pay', 'planillas');
+  const tenantId = session?.user?.tenant_id || '', actorId = session?.user?.id || '';
+  const scope = `${tenantId}:${actorId}`;
+  const activeScope = useRef(scope); activeScope.current = scope;
+  const activePermission = useRef(false); activePermission.current = canPay && !permissionsLoading;
+  const operationEpoch = useRef(0), writing = useRef(false);
+  const pendingBytes = useRef<string | null>(null);
+  const [pendingIntent, setPendingIntent] = useState<PayrollPaymentIntent | null>(null);
+  const [storageError, setStorageError] = useState('');
+  const [intentReady, setIntentReady] = useState('');
+  const [livePayroll, setLivePayroll] = useState<any>(null);
+  const [liveDetails, setLiveDetails] = useState<any[]>([]);
+  const visibleIntent = pendingIntent?.tenantId === tenantId && pendingIntent.actorId === actorId ? pendingIntent : null;
   const country = useCountryContext();
   const currencySymbol = country.simboloMoneda || "S/";
   const locale = country.locale || "es-PE";
@@ -64,27 +89,50 @@ export default function PlanillaPagarModal({
   const [pagando, setPagando] = useState(false);
   const [empleados, setEmpleados] = useState<EmpleadoPago[]>([]);
   const [error, setError] = useState("");
+  const [readError, setReadError] = useState("");
+  const [readReady, setReadReady] = useState(false);
+  const readGeneration = useRef(0);
   const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancariaPago[]>([]);
   const [sesionesCaja, setSesionesCaja] = useState<SesionCajaPago[]>([]);
   const [cuentaBancariaId, setCuentaBancariaId] = useState("");
   const [sesionCajaId, setSesionCajaId] = useState("");
   const [referencia, setReferencia] = useState("");
-  const paymentKeyRef = useRef("");
   const [metodoPago, setMetodoPago] = useState<"efectivo" | "transferencia">(
     "transferencia",
   );
 
-  const loadDetallePlanilla = useCallback(async () => {
-    if (!isOpen || !planilla?.id) return;
+  const loadPaymentData = useCallback(async () => {
+    if (!isOpen || !planilla?.id || !tenantId || !actorId || !activePermission.current) return;
+    const generation = ++readGeneration.current;
+    setLoading(true); setReadReady(false); setReadError("");
+    setEmpleados([]); setCuentasBancarias([]); setSesionesCaja([]); setLivePayroll(null); setLiveDetails([]);
+    let recovered = false;
     try {
-      setLoading(true);
-      setError("");
-      const response = await get(`/api/rrhh/planillas/${planilla.id}/detalle`);
-      const detalles = Array.isArray(response)
-        ? response
-        : Array.isArray(response?.data)
-          ? response.data
-          : [];
+      const actor = (await customAuth.getRequestSession()).session?.user;
+      if (!actor || `${actor.tenant_id}:${actor.id}` !== scope) throw new Error('La sesión cambió. Consulte nuevamente el pago.');
+      setStorageError(''); setIntentReady('');
+      const serialized = localStorage.getItem(payrollPaymentIntentKey({ tenantId, actorId }));
+      const pending = readPayrollPaymentIntent(serialized, { tenantId, actorId });
+      pendingBytes.current = serialized;
+      recovered = true;
+      setPendingIntent(pending); setIntentReady(scope);
+      if (pending && pending.payroll.id !== planilla.id) throw new Error('Existe un pago pendiente de otra planilla. Retómelo desde el listado.');
+      if (pending) {
+        setMetodoPago(pending.payload.metodo_pago); setCuentaBancariaId(pending.payload.cuenta_bancaria_id || ''); setSesionCajaId(pending.payload.sesion_caja_id || ''); setReferencia(pending.payload.referencia || '');
+      }
+      const [headers, detalles, response] = await Promise.all([
+        readLivePayroll('/api/rrhh/planillas', readPayrollList),
+        readLivePayroll(`/api/rrhh/planillas/${planilla.id}/detalle`, data => readPayrollDetail(data, planilla)),
+        fetchApi('/api/rrhh/planillas/tesoreria/destinos'),
+      ]);
+      if (!response.ok || isOfflineCachedResponse(response) || response.headers.get('x-erp-offline-queued') === 'true') throw new Error('No se pudieron consultar los destinos actuales del pago.');
+      const destinos = readPayrollPaymentDestinations(await response.json());
+      const current = (await customAuth.getRequestSession()).session?.user;
+      if (!actor || current?.id !== actor.id || current.tenant_id !== actor.tenant_id) throw new Error('La sesión cambió durante la consulta del pago. Reintente.');
+      if (generation !== readGeneration.current || activeScope.current !== scope || !activePermission.current) return;
+      const header = headers.find(row => row.id === planilla.id && row.tenant_id === tenantId);
+      if (!header) throw new Error('No se pudo recuperar la planilla actual de esta empresa.');
+      setLivePayroll(header); setLiveDetails(detalles);
       setEmpleados(
         detalles.map((detalle: any) => ({
           id: String(detalle.id),
@@ -99,60 +147,47 @@ export default function PlanillaPagarModal({
           estado_pago: String(detalle.estado_pago || "pendiente").toLowerCase(),
         })),
       );
+      setCuentasBancarias(destinos.cuentas_bancarias); setSesionesCaja(destinos.sesiones_caja);
+      if (!pending) {
+        setCuentaBancariaId(currentId => destinos.cuentas_bancarias.some((row: any) => row.id === currentId) ? currentId : String(destinos.cuentas_bancarias[0]?.id || ''));
+        setSesionCajaId(currentId => destinos.sesiones_caja.some((row: any) => row.id === currentId) ? currentId : String(destinos.sesiones_caja[0]?.id || ''));
+      }
+      setReadReady(true);
     } catch (loadError: any) {
-      console.error("Error cargando el detalle de planilla:", loadError);
-      setError(loadError?.message || "No se pudo cargar el detalle de la planilla");
-      setEmpleados([]);
+      if (generation !== readGeneration.current || activeScope.current !== scope) return;
+      setIntentReady(scope);
+      if (!recovered) setStorageError(loadError?.message || 'No se pudo recuperar el pago pendiente.');
+      setReadError(loadError?.message || "No se pudo consultar la información completa del pago.");
     } finally {
-      setLoading(false);
+      if (generation === readGeneration.current) setLoading(false);
     }
-  }, [get, isOpen, planilla?.id]);
+  }, [isOpen, planilla, tenantId, actorId, scope, canPay, permissionsLoading]);
 
   useEffect(() => {
-    void loadDetallePlanilla();
-  }, [loadDetallePlanilla]);
-
-  const loadDestinosTesoreria = useCallback(async () => {
-    if (!isOpen) return;
-    try {
-      const response = await get("/api/rrhh/planillas/tesoreria/destinos");
-      const payload = response?.data ?? response ?? {};
-      const cuentas = Array.isArray(payload?.cuentas_bancarias)
-        ? payload.cuentas_bancarias
-        : [];
-      const sesiones = Array.isArray(payload?.sesiones_caja)
-        ? payload.sesiones_caja
-        : [];
-      setCuentasBancarias(cuentas);
-      setSesionesCaja(sesiones);
-      setCuentaBancariaId((current) => current || String(cuentas[0]?.id || ""));
-      setSesionCajaId((current) => current || String(sesiones[0]?.id || ""));
-    } catch (loadError: any) {
-      setCuentasBancarias([]);
-      setSesionesCaja([]);
-      setError(loadError?.message || "No se pudieron cargar los destinos de tesorería");
-    }
-  }, [get, isOpen]);
+    void loadPaymentData();
+    return () => { readGeneration.current++; operationEpoch.current++; };
+  }, [isOpen, loadPaymentData]);
 
   useEffect(() => {
-    if (isOpen && !paymentKeyRef.current) paymentKeyRef.current = crypto.randomUUID();
-    void loadDestinosTesoreria();
-  }, [isOpen, loadDestinosTesoreria]);
+    setPendingIntent(null); setStorageError(''); setIntentReady(''); setReadReady(false); setError(''); setPagando(false); setReferencia(''); setCuentaBancariaId(''); setSesionCajaId(''); writing.current = false;
+    pendingBytes.current = null;
+    return () => { operationEpoch.current++; readGeneration.current++; };
+  }, [scope]);
 
   const totalNeto = useMemo(
     () => empleados.reduce((sum, empleado) => sum + empleado.neto_pagar, 0),
     [empleados],
   );
-  const planillaAprobada = String(planilla?.estado || "").toLowerCase() === "aprobada";
+  const planillaAprobada = String(livePayroll?.estado || "").toLowerCase() === "aprobada";
   const cerrarModal = () => {
-    paymentKeyRef.current = "";
     setReferencia("");
     setError("");
     onClose();
   };
 
   const procesarPago = async () => {
-    if (!planillaAprobada) {
+    if (!readReady || loading || readError || storageError || intentReady !== scope || !activePermission.current || writing.current || pagando) return;
+    if (!planillaAprobada && !(visibleIntent && livePayroll?.estado === 'pagada')) {
       setError("La planilla debe estar aprobada antes de pagarla.");
       return;
     }
@@ -169,37 +204,56 @@ export default function PlanillaPagarModal({
       return;
     }
 
+    const submittedScope = scope, epoch = operationEpoch.current;
+    const currentOperation = () => submittedScope === activeScope.current && epoch === operationEpoch.current && activePermission.current;
     try {
+      writing.current = true;
       setPagando(true);
       setError("");
-      const response = await post(`/api/rrhh/planillas/${planilla.id}/pagar`, {
+      const actor = (await customAuth.getRequestSession()).session?.user;
+      if (!actor || `${actor.tenant_id}:${actor.id}` !== submittedScope || !currentOperation()) throw new Error('La sesión cambió. El pago pendiente se conserva.');
+      const ownScope = { tenantId, actorId }, storageKey = payrollPaymentIntentKey(ownScope);
+      const original = localStorage.getItem(storageKey);
+      if (original !== pendingBytes.current) throw new Error('El pago pendiente cambió en otra ventana. Consulte nuevamente sus datos antes de reintentar.');
+      const stored = readPayrollPaymentIntent(original, ownScope);
+      const payload: PayrollPaymentPayload = {
         metodo_pago: metodoPago,
-        idempotency_key: paymentKeyRef.current,
-        cuenta_bancaria_id: metodoPago === "transferencia" ? cuentaBancariaId : undefined,
-        sesion_caja_id: metodoPago === "efectivo" ? sesionCajaId : undefined,
-        referencia: metodoPago === "transferencia" ? referencia.trim() : undefined,
-      });
-      if (!response?.success) {
-        throw new Error(response?.message || "La transacción de pago no fue confirmada");
-      }
-
-      const empleadosPagados = response?.data?.empleadosPagados ?? empleados.length;
-      const totalPagado = toAmount(response?.data?.totalPagado ?? totalNeto);
+        idempotency_key: stored?.payload.idempotency_key || crypto.randomUUID(),
+        ...(metodoPago === 'transferencia' ? { cuenta_bancaria_id: cuentaBancariaId, referencia: referencia.trim() } : { sesion_caja_id: sesionCajaId }),
+      };
+      const candidate = stored || createPayrollPaymentIntent(ownScope, livePayroll, liveDetails, payload, country.paisCodigo);
+      if (candidate.payroll.id !== planilla.id) throw new Error('Retome el pago pendiente de su planilla original.');
+      if (!stored && metodoPago === 'transferencia' && cuentasBancarias.find(row => row.id === cuentaBancariaId)?.moneda !== candidate.payroll.currency) throw new Error('La moneda de la cuenta bancaria no coincide con la planilla.');
+      const serialized = original ?? JSON.stringify(candidate);
+      if (localStorage.getItem(storageKey) !== original) throw new Error('El pago pendiente cambió en otra ventana. Sus datos se conservan.');
+      if (original === null) localStorage.setItem(storageKey, serialized);
+      if (localStorage.getItem(storageKey) !== serialized) throw new Error('No se pudo conservar el pago antes de enviarlo.');
+      pendingBytes.current = serialized;
+      setPendingIntent(candidate); onPendingChange?.();
+      const response = await post(`/api/rrhh/planillas/${candidate.payroll.id}/pagar`, candidate.payload);
+      const currentActor = (await customAuth.getRequestSession()).session?.user;
+      if (!currentOperation() || !currentActor || `${currentActor.tenant_id}:${currentActor.id}` !== submittedScope) return;
+      const confirmed = confirmPayrollPayment(response, candidate, ownScope, country.paisCodigo);
+      if (localStorage.getItem(storageKey) !== serialized) throw new Error('El pago pendiente cambió. No se retira la operación de otra ventana.');
+      localStorage.removeItem(storageKey);
+      if (localStorage.getItem(storageKey) !== null) throw new Error('No se pudo retirar el pago confirmado. Reintente la misma operación.');
+      pendingBytes.current = null;
+      setPendingIntent(null); onPendingChange?.();
+      const empleadosPagados = confirmed.empleadosPagados;
+      const totalPagado = confirmed.totalPagado;
       alert(
         `✅ Planilla pagada en una sola operación\n\n${empleadosPagados} empleados · ${currencySymbol} ${totalPagado.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       );
       onSuccess();
-      paymentKeyRef.current = "";
       onClose();
     } catch (paymentError: any) {
-      console.error("Error pagando la planilla:", paymentError);
-      setError(paymentError?.message || "No se pudo pagar la planilla");
+      if (currentOperation()) setError(paymentError?.message || "No se pudo pagar la planilla");
     } finally {
-      setPagando(false);
+      if (currentOperation()) { setPagando(false); writing.current = false; }
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !canPay || permissionsLoading || !tenantId || !actorId || planilla?.tenant_id !== tenantId) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && !pagando && cerrarModal()}>
@@ -208,7 +262,17 @@ export default function PlanillaPagarModal({
           <DialogTitle>💰 Pagar planilla {planilla?.periodo}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-1 flex-col gap-4 overflow-hidden px-6 py-5">
+        {visibleIntent && <div className="mx-6 mt-4 rounded-xl border border-amber-500/40 p-4 text-sm" role="status">
+          <p className="font-semibold">Pago pendiente de confirmación · {visibleIntent.payroll.period}</p>
+          <p>{visibleIntent.payroll.currency} {visibleIntent.payroll.total.toFixed(2)} · {visibleIntent.payroll.employees.length} empleados · {visibleIntent.payload.metodo_pago}</p>
+          {visibleIntent.payload.referencia && <p>Referencia: {visibleIntent.payload.referencia}</p>}
+          <p>Los importes y el destino se conservan. Reintente este mismo pago con conexión.</p>
+        </div>}
+
+        {!readReady || intentReady !== scope ? <div className="px-6 py-5" role={readError ? 'alert' : 'status'}>
+          {readError ? <><p>{readError}</p><Button variant="outline" disabled={loading} onClick={() => void loadPaymentData()}>Reintentar consulta de pago</Button></> : <p>Cargando información actual del pago…</p>}
+        </div> : <div className="flex flex-1 flex-col gap-4 overflow-hidden px-6 py-5">
+          <Button variant="outline" disabled={pagando} onClick={() => void loadPaymentData()}>Actualizar consulta de pago</Button>
           <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm text-foreground">
             <div className="font-semibold">Pago total y atómico</div>
             <p className="mt-1 text-muted-foreground">
@@ -218,7 +282,7 @@ export default function PlanillaPagarModal({
             </p>
           </div>
 
-          {!planillaAprobada && (
+          {!planillaAprobada && !(visibleIntent && livePayroll?.estado === 'pagada') && (
             <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-300">
               Esta planilla no está aprobada. Vuelva al listado y complete la aprobación.
             </div>
@@ -245,9 +309,10 @@ export default function PlanillaPagarModal({
           <label className="flex flex-col gap-2 text-sm font-semibold sm:max-w-xs">
             Método de pago
             <select
+              aria-label="Método de pago"
               value={metodoPago}
               onChange={(event) => setMetodoPago(event.target.value as "efectivo" | "transferencia")}
-              disabled={pagando}
+              disabled={pagando || !!visibleIntent}
               className="rounded-md border border-input bg-background px-3 py-2 font-normal"
             >
               <option value="transferencia">Transferencia</option>
@@ -260,9 +325,10 @@ export default function PlanillaPagarModal({
               <label className="flex flex-col gap-2 text-sm font-semibold">
                 Cuenta bancaria
                 <select
+                  aria-label="Cuenta bancaria"
                   value={cuentaBancariaId}
                   onChange={(event) => setCuentaBancariaId(event.target.value)}
-                  disabled={pagando}
+                  disabled={pagando || !!visibleIntent}
                   className="rounded-md border border-input bg-background px-3 py-2 font-normal"
                 >
                   <option value="">Seleccione una cuenta</option>
@@ -278,7 +344,7 @@ export default function PlanillaPagarModal({
                 <input
                   value={referencia}
                   onChange={(event) => setReferencia(event.target.value)}
-                  disabled={pagando}
+                  disabled={pagando || !!visibleIntent}
                   maxLength={180}
                   placeholder="Ej. OP-2026-000123"
                   className="rounded-md border border-input bg-background px-3 py-2 font-normal"
@@ -289,9 +355,10 @@ export default function PlanillaPagarModal({
             <label className="flex flex-col gap-2 text-sm font-semibold sm:max-w-md">
               Sesión de caja del pagador
               <select
+                aria-label="Sesión de caja del pagador"
                 value={sesionCajaId}
                 onChange={(event) => setSesionCajaId(event.target.value)}
-                disabled={pagando}
+                disabled={pagando || !!visibleIntent}
                 className="rounded-md border border-input bg-background px-3 py-2 font-normal"
               >
                 <option value="">Seleccione una sesión abierta</option>
@@ -334,17 +401,17 @@ export default function PlanillaPagarModal({
               </tbody>
             </table>
           </div>
-        </div>
+        </div>}
 
         <div className="flex shrink-0 flex-wrap justify-end gap-3 border-t border-border p-6">
           <Button variant="outline" onClick={cerrarModal} disabled={pagando}>Cancelar</Button>
-          <Button
+          {readReady && <Button
             variant="success"
             onClick={procesarPago}
-            disabled={loading || pagando || !planillaAprobada || empleados.length === 0}
+            disabled={loading || pagando || writing.current || !readReady || !!storageError || intentReady !== scope || (!planillaAprobada && !(visibleIntent && livePayroll?.estado === 'pagada')) || empleados.length === 0}
           >
-            {pagando ? "Procesando…" : `Pagar planilla completa · ${currencySymbol} ${totalNeto.toFixed(2)}`}
-          </Button>
+            {pagando ? "Procesando…" : visibleIntent ? 'Reintentar pago pendiente' : `Pagar planilla completa · ${currencySymbol} ${totalNeto.toFixed(2)}`}
+          </Button>}
         </div>
       </DialogContent>
     </Dialog>

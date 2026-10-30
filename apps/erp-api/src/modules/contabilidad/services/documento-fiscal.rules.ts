@@ -54,6 +54,20 @@ export function esEstadoFiscal(estado: string | null | undefined): boolean {
   return !(ESTADOS_NO_FISCALES as readonly string[]).includes(normalizado);
 }
 
+/** Un borrador de venta todavía no emite ni rectifica un comprobante. */
+export function esBorradorVentaFiscal(estado: string | null | undefined): boolean {
+  return String(estado ?? '').trim().toUpperCase() === 'BORRADOR';
+}
+
+/** Una firma técnica sin documento emitido todavía no rectifica el libro de ventas. */
+export function esNotaFiscalSinDocumento(
+  tipoDocumento: string | null | undefined,
+  documentoId: string | null | undefined,
+): boolean {
+  return ['NOTA_CREDITO', 'NOTA_DEBITO'].includes(normalizarTipo(tipoDocumento))
+    && !String(documentoId ?? '').trim();
+}
+
 export function esVentaFiscal(tipoDocumento: string | null | undefined): boolean {
   return (TIPOS_DOCUMENTO_VENTA_FISCAL as readonly string[]).includes(
     normalizarTipo(tipoDocumento),

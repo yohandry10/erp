@@ -17,6 +17,15 @@ type Almacen = {
   descripcion?: string | null
   activo: boolean
   es_principal?: boolean
+  sucursal_id?: string | null
+}
+
+type Sucursal = { id: string; nombre: string; codigo_establecimiento: string; activo: boolean }
+
+const ERRORES_ALMACEN: Record<string, string> = {
+  INVENTORY_WAREHOUSE_BRANCH_LOCKED_BY_HISTORY: 'El almacén ya tiene stock o movimientos: no puede cambiar de establecimiento.',
+  INVENTORY_WAREHOUSE_BRANCH_LOCKED_BY_CASH: 'El almacén está asignado a una caja: cambie primero la caja.',
+  ESTABLISHMENT_NOT_ACTIVE_IN_TENANT: 'El establecimiento elegido no está activo.',
 }
 
 type Ubicacion = {
@@ -36,6 +45,7 @@ type AlmacenForm = {
   telefono: string
   descripcion: string
   es_principal: boolean
+  sucursal_id: string
 }
 
 type UbicacionForm = {
@@ -52,6 +62,7 @@ const EMPTY_ALMACEN: AlmacenForm = {
   telefono: '',
   descripcion: '',
   es_principal: false,
+  sucursal_id: '',
 }
 
 const EMPTY_UBICACION: UbicacionForm = {
@@ -70,12 +81,15 @@ function NoPermission() {
 }
 
 export default function AlmacenesPage() {
-  const { get, post, put, del } = useApi()
+  const { get, post, put, del } = useApi({ throwOnError: true })
+  // El guardado muestra el motivo del rechazo en la tarjeta del formulario.
+  const almacenWriter = useApi({ throwOnError: true, showErrorToast: false })
   const intentsRef = useRef(new Map<string, { fingerprint: string; key: string }>())
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [almacenes, setAlmacenes] = useState<Almacen[]>([])
+  const [sucursales, setSucursales] = useState<Sucursal[]>([])
   const [ubicacionesPorAlmacen, setUbicacionesPorAlmacen] = useState<Record<string, Ubicacion[]>>({})
   const [expanded, setExpanded] = useState<string | null>(null)
   const [almacenEditor, setAlmacenEditor] = useState<{ id?: string; data: AlmacenForm } | null>(null)
@@ -101,10 +115,17 @@ export default function AlmacenesPage() {
     setLoading(true)
     setError(null)
     try {
-      const response = await get('/inventario/almacenes?includeInactive=true')
+      const [response, sucursalesResponse] = await Promise.all([
+        get('/inventario/almacenes?includeInactive=true'),
+        get('/sucursales'),
+      ])
+      if (!response?.success || !Array.isArray(response.data) || !Array.isArray(sucursalesResponse?.data)) {
+        throw new Error('La respuesta de almacenes o establecimientos está incompleta.')
+      }
       setAlmacenes(response?.success && Array.isArray(response.data) ? response.data : [])
+      setSucursales(Array.isArray(sucursalesResponse?.data) ? sucursalesResponse.data : [])
     } catch {
-      setError('No se pudieron cargar los almacenes. Intenta nuevamente.')
+      setError('No se pudieron cargar los almacenes y establecimientos. Intenta nuevamente.')
       setAlmacenes([])
     } finally {
       setLoading(false)
@@ -116,6 +137,7 @@ export default function AlmacenesPage() {
   }, [loadAlmacenes])
 
   const loadUbicaciones = useCallback(async (almacenId: string) => {
+    setError(null)
     try {
       const response = await get(`/inventario/almacenes/${almacenId}/ubicaciones`)
       setUbicacionesPorAlmacen((prev) => ({
@@ -148,14 +170,15 @@ export default function AlmacenesPage() {
         telefono: almacenEditor.data.telefono.trim() || undefined,
         descripcion: almacenEditor.data.descripcion.trim() || undefined,
         es_principal: almacenEditor.data.es_principal,
+        sucursal_id: almacenEditor.data.sucursal_id || undefined,
       }
       const id = almacenEditor.id
       const response = id
-        ? await put(
+        ? await almacenWriter.put(
             `/inventario/almacenes/${id}`,
             withIntent(`inventory-warehouse-update:${id}`, payload),
           )
-        : await post(
+        : await almacenWriter.post(
             '/inventario/almacenes',
             withIntent('inventory-warehouse-create', payload),
           )
@@ -163,7 +186,9 @@ export default function AlmacenesPage() {
       setAlmacenEditor(null)
       await loadAlmacenes()
     } catch (caught: any) {
-      setError(caught?.message || 'No se pudo guardar el almacén.')
+      const message = String(caught?.message || '')
+      const code = Object.keys(ERRORES_ALMACEN).find((key) => message.includes(key))
+      setError(code ? ERRORES_ALMACEN[code] : message || 'No se pudo guardar el almacén.')
     } finally {
       setSaving(false)
     }
@@ -294,6 +319,12 @@ export default function AlmacenesPage() {
                   <label className="space-y-1 text-sm">Código *<Input aria-label="Código de almacén" value={almacenEditor.data.codigo} onChange={(event) => setAlmacenEditor((current) => current && ({ ...current, data: { ...current.data, codigo: event.target.value } }))} /></label>
                   <label className="space-y-1 text-sm">Nombre *<Input aria-label="Nombre de almacén" value={almacenEditor.data.nombre} onChange={(event) => setAlmacenEditor((current) => current && ({ ...current, data: { ...current.data, nombre: event.target.value } }))} /></label>
                   <label className="space-y-1 text-sm">Dirección<Input value={almacenEditor.data.direccion} onChange={(event) => setAlmacenEditor((current) => current && ({ ...current, data: { ...current.data, direccion: event.target.value } }))} /></label>
+                  <label className="space-y-1 text-sm">Establecimiento
+                    <select aria-label="Establecimiento del almacén" className="flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm" value={almacenEditor.data.sucursal_id} onChange={(event) => setAlmacenEditor((current) => current && ({ ...current, data: { ...current.data, sucursal_id: event.target.value } }))}>
+                      <option value="">Por defecto (casa matriz)</option>
+                      {sucursales.filter((sucursal) => sucursal.activo || sucursal.id === almacenEditor.data.sucursal_id).map((sucursal) => <option key={sucursal.id} value={sucursal.id}>{sucursal.codigo_establecimiento} · {sucursal.nombre}</option>)}
+                    </select>
+                  </label>
                   <label className="space-y-1 text-sm">Teléfono<Input value={almacenEditor.data.telefono} onChange={(event) => setAlmacenEditor((current) => current && ({ ...current, data: { ...current.data, telefono: event.target.value } }))} /></label>
                 </div>
                 <label className="block space-y-1 text-sm">Descripción<Input value={almacenEditor.data.descripcion} onChange={(event) => setAlmacenEditor((current) => current && ({ ...current, data: { ...current.data, descripcion: event.target.value } }))} /></label>
@@ -311,7 +342,7 @@ export default function AlmacenesPage() {
             <CardContent>
               {loading ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">Cargando almacenes…</p>
-              ) : almacenes.length === 0 ? (
+              ) : error && almacenes.length === 0 ? null : almacenes.length === 0 ? (
                 <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">No hay almacenes registrados.</p>
               ) : (
                 <ul className="space-y-3">
@@ -325,13 +356,14 @@ export default function AlmacenesPage() {
                               <strong>{almacen.nombre}</strong><code className="rounded bg-muted px-2 py-0.5 text-xs">{almacen.codigo}</code>
                               {almacen.es_principal && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">Principal</span>}
                               <span className={almacen.activo ? 'text-xs font-semibold text-emerald-600' : 'text-xs font-semibold text-muted-foreground'}>{almacen.activo ? 'Activo' : 'Inactivo'}</span>
+                              {(() => { const sucursal = sucursales.find((item) => item.id === almacen.sucursal_id); return sucursal ? <span className="text-xs text-muted-foreground">{sucursal.codigo_establecimiento} · {sucursal.nombre}</span> : null })()}
                             </div>
                             {(almacen.direccion || almacen.descripcion) && <p className="mt-1 text-sm text-muted-foreground">{almacen.direccion || almacen.descripcion}</p>}
                           </div>
                           <div className="flex flex-wrap gap-2">
                             <Button size="sm" variant="outline" onClick={() => toggleExpanded(almacen.id)}>{expanded === almacen.id ? 'Ocultar ubicaciones' : 'Ver ubicaciones'}</Button>
                             <ProtectedComponent modulo="inventario" recurso="almacenes" accion="update">
-                              <Button size="sm" variant="outline" onClick={() => setAlmacenEditor({ id: almacen.id, data: { codigo: almacen.codigo, nombre: almacen.nombre, direccion: almacen.direccion ?? '', telefono: almacen.telefono ?? '', descripcion: almacen.descripcion ?? '', es_principal: almacen.es_principal === true } })}><Pencil className="mr-1 h-3.5 w-3.5" />Editar</Button>
+                              <Button size="sm" variant="outline" onClick={() => setAlmacenEditor({ id: almacen.id, data: { codigo: almacen.codigo, nombre: almacen.nombre, direccion: almacen.direccion ?? '', telefono: almacen.telefono ?? '', descripcion: almacen.descripcion ?? '', es_principal: almacen.es_principal === true, sucursal_id: almacen.sucursal_id ?? '' } })}><Pencil className="mr-1 h-3.5 w-3.5" />Editar</Button>
                             </ProtectedComponent>
                             <ProtectedComponent modulo="inventario" recurso="almacenes" accion={almacen.activo ? 'delete' : 'update'}>
                               <Button size="sm" variant="ghost" onClick={() => changeWarehouseState(almacen)}>{almacen.activo ? <Power className="mr-1 h-3.5 w-3.5" /> : <RotateCcw className="mr-1 h-3.5 w-3.5" />}{almacen.activo ? 'Desactivar' : 'Reactivar'}</Button>

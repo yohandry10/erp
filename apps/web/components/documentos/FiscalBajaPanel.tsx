@@ -3,44 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, RefreshCw, Search, Send, ShieldCheck } from 'lucide-react'
 import { useApiCall } from '@/hooks/use-api'
-import { unwrapApiArray } from '@/lib/api-contract'
+import { readFiscalBajaSources, type TipoLote, type CpeBajaElegible, type LoteFiscal } from '@/lib/cpe-baja-read-contract'
+import { useTenant } from '@/contexts/TenantContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
-
-type TipoLote = 'RA' | 'RC'
-
-interface CpeBajaElegible {
-  id: string
-  tipo: TipoLote
-  tipoDocumento: '01' | '03'
-  serie: string
-  numero: string
-  fechaEmision: string
-  receptor?: string
-  receptorDocumento?: string
-  total: number
-  moneda: string
-  reversaComercialConfirmada: true
-}
-
-interface LoteFiscal {
-  id: string
-  tipo: TipoLote
-  numero_comunicacion?: string
-  numero_resumen?: string
-  comprobantes_ids?: string[]
-  estado: string
-  motivo_baja?: string
-  fecha_comunicacion?: string
-  fecha_referencia?: string
-  idempotency_key?: string
-  ticket_sunat?: string
-  codigo_respuesta?: string
-  descripcion_respuesta?: string
-  ultimo_error?: string
-  next_retry_at?: string
-}
 
 const inputClass =
   'w-full rounded-xl border border-cyan-400/20 bg-card/75 px-3 py-2.5 text-sm text-foreground outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
@@ -65,45 +32,54 @@ function newIntentKey(prefix: string): string {
 export default function FiscalBajaPanel({ onChanged }: { onChanged?: () => void | Promise<void> }) {
   const { toast } = useToast()
   const [tipo, setTipo] = useState<TipoLote>('RA')
-  const [eligible, setEligible] = useState<CpeBajaElegible[]>([])
-  const [batches, setBatches] = useState<LoteFiscal[]>([])
+  const [eligibleRows, setEligible] = useState<CpeBajaElegible[]>([])
+  const [batchRows, setBatches] = useState<LoteFiscal[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [motivo, setMotivo] = useState('Baja fiscal posterior a reversa comercial confirmada')
   const [working, setWorking] = useState<string | null>(null)
   const [readError, setReadError] = useState<string | null>(null)
   const createKey = useRef<string | null>(null)
-  const { get } = useApiCall<any>({ showErrorToast: false, throwOnError: true })
-  const { post } = useApiCall<any>({ showErrorToast: false, throwOnError: true })
+  const { tenant, user } = useTenant()
+  const scope = `${tenant?.id || ''}:${user?.id || ''}:${tipo}`
+  const currentScope = useRef(scope); currentScope.current = scope
+  const generation = useRef(0)
+  const [readyScope, setReadyScope] = useState('')
+  const [readLoading, setReadLoading] = useState(false)
+  const readReady = readyScope === scope && !!tenant?.id && !!user?.id
+  const eligible = readReady ? eligibleRows : []
+  const batches = readReady ? batchRows : []
+  const { get } = useApiCall<any>({ showErrorToast: false, throwOnError: true, requireLive: true })
+  const { post } = useApiCall<any>({ showErrorToast: false, throwOnError: true, requireLive: true })
 
+  const currentGet = useRef(get); currentGet.current = get
   const loadFiscal = useCallback(async () => {
-    setReadError(null)
-    const [eligibleResult, batchResult] = await Promise.allSettled([
-      get(`/api/cpe/baja/elegibles?tipo=${tipo}`),
-      get(`/api/cpe/baja/lotes?tipo=${tipo}`),
-    ])
-    if (eligibleResult.status === 'fulfilled') {
-      setEligible(unwrapApiArray<CpeBajaElegible>(eligibleResult.value))
-    } else {
-      setEligible([])
-      setReadError(eligibleResult.reason instanceof Error
-        ? eligibleResult.reason.message
-        : 'No se pudieron consultar los CPE elegibles')
-    }
-    if (batchResult.status === 'fulfilled') {
-      setBatches(unwrapApiArray<LoteFiscal>(batchResult.value))
-    } else {
-      setBatches([])
-      setReadError((current) => current ?? (batchResult.reason instanceof Error
-        ? batchResult.reason.message
-        : 'No se pudieron consultar los lotes fiscales'))
-    }
-  }, [get, tipo])
+    if (currentScope.current !== scope || currentGet.current !== get) return false
+    const current = ++generation.current
+    const active = () => current === generation.current && currentScope.current === scope && currentGet.current === get
+    setReadyScope(''); setReadLoading(true); setReadError(null)
+    try {
+      if (!tenant?.id || !user?.id) throw new Error('Confirme su sesión para consultar bajas fiscales.')
+      const [eligibleResult, batchResult] = await Promise.all([
+        get(`/api/cpe/baja/elegibles?tipo=${tipo}`),
+        get(`/api/cpe/baja/lotes?tipo=${tipo}`),
+      ])
+      if (!active()) return false
+      const result = readFiscalBajaSources(eligibleResult, batchResult, tipo, tenant.id)
+      setEligible(result.eligible); setBatches(result.batches); setReadyScope(scope)
+      return true
+    } catch (error) {
+      if (!active()) return false
+      setEligible([]); setBatches([])
+      setReadError(error instanceof Error ? error.message : 'No se pudieron consultar las bajas fiscales actuales')
+      return false
+    } finally { if (active()) setReadLoading(false) }
+  }, [get, tipo, scope, tenant?.id, user?.id])
 
   useEffect(() => {
-    setSelectedIds([])
-    createKey.current = null
+    setSelectedIds([]); createKey.current = null; setWorking(null)
     void loadFiscal()
-  }, [loadFiscal, tipo])
+    return () => { generation.current += 1 }
+  }, [loadFiscal])
 
   const selected = useMemo(
     () => eligible.filter((cpe) => selectedIds.includes(cpe.id)),
@@ -127,7 +103,7 @@ export default function FiscalBajaPanel({ onChanged }: { onChanged?: () => void 
   }
 
   const crearLote = async () => {
-    if (selected.length === 0) return
+    if (!readReady || selected.length === 0) return
     if (tipo === 'RA' && motivo.trim().length < 3) {
       toast({ title: 'Motivo requerido', description: 'Describe la razón de la baja fiscal.', variant: 'destructive' })
       return
@@ -177,7 +153,7 @@ export default function FiscalBajaPanel({ onChanged }: { onChanged?: () => void 
   }
 
   const reanudarFirma = async (lote: LoteFiscal) => {
-    if (!lote.idempotency_key || !Array.isArray(lote.comprobantes_ids)) return
+    if (!readReady || !lote.idempotency_key || !Array.isArray(lote.comprobantes_ids)) return
     setWorking(`resume:${lote.id}`)
     try {
       const payload = lote.tipo === 'RA'
@@ -204,6 +180,7 @@ export default function FiscalBajaPanel({ onChanged }: { onChanged?: () => void 
   }
 
   const enviarLote = async (lote: LoteFiscal) => {
+    if (!readReady) return
     setWorking(`send:${lote.id}`)
     try {
       const endpoint = lote.tipo === 'RA'
@@ -225,6 +202,7 @@ export default function FiscalBajaPanel({ onChanged }: { onChanged?: () => void 
   }
 
   const consultarLote = async (lote: LoteFiscal) => {
+    if (!readReady) return
     setWorking(`status:${lote.id}`)
     try {
       const endpoint = lote.tipo === 'RA'
@@ -256,7 +234,7 @@ export default function FiscalBajaPanel({ onChanged }: { onChanged?: () => void 
               RA corresponde a facturas; RC usa operación 3 para boletas. Esta pantalla no repite la reversa comercial.
             </p>
           </div>
-          <Button type="button" variant="outline" onClick={refreshAll} disabled={Boolean(working)} className="gap-2">
+          <Button type="button" variant="outline" onClick={refreshAll} disabled={Boolean(working) || readLoading} className="gap-2">
             <RefreshCw className={`h-4 w-4 ${working ? 'animate-spin' : ''}`} />
             Actualizar bajas
           </Button>
@@ -270,6 +248,7 @@ export default function FiscalBajaPanel({ onChanged }: { onChanged?: () => void 
               type="button"
               role="tab"
               aria-selected={tipo === candidate}
+              disabled={Boolean(working)}
               variant={tipo === candidate ? 'default' : 'outline'}
               onClick={() => setTipo(candidate)}
             >
@@ -279,7 +258,7 @@ export default function FiscalBajaPanel({ onChanged }: { onChanged?: () => void 
         </div>
 
         {readError && (
-          <div className="rounded-xl border border-red-300/25 bg-red-300/10 px-4 py-3 text-sm text-red-500 dark:text-red-200">
+          <div role="alert" className="rounded-xl border border-red-300/25 bg-red-300/10 px-4 py-3 text-sm text-red-500 dark:text-red-200">
             {readError}. Verifica los permisos cpe.comprobantes.anular/consultar.
           </div>
         )}
@@ -287,10 +266,10 @@ export default function FiscalBajaPanel({ onChanged }: { onChanged?: () => void 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(340px,0.75fr)]">
           <div className="overflow-hidden rounded-2xl border border-cyan-400/15 bg-card/40">
             <div className="border-b border-cyan-400/10 px-4 py-3">
-              <div className="font-semibold">CPE elegibles ({eligible.length})</div>
+              <div className="font-semibold">CPE elegibles ({readReady ? eligible.length : '—'})</div>
               <div className="text-xs text-muted-foreground">Selecciona uno o más CPE ya revertidos comercialmente.</div>
             </div>
-            {eligible.length === 0 ? (
+            {!readReady ? (<div className="p-5 text-sm text-muted-foreground">{readLoading ? 'Cargando bajas fiscales…' : 'Consulta de bajas no disponible.'}</div>) : eligible.length === 0 ? (
               <div className="flex min-h-36 flex-col items-center justify-center gap-2 p-5 text-center text-sm text-muted-foreground">
                 <CheckCircle2 className="h-7 w-7 text-cyan-300/60" />
                 No hay {tipo === 'RA' ? 'facturas' : 'boletas'} pendientes de baja fiscal.
@@ -359,7 +338,7 @@ export default function FiscalBajaPanel({ onChanged }: { onChanged?: () => void 
             <div className="font-semibold">Seguimiento y reintentos {tipo}</div>
             <div className="text-xs text-muted-foreground">Los tickets y errores sobreviven recargas; un resultado aceptado/rechazado es terminal.</div>
           </div>
-          {batches.length === 0 ? (
+          {!readReady ? (<div className="p-5 text-sm text-muted-foreground">{readLoading ? 'Cargando seguimiento…' : 'Seguimiento no disponible.'}</div>) : batches.length === 0 ? (
             <div className="p-5 text-sm text-muted-foreground">Todavía no hay lotes {tipo}.</div>
           ) : (
             <div className="overflow-x-auto">
@@ -391,17 +370,17 @@ export default function FiscalBajaPanel({ onChanged }: { onChanged?: () => void 
                         </td>
                         <td className="px-4 py-3 text-right">
                           {estado === 'PENDIENTE' && (
-                            <Button type="button" size="sm" variant="outline" onClick={() => reanudarFirma(lote)} disabled={Boolean(working)} className="gap-1">
+                            <Button type="button" size="sm" variant="outline" onClick={() => reanudarFirma(lote)} disabled={Boolean(working) || !readReady} className="gap-1">
                               <RefreshCw className="h-4 w-4" /> Reanudar firma
                             </Button>
                           )}
                           {estado === 'GENERADO' && (
-                            <Button type="button" size="sm" onClick={() => enviarLote(lote)} disabled={Boolean(working)} className="gap-1 bg-cyan-600 text-white hover:bg-cyan-500">
+                            <Button type="button" size="sm" onClick={() => enviarLote(lote)} disabled={Boolean(working) || !readReady} className="gap-1 bg-cyan-600 text-white hover:bg-cyan-500">
                               <Send className="h-4 w-4" /> {lote.ultimo_error ? 'Reintentar envío' : 'Enviar'}
                             </Button>
                           )}
                           {estado === 'ENVIADO' && lote.ticket_sunat && (
-                            <Button type="button" size="sm" variant="outline" onClick={() => consultarLote(lote)} disabled={Boolean(working)} className="gap-1">
+                            <Button type="button" size="sm" variant="outline" onClick={() => consultarLote(lote)} disabled={Boolean(working) || !readReady} className="gap-1">
                               <Search className="h-4 w-4" /> Consultar ticket
                             </Button>
                           )}

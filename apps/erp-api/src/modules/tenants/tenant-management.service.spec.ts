@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException, ConflictException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, NotFoundException, ConflictException, ForbiddenException, ServiceUnavailableException } from '@nestjs/common';
 import { TenantManagementService } from './tenant-management.service';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { TenantContextService } from '../../shared/tenant/tenant-context.service';
@@ -364,6 +364,25 @@ describe('TenantManagementService', () => {
     describe('createTenant', () => {
     // El alta pasa un plazo propio al RPC (`.abortSignal`).
     const abortable = (value: unknown) => ({ abortSignal: jest.fn(() => Promise.resolve(value)) });
+        const createDto={razon_social:'Empresa nueva',ruc:'20123456789',email:'alta@example.test',pais_id:1};
+        it.each(['57014','08006','PGRST000','',undefined])('error de infraestructura %s responde503 sin detalles internos ni falso alta',async(code)=>{
+            mockClient.single.mockResolvedValueOnce({data:{id:1,codigo_iso:'PE',moneda_codigo:'PEN'},error:null});
+            mockClient.rpc.mockReturnValueOnce(abortable({data:null,error:{code,message:'AbortError private_database_detail'}}));
+            try {await service.createTenant(createDto as any,actorId,idempotencyKey);throw Error('Debe rechazar');}
+            catch(error){expect(error).toBeInstanceOf(ServiceUnavailableException);expect(String(error)).not.toContain('private_');expect(String(error)).toMatch(/mism[ao] (operación|formulario)/);}
+            expect(mockClient.rpc).toHaveBeenCalledTimes(1);
+            expect(mockClient.rpc.mock.calls[0][1].p_idempotency_key).toBe(idempotencyKey);
+        });
+        it.each([['22023',BadRequestException],['23514',BadRequestException],['42501',ForbiddenException]] as const)('error SQL %s conserva su clasificación sin filtrar SQL',async(code,Type)=>{
+            mockClient.single.mockResolvedValueOnce({data:{id:1,codigo_iso:'PE',moneda_codigo:'PEN'},error:null});
+            mockClient.rpc.mockReturnValueOnce(abortable({data:null,error:{code,message:'private_database_detail'}}));
+            await expect(service.createTenant(createDto as any,actorId,idempotencyKey)).rejects.toBeInstanceOf(Type);
+        });
+        it('catálogo indisponible no se presenta como país inválido ni intenta el writer',async()=>{
+            mockClient.single.mockResolvedValueOnce({data:null,error:{message:'private_database_detail'}});
+            await expect(service.createTenant(createDto as any,actorId,idempotencyKey)).rejects.toBeInstanceOf(ServiceUnavailableException);
+            expect(mockClient.rpc).not.toHaveBeenCalled();
+        });
         it('should have createTenant method defined', () => {
             expect(service.createTenant).toBeDefined();
         });

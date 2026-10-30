@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { AuditService } from '../audit/audit.service';
@@ -143,6 +144,7 @@ export class CpeCancellationService {
         this.throwAtomicCancellationError(noteResponse.error, 'finalizar');
       }
       notaCredito = noteResponse.data;
+      if (!notaCredito || notaCredito.id !== cpe.nota_credito_id) throw new ServiceUnavailableException('No se pudo consultar la nota de crédito vinculada; reintente');
     }
 
     let cxc: any = null;
@@ -156,6 +158,7 @@ export class CpeCancellationService {
       if (cxcResponse.error) {
         this.throwAtomicCancellationError(cxcResponse.error, 'finalizar');
       }
+      if (!Array.isArray(cxcResponse.data)) throw new ServiceUnavailableException('La consulta de CxC está incompleta; reintente');
       if ((cxcResponse.data?.length ?? 0) > 1) {
         throw new ConflictException(
           'El CPE tiene más de una cuenta por cobrar y requiere saneamiento previo',
@@ -184,6 +187,7 @@ export class CpeCancellationService {
           this.throwAtomicCancellationError(cxcResponse.error, 'finalizar');
         }
         cxc = cxcResponse.data;
+        if (!cxc || cxc.id !== posResponse.data.cuenta_por_cobrar_id) throw new ServiceUnavailableException('No se pudo consultar la CxC vinculada; reintente');
       }
     }
 
@@ -193,18 +197,18 @@ export class CpeCancellationService {
       const [paymentsResponse, reversalsResponse, fiscalOperationsResponse] = await Promise.all([
         client
           .from('cxc_pagos')
-          .select('id, cuenta_id, tipo, monto, moneda, fecha_pago, metodo_pago, referencia, cuenta_bancaria_id, event_id, idempotency_key, estado, activo, metadata, created_at')
+          .select('id, cuenta_id, tipo, monto, moneda, fecha_pago, metodo_pago, referencia, cuenta_bancaria_id, event_id, idempotency_key, estado, activo, metadata, created_at', { count: 'exact' })
           .eq('tenant_id', tenantId)
           .eq('cuenta_id', cxc.id)
           .order('created_at', { ascending: true }),
         client
           .from('cxc_cobro_reversas')
-          .select('id, pago_id, medio, monto, moneda, motivo, event_id, resultado, created_at')
+          .select('id, pago_id, medio, monto, moneda, motivo, event_id, resultado, created_at', { count: 'exact' })
           .eq('tenant_id', tenantId)
           .eq('cpe_id', cpeId),
         client
           .from('operaciones_fiscales_financieras')
-          .select('id, tipo, monto, monto_contabilizado, moneda, estado, source_event_id, idempotency_key, referencia, created_at')
+          .select('id, tipo, monto, monto_contabilizado, moneda, estado, source_event_id, idempotency_key, referencia, created_at', { count: 'exact' })
           .eq('tenant_id', tenantId)
           .eq('origen', 'CLIENTE')
           .eq('cxc_id', cxc.id),
@@ -217,6 +221,11 @@ export class CpeCancellationService {
       }
       if (fiscalOperationsResponse.error) {
         this.throwAtomicCancellationError(fiscalOperationsResponse.error, 'finalizar');
+      }
+      for (const response of [paymentsResponse, reversalsResponse, fiscalOperationsResponse]) {
+        if (!Array.isArray(response.data) || response.count !== response.data.length || new Set(response.data.map(row => row.id)).size !== response.data.length) {
+          throw new ServiceUnavailableException('La trazabilidad financiera está incompleta; reintente');
+        }
       }
       const reversalByPayment = new Map(
         (reversalsResponse.data ?? []).map((row: any) => [row.pago_id, row]),
@@ -239,9 +248,9 @@ export class CpeCancellationService {
       }));
     }
 
-    const { data: sesiones, error: sesionesError } = await client
+    const { data: sesiones, error: sesionesError, count: sesionesCount } = await client
       .from('sesiones_caja')
-      .select('id, caja_id, moneda, estado, hora_apertura, cajas:caja_id(id, codigo, nombre)')
+      .select('id, caja_id, moneda, estado, hora_apertura, cajas:caja_id(id, codigo, nombre)', { count: 'exact' })
       .eq('tenant_id', tenantId)
       .eq('estado', 'ABIERTA')
       .or(
@@ -251,6 +260,7 @@ export class CpeCancellationService {
     if (sesionesError) {
       this.throwAtomicCancellationError(sesionesError, 'finalizar');
     }
+    if (!Array.isArray(sesiones) || sesionesCount !== sesiones.length || new Set(sesiones.map(row => row.id)).size !== sesiones.length) throw new ServiceUnavailableException('La consulta de sesiones de caja está incompleta; reintente');
 
     const notaAceptada = Boolean(
       notaCredito &&

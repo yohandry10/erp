@@ -1,7 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { useApi } from '@/hooks/use-api'
+import { useState } from 'react'
+import { useFinanceReport } from '@/hooks/use-finance-report'
+import FinanceReportStatus from './FinanceReportStatus'
+import { loadAllBankMovements, readBankMovements, sumReportMoney } from '@/lib/finanzas/report-read-contract'
 import { FileText, RefreshCw, Download, Filter } from 'lucide-react'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import { parseDateLocal } from '@/lib/date-utils'
@@ -24,38 +26,19 @@ interface MovimientoBancario {
 interface MovimientosReportProps {
   fechaDesde?: string
   fechaHasta?: string
+  onReadyChange?: (ready: boolean) => void
 }
 
-export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: MovimientosReportProps) {
-  const { get } = useApi()
+export default function MovimientosBancariosReport({ fechaDesde, fechaHasta, onReadyChange }: MovimientosReportProps) {
   const { country, formatCurrency } = useLocalizedMoney()
-  const [movimientos, setMovimientos] = useState<MovimientoBancario[]>([])
-  const [loading, setLoading] = useState(true)
   const [filtroTipo, setFiltroTipo] = useState<'TODOS' | 'ABONO' | 'CARGO'>('TODOS')
   const [filtroConciliado, setFiltroConciliado] = useState<'TODOS' | 'SI' | 'NO'>('TODOS')
-
-  const loadMovimientos = useCallback(async () => {
-    try {
-      setLoading(true)
-      const params = new URLSearchParams()
-      if (fechaDesde) params.append('fecha_desde', fechaDesde)
-      if (fechaHasta) params.append('fecha_hasta', fechaHasta)
-
-      const response = await get(`/api/finanzas/bancos/movimientos/periodo?${params.toString()}`)
-
-      if (response?.success) {
-        setMovimientos(response.data || [])
-      }
-    } catch (error) {
-      console.error('Error loading movimientos:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [fechaDesde, fechaHasta, get])
-
-  useEffect(() => {
-    loadMovimientos()
-  }, [loadMovimientos])
+  const params = new URLSearchParams()
+  if (fechaDesde) params.append('fecha_desde', fechaDesde)
+  if (fechaHasta) params.append('fecha_hasta', fechaHasta)
+  const { data, loading, error, reload: loadMovimientos } = useFinanceReport<MovimientoBancario[]>(
+    `/api/finanzas/bancos/movimientos/periodo?${params.toString()}`, readBankMovements, onReadyChange, loadAllBankMovements)
+  const movimientos = data ?? []
 
   const formatDate = (dateString: string) => {
     return parseDateLocal(dateString).toLocaleDateString(country.locale || 'es-PE', {
@@ -80,22 +63,15 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
       acc[key] = { abonos: 0, cargos: 0, neto: 0 }
     }
     if (mov.tipo === 'ABONO') {
-      acc[key].abonos += mov.monto
+      acc[key].abonos = sumReportMoney([acc[key].abonos, mov.monto])
     } else {
-      acc[key].cargos += mov.monto
+      acc[key].cargos = sumReportMoney([acc[key].cargos, mov.monto])
     }
-    acc[key].neto = acc[key].abonos - acc[key].cargos
+    acc[key].neto = sumReportMoney([acc[key].abonos, -acc[key].cargos])
     return acc
   }, {} as Record<string, { abonos: number; cargos: number; neto: number }>)
 
-  if (loading) {
-    return (
-      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl p-8 text-center">
-        <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
-        <p className="text-muted-foreground">Cargando movimientos bancarios...</p>
-      </div>
-    )
-  }
+  if (loading || error) return <FinanceReportStatus loading={loading} retry={loadMovimientos} />
 
   return (
     <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
@@ -180,7 +156,7 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
         </div>
       ) : (
         <div className="overflow-auto">
-          <table className="w-[100%]">
+          <table data-finance-movements className="w-[100%]">
             <thead>
               <tr>
                 <th className="text-left p-3 font-semibold text-xs text-muted-foreground">

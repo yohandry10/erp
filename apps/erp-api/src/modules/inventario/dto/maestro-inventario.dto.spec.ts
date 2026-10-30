@@ -3,6 +3,19 @@ import { validate } from 'class-validator';
 import { CreateProductoMaestroDto, UpdateAlmacenDto, UpdateUbicacionDto } from './maestro-inventario.dto';
 
 describe('DTOs de maestros de inventario 460', () => {
+  it('conserva cantidades fraccionarias y exige boolean real para declarar costo cero', async () => {
+    const payload = { codigo: 'FRAC-ZERO', nombre: 'Producto por kg', categoria: 'INSUMOS',
+      unidad_medida: 'KGM', stock_inicial: 2.5, stock_minimo: 0.125,
+      precio_compra: 0, costo_cero_confirmado: true, idempotency_key: 'fractional-zero-create' };
+    const dto = plainToInstance(CreateProductoMaestroDto, payload);
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.stock_inicial).toBe(2.5);
+    expect(dto.costo_cero_confirmado).toBe(true);
+    const invalid = await validate(plainToInstance(CreateProductoMaestroDto, {
+      ...payload, costo_cero_confirmado: 'true',
+    }));
+    expect(invalid.some((error) => error.property === 'costo_cero_confirmado')).toBe(true);
+  });
   it('exige una intención idempotente en el alta de producto', async () => {
     const dto = plainToInstance(CreateProductoMaestroDto, {
       codigo: 'SKU-1', nombre: 'Producto', categoria: 'REPUESTOS',

@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { useApi } from '@/hooks/use-api'
+import { useState } from 'react'
+import { useSalesReport, ReportReadError } from './use-sales-report'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Package, ArrowUpDown } from 'lucide-react'
@@ -33,37 +33,10 @@ type SortField = 'unidades' | 'importe'
 type SortOrder = 'asc' | 'desc'
 
 export default function ProductosMasVendidosReport({ filters }: Props) {
-  const { get } = useApi()
-  const [data, setData] = useState<ProductoVendido[]>([])
-  const [loading, setLoading] = useState(true)
   const [sortField, setSortField] = useState<SortField>('unidades')
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
-
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true)
-      const response = await get('/ventas/reportes/productos-mas-vendidos', {
-        params: filters
-      })
-
-      if (response?.success) {
-        setData(response.data || [])
-      }
-    } catch (error) {
-      console.error('Error loading report:', error)
-      toast({
-        title: 'Error',
-        description: 'No se pudo cargar el reporte',
-        variant: 'destructive'
-      })
-    } finally {
-      setLoading(false)
-    }
-  }, [filters, get])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
+  const { data: reportData, loading, error, retry } = useSalesReport<ProductoVendido[]>('/ventas/reportes/productos-mas-vendidos', filters, 'array')
+  const data = reportData || []
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -85,6 +58,8 @@ export default function ProductosMasVendidosReport({ filters }: Props) {
 
   const totalUnidades = data.reduce((sum, item) => sum + item.unidades_vendidas, 0)
   const totalProductos = new Set(data.map(row => row.producto_id)).size
+
+  if (error) return <ReportReadError error={error} retry={retry} />
 
   return (
     <Card>

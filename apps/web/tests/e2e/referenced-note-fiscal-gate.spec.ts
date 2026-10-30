@@ -1,3 +1,5 @@
+import { cpeListFixture } from './fixtures/cpe-list'
+import { fiscalCountryFixture } from './fixtures/fiscal-country'
 import { expect, test } from "@playwright/test";
 import { SignJWT } from "jose";
 import fs from "node:fs";
@@ -68,15 +70,14 @@ test.describe("NC/ND referenciada con gate fiscal 494", () => {
           body: JSON.stringify(body),
         });
       if (/\/api\/auth\/profile\/?$/.test(pathname)) return json(user);
-      if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
-        return json({
-          data: {
+      if (pathname.replace(/\/$/, '') === '/api/tenants/me') return json({ data: { id: user.tenant_id, nombre: 'Empresa aislada', estado: 'ACTIVO' } });
+    if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
+        return json(fiscalCountryFixture(user.tenant_id, {
             pais_id: 1,
             pais: "PE",
             paisCodigo: "PE",
             monedaDefecto: "PEN",
-          },
-        });
+          }));
       }
       if (/\/api\/demo\/status\/?$/.test(pathname)) {
         return json({ is_demo: false, is_expired: false });
@@ -116,7 +117,7 @@ test.describe("NC/ND referenciada con gate fiscal 494", () => {
         });
       }
       if (/\/api\/cpe\/comprobantes\/?$/.test(pathname)) {
-        return json({ success: true, data: [] });
+        return json(cpeListFixture([]));
       }
       return json({ success: true, data: [] });
     });

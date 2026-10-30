@@ -1,4 +1,4 @@
-import { ArgumentsHost, BadRequestException, ConflictException, ServiceUnavailableException } from '@nestjs/common';
+import { ArgumentsHost, BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { GlobalExceptionFilter } from './global-exception.filter';
 
 function createHost() {
@@ -51,7 +51,7 @@ describe('GlobalExceptionFilter API contract', () => {
     expect(response.json).toHaveBeenCalledWith(
       expect.objectContaining({
         statusCode: 409,
-        message: 'A record with this information already exists',
+        message: 'Ya existe un registro con estos datos',
         error: 'CONFLICT',
       }),
     );
@@ -70,6 +70,21 @@ describe('GlobalExceptionFilter API contract', () => {
         message: 'fecha_desde debe ser una fecha valida',
       }),
     );
+  });
+
+  it('reemplaza un código interno por un texto en español y lo conserva en code', () => {
+    const filter = new GlobalExceptionFilter();
+    const missing = createHost();
+    filter.catch(new NotFoundException('ADMIN_USER_NOT_FOUND'), missing.host);
+    expect(missing.response.json).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 404,
+      message: 'No se encontró el registro solicitado',
+      code: 'ADMIN_USER_NOT_FOUND',
+    }));
+
+    const legible = createHost();
+    filter.catch(new NotFoundException('Pedido no encontrado'), legible.host);
+    expect(legible.response.json).toHaveBeenCalledWith(expect.objectContaining({ message: 'Pedido no encontrado' }));
   });
 
   describe('en producción', () => {

@@ -53,12 +53,13 @@ export class CentrosCostoService {
         .select('*')
         .eq('tenant_id', tenantId)
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('❌ [CentrosCosto] Error obteniendo centro de costo:', error);
-        throw new NotFoundException(`Centro de costo no encontrado: ${error.message}`);
+        throw lecturaContableFallida(error, 'el centro de costo');
       }
+      if (!data) throw new NotFoundException('Centro de costo no encontrado');
 
       if (!data) {
         throw new NotFoundException(`Centro de costo con ID ${id} no encontrado`);

@@ -17,6 +17,40 @@ describe('CsvParserService - Plantillas Configurables', () => {
     expect(service).toBeDefined();
   });
 
+  it('conserva registros con comas, comillas escapadas y líneas dentro de la descripción', () => {
+    const csv = 'Fecha,Descripción,Referencia,Tipo,Monto\r\n2026-10-07,"Pago, ""local""\r\ncontinuación",OP1,CARGO,"1,945.31"\r\n2026-10-07,Cobro,OP2,ABONO,3.60';
+    const actual = service.parsearExtractoBancario(csv, 'GENERICO');
+    expect(actual.errores).toEqual([]);
+    expect(actual.movimientos).toEqual([
+      { fecha: '2026-10-07', descripcion: 'Pago, "local" continuación', referencia: 'OP1', tipo: 'CARGO', monto: 1945.31 },
+      { fecha: '2026-10-07', descripcion: 'Cobro', referencia: 'OP2', tipo: 'ABONO', monto: 3.6 },
+    ]);
+    expect(actual.totalCargos).toBe(1945.31);
+  });
+
+  it('rechaza comillas sin cerrar antes de construir un lote parcial', () => {
+    expect(() => service.parsearExtractoBancario('Fecha,Descripción,Referencia,Tipo,Monto\n2026-10-07,"sin cierre,OP1,CARGO,10', 'GENERICO'))
+      .toThrow('comillas sin cerrar');
+  });
+
+  it.each(['08/10/2026', '08-10-2026', '2026-10-08'])('importa la fecha %s admitida en la vista previa genérica', fecha => {
+    const parsed = service.parsearExtractoBancario(`Fecha,Descripción,Referencia,Tipo,Monto\n${fecha},Cobro,DATE-1,ABONO,11.80`, 'GENERICO');
+    expect(parsed.errores).toEqual([]);
+    expect(parsed.movimientos[0].fecha).toBe('2026-10-08');
+  });
+
+  it.each(['2026-02-29', '31/04/2026', '00-10-2026', '2026-13-01', '08/10/2026oops', '08/10-2026'])('rechaza fecha imposible o ambigua %s sin producir movimiento', fecha => {
+    const parsed = service.parsearExtractoBancario(`Fecha,Descripción,Referencia,Tipo,Monto\n${fecha},Cobro,DATE-1,ABONO,11.80`, 'GENERICO');
+    expect(parsed.errores).toHaveLength(1);
+    expect(parsed.movimientos).toEqual([]);
+  });
+
+  it('acepta el 29 de febrero únicamente en año bisiesto', () => {
+    const parsed = service.parsearExtractoBancario('Fecha,Descripción,Cargo,Abono,Saldo\n29/02/2024,Cobro,0,11.80,11.80', 'BCP');
+    expect(parsed.errores).toEqual([]);
+    expect(parsed.movimientos[0].fecha).toBe('2024-02-29');
+  });
+
   describe('Plantillas Predefinidas', () => {
     it('debe parsear CSV con plantilla BCP (cargo/abono separado)', () => {
       const csvBCP = `Fecha,Descripcion,Cargo,Abono,Saldo

@@ -5,6 +5,19 @@
 - No reviertas cambios existentes que no hayas hecho.
 - No ejecutes acciones destructivas fuera del alcance solicitado.
 
+## Meta global del UAT
+
+- Por instrucción expresa del usuario, el trabajo debe continuar hasta completar
+  todo el UAT y acreditar READY FOR PROD con evidencia verificable.
+- Ningún agente debe dar por terminado el UAT al cerrar una fase, obtener pruebas
+  verdes o conservar NO_GO. Debe continuar con los pendientes reales y mantener
+  el estado de continuidad actualizado.
+- No declarar aceptación sin pruebas ni ocultar casos pendientes. Una dependencia
+  externa real debe quedar identificada después de agotar el trabajo independiente;
+  no permite marcar la meta completa.
+- Esta meta conserva las restricciones operativas y no autoriza despliegues,
+  promociones, borrados ni escrituras empresariales adicionales en PROD.
+
 ## Lectura mínima
 
 Antes de analizar o modificar:

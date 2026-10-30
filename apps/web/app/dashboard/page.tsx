@@ -42,6 +42,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/erp/status-badge'
 import { useApiCall } from '@/hooks/use-api'
+import { readDashboardStats, readDashboardActivities } from '@/lib/operational-read-contract'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { useConfigurationStatus } from './hooks/useConfigurationStatus'
 import { ConfigurationBanner } from './components/ConfigurationBanner'
@@ -54,6 +55,8 @@ import { parseDateLocal } from '@/lib/date-utils'
 // ============================================================================
 
 interface DashboardStats {
+  monedaBase: string
+  importesPorMoneda: Array<{ moneda: string; ventasMes: number; ventasHoy: number; comprasMes: number }>
   totalCpe: number
   totalGre: number
   totalSire: number
@@ -83,6 +86,7 @@ interface RecentActivity {
   type: 'CPE' | 'GRE' | 'COMPRA' | 'COTIZACION' | 'VENTA'
   description: string
   amount?: number
+  moneda?: string
   date: string
   status: 'success' | 'warning' | 'error' | 'pending'
 }
@@ -101,6 +105,8 @@ const formatCurrency = (value: number | undefined, currencySymbol: string, local
   })}`
 
 const DEFAULT_DASHBOARD_STATS: DashboardStats = {
+  monedaBase: '',
+  importesPorMoneda: [],
   totalCpe: 0,
   totalGre: 0,
   totalSire: 0,
@@ -343,8 +349,7 @@ function FinancialFlowChart({
   const chartData = data
     .filter((d) => d.chart !== false)
     .map((d) => ({ label: d.label, value: d.value, tone: d.tone }))
-  const total = chartData.reduce((s, d) => s + d.value, 0)
-  const hasReal = total > 0
+  const hasReal = chartData.some(d => d.value !== 0)
 
   const renderTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null
@@ -614,9 +619,9 @@ function ActivityTimeline({
                         minute: '2-digit',
                       })}
                     </span>
-                    {activity.amount ? (
+                    {activity.amount !== undefined ? (
                       <span className={`${tabularNum} text-[0.7rem] ${tonePalette.cyan.text}`}>
-                        {formatCurrency(activity.amount, currencySymbol, locale)}
+                        {formatCurrency(activity.amount, activity.moneda!, locale)}
                       </span>
                     ) : null}
                   </div>
@@ -800,8 +805,9 @@ function ModuleTile({
 // ============================================================================
 
 export default function Dashboard() {
-  const { get } = useApiCall({ throwOnError: true, timeoutMs: 30000 })
-  const dashboardFetchInFlightRef = useRef(false)
+  const { get } = useApiCall({ throwOnError: true, requireLive: true, showErrorToast: false, timeoutMs: 30000 })
+  const dashboardReadGeneration = useRef(0)
+  const [isReady, setIsReady] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<DashboardStats>(DEFAULT_DASHBOARD_STATS)
@@ -812,58 +818,40 @@ export default function Dashboard() {
   const country = useCountryContext()
   const isPeru = country.paisCodigo === 'PE'
   const fiscalAuthority = country.servicioFiscal || (isPeru ? 'SUNAT' : 'Autoridad fiscal')
-  const currencySymbol = country.simboloMoneda || 'S/'
+  const currencySymbol = stats.monedaBase || country.simboloMoneda || 'S/'
   const locale = country.locale || 'es-PE'
 
-  const fetchDashboardData = useCallback(async (showLoading = false) => {
-    if (dashboardFetchInFlightRef.current) {
-      return
-    }
-
-    dashboardFetchInFlightRef.current = true
-
+  const fetchDashboardData = useCallback(async (_showLoading = false) => {
+    const generation = ++dashboardReadGeneration.current
+    setIsRefreshing(true)
+    setIsReady(false)
+    setStats(DEFAULT_DASHBOARD_STATS)
+    setActivities([])
+    setLastUpdate('')
+    setError(null)
     try {
-      if (!showLoading) setIsRefreshing(true)
-      setError(null)
-
-      const [statsResult, activitiesResult] = await Promise.allSettled([
-        get('/dashboard/stats'),
-        get('/dashboard/activities'),
+      const [statsResponse, activitiesResponse] = await Promise.all([
+        get('/dashboard/stats'), get('/dashboard/activities'),
       ])
-
-      if (statsResult.status === 'fulfilled' && statsResult.value?.success) {
-        setStats({ ...DEFAULT_DASHBOARD_STATS, ...statsResult.value.data })
-      } else {
-        const reason =
-          statsResult.status === 'rejected'
-            ? statsResult.reason
-            : statsResult.value?.message || 'Error al obtener estadísticas'
-        setError(
-          `No se pudieron actualizar las métricas: ${reason instanceof Error ? reason.message : String(reason)}`,
-        )
+      const nextStats = readDashboardStats(statsResponse) as DashboardStats
+      const nextActivities = readDashboardActivities(activitiesResponse) as RecentActivity[]
+      if (generation !== dashboardReadGeneration.current) return
+      setStats(nextStats)
+      setActivities(nextActivities)
+      setLastUpdate(new Date(nextStats.ultimaActualizacion!).toLocaleTimeString('es-PE'))
+      setIsReady(true)
+    } catch {
+      if (generation === dashboardReadGeneration.current) {
+        setError('No se pudo consultar el panel completo. Reintente para recuperar las métricas y actividades actuales.')
       }
-
-      if (activitiesResult.status === 'fulfilled' && activitiesResult.value?.success) {
-        setActivities(activitiesResult.value.data || [])
-      } else {
-        // Sin lectura no hay «actividad vacía»: se avisa junto a las métricas.
-        setActivities([])
-        setError((actual) => actual ?? 'No se pudieron cargar las actividades recientes. Actualiza en unos minutos.')
-      }
-
-      setLastUpdate(new Date().toLocaleTimeString('es-PE'))
-    } catch (err) {
-      setError(
-        `No se pudieron actualizar las métricas: ${err instanceof Error ? err.message : 'Error desconocido'}`,
-      )
     } finally {
-      dashboardFetchInFlightRef.current = false
-      setIsRefreshing(false)
+      if (generation === dashboardReadGeneration.current) setIsRefreshing(false)
     }
   }, [get])
 
   useEffect(() => {
-    fetchDashboardData(true)
+    void fetchDashboardData(true)
+    return () => { dashboardReadGeneration.current += 1 }
   }, [fetchDashboardData])
 
   useEffect(() => {
@@ -909,7 +897,6 @@ export default function Dashboard() {
   // Derived metrics
   const alertasCriticas =
     Number(stats?.productosConStockBajo ?? 0) + Number(stats?.ordenesCompraPendientes ?? 0)
-  const crecimiento = Number(stats?.crecimientoVentas ?? 0)
   const saludOperativa = Math.max(0, Math.min(100, 100 - alertasCriticas))
   const eficienciaFiscal = Number(stats?.totalCpe ?? 0) +
     (isPeru ? Number(stats?.totalGre ?? 0) + Number(stats?.totalSire ?? 0) : 0)
@@ -971,6 +958,7 @@ export default function Dashboard() {
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Dashboard sin sincronización completa</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
+            <Button type="button" variant="outline" onClick={handleRefresh}>Reintentar</Button>
           </Alert>
         ) : null}
 
@@ -983,7 +971,7 @@ export default function Dashboard() {
                 ERP Command Center
               </span>
               <span className={`rounded-full border px-2.5 py-1 text-[0.65rem] font-medium uppercase tracking-wider ${tonePalette.emerald.chip}`}>
-                Datos reales del tenant
+                {isReady ? 'Datos reales del tenant' : isRefreshing ? 'Consultando datos' : 'Datos no disponibles'}
               </span>
             </div>
             <h1 className="text-3xl font-bold tracking-tight text-white group-data-[erp-theme=light]/dashboard:text-foreground md:text-4xl">
@@ -1006,23 +994,21 @@ export default function Dashboard() {
           </Button>
         </header>
 
+        {isRefreshing && <p role="status">Consultando métricas y actividades...</p>}
+        {isReady && <>
         {/* ─── KPI STRIP ──────────────────────────────────────────────── */}
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <MetricTile
-            label="Revenue operativo"
+            label="Ventas registradas"
             value={formatCurrency(stats?.ventasMes, currencySymbol, locale)}
-            delta={{
-              value: `${crecimiento > 0 ? '+' : ''}${crecimiento}%`,
-              direction: crecimiento > 0 ? 'up' : crecimiento < 0 ? 'down' : 'neutral',
-              description: 'vs mes anterior',
-            }}
+            delta={{ value: '', direction: 'neutral', description: 'Comprobantes y POS del periodo' }}
             icon={DollarSign}
             tone="cyan"
           />
           <MetricTile
             label="Compras del periodo"
             value={formatCurrency(stats?.comprasMes, currencySymbol, locale)}
-            delta={{ value: '', direction: 'neutral', description: 'Inversión registrada' }}
+            delta={{ value: '', direction: 'neutral', description: 'Órdenes vigentes del periodo' }}
             icon={ShoppingCart}
             tone="violet"
           />
@@ -1044,6 +1030,17 @@ export default function Dashboard() {
             icon={Package}
             tone="emerald"
           />
+        </section>
+
+        <section className={`${surface} p-5`} aria-labelledby="dashboard-currencies">
+          <h3 id="dashboard-currencies" className={cardTitle}>Importes por moneda</h3>
+          <p className="mt-1 text-xs text-muted-foreground">Los indicadores y el inventario se expresan en {stats.monedaBase}. Los importes de otras monedas se muestran por separado, sin conversión. Las notas de crédito restan de ventas; las órdenes anuladas, canceladas o rechazadas se excluyen de compras.</p>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-left text-sm tabular-nums">
+              <thead><tr><th scope="col">Moneda</th><th scope="col">Ventas mes</th><th scope="col">Ventas hoy</th><th scope="col">Compras vigentes</th></tr></thead>
+              <tbody>{stats.importesPorMoneda.map(row => <tr key={row.moneda} data-currency={row.moneda}><th scope="row">{row.moneda}</th><td>{formatCurrency(row.ventasMes,row.moneda,locale)}</td><td>{formatCurrency(row.ventasHoy,row.moneda,locale)}</td><td>{formatCurrency(row.comprasMes,row.moneda,locale)}</td></tr>)}</tbody>
+            </table>
+          </div>
         </section>
 
         {/* ─── HERO ROW: Flujo + Mix fiscal ───────────────────────────── */}
@@ -1122,6 +1119,8 @@ export default function Dashboard() {
             hint="Equipo activo"
           />
         </section>
+
+        </>}
 
       </div>
     </main>

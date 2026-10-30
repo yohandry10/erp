@@ -105,6 +105,8 @@ const normativa = {
   asignacionFamiliar: 113,
   afpAporte: 0.1,
   afpPrimaSeguro: 0.0137,
+  // Parámetro explícito de la fixture; no configura el valor de producción2026.
+  afpRemuneracionMaxAsegurable: 12178.56,
   afpComisionFlujoDefault: 0.0155,
   onpAporte: 0.13,
   essaludAporte: 0.09,
@@ -308,6 +310,25 @@ describe('calcularEmpleadoPersonalizado — contrato autoritativo', () => {
   const calcularPersonalizado = (empleado: any, periodo = '2026-01') =>
     (service as any).calcularEmpleadoPersonalizado(empleado, conceptos, normativa, periodo);
 
+  it('separa cinco días aprobados sin duplicar remuneración ni aportes', () => {
+    const r = calcularPersonalizado({ id: 'vacaciones-ui', sueldo_base: 1200,
+      dias_trabajados: 30, dias_vacaciones: 5,
+      contratos: [{ estado: 'vigente', regimen_pensionario: 'ONP' }] }, '2026-10');
+    expect(montoDe(r, '001')).toBe(1000);
+    expect(montoDe(r, '008')).toBe(200);
+    expect(r.totalIngresos).toBe(1200);
+    expect(montoDe(r, '104')).toBe(156);
+    expect(r.totalAportes).toBe(108);
+    expect(r.netoPagar).toBe(1044);
+  });
+
+  it('no omite vacaciones de la declaración cuando falta el concepto', () => {
+    expect(() => (service as any).calcularEmpleadoPersonalizado({ id: 'vacaciones-ui',
+      sueldo_base: 1200, dias_trabajados: 30, dias_vacaciones: 5 },
+      conceptos.filter(c => c.codigo !== '008'), normativa, '2026-10'))
+      .toThrow('Falta el concepto de remuneración vacacional 008');
+  });
+
   it.each([
     { dias: 15, aporte: 101.7, ingresos: 750 },
     { dias: 30, aporte: 135, ingresos: 1500 },
@@ -405,6 +426,8 @@ describe('persistencia atomica de planilla', () => {
     const rpc = jest.fn().mockResolvedValue({
       data: {
         success: true,
+        planillaId: '22222222-2222-4222-8222-222222222222',
+        idempotent: false,
         totalEmpleados: 1,
         totalIngresos: 2000,
         totalDescuentos: 260,

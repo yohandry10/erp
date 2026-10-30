@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   CheckCircle,
@@ -154,12 +154,14 @@ const normalizeOrden = (raw: any): OrdenCompra => ({
 export default function OrdenesCompraPage() {
   const { formatCurrency: formatLocalizedCurrency, locale, taxIdLabel } = useLocalizedMoney()
   const router = useRouter()
-  const { get } = useApi()
+  const { get } = useApi({ throwOnError: true, showErrorToast: false })
 
   const [ordenes, setOrdenes] = useState<OrdenCompra[]>([])
   const [ordenEditando, setOrdenEditando] = useState<OrdenCompra | null>(null)
   const [proveedores, setProveedores] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
+  const latestRead = useRef(0)
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban')
   const [estadoFilter, setEstadoFilter] = useState<string>('')
   const [proveedorFilter, setProveedorFilter] = useState<string>('')
@@ -171,8 +173,10 @@ export default function OrdenesCompraPage() {
   const itemsPerPage = 10
 
   const loadOrdenes = useCallback(async () => {
+    const request = ++latestRead.current
     try {
       setLoading(true)
+      setLoadError(false)
       const params = new URLSearchParams()
 
       if (estadoFilter) params.append('estado', estadoFilter)
@@ -186,35 +190,27 @@ export default function OrdenesCompraPage() {
         params.append('offset', offset.toString())
       }
 
-      const response = await get(`/compras/ordenes?${params.toString()}`)
-
-      if (response?.success) {
-        const data = (Array.isArray(response.data) ? response.data : []).map(normalizeOrden)
-        setOrdenes(data)
-        const count = toNumber(response.count) || data.length
-        setTotalOrdenes(count)
-        setTotalPages(Math.max(1, Math.ceil(count / itemsPerPage)))
+      const [response, suppliers] = await Promise.all([
+        get(`/compras/ordenes?${params.toString()}`),
+        get('/compras/proveedores?activo=true'),
+      ])
+      if (!response?.success || !Array.isArray(response.data)
+        || !Number.isSafeInteger(response.count) || response.count < response.data.length
+        || !suppliers?.success || !Array.isArray(suppliers.data)) {
+        throw new Error('Catálogo de compras incompleto')
       }
+      if (request !== latestRead.current) return
+      const data = response.data.map(normalizeOrden)
+      setOrdenes(data)
+      setProveedores(suppliers.data)
+      setTotalOrdenes(response.count)
+      setTotalPages(Math.max(1, Math.ceil(response.count / itemsPerPage)))
     } catch (error) {
-      console.error('Error loading ordenes:', error)
-      toast.error('Error: No se pudieron cargar las ordenes de compra')
+      if (request === latestRead.current) setLoadError(true)
     } finally {
-      setLoading(false)
+      if (request === latestRead.current) setLoading(false)
     }
   }, [estadoFilter, proveedorFilter, fechaDesde, fechaHasta, currentPage, viewMode, get])
-
-  const loadProveedores = useCallback(async () => {
-    try {
-      const response = await get('/compras/proveedores?activo=true')
-      if (response?.success) setProveedores(Array.isArray(response.data) ? response.data : [])
-    } catch (error) {
-      console.error('Error loading proveedores:', error)
-    }
-  }, [get])
-
-  useEffect(() => {
-    loadProveedores()
-  }, [loadProveedores])
 
   useEffect(() => {
     loadOrdenes()
@@ -368,6 +364,10 @@ export default function OrdenesCompraPage() {
       </div>
     )
   }
+
+  if (loadError) return (
+    <div className="p-6"><h1>Órdenes de Compra</h1><div role="alert" className="my-4 rounded-lg border p-4">No se pudo cargar el catálogo de órdenes y proveedores. Reintenta para continuar.</div><button onClick={loadOrdenes}>Reintentar</button></div>
+  )
 
   return (
     <div className="min-h-screen bg-background px-4 py-5 text-foreground sm:px-6 lg:px-8">

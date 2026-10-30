@@ -39,6 +39,8 @@ DECLARE
   v_tenant_ajeno uuid := gen_random_uuid();
   v_actor uuid := gen_random_uuid();
   v_actor_ajeno uuid := gen_random_uuid();
+  v_role uuid;
+  v_permission uuid;
   v_almacen_a uuid := gen_random_uuid();
   v_almacen_b uuid := gen_random_uuid();
   v_producto uuid;
@@ -59,6 +61,20 @@ BEGIN
   VALUES
     (v_actor, v_tenant, 'v455-' || v_actor || '@example.test', true, 'ACTIVO'),
     (v_actor_ajeno, v_tenant_ajeno, 'v455-' || v_actor_ajeno || '@example.test', true, 'ACTIVO');
+
+  -- El fence570 comprueba también el permiso de escritura. El actor del
+  -- caso positivo recibe sólo ese permiso; no se convierte en superadmin.
+  INSERT INTO public.roles(tenant_id,nombre,activo)
+  VALUES(v_tenant,'VERIFY455_INVENTORY_OPERATOR',true) RETURNING id INTO v_role;
+  SELECT id INTO v_permission FROM public.permisos
+  WHERE tenant_id=v_tenant AND codigo='inventario.movimientos.create';
+  IF v_permission IS NULL THEN
+    INSERT INTO public.permisos(tenant_id,modulo,recurso,accion,codigo,activo)
+    VALUES(v_tenant,'inventario','movimientos','create','inventario.movimientos.create',true)
+    RETURNING id INTO v_permission;
+  END IF;
+  INSERT INTO public.rol_permisos(role_id,permiso_id,concedido) VALUES(v_role,v_permission,true);
+  INSERT INTO public.user_roles(tenant_id,usuario_sistema_id,role_id) VALUES(v_tenant,v_actor,v_role);
 
   INSERT INTO public.almacenes (
     id, tenant_id, codigo, nombre, estado, activo, es_principal, pais

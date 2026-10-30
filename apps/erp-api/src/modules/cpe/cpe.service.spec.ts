@@ -425,6 +425,29 @@ describe('CpeService', () => {
             expect(completedDirectRetrySpy).not.toHaveBeenCalled();
         });
 
+        it('conserva CONTADO fiscal y crea deuda para cobrar cuando el CPE directo PE tiene cliente', async () => {
+            validationService.validateCertificate.mockResolvedValue({ isValid: true, warnings: [], errors: [] });
+            validationService.validateRucConfiguration.mockResolvedValue({ isValid: true, missingFields: [], errors: [] });
+            validationService.validateDocumentBeforeEmission.mockResolvedValue({ isValid: true, warnings: [], errors: [] });
+            jest.spyOn(service as any, 'getXmlSigner').mockResolvedValue({
+                signXml: jest.fn().mockReturnValue('<xml>signed-cash</xml>'),
+                generateHash: jest.fn().mockReturnValue('cash-hash'),
+                validateSignatureStrict: jest.fn().mockReturnValue(true),
+            });
+            mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: { id: '22222222-2222-4222-8222-222222222222' }, error: null })
+                .mockResolvedValueOnce({ data: {}, error: null });
+            mockSupabaseClient.rpc.mockResolvedValueOnce({ data: {
+                cpe: { id: 'cpe-cash', ...mockCreateFacturaDto, estado: 'FIRMADO', sunat_status: 'READY' },
+                documento_id: 'doc-cash', cxc_id: 'cxc-cash',
+            }, error: null });
+            await service.create({ ...mockCreateFacturaDto, cliente_id: '22222222-2222-4222-8222-222222222222' } as CreateFacturaDto, mockTenantId, mockUserId);
+            expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('emitir_cpe_directo_peru_tx', expect.objectContaining({
+                p_cpe: expect.objectContaining({ condicion_pago: 'CONTADO', fecha_vencimiento: '2023-10-27' }),
+                p_cxc: expect.objectContaining({ monto_total: 118, monto_pendiente: 118 }),
+            }));
+            expect(mockSupabaseClient.rpc).toHaveBeenCalledTimes(1);
+        });
+
         it('debe lanzar BadRequestException si falla validación de certificado', async () => {
             const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
             mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: null } as any);
@@ -951,6 +974,38 @@ describe('CpeService', () => {
             expect(deliverySpy).toHaveBeenCalledWith('cpe-1', mockTenantId, options);
             expect(cancellationSpy).toHaveBeenCalledWith('cpe-1', mockTenantId);
             expect(supabaseService.update).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('exportación de bienes Perú — contrato de operación', () => {
+        const exportDto = (overrides: Record<string, any> = {}) => ({
+            ...mockCreateFacturaDto, tipo_operacion: '0200',
+            tipo_documento_receptor: '7', documento_receptor: 'AB570123',
+            items: [{ cantidad: 1, descripcion: 'Bien exportado', valor_unitario: 20,
+                valor_venta: 20, total: 20, igv: 0, tipo_afectacion_igv: '40' }],
+            ...overrides,
+        }) as unknown as CreateFacturaDto;
+        const valid = (dto: CreateFacturaDto) => (service as any).assertPeruOperation(dto, { exportacion: 20, totalIgv: 0 });
+        it('permite exportación0200 con todas las líneas40 y receptor pasaporte', () => {
+            expect(() => valid(exportDto())).not.toThrow();
+            expect(() => (service as any).assertReceptorValido(exportDto())).not.toThrow();
+        });
+        it('rechaza exportación rotulada como venta interna antes de emitir', () => {
+            expect(() => valid(exportDto({ tipo_operacion: '0101' }))).toThrow(BadRequestException);
+        });
+        it('rechaza mezclar una línea gravada con exportación', () => {
+            const dto = exportDto();
+            dto.items.push({ ...dto.items[0], tipo_afectacion_igv: '10' } as any);
+            expect(() => valid(dto)).toThrow(BadRequestException);
+        });
+        it('mantiene obligación de RUC en factura doméstica y rechaza RUC en exportación sin excepción', () => {
+            expect(() => (service as any).assertReceptorValido(exportDto({ tipo_operacion: '0101' }))).toThrow(BadRequestException);
+            expect(() => (service as any).assertReceptorValido(exportDto({ tipo_documento_receptor: '6', documento_receptor: '20600000013' }))).toThrow(BadRequestException);
+        });
+        it('conserva huella565 doméstica y distingue cambio de operación en retry', () => {
+            const fingerprint = (dto: CreateFacturaDto) => (service as any).buildDirectPeruRequestFingerprint(dto, mockTenantId, true);
+            expect(fingerprint(mockCreateFacturaDto)).toBe(fingerprint({ ...mockCreateFacturaDto, tipo_operacion: '0101' } as any));
+            expect(fingerprint(mockCreateFacturaDto)).not.toBe(fingerprint({ ...mockCreateFacturaDto, tipo_operacion: '0200' } as any));
         });
     });
 

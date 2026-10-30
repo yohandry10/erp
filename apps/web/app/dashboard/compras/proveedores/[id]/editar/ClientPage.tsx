@@ -1,5 +1,6 @@
 'use client'
 
+import { requestConfirmation } from '@/lib/confirm-action'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, AlertCircle } from 'lucide-react'
@@ -76,8 +77,8 @@ export default function EditProveedorPage() {
     }
   }
 
-  const handleCancel = () => {
-    if (confirm('¿Está seguro de cancelar? Los cambios no guardados se perderán.')) {
+  const handleCancel = async () => {
+    if ((await requestConfirmation('¿Está seguro de cancelar? Los cambios no guardados se perderán.'))) {
       router.push(`/dashboard/compras/proveedores/${params.id}`)
     }
   }

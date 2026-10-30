@@ -1,3 +1,4 @@
+import { UuidParamPipe } from '../../common/pipes/uuid-param.pipe';
 import {
   Controller,
   Get,
@@ -37,6 +38,7 @@ import { CreateDianEventDto, ImportDianReceivedInvoiceDto } from './dto/dian-eve
 import { CpeDianEventsService } from './cpe-dian-events.service';
 
 import { CrearComprobanteUiDto } from './dto/crear-comprobante-ui.dto';
+import { VincularCxcCpeDto } from './dto/vincular-cxc-cpe.dto';
 
 @ApiTags('cpe')
 @Controller('cpe')
@@ -69,7 +71,7 @@ export class CpeController {
   @UseGuards(WorkerAuthGuard)
   @ApiOperation({ summary: 'Enviar CPE a SUNAT/OSE (worker)' })
   async enviarSunatWorker(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') actorId: string,
     @Headers('idempotency-key') idempotencyKey?: string,
@@ -86,7 +88,7 @@ export class CpeController {
   @UseGuards(WorkerAuthGuard)
   @ApiOperation({ summary: 'Consultar estado CPE en OSE (worker)' })
   async checkStatusWorker(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') actorId: string,
     @Headers('idempotency-key') idempotencyKey?: string,
@@ -103,7 +105,7 @@ export class CpeController {
   @UseGuards(WorkerAuthGuard)
   @ApiOperation({ summary: 'Descargar PDF del CPE (worker)' })
   async downloadPdfWorker(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @CurrentTenant() tenantId: string,
     @Res() res: Response,
   ) {
@@ -180,7 +182,7 @@ export class CpeController {
     summary: 'Preparar y firmar una NC/ND pendiente; todavía no modifica CxC ni contabilidad',
   })
   async firmarNotaReferenciada(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId?: string,
@@ -260,6 +262,20 @@ export class CpeController {
     return this.cpeService.getComprobantesFromDatabase(filters, tenantId);
   }
 
+  @Post('comprobantes/:id/vincular-cxc')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('finanzas.cxc.cobros.write')
+  @ApiOperation({ summary: 'Vincular el receptor de un CPE directo al contado con su cuenta por cobrar' })
+  async vincularCxcContado(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: VincularCxcCpeDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Headers('idempotency-key') key?: string,
+  ) {
+    return this.cpeService.vincularCxcContado(id, dto.cliente_id, tenantId, actorId, key);
+  }
+
   @Get('comprobantes/export')
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.listar')
@@ -312,7 +328,7 @@ export class CpeController {
   @RequirePermission('cpe.comprobantes.enviar')
   @ApiOperation({ summary: 'Enviar CPE a autoridad fiscal (SUNAT/DIAN)' })
   async enviarSunat(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') actorId: string,
     @Headers('idempotency-key') idempotencyKey?: string,
@@ -337,7 +353,7 @@ export class CpeController {
     summary: 'Registrar evento DIAN 034 como facturador sobre una factura aceptada',
   })
   async registrarEventoDian(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Body() dto: CreateDianEventDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @CurrentTenant() tenantId: string,
@@ -394,7 +410,7 @@ export class CpeController {
   @RequirePermission('cpe.dian.facturas_recibidas.gestionar')
   @ApiOperation({ summary: 'Registrar evento DIAN 030-033 como adquirente de una FEV recibida' })
   async registrarEventoFacturaRecibidaDian(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Body() dto: CreateDianEventDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @CurrentTenant() tenantId: string,
@@ -446,7 +462,7 @@ export class CpeController {
     summary: 'Consultar cobros y estado financiero de una anulación CPE',
   })
   async obtenerAnulacionFinanciera(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId?: string,
   ) {
@@ -464,7 +480,7 @@ export class CpeController {
     summary: 'Revertir un cobro aplicado y continuar la anulación CPE',
   })
   async revertirCobroAplicado(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Param('pagoId') pagoId: string,
     @Body() dto: RevertirCobroCxcDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
@@ -488,7 +504,7 @@ export class CpeController {
     summary: 'Revertir un ajuste fiscal aplicado y continuar la anulación CPE',
   })
   async revertirAjusteAplicado(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Param('operacionId') operacionId: string,
     @Body() dto: RevertirAjusteCxcDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
@@ -510,7 +526,7 @@ export class CpeController {
   @RequirePermission('cpe.comprobantes.anular')
   @ApiOperation({ summary: 'Reintentar el cierre operativo de la anulación' })
   async finalizarAnulacion(
-    @Param('id') notaCreditoId: string,
+    @Param('id', UuidParamPipe) notaCreditoId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId?: string,
@@ -558,7 +574,7 @@ export class CpeController {
   @RequirePermission('cpe.comprobantes.reenviar')
   @ApiOperation({ summary: 'Reenviar CPE a OSE/SUNAT' })
   async resend(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') actorId: string,
     @Headers('idempotency-key') idempotencyKey?: string,
@@ -575,7 +591,7 @@ export class CpeController {
   @RequirePermission('cpe.comprobantes.consultar')
   @ApiOperation({ summary: 'Consultar estado del CPE en OSE' })
   async checkStatus(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') actorId: string,
     @Headers('idempotency-key') idempotencyKey?: string,
@@ -593,7 +609,7 @@ export class CpeController {
   @ApiOperation({ summary: 'Enviar CPE firmado a SUNAT manualmente' })
   @ApiResponse({ status: 200, description: 'CPE enviado a SUNAT exitosamente' })
   async enviarManualmenteSunat(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') actorId: string,
     @Headers('idempotency-key') idempotencyKey?: string,
@@ -630,7 +646,7 @@ export class CpeController {
     description: 'CPE no encontrado',
   })
   async anularCPE(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Body() anularDto: SolicitarAnulacionCpeDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @CurrentTenant() tenantId: string,

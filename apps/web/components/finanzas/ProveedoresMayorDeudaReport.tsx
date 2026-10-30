@@ -1,7 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { useApi } from '@/hooks/use-api'
+import { useState } from 'react'
+import { useFinanceReport } from '@/hooks/use-finance-report'
+import FinanceReportStatus from './FinanceReportStatus'
+import { loadDebtWithAging, readDebtReport, sumReportMoney } from '@/lib/finanzas/report-read-contract'
 import { TrendingDown, RefreshCw, AlertTriangle } from 'lucide-react'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
@@ -22,49 +24,29 @@ interface ProveedorDeuda {
 
 interface ProveedoresMayorDeudaProps {
   limite?: number
+  onReadyChange?: (ready: boolean) => void
 }
 
-export default function ProveedoresMayorDeudaReport({ limite = 20 }: ProveedoresMayorDeudaProps) {
-  const { get } = useApi()
+export default function ProveedoresMayorDeudaReport({ limite = 20, onReadyChange }: ProveedoresMayorDeudaProps) {
   const { currency, taxIdLabel, formatCurrency } = useLocalizedMoney()
-  const [proveedores, setProveedores] = useState<ProveedorDeuda[]>([])
-  const [loading, setLoading] = useState(true)
-
-  const loadProveedores = useCallback(async () => {
-    try {
-      setLoading(true)
-      const response = await get(`/api/finanzas/cxp/proveedores-mayor-deuda?limite=${limite}`)
-
-      if (response?.success) {
-        setProveedores(response.data || [])
-      }
-    } catch (error) {
-      console.error('Error loading proveedores:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [get, limite])
-
-  useEffect(() => {
-    loadProveedores()
-  }, [loadProveedores])
+  const [selectedMoneda, setSelectedMoneda] = useState(currency)
+  const { data, loading, error, reload: loadProveedores } = useFinanceReport(
+    '/api/finanzas/cxp/proveedores-mayor-deuda', readDebtReport, onReadyChange, loadDebtWithAging)
+  const monedas = Array.from(new Set<string>((data ?? []).flatMap(row => Object.keys(row.byCurrency)))).sort()
+  const moneda = monedas.includes(selectedMoneda) ? selectedMoneda : monedas[0] || currency
+  const proveedores: ProveedorDeuda[] = (data ?? []).filter(row => row.byCurrency[moneda]).map(row => ({
+    ...row, ...row.byCurrency[moneda], monedas: [{ moneda, monto: row.byCurrency[moneda].deuda_total }],
+  })).sort((a,b) => b.deuda_total - a.deuda_total).slice(0, limite)
 
   const getTotalDeuda = () => {
-    return proveedores.reduce((sum, p) => sum + p.deuda_total, 0)
+    return sumReportMoney(proveedores.map(p => p.deuda_total))
   }
 
   const getTotalVencida = () => {
-    return proveedores.reduce((sum, p) => sum + p.deuda_vencida, 0)
+    return sumReportMoney(proveedores.map(p => p.deuda_vencida))
   }
 
-  if (loading) {
-    return (
-      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl p-8 text-center">
-        <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
-        <p className="text-muted-foreground">Cargando proveedores con mayor deuda...</p>
-      </div>
-    )
-  }
+  if (loading || error) return <FinanceReportStatus loading={loading} retry={loadProveedores} />
 
   if (proveedores.length === 0) {
     return (
@@ -76,6 +58,7 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
         <p className="text-muted-foreground">
           No hay proveedores con deuda pendiente
         </p>
+        <button type="button" onClick={loadProveedores} className="mt-4 rounded border px-4 py-2">Actualizar</button>
       </div>
     )
   }
@@ -84,6 +67,7 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
 
   return (
     <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
+      <div className="mb-4"><label htmlFor="proveedores-deuda-moneda">Moneda</label><select id="proveedores-deuda-moneda" value={moneda} onChange={event => setSelectedMoneda(event.target.value)} className="ml-3 rounded border p-2">{monedas.map(code => <option key={code} value={code}>{code}</option>)}</select></div>
       {/* Header */}
       <div className="flex justify-between items-center mb-6 pb-4 border-b">
         <div className="flex items-center gap-3">
@@ -112,7 +96,7 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
             Deuda Total
           </div>
           <div className="text-[1.75rem] font-bold mt-2">
-            {formatCurrency(getTotalDeuda(), currency)}
+            {formatCurrency(getTotalDeuda(), moneda)}
           </div>
           <div className="text-[0.875rem] mt-1 opacity-[0.9]">
             {proveedores.length} proveedor{proveedores.length !== 1 ? 'es' : ''}
@@ -124,7 +108,7 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
             Deuda Vencida
           </div>
           <div className="text-2xl font-bold mt-2 text-destructive">
-            {formatCurrency(getTotalVencida(), currency)}
+            {formatCurrency(getTotalVencida(), moneda)}
           </div>
           <div className="text-[0.875rem] mt-1 text-destructive">
             {((getTotalVencida() / getTotalDeuda()) * 100).toFixed(1)}% del total
@@ -140,7 +124,7 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
 
           return (
             <div
-              key={proveedor.proveedor_id} className="p-6 rounded-xl border bg-card transition"
+              key={proveedor.proveedor_id} data-finance-provider className="p-6 rounded-xl border bg-card transition"
               onMouseEnter={(e) => {
                 e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'
               }}
@@ -179,7 +163,7 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
               {/* Deuda Bar */}
               <div className="mb-4">
                 <div className="w-[100%] h-8 bg-[rgba(0,0,0,0.05)] rounded-[6px] overflow-hidden relative">
-                  <div className="h-[100%] transition flex items-center justify-end pr-3">
+                <div className="h-[100%] transition flex items-center justify-end pr-3 bg-primary" style={{ width: `${barWidth}%` }}>
                     {barWidth > 20 && (
                       <span className="text-xs font-semibold text-white">
                         {barWidth.toFixed(0)}%
@@ -216,7 +200,7 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
                   </div>
                   <div className="text-[0.875rem] font-semibold text-foreground/85">
                     {proveedor.dias_promedio_vencimiento > 0
-                      ? `${proveedor.dias_promedio_vencimiento} días`
+                      ? `${proveedor.dias_promedio_vencimiento} ${proveedor.dias_promedio_vencimiento === 1 ? 'día' : 'días'}`
                       : 'Al día'
                     }
                   </div>

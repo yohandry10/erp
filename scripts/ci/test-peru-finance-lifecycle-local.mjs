@@ -37,9 +37,15 @@ try {
   const other=await call('auth/login',{email:'peru-integrated-2@example.test',password:'Local-Peru-2026-Only!'});
   const accounts=await call('contabilidad/plan-cuentas');
   const account=code=>{const found=accounts.find(row=>row.codigo===code&&row.activo);assert.ok(found,code);return found.id;};
-  const today=sql(`SELECT app.hoy_tenant(${quote(tenant)});`);
+  // El cierre exige un mes ya terminado; todas sus operaciones deben pertenecer
+  // a ese mes. La fecha local actual se conserva para el rechazo del mes abierto.
+  const actualToday=sql(`SELECT app.hoy_tenant(${quote(tenant)});`);
+  const today=sql(`SELECT (date_trunc('month',app.hoy_tenant(${quote(tenant)}))-interval '1 month'+interval '14 days')::date;`);
   const month=today.slice(0,7);
-  const last=sql(`SELECT (date_trunc('month',app.hoy_tenant(${quote(tenant)}))+interval '1 month'-interval '1 day')::date;`);
+  const last=sql(`SELECT (date_trunc('month',app.hoy_tenant(${quote(tenant)}))-interval '1 day')::date;`);
+  const [year,monthNumber]=month.split('-').map(Number);
+  if(sql(`SELECT count(*) FROM periodos_contables WHERE tenant_id=${quote(tenant)} AND anio=${year} AND mes=${monthNumber};`)==='0')
+    await call('contabilidad/periodos',{anio:year,mes:monthNumber});
   const bankBody=code=>({nombre:`Banco local ${code}`,banco:'BANCO LOCAL',numero_cuenta:`LOCAL-${code}`,moneda:'PEN',tipo_cuenta:'CORRIENTE',cuenta_contable_id:account(code),saldo:0});
   const creation={'idempotency-key':randomUUID()};
   const a=await call('finanzas/bancos/cuentas',bankBody('1041'),201,creation);
@@ -49,6 +55,15 @@ try {
   await call(`finanzas/bancos/cuentas/${a.id}`,{nombre:'Banco A editado'},200,{},'PUT');
   assert.equal((await call(`finanzas/bancos/cuentas/${a.id}`)).nombre,'Banco A editado');
   pass('Bancos: altas con cuenta contable, replay, edición y rechazo de saldo inventado');
+  const openMonth=actualToday.slice(0,7);
+  const openLast=sql(`SELECT (date_trunc('month',app.hoy_tenant(${quote(tenant)}))+interval '1 month'-interval '1 day')::date;`);
+  const open=await call('finanzas/conciliacion',{cuenta_bancaria_id:a.id,periodo:openMonth,fecha_desde:openMonth+'-01',fecha_hasta:openLast,idempotency_key:randomUUID()});
+  const openId=open.conciliacion?.id??open.conciliacion_id??open.id;
+  const openState=()=>sql(`SELECT to_jsonb(c)::text FROM conciliaciones_bancarias c WHERE tenant_id=${quote(tenant)} AND id=${quote(openId)};`);
+  const openBefore=openState();
+  await call(`finanzas/conciliacion/${openId}/cerrar`,{idempotency_key:randomUUID()},400);
+  assert.equal(openState(),openBefore,'El rechazo de cierre conserva el mes abierto');
+  pass('Conciliación: el mes local todavía abierto no se puede cerrar ni altera su registro');
   const move=(type,monto,reference,code='63')=>({cuenta_bancaria_id:a.id,cuenta_contrapartida_id:account(code),tipo:type,monto,moneda:'PEN',fecha:today,descripcion:reference,referencia:reference,categoria:type==='ABONO'?'OTRO_INGRESO':'COMISION_BANCARIA',metodo_pago:'TRANSFERENCIA',idempotency_key:randomUUID()});
   const fundBody=move('ABONO',100,'FUND-LOCAL','70');
   const fund=await call('finanzas/bancos/movimientos',fundBody);

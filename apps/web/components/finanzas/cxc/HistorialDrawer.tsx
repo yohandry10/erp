@@ -37,6 +37,9 @@ interface HistorialDrawerProps {
   isOpen: boolean
   onClose: () => void
   detalle: HistorialCuentaPorCobrar | null
+  loading: boolean
+  error: string | null
+  onRetry: () => void
 }
 
 const formatCurrency = (value: number, currency: string = 'PEN') =>
@@ -51,14 +54,14 @@ const humanizeDate = (date?: string | null) => {
   }
 }
 
-export function HistorialDrawer({ isOpen, onClose, detalle }: HistorialDrawerProps) {
+export function HistorialDrawer({ isOpen, onClose, detalle, loading, error, onRetry }: HistorialDrawerProps) {
   const country = useCountryContext()
   const pagosOrdenados = (detalle?.pagos || []).slice().sort((a, b) => {
     return new Date(b.fecha_pago).getTime() - new Date(a.fecha_pago).getTime()
   })
 
   const tituloDocumento = formatFiscalDocumentNumber(country.paisCodigo, detalle?.serie, detalle?.numero)
-  const isLoading = !detalle
+  const isLoading = loading
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => (open ? undefined : onClose())}>
@@ -71,7 +74,12 @@ export function HistorialDrawer({ isOpen, onClose, detalle }: HistorialDrawerPro
         </DialogHeader>
 
         <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-          {isLoading ? (
+          {error ? (
+            <div role="alert" className="rounded-md border border-destructive/40 p-4 text-sm text-destructive">
+              <p>{error}</p>
+              <button type="button" className="mt-2 underline" onClick={onRetry}>Reintentar historial</button>
+            </div>
+          ) : isLoading || !detalle ? (
             <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
               Cargando historial...
             </div>

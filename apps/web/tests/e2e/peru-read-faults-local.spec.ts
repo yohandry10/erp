@@ -29,11 +29,15 @@ test('Lecturas: el catálogo con la lectura caída avisa y no se muestra vacío'
     try {
       // La primera visita compila la página en Next dev: plazo propio para no confundirlo con un fallo.
       await page.goto('/dashboard/inventario/productos/', { timeout: 120000 })
-      await expect.soft(page.locator('#productos-load-error')).toBeVisible({ timeout: 60000 })
+      await expect(page.getByRole('alert').filter({hasText:'No se pudo cargar el catálogo de productos. Reintente para consultar o editar.'})).toBeVisible()
+      await expect(page.getByText('Productos no disponibles',{exact:true})).toBeVisible()
       await expect.soft(page.getByText('No se encontraron productos')).toHaveCount(0)
     } finally {
       sql('GRANT SELECT ON public.productos TO service_role;')
     }
+    await page.getByRole('button',{name:'Reintentar',exact:true}).click()
+    await expect(page.getByText('Productos no disponibles',{exact:true})).toHaveCount(0)
+    await expect(page.getByRole('alert').filter({hasText:'No se pudo cargar el catálogo de productos.'})).toHaveCount(0)
     checks.push({ operation: 'Sin lectura de productos el catálogo avisa en vez de mostrarse vacío', passed: test.info().errors.length === before })
     proof.success = checks.every(check => check.passed)
   } finally {

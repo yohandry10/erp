@@ -1,11 +1,13 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useWizardContext } from './WizardContext'
 import { WizardConfiguration } from './types'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { fetchApi } from '@/lib/api-fetch'
-import { isOfflineQueuedResponse } from '@/lib/offline-store'
+import { isOfflineCachedResponse, isOfflineQueuedResponse } from '@/lib/offline-store'
+import { useAuth } from '@/contexts/AuthContext'
+import { confirmWizardCompletion, confirmWizardStep, readWizardProgress, readWizardStatus } from './read-contract'
 import { INITIAL_ACTIVE_COUNTRY_CODE, INITIAL_ACTIVE_COUNTRY_ID } from '@/lib/initial-country'
 import { parseColombiaNit, validateCountryTaxId } from '@/lib/country-tax-id'
 import { configurationWithoutLocalLogo } from './wizard-logo'
@@ -21,6 +23,9 @@ function getOrCreateWizardIntent(storageKey: string, prefix: string) {
 
 export function useWizard() {
   const country = useCountryContext()
+  const { user } = useAuth()
+  const readGeneration = useRef(0)
+  useEffect(() => () => { readGeneration.current += 1 }, [user?.id, user?.tenant_id])
   const {
     state,
     goToStep,
@@ -36,6 +41,7 @@ export function useWizard() {
   } = useWizardContext()
 
   const loadProgress = async (): Promise<boolean> => {
+    const generation = ++readGeneration.current
     try {
       setLoading(true)
       setError(null)
@@ -44,18 +50,15 @@ export function useWizard() {
         fetchApi('/api/configuration/status', { headers, credentials: 'include' }),
         fetchApi('/api/configuration/wizard/progress', { headers, credentials: 'include' }),
       ])
-      if (!statusResponse.ok || !progressResponse.ok) {
+      if (!statusResponse.ok || !progressResponse.ok ||
+          isOfflineCachedResponse(statusResponse) || isOfflineCachedResponse(progressResponse)) {
         throw new Error('No se pudo recuperar la configuración guardada. Reintenta la consulta.')
       }
       const [statusData, progressData] = await Promise.all([statusResponse.json(), progressResponse.json()])
-      if (!statusData.success || !progressData.success) {
-        throw new Error('No se pudo recuperar la configuración guardada. Reintenta la consulta.')
-      }
-      const progress = progressData.data
+      const { coreReady } = readWizardStatus(statusData)
+      const progress = readWizardProgress(progressData)
+      if (readGeneration.current !== generation) return false
       // Identidad preparada del ERP y asistente finalizado son estados diferentes.
-      const coreReady = statusData.data?.isComplete === true &&
-        statusData.data?.ruc?.isConfigured === true &&
-        (!statusData.data?.ruc?.missingFields || statusData.data.ruc.missingFields.length === 0)
       if (coreReady && progress?.completado === true) {
         state.steps.forEach((_, index) => markStepComplete(index))
         setPersistedConfiguration(true)
@@ -69,13 +72,13 @@ export function useWizard() {
           if (stepIndex >= 0 && stepIndex < state.steps.length) markStepComplete(stepIndex)
         })
       }
-      if (progress?.pasoActual > 0) goToStep(progress.pasoActual - 1)
+      if (progress && progress.pasoActual > 0) goToStep(progress.pasoActual - 1)
       return true
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'No se pudo recuperar la configuración guardada.')
+      if (readGeneration.current === generation) setError(error instanceof Error ? error.message : 'No se pudo recuperar la configuración guardada.')
       return false
     } finally {
-      setLoading(false)
+      if (readGeneration.current === generation) setLoading(false)
     }
   }
 
@@ -85,6 +88,7 @@ export function useWizard() {
       ? configurationWithoutLocalLogo(state.configuration)
       : stepData
     try {
+      setError(null)
       if (showLoader) {
         setLoading(true)
       }
@@ -123,10 +127,9 @@ export function useWizard() {
 
       const data = await response.json()
 
-      if (data.success) {
-        window.sessionStorage.removeItem(`configuration-wizard-step-intent:${stepId}`)
-        markStepComplete(state.currentStep)
-      }
+      confirmWizardStep(data, pasoActual)
+      window.sessionStorage.removeItem(`configuration-wizard-step-intent:${stepId}`)
+      markStepComplete(state.currentStep)
 
       return data
     } catch (error) {
@@ -382,6 +385,11 @@ export function useWizard() {
 
       const data = await response.json()
 
+      if (isOfflineQueuedResponse(response)) {
+        throw new Error('No se pudo confirmar el cierre en el servidor. Verifica la conexión.')
+      }
+      confirmWizardCompletion(data)
+
       if (logoFile) {
         const logoIntentStorageKey = 'configuration-wizard-logo-upload-intent'
         const logoSignatureStorageKey = `${logoIntentStorageKey}:signature`
@@ -463,7 +471,17 @@ export function useWizard() {
       }
 
       resetWizardState()
-      window.sessionStorage.removeItem('configuration-wizard-reset-intent')
+      // El reset confirmado invalida los intentos del asistente anterior.
+      // Si su respuesta falla, se conservan para recuperar ese mismo reset.
+      for (const key of Object.keys(window.sessionStorage)) {
+        if (key === 'configuration-wizard-reset-intent' ||
+            key === 'configuration-wizard-complete-intent' ||
+            key === 'configuration-wizard-logo-upload-intent' ||
+            key === 'configuration-wizard-logo-upload-intent:signature' ||
+            key.startsWith('configuration-wizard-step-intent:')) {
+          window.sessionStorage.removeItem(key)
+        }
+      }
       goToStep(0)
 
       return data

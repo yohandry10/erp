@@ -1,8 +1,10 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { FiltrosContables } from './accounting.interfaces';
 import { TenantContextService } from '../tenant/tenant-context.service';
 import { createHash } from 'crypto';
+import { compraFiscalOriginal } from '../../modules/contabilidad/services/compra-fiscal-original';
+import { esCompraFiscal, esEstadoFiscal, importeFiscal, normalizarTipo } from '../../modules/contabilidad/services/documento-fiscal.rules';
 
 function normalizePC(pc: any) {
   return Array.isArray(pc) ? pc?.[0] : pc;
@@ -739,54 +741,77 @@ export class AccountingBooksService {
       const tenantId = this.resolveTenantId();
       const { fechaDesde, fechaHasta } = filtros;
 
-      // El Registro de Compras SUNAT es a nivel de comprobante → se lee de la tabla
-      // `compras` (facturas/OC recibidas), NO de líneas de asiento. Antes filtraba
-      // clase 60 sobre detalle_asientos, pero las compras postean a clase 20
-      // (Mercaderías) → siempre daba 0.
-      let query = this.supabase
+      // Una orden no es un comprobante. CxP conserva la factura original y sus
+      // notas separadas aunque una devolución o un descuento reduzca la deuda.
+      const documentos: any[] = [];
+      const pageSize = 1000;
+      for (let offset = 0; ; offset += pageSize) {
+        let query = this.supabase
         .getClient()
-        .from('compras')
+        .from('cuentas_por_pagar')
         .select(
           `
-          fecha, tipo_documento, numero_documento, subtotal, igv, total, moneda, estado,
-          proveedores!fk_compras_proveedor_id(razon_social, nombre, ruc, numero_documento)
+          id, fecha_emision, tipo_documento, numero_documento, subtotal, igv, total, moneda, estado,
+          metadata, fiscal_metadata, original_fiscal_amounts,
+          proveedores!cuentas_por_pagar_proveedor_id_fkey(razon_social, nombre, ruc, numero_documento)
         `,
         )
         .eq('tenant_id', tenantId)
-        .not('estado', 'in', '("ANULADA","ANULADO","CANCELADA","CANCELADO")')
-        .order('fecha', { ascending: true });
+        .order('fecha_emision', { ascending: true })
+        .order('id', { ascending: true })
+        .range(offset, offset + pageSize - 1);
 
-      if (fechaDesde) query = query.gte('fecha', fechaDesde);
-      if (fechaHasta) query = query.lte('fecha', fechaHasta);
+        if (fechaDesde) query = query.gte('fecha_emision', fechaDesde);
+        if (fechaHasta) query = query.lte('fecha_emision', fechaHasta);
 
-      const { data, error } = await query;
-      if (error) throw error;
+        const { data, error } = await query;
+        if (error) throw error;
+        documentos.push(...(data || []));
+        if ((data || []).length < pageSize) break;
+      }
 
-      const compras = (data || []).map((c: any) => ({
-        fecha: c.fecha,
-        tipoDocumento: c.tipo_documento,
+      const compras = documentos
+        .filter((c) => esCompraFiscal(c.tipo_documento))
+        .map(compraFiscalOriginal)
+        .filter((c) => esEstadoFiscal(c.estado))
+        .map((c: any) => {
+        const proveedor = normalizePC(c.proveedores) || {};
+        const fiscal = c.fiscal_metadata || {};
+        return {
+        id: c.id,
+        fecha: c.fecha_emision,
+        tipoDocumento: normalizarTipo(c.tipo_documento),
         numeroDocumento: c.numero_documento,
         razonSocialProveedor:
-          c.proveedores?.razon_social || c.proveedores?.nombre || 'Proveedor no especificado',
-        rucProveedor: c.proveedores?.ruc || c.proveedores?.numero_documento || '',
-        baseImponible: Number(c.subtotal || 0),
-        igv: Number(c.igv || 0),
-        importeTotal: Number(c.total || 0),
-        moneda: c.moneda || 'PEN',
-      }));
+          proveedor.razon_social || proveedor.nombre || 'Proveedor no especificado',
+        rucProveedor: proveedor.ruc || proveedor.numero_documento || '',
+        baseImponible: importeFiscal(c.tipo_documento, c.subtotal),
+        igv: importeFiscal(c.tipo_documento, c.igv),
+        importeTotal: importeFiscal(c.tipo_documento, c.total),
+        moneda: String(c.moneda || 'PEN').toUpperCase(),
+        documentoModificado: fiscal.documento_referencia_serie && fiscal.documento_referencia_numero
+          ? `${normalizarTipo(fiscal.documento_referencia_tipo)}-${fiscal.documento_referencia_serie}-${fiscal.documento_referencia_numero}`
+          : '',
+      };
+      });
 
       const r2 = (n: number) => Math.round(n * 100) / 100;
-      const resumen = compras.reduce(
-        (acc, c) => {
-          acc.baseImponible = r2(acc.baseImponible + c.baseImponible);
-          acc.igv = r2(acc.igv + c.igv);
-          acc.total = r2(acc.total + c.importeTotal);
-          return acc;
-        },
-        { cantidadComprobantes: compras.length, baseImponible: 0, igv: 0, total: 0 },
-      );
+      const porMoneda = new Map<string, { moneda: string; cantidadComprobantes: number; baseImponible: number; igv: number; total: number }>();
+      for (const c of compras) {
+        const subtotal = porMoneda.get(c.moneda) || { moneda: c.moneda, cantidadComprobantes: 0, baseImponible: 0, igv: 0, total: 0 };
+        subtotal.cantidadComprobantes++;
+        subtotal.baseImponible = r2(subtotal.baseImponible + c.baseImponible);
+        subtotal.igv = r2(subtotal.igv + c.igv);
+        subtotal.total = r2(subtotal.total + c.importeTotal);
+        porMoneda.set(c.moneda, subtotal);
+      }
+      const resumenPorMoneda = [...porMoneda.values()];
+      // No sumar divisas distintas como si fueran soles.
+      const resumen = resumenPorMoneda.length <= 1
+        ? resumenPorMoneda[0] || { cantidadComprobantes: 0, baseImponible: 0, igv: 0, total: 0, moneda: 'PEN' }
+        : { cantidadComprobantes: compras.length, baseImponible: null, igv: null, total: null, moneda: null };
 
-      return { resumen, compras, total: compras.length };
+      return { resumen, resumenPorMoneda, compras, total: compras.length };
     } catch (error) {
       console.error('Error obteniendo registro de compras:', error);
       throw error;
@@ -794,34 +819,42 @@ export class AccountingBooksService {
   }
 
   async getRegistroConsignaciones(filtros: FiltrosContables = {}) {
-    try {
-      const tenantId = this.resolveTenantId();
-      const { fechaDesde, fechaHasta, estado } = filtros;
+    return this.readConsignmentSource('registro_consignaciones', `*,
+      movimientos_consignacion!movimientos_consignacion_registro_id_fkey_runtime(*,productos(codigo,nombre,categoria))`, filtros);
+  }
 
-      let query = this.supabase
-        .getClient()
-        .from('registro_consignaciones')
-        .select(`
-          *,
-          movimientos_consignacion!movimientos_consignacion_registro_id_fkey_runtime(
-            *,
-            productos(codigo, nombre, categoria)
-          )
-        `)
-        .eq('tenant_id', tenantId)
-        .order('fecha_registro', { ascending: false });
+  async getProductosConsignacion() {
+    return this.readConsignmentSource('productos', 'id,tenant_id,codigo,nombre,activo');
+  }
 
-      if (fechaDesde) query = query.gte('fecha_registro', fechaDesde);
-      if (fechaHasta) query = query.lte('fecha_registro', fechaHasta);
-      if (estado) query = query.eq('estado', String(estado).trim().toUpperCase());
-
-      const { data: consignaciones, error } = await query;
-      if (error) throw error;
-
-      return consignaciones || [];
-    } catch (error) {
-      console.error('Error obteniendo registro de consignaciones:', error);
-      throw error;
+  private async readConsignmentSource(table: string, selection: string, filtros: FiltrosContables = {}) {
+    const tenantId = this.resolveTenantId();
+    const result: any[] = [];
+    const ids = new Set<string>();
+    let total: number | undefined;
+    const pageSize = 1000;
+    for (let offset = 0; ; offset += pageSize) {
+      let query: any = this.supabase.getClient().from(table).select(selection, { count: 'exact' })
+        .eq('tenant_id', tenantId).order(table === 'productos' ? 'codigo' : 'fecha_registro', { ascending: table === 'productos' })
+        .order('id', { ascending: true }).range(offset, offset + pageSize - 1);
+      if (table === 'productos') query = query.eq('activo', true);
+      if (filtros.fechaDesde) query = query.gte('fecha_registro', filtros.fechaDesde);
+      if (filtros.fechaHasta) query = query.lte('fecha_registro', filtros.fechaHasta);
+      if (filtros.estado) query = query.eq('estado', String(filtros.estado).trim().toUpperCase());
+      const { data, error, count } = await query;
+      if (error || !Array.isArray(data) || !Number.isSafeInteger(count) || count < 0 ||
+          (total !== undefined && count !== total) || data.length !== Math.min(pageSize, Math.max(0, count - offset))) {
+        throw new ServiceUnavailableException('No se pudo completar el registro de consignaciones y sus productos. Reintente la consulta.');
+      }
+      total = count;
+      for (const row of data) {
+        if (!row || typeof row.id !== 'string' || !row.id || row.tenant_id !== tenantId || ids.has(row.id) ||
+            (table === 'productos' && row.activo !== true)) {
+          throw new ServiceUnavailableException('La fuente de consignaciones está incompleta o cambió durante la consulta.');
+        }
+        ids.add(row.id); result.push(row);
+      }
+      if (result.length === total) return result;
     }
   }
 

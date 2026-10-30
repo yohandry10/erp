@@ -35,6 +35,7 @@ describe('TiposCambioService', () => {
         filtros.push(columna);
         return query;
       }),
+      or: jest.fn(() => query),
       lte: jest.fn(() => query),
       gte: jest.fn(() => query),
       order: jest.fn(() => query),
@@ -73,6 +74,15 @@ describe('TiposCambioService', () => {
 
   afterEach(() => jest.clearAllMocks());
 
+  it.each([4.1234567, 0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
+    'rechaza la cotización inválida %s antes del writer', async value => {
+      await expect(service.registrar(TENANT, USER, {
+        moneda_origen: 'EUR', moneda_destino: 'PEN', fecha: '2026-10-06', compra: value, venta: 4.15
+      })).rejects.toThrow(BadRequestException);
+      expect(rpc).not.toHaveBeenCalled();
+    }
+  );
+
   describe('obtenerMonedaLocal', () => {
     it('deriva la moneda del país del tenant', async () => {
       tablas['empresa_config'] = { data: { pais: 'AR' }, error: null };
@@ -82,6 +92,11 @@ describe('TiposCambioService', () => {
     it('cae en PEN cuando el tenant no tiene país configurado', async () => {
       tablas['empresa_config'] = { data: null, error: null };
       await expect(service.obtenerMonedaLocal(TENANT)).resolves.toBe('PEN');
+    });
+
+    it('no sustituye un fallo de lectura de configuración por moneda PEN', async () => {
+      tablas.empresa_config = { data: null, error: { message: 'unavailable' } };
+      await expect(service.obtenerMonedaLocal(TENANT)).rejects.toThrow(/No se pudo consultar el país/);
     });
   });
 

@@ -25,7 +25,7 @@ export function CashIncomeExpenseDialog({
 }: CashIncomeExpenseDialogProps) {
     const country = useCountryContext();
     const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$');
-    const { get, post } = useApi();
+    const { get, post } = useApi({ throwOnError: true, requireLive: true });
     const [tipo, setTipo] = useState<'INGRESO' | 'GASTO'>('INGRESO');
     const [monto, setMonto] = useState('');
     const [motivo, setMotivo] = useState('');

@@ -7,7 +7,7 @@ describe('CashflowService', () => {
 
   beforeEach(() => {
     estadosFinancieros = {
-      getEstadoResultados: jest.fn(),
+      getEstadoResultados: jest.fn().mockResolvedValue({ utilidad_neta: 0 }),
       getBalanceComprobacion: jest.fn(),
     } as any;
 
@@ -34,7 +34,7 @@ describe('CashflowService', () => {
       .mockResolvedValueOnce(currentBalance as any)
       .mockResolvedValueOnce(prevBalance as any);
 
-    estadosFinancieros.getEstadoResultados.mockResolvedValue({
+    estadosFinancieros.getEstadoResultados.mockResolvedValueOnce({
       ingresos: { total_ingresos: 0 },
       costos: { costo_ventas: 0 },
       gastos: { total_gastos: 0 },
@@ -67,7 +67,7 @@ describe('CashflowService', () => {
 
     estadosFinancieros.getBalanceComprobacion.mockResolvedValueOnce(balance as any);
 
-    estadosFinancieros.getEstadoResultados.mockResolvedValue({
+    estadosFinancieros.getEstadoResultados.mockResolvedValueOnce({
       ingresos: { total_ingresos: 500 },
       costos: { costo_ventas: 300, utilidad_bruta: 200 },
       gastos: { total_gastos: 100 },
@@ -87,6 +87,42 @@ describe('CashflowService', () => {
     expect(result.rotacionInventario).toBeCloseTo(300 / 200, 6);
   });
 
+  it('usa la utilidad mensual al pagar una planilla devengada antes', async () => {
+    estadosFinancieros.getBalanceComprobacion
+      .mockResolvedValueOnce([
+        { cuenta: '1041', saldo_final: -1044 },
+        { cuenta: '403', saldo_final: -264 },
+        { cuenta: '411', saldo_final: 0 },
+      ] as any)
+      .mockResolvedValueOnce([
+        { cuenta: '403', saldo_final: -264 },
+        { cuenta: '411', saldo_final: -1044 },
+      ] as any);
+    estadosFinancieros.getEstadoResultados
+      .mockResolvedValueOnce({ utilidad_neta: -1308 } as any)
+      .mockResolvedValueOnce({ utilidad_neta: -1308 } as any);
+    const result = await service.getCashFlow('tenant', 2026, 10);
+    expect(result.detalle.utilidadNeta).toBe(0);
+    expect(result.operativo).toBe(-1044);
+    expect(result.neto).toBe(-1044);
+    expect(result.detalle.descuadre).toBe(0);
+    expect(estadosFinancieros.getEstadoResultados.mock.calls).toEqual([
+      ['tenant', 2026, 10], ['tenant', 2026, 9],
+    ]);
+  });
+
+  it('enero no descuenta el resultado del ejercicio anterior', async () => {
+    estadosFinancieros.getBalanceComprobacion
+      .mockResolvedValueOnce([{ cuenta: '1041', saldo_final: 1100 }] as any)
+      .mockResolvedValueOnce([{ cuenta: '1041', saldo_final: 1000 }] as any);
+    estadosFinancieros.getEstadoResultados.mockResolvedValueOnce({ utilidad_neta: 100 } as any);
+    const result = await service.getCashFlow('tenant', 2027, 1);
+    expect(result.detalle.utilidadNeta).toBe(100);
+    expect(result.neto).toBe(100);
+    expect(result.detalle.descuadre).toBe(0);
+    expect(estadosFinancieros.getEstadoResultados).toHaveBeenCalledTimes(1);
+  });
+
   it('redondea los importes monetarios del flujo a dos decimales', async () => {
     estadosFinancieros.getBalanceComprobacion
       .mockResolvedValueOnce([
@@ -96,7 +132,7 @@ describe('CashflowService', () => {
         { cuenta: '50', saldo_final: -300 },
       ] as any)
       .mockResolvedValueOnce([] as any);
-    estadosFinancieros.getEstadoResultados.mockResolvedValue({
+    estadosFinancieros.getEstadoResultados.mockResolvedValueOnce({
       ingresos: { total_ingresos: 0 },
       costos: { costo_ventas: 0 },
       gastos: { total_gastos: 0 },
@@ -112,15 +148,13 @@ describe('CashflowService', () => {
   });
 
   describe('correccion por gastos que no movieron caja', () => {
-    // El metodo indirecto corrige la utilidad con lo que no salio de caja. Esa
-    // correccion faltaba: el operativo salia subestimado exactamente en la
-    // depreciacion del mes y, como la depreciacion no toca la 33 sino la 39,
-    // tampoco aparecia en inversion. Se perdia.
+    // El metodo indirecto corrige la utilidad con lo que no salio de caja. La
+    // depreciacion abona la 39: su aumento es lo que se devuelve al operativo.
     const conBalances = (actual: any[], previo: any[], utilidadNeta: number) => {
       estadosFinancieros.getBalanceComprobacion
         .mockResolvedValueOnce(actual as any)
         .mockResolvedValueOnce(previo as any);
-      estadosFinancieros.getEstadoResultados.mockResolvedValue({
+      estadosFinancieros.getEstadoResultados.mockResolvedValueOnce({
         ingresos: { total_ingresos: 0 },
         costos: { costo_ventas: 0 },
         gastos: { total_gastos: 0 },
@@ -133,7 +167,7 @@ describe('CashflowService', () => {
       conBalances(
         [
           { cuenta: '10', saldo_final: 1300 },
-          { cuenta: '68', saldo_final: 300, debe: 300, haber: 0 },
+          { cuenta: '39', saldo_final: -300 },
         ],
         [{ cuenta: '10', saldo_final: 0 }],
         1000,
@@ -149,7 +183,7 @@ describe('CashflowService', () => {
       conBalances(
         [
           { cuenta: '10', saldo_final: 1300 },
-          { cuenta: '68', saldo_final: 300, debe: 300, haber: 0 },
+          { cuenta: '39', saldo_final: -300 },
         ],
         [{ cuenta: '10', saldo_final: 0 }],
         1000,
@@ -167,7 +201,7 @@ describe('CashflowService', () => {
       conBalances(
         [
           { cuenta: '10', saldo_final: 2000 },
-          { cuenta: '68', saldo_final: 300, debe: 300, haber: 0 },
+          { cuenta: '39', saldo_final: -300 },
         ],
         [{ cuenta: '10', saldo_final: 0 }],
         1000,
@@ -194,6 +228,51 @@ describe('CashflowService', () => {
       const result = await service.getCashFlow('tenant', 2026, 8);
 
       expect(result.inversion).toBe(-500);
+      expect(result.operativo).toBe(0);
+      expect(result.detalle.descuadre).toBe(0);
+    });
+
+    it('incluye el IGV a favor y la mercaderia por facturar', async () => {
+      // Compra de 1000 + 180 de IGV recibida y facturada: 20 D 1000 / 4699 H,
+      // 4699 D 1000 + 40 D 180 / 42 H 1180, y se paga 1180 por banco.
+      conBalances(
+        [
+          { cuenta: '1041', saldo_final: -1180 },
+          { cuenta: '20', saldo_final: 1000 },
+          { cuenta: '40', saldo_final: 180 },
+          { cuenta: '4699', saldo_final: 0 },
+          { cuenta: '42', saldo_final: 0 },
+        ],
+        [],
+        0,
+      );
+
+      const result = await service.getCashFlow('tenant', 2026, 10);
+
+      expect(result.detalle.otrosOperativos).toBe(-180);
+      expect(result.operativo).toBe(-1180);
+      expect(result.detalle.descuadre).toBe(0);
+    });
+
+    it('no cuenta dos veces un faltante de inventario', async () => {
+      // Faltante de 96 contra la 20: es gasto sin caja, pero ya esta dentro de
+      // la variacion de existencias.
+      conBalances(
+        [
+          { cuenta: '10', saldo_final: 0 },
+          { cuenta: '20', saldo_final: 904 },
+          { cuenta: '68', saldo_final: 96, debe: 96, haber: 0 },
+        ],
+        [
+          { cuenta: '10', saldo_final: 0 },
+          { cuenta: '20', saldo_final: 1000 },
+        ],
+        -96,
+      );
+
+      const result = await service.getCashFlow('tenant', 2026, 10);
+
+      expect(result.detalle.gastosNoDesembolsables).toBe(0);
       expect(result.operativo).toBe(0);
       expect(result.detalle.descuadre).toBe(0);
     });

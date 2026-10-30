@@ -15,8 +15,9 @@ import { cn } from '@/lib/utils'
 import { useDashboardTheme } from '@/hooks/use-dashboard-theme'
 
 export default function EstadosFinancierosPage() {
-  const { post } = useApi()
+  const { post } = useApi({ throwOnError: true, showErrorToast: false, requireLive: true })
   const [loading, setLoading] = useState(false)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState('balance-comprobacion')
 
   const currentDate = new Date()
@@ -45,12 +46,16 @@ export default function EstadosFinancierosPage() {
 
   const handleRefresh = async () => {
     setLoading(true)
+    setRefreshError(null)
     try {
-      // El API lee el periodo del cuerpo: en la URL cada clic terminaba en 400.
-      await post('/api/contabilidad/estados/refrescar', { anio, mes })
+      const response = await post('/api/contabilidad/estados/refrescar', { anio, mes })
+      if (response?.success !== true || response.data?.periodo?.anio !== anio ||
+          response.data?.periodo?.mes !== mes || response.data?.errores?.length) {
+        throw new Error('Refresco incompleto')
+      }
       setRefreshKey((prev) => prev + 1)
-    } catch (error) {
-      console.error('Error refrescando estados financieros:', error)
+    } catch {
+      setRefreshError(`No se pudieron refrescar las vistas de ${anio}-${String(mes).padStart(2, '0')}. Reintente con Refrescar vistas.`)
     } finally {
       setLoading(false)
     }
@@ -98,6 +103,7 @@ export default function EstadosFinancierosPage() {
                 <span className={cn('block text-xs font-semibold uppercase tracking-[0.16em]', darkMode ? 'text-primary/80' : 'text-muted-foreground')}>Año</span>
                 <select
                   value={anio}
+                  disabled={loading}
                   onChange={(event) => setAnio(Number(event.target.value))}
                   className={cn('h-11 w-full rounded-lg border px-3 text-sm outline-none transition focus:ring-4', darkMode ? 'border-cyan-400/15 bg-card text-foreground focus:border-cyan-300 focus:ring-cyan-400/10' : 'border-border bg-card text-foreground focus:border-blue-400 focus:ring-blue-100')}
                 >
@@ -111,6 +117,7 @@ export default function EstadosFinancierosPage() {
                 <span className={cn('block text-xs font-semibold uppercase tracking-[0.16em]', darkMode ? 'text-primary/80' : 'text-muted-foreground')}>Mes</span>
                 <select
                   value={mes}
+                  disabled={loading}
                   onChange={(event) => setMes(Number(event.target.value))}
                   className={cn('h-11 w-full rounded-lg border px-3 text-sm outline-none transition focus:ring-4', darkMode ? 'border-cyan-400/15 bg-card text-foreground focus:border-cyan-300 focus:ring-cyan-400/10' : 'border-border bg-card text-foreground focus:border-blue-400 focus:ring-blue-100')}
                 >
@@ -124,6 +131,7 @@ export default function EstadosFinancierosPage() {
                 <input
                   type="checkbox"
                   checked={showComparison}
+                  disabled={loading}
                   onChange={(event) => setShowComparison(event.target.checked)}
                   className="h-4 w-4 rounded border-cyan-400/30 accent-blue-600"
                 />
@@ -139,6 +147,7 @@ export default function EstadosFinancierosPage() {
                 {loading ? 'Refrescando...' : 'Refrescar vistas'}
               </Button>
             </div>
+            {refreshError && <p role="alert" className="mt-4 text-sm text-destructive">{refreshError}</p>}
           </CardContent>
         </Card>
 

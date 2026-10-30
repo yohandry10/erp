@@ -98,9 +98,13 @@ export async function testRecordFlows({ request, sql, uuid, results, tenantId, p
   const receipt = { almacen_id: warehouseId, items: [{ rma_item_id: rmaDetail.items[0].id, cantidad_recibida: 1 }] };
   const receiptHeaders = { 'idempotency-key': randomUUID() };
   const early = await request(`ventas/rma/${rmaId}/recepcionar`, receipt, 400, receiptHeaders);
-  assert.match(early.message, /RMA_RECEIPT_REQUIRES_APPROVED/);
+  assert.match(early.code ?? early.message, /RMA_RECEIPT_REQUIRES_APPROVED/);
   const self = await request(`ventas/rma/${rmaId}/aprobar`, { aprobar: true }, 403, { 'idempotency-key': randomUUID() });
-  assert.match(self.message, /RMA_SELF_APPROVAL_FORBIDDEN/);
+  assert.equal(self.code, 'RMA_SELF_APPROVAL_FORBIDDEN');
+  assert.equal(self.message, 'No tienes permiso para realizar esta operación');
+  const afterSelf = await request(`ventas/rma/${rmaId}`);
+  const unchangedRma = afterSelf.data ?? afterSelf;
+  for (const field of ['estado', 'aprobado_por', 'aprobado_en']) assert.deepEqual(unchangedRma[field], rmaDetail[field], 'La autoaprobación no debe cambiar ' + field);
   assert.ok(approverToken);
   const approvalHeaders = { authorization: `Bearer ${approverToken}`, 'idempotency-key': randomUUID() };
   const approval = await request(`ventas/rma/${rmaId}/aprobar`, { aprobar: true }, 201, approvalHeaders);

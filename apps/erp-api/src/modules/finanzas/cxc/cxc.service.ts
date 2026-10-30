@@ -12,6 +12,7 @@ import Decimal from 'decimal.js';
 import { errorWriterFinanciero, lecturaFinancieraFallida } from '../finanzas-errors';
 import { fechaHoyDelTenant } from '../../../shared/utils/fecha-tenant.util';
 import { appendIntegrationLog } from '../../../shared/utils/integration-log';
+import { readCxcNoteReceipt, readCxcRescheduleReceipt } from './cxc-adjustment-receipt';
 
 interface ListarCxcFilters {
   estado?: 'PENDIENTE' | 'PARCIAL' | 'CANCELADO' | 'VENCIDO';
@@ -91,7 +92,9 @@ export class CxcService {
       )
       .eq('tenant_id', tenantId);
 
-    if (filters.estado) {
+    if (filters.estado === 'VENCIDO') {
+      query = query.in('estado', ['VENCIDO', 'VENCIDA']);
+    } else if (filters.estado) {
       query = query.eq('estado', filters.estado);
     }
 
@@ -123,6 +126,7 @@ export class CxcService {
         const searchFilters = [
           `serie.ilike.${term}`,
           `numero.ilike.${term}`,
+          `numero_documento.ilike.${term}`,
         ];
 
         // PostgREST no admite una columna de relación dentro del OR de la
@@ -822,7 +826,10 @@ export class CxcService {
       this.logger.error('Error en crear_nota_referenciada_tx desde CxC:', error);
       throw this.errorNotaCredito(error);
     }
-    return { success: true, data: Array.isArray(data) ? data[0] : data };
+    const receipt = await readCxcNoteReceipt(client, tenantId, userId, cuentaId, cuenta.documento_id,
+      { monto: dto.monto, codigo_motivo: reasonCode, motivo: dto.motivo ?? dto.notas ?? 'Ajuste comercial de cuenta por cobrar' },
+      isColombia ? '91' : '07', key, data);
+    return { success: true, data: receipt };
   }
   async reprogramarCuentaPorCobrar(
     tenantId: string,
@@ -832,25 +839,34 @@ export class CxcService {
     idempotencyKey?: string,
   ): Promise<{ success: boolean; data: any }> {
     if (!userId) throw new BadRequestException('Se requiere un usuario autenticado');
-    // Sin Idempotency-Key cada pedido es una intención nueva. Una clave derivada
-    // del contenido convertía volver a una fecha ya usada (mismo motivo) en la
-    // repetición de la primera: 201 sin aplicar nada.
-    const key = idempotencyKey?.trim() || `cxc-reprogram:${uuidv4()}`;
+    // The RPC parameter is a civil date. Preserve PostgreSQL's literal day for
+    // valid ISO timestamps before executing the writer and checking its receipt.
+    const requestedDate = dto.nueva_fecha_vencimiento;
+    const canonicalDate = typeof requestedDate === 'string' ? requestedDate.slice(0, 10) : '';
+    const [civilYear, civilMonth, civilDay] = canonicalDate.split('-').map(Number);
+    const leapYear = civilYear % 4 === 0 && (civilYear % 100 !== 0 || civilYear % 400 === 0);
+    const lastCivilDay = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][civilMonth - 1] || 0;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(canonicalDate) || !Number.isFinite(Date.parse(requestedDate))
+      || civilYear < 1 || civilDay < 1 || civilDay > lastCivilDay) {
+      throw new BadRequestException('La nueva fecha de vencimiento es inválida');
+    }
+    const operationDto = { ...dto, nueva_fecha_vencimiento: canonicalDate };
+    const key = (idempotencyKey?.trim() || `cxc-reprogram:${uuidv4()}`).toLowerCase();
     const { data: rpcData, error: rpcError } = await this.supabase.getClient().rpc(
       'reprogramar_cxc_tx',
       {
         p_tenant_id: tenantId,
         p_cxc_id: cuentaId,
         p_actor_id: userId,
-        p_fecha_vencimiento: dto.nueva_fecha_vencimiento,
+        p_fecha_vencimiento: operationDto.nueva_fecha_vencimiento,
         p_motivo: dto.motivo ?? null,
         p_comentarios: dto.comentarios ?? null,
         p_idempotency_key: key,
       },
     );
     if (rpcError) throw this.errorReprogramacion(rpcError);
-    const result: any = Array.isArray(rpcData) ? rpcData[0] : rpcData;
-    return { success: true, data: result?.cuenta ?? result };
+    const result = await readCxcRescheduleReceipt(this.supabase.getClient(), tenantId, userId, cuentaId, operationDto, key, rpcData);
+    return { success: true, data: result };
 
     /* istanbul ignore next -- implementación legacy inalcanzable; retirar tras ventana compatible */
     const client = this.supabase.getClient();

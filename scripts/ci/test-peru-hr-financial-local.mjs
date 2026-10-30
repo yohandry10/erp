@@ -44,27 +44,42 @@ try {
   employees.push(employee);
  }
  const beforeCts=snapshot();await call('rrhh/cts/depositos',{periodo:'2026-06'},400);assert.equal(snapshot(),beforeCts);
- const cts=await call('rrhh/cts/depositos',{periodo:'2026-05'});assert.equal(cts.depositos.length,2);
+ await call('rrhh/cts/depositos',{periodo:'2026-05'},409);assert.equal(snapshot(),beforeCts);
+ // Ambos ingresaron en noviembre: el fixture declara S/500 de gratificación
+ // de diciembre por sus dos meses completos. Es una fuente sintética externa,
+ // no un pago creado en el ERP ni una aceptación de normativa externa.
+ const ctsBody={periodo:'2026-05',gratificaciones_previas:employees.map(employee=>({empleado_id:employee.id,periodo:'2025-12',monto:500,bonificacion_extraordinaria:45,fecha_pago:'2025-12-15',referencia:'FUENTE SINTETICA UAT: gratificacion diciembre de dos meses, sin pago ERP'}))};
+ const historicalPayrollCount=sql(`SELECT count(*) FROM planillas WHERE tenant_id=${q(tenant)};`);
+ const cts=await call('rrhh/cts/depositos',ctsBody);assert.equal(cts.depositos.length,2);
  const a=cts.depositos.find(row=>row.empleado_id===employees[0].id);const b=cts.depositos.find(row=>row.empleado_id===employees[1].id);
- assert.equal(cents(a.monto),87500);assert.equal(cents(b.monto),87500);
- const repeated=await call('rrhh/cts/depositos',{periodo:'2026-05'});assert.deepEqual(repeated.depositos.map(x=>x.id).sort(),cts.depositos.map(x=>x.id).sort());
- pass('CTS: semestre inválido rechazado, dos cálculos 875 persistidos y recálculo sin duplicar');
+ const ctsCents=79167,bankAfterCts=1000000-ctsCents;
+ for(const deposit of [a,b]){
+  assert.equal(cents(deposit.monto),ctsCents);assert.equal(cents(deposit.remuneracion_computable),158333);
+  assert.equal(deposit.metadata.gratificacion_cts.monto,500);assert.equal(deposit.metadata.gratificacion_cts.bonificacion_extraordinaria,45);
+  assert.equal(deposit.metadata.gratificacion_cts.fuente,'FUENTE_EXTERNA_DECLARADA');assert.equal(deposit.metadata.gratificacion_cts.declarado_por,login.user.id);
+ }
+ assert.equal(sql(`SELECT count(*) FROM planillas WHERE tenant_id=${q(tenant)};`),historicalPayrollCount);
+ const repeated=await call('rrhh/cts/depositos',ctsBody);assert.deepEqual(repeated.depositos.map(x=>x.id).sort(),cts.depositos.map(x=>x.id).sort());
+ pass('CTS: semestre inválido y fuente ausente no persisten; fuente histórica explícita excluye bonificación y calcula dos depósitos791.67 sin duplicar');
  const depositBody={cuenta_bancaria_id:bank.id,referencia:'CTS-HR-LOCAL',fecha_deposito:'2026-05-15'};
  const beforeDeposit=snapshot();await call(`rrhh/cts/depositos/${a.id}/depositar`,depositBody,403);assert.equal(snapshot(),beforeDeposit);
  await call(`rrhh/cts/depositos/${a.id}/depositar`,depositBody,201,checkerHeaders);
  const afterDeposit=snapshot();await call(`rrhh/cts/depositos/${a.id}/depositar`,depositBody,201,checkerHeaders);assert.equal(snapshot(),afterDeposit);
  assert.equal(sql(`SELECT estado FROM depositos_cts WHERE id=${q(a.id)};`),'DEPOSITADO');
- assert.equal(cents((await call(`finanzas/bancos/cuentas/${bank.id}`)).saldo),912500);
- await call('rrhh/cts/depositos',{periodo:'2026-05'},409);
+ assert.equal(cents((await call(`finanzas/bancos/cuentas/${bank.id}`)).saldo),bankAfterCts);
+ await call('rrhh/cts/depositos',ctsBody,409);
  assert.equal(snapshot(),afterDeposit);
- assert.equal(sql(`SELECT estado||':'||monto::text FROM depositos_cts WHERE id=${q(a.id)};`),'DEPOSITADO:875.00');
+ assert.equal(sql(`SELECT estado||':'||monto::text FROM depositos_cts WHERE id=${q(a.id)};`),'DEPOSITADO:791.67');
  pass('CTS: depositante distinto, banco debitado, replay y recálculo rechazado conservan depósito realizado');
- const liquidationBody={motivo_terminacion:'renuncia',fecha_terminacion:'2026-09-30'};
+ const missingLiquidation={motivo_terminacion:'renuncia',fecha_terminacion:'2026-09-30'};
+ await call(`rrhh/empleados/${employees[1].id}/liquidacion`,missingLiquidation,409);assert.equal(snapshot(),afterDeposit);
+ const liquidationBody={...missingLiquidation,gratificacion_previa:{periodo:'2026-07',monto:1500,bonificacion_extraordinaria:135,fecha_pago:'2026-07-15',referencia:'FUENTE SINTETICA UAT: gratificacion julio de seis meses, sin pago ERP'}};
  const liquidation=await call(`rrhh/empleados/${employees[1].id}/liquidacion`,liquidationBody);q(liquidation.id);
  assert.equal((await call(`rrhh/empleados/${employees[1].id}/liquidacion`,liquidationBody)).id,liquidation.id);
  assert.equal(sql(`SELECT estado FROM empleados WHERE id=${q(employees[1].id)};`),'activo');
- assert.equal(cents(liquidation.metadata.monto_cts_semestres_pendientes),87500);
- const frozenTotal=cents(liquidation.total_liquidacion);assert.ok(frozenTotal>87500);
+ assert.equal(cents(liquidation.metadata.monto_cts_semestres_pendientes),ctsCents);
+ assert.equal(liquidation.metadata.gratificacion_cts.monto,1500);assert.equal(liquidation.metadata.gratificacion_cts.fuente,'FUENTE_EXTERNA_DECLARADA');
+ const frozenTotal=cents(liquidation.total_liquidacion);assert.ok(frozenTotal>ctsCents);
  const base=`rrhh/liquidaciones/${liquidation.id}`;
  const beforeConfirm=snapshot();await call(`${base}/confirmar`,{},403);assert.equal(snapshot(),beforeConfirm);
  await call(`${base}/confirmar`,{},201,checkerHeaders);
@@ -82,13 +97,13 @@ try {
  const paid=snapshot();await call(`${base}/pagar`,payment);assert.equal(snapshot(),paid);
  assert.equal(sql(`SELECT estado FROM liquidaciones WHERE id=${q(liquidation.id)};`),'pagada');
  assert.equal(Number(sql(`SELECT count(*) FROM pagos_liquidaciones WHERE liquidacion_id=${q(liquidation.id)} AND estado='APLICADO';`)),1);
- assert.equal(cents((await call(`finanzas/bancos/cuentas/${bank.id}`)).saldo),912500-frozenTotal);
+ assert.equal(cents((await call(`finanzas/bancos/cuentas/${bank.id}`)).saldo),bankAfterCts-frozenTotal);
  pass('Liquidación: pagador distinto, efectivo bloqueado, transferencia completa y replay conservan banco/pago únicos');
  await call(`${base}/pago/revertir`,{motivo:'Reversa local'},403);assert.equal(snapshot(),paid);
  await call(`${base}/pago/revertir`,{motivo:'Reversa local'},201,checkerHeaders);
  const reversed=snapshot();await call(`${base}/pago/revertir`,{motivo:'Reversa local'},201,checkerHeaders);assert.equal(snapshot(),reversed);
  assert.equal(sql(`SELECT estado FROM liquidaciones WHERE id=${q(liquidation.id)};`),'aprobada');
- assert.equal(cents((await call(`finanzas/bancos/cuentas/${bank.id}`)).saldo),912500);
+ assert.equal(cents((await call(`finanzas/bancos/cuentas/${bank.id}`)).saldo),bankAfterCts);
  assert.equal(Number(sql(`SELECT count(*) FROM pagos_liquidaciones WHERE liquidacion_id=${q(liquidation.id)} AND estado='REVERTIDO';`)),1);
  pass('Liquidación: reversor distinto recupera obligación y banco exactos, preserva pago original y replay sin duplicar');
  for(const endpoint of [`${base}/confirmar`,`${base}/pagar`,`${base}/pago/revertir`,`rrhh/cts/depositos/${a.id}/depositar`]) {

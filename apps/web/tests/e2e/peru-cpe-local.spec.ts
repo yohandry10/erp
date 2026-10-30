@@ -38,7 +38,8 @@ test('CPE local: listado completo, formulario manual, recuperación y crédito',
  await page.route(cpeEndpoint,async route=>{if(route.request().method()!=='POST')return route.continue();const response=await route.fetch();const body=await response.json();created.push({status:response.status(),id:body.data?.id??body.id,key:route.request().headers()['idempotency-key']});proof();if(lost&&response.status()===201){lost=false;await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({message:'Respuesta interrumpida después del commit local'})});}else await route.fulfill({response});});
  await page.getByRole('button',{name:'Crear Comprobante',exact:true}).click();
  await expect(page.getByText('Respuesta interrumpida después del commit local').first()).toBeVisible();
- await page.getByRole('button',{name:'Crear Comprobante',exact:true}).click();
+ await expect(page.locator('#cpe-item-descripcion-0')).toHaveValue('Servicio manual CPE navegador');
+ await page.getByRole('button',{name:'Reintentar emisión',exact:true}).click();
  await expect(page.locator('#cpe-item-descripcion-0')).toHaveCount(0);
  const recovered=created.length===2&&created.every(c=>c.status===201)&&created[0].id===created[1].id&&created[0].key===created[1].key&&count()===beforeCreate+1;
  checks.push({check:'Formulario recupera una respuesta perdida con el mismo CPE y la misma intención',passed:recovered,statuses:created.map(c=>c.status)});proof();

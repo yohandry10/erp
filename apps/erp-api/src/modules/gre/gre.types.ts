@@ -81,6 +81,14 @@ export class CreateGuiaRemisionDto {
   ])
   motivo!: string;
 
+  /** Establecimiento desde el que sale la mercadería; por defecto la casa matriz. */
+  @IsOptional() @IsUUID()
+  sucursalPartidaId?: string;
+
+  /** Establecimiento propio de llegada: obligatorio en traslado entre establecimientos. */
+  @IsOptional() @IsUUID()
+  sucursalLlegadaId?: string;
+
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 3 })
   @Min(0.001)

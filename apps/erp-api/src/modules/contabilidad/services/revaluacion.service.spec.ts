@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ValidationPipe } from '@nestjs/common';
+import { EjecutarRevaluacionDto } from '@erp-suite/dtos';
 import { RevaluacionService } from './revaluacion.service';
 import { PeriodosService } from './periodos.service';
 import { PlanCuentasService } from './plan-cuentas.service';
@@ -29,9 +30,12 @@ describe('RevaluacionService', () => {
 
   const construirQuery = (tabla: string) => {
     const filtros: string[] = [];
+    const cortes: Record<string, string> = {};
     const resultado = () => {
       const valor = tablas[tabla];
-      return typeof valor === 'function' ? valor(filtros) : valor ?? { data: null, error: null };
+      const result = typeof valor === 'function' ? valor(filtros) : valor ?? { data: null, error: null };
+      return Array.isArray(result.data) ? { ...result, data: result.data.filter((row: any) =>
+        Object.entries(cortes).every(([key, date]) => !row[key] || row[key] <= date)) } : result;
     };
     const query: any = {
       select: jest.fn(() => query),
@@ -49,8 +53,9 @@ describe('RevaluacionService', () => {
       not: jest.fn(() => query),
       in: jest.fn(() => query),
       gte: jest.fn(() => query),
-      lte: jest.fn(() => query),
+      lte: jest.fn((column: string, date: string) => { cortes[column] = date; return query; }),
       order: jest.fn(() => query),
+      range: jest.fn(() => query),
       limit: jest.fn(() => query),
       single: jest.fn(async () => resultado()),
       maybeSingle: jest.fn(async () => resultado()),
@@ -77,7 +82,7 @@ describe('RevaluacionService', () => {
       : { data: { id: 'asiento-reval', numero_asiento: 99 }, error: null };
 
   beforeEach(async () => {
-    tablas = { asientos_contables: sinAsientoPrevio };
+    tablas = { asientos_contables: sinAsientoPrevio,empresa_config:{data:{tenant_id:TENANT,pais:'PE'},error:null},tipos_cambio:{data:[],count:0,error:null} };
     inserciones = [];
     tiposCambio = {
       obtenerMonedaLocal: jest.fn().mockResolvedValue('PEN'),
@@ -95,7 +100,7 @@ describe('RevaluacionService', () => {
               from: jest.fn((tabla: string) => construirQuery(tabla)),
               rpc: jest.fn(async (nombre: string, payload: any) => {
                 inserciones.push({ tabla: `rpc:${nombre}`, payload });
-                return { data: { id: 'asiento-reval', numero_asiento: 99 }, error: null };
+                return tablas[`rpc:${nombre}`] ?? { data: { ...payload.p_simulacion, asiento_id: 'asiento-reval', numero_asiento: 99 }, error: null };
               })
             }))
           }
@@ -114,12 +119,14 @@ describe('RevaluacionService', () => {
 
   afterEach(() => jest.clearAllMocks());
 
-  const conCotizacion = (compra: number, venta: number) =>
+  const conCotizacion = (compra: number, venta: number) =>{
     tiposCambio.obtenerVigente.mockResolvedValue({ compra, venta });
+    tablas.tipos_cambio={data:[{id:'rate-1',tenant_id:TENANT,moneda_origen:'USD',moneda_destino:'PEN',fecha:'2026-08-01',compra,venta,activo:true,estado:'ACTIVO'}],count:1,error:null};
+  };
 
   const conPosiciones = (cxc: any[], cxp: any[]) => {
-    tablas['cuentas_por_cobrar'] = { data: cxc, error: null };
-    tablas['cuentas_por_pagar'] = { data: cxp, error: null };
+    tablas['cuentas_por_cobrar'] = { data: cxc.map(r=>({tenant_id:TENANT,fecha_emision:'2026-08-01',...r})),count:cxc.length,error:null };
+    tablas['cuentas_por_pagar'] = { data: cxp.map(r=>({tenant_id:TENANT,fecha_emision:'2026-08-01',...r})),count:cxp.length,error:null };
   };
 
   describe('signo de la diferencia', () => {
@@ -186,6 +193,15 @@ describe('RevaluacionService', () => {
   });
 
   describe('exclusiones', () => {
+    it('no incluye CxC ni CxP emitidas después del corte; sí incluye su día de emisión', async () => {
+      conPosiciones(
+        [{ id: 'cxc-futura', moneda: 'USD', estado: 'PENDIENTE', monto_pendiente: 100, tipo_cambio_origen: 3.7, fecha_emision: '2026-09-01' }],
+        [{ id: 'cxp-futura', moneda: 'USD', estado: 'PENDIENTE', saldo: 100, tipo_cambio_origen: 3.7, fecha_emision: '2026-09-01' }]
+      );
+      conCotizacion(3.8, 3.8);
+      expect((await service.simular(TENANT, '2026-08-31')).posiciones).toHaveLength(0);
+      expect((await service.simular(TENANT, '2026-09-01')).posiciones).toHaveLength(2);
+    });
     it('excluye documentos sin tipo de cambio de origen, diciendo por qué', async () => {
       conPosiciones(
         [{ id: 'cxc-1', moneda: 'USD', estado: 'PENDIENTE', monto_pendiente: 1000, tipo_cambio_origen: null }],
@@ -231,7 +247,17 @@ describe('RevaluacionService', () => {
   });
 
   describe('asiento generado', () => {
-    it('cuadra y registra ganancia y pérdida en bruto, sin compensarlas', async () => {
+    it('conserva la simulación revisada al pasar por el ValidationPipe real', async () => {
+      conPosiciones([], [{ id: 'cxp-1', moneda: 'USD', estado: 'PENDIENTE', saldo: 11.8, tipo_cambio_origen: 3.75 }]);
+      conCotizacion(3.710001, 3.760001);
+      const simulacion = await service.simular(TENANT, '2026-10-08');
+      const pipe = new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true,
+        transformOptions: { enableImplicitConversion: true } });
+      const dto = await pipe.transform({ fecha: simulacion.fecha, simulacion, idempotency_key: 'fx-reviewed-intent' },
+        { type: 'body', metatype: EjecutarRevaluacionDto });
+      expect(JSON.parse(JSON.stringify(dto.simulacion))).toEqual(JSON.parse(JSON.stringify(simulacion)));
+    });
+    it('entrega a la transacción tenant, actor y simulación sin compensar ganancia/pérdida', async () => {
       // Ganancia en la CxC (+100) y pérdida en la CxP (-60): el neto es 40,
       // pero el estado de resultados debe mostrar los dos importes.
       conPosiciones(
@@ -242,27 +268,12 @@ describe('RevaluacionService', () => {
 
       await service.ejecutar(TENANT, USER, '2026-08-31');
 
-      const llamada = inserciones.find(i => i.tabla === 'rpc:crear_asiento_con_detalles_tx')!.payload;
-      const cabecera = llamada.p_asiento;
-      const lineas = llamada.p_detalles;
-
-      const totalDebe = lineas.reduce((s: number, l: any) => s + l.debe, 0);
-      const totalHaber = lineas.reduce((s: number, l: any) => s + l.haber, 0);
-      expect(Math.round(totalDebe * 100)).toBe(Math.round(totalHaber * 100));
-
-      expect(lineas).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ cuenta_id: 'cuenta-12', debe: 100, haber: 0 }),
-          expect.objectContaining({ cuenta_id: 'cuenta-42', debe: 0, haber: 60 }),
-          expect.objectContaining({ cuenta_id: 'cuenta-676', debe: 60, haber: 0 }),
-          expect.objectContaining({ cuenta_id: 'cuenta-776', debe: 0, haber: 100 })
-        ])
-      );
-      expect(cabecera.origen).toBe('REVALUACION_MONEDA');
-      expect(cabecera.estado).toBe('CONFIRMADO');
+      const llamada = inserciones.find(i => i.tabla === 'rpc:registrar_revaluacion_tx_570')!.payload;
+      expect(llamada).toEqual(expect.objectContaining({ p_tenant_id: TENANT, p_actor_id: USER, p_fecha: '2026-08-31' }));
+      expect(llamada.p_simulacion).toEqual(expect.objectContaining({ total_ganancia: 100, total_perdida: 60, diferencia_neta: 40 }));
     });
 
-    it('usa un source_event_id uuid derivado de la fecha, no un texto libre', async () => {
+    it('identifica la intención de un consumidor sin clave explícita con un UUID estable', async () => {
       conPosiciones(
         [{ id: 'cxc-1', moneda: 'USD', estado: 'PENDIENTE', monto_pendiente: 1000, tipo_cambio_origen: 3.7 }],
         []
@@ -271,8 +282,8 @@ describe('RevaluacionService', () => {
 
       await service.ejecutar(TENANT, USER, '2026-08-31');
 
-      const cabecera = inserciones.find(i => i.tabla === 'rpc:crear_asiento_con_detalles_tx')!.payload.p_asiento;
-      expect(cabecera.source_event_id).toMatch(
+      const llamada = inserciones.find(i => i.tabla === 'rpc:registrar_revaluacion_tx_570')!.payload;
+      expect(llamada.p_idempotency_key).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
       );
     });
@@ -283,12 +294,12 @@ describe('RevaluacionService', () => {
         []
       );
       conCotizacion(3.8, 3.8);
-      tablas['asientos_contables'] = { data: { id: 'asiento-previo', numero_asiento: 7 }, error: null };
+      tablas['rpc:registrar_revaluacion_tx_570'] = { data: null, error: { message: 'Ya existe un asiento de revaluación vigente.' } };
 
       await expect(service.ejecutar(TENANT, USER, '2026-08-31')).rejects.toThrow(
         /Ya existe un asiento de revaluación/
       );
-      expect(inserciones).toHaveLength(0);
+      expect(inserciones).toHaveLength(1);
     });
 
     it('no escribe nada si no hay diferencia que registrar', async () => {

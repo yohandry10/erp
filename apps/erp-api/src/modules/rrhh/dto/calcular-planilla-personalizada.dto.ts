@@ -1,4 +1,6 @@
 import { Type } from 'class-transformer';
+import { CoberturaEpsPlanillaDto } from './planilla-eps.dto';
+import { RemuneracionGratificacionPreviaDto } from './rrhh-acciones.dto';
 import {
   ArrayMinSize,
   IsArray,
@@ -12,6 +14,8 @@ import {
 } from 'class-validator';
 
 export class EmpleadoPlanillaPersonalizadaDto {
+  @IsOptional() @ValidateNested() @Type(() => RemuneracionGratificacionPreviaDto)
+  remuneracion_gratificacion_previa?: RemuneracionGratificacionPreviaDto;
   @IsUUID()
   empleado_id!: string;
 
@@ -73,6 +77,8 @@ export class EmpleadoPlanillaPersonalizadaDto {
 }
 
 export class CalcularPlanillaPersonalizadaDto {
+  @IsOptional() @ValidateNested() @Type(() => CoberturaEpsPlanillaDto)
+  eps_cobertura?: CoberturaEpsPlanillaDto;
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

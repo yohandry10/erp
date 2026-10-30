@@ -6,11 +6,35 @@
  * fórmula sin cobertura.
  *
  * Referencias:
- * - CTS: D.S. 001-97-TR (TUO del D. Leg. 650), arts. 9, 21 y 22.
+ * - CTS: D.S. 001-97-TR (TUO del D. Leg. 650), arts. 9, 18, 21 y 22.
  * - Vacaciones: D. Leg. 713, arts. 10 y 22 (récord trunco).
  * - Indemnización por despido arbitrario: D.S. 003-97-TR, art. 38.
  * - Gratificaciones: Ley 27735 (trunca, art. 7) y Ley 30334 (bonificación 9%).
  */
+
+import { ConflictException } from '@nestjs/common';
+
+/** Cobertura declarada en la ficha SUNAT (Tabla 32) para la bonificación. */
+export function regimenBonificacionGratificacionPeru(empleado: any): 'ESSALUD' | 'EPS' {
+  const relacion = empleado?.rrhh_peru_fichas_laborales;
+  const fichas = Array.isArray(relacion) ? relacion : relacion ? [relacion] : [];
+  const ficha = fichas.find((f: any) => f.activo !== false);
+  const regimenLaboral = String(ficha?.regimen_laboral_codigo || '01').trim();
+  if (regimenLaboral !== '01') {
+    throw new ConflictException('El motor de beneficios corresponde al régimen laboral general; el régimen especial de la ficha SUNAT requiere un cálculo compatible');
+  }
+  const codigo = String(ficha?.regimen_salud_codigo || '').trim();
+  // La configuración previa del ERP era EsSalud; una ficha vacía mantiene ese
+  // contrato. Un código explícito distinto nunca se interpreta como EsSalud.
+  if (!codigo || codigo === '00') return 'ESSALUD';
+  if (codigo === '01') {
+    if (!/^[1-6]$/.test(String(ficha?.eps_servicios_propios_codigo || '').trim())) {
+      throw new ConflictException('El régimen EsSalud y EPS requiere la entidad EPS de la Tabla 14 en la ficha SUNAT');
+    }
+    return 'EPS';
+  }
+  throw new ConflictException('El motor de gratificaciones admite régimen general con EsSalud o EPS; el régimen de salud especial declarado requiere revisión');
+}
 
 /**
  * Interpreta una fecha sin hora como fecha local. `new Date('2026-08-01')` la
@@ -68,7 +92,7 @@ export function fraccionAnual({ meses, dias }: TiempoServicios): number {
 
 /**
  * Remuneración computable para CTS: remuneración mensual más un sexto de la
- * última gratificación (D.S. 001-97-TR, art. 9).
+ * gratificación percibida en el semestre respectivo (D.S. 001-97-TR, art. 18).
  */
 export function remuneracionComputableCts(remuneracionMensual: number, ultimaGratificacion?: number): number {
   const base = Number(remuneracionMensual) || 0;
@@ -136,12 +160,13 @@ export function calcularIndemnizacionDespido(remuneracionMensual: number, tiempo
 export function calcularGratificacionTrunca(
   remuneracionMensual: number,
   mesesDelSemestre: number,
+  regimenSalud: 'ESSALUD' | 'EPS' = 'ESSALUD',
 ): { gratificacion: number; bonificacionExtraordinaria: number; total: number } {
   const base = Number(remuneracionMensual) || 0;
   const meses = Math.max(0, Math.min(6, Math.floor(Number(mesesDelSemestre) || 0)));
 
   const gratificacion = redondear((base / 6) * meses);
-  const bonificacionExtraordinaria = redondear(gratificacion * 0.09);
+  const bonificacionExtraordinaria = redondear(gratificacion * (regimenSalud === 'EPS' ? 0.0675 : 0.09));
 
   return {
     gratificacion,
@@ -282,9 +307,22 @@ export function mesesGratificablesDelPeriodo(periodo: string, fechaIngreso: Date
   return Math.max(0, Math.min(6, tiempoDeServicios(desde, finSemestre).meses));
 }
 
-/** Meses completos transcurridos del semestre gratificatorio (ene-jun o jul-dic). */
+/** Identifica el período de la última gratificación; no estima un importe percibido. */
+export function periodoGratificacionParaCts(alDia: Date): string {
+  const anio = alDia.getFullYear();
+  if (alDia.getMonth() === 11) return `${anio}-12`;
+  return alDia.getMonth() >= 6 ? `${anio}-07` : `${anio - 1}-12`;
+}
+
+/** Meses calendario completos del semestre al que pertenece el último día trabajado. */
 export function mesesDelSemestreGratificatorio(ingreso: Date, cese: Date): number {
   const inicioSemestre = new Date(cese.getFullYear(), cese.getMonth() < 6 ? 0 : 6, 1);
-  const desde = ingreso > inicioSemestre ? ingreso : inicioSemestre;
-  return tiempoDeServicios(desde, cese).meses;
+  // El cese es inclusivo, pero no elige el semestre con el día siguiente:
+  // 30 de junio y 31 de diciembre siguen perteneciendo al semestre terminado.
+  const finExclusivo = new Date(cese.getFullYear(), cese.getMonth(), cese.getDate() + 1);
+  const primerMesCompleto = ingreso.getDate() === 1
+    ? ingreso
+    : new Date(ingreso.getFullYear(), ingreso.getMonth() + 1, 1);
+  const desde = primerMesCompleto > inicioSemestre ? primerMesCompleto : inicioSemestre;
+  return Math.min(6, tiempoDeServicios(desde, finExclusivo).meses);
 }

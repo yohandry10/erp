@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Boxes, CheckCircle2, FileText, ShieldCheck } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
@@ -58,6 +58,7 @@ export default function NuevaRmaPage() {
   const [selected, setSelected] = useState<Record<string, { enabled: boolean; cantidad: string; motivo: string }>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const intents = useRef<Record<string, string>>({})
   const fiscalFlowStep = country.paisCodigo === 'CO'
     ? 'Nota crédito DIAN 91; CxC tras aceptación'
     : country.paisCodigo === 'AR'
@@ -116,14 +117,18 @@ export default function NuevaRmaPage() {
     }
     setSaving(true)
     try {
-      const response = await post('/api/ventas/rma', {
+      const payload = {
         pedido_id: pedido.id,
         ...(documentoId ? { documento_origen_id: documentoId } : {}),
         motivo_general: motivo.trim(),
         items,
-      }, { headers: { 'Idempotency-Key': operationKey() } })
+      }
+      const fingerprint = JSON.stringify(payload)
+      const intent = intents.current[fingerprint] ??= operationKey()
+      const response = await post('/api/ventas/rma', payload, { headers: { 'Idempotency-Key': intent } })
       const result = unwrap<any>(response, response)
       if (!result?.rma_id) throw new Error('La creación no devolvió el identificador RMA')
+      delete intents.current[fingerprint]
       toast({ title: 'RMA creada', description: `${result.numero ?? 'La solicitud'} quedó pendiente de aprobación segregada.` })
       router.push(`/dashboard/ventas/rma/${result.rma_id}`)
     } catch (error: any) {

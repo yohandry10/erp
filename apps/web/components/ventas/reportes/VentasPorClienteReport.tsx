@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { useApi } from '@/hooks/use-api'
+import { useState } from 'react'
+import { useSalesReport, ReportReadError } from './use-sales-report'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Download, TrendingUp } from 'lucide-react'
@@ -35,37 +35,10 @@ interface Props {
 }
 
 export default function VentasPorClienteReport({ filters }: Props) {
-  const { get } = useApi()
-  const [data, setData] = useState<VentaPorCliente[]>([])
-  const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState<'total' | 'cantidad'>('total')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true)
-      const response = await get('/ventas/reportes/ventas-por-cliente', {
-        params: filters
-      })
-
-      if (response?.success) {
-        setData(response.data || [])
-      }
-    } catch (error) {
-      console.error('Error loading report:', error)
-      toast({
-        title: 'Error',
-        description: 'No se pudo cargar el reporte',
-        variant: 'destructive'
-      })
-    } finally {
-      setLoading(false)
-    }
-  }, [filters, get])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
+  const { data: reportData, loading, error, retry } = useSalesReport<VentaPorCliente[]>('/ventas/reportes/ventas-por-cliente', filters, 'array')
+  const data = reportData || []
 
   const handleExport = () => {
     try {
@@ -119,6 +92,8 @@ export default function VentasPorClienteReport({ filters }: Props) {
       setSortOrder('desc')
     }
   }
+
+  if (error) return <ReportReadError error={error} retry={retry} />
 
   return (
     <Card>

@@ -21,8 +21,10 @@ export interface ResultadoValidacion {
 export interface ResultadoCierre {
     valido: boolean;
     saldo_teorico: number;
+    saldo_teorico_nominal: number;
     saldo_real: number;
     diferencia: number;
+    diferencia_nominal: number;
     tipo_diferencia: 'SOBRANTE' | 'FALTANTE' | 'CUADRADO' | 'REDONDEO_EFECTIVO_LEGAL';
     requiere_supervisor: boolean;
     requiere_justificacion: boolean;
@@ -244,7 +246,7 @@ export class CashReconciliationService {
             .maybeSingle();
 
         if (movimientosError) throw new ServiceUnavailableException('No se pudo consultar el saldo de caja; reintente');
-        const saldoTeorico = Number(
+        const saldoTeoricoNominal = Number(
             ultimoMovimiento?.saldo_nuevo ?? sesion.monto_inicio ?? 0,
         );
 
@@ -252,8 +254,8 @@ export class CashReconciliationService {
         // La RPC opera con numeric y redondea a dos decimales antes de decidir.
         // Normalizar aquí evita que un residuo IEEE-754 cambie la clase o el
         // umbral del preview frente al commit atómico.
-        const diferencia = new Decimal(saldoReal)
-            .minus(saldoTeorico)
+        const diferenciaNominal = new Decimal(saldoReal)
+            .minus(saldoTeoricoNominal)
             .toDecimalPlaces(2)
             .toNumber();
 
@@ -317,8 +319,14 @@ export class CashReconciliationService {
             .toDecimalPlaces(2)
             .toNumber();
         const redondeoCantidad = Math.max(Number(redondeoResumen.cantidad ?? 0), 0);
+        const aplicaRedondeo = ['PE', 'PER'].includes(pais) && moneda === 'PEN';
+        const saldoTeorico = new Decimal(saldoTeoricoNominal)
+            .minus(aplicaRedondeo ? redondeoDocumentado : 0)
+            .toDecimalPlaces(2).toNumber();
+        const diferencia = new Decimal(saldoReal).minus(saldoTeorico)
+            .toDecimalPlaces(2).toNumber();
         const esRedondeoLegal = esRedondeoLegalEfectivoPeru(
-            diferencia,
+            diferenciaNominal,
             pais,
             moneda,
             redondeoDocumentado,
@@ -326,10 +334,10 @@ export class CashReconciliationService {
 
         // Clasificar diferencia
         let tipoDiferencia: ResultadoCierre['tipo_diferencia'];
-        if (Math.abs(diferencia) < 0.01) {
-            tipoDiferencia = 'CUADRADO';
-        } else if (esRedondeoLegal) {
+        if (esRedondeoLegal && Math.abs(diferencia) < 0.01) {
             tipoDiferencia = 'REDONDEO_EFECTIVO_LEGAL';
+        } else if (Math.abs(diferencia) < 0.01) {
+            tipoDiferencia = 'CUADRADO';
         } else if (diferencia > 0) {
             tipoDiferencia = 'SOBRANTE';
         } else {
@@ -342,7 +350,7 @@ export class CashReconciliationService {
             tolerancia,
             pais,
             moneda,
-            redondeoDocumentado,
+            0, // El saldo físico ya descontó la evidencia; no perdonarla otra vez.
         );
         const requiereJustificacion = requiereSupervisor;
 
@@ -353,8 +361,10 @@ export class CashReconciliationService {
         return {
             valido: !requiereSupervisor,
             saldo_teorico: saldoTeorico,
+            saldo_teorico_nominal: saldoTeoricoNominal,
             saldo_real: saldoReal,
             diferencia,
+            diferencia_nominal: diferenciaNominal,
             tipo_diferencia: tipoDiferencia,
             requiere_supervisor: requiereSupervisor,
             requiere_justificacion: requiereJustificacion,

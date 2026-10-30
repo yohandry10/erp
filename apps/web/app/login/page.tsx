@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
@@ -21,17 +21,25 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [clientReady, setClientReady] = useState(false)
+  const redirecting = useRef(false)
   const [selectedCountryId, setSelectedCountryId] = useState(INITIAL_ACTIVE_COUNTRY_ID)
   const router = useRouter()
   const { toast } = useToast()
   const { signIn, session, loading: authLoading } = useAuth()
 
+  const redirectOnce = useCallback((isSuperAdmin: boolean) => {
+    if (redirecting.current) return
+    redirecting.current = true
+    window.location.replace(isSuperAdmin ? '/superadmin/dashboard/' : '/dashboard/')
+  }, [])
+  const canInteract = clientReady && !authLoading && !loading && !session && !redirecting.current
+
   useEffect(() => {
     if (!authLoading && session) {
-      const target = session.user.is_super_admin ? '/superadmin/dashboard/' : '/dashboard/'
-      window.location.replace(target)
+      redirectOnce(session.user.is_super_admin)
     }
-  }, [authLoading, session])
+  }, [authLoading, session, redirectOnce])
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -48,12 +56,14 @@ export default function LoginPage() {
         ?? INITIAL_ACTIVE_COUNTRY
       setSelectedCountryId(String(detected.id))
       window.localStorage.setItem('selectedCountry', String(detected.id))
+      setClientReady(true)
     }
   }, [])
   const selectedCountry = getActiveCountryById(selectedCountryId) ?? INITIAL_ACTIVE_COUNTRY
 
   const handleLogin = async (e?: React.FormEvent) => {
     e?.preventDefault()
+    if (!canInteract) return
 
     setLoading(true)
 
@@ -77,9 +87,7 @@ export default function LoginPage() {
       // La navegación completa obliga al navegador a reenviar la cookie HttpOnly
       // que acaba de emitir la API. Con router.push el middleware podía evaluar
       // una precarga anterior al login y dejar al usuario en /login pese al 200.
-      window.location.replace(
-        authenticatedUser.is_super_admin ? '/superadmin/dashboard/' : '/dashboard/',
-      )
+      redirectOnce(authenticatedUser.is_super_admin)
     } catch (error) {
       if (process.env.NODE_ENV === 'development') {
         console.info('[LoginPage] Login rechazado:', error instanceof Error ? error.message : error)
@@ -95,6 +103,7 @@ export default function LoginPage() {
   }
 
   const handleDemoLogin = () => {
+    if (!canInteract) return
     setLoading(true)
 
     if (typeof window !== 'undefined') {
@@ -143,6 +152,7 @@ export default function LoginPage() {
                 </Label>
                 <select
                   id="country"
+                  disabled={!canInteract}
                   value={selectedCountryId}
                   onChange={(event) => {
                     const value = event.target.value
@@ -166,6 +176,7 @@ export default function LoginPage() {
                 </Label>
                 <Input
                   id="email"
+                  disabled={!canInteract}
                   type="text"
                   inputMode="email"
                   placeholder="tu@empresa.com"
@@ -184,6 +195,7 @@ export default function LoginPage() {
                 </Label>
                 <Input
                   id="password"
+                  disabled={!canInteract}
                   type="password"
                   placeholder="••••••••"
                   value={password}
@@ -202,7 +214,7 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <button type="submit" className="hidden" aria-hidden="true" />
+              <button type="submit" className="hidden" aria-hidden="true" disabled={!canInteract} />
             </form>
           </CardContent>
 
@@ -210,7 +222,7 @@ export default function LoginPage() {
             <Button
               type="submit"
               onClick={handleLogin}
-              disabled={loading}
+              disabled={!canInteract}
               className="h-12 w-full bg-gradient-to-r from-blue-800 via-blue-600 to-cyan-500 text-base text-white shadow-lg shadow-blue-900/20 hover:from-blue-900 hover:via-blue-700 hover:to-cyan-600"
             >
               {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
@@ -226,7 +238,7 @@ export default function LoginPage() {
             <Button
               variant="outline"
               onClick={handleDemoLogin}
-              disabled={loading}
+              disabled={!canInteract}
               className="h-12 w-full border-2 border-border bg-card text-base text-foreground/85 hover:border-border hover:bg-muted/30 hover:text-foreground"
             >
               {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}

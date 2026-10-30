@@ -1,3 +1,4 @@
+import {RegistrarEntregaDto} from './dto/registrar-entrega.dto';
 import {
   Controller,
   Get,
@@ -214,6 +215,19 @@ export class LogisticaController {
    * POST /api/inventario/logistica/:pedidoId/tracking
    * Actualiza el estado de tracking (EN_TRANSITO / ENTREGADO / INCIDENCIA)
    */
+  @Post(':pedidoId/registrar-entrega')
+  @RequirePermission('inventario.logistica.despachar')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({summary:'Registrar entrega con fotografía previa y recibo completo'})
+  async registrarEntrega(
+    @Param('pedidoId') pedidoId: string,
+    @Body() dto: RegistrarEntregaDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.logisticaService.registrarEntrega(pedidoId,tenantId,dto,user?.id);
+  }
+
   @Post(':pedidoId/tracking')
   @RequirePermission('inventario.logistica.despachar')
   @HttpCode(HttpStatus.OK)

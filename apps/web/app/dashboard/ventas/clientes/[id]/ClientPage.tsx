@@ -8,7 +8,7 @@ import { ArrowLeft, Edit, Mail, Phone, MapPin } from 'lucide-react'
 export default function ClienteDetallePage() {
   const router = useRouter()
   const params = useParams()
-  const { get } = useApi()
+  const { get, unwrapObject } = useApi()
   const clienteId = params.id as string
 
   const [cliente, setCliente] = useState<any>(null)
@@ -17,7 +17,7 @@ export default function ClienteDetallePage() {
   const loadCliente = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await get(`/api/ventas/clientes/${clienteId}`)
+      const response = unwrapObject<any>(await get(`/api/ventas/clientes/${clienteId}`), {})
 
       if (response?.id) {
         setCliente(response)
@@ -31,7 +31,7 @@ export default function ClienteDetallePage() {
     } finally {
       setLoading(false)
     }
-  }, [clienteId, get, router])
+  }, [clienteId, get, router, unwrapObject])
 
   useEffect(() => {
     loadCliente()

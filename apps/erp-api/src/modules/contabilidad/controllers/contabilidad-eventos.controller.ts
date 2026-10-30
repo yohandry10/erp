@@ -6,6 +6,7 @@ import {
   Param,
   UseGuards,
   NotFoundException,
+  BadRequestException,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
@@ -23,6 +24,12 @@ export class ContabilidadEventosController {
     private readonly outboxEventsService: OutboxEventsService,
     private readonly asientosGeneratorService: AsientosGeneratorService,
   ) {}
+
+  private readLimit(value?: number) {
+    const limit = Number(value ?? 100);
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new BadRequestException('El límite de eventos debe ser un entero entre 1 y 1000');
+    return limit;
+  }
 
   @Get("eventos/estadisticas")
   @RequirePermission("contabilidad.reportes.read") // HARDENING: permisos granulares.
@@ -80,6 +87,7 @@ export class ContabilidadEventosController {
     return {
       success: true,
       data: stats,
+      complete: true, tenant_id: tenantId, scope: "ACCOUNTING_OWNED_EVENTS",
       message: `Estadísticas: ${stats.pending} pendientes, ${stats.processed_today} procesados hoy, ${stats.failed} fallidos`,
     };
   }
@@ -99,12 +107,13 @@ export class ContabilidadEventosController {
     const eventos = await this.outboxEventsService.leerEventosFallidos(
       tenantId,
       actorId,
-      limit || 100,
+      this.readLimit(limit),
     );
 
     return {
       success: true,
       data: eventos,
+      complete: true, tenant_id: tenantId, scope: "ACCOUNTING_OWNED_EVENTS", window_count: eventos.length, window_limit: this.readLimit(limit),
       message: `${eventos.length} evento(s) fallido(s) encontrado(s)`,
     };
   }
@@ -127,12 +136,13 @@ export class ContabilidadEventosController {
     const eventos = await this.outboxEventsService.leerEventosDeadLetter(
       tenantId,
       actorId,
-      limit || 100,
+      this.readLimit(limit),
     );
 
     return {
       success: true,
       data: eventos,
+      complete: true, tenant_id: tenantId, scope: "ACCOUNTING_OWNED_EVENTS", window_count: eventos.length, window_limit: this.readLimit(limit),
       message: `${eventos.length} evento(s) dead letter encontrado(s)`,
     };
   }

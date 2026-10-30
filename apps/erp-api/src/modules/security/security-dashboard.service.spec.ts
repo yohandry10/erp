@@ -1,57 +1,66 @@
+import { ServiceUnavailableException } from '@nestjs/common';
 import { SecurityDashboardService } from './security-dashboard.service';
 
+const metrics = [
+  { metric: 'periodo', value: '7' },
+  { metric: 'total_violations', value: '1502' },
+  { metric: 'critical_violations', value: '3' },
+  { metric: 'unique_users', value: '1201' },
+  { metric: 'tables_affected', value: '2' },
+];
+
+function build() {
+  const alerts = { count: 4, error: null } as any;
+  const pending = { count: 2, error: null } as any;
+  const rows = { data: [], error: null } as any;
+  const chain: any = {
+    select: jest.fn(() => chain),
+    order: jest.fn(() => chain),
+    gte: jest.fn(async () => alerts),
+    eq: jest.fn(async () => pending),
+    limit: jest.fn(async () => rows),
+    then: (resolve: any) => Promise.resolve(rows).then(resolve),
+  };
+  const client = { from: jest.fn(() => chain), rpc: jest.fn().mockResolvedValue({ data: metrics, error: null }) };
+  const service = new SecurityDashboardService({ getClient: () => client } as any);
+  return { service, client, chain, alerts, pending, rows };
+}
+
 describe('SecurityDashboardService', () => {
-  it('construye estadísticas desde auditoría RLS y alertas', async () => {
-    const tableCalls: Record<string, number> = {};
-    const client = {
-      from: jest.fn((table: string) => {
-        tableCalls[table] = (tableCalls[table] || 0) + 1;
-        const callIndex = tableCalls[table];
-        const chain: any = {
-          select: jest.fn((select?: string, options?: any) => {
-            chain.__select = select;
-            chain.__isCount = options?.count === 'exact';
-            return chain;
-          }),
-          eq: jest.fn(() => {
-            chain.__eq = true;
-            return chain;
-          }),
-          gte: jest.fn(() => {
-            if (table === 'rls_audit_log' && chain.__isCount) {
-              return Promise.resolve({ count: chain.__eq ? 3 : 7 });
-            }
-            if (table === 'rls_alert_history' && chain.__isCount) {
-              return Promise.resolve({ count: 4 });
-            }
-            if (table === 'rls_audit_log' && chain.__select === 'user_id') {
-              return Promise.resolve({ data: [{ user_id: 'u1' }, { user_id: 'u1' }, { user_id: 'u2' }] });
-            }
-            if (table === 'rls_audit_log' && chain.__select === 'table_name') {
-              return Promise.resolve({ data: [{ table_name: 'ventas' }, { table_name: 'compras' }, { table_name: 'ventas' }] });
-            }
-            return Promise.resolve({});
-          }),
-          then: (resolve: any) => {
-            if (table === 'rls_alert_history' && chain.__eq) {
-              return Promise.resolve({ count: 2 }).then(resolve);
-            }
-            return Promise.resolve({}).then(resolve);
-          },
-        };
-        return chain;
-      }),
-    };
+  it('conserva estadísticas SQL completas, incluso más de1000usuarios', async () => {
+    const { service, client } = build();
+    await expect(service.getDashboardStats(7)).resolves.toEqual({ period: '7 días', totalViolations: 1502, criticalViolations: 3, uniqueUsers: 1201, tablesAffected: 2, totalAlerts: 4, unacknowledgedAlerts: 2 });
+    expect(client.rpc).toHaveBeenCalledWith('generate_rls_security_report', { p_days: 7 });
+  });
 
-    const service = new SecurityDashboardService({ getClient: () => client } as any);
-    const stats = await service.getDashboardStats(7);
+  it.each(['alerts', 'pending'] as const)('rechaza error de %s sin inventar ceros', async (source) => {
+    const state = build(); state[source].error = { message: 'provider-private-detail' };
+    await expect(state.service.getDashboardStats()).rejects.toThrow(ServiceUnavailableException);
+    await expect(state.service.getDashboardStats()).rejects.not.toThrow('provider-private-detail');
+  });
 
-    expect(stats.period).toBe('7 días');
-    expect(stats.totalViolations).toBe(7);
-    expect(stats.criticalViolations).toBe(3);
-    expect(stats.uniqueUsers).toBe(2);
-    expect(stats.tablesAffected).toBe(2);
-    expect(stats.totalAlerts).toBe(4);
-    expect(stats.unacknowledgedAlerts).toBe(2);
+  it.each([null, undefined, -1, 1.5])('rechaza un conteo incompleto o inválido: %s', async (count) => {
+    const state = build(); state.alerts.count = count;
+    await expect(state.service.getDashboardStats()).rejects.toThrow(ServiceUnavailableException);
+  });
+
+  it.each([null, {}, [{ metric: 'total_violations', value: '0' }], [...metrics.slice(0, 3), { metric: 'unique_users', value: 'NaN' }]])('rechaza informe incompleto o malformado', async (data) => {
+    const state = build(); state.client.rpc.mockResolvedValue({ data, error: null } as any);
+    await expect(state.service.getDashboardStats()).rejects.toThrow(ServiceUnavailableException);
+  });
+
+  it('distingue un informe vacío válido de una consulta fallida', async () => {
+    const state = build(); state.alerts.count = 0; state.pending.count = 0;
+    state.client.rpc.mockResolvedValue({ data: metrics.map(row => ({ ...row, value: '0' })), error: null });
+    await expect(state.service.getDashboardStats()).resolves.toEqual({ period: '7 días', totalViolations: 0, criticalViolations: 0, uniqueUsers: 0, tablesAffected: 0, totalAlerts: 0, unacknowledgedAlerts: 0 });
+  });
+
+  it.each(['getViolationsByTable','getRecentViolations','getViolationsByUser','getViolationsHourly','getRecentAlerts','getUnacknowledgedAlerts'] as const)('%s no confunde una fuente fallida con una lista vacía', async (method) => {
+    const state = build(); state.rows.error = { message: 'provider-private-detail' };
+    await expect(state.service[method]()).rejects.toThrow(ServiceUnavailableException);
+    state.rows.error = null; state.rows.data = null;
+    await expect(state.service[method]()).rejects.toThrow(ServiceUnavailableException);
+    state.rows.data = [];
+    await expect(state.service[method]()).resolves.toEqual([]);
   });
 });

@@ -1,5 +1,6 @@
 import {
   IsDateString,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsNumber,
@@ -200,6 +201,11 @@ export class ActivoFijoResponseDto {
 
 /** Una cuota del cronograma de depreciación. */
 export class CuotaDepreciacionDto {
+  @ApiPropertyOptional({ description: 'Cuota ya registrada; las restantes son una proyección.' })
+  @IsOptional()
+  @IsBoolean()
+  registrada?: boolean;
+
   @ApiProperty({ example: '2026-09' })
   @IsString()
   periodo: string;

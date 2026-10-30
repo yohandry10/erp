@@ -13,7 +13,22 @@ import {
   tiempoCtsTrunca,
   tiempoDeServicios,
   parseFechaLocal,
+  periodoGratificacionParaCts,
+  regimenBonificacionGratificacionPeru,
 } from './liquidacion-peru.util';
+
+describe('Bonificación extraordinaria según cobertura SUNAT', () => {
+  it('usa6.75% enEPS y9% enEsSalud sobre la misma gratificación', () => {
+    expect(calcularGratificacionTrunca(1200, 6, 'EPS')).toEqual({ gratificacion: 1200, bonificacionExtraordinaria: 81, total: 1281 });
+    expect(calcularGratificacionTrunca(1200, 6, 'ESSALUD')).toEqual({ gratificacion: 1200, bonificacionExtraordinaria: 108, total: 1308 });
+  });
+  it('resuelve la ficha activa00/01 y exigeEPS declarada', () => {
+    expect(regimenBonificacionGratificacionPeru({ rrhh_peru_fichas_laborales: [{ activo: true, regimen_salud_codigo: '00' }] })).toBe('ESSALUD');
+    expect(regimenBonificacionGratificacionPeru({ rrhh_peru_fichas_laborales: [{ activo: true, regimen_salud_codigo: '01', eps_servicios_propios_codigo: '3' }] })).toBe('EPS');
+    expect(() => regimenBonificacionGratificacionPeru({ rrhh_peru_fichas_laborales: [{ activo: true, regimen_salud_codigo: '01' }] })).toThrow(/Tabla 14/);
+    expect(() => regimenBonificacionGratificacionPeru({ rrhh_peru_fichas_laborales: [{ activo: true, regimen_salud_codigo: '21' }] })).toThrow(/especial/);
+  });
+});
 
 describe('tiempoDeServicios', () => {
   it('cuenta meses completos y días sueltos', () => {
@@ -129,11 +144,33 @@ describe('gratificación trunca', () => {
     // Cese en agosto: el semestre corre desde julio
     expect(mesesDelSemestreGratificatorio(parseFechaLocal('2020-01-01'), parseFechaLocal('2026-08-15'))).toBe(1);
     // Cese en junio: el semestre corre desde enero
-    expect(mesesDelSemestreGratificatorio(parseFechaLocal('2020-01-01'), parseFechaLocal('2026-06-30'))).toBe(5);
+    expect(mesesDelSemestreGratificatorio(parseFechaLocal('2020-01-01'), parseFechaLocal('2026-06-30'))).toBe(6);
   });
 
   it('arranca en la fecha de ingreso si entró dentro del semestre', () => {
     expect(mesesDelSemestreGratificatorio(parseFechaLocal('2026-08-01'), parseFechaLocal('2026-10-01'))).toBe(2);
+  });
+
+  it.each(['2026-06-30', '2026-12-31'])(
+    'incluye el último día de %s sin saltar al semestre siguiente',
+    (cese) => {
+      const meses = mesesDelSemestreGratificatorio(parseFechaLocal('2024-01-01'), parseFechaLocal(cese));
+      expect(meses).toBe(6);
+      expect(calcularGratificacionTrunca(1200, meses)).toEqual({
+        gratificacion: 1200, bonificacionExtraordinaria: 108, total: 1308,
+      });
+    },
+  );
+
+  it.each([
+    ['2026-06-29', 5], ['2026-07-01', 0],
+    ['2026-12-30', 5], ['2027-01-01', 0],
+  ])('no cuenta meses calendario incompletos al cesar el %s', (cese, meses) => {
+    expect(mesesDelSemestreGratificatorio(parseFechaLocal('2024-01-01'), parseFechaLocal(String(cese)))).toBe(meses);
+  });
+
+  it('excluye tanto el mes de ingreso parcial como el mes de cese parcial', () => {
+    expect(mesesDelSemestreGratificatorio(parseFechaLocal('2026-02-15'), parseFechaLocal('2026-06-20'))).toBe(3);
   });
 });
 
@@ -240,5 +277,14 @@ describe('diasEnPeriodo', () => {
 
   it('ignora descansos de otros meses', () => {
     expect(diasEnPeriodo('2026-05', parseFechaLocal('2026-03-10'), parseFechaLocal('2026-03-19'))).toBe(0);
+  });
+});
+
+describe('período de la gratificación para CTS', () => {
+  it.each([
+    ['2026-04-30', '2025-12'], ['2026-06-30', '2025-12'],
+    ['2026-10-31', '2026-07'], ['2026-12-31', '2026-12'],
+  ])('al %s identifica %s sin estimar su importe con el sueldo actual', (fecha, periodo) => {
+    expect(periodoGratificacionParaCts(parseFechaLocal(fecha))).toBe(periodo);
   });
 });

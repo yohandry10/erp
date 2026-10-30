@@ -17,6 +17,7 @@ import { validateCountryTaxId } from '../paises/initial-country';
 import { resolveDianPrintedFiscalInfo, type DianPrintedFiscalInfo } from './dian-print.util';
 import { resolveArcaPrintedFiscalInfo, type ArcaPrintedFiscalInfo } from './arca-print.util';
 import { resolveHistoricalCpeCountry } from './historical-cpe-country.util';
+import { categoriaDeAfectacion } from '../../shared/utils/igv-afectacion.util';
 
 export const CPE_PDF_PRINT_FORMAT = {
   size: 'A4' as const,
@@ -186,7 +187,15 @@ export function resolveAllowedCpePdfLogoUrl(value: string, supabaseUrl?: string)
 export function resolveCpePrintedLineTotal(item: Record<string, unknown>): number {
   // La tabla es una representación para el cliente: muestra el total bruto de
   // la línea. `valor_venta` es la base imponible SUNAT y no incluye IGV.
-  const persisted = item.total_item ?? item.total ?? item.precio_venta
+  // `precio_venta` no es uniforme entre emisores: en pedidos y CPE es el precio
+  // unitario con IGV y en documentos el total de la línea. Base más IGV
+  // significa lo mismo en todos y va antes que él.
+  const igvValue = item.igv ?? item.impuesto_igv;
+  const grossFromBase = item.valor_venta != null && igvValue != null
+    && Number.isFinite(Number(item.valor_venta)) && Number.isFinite(Number(igvValue))
+    ? Math.round((Number(item.valor_venta) + Number(igvValue)) * 100) / 100
+    : undefined;
+  const persisted = item.total_item ?? item.total ?? grossFromBase ?? item.precio_venta
     ?? item.valor_venta ?? item.subtotal;
   if (persisted !== undefined && persisted !== null && Number.isFinite(Number(persisted))) {
     return Number(persisted);
@@ -220,6 +229,14 @@ export function getCpeNonFiscalPdfNotice(countryCode: string, evidenceStatus: st
   }
   const authority = getActiveCountryByCode(countryCode)?.autoridadFiscal ?? 'fiscal';
   return `SIN ACEPTACIÓN NI VALIDEZ ${authority.toUpperCase()}`;
+}
+
+export function getCpePeruPendingAcceptanceNotice(cpeData: any): string | null {
+  if (cpeData.simulated_origin !== false) return null; // La muestra tiene su aviso propio.
+  const accepted = String(cpeData.estado || '').toUpperCase() === 'ACEPTADO'
+    && String(cpeData.sunat_status || '').toUpperCase() === 'ACCEPTED'
+    && typeof cpeData.cdr_sunat === 'string' && Boolean(cpeData.cdr_sunat.trim());
+  return accepted ? null : 'Sin aceptación SUNAT · CDR no acreditado';
 }
 
 export interface CpePrintedNoteReference {
@@ -1312,9 +1329,14 @@ export class PdfGeneratorService {
         cpeData.sunat_status ||
         cpeData.estado ||
         'PENDIENTE';
+    const pendingAcceptance = countryCode === 'PE' ? getCpePeruPendingAcceptanceNotice(cpeData) : null;
+    if (pendingAcceptance) {
+      doc.fontSize(7).font('Helvetica-Bold').text(pendingAcceptance, 50, footerY - 11,
+        { width: 495, align: 'center', lineBreak: false });
+    }
     doc.fontSize(7).font('Helvetica')
       .text(
-        `Estado ${authority}: ${status} | ` +
+        `Estado ${pendingAcceptance ? 'técnico' : authority}: ${status} | ` +
         `Generado: ${new Date().toLocaleString(locale)}`,
         50, footerY,
         { width: 495, align: 'center', lineBreak: false }
@@ -1380,16 +1402,26 @@ export class PdfGeneratorService {
   }
 
   private getTaxLabel(cpeData: any, countryCode: string = 'PE'): string {
-    const defaultTaxName = countryCode === 'PE' ? 'IGV' : 'IVA';
-    const defaultRate = countryCode === 'AR' ? 21 : countryCode === 'CO' ? 19 : 18;
+    const country = getActiveCountryByCode(countryCode);
+    const defaultTaxName = country?.impuesto || (countryCode === 'PE' ? 'IGV' : 'IVA');
+    const defaultRate = (country?.tasaImpuesto ?? 0.18) * 100;
     const taxName = cpeData.impuesto_nombre || cpeData.tax_name || defaultTaxName;
-    const explicitRate = Number(cpeData.tasa_igv ?? cpeData.tasa_impuesto ?? cpeData.tax_rate);
-    const derivedRate = Number(cpeData.total_gravadas) > 0
-      ? (Number(cpeData.total_igv || 0) / Number(cpeData.total_gravadas)) * 100
-      : defaultRate;
-    const rate = Number.isFinite(explicitRate) && explicitRate > 0
-      ? (explicitRate <= 1 ? explicitRate * 100 : explicitRate)
-      : derivedRate;
+    const normalizedRate = (raw: unknown): number | undefined => {
+      if (raw === undefined || raw === null || raw === '') return undefined;
+      const value = Number(raw);
+      if (!Number.isFinite(value) || value < 0 || value > 100) return undefined;
+      return value > 0 && value <= 1 ? value * 100 : value;
+    };
+    const lineRates = [...new Set<number>((Array.isArray(cpeData.items) ? cpeData.items : [])
+      .filter((item: any) => categoriaDeAfectacion(item?.tipo_afectacion_igv ?? item?.afectacion_igv) === 'GRAVADO')
+      .map((item: any) => normalizedRate(item?.tasa_igv ?? item?.tasaIgv ?? item?.tasa_impuesto ?? item?.tasaImpuesto))
+      .filter((rate: number | undefined): rate is number => rate !== undefined))];
+    // Una tasa resumen no representa un comprobante con tasas distintas.
+    if (lineRates.length > 1) return taxName;
+    const explicitRate = normalizedRate(cpeData.tasa_igv ?? cpeData.tasa_impuesto ?? cpeData.tax_rate);
+    // Dividir impuestos y bases ya redondeados convierte el 18% en 17.99%.
+    // Usar las tasas persistidas o el contrato del país histórico del CPE.
+    const rate = lineRates[0] ?? explicitRate ?? defaultRate;
 
     return `${taxName} (${Number(rate.toFixed(2))}%)`;
   }
@@ -1481,10 +1513,6 @@ export class PdfGeneratorService {
     const normalized = leyendas
       .map((leyenda) => String(leyenda || '').trim())
       .filter(Boolean);
-
-    if (String(cpeData.tipo_operacion || '').trim() === '0200') {
-      normalized.push('TRANSFERENCIA GRATUITA DE UN BIEN Y/O SERVICIO PRESTADO GRATUITAMENTE');
-    }
 
     if (Number(cpeData.monto_detraccion || cpeData.detraccion_monto || 0) > 0) {
       normalized.push('OPERACIÓN SUJETA AL SISTEMA DE PAGO DE OBLIGACIONES TRIBUTARIAS');

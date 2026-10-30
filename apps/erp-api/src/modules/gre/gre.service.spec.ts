@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { GreService } from './gre.service';
 import { CreateGuiaRemisionDto } from './gre.types';
 
@@ -28,6 +28,33 @@ function validGre(overrides: Partial<CreateGuiaRemisionDto> = {}): CreateGuiaRem
 }
 
 describe('GreService validaciones de creación', () => {
+  describe.each(['findAllGuias','getStats','generarCsvGre'] as const)('%s indisponible', (method) => {
+    it.each(['source_error','null_data','network_error'])('falla503 sin falso vacío ni detalle interno: %s', async (kind) => {
+      const response = { data: kind === 'source_error' ? [] : null, error: kind === 'source_error' ? { message: 'private_database_detail' } : null };
+      const chain: any = { select: jest.fn(), eq: jest.fn(), order: jest.fn(), limit: jest.fn(),
+        then: (resolve: any, reject: any) => kind === 'network_error' ? Promise.reject(new Error('private_transport_detail')).then(resolve, reject) : Promise.resolve(response).then(resolve, reject) };
+      for (const key of ['select','eq','order','limit']) chain[key].mockReturnValue(chain);
+      const service = new GreService({ getClient: jest.fn(() => ({ from: jest.fn(() => chain) })) } as any,
+        { on: jest.fn(), emit: jest.fn(), eventEmitter: { eventNames: () => [] } } as any, {} as any, {} as any);
+      try { await service[method]('tenant-1'); throw new Error('Expected unavailable'); }
+      catch (error) { expect(error).toBeInstanceOf(ServiceUnavailableException); expect(String(error)).not.toContain('private_'); }
+    });
+  });
+  it('conserva tres decimales de peso y escapes en el reporte CSV', async () => {
+    const chain: any = { select: jest.fn(), eq: jest.fn(), then: (resolve: any) => Promise.resolve({ data: [{ serie: 'T001', numero: 'T001-00000001', destinatario: '=Cliente, "GRE"', peso_total: .125, created_at: '2026-10-09T12:00:00Z' }], error: null }).then(resolve) };
+    chain.select.mockReturnValue(chain); chain.eq.mockReturnValue(chain);
+    const service = new GreService({ getClient: jest.fn(() => ({ from: jest.fn(() => chain) })) } as any,
+      { on: jest.fn(), emit: jest.fn(), eventEmitter: { eventNames: () => [] } } as any, {} as any, {} as any);
+    const csv = await service.generarCsvGre('tenant-1'); expect(csv).toContain('"0.125"'); expect(csv).toContain('"\'=Cliente, ""GRE"""');
+    expect(csv).toContain('"2026-10-09"');
+  });
+  it('usa la fecha congelada del XML aunque la creación y la columna anterior difieran', () => {
+    const service = buildService();
+    expect((service as any).greEmissionDate({ created_at: '2026-10-10T01:00:00Z', fecha_emision: '2026-10-10', xml_ubl: '<DespatchAdvice><cbc:IssueDate xmlns:cbc="urn:test">2026-10-09</cbc:IssueDate></DespatchAdvice>' })).toBe('2026-10-09');
+  });
+  it.each([{}, { xml_ubl: '<DespatchAdvice/>' }, { fecha_emision: 'invalid' }])('bloquea un reporte sin fecha verificable: %j', (record) => {
+    expect(() => (buildService() as any).greEmissionDate(record)).toThrow(ServiceUnavailableException);
+  });
   it('aplica modalidad y fechas canónicas al listar GRE', async () => {
     const response = { data: [], error: null };
     const chain: any = {
@@ -287,6 +314,36 @@ describe('GreService validaciones de creación', () => {
     expect(xml).not.toContain('<cac:OriginAddress>');
     expect(xml).toContain('<cbc:Description><![CDATA[Producto <auditado>]]></cbc:Description>');
     expect(xml).not.toContain('<cac:AdditionalDocumentReference>');
+  });
+
+  it('declara partida y llegada del establecimiento real en un traslado entre establecimientos', () => {
+    const service = buildService() as any;
+
+    const xml = service.generateGreXmlUbl({
+      partida: { codigo: '0001', direccion: 'CALLE MERCADERES 210', ubigeo: '040101' },
+      llegada: { codigo: '0000', direccion: 'AV ORIGEN 123', ubigeo: '150101' },
+      emisor: {
+        ruc: '20100066603', razonSocial: 'EMPRESA DEMO', nombreComercial: 'EMPRESA DEMO',
+        direccion: 'AV ORIGEN 123', ubigeo: '150101', departamento: 'LIMA', provincia: 'LIMA', distrito: 'LIMA',
+      },
+      receptor: { docTipo: '6', docNumero: '20100066603', razonSocial: 'EMPRESA DEMO', direccion: 'OTRA DIRECCION' },
+      gre: {
+        numero: 'T001-00000002', motivo: 'TRASLADO_ENTRE_ESTABLECIMIENTOS', modalidad: 'TRANSPORTE_PUBLICO',
+        peso_total: 10, fecha_traslado: '2026-10-05T00:00:00.000Z', transportista: 'TRANSPORTES DEMO SAC',
+        transportista_documento: '20555555555', datos_adicionales: {},
+      },
+      detalles: [{ id: 1, descripcion: 'Cemento', cantidad: 4, unidad: 'NIU' }],
+    });
+
+    const llegada = /<cac:DeliveryAddress>[\s\S]*?<\/cac:DeliveryAddress>/.exec(xml)?.[0] ?? '';
+    const partida = /<cac:DespatchAddress>[\s\S]*?<\/cac:DespatchAddress>/.exec(xml)?.[0] ?? '';
+    expect(xml).toContain('catalogo20">04</cbc:HandlingCode>');
+    expect(partida).toContain('>040101</cbc:ID>');
+    expect(partida).toContain('listID="20100066603">0001</cbc:AddressTypeCode>');
+    expect(partida).toContain('CALLE MERCADERES 210');
+    expect(llegada).toContain('>150101</cbc:ID>');
+    expect(llegada).toContain('listID="20100066603">0000</cbc:AddressTypeCode>');
+    expect(llegada).toContain('AV ORIGEN 123');
   });
 
   it('genera GRE privada con conductor principal y placa en estructura validada por SUNAT', () => {

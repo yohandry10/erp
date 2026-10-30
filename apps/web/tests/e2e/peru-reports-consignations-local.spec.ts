@@ -1,5 +1,6 @@
 import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';import {execFileSync} from 'node:child_process';
 import {test,expect} from '@playwright/test';
+import {loginPeruLocal} from './helpers/peru-login-local';
 const output=process.env.LOCAL_INTEGRATED_OUTPUT_DIR!;
 const first=JSON.parse(fs.readFileSync(path.join(output,'tax-intents-fixture.json'),'utf8')),other=JSON.parse(fs.readFileSync(path.join(output,'tax-other-fixture.json'),'utf8'));
 assert.equal(process.env.E2E_EPHEMERAL_LOCAL_DB,'1');assert.equal(process.env.PGHOST,'127.0.0.1');assert.equal(process.env.PGDATABASE,'erp_e2e');assert.equal(new URL(process.env.LOCAL_API_URL!).hostname,'127.0.0.1');
@@ -7,12 +8,7 @@ const sql=(query:string)=>execFileSync(process.env.PSQL_BIN!,['-XqAt','-h','127.
 const endpoint=(r:{url():string})=>new URL(r.url()).pathname.replace(/^\/backend/,'').replace(/\/$/,'');
 async function setup(context:any,page:any,fixture:any){
  await context.route('**/*',(route:any)=>['127.0.0.1','localhost','[::1]'].includes(new URL(route.request().url()).hostname)?route.continue():route.abort('blockedbyclient'));
- await page.goto('/login/');await page.locator('#email').fill(fixture.email);await page.locator('#password').fill('Cliente-Local-2026-Only!');
- for(let attempt=0;attempt<2;attempt++){
-  const [login]=await Promise.all([page.waitForResponse((r:any)=>endpoint(r)==='/api/auth/login'&&r.request().method()==='POST'),page.getByRole('button',{name:'Iniciar Sesión',exact:true}).click()]);
-  if(login.status()===429&&attempt===0){const seconds=Number(await login.headerValue('retry-after'));expect(seconds).toBeGreaterThan(0);expect(seconds).toBeLessThanOrEqual(60);await new Promise(resolve=>setTimeout(resolve,seconds*1000));continue;}
-  expect(login.status()).toBe(201);await expect(page).toHaveURL(/\/dashboard\//,{timeout:25000});break;
- }
+ return await loginPeruLocal(page,fixture.email,'Cliente-Local-2026-Only!');
 }
 test('Consignaciones: respuesta perdida recupera entrega y nueva intención idéntica crea otra',async({page,context})=>{
  test.setTimeout(240000);page.setDefaultTimeout(25000);
@@ -33,7 +29,7 @@ test('Consolidación: controladora registra su tasa y ambas empresas generan rep
  test.setTimeout(300000);page.setDefaultTimeout(25000);
  const proof:{success:boolean;remoteWrites:boolean;scope:string;checks:Array<{check:string;passed:boolean}>;unexpected_errors:string[]}={success:false,remoteWrites:false,scope:'Navegador/API/PostgreSQL reales locales de consolidación',checks:[],unexpected_errors:[]};page.on('pageerror',e=>proof.unexpected_errors.push(e.message));let invitedContext:any;
  try{
-  await setup(context,page,first);await page.goto('/dashboard/contabilidad/consolidacion/');await expect(page.getByRole('heading',{name:'Consolidación y reportes configurables'})).toBeVisible();
+  const auth=await setup(context,page,first);await page.goto('/dashboard/contabilidad/consolidacion/');await expect(page.getByRole('heading',{name:'Consolidación y reportes configurables'})).toBeVisible();
   await page.getByRole('textbox',{name:'Código',exact:true}).first().fill('UI-GROUP-USD');await page.getByRole('textbox',{name:'Nombre del grupo'}).fill('UI grupo USD');const presentation=page.getByRole('textbox',{name:'Moneda de presentación'});await presentation.fill('USD');
   const [created]=await Promise.all([page.waitForResponse(r=>endpoint(r)==='/api/contabilidad/consolidacion/grupos'&&r.request().method()==='POST'),presentation.locator('..').getByRole('button').click()]);expect(created.status()).toBe(201);const group=(await created.json()).data;
   await page.getByRole('combobox',{name:'Grupo',exact:true}).selectOption(group.id);await page.getByRole('textbox',{name:'RUC exacto de la empresa'}).fill(other.ruc);
@@ -52,6 +48,27 @@ test('Consolidación: controladora registra su tasa y ambas empresas generan rep
   await page.getByRole('combobox',{name:'Reporte',exact:true}).selectOption(report.id);await page.locator('input[aria-label="Fecha desde"]').fill('2026-09-01');await page.locator('input[aria-label="Fecha hasta"]').fill('2026-09-30');
   const [generated]=await Promise.all([page.waitForResponse(r=>endpoint(r).endsWith('/generar')),page.getByRole('button',{name:'Generar',exact:true}).click()]);expect(generated.status(),await generated.text()).toBe(200);const value=(await generated.json()).data;expect(value.empresas_incluidas).toBe(2);expect(Number(value.lineas.find((l:any)=>l.codigo==='RESULTADO').valor)).toBe(125);
   await expect(page.locator('tr').filter({has:page.getByText('RESULTADO',{exact:true})})).toContainText('125.00');proof.checks.push({check:'Definición y fórmula UI muestran 125.00 de dos empresas con fuentes reales',passed:true});
+  // Contraste empresarial: extorno de ingreso y gasto/reversión reales.
+  // La plantilla de la UI debe usar saldos netos, sin borrar el test de 125.
+  const account=(code:string)=>sql(`SELECT id FROM plan_cuentas WHERE tenant_id='${first.tenant}' AND codigo='${code}' AND activo ORDER BY id LIMIT 1`);
+  const journal=await context.request.post(process.env.LOCAL_API_URL+'/api/contabilidad/asiento-contable',{
+   headers:{authorization:'Bearer '+(auth.access_token??auth.data?.access_token),'idempotency-key':crypto.randomUUID()},
+   data:{fecha:'2026-09-03',concepto:'UI extorno y gasto netos',estado:'CONFIRMADO',detalles:[
+    {cuenta_id:account('70'),debe:20,haber:0,concepto:'Extorno ingreso'},
+    {cuenta_id:account('1041'),debe:0,haber:20,concepto:'Salida por extorno ingreso'},
+    {cuenta_id:account('63'),debe:10,haber:0,concepto:'Gasto'},
+    {cuenta_id:account('1041'),debe:0,haber:10,concepto:'Pago gasto'},
+    {cuenta_id:account('1041'),debe:3,haber:0,concepto:'Recuperación gasto'},
+    {cuenta_id:account('63'),debe:0,haber:3,concepto:'Extorno gasto'}]}});
+  expect(journal.status(),await journal.text()).toBe(201);
+  const [netResponse]=await Promise.all([page.waitForResponse(r=>endpoint(r).endsWith('/generar')),page.getByRole('button',{name:'Generar',exact:true}).click()]);
+  expect(netResponse.status()).toBe(200);const net=(await netResponse.json()).data;
+  expect(Number(net.lineas.find((l:any)=>l.codigo==='INGRESOS').valor)).toBe(120);
+  expect(Number(net.lineas.find((l:any)=>l.codigo==='GASTOS').valor)).toBe(1.75);
+  expect(Number(net.lineas.find((l:any)=>l.codigo==='RESULTADO').valor)).toBe(118.25);
+  await expect(page.locator('tr').filter({has:page.getByText('RESULTADO',{exact:true})})).toContainText('118.25');
+  expect(JSON.parse(sql(`SELECT jsonb_object_agg(codigo,jsonb_build_object('naturaleza',naturaleza,'signo',signo)) FROM reportes_contables_lineas WHERE reporte_id='${report.id}' AND codigo IN ('INGRESOS','GASTOS')`))).toEqual({INGRESOS:{naturaleza:'SALDO',signo:-1},GASTOS:{naturaleza:'SALDO',signo:1}});
+  proof.checks.push({check:'Plantilla netea extorno de ingreso20 y gasto10 menos extorno3: 118.25; SQL conserva SALDO/signos',passed:true});
   await page.reload();await expect(page.getByRole('combobox',{name:'Grupo'}).locator(`option[value="${group.id}"]`)).toHaveCount(1);expect(proof.unexpected_errors).toEqual([]);proof.success=true;
  }finally{await invitedContext?.close();fs.writeFileSync(path.join(output,'browser-consolidation.json'),JSON.stringify(proof,null,2));}
 });

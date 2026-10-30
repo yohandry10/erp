@@ -22,7 +22,7 @@ log = "0.4"
 rusqlite = { version = "0.32", features = ["bundled"] }
 
 # Tauri dependencies
-tauri = { version = "2.6.2", features = ["tray-icon"] }
+tauri = { version = "2.11.1", features = ["tray-icon"] }
 tauri-plugin-log = "2.0"
 tauri-plugin-fs = "2.0"
 tauri-plugin-dialog = "2.0"

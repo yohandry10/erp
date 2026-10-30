@@ -461,13 +461,18 @@ BEGIN
     RAISE EXCEPTION 'VERIFY_518: total sub-S/0.10 no quedó documentado %', v_result;
   END IF;
 
+  -- Contrato570: diferencia física excluye redondeo acreditado, conserva
+  -- diferencia nominal para el asiento; no se concede tolerancia adicional.
   SELECT public.cerrar_caja_tx(v_tenant, v_sesion_redondeo, v_actor,
     jsonb_build_object('monto_contado', 220.00, 'denominaciones', '{}'::jsonb,
       'notas', 'Arqueo con redondeo legal 518')) INTO v_result;
   v_close_event := (v_result->>'close_event_id')::uuid;
   IF coalesce((v_result->>'success')::boolean, false) IS NOT TRUE
      OR v_result->>'estado' <> 'CERRADA'
-     OR (v_result->>'diferencia')::numeric <> -0.11
+     OR (v_result->>'diferencia')::numeric <> 0
+     OR (v_result->>'diferencia_nominal')::numeric <> -0.11
+     OR (v_result->>'monto_esperado_nominal')::numeric <> 220.11
+     OR (v_result->>'monto_esperado')::numeric <> 220
      OR v_result->>'tipo_diferencia' <> 'REDONDEO_EFECTIVO_LEGAL'
      OR coalesce((v_result->>'redondeo_efectivo_legal')::boolean, false) IS NOT TRUE
      OR (v_result->>'redondeo_efectivo_documentado')::numeric <> 0.11
@@ -480,10 +485,12 @@ BEGIN
   WHERE tenant_id = v_tenant AND event_id = v_close_event;
   IF v_payload->>'tipoDiferencia' <> 'REDONDEO_EFECTIVO_LEGAL'
      OR coalesce((v_payload->>'redondeoEfectivoLegal')::boolean, false) IS NOT TRUE
-     OR (v_payload->>'diferencia')::numeric <> -0.11
+     OR (v_payload->>'diferencia')::numeric <> 0
+     OR (v_payload->>'diferenciaNominal')::numeric <> -0.11
+     OR (v_payload->>'montoEsperadoFisico')::numeric <> 220
      OR (v_payload->>'redondeoEfectivoDocumentado')::numeric <> 0.11
      OR (v_payload->>'redondeoEfectivoCantidad')::integer <> 3
-     OR (v_payload->>'schemaVersion')::integer <> 518 THEN
+     OR (v_payload->>'schemaVersion')::integer <> 570 THEN
     RAISE EXCEPTION 'VERIFY_518: outbox no congeló clase contable %', v_payload;
   END IF;
   IF (SELECT count(*) FROM public.cortes_caja
@@ -657,7 +664,7 @@ BEGIN
      OR v_def !~ 'supervisorAuthorizationFingerprint'
      OR v_def !~ 'redondeoEfectivoLegal'
      OR v_def !~ 'REDONDEO_EFECTIVO_LEGAL'
-     OR v_def !~ 'schemaVersion.*, 518' THEN
+     OR v_def !~ 'schemaVersion.*, 570' THEN
     RAISE EXCEPTION 'VERIFY_518: writer perdió lock/autorización/evidencia/clase';
   END IF;
   SELECT pg_get_functiondef(

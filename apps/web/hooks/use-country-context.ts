@@ -2,11 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchApi } from '@/lib/api-fetch';
 import { etiquetaImpuesto, resolverTasaImpuesto } from '@/lib/tasa-impuesto';
-import {
-  ACTIVE_COUNTRIES,
-  INITIAL_ACTIVE_COUNTRY_CODE,
-  INITIAL_ACTIVE_COUNTRY_ID,
-} from '@/lib/initial-country';
+import { ACTIVE_COUNTRIES } from '@/lib/initial-country';
+import { readCountryContext, type CountryContextData } from '@/lib/country-context-contract';
 
 interface CountryContext {
   paisId: number;
@@ -24,6 +21,9 @@ interface CountryContext {
   locale: string;
   requiresSetup: boolean;
   loading: boolean;
+  error?: string;
+  retry?: () => void;
+  retrying?: boolean;
 }
 
 const EMPTY_CONTEXT: CountryContext = {
@@ -85,29 +85,18 @@ const resolveCurrencySymbol = (currencyCode: string, fallbackSymbol: string) => 
 
 // Transforma el payload crudo del backend al CountryContext consumido por la app.
 // Función pura: facilita testing y reuso en `select` de useQuery.
-function buildCountryContext(empresaConfig: any): CountryContext {
+function buildCountryContext(empresaConfig: CountryContextData | null): CountryContext {
   if (!empresaConfig) return EMPTY_CONTEXT;
 
-  const paisId = empresaConfig.pais_id ? Number(empresaConfig.pais_id) : Number(INITIAL_ACTIVE_COUNTRY_ID);
-  const configuredCode = typeof empresaConfig.paisCodigo === 'string'
-    ? empresaConfig.paisCodigo
-    : empresaConfig.pais;
-  const paisCodigo = typeof configuredCode === 'string'
-    ? configuredCode.toUpperCase()
-    : INITIAL_ACTIVE_COUNTRY_CODE;
-  const rawCurrency = empresaConfig.monedaDefecto ?? empresaConfig.moneda;
-  const monedaDefecto = typeof rawCurrency === 'string'
-    ? rawCurrency.toUpperCase()
-    : '';
-
-  if (!paisId || !paisCodigo) return EMPTY_CONTEXT;
+  const paisId = empresaConfig.pais_id;
+  const paisCodigo = empresaConfig.pais;
 
   const countryData = CONTEXT_MAP[paisCodigo];
   if (!countryData) {
     return { ...EMPTY_CONTEXT, paisId, paisCodigo };
   }
 
-  const resolvedMoneda = monedaDefecto || countryData.moneda;
+  const resolvedMoneda = empresaConfig.monedaDefecto;
 
   // La tasa manda la del tenant, no la constante del país: es la que aplica la
   // RPC de venta, y usar otra hacía que el POS exhibiera un total y registrara
@@ -126,9 +115,7 @@ function buildCountryContext(empresaConfig: any): CountryContext {
     simboloMoneda: resolveCurrencySymbol(resolvedMoneda, countryData.simboloMoneda),
     isDemo: empresaConfig.isDemo === true,
     arcaPuntoVenta:
-      Number.isInteger(Number(empresaConfig.arcaPuntoVenta))
-        ? Number(empresaConfig.arcaPuntoVenta)
-        : null,
+      empresaConfig.arcaPuntoVenta,
     arcaCondicionIva:
       typeof empresaConfig.arcaCondicionIva === 'string'
         ? empresaConfig.arcaCondicionIva.trim().toUpperCase()
@@ -138,14 +125,13 @@ function buildCountryContext(empresaConfig: any): CountryContext {
   };
 }
 
-async function fetchCountryContext(): Promise<any> {
+async function fetchCountryContext(tenantId: string): Promise<CountryContextData | null> {
   const res = await fetchApi('/api/configuration/context/country/');
   if (!res.ok) {
-    if (res.status === 401 || res.status === 403) return null;
     throw new Error(`HTTP ${res.status}`);
   }
   const json = await res.json();
-  return json?.data ?? json;
+  return readCountryContext(json, tenantId);
 }
 
 export const COUNTRY_CONTEXT_QUERY_KEY = ['configuration', 'context', 'country'] as const;
@@ -159,12 +145,12 @@ export const COUNTRY_CONTEXT_QUERY_KEY = ['configuration', 'context', 'country']
 export function useCountryContext(): CountryContext {
   const { session } = useAuth();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
     // El tenant forma parte de la identidad del dato. Sin este segmento, al
     // cerrar una demo PE y entrar a una AR en la misma pestaña React Query
     // reutilizaba durante cinco minutos el país del tenant anterior.
-    queryKey: [...COUNTRY_CONTEXT_QUERY_KEY, session?.user?.tenant_id ?? 'anonymous'],
-    queryFn: fetchCountryContext,
+    queryKey: [...COUNTRY_CONTEXT_QUERY_KEY, session?.user?.tenant_id ?? 'anonymous', session?.user?.id ?? 'anonymous'],
+    queryFn: () => fetchCountryContext(session?.user?.tenant_id ?? ''),
     select: buildCountryContext,
     enabled: !!session, // no llamar si aún no hay sesión hidratada
     staleTime: 5 * 60 * 1000, // 5 min: el país del tenant no cambia con frecuencia
@@ -173,5 +159,12 @@ export function useCountryContext(): CountryContext {
   });
 
   if (isLoading) return INITIAL_CONTEXT;
+  if (isError) return {
+    ...INITIAL_CONTEXT,
+    loading: false,
+    error: 'No se pudo cargar la configuración fiscal',
+    retry: () => { void refetch(); },
+    retrying: isFetching,
+  };
   return data ?? EMPTY_CONTEXT;
 }

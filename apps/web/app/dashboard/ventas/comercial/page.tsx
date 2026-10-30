@@ -107,6 +107,7 @@ export default function ComercialVentasPage() {
   const [loadingConsolidadoId, setLoadingConsolidadoId] = useState<string | null>(null)
   const [selected, setSelected] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const keys = useRef<Record<string, string>>({})
 
@@ -123,6 +124,7 @@ export default function ComercialVentasPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const [catalogResponse, listResponse, ruleResponse, movementResponse, candidateResponse, batchResponse] = await Promise.all([
         get('/api/ventas/comercial/catalogos'),
@@ -132,16 +134,28 @@ export default function ComercialVentasPage() {
         get('/api/ventas/comercial/consolidados/candidatos?limit=100'),
         get('/api/ventas/comercial/consolidados'),
       ])
-      setCatalogos(unwrap<Catalogos>(catalogResponse, { productos: [], clientes: [], vendedores: [] }))
-      setListas(unwrap<ListaPrecio[]>(listResponse, []))
-      setReglas(unwrap<ReglaComision[]>(ruleResponse, []))
-      setMovimientos(unwrap<MovimientoComision[]>(movementResponse, []))
-      setCandidatos(unwrap<Candidato[]>(candidateResponse, []))
-      setConsolidados(unwrap<Consolidado[]>(batchResponse, []))
+      const catalog = unwrap<Catalogos | null>(catalogResponse, null)
+      const lists = unwrap<ListaPrecio[] | null>(listResponse, null)
+      const rules = unwrap<ReglaComision[] | null>(ruleResponse, null)
+      const movements = unwrap<MovimientoComision[] | null>(movementResponse, null)
+      const candidates = unwrap<Candidato[] | null>(candidateResponse, null)
+      const batches = unwrap<Consolidado[] | null>(batchResponse, null)
+      if (!catalog || !Array.isArray(catalog.productos) || !Array.isArray(catalog.clientes)
+        || !Array.isArray(catalog.vendedores) || !Array.isArray(lists) || !Array.isArray(rules)
+        || !Array.isArray(movements) || !Array.isArray(candidates) || !Array.isArray(batches)) {
+        throw new Error('La respuesta comercial está incompleta. Reintenta la consulta.')
+      }
+      setCatalogos(catalog)
+      setListas(lists)
+      setReglas(rules)
+      setMovimientos(movements)
+      setCandidatos(candidates)
+      setConsolidados(batches)
       setSelected((current) => current.filter((key) =>
-        unwrap<Candidato[]>(candidateResponse, []).some((row) => candidateKey(row) === key),
+        candidates.some((row) => candidateKey(row) === key),
       ))
     } catch (error: any) {
+      setLoadError('No se pudo cargar la gestión comercial. Reintenta para recuperar el catálogo completo.')
       toast({ variant: 'destructive', title: 'No se cargó la gestión comercial', description: error?.message })
     } finally {
       setLoading(false)
@@ -167,7 +181,9 @@ export default function ComercialVentasPage() {
   )
   const selectedTotal = selectedRows.reduce((sum, row) => sum + Number(row.total || 0), 0)
 
-  const keyFor = (slot: string) => (keys.current[slot] ??= operationKey(slot))
+  // El payload identifica el formulario dentro del mapa; la cabecera debe
+  // contener sólo el tipo de operación y el UUID (máximo API: 255 caracteres).
+  const keyFor = (slot: string) => (keys.current[slot] ??= operationKey(slot.split(':', 1)[0]))
 
   const savePriceList = async () => {
     const details = priceLines.map((line) => ({
@@ -301,6 +317,16 @@ export default function ComercialVentasPage() {
     } finally { setSaving(false) }
   }
 
+  if (loadError && !loading) {
+    return <div className="mx-auto w-full max-w-[1600px] space-y-4 p-6">
+      <h1 className="text-3xl font-bold">Precios, comisiones y bloques de venta</h1>
+      <div role="alert" className="rounded-xl border border-destructive p-5">
+        <p>{loadError}</p>
+        <Button className="mt-4" onClick={() => void load()}>Reintentar</Button>
+      </div>
+    </div>
+  }
+
   return (
     <div className="mx-auto w-full max-w-[1600px] space-y-6 p-4 text-foreground md:p-6">
       <header className="relative overflow-hidden rounded-2xl border border-border bg-card/95 p-6 shadow-lg before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex md:items-center md:justify-between md:p-8">
@@ -314,12 +340,12 @@ export default function ComercialVentasPage() {
         </Button>
       </header>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {!loading && <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric icon={Tags} label="Listas activas" value={String(listas.filter((row) => row.activo).length)} />
         <Metric icon={BadgeDollarSign} label="Comisión neta" value={netCommission} />
         <Metric icon={ListChecks} label="Ventas por agrupar" value={String(candidatos.length)} />
         <Metric icon={Layers3} label="Bloques emitidos" value={String(consolidados.length)} />
-      </section>
+      </section>}
 
       <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-card p-2">
         {([

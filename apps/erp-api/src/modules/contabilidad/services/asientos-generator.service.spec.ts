@@ -510,6 +510,20 @@ describe('AsientosGeneratorService', () => {
   });
 
   describe('generarAsientoVenta', () => {
+    it('contabiliza una venta sin IGV con dos detalles positivos y ningún movimiento tributario cero', async () => {
+      planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(new Map([
+        ['12', createMockPlanCuenta('12', 'Clientes', 'ACTIVO')],
+        ['70', createMockPlanCuenta('70', 'Ventas', 'INGRESO')],
+        ['40', createMockPlanCuenta('40', 'IGV', 'PASIVO')],
+      ]));
+      mockSupabaseClient.single.mockResolvedValueOnce({ data: { id: 'asiento-exportacion', total_debe: 20, total_haber: 20 }, error: null });
+      await service.generarAsientoVenta({ tenant_id: 'test-tenant-id', fecha: '2026-10-08', total: 20, base_imponible: 20, igv: 0 });
+      const rpc = mockSupabaseClient.rpc.mock.calls.find(([fn]: [string]) => fn === 'crear_asiento_con_detalles_tx');
+      expect(rpc?.[1].p_detalles).toEqual([
+        expect.objectContaining({ cuenta_id: 'cuenta-12', debe: 20, haber: 0 }),
+        expect.objectContaining({ cuenta_id: 'cuenta-70', debe: 0, haber: 20 }),
+      ]);
+    });
     it('debe generar asiento de venta correctamente', async () => {
       const evento = {
         tenant_id: 'test-tenant-id',
@@ -620,6 +634,21 @@ describe('AsientosGeneratorService', () => {
 
       expect(resultado).toBeDefined();
       expect(resultado.id).toBe('asiento-venta-2');
+    });
+
+    it('rechaza una venta POS si falta la cuenta operativa del medio de pago, sin cargar la cuenta resumen', async () => {
+      planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(new Map([
+        ['12', createMockPlanCuenta('12', 'Clientes', 'ACTIVO')],
+        ['70', createMockPlanCuenta('70', 'Ventas', 'INGRESO')],
+        ['40', createMockPlanCuenta('40', 'IGV', 'PASIVO')],
+        ['69', createMockPlanCuenta('69', 'Costo de Ventas', 'GASTO')],
+        ['20', createMockPlanCuenta('20', 'Mercaderías', 'ACTIVO')],
+        ['10', createMockPlanCuenta('10', 'Efectivo y equivalentes', 'ACTIVO')],
+      ]));
+      planCuentasService.buscarCuentaPorCodigoONombre.mockResolvedValue(null);
+      await expect(service.generarAsientoVenta({ tenant_id: 'test-tenant-id', fecha: '2026-10-07', total: 118,
+        base_imponible: 100, igv: 18, cobros: [{ tipo: 'TARJETA', monto: 118 }] })).rejects.toThrow('La cuenta 10411 no acepta movimientos');
+      expect(mockSupabaseClient.rpc.mock.calls.some(([fn]) => fn === 'crear_asiento_con_detalles_tx')).toBe(false);
     });
 
     it('distribuye una venta POS mixta entre caja, tarjeta y CxC sin tratar todo como contado', async () => {
@@ -748,6 +777,34 @@ describe('AsientosGeneratorService', () => {
         }),
       ]));
       expect(JSON.stringify(rpc?.[1].p_detalles)).not.toContain('faltante');
+    });
+
+    it.each([-20, 0, 20])('reconcilia cierre570 con diferencia operativa %s y redondeo exactamente una vez', async (diferencia) => {
+      periodosService.validarPeriodoAbierto.mockResolvedValue();
+      planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(new Map([
+        ['65', createMockPlanCuenta('65', 'Otros gastos', 'GASTO')],
+        ['75', createMockPlanCuenta('75', 'Otros ingresos', 'INGRESO')],
+      ]));
+      planCuentasService.buscarCuentaPorCodigoONombre.mockResolvedValue(
+        createMockPlanCuenta('10111', 'Caja principal', 'ACTIVO'),
+      );
+      mockSupabaseClient.single.mockResolvedValueOnce({ data: { id: 'asiento-cierre570' }, error: null });
+      await service.generarAsientoCierreCaja({
+        tenant_id: 'test-tenant-id', fecha: '2026-10-07T18:00:00Z',
+        diferencia, diferencia_nominal: diferencia - 0.02,
+        redondeo_efectivo_documentado: 0.02, schema_version: 570,
+        referencia: 'CIERRE-CAJA-570', cuenta_caja_codigo: '10111',
+      });
+      const rpc = mockSupabaseClient.rpc.mock.calls.find(([fn]: [string]) => fn === 'crear_asiento_con_detalles_tx');
+      const lines = rpc?.[1].p_detalles;
+      expect(lines).toEqual(expect.arrayContaining([
+        expect.objectContaining({ cuenta_id: 'cuenta-65', debe: 0.02, haber: 0, concepto: 'Redondeo legal de pago en efectivo' }),
+        expect.objectContaining({ cuenta_id: 'cuenta-10111', debe: 0, haber: 0.02, concepto: 'Menor efectivo por redondeo legal' }),
+      ]));
+      const saldoCaja = lines.filter((line: any) => line.cuenta_id === 'cuenta-10111')
+        .reduce((sum: number, line: any) => sum + line.debe - line.haber, 0);
+      expect(saldoCaja).toBeCloseTo(diferencia - 0.02, 2);
+      expect(lines.reduce((sum: number, line: any) => sum + line.debe - line.haber, 0)).toBeCloseTo(0, 2);
     });
 
     it('no duplica el asiento del cierre cuando se reentrega el mismo event_id', async () => {
@@ -1127,6 +1184,12 @@ describe('AsientosGeneratorService', () => {
   });
 
   describe('generarAsientoAjusteInventario', () => {
+    it.each([0, -1, NaN])('rechaza importe %s sin insertar un asiento ficticio', async (valor) => {
+      await expect(service.generarAsientoAjusteInventario({ tenant_id: 'test-tenant-id', valor }))
+        .rejects.toThrow('requiere un importe monetario positivo');
+      expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
+      expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
+    });
     it('debe generar asiento de ajuste de inventario por sobrante', async () => {
       const evento = {
         tenant_id: 'test-tenant-id',

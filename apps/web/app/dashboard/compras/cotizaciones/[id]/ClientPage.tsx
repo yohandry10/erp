@@ -1,11 +1,17 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { requestConfirmation } from '@/lib/confirm-action'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
+import { useAuth } from '@/contexts/AuthContext'
+import { readPurchaseQuote, confirmPurchaseQuoteAction, confirmPurchaseQuoteConversion } from '@/lib/compras/purchase-quote-contract'
 import toast from 'react-hot-toast'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
+import { isOverdue, parseDateLocal } from '@/lib/date-utils'
+import CompraEditarDetallesModal from '@/components/compras/CompraEditarDetallesModal'
+import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 import {
   ArrowLeft,
   Edit,
@@ -55,6 +61,7 @@ interface CotizacionDetalle {
   detalles?: Array<{
     id: string
     producto_id: string
+    descripcion?: string
     cantidad: number
     precio_unitario: number
     subtotal: number
@@ -95,7 +102,7 @@ const toNumber = (value: unknown) => {
 
 const formatDate = (value?: string | null) => {
   if (!value) return 'N/A'
-  const date = new Date(value)
+  const date = parseDateLocal(value)
   return Number.isNaN(date.getTime()) ? 'N/A' : date.toLocaleDateString('es-PE')
 }
 
@@ -113,51 +120,61 @@ const normalizeEstado = (estado?: string): EstadoCotizacionKey => {
 export default function CotizacionDetallePage() {
   const router = useRouter()
   const params = useParams()
-  const { get, post } = useApi()
+  const { get, post } = useApi({ requireLive: true, throwOnError: true, showErrorToast: false })
+  const { session } = useAuth()
   const { currency, taxIdLabel } = useLocalizedMoney()
   const { tasaIgv, nombreImpuesto } = useTaxConfig()
   const cotizacionId = params.id as string
+  const tenantId = session?.user?.tenant_id || ''
+  const actorId = session?.user?.id || ''
+  const activeScope = useRef('')
+  activeScope.current = `${tenantId}:${actorId}:${cotizacionId}`
 
   const [cotizacion, setCotizacion] = useState<CotizacionDetalle | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
+  const latestRead = useRef(0)
   const [actionLoading, setActionLoading] = useState(false)
+  const [editandoProductos, setEditandoProductos] = useState(false)
 
   const loadCotizacion = useCallback(async () => {
+    if (!tenantId || !actorId) return
+    const request = ++latestRead.current
+    const scope = `${tenantId}:${actorId}:${cotizacionId}`
     try {
       setLoading(true)
+      setLoadError(false)
       const response = await get(`/api/compras/cotizaciones/${cotizacionId}`)
 
-      if (response?.success && response.data) {
-        setCotizacion(response.data)
-      } else {
-        toast.error('Error al cargar la cotización')
-        router.push('/dashboard/compras/cotizaciones')
-      }
+      const data = readPurchaseQuote(response, { id: cotizacionId, tenantId, actorId })
+      if (request === latestRead.current && scope === activeScope.current) setCotizacion(data)
     } catch (error) {
-      console.error('Error loading cotizacion:', error)
-      toast.error('Error al cargar la cotización')
-      router.push('/dashboard/compras/cotizaciones')
+      if (request === latestRead.current && scope === activeScope.current) { setLoadError(true); setCotizacion(null) }
     } finally {
-      setLoading(false)
+      if (request === latestRead.current && scope === activeScope.current) setLoading(false)
     }
-  }, [cotizacionId, get, router])
+  }, [cotizacionId, tenantId, actorId, get])
 
   useEffect(() => {
+    setCotizacion(null)
+    setLoading(true)
+    setActionLoading(false)
     loadCotizacion()
+    return () => { latestRead.current++ }
   }, [loadCotizacion])
 
   const handleEnviar = async () => {
-    if (!confirm('¿Está seguro de enviar esta cotización al proveedor?')) return
+    if (actionLoading || !cotizacion) return
+    if (!(await requestConfirmation('¿Está seguro de enviar esta cotización al proveedor?'))) return
 
     try {
       setActionLoading(true)
       const response = await post(`/api/compras/cotizaciones/${cotizacionId}/enviar`, {})
 
-      if (response?.success) {
+      confirmPurchaseQuoteAction(response, { id: cotizacionId, tenantId, actorId }, cotizacion, 'ENVIAR')
+      if (activeScope.current === `${tenantId}:${actorId}:${cotizacionId}`) {
         toast.success('✅ Cotización enviada exitosamente')
-        loadCotizacion()
-      } else {
-        toast.error(`Error: ${response?.message || 'No se pudo enviar la cotización'}`)
+        await loadCotizacion()
       }
     } catch (error: any) {
       console.error('Error enviando cotización:', error)
@@ -168,17 +185,17 @@ export default function CotizacionDetallePage() {
   }
 
   const handleAprobar = async () => {
-    if (!confirm('¿Está seguro de aprobar esta cotización?')) return
+    if (actionLoading || !cotizacion) return
+    if (!(await requestConfirmation('¿Está seguro de aprobar esta cotización?'))) return
 
     try {
       setActionLoading(true)
       const response = await post(`/api/compras/cotizaciones/${cotizacionId}/aprobar`, {})
 
-      if (response?.success) {
+      confirmPurchaseQuoteAction(response, { id: cotizacionId, tenantId, actorId }, cotizacion, 'APROBAR')
+      if (activeScope.current === `${tenantId}:${actorId}:${cotizacionId}`) {
         toast.success('✅ Cotización aprobada exitosamente')
-        loadCotizacion()
-      } else {
-        toast.error(`Error: ${response?.message || 'No se pudo aprobar la cotización'}`)
+        await loadCotizacion()
       }
     } catch (error: any) {
       console.error('Error aprobando cotización:', error)
@@ -189,18 +206,18 @@ export default function CotizacionDetallePage() {
   }
 
   const handleRechazar = async () => {
+    if (actionLoading || !cotizacion) return
     const motivo = prompt('Ingrese el motivo del rechazo:')
-    if (!motivo) return
+    if (!motivo?.trim()) return
 
     try {
       setActionLoading(true)
-      const response = await post(`/api/compras/cotizaciones/${cotizacionId}/rechazar`, { motivo })
+      const response = await post(`/api/compras/cotizaciones/${cotizacionId}/rechazar`, { motivo: motivo.trim() })
 
-      if (response?.success) {
+      confirmPurchaseQuoteAction(response, { id: cotizacionId, tenantId, actorId }, cotizacion, 'RECHAZAR', motivo)
+      if (activeScope.current === `${tenantId}:${actorId}:${cotizacionId}`) {
         toast.success('✅ Cotización rechazada')
-        loadCotizacion()
-      } else {
-        toast.error(`Error: ${response?.message || 'No se pudo rechazar la cotización'}`)
+        await loadCotizacion()
       }
     } catch (error: any) {
       console.error('Error rechazando cotización:', error)
@@ -211,18 +228,17 @@ export default function CotizacionDetallePage() {
   }
 
   const handleConvertirOC = async () => {
-    if (!confirm('¿Está seguro de convertir esta cotización en una Orden de Compra?')) return
+    if (actionLoading || !cotizacion) return
+    if (!(await requestConfirmation('¿Está seguro de convertir esta cotización en una Orden de Compra?'))) return
 
     try {
       setActionLoading(true)
       const response = await post(`/api/compras/cotizaciones/${cotizacionId}/convertir-oc`, {})
 
-      const ordenId = response?.data?.id || response?.data?.orden_id
-      if (response?.success && ordenId) {
+      const ordenId = confirmPurchaseQuoteConversion(response, { id: cotizacionId, tenantId, actorId }, cotizacion)
+      if (activeScope.current === `${tenantId}:${actorId}:${cotizacionId}`) {
         toast.success('✅ Orden de Compra creada exitosamente')
         router.push(`/dashboard/compras/ordenes/${ordenId}`)
-      } else {
-        toast.error(`Error: ${response?.message || 'No se pudo convertir a OC'}`)
       }
     } catch (error: any) {
       console.error('Error convirtiendo a OC:', error)
@@ -242,11 +258,11 @@ export default function CotizacionDetallePage() {
     )
   }
 
-  if (!cotizacion) {
+  if (loadError || !cotizacion) {
     return (
       <div className={pageClass}>
         <div className="flex min-h-[40vh] items-center justify-center">
-          <div className={panelClass}>Cotización no encontrada</div>
+          <div className={panelClass}><p role="alert">No se pudo cargar la cotización. Reintenta para continuar.</p><button onClick={loadCotizacion} className={actionClass}>Reintentar</button></div>
         </div>
       </div>
     )
@@ -255,8 +271,7 @@ export default function CotizacionDetallePage() {
   const estado = normalizeEstado(cotizacion.estado)
   const estadoConfig = ESTADO_CONFIG[estado]
   const EstadoIcon = estadoConfig.icon
-  const vencimiento = cotizacion.fecha_vencimiento ? new Date(cotizacion.fecha_vencimiento) : null
-  const isVencida = !!vencimiento && !Number.isNaN(vencimiento.getTime()) && vencimiento < new Date()
+  const isVencida = !!cotizacion.fecha_vencimiento && isOverdue(cotizacion.fecha_vencimiento)
   const puedeEnviar = estado === 'BORRADOR'
   const puedeAprobar = estado === 'ENVIADA' && !isVencida
   const puedeRechazar = estado === 'ENVIADA'
@@ -293,6 +308,7 @@ export default function CotizacionDetallePage() {
           </div>
 
           <div className="flex flex-wrap gap-3">
+            {estado === 'BORRADOR' && <ProtectedComponent modulo="compras" accion="editar" recurso="cotizaciones" fallback={null}><button className={secondaryActionClass} disabled={actionLoading} onClick={() => setEditandoProductos(true)}>Editar productos</button></ProtectedComponent>}
             {puedeEnviar && (
               <button onClick={handleEnviar} disabled={actionLoading} className={primaryActionClass}>
                 <Send size={16} />
@@ -321,6 +337,7 @@ export default function CotizacionDetallePage() {
         </div>
       </div>
 
+      <CompraEditarDetallesModal tipo="cotizacion" documento={cotizacion} open={editandoProductos} onClose={() => setEditandoProductos(false)} onSuccess={loadCotizacion} />
       <div className="mb-6 grid gap-6 xl:grid-cols-2">
         <div className={panelClass}>
           <div className={panelHeaderClass}>

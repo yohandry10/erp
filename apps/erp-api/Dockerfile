@@ -1,5 +1,5 @@
 # Multi-stage build for production
-FROM node:24-alpine AS base
+FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS base
 
 # Install the lockfile-compatible pnpm version.
 RUN npm install -g pnpm@9.15.4
@@ -48,7 +48,7 @@ RUN if [ -f apps/erp-api/dist/src/main.js ]; then \
     fi
 
 # Production stage
-FROM node:24-alpine AS production
+FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS production
 
 # Install the lockfile-compatible pnpm version.
 RUN npm install -g pnpm@9.15.4

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import type { ComponentType } from "react";
 import {
   BarChart3,
@@ -22,6 +22,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDashboardTheme } from "@/hooks/use-dashboard-theme";
 import { useCountryContext } from "@/hooks/use-country-context";
+import { exportToExcel, formatCurrencyForExcel } from "@/lib/excel-export";
+import { renderRegistroCompras } from "./render-nuevos-libros";
 
 type VistaContable =
   | "estado-resultados"
@@ -34,6 +36,42 @@ type VistaContable =
   | "libro-inventarios-balances"
   | "registro-costos"
   | "libros-electronicos-sunat";
+
+const esRegistro = (value: any): value is Record<string, any> =>
+  value !== null && typeof value === "object" && !Array.isArray(value);
+const esNumero = (value: any) =>
+  (typeof value === "number" || (typeof value === "string" && value.trim() !== "")) &&
+  Number.isFinite(Number(value));
+const sonFilas = (value: any): value is Record<string, any>[] =>
+  Array.isArray(value) && value.every(esRegistro);
+const tieneImportes = (value: any, fields: string[]) =>
+  esRegistro(value) && fields.every((field) => esNumero(value[field]));
+const filasConImportes = (value: any, fields: string[]) =>
+  sonFilas(value) && value.every((row) => tieneImportes(row, fields));
+const validadoresContables: Record<VistaContable, (data: any) => boolean> = {
+  "estado-resultados": (data) => esRegistro(data) &&
+    tieneImportes(data.ingresos, ["total_ingresos"]) &&
+    tieneImportes(data.costos, ["costo_ventas"]) &&
+    tieneImportes(data.gastos, ["total_gastos"]) && esNumero(data.utilidad_neta),
+  "registro-compras": (data) => esRegistro(data) &&
+    filasConImportes(data.compras, ["baseImponible", "igv", "importeTotal"]) &&
+    tieneImportes(data.resumen, ["cantidadComprobantes"]) && esNumero(data.total) &&
+    (data.resumen.moneda === null || typeof data.resumen.moneda === "string") &&
+    filasConImportes(data.resumenPorMoneda, ["cantidadComprobantes", "baseImponible", "igv", "total"]),
+  "balance-comprobacion": (data) => esRegistro(data) && sonFilas(data.cuentas) &&
+    tieneImportes(data.totales, ["debe", "haber"]),
+  "kardex-valorizado": (data) => filasConImportes(data, ["valor_total"]),
+  "libro-caja-bancos": (data) => filasConImportes(data, ["saldoFinal"]) &&
+    data.every((row: any) => sonFilas(row.movimientos)),
+  "registro-activos-fijos": (data) =>
+    filasConImportes(data, ["valor_adquisicion", "valor_neto", "depreciacion_acumulada"]),
+  "libro-planillas": (data) => filasConImportes(data, ["debe", "haber"]),
+  "libro-inventarios-balances": (data) =>
+    filasConImportes(data, ["saldoInicial", "entradas", "salidas", "saldoFinal"]),
+  "registro-costos": (data) => filasConImportes(data, ["debe", "haber"]),
+  "libros-electronicos-sunat": (data) => sonFilas(data) &&
+    data.every((row) => sonFilas(row.detalle_asientos)),
+};
 
 const vistas: Array<{
   id: VistaContable;
@@ -106,7 +144,9 @@ const vistas: Array<{
 export default function ContabilidadPage() {
   const [vistaActual, setVistaActual] =
     useState<VistaContable>("registro-compras");
-  const [loading, setLoading] = useState(false);
+  const [cargasPorVista, setCargasPorVista] = useState<Partial<Record<VistaContable, boolean>>>({});
+  const secuenciasCarga = useRef<Partial<Record<VistaContable, number>>>({});
+  const loading = cargasPorVista[vistaActual] === true;
   const [erroresCarga, setErroresCarga] = useState<Record<string, string>>({});
   const marcarErrorCarga = useCallback((vista: string, mensaje: string | null) => {
     setErroresCarga((actual) => {
@@ -135,6 +175,10 @@ export default function ContabilidadPage() {
   );
 
   const [registroCompras, setRegistroCompras] = useState<any>(null);
+  const [periodoCompras, setPeriodoCompras] = useState(() => {
+    const hoy = new Date();
+    return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}`;
+  });
   const [estadoResultados, setEstadoResultados] = useState<any>(null);
   const [balanceComprobacion, setBalanceComprobacion] = useState<any>(null);
   // El endpoint responde con el array de cuentas y sus movimientos: no existe
@@ -268,7 +312,7 @@ export default function ContabilidadPage() {
     0,
   );
 
-  const { get } = useApi();
+  const { get } = useApi({ throwOnError: true });
 
   // La exportacion PLE existia en el backend sin ninguna ruta ni boton que la
   // alcanzara: el contador no podia bajar ningun libro electronico.
@@ -418,169 +462,122 @@ export default function ContabilidadPage() {
     </Card>
   );
 
-  const formatearMoneda = (valor: number) => {
+  const formatearMoneda = (valor: number, moneda?: string) => {
     return new Intl.NumberFormat(country.locale || "es-PE", {
       style: "currency",
-      currency: country.moneda || "PEN",
+      currency: moneda || country.moneda || "PEN",
     }).format(valor);
   };
 
-  const cargarEstadoResultados = useCallback(async () => {
-    setLoading(true);
+  const cargarVistaContable = useCallback(async (
+    vista: VistaContable,
+    endpoint: string,
+    guardar: (data: any) => void,
+    descripcion: string,
+  ) => {
+    const secuencia = (secuenciasCarga.current[vista] || 0) + 1;
+    secuenciasCarga.current[vista] = secuencia;
+    setCargasPorVista((actual) => ({ ...actual, [vista]: true }));
+    marcarErrorCarga(vista, null);
+    guardar(null);
     try {
-      marcarErrorCarga("estado-resultados", null);
-      const response = await get(
-        `/api/contabilidad/estados/estado-resultados?anio=${anioActual}&mes=${mesActual}`,
-      );
-      if (response?.success) setEstadoResultados(response.data);
-    } catch (error) {
-      console.error("Error cargando estado de resultados:", error);
-      marcarErrorCarga("estado-resultados", "No se pudo cargar estado de resultados; reintente.");
+      const response = await get(endpoint);
+      if (secuenciasCarga.current[vista] !== secuencia) return;
+      if (response?.success !== true || !validadoresContables[vista](response.data)) {
+        throw new Error("Respuesta contable incompleta");
+      }
+      guardar(response.data);
+    } catch {
+      if (secuenciasCarga.current[vista] !== secuencia) return;
+      guardar(null);
+      marcarErrorCarga(vista, `No se pudo cargar ${descripcion}. Revisa tu acceso o conexión y reintenta.`);
     } finally {
-      setLoading(false);
+      if (secuenciasCarga.current[vista] === secuencia) {
+        setCargasPorVista((actual) => ({ ...actual, [vista]: false }));
+      }
     }
-  }, [marcarErrorCarga, anioActual, get, mesActual]);
+  }, [get, marcarErrorCarga]);
 
-  const cargarRegistroCompras = useCallback(async () => {
-    setLoading(true);
-    try {
-      marcarErrorCarga("registro-compras", null);
-      const response = await get("/api/contabilidad/registro-compras");
-      if (response && response.success) setRegistroCompras(response.data);
-    } catch (error) {
-      console.error("Error cargando registro de compras:", error);
-      marcarErrorCarga("registro-compras", "No se pudo cargar registro de compras; reintente.");
-    } finally {
-      setLoading(false);
-    }
-  }, [marcarErrorCarga, get]);
+  useEffect(() => {
+    const secuencias = secuenciasCarga.current;
+    return () => {
+      for (const vista of vistas) secuencias[vista.id] = (secuencias[vista.id] || 0) + 1;
+    };
+  }, []);
 
-  const cargarBalanceComprobacion = useCallback(async () => {
-    setLoading(true);
-    try {
-      marcarErrorCarga("balance-comprobacion", null);
-      const response = await get(
-        `/api/contabilidad/balance-comprobacion?anio=${anioActual}&mes=${mesActual}`,
-      );
-      if (response && response.success) setBalanceComprobacion(response.data);
-    } catch (error) {
-      console.error("Error cargando balance de comprobación:", error);
-      marcarErrorCarga("balance-comprobacion", "No se pudo cargar balance de comprobación; reintente.");
-    } finally {
-      setLoading(false);
-    }
-  }, [marcarErrorCarga, anioActual, get, mesActual]);
+  const cargarEstadoResultados = useCallback(() => cargarVistaContable(
+    "estado-resultados", `/api/contabilidad/estados/estado-resultados?anio=${anioActual}&mes=${mesActual}`, setEstadoResultados, "estado de resultados",
+  ), [cargarVistaContable, anioActual, mesActual]);
 
-  const cargarKardexValorizado = useCallback(async () => {
-    setLoading(true);
-    try {
-      marcarErrorCarga("kardex-valorizado", null);
-      const response = await get("/api/contabilidad/kardex-valorizado");
-      if (response && response.success) setKardexValorizado(response.data);
-    } catch (error) {
-      console.error("Error cargando kardex valorizado:", error);
-      marcarErrorCarga("kardex-valorizado", "No se pudo cargar kardex valorizado; reintente.");
-    } finally {
-      setLoading(false);
-    }
-  }, [marcarErrorCarga, get]);
+  const cargarRegistroCompras = useCallback(() => cargarVistaContable(
+    "registro-compras", `/api/contabilidad/registro-compras?anio=${periodoCompras.slice(0, 4)}&mes=${periodoCompras.slice(5, 7)}`, setRegistroCompras, "registro de compras",
+  ), [cargarVistaContable, periodoCompras]);
 
-  const cargarLibroCajaBancos = useCallback(async () => {
-    setLoading(true);
-    try {
-      marcarErrorCarga("libro-caja-bancos", null);
-      const response = await get("/api/contabilidad/libro-caja-bancos");
-      if (response && response.success) setLibroCajaBancos(response.data);
-    } catch (error) {
-      console.error("Error cargando libro de caja y bancos:", error);
-      marcarErrorCarga("libro-caja-bancos", "No se pudo cargar libro de caja y bancos; reintente.");
-    } finally {
-      setLoading(false);
-    }
-  }, [marcarErrorCarga, get]);
+  const exportarRegistroCompras = () => {
+    if (!registroCompras || cargasPorVista["registro-compras"] || erroresCarga["registro-compras"]) return;
+    exportToExcel([{
+      name: "Registro de Compras",
+      columns: [
+        { header: "Fecha", key: "fecha" },
+        { header: "Tipo", key: "tipoDocumento" },
+        { header: "Comprobante", key: "numeroDocumento", width: 22 },
+        { header: "Proveedor", key: "razonSocialProveedor", width: 35 },
+        { header: "Documento proveedor", key: "rucProveedor", width: 20 },
+        { header: "Moneda", key: "moneda" },
+        { header: "Base imponible", key: "baseImponible", width: 18 },
+        { header: "IGV", key: "igv" },
+        { header: "Total", key: "importeTotal" },
+        { header: "Documento modificado", key: "documentoModificado", width: 30 },
+      ],
+      data: (registroCompras?.compras || []).map((compra: any) => ({
+        ...compra,
+        baseImponible: formatCurrencyForExcel(compra.baseImponible),
+        igv: formatCurrencyForExcel(compra.igv),
+        importeTotal: formatCurrencyForExcel(compra.importeTotal),
+      })),
+    }], `Registro_Compras_${periodoCompras}.xls`);
+  };
 
-  const cargarRegistroActivosFijos = useCallback(async () => {
-    setLoading(true);
-    try {
-      marcarErrorCarga("registro-activos-fijos", null);
-      const response = await get("/api/contabilidad/registro-activos-fijos");
-      if (response && response.success) setRegistroActivosFijos(response.data);
-    } catch (error) {
-      console.error("Error cargando registro de activos fijos:", error);
-      marcarErrorCarga("registro-activos-fijos", "No se pudo cargar registro de activos fijos; reintente.");
-    } finally {
-      setLoading(false);
-    }
-  }, [marcarErrorCarga, get]);
+  const cargarBalanceComprobacion = useCallback(() => cargarVistaContable(
+    "balance-comprobacion", `/api/contabilidad/balance-comprobacion?anio=${anioActual}&mes=${mesActual}`, setBalanceComprobacion, "balance de comprobación",
+  ), [cargarVistaContable, anioActual, mesActual]);
 
-  const cargarLibroPlanillas = useCallback(async () => {
-    setLoading(true);
-    try {
-      marcarErrorCarga("libro-planillas", null);
-      const response = await get("/api/contabilidad/libro-planillas");
-      if (response && response.success) setLibroPlanillas(response.data);
-    } catch (error) {
-      console.error("Error cargando libro de planillas:", error);
-      marcarErrorCarga("libro-planillas", "No se pudo cargar libro de planillas; reintente.");
-    } finally {
-      setLoading(false);
-    }
-  }, [marcarErrorCarga, get]);
+  const cargarKardexValorizado = useCallback(() => cargarVistaContable(
+    "kardex-valorizado", "/api/contabilidad/kardex-valorizado", setKardexValorizado, "kardex valorizado",
+  ), [cargarVistaContable]);
 
-  const cargarLibroInventariosBalances = useCallback(async () => {
-    setLoading(true);
-    try {
-      marcarErrorCarga("libro-inventarios-balances", null);
-      const response = await get(
-        "/api/contabilidad/libro-inventarios-balances",
-      );
-      if (response && response.success)
-        setLibroInventariosBalances(response.data);
-    } catch (error) {
-      console.error("Error cargando libro de inventarios y balances:", error);
-      marcarErrorCarga("libro-inventarios-balances", "No se pudo cargar libro de inventarios y balances; reintente.");
-    } finally {
-      setLoading(false);
-    }
-  }, [marcarErrorCarga, get]);
+  const cargarLibroCajaBancos = useCallback(() => cargarVistaContable(
+    "libro-caja-bancos", "/api/contabilidad/libro-caja-bancos", setLibroCajaBancos, "libro de caja y bancos",
+  ), [cargarVistaContable]);
 
-  const cargarRegistroCostos = useCallback(async () => {
-    setLoading(true);
-    try {
-      marcarErrorCarga("registro-costos", null);
-      const response = await get("/api/contabilidad/registro-costos");
-      if (response && response.success) setRegistroCostos(response.data);
-    } catch (error) {
-      console.error("Error cargando registro de costos:", error);
-      marcarErrorCarga("registro-costos", "No se pudo cargar registro de costos; reintente.");
-    } finally {
-      setLoading(false);
-    }
-  }, [marcarErrorCarga, get]);
+  const cargarRegistroActivosFijos = useCallback(() => cargarVistaContable(
+    "registro-activos-fijos", "/api/contabilidad/registro-activos-fijos", setRegistroActivosFijos, "registro de activos fijos",
+  ), [cargarVistaContable]);
+
+  const cargarLibroPlanillas = useCallback(() => cargarVistaContable(
+    "libro-planillas", "/api/contabilidad/libro-planillas", setLibroPlanillas, "libro de planillas",
+  ), [cargarVistaContable]);
+
+  const cargarLibroInventariosBalances = useCallback(() => cargarVistaContable(
+    "libro-inventarios-balances", "/api/contabilidad/libro-inventarios-balances", setLibroInventariosBalances, "inventarios y balances",
+  ), [cargarVistaContable]);
+
+  const cargarRegistroCostos = useCallback(() => cargarVistaContable(
+    "registro-costos", "/api/contabilidad/registro-costos", setRegistroCostos, "registro de costos",
+  ), [cargarVistaContable]);
 
   const cargarLibrosElectronicosSunat = useCallback(async () => {
     if (isArgentina || isColombia) {
-      setLibrosElectronicosSunat({
-        librosConfigurados: 4,
-        archivosGenerados: 0,
-        ultimoEnvio: isColombia ? "Sin generar" : "Sin presentar",
-        estadoPLE: "Libro IVA Ventas / Compras",
-      });
+      secuenciasCarga.current["libros-electronicos-sunat"] = (secuenciasCarga.current["libros-electronicos-sunat"] || 0) + 1;
+      marcarErrorCarga("libros-electronicos-sunat", null);
+      setCargasPorVista((actual) => ({ ...actual, ["libros-electronicos-sunat"]: false }));
+      setLibrosElectronicosSunat([]);
       return;
     }
-    setLoading(true);
-    try {
-      marcarErrorCarga("libros-electronicos-sunat", null);
-      const response = await get("/api/contabilidad/libros-electronicos-sunat");
-      if (response && response.success)
-        setLibrosElectronicosSunat(response.data);
-    } catch (error) {
-      console.error("Error cargando libros electrónicos SUNAT:", error);
-      marcarErrorCarga("libros-electronicos-sunat", "No se pudo cargar libros electrónicos SUNAT; reintente.");
-    } finally {
-      setLoading(false);
-    }
-  }, [marcarErrorCarga, get, isArgentina, isColombia]);
+    await cargarVistaContable("libros-electronicos-sunat",
+      "/api/contabilidad/libros-electronicos-sunat", setLibrosElectronicosSunat,
+      "libros electrónicos SUNAT");
+  }, [cargarVistaContable, isArgentina, isColombia, marcarErrorCarga]);
 
   const cargarDatos = useCallback(async () => {
     if (vistaActual === "estado-resultados") await cargarEstadoResultados();
@@ -735,7 +732,31 @@ export default function ContabilidadPage() {
     );
   };
 
+  const renderPeriodoCompras = () => (
+          <div className="flex items-end gap-3">
+            <label htmlFor="registro-compras-periodo" className="text-sm font-medium">
+              Período
+              <input id="registro-compras-periodo" type="month" value={periodoCompras}
+                onChange={(event) => {
+                  const periodo = event.target.value;
+                  if (!/^\d{4}-\d{2}$/.test(periodo) || periodo === periodoCompras) return;
+                  secuenciasCarga.current["registro-compras"] = (secuenciasCarga.current["registro-compras"] || 0) + 1;
+                  setRegistroCompras(null);
+                  setPeriodoCompras(periodo);
+                }}
+                className="mt-1 block rounded-md border border-border bg-background px-3 py-2 text-foreground" />
+            </label>
+          </div>
+  );
+
   const renderContent = () => {
+    if (erroresCarga[vistaActual]) {
+      return <Card><CardContent className="space-y-4 p-6">
+        <p role="alert" className="text-destructive">{erroresCarga[vistaActual]}</p>
+        <p className="text-sm text-muted-foreground">No hay datos vigentes para mostrar o exportar de esta consulta.</p>
+        <Button onClick={() => void cargarDatos()} disabled={loading}>Reintentar</Button>
+      </CardContent></Card>;
+    }
     if (vistaActual === "estado-resultados") {
       return renderPanel(
         "Estado de Resultados",
@@ -770,14 +791,12 @@ export default function ContabilidadPage() {
     }
 
     if (vistaActual === "registro-compras") {
-      return renderPanel(
-        "Registro de Compras",
-        "Registro detallado de compras para control tributario y contable.",
-        [
-          { label: "Estado", value: "Activo" },
-          { label: "Total registros", value: registroCompras?.total || 0 },
-          { label: "Origen", value: "Compras" },
-        ],
+      return (
+        <div className="space-y-4">
+          {renderRegistroCompras(registroCompras, loading, formatearMoneda,
+            (fecha: string) => fecha ? new Intl.DateTimeFormat(country.locale || "es-PE").format(new Date(`${fecha.slice(0, 10)}T12:00:00`)) : "—",
+            exportarRegistroCompras)}
+        </div>
       );
     }
 
@@ -974,10 +993,10 @@ export default function ContabilidadPage() {
   };
 
   const connectedMetrics = [
-    ["Compras", registroCompras?.total || 0],
-    ["Cuentas en balance", totalCuentasBalance],
-    ["Productos valorizados", productosValorizados],
-    ["Movimientos caja/bancos", movimientosCajaBancos],
+    ["Compras", registroCompras === null ? "No evaluado" : registroCompras.total],
+    ["Cuentas en balance", balanceComprobacion === null ? "No evaluado" : totalCuentasBalance],
+    ["Productos valorizados", kardexValorizado === null ? "No evaluado" : productosValorizados],
+    ["Movimientos caja/bancos", libroCajaBancos === null ? "No evaluado" : movimientosCajaBancos],
   ];
 
   const controlItems = [
@@ -1220,7 +1239,7 @@ export default function ContabilidadPage() {
             </div>
             <div className={metricClass}>
               <div className={labelClass}>Estado</div>
-              <div className={valueClass}>{loading ? "Sync" : "Operativo"}</div>
+              <div className={valueClass}>{erroresCarga[vistaActual] ? "Consulta fallida" : loading ? "Sync" : "Operativo"}</div>
             </div>
             <div className={metricClass}>
               <div className={labelClass}>Tenant</div>
@@ -1228,17 +1247,14 @@ export default function ContabilidadPage() {
             </div>
             <div className={metricClass}>
               <div className={labelClass}>Cuadre</div>
-              <div className={valueClass}>Activo</div>
+              <div className={valueClass}>{erroresCarga[vistaActual] || loading ? "No evaluado" : "Activo"}</div>
             </div>
           </div>
 
-          {erroresCarga[vistaActual] && (
-            <p role="alert" className="text-sm text-destructive">
-              {erroresCarga[vistaActual]}
-            </p>
-          )}
-
-          {renderContent()}
+          {vistaActual === "registro-compras" && renderPeriodoCompras()}
+          <div role="region" aria-label={`Vista contable: ${currentVista.title}`}>
+            {renderContent()}
+          </div>
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(380px,0.42fr)]">
             <Card

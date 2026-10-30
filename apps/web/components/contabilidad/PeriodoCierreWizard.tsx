@@ -1,11 +1,17 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
+import { usePermission } from '@/hooks/use-permission'
+import { readPeriodClosurePreview, type PeriodClosurePreview, type PeriodSnapshot } from '@/lib/accounting-period-read'
 import { CheckCircle, XCircle, AlertTriangle, Lock, Loader2 } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
+import { usePeriodTransitionOperations } from '@/hooks/use-period-transition-operation'
+import PeriodTransitionRecovery from '@/components/contabilidad/PeriodTransitionRecovery'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface PeriodoCierreWizardProps {
+  periodo: PeriodSnapshot
   periodoId: string
   anio: number
   mes: number
@@ -13,30 +19,35 @@ interface PeriodoCierreWizardProps {
   onSuccess: () => void
 }
 
-interface ValidationResult {
-  asientos: {
-    valido: boolean
-    asientosDescuadrados: any[]
-  }
-  eventos: {
-    valido: boolean
-    eventosPendientes: number
-  }
-}
+type ValidationResult = PeriodClosurePreview
 
 export default function PeriodoCierreWizard({
   periodoId,
   anio,
   mes,
   onClose,
-  onSuccess
+  onSuccess,
+  periodo
 }: PeriodoCierreWizardProps) {
   const { formatCurrency } = useLocalizedMoney()
+  const { session, loading: authLoading } = useAuth()
+  const tenantId = session?.user?.tenant_id || '', actorId = session?.user?.id || ''
+  const scopeIdentity = `${tenantId}:${actorId}:${periodoId}:${anio}:${mes}`
+  const activeScope = useRef(scopeIdentity); activeScope.current = scopeIdentity
+  const readEpoch = useRef(0)
+  const [validatedScope, setValidatedScope] = useState('')
+  const closePermission = usePermission('contabilidad', 'cerrar', 'periodos')
+  const validatePermission = usePermission('contabilidad', 'validar', 'periodos')
+  const scopeReady = !authLoading && !!tenantId && !!actorId
+  const allowed = scopeReady && !closePermission.loading && closePermission.hasPermission && !validatePermission.loading && validatePermission.hasPermission
   const [step, setStep] = useState<'validating' | 'results' | 'confirming' | 'processing'>('validating')
   const [validationResults, setValidationResults] = useState<ValidationResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const { apiCall } = useApi<any>({ retries: 2, timeoutMs: 12000, showErrorToast: false, throwOnError: true })
+  const transition = usePeriodTransitionOperations()
+  const writeEpoch = useRef(0)
+  useEffect(() => () => { writeEpoch.current++ }, [])
+  const { apiCall: readApi } = useApi<unknown>({ requireLive: true, throwOnError: true, retries: 0, timeoutMs: 30000, showErrorToast: false })
 
   const formatPeriodo = (anio: number, mes: number) => {
     const meses = [
@@ -47,43 +58,43 @@ export default function PeriodoCierreWizard({
   }
 
   const validatePeriodo = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
+    const run = ++readEpoch.current
+    const current = () => run === readEpoch.current && activeScope.current === scopeIdentity
+    setLoading(true); setError(null); setValidationResults(null); setValidatedScope(''); setStep('validating')
+    if (!scopeReady) return
     try {
-      const data = await apiCall(`/contabilidad/periodos/${periodoId}/validar-cierre`)
-      setValidationResults(data)
-      setStep('results')
-    } catch (err: any) {
-      setError(err.message || 'Error al validar el período')
-      setStep('results')
+      const data = await readApi(`/contabilidad/periodos/${periodoId}/validar-cierre`)
+      const preview = readPeriodClosurePreview(data, { id: periodoId, anio, mes })
+      if (current()) { setValidationResults(preview); setValidatedScope(scopeIdentity); setStep('results') }
+    } catch (err) {
+      if (current()) { setError(err instanceof Error ? err.message : 'Error al validar el período'); setStep('results') }
     } finally {
-      setLoading(false)
+      if (current()) setLoading(false)
     }
-  }, [apiCall, periodoId])
+  }, [readApi, periodoId, anio, mes, scopeReady, scopeIdentity])
 
   const cerrarPeriodo = async () => {
-    setStep('processing')
-    setLoading(true)
-    setError(null)
-
+    if (!canClose || step !== 'confirming') return
+    const run = ++writeEpoch.current, requestedScope = scopeIdentity
+    const current = () => run === writeEpoch.current && activeScope.current === requestedScope
+    setStep('processing'); setLoading(true); setError(null)
     try {
-      await apiCall(`/contabilidad/periodos/${periodoId}/cerrar`, { method: 'POST' })
-      onSuccess()
-    } catch (err: any) {
-      setError(err.message || 'Error al cerrar el período')
-      setStep('results')
+      const confirmed = await transition.perform(periodo, 'CLOSE')
+      if (current() && confirmed) onSuccess()
+    } catch (err: unknown) {
+      if (current()) { setError(err instanceof Error ? err.message : 'Error al cerrar el período'); setStep('results') }
     } finally {
-      setLoading(false)
+      if (current()) setLoading(false)
     }
   }
 
   // Auto-validate on mount
   useEffect(() => {
-    validatePeriodo()
+    void validatePeriodo()
+    return () => { readEpoch.current += 1 }
   }, [validatePeriodo])
 
-  const canClose = validationResults?.asientos.valido && validationResults?.eventos.valido
+  const canClose = allowed && transition.ready && !transition.recoveryError && !transition.pending.some(row => row.intent.snapshot.id === periodoId) && !loading && !error && validatedScope === scopeIdentity && validationResults?.puedeCerrar === true
 
   return (
     <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(15,_23,_42,_0.8)] flex items-center justify-center p-4 z-[1100]">
@@ -122,6 +133,7 @@ export default function PeriodoCierreWizard({
           </p>
         </div>
 
+        {step !== 'processing' && <PeriodTransitionRecovery onConfirmed={onSuccess} />}
         {/* Content */}
         {step === 'validating' && (
           <div className="text-center py-8 px-0">
@@ -130,13 +142,22 @@ export default function PeriodoCierreWizard({
               Validando período contable...
             </p>
             <p className="mt-2 mr-0 mb-0 ml-0 text-[0.875rem] text-muted-foreground">
-              Verificando asientos y eventos pendientes
+              Verificando estado, períodos anteriores, borradores, detalle contable y eventos pendientes
             </p>
           </div>
         )}
 
-        {step === 'results' && validationResults && (
+        {step === 'results' && !validationResults && error && <div role="alert" className="rounded-xl border p-4 mb-6 text-sm text-destructive">{error}</div>}
+        {step === 'results' && validationResults && validatedScope === scopeIdentity && (
           <div className="flex flex-col gap-4 mb-6">
+            <div className="rounded-xl p-4 space-y-2">
+              <h3 className="text-base font-semibold">Estado y períodos anteriores</h3>
+              <p className="text-sm">{validationResults.estado.valido ? '✓ El período está abierto' : `✗ El período está ${validationResults.estado.actual}`}</p>
+              <p className="text-sm">{validationResults.previos.valido ? '✓ Los períodos anteriores del mismo año están cerrados' : '✗ Debe cerrar primero los períodos anteriores del mismo año'}</p>
+              {!validationResults.previos.valido && <ul className="list-disc pl-5 text-sm">{validationResults.previos.periodos.map(periodo=><li key={periodo.id}>{formatPeriodo(periodo.anio,periodo.mes)} · {periodo.estado}</li>)}</ul>}
+              <p className="text-sm">{validationResults.borradores.valido ? '✓ No hay asientos en borrador' : `✗ Hay ${validationResults.borradores.cantidad} asiento(s) en borrador`}</p>
+              {!validationResults.cierreAnual.valido && <p className="text-sm text-destructive">✗ El cierre anual requiere las cuentas 89 y 59</p>}
+            </div>
             {/* Validation: Asientos */}
             <div className="rounded-xl p-4">
               <div className="flex items-center gap-3 mb-2">
@@ -152,7 +173,7 @@ export default function PeriodoCierreWizard({
               <p className="m-0 text-[0.875rem]">
                 {validationResults.asientos.valido
                   ? '✓ Todos los asientos cuadran correctamente (Debe = Haber)'
-                  : `✗ Hay ${validationResults.asientos.asientosDescuadrados.length} asiento(s) descuadrado(s)`
+                  : `✗ Hay ${validationResults.asientos.cantidadInvalidos} asiento(s) con detalle o totales inválidos`
                 }
               </p>
               {!validationResults.asientos.valido && validationResults.asientos.asientosDescuadrados.length > 0 && (
@@ -260,6 +281,7 @@ export default function PeriodoCierreWizard({
               >
                 Cancelar
               </button>
+              <button onClick={validatePeriodo} disabled={loading} className="py-3 px-6 border rounded-xl text-sm">Reintentar validación</button>
               {canClose && (
                 <button
                   onClick={() => setStep('confirming')}
@@ -302,7 +324,7 @@ export default function PeriodoCierreWizard({
               </button>
               <button
                 onClick={cerrarPeriodo}
-                disabled={loading} className="py-3 px-6 text-white border-0 rounded-xl font-semibold transition shadow text-[0.875rem] min-w-[120px] flex items-center gap-2 justify-center"
+                disabled={loading || !canClose} className="py-3 px-6 text-white border-0 rounded-xl font-semibold transition shadow text-[0.875rem] min-w-[120px] flex items-center gap-2 justify-center"
                 onMouseEnter={(e) => {
                   if (!loading) {
                     e.currentTarget.style.transform = 'translateY(-2px)'

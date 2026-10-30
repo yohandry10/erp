@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -10,6 +10,9 @@ import {
   XCircle,
 } from "lucide-react";
 import { useApi } from "@/hooks/use-api";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePermission } from "@/hooks/use-permission";
+import { readMonitorSnapshot } from "@/lib/contabilidad/monitor-read-contract";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -83,98 +86,74 @@ const metricCards: Array<{
 ];
 
 export default function MonitoreoPage() {
-  const [stats, setStats] = useState<EventStats>({
-    pending: 0,
-    processed: 0,
-    processed_today: 0,
-    failed: 0,
-    dead_letter: 0,
-    avg_processing_time_ms: null,
-  });
+  const {session} = useAuth();
+  return <MonitorWorkspace key={`${session?.user?.tenant_id || ''}:${session?.user?.id || ''}`} />;
+}
+function MonitorWorkspace() {
+  const {session} = useAuth();
+  const tenantId = session?.user?.tenant_id || '';
+  const actorId = session?.user?.id || '';
+  const permission = usePermission('contabilidad','reintentar','eventos');
+  const canRetry = !permission.loading && permission.hasPermission;
+  const latestRead = useRef(0);
+  const writing = useRef(false);
+  const [readReady,setReadReady] = useState(false);
+  const [retrying,setRetrying] = useState(false);
+  const [stats, setStats] = useState<EventStats | null>(null);
   const [eventosFallidos, setEventosFallidos] = useState<EventoFallido[]>([]);
   const [asientosPorTipo, setAsientosPorTipo] = useState<AsientoPorTipo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const { apiCall: apiGet } = useApi<any>({
-    retries: 2,
+    requireLive: true,
+    throwOnError: true,
+    retries: 0,
     timeoutMs: 12000,
     showErrorToast: false,
   });
 
   const fetchData = useCallback(async () => {
+    if (!tenantId || !actorId || writing.current) return;
+    const request = ++latestRead.current;
+    setRefreshing(true);setReadReady(false);setError(null);setStats(null);setEventosFallidos([]);setAsientosPorTipo([]);
     try {
-      setError(null);
-      const [statsResult, failedResult, deadLetterResult, asientosTipoResult] =
-        await Promise.all([
-          apiGet("/contabilidad/eventos/estadisticas"),
-          apiGet("/contabilidad/eventos/fallidos?limit=10"),
-          apiGet("/contabilidad/eventos/dead-letter?limit=10"),
-          apiGet("/contabilidad/asientos/estadisticas/por-tipo"),
-        ]);
-      if (
-        statsResult?.success !== true ||
-        failedResult?.success !== true ||
-        deadLetterResult?.success !== true ||
-        asientosTipoResult?.success !== true ||
-        !statsResult.data ||
-        !Array.isArray(failedResult.data) ||
-        !Array.isArray(deadLetterResult.data) ||
-        !Array.isArray(asientosTipoResult.data)
-      ) {
-        throw new Error("MONITORING_RESPONSE_INCOMPLETE");
-      }
-
-      // El snapshot se reemplaza como una unidad; ante un error se conservan
-      // los últimos datos válidos y se muestra que el monitoreo está degradado.
-      setStats(statsResult.data);
-      setEventosFallidos(
-        [...failedResult.data, ...deadLetterResult.data]
-          .sort(
-            (left: EventoFallido, right: EventoFallido) =>
-              new Date(right.created_at).getTime() -
-              new Date(left.created_at).getTime(),
-          )
-          .slice(0, 10),
-      );
-      setAsientosPorTipo(asientosTipoResult.data);
+      const [statsResult,failedResult,deadLetterResult,asientosTipoResult] = await Promise.all([
+        apiGet('/contabilidad/eventos/estadisticas'),
+        apiGet('/contabilidad/eventos/fallidos?limit=10'),
+        apiGet('/contabilidad/eventos/dead-letter?limit=10'),
+        apiGet('/contabilidad/asientos/estadisticas/por-tipo'),
+      ]);
+      const current = readMonitorSnapshot(statsResult,failedResult,deadLetterResult,asientosTipoResult,tenantId);
+      if (request !== latestRead.current) return;
+      setStats(current.stats);setEventosFallidos(current.events);setAsientosPorTipo(current.journals);setReadReady(true);
     } catch {
-      setError(
-        "Monitoreo degradado: no se pudo obtener un snapshot completo y confiable",
-      );
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [apiGet]);
+      if (request === latestRead.current) {
+        setStats(null);setEventosFallidos([]);setAsientosPorTipo([]);setReadReady(false);
+        setError('Monitoreo no disponible: no se pudo completar una lectura en vivo confiable. Reintente la consulta.');
+      }
+    } finally {if (request === latestRead.current) {setLoading(false);setRefreshing(false);}}
+  },[apiGet,tenantId,actorId]);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchData();
-  };
-
+  const handleRefresh = () => {void fetchData();};
   const handleRetry = async (eventId: string) => {
+    if (!canRetry || !readReady || refreshing || error || writing.current || !eventosFallidos.some(e=>e.event_id===eventId)) return;
+    const request = latestRead.current;
+    writing.current=true;setRetrying(true);
     try {
-      const response = await apiGet(
-        `/contabilidad/eventos/${eventId}/reintentar`,
-        { method: "POST" },
-      );
-      if (response?.success !== true) {
-        throw new Error("OUTBOX_RETRY_REJECTED");
-      }
-      await fetchData();
+      const response=await apiGet(`/contabilidad/eventos/${eventId}/reintentar`,{method:'POST'});
+      if (request !== latestRead.current) return;
+      if (response?.success !== true) throw new Error('OUTBOX_RETRY_REJECTED');
+      writing.current=false;await fetchData();
     } catch {
-      setError(
-        "No se pudo reintentar el evento; verifique su estado, tenant y permisos",
-      );
-    }
+      if (request === latestRead.current) setError('No se pudo reintentar el evento; verifique su estado, empresa y permisos');
+    } finally {writing.current=false;setRetrying(false);}
   };
-
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
+    void fetchData();
+    const interval=setInterval(()=>{void fetchData();},30000);
+    return ()=>{++latestRead.current;clearInterval(interval);};
+  },[fetchData]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -216,8 +195,8 @@ export default function MonitoreoPage() {
 
   const metricValue = (key: keyof EventStats) => {
     if (key === "avg_processing_time_ms")
-      return formatProcessingTime(stats.avg_processing_time_ms);
-    return stats[key];
+      return stats ? formatProcessingTime(stats.avg_processing_time_ms) : "—";
+    return stats?.[key] ?? "—";
   };
 
   if (loading) {
@@ -258,7 +237,7 @@ export default function MonitoreoPage() {
             <Button
               type="button"
               onClick={handleRefresh}
-              disabled={refreshing}
+              disabled={refreshing || retrying}
               className="gap-2 bg-blue-600 text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500"
             >
               <RefreshCw
@@ -270,7 +249,7 @@ export default function MonitoreoPage() {
         </section>
 
         {error && (
-          <div className="rounded-xl border border-blue-300/20 bg-blue-400/10 p-4 text-sm font-medium text-primary dark:text-blue-200">
+          <div role="alert" className="rounded-xl border border-blue-300/20 bg-blue-400/10 p-4 text-sm font-medium text-primary dark:text-blue-200">
             {error}
           </div>
         )}
@@ -305,6 +284,7 @@ export default function MonitoreoPage() {
           ))}
         </section>
 
+        {readReady && stats ? (
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(420px,0.9fr)]">
           <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
             <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
@@ -385,14 +365,16 @@ export default function MonitoreoPage() {
           </Card>
         </section>
 
-        {eventosFallidos.length > 0 ? (
+        ) : <Card><CardContent className="p-6 text-muted-foreground">Monitoreo no disponible. Las métricas y eventos requieren una lectura completa en vivo.</CardContent></Card>}
+
+        {readReady && (eventosFallidos.length > 0 ? (
           <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
             <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
               <CardTitle className="text-base text-foreground">
                 Eventos fallidos y dead letter
               </CardTitle>
               <p className="text-xs text-muted-foreground">
-                Últimos 10 eventos contables que requieren atención.
+                Últimos 10 eventos contables que requieren atención. Esta ventana no contiene toda la cola histórica.
               </p>
             </CardHeader>
             <CardContent className="overflow-x-auto p-0">
@@ -432,12 +414,13 @@ export default function MonitoreoPage() {
                         {formatDate(evento.created_at)}
                       </td>
                       <td className="px-5 py-4">
-                        {["failed", "dead_letter"].includes(
+                        {canRetry && ["failed", "dead_letter"].includes(
                           evento.status.toLowerCase(),
                         ) ? (
                           <Button
                             type="button"
                             onClick={() => handleRetry(evento.event_id)}
+                            disabled={retrying || refreshing || !readReady || !!error || !canRetry}
                             size="sm"
                             className="gap-2 bg-blue-600 text-white hover:bg-blue-500"
                           >
@@ -470,7 +453,7 @@ export default function MonitoreoPage() {
               </div>
             </CardContent>
           </Card>
-        )}
+        ))}
       </div>
     </div>
   );

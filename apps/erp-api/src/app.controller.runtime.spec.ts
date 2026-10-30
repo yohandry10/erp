@@ -48,16 +48,16 @@ describe('AppController runtime contract', () => {
       }),
     }));
     expect(rpc).toHaveBeenCalledWith('outbox_runtime_health_492', expect.objectContaining({
-      p_required_schema_version: 569,
+      p_required_schema_version: 575,
     }));
     expect(rpc).not.toHaveBeenCalledWith('pgrst_reload_schema', expect.anything());
     expect(cache.getRuntimeHealth).toHaveBeenCalledTimes(1);
   });
 
-  it('permite que el despliegue eleve, pero no rebaje, el piso contractual', async () => {
+  it.each([{ configured: '558', expected: 575 }, { configured: '572', expected: 575 }, { configured: '573', expected: 575 }, { configured: '574', expected: 575 }])('respeta el piso contractual con despliegue $configured', async ({ configured, expected }) => {
     const { controller, rpc } = build();
     (controller as any).configService.get.mockImplementation((key: string) => (
-      key === 'REQUIRED_DATABASE_SCHEMA_VERSION' ? '558' : {
+      key === 'REQUIRED_DATABASE_SCHEMA_VERSION' ? configured : {
         NODE_ENV: 'production',
         RENDER_GIT_COMMIT: 'render-sha-492',
         RENDER_SERVICE_ID: 'srv-local-492',
@@ -68,7 +68,7 @@ describe('AppController runtime contract', () => {
     await controller.getReadyHealth();
 
     expect(rpc).toHaveBeenCalledWith('outbox_runtime_health_492', expect.objectContaining({
-      p_required_schema_version: 569,
+      p_required_schema_version: expected,
     }));
   });
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';import path from 'node:path';import {randomUUID} from 'node:crypto';import {execFileSync} from 'node:child_process';
 import {fetchWithLocalLoginRetry} from './peru-local-http.mjs';
-// Presupuestos de contabilidad (lo que hace el formulario: sin Idempotency-Key)
+// Presupuestos de contabilidad con intención original y fotografía completa
 // con API/PostgreSQL locales efímeros.
 assert.equal(process.env.E2E_EPHEMERAL_LOCAL_DB,'1');assert.equal(process.env.PGHOST,'127.0.0.1');assert.equal(process.env.PGDATABASE,'erp_e2e');
 const api=process.env.LOCAL_API_URL;assert.equal(new URL(api).hostname,'127.0.0.1');const output=process.env.LOCAL_INTEGRATED_OUTPUT_DIR;
@@ -10,9 +10,17 @@ const sql=query=>execFileSync(process.env.PSQL_BIN,['-XqAt','-h','127.0.0.1','-p
 assert.equal(sql("SELECT current_database()||'|'||environment||'|'||project_ref FROM app.deployment_environment WHERE singleton;"),'erp_e2e|DEV|localerpephemeralqax');
 const q=id=>{assert.match(id,/^[0-9a-f-]{36}$/i);return "'"+id+"'::uuid";};
 let token,otherToken;const scenarios=[],requests=[];let success=false;
-// Sin Idempotency-Key, como envía PresupuestoForm.
+// El formulario conserva esta clave y fotografía hasta recibir su recibo completo.
 async function raw(endpoint,body,access=token,method=body===undefined?'GET':'POST'){
- const response=await fetchWithLocalLoginRetry(api+'/api/'+endpoint,{method,headers:{'content-type':'application/json',connection:'close',...(access?{authorization:'Bearer '+access}:{})},body:body===undefined?undefined:JSON.stringify(body)});
+ let key;
+ if(endpoint.startsWith('contabilidad/presupuestos')&&(body!==undefined||method==='DELETE'))key=randomUUID();
+ if(/^contabilidad\/presupuestos\/[0-9a-f-]{36}$/.test(endpoint)&&['PUT','DELETE'].includes(method)){
+  const id=endpoint.split('/').at(-1);
+  const snapshot=JSON.parse(sql(`SELECT row_to_json(b) FROM presupuestos b WHERE id=${q(id)};`));
+  if(access===otherToken)snapshot.tenant_id=other.tenant;
+  body={...(body||{}),expected_snapshot:snapshot};
+ }
+ const response=await fetchWithLocalLoginRetry(api+'/api/'+endpoint,{method,headers:{'content-type':'application/json',connection:'close',...(key?{'idempotency-key':key}:{}),...(access?{authorization:'Bearer '+access}:{})},body:body===undefined?undefined:JSON.stringify(body)});
  const bytes=Buffer.from(await response.arrayBuffer());let value;try{value=JSON.parse(bytes.toString());}catch{value=bytes.toString();}
  requests.push({method,endpoint:endpoint.replace(/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}/gi,':id').split('?')[0],status:response.status});
  return {status:response.status,body:value,data:value&&typeof value==='object'&&Object.hasOwn(value,'data')?value.data:value};

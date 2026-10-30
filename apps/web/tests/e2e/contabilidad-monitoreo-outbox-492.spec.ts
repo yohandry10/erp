@@ -1,3 +1,5 @@
+import { monitorFixture } from './fixtures/monitor'
+import { fiscalCountryFixture } from './fixtures/fiscal-country'
 import { expect, test } from "@playwright/test";
 import { SignJWT } from "jose";
 import fs from "node:fs";
@@ -38,7 +40,7 @@ function jwtSecret() {
 }
 
 test.describe("monitor contable outbox 492", () => {
-  test("muestra failed y dead letter, reintenta por POST y conserva el snapshot si la recarga falla", async ({
+  test("muestra failed y dead letter, reintenta por POST y retira el snapshot si la recarga falla y recupera la lectura actual", async ({
     context,
     page,
   }) => {
@@ -70,23 +72,22 @@ test.describe("monitor contable outbox 492", () => {
     await page.route("**/api/**", async (route) => {
       const request = route.request();
       const pathname = new URL(request.url()).pathname;
-      const json = (body: unknown, status = 200) =>
+      const json = (body: any, status = 200) =>
         route.fulfill({
           status,
           contentType: "application/json",
-          body: JSON.stringify(body),
+          body: JSON.stringify(monitorFixture(pathname,body,user.tenant_id)),
         });
 
       if (/\/api\/auth\/profile\/?$/.test(pathname)) return json(user);
-      if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
-        return json({
-          data: {
+      if (pathname.replace(/\/$/, '') === '/api/tenants/me') return json({ data: { id: user.tenant_id, nombre: 'Empresa aislada', estado: 'ACTIVO' } });
+    if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
+        return json(fiscalCountryFixture(user.tenant_id, {
             pais_id: 1,
             pais: "PE",
             paisCodigo: "PE",
             monedaDefecto: "PEN",
-          },
-        });
+          }));
       }
       if (/\/api\/demo\/status\/?$/.test(pathname)) {
         return json({ is_demo: false, is_expired: false });
@@ -220,8 +221,12 @@ test.describe("monitor contable outbox 492", () => {
     degraded = true;
     await page.getByRole("button", { name: "Actualizar" }).click();
 
-    await expect(page.getByText(/Monitoreo degradado:/)).toBeVisible();
+    await expect(page.getByText(/Monitoreo no disponible:/)).toBeVisible();
+    await expect(deadLetterRow).toHaveCount(0);
+    await expect(page.getByText("42ms", {exact:true})).toHaveCount(0);
+    degraded=false;
+    await page.getByRole("button", {name:"Actualizar",exact:true}).click();
     await expect(deadLetterRow).toBeVisible();
-    await expect(page.getByText("42ms", { exact: true })).toBeVisible();
+    await expect(page.getByText("42ms", {exact:true})).toBeVisible();
   });
 });

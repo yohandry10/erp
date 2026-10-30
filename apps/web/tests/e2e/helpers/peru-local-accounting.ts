@@ -14,7 +14,7 @@ export function readLocalSql(query: string): string {
   for (const key of ['PGSERVICE', 'PGSERVICEFILE', 'PGOPTIONS']) delete environment[key]
   return execFileSync(process.env.PSQL_BIN ?? 'psql', ['-XqAt', '-h', host, '-p', port,
     '-U', 'postgres', '-d', 'erp_e2e', '-v', 'ON_ERROR_STOP=1'], {
-    input: `BEGIN READ ONLY;\n${query}\nCOMMIT;`, encoding: 'utf8', env: environment,
+    input: `BEGIN READ ONLY;\n${query}\n;\nCOMMIT;`, encoding: 'utf8', env: environment,
   }).trim()
 }
 
