@@ -25,10 +25,10 @@ import {
 // para no delegar al error genérico del writer una decisión que toma el usuario.
 const createClienteSchema = (isColombia: boolean) => z.object({
   tipo: z.nativeEnum(TipoCliente, {
-    errorMap: () => ({ message: 'Seleccione un tipo de cliente' })
+    error: 'Seleccione un tipo de cliente'
   }),
   documento_tipo: z.nativeEnum(TipoDocumento, {
-    errorMap: () => ({ message: 'Seleccione un tipo de documento' })
+    error: 'Seleccione un tipo de documento'
   }),
   documento_numero: z.string()
     .min(6, 'El documento debe tener al menos 6 caracteres')
