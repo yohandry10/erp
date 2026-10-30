@@ -336,6 +336,7 @@ export function ContractPenalties({ contrato, busy, manage, approve, onSubmit }:
               >
                 <div className="w-44">
                   <Campo label="Fecha de corte">
+                    {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
                     <Input type="date" required max={hoyLocal()} value={corte} disabled={busy} onChange={(e) => setCorte(e.target.value)} />
                   </Campo>
                 </div>
@@ -510,6 +511,7 @@ function ReglaForm({
     >
       <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Campo label="Nombre">
+          {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
           <Input value={f.nombre} maxLength={160} onChange={set("nombre")} />
         </Campo>
         <Campo label="Método">
@@ -521,6 +523,7 @@ function ReglaForm({
           </select>
         </Campo>
         <Campo label="Base">
+          {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
           <select className={control} value={f.base_calculo} onChange={set("base_calculo")}>
             <option value="VALOR_ENTREGA">Valor de la entrega</option>
             <option value="VALOR_NO_ACEPTADO">Valor no aceptado al límite</option>
@@ -532,6 +535,7 @@ function ReglaForm({
               <Input type="number" inputMode="decimal" min="0.0001" max="9" step="0.0001" value={f.factor_f} onChange={set("factor_f")} />
             </Campo>
             <Campo label="Plazo">
+              {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
               <select className={control} value={f.plazo_modo} onChange={set("plazo_modo")}>
                 <option value="OC_A_ENTREGA">Días desde la OC hasta la entrega</option>
                 <option value="FIJO">Días fijos</option>
@@ -546,6 +550,7 @@ function ReglaForm({
         )}
         {f.metodo === "PORCENTAJE_DIARIO" && (
           <Campo label="Porcentaje diario (%)">
+            {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
             <Input type="number" inputMode="decimal" min="0.000001" max="100" step="0.000001" value={f.tasa} onChange={set("tasa")} />
           </Campo>
         )}
@@ -558,6 +563,7 @@ function ReglaForm({
           <Input type="number" min="0" max="365" step="1" value={f.tolerancia_dias} onChange={set("tolerancia_dias")} />
         </Campo>
         <Campo label="Días">
+          {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
           <select className={control} value={f.calendario} onChange={set("calendario")}>
             <option value="CALENDARIO">Calendario</option>
             <option value="HABILES">Hábiles (lunes a viernes)</option>
@@ -570,6 +576,7 @@ function ReglaForm({
         {f.con_tope && (
           <>
             <Campo label="Tope (%)">
+              {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
               <Input type="number" inputMode="decimal" min="0.0001" max="100" step="0.0001" value={f.tope_porcentaje} onChange={set("tope_porcentaje")} />
             </Campo>
             <Campo label="Tope sobre">
@@ -582,6 +589,7 @@ function ReglaForm({
         )}
         <div className="sm:col-span-2 lg:col-span-3">
           <Campo label={previa ? "Motivo de la nueva versión (adenda, cláusula)" : "Sustento (cláusula del contrato)"}>
+            {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
             <Input value={f.motivo} maxLength={1000} onChange={set("motivo")} />
           </Campo>
         </div>
@@ -638,6 +646,7 @@ function ExcepcionForm({
     >
       <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Campo label="Entrega">
+          {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
           <select className={control} value={f.entrega_id} onChange={(e) => setF({ ...f, entrega_id: e.target.value })}>
             {programadas.map((e) => (
               <option key={e.id} value={e.id}>
@@ -657,6 +666,7 @@ function ExcepcionForm({
           </select>
         </Campo>
         <Campo label="Días excluidos">
+          {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
           <Input type="number" min="1" max="3650" step="1" value={f.dias} onChange={(e) => setF({ ...f, dias: e.target.value })} />
         </Campo>
         <div className="sm:col-span-2">
@@ -715,6 +725,7 @@ function RevisionForm({
     >
       <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-3">
         <Campo label="Decisión">
+          {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
           <select className={control} value={accion} onChange={(e) => setAccion(e.target.value)}>
             {Object.entries(revisiones)
               .filter(([k]) => !(k === "REVISAR" && calculo.estado === "EN_REVISION"))
@@ -727,6 +738,7 @@ function RevisionForm({
         </Campo>
         {accion === "APROBAR" && (
           <Campo label={`Monto aprobado (máx. ${dinero(calculo.monto_estimado, calculo.moneda)})`}>
+            {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
             <Input
               type="number"
               inputMode="decimal"
@@ -784,6 +796,7 @@ function MotivoForm({
     >
       <p className="text-sm font-medium">{titulo}</p>
       <Campo label="Motivo">
+        {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
         <Input value={motivo} maxLength={1000} disabled={busy} onChange={(e) => setMotivo(e.target.value)} />
       </Campo>
       <p className="text-xs text-muted-foreground">{ayuda}</p>

@@ -23,7 +23,8 @@ concurrency:
 jobs:
   isolated-browser-contracts:
     name: Playwright isolated browser contracts
-    runs-on: ubuntu-latest
+    # Fijado: Playwright instala paquetes del sistema; ubuntu-latest pasó a 26.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       CI: "true"

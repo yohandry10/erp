@@ -277,6 +277,7 @@ function BaseForm({
     >
       <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2">
         <Campo label="Facturar">
+          {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
           <select className={control} value={baseFacturacion} onChange={(e) => setBase(e.target.value as typeof actual)}>
             <option value="DESPACHO">Por despacho completo del pedido</option>
             <option value="CONFORMIDAD">Contra conformidad total del cliente</option>

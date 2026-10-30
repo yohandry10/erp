@@ -171,7 +171,8 @@ jobs:
 
   database-contracts:
     name: PostgreSQL 16 fresh schema + SQL contracts
-    runs-on: ubuntu-latest
+    # Fijado: ubuntu-latest pasó a 26.04, que no trae postgresql-client-16.
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     needs: [install]
     services:
@@ -233,7 +234,8 @@ jobs:
 
   peru-integrated:
     name: Peru API, browser and backup recovery
-    runs-on: ubuntu-latest
+    # Fijado: ubuntu-latest pasó a 26.04, que no trae postgresql-client-16.
+    runs-on: ubuntu-24.04
     timeout-minutes: 50
     needs: [install]
     steps:
@@ -269,7 +271,8 @@ jobs:
 
   peru-company-storage:
     name: Peru company logo with real local Storage
-    runs-on: ubuntu-latest
+    # Fijado: ubuntu-latest pasó a 26.04, que no trae postgresql-client-16.
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     needs: [install]
     steps:

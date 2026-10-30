@@ -128,7 +128,8 @@ export class ExpedienteService {
     if (
       !file.originalname ||
       file.originalname.length > 160 ||
-      /[\x00-\x1f\x7f/\\]/.test(file.originalname)
+      /[/\\]/.test(file.originalname) ||
+      [...file.originalname].some((c) => c.charCodeAt(0) < 0x20 || c.charCodeAt(0) === 0x7f)
     )
       throw new BadRequestException(
         "Use un nombre de archivo de hasta 160 caracteres, sin rutas ni caracteres de control.",
