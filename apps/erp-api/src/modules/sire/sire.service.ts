@@ -3,13 +3,15 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { EventBusService, ERPEvent } from '../../shared/events/event-bus.service';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { TenantContextService } from '../../shared/tenant/tenant-context.service';
 import { SireApiClientService, SireLibro } from './sire-api-client.service';
-
-import { fechaHoyDelTenant } from '../../shared/utils/fecha-tenant.util';
+
+
+import { fechaHoyDelTenant, rangoDelDiaDelTenant } from '../../shared/utils/fecha-tenant.util';
 type SireReportType = 'REG_VEN' | 'REG_COM';
 
 interface SireGenerationRequest {
@@ -101,82 +103,68 @@ export class SireService {
 
   async getStats(tenantId?: string) {
     const currentTenantId = this.ensureTenant(tenantId);
-    const currentMonth = (await fechaHoyDelTenant(this.supabaseService.getClient(), currentTenantId)).slice(0, 7);
-    const nextMonth = this.getNextMonth(currentMonth);
     const client = this.supabaseService.getClient();
-
-    const [monthResult, reportsResult, sentResult, pendingResult, detailsResult] = await Promise.all([
-      client
-        .from('sire_files')
-        .select('*', { count: 'exact', head: true })
-        .eq('tenant_id', currentTenantId)
-        .gte('created_at', `${currentMonth}-01`)
-        .lt('created_at', `${nextMonth}-01`),
-      client.from('sire_files').select('total_registros').eq('tenant_id', currentTenantId),
-      client
-        .from('sire_files')
-        .select('*', { count: 'exact', head: true })
-        .eq('tenant_id', currentTenantId)
-        .eq('estado', 'ENVIADO'),
-      client
-        .from('sire_files')
-        .select('*', { count: 'exact', head: true })
-        .eq('tenant_id', currentTenantId)
-        .in('estado', ['GENERADO', 'GENERANDO', 'PENDIENTE']),
-      client
-        .from('sire_registros_detalle')
-        .select('*', { count: 'exact', head: true })
-        .eq('tenant_id', currentTenantId),
+    const currentMonth = (await fechaHoyDelTenant(client, currentTenantId)).slice(0, 7);
+    const nextMonth = this.getNextMonth(currentMonth);
+    const [start, end] = await Promise.all([
+      rangoDelDiaDelTenant(client, currentTenantId, new Date(`${currentMonth}-01T12:00:00Z`)),
+      rangoDelDiaDelTenant(client, currentTenantId, new Date(`${nextMonth}-01T12:00:00Z`)),
     ]);
-
-    const firstError = [monthResult, reportsResult, sentResult, pendingResult, detailsResult]
-      .find((result) => result.error)?.error;
-    if (firstError) {
-      throw new BadRequestException(`No se pudieron calcular las estadísticas SIRE: ${firstError.message}`);
+    const [reports, details] = await Promise.all([
+      this.readSireRows('sire_files', 'id,tenant_id,total_registros,estado,created_at', currentTenantId),
+      client.from('sire_registros_detalle').select('id', { count: 'exact', head: true }).eq('tenant_id', currentTenantId),
+    ]);
+    if (details.error || !Number.isSafeInteger(details.count) || details.count < 0 ||
+        reports.some(r => !Number.isSafeInteger(r.total_registros) || r.total_registros < 0 ||
+          typeof r.created_at !== 'string' || !Number.isFinite(Date.parse(r.created_at)) ||
+          !['GENERANDO','GENERADO','PENDIENTE','ENVIADO','ERROR'].includes(r.estado))) {
+      throw new ServiceUnavailableException('No se pudieron completar las estadísticas SIRE. Reintente la consulta.');
     }
-
-    const reports = reportsResult.data ?? [];
-    return {
-      success: true,
-      data: {
-        reportesDelMes: monthResult.count ?? 0,
-        registrosTotales: reports.reduce(
-          (sum: number, report: any) => sum + Number(report.total_registros ?? 0),
-          0,
-        ),
-        totalDetalles: detailsResult.count ?? 0,
-        enviadosASunat: sentResult.count ?? 0,
-        pendientes: pendingResult.count ?? 0,
-      },
-    };
+    const registrosTotales = reports.reduce((sum, r) => sum + r.total_registros, 0);
+    if (!Number.isSafeInteger(registrosTotales)) throw new ServiceUnavailableException('Las estadísticas SIRE están fuera de rango.');
+    return { success: true, complete: true, tenant_id: currentTenantId, data: {
+      periodoActual: currentMonth,
+      reportesDelMes: reports.filter(r => Date.parse(r.created_at) >= Date.parse(start.desde) && Date.parse(r.created_at) < Date.parse(end.desde)).length,
+      registrosTotales, totalDetalles: details.count,
+      enviadosASunat: reports.filter(r => r.estado === 'ENVIADO').length,
+      pendientes: reports.filter(r => ['GENERADO','GENERANDO','PENDIENTE'].includes(r.estado)).length,
+    }};
   }
 
   async getReportes(filters: SireReportFilters = {}, tenantId?: string) {
     const currentTenantId = this.ensureTenant(tenantId);
-    let query = this.supabaseService
-      .getClient()
-      .from('sire_files')
-      .select('*')
-      .eq('tenant_id', currentTenantId)
-      .order('created_at', { ascending: false });
+    const conditions: Record<string,string> = {};
+    if (filters.periodo) conditions.periodo = this.normalizePeriodo(filters.periodo);
+    if (filters.tipoReporte) conditions.tipo = this.mapTipoReporte(filters.tipoReporte);
+    if (filters.estado) conditions.estado = filters.estado;
+    const data = await this.readSireRows('sire_files', '*', currentTenantId, conditions);
+    return { success: true, complete: true, total: data.length, tenant_id: currentTenantId,
+      data: data.map(report => ({ ...report, tipo_display: this.getTipoReporteFullName(report.tipo), periodo_display: report.periodo })) };
+  }
 
-    if (filters.periodo) query = query.eq('periodo', this.normalizePeriodo(filters.periodo));
-    if (filters.tipoReporte) query = query.eq('tipo', this.mapTipoReporte(filters.tipoReporte));
-    if (filters.estado) query = query.eq('estado', filters.estado);
-
-    const { data, error } = await query;
-    if (error) {
-      throw new BadRequestException(`No se pudieron consultar los reportes SIRE: ${error.message}`);
+  private async readSireRows(table: string, selection: string, tenantId: string, filters: Record<string,string> = {}) {
+    const rows: any[] = []; const ids = new Set<string>(); let total: number | undefined;
+    const pageSize = 1000;
+    for (let offset = 0; ; offset += pageSize) {
+      let query: any = this.supabaseService.getClient().from(table).select(selection, { count: 'exact' })
+        .eq('tenant_id', tenantId).order('created_at', { ascending: false }).order('id', { ascending: true })
+        .range(offset, offset + pageSize - 1);
+      for (const [key,value] of Object.entries(filters)) query = query.eq(key,value);
+      const {data,error,count} = await query;
+      if (error || !Array.isArray(data) || !Number.isSafeInteger(count) || count < 0 ||
+          (total !== undefined && count !== total) || data.length !== Math.min(pageSize,Math.max(0,count-offset))) {
+        throw new ServiceUnavailableException('No se pudo completar la lectura SIRE. Reintente la consulta.');
+      }
+      total = count;
+      for (const row of data) {
+        if (!row || typeof row.id !== 'string' || !row.id || row.tenant_id !== tenantId || ids.has(row.id) ||
+            Object.entries(filters).some(([key,value]) => row[key] !== value)) {
+          throw new ServiceUnavailableException('La lectura SIRE contiene datos incompletos, ajenos o cambió durante la consulta.');
+        }
+        ids.add(row.id); rows.push(row);
+      }
+      if (rows.length === total) return rows;
     }
-
-    return {
-      success: true,
-      data: (data ?? []).map((report) => ({
-        ...report,
-        tipo_display: this.getTipoReporteFullName(report.tipo),
-        periodo_display: report.periodo,
-      })),
-    };
   }
 
   async generarReporte(
@@ -391,15 +379,15 @@ export class SireService {
   async getOperaciones(id: string, tenantId?: string) {
     const currentTenantId = this.ensureTenant(tenantId);
     const reportId = this.requireUuid(id, 'reporteId');
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('sire_operaciones')
-      .select('id,accion,tipo_libro,periodo,ticket,estado,codigo_estado_sunat,descripcion_estado_sunat,http_status,intentos,error_code,error_message,solicitado_at,ultima_consulta_at,completado_at')
-      .eq('tenant_id', currentTenantId)
-      .eq('reporte_id', reportId)
-      .order('created_at', { ascending: false });
-    if (error) throw new BadRequestException(`No se pudo consultar la bitácora SIRE: ${error.message}`);
-    return { success: true, data: data ?? [] };
+    const owner = await this.supabaseService.getClient().from('sire_files').select('id,tenant_id')
+      .eq('tenant_id', currentTenantId).eq('id', reportId).maybeSingle();
+    if (owner.error) throw new ServiceUnavailableException('No se pudo verificar el reporte de la bitácora.');
+    if (!owner.data) throw new NotFoundException('Reporte SIRE no encontrado');
+    if (owner.data.id !== reportId || owner.data.tenant_id !== currentTenantId) throw new ServiceUnavailableException('El reporte de la bitácora no está confirmado.');
+    const data = await this.readSireRows('sire_operaciones',
+      'id,tenant_id,reporte_id,accion,tipo_libro,periodo,ticket,estado,codigo_estado_sunat,descripcion_estado_sunat,http_status,intentos,error_code,error_message,solicitado_at,ultima_consulta_at,completado_at',
+      currentTenantId, {reporte_id:reportId});
+    return {success:true,complete:true,total:data.length,tenant_id:currentTenantId,reporte_id:reportId,data};
   }
 
   private workflowResponse(result: SireWorkflowResult, message: string) {
@@ -463,6 +451,12 @@ export class SireService {
   ): Promise<T> {
     const { data, error } = await this.supabaseService.getClient().rpc(functionName, args);
     if (error) {
+      if (String(error.message).includes('SIRE_RCE_ORIGINAL_AMOUNTS_REQUIRED')) {
+        throw new BadRequestException({
+          code: 'SIRE_RCE_ORIGINAL_AMOUNTS_REQUIRED',
+          message: 'Una compra con devoluciones no conserva evidencia verificable de los importes originales. Reconcilie el comprobante del proveedor antes de generar el RCE.',
+        });
+      }
       throw new BadRequestException({
         code: error.code ?? 'SIRE_RPC_ERROR',
         message: `${context}: ${error.message}`,

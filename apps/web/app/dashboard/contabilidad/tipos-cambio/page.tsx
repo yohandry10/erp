@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { requestConfirmation } from '@/lib/confirm-action'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { parseDateLocal } from '@/lib/date-utils'
 import { AlertCircle, Coins, Loader2, PlusCircle, RefreshCw, Trash2, Download } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
@@ -25,7 +26,12 @@ const labelClass = 'block text-xs font-semibold uppercase tracking-[0.12em] text
 const hoy = () => new Date().toISOString().slice(0, 10)
 
 export default function TiposCambioPage() {
-  const { get, post, del } = useApi()
+  const { get, post, del } = useApi({ throwOnError: true, showErrorToast: false })
+  const latestRead = useRef(0)
+  const pendingRegistration = useRef<{ signature: string; key: string } | null>(null)
+  const pendingDeletion = useRef<{ id: string; key: string } | null>(null)
+  const writing = useRef(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const [tipos, setTipos] = useState<TipoCambio[]>([])
   const [monedaLocal, setMonedaLocal] = useState('PEN')
@@ -40,25 +46,31 @@ export default function TiposCambioPage() {
     fecha: hoy(),
     compra: '',
     venta: '',
-    fuente: 'SUNAT',
+    fuente: 'MANUAL',
   })
 
   const cargar = useCallback(async () => {
+    const read = ++latestRead.current
     try {
       setLoading(true)
-      setError(null)
+      setLoadError(null)
 
       const [listado, local] = await Promise.all([
         get('/api/contabilidad/tipos-cambio'),
         get('/api/contabilidad/moneda-local'),
       ])
 
-      if (listado?.success) setTipos(listado.data || [])
-      if (local?.success && local.data?.moneda) setMonedaLocal(local.data.moneda)
+      if (!listado?.success || !Array.isArray(listado.data) || !local?.success ||
+          typeof local.data?.moneda !== 'string' || !/^[A-Z]{3}$/.test(local.data.moneda)) {
+        throw new Error('Respuesta incompleta de cotizaciones o moneda local.')
+      }
+      if (read !== latestRead.current) return
+      setTipos(listado.data)
+      setMonedaLocal(local.data.moneda)
     } catch (err: any) {
-      setError(err.message || 'Error al cargar los tipos de cambio')
+      if (read === latestRead.current) setLoadError('No se pudo cargar el registro de cotizaciones y la moneda local. Reintente la consulta.')
     } finally {
-      setLoading(false)
+      if (read === latestRead.current) setLoading(false)
     }
   }, [get])
 
@@ -111,43 +123,72 @@ export default function TiposCambioPage() {
   }
 
   const registrar = async () => {
+    if (writing.current) return
     if (!form.compra && !form.venta) {
       setError('Informe al menos una cotización: compra o venta.')
       return
     }
+    if ([form.compra, form.venta].some(value => value !== '' && Number.isFinite(Number(value)) &&
+        Number(value) !== Number(Number(value).toFixed(6)))) {
+      setError('Las cotizaciones admiten como máximo 6 decimales. Corrija el valor antes de registrar.')
+      return
+    }
 
+    const payload = {
+      moneda_origen: form.moneda_origen.toUpperCase(), moneda_destino: monedaLocal, fecha: form.fecha,
+      ...(form.compra ? { compra: Number(form.compra) } : {}),
+      ...(form.venta ? { venta: Number(form.venta) } : {}), fuente: form.fuente,
+    }
+    const signature = JSON.stringify(payload)
+    if (pendingRegistration.current?.signature !== signature) {
+      pendingRegistration.current = { signature, key: crypto.randomUUID() }
+    }
+    writing.current = true
     try {
       setGuardando(true)
       setError(null)
 
-      const response = await post('/api/contabilidad/tipos-cambio', {
-        moneda_origen: form.moneda_origen.toUpperCase(),
-        moneda_destino: monedaLocal,
-        fecha: form.fecha,
-        ...(form.compra ? { compra: Number(form.compra) } : {}),
-        ...(form.venta ? { venta: Number(form.venta) } : {}),
-        fuente: form.fuente,
+      const response = await post('/api/contabilidad/tipos-cambio', payload, {
+        headers: { 'Idempotency-Key': pendingRegistration.current.key },
       })
 
       if (!response?.success) throw new Error(response?.message || 'No se pudo registrar')
-
+      if (!response.data?.id || response.data.moneda_origen !== payload.moneda_origen ||
+          response.data.moneda_destino !== payload.moneda_destino || response.data.fecha !== payload.fecha ||
+          Number(response.data.compra) !== (payload.compra ?? payload.venta) ||
+          Number(response.data.venta) !== (payload.venta ?? payload.compra)) {
+        throw new Error('No se pudo confirmar la cotización registrada.')
+      }
+      pendingRegistration.current = null
       setForm({ ...form, compra: '', venta: '' })
       await cargar()
     } catch (err: any) {
       setError(err.message || 'No se pudo registrar el tipo de cambio')
     } finally {
+      writing.current = false
       setGuardando(false)
     }
   }
 
   const eliminar = async (id: string) => {
-    if (!confirm('¿Eliminar esta cotización?')) return
+    if (writing.current) return
+    if (!(await requestConfirmation('¿Eliminar esta cotización?'))) return
+    if (pendingDeletion.current?.id !== id) pendingDeletion.current = { id, key: crypto.randomUUID() }
+    writing.current = true
+    setGuardando(true)
     try {
       setError(null)
-      await del(`/api/contabilidad/tipos-cambio/${id}`)
+      const response = await del(`/api/contabilidad/tipos-cambio/${id}`, {
+        headers: { 'Idempotency-Key': pendingDeletion.current.key },
+      })
+      if (!response?.success) throw new Error('No se pudo confirmar la baja de la cotización.')
+      pendingDeletion.current = null
       await cargar()
     } catch (err: any) {
       setError(err.message || 'No se pudo eliminar la cotización')
+    } finally {
+      writing.current = false
+      setGuardando(false)
     }
   }
 
@@ -179,7 +220,7 @@ export default function TiposCambioPage() {
               <Button
                 type="button"
                 onClick={importar}
-                disabled={importando}
+                disabled={importando || loading || !!loadError || guardando}
                 className="gap-2"
               >
                 <Download className="h-4 w-4" />
@@ -188,6 +229,7 @@ export default function TiposCambioPage() {
               <Button
                 type="button"
                 onClick={cargar}
+                disabled={loading}
                 variant="outline"
                 className="gap-2 border-cyan-400/20 bg-white/10 text-primary hover:bg-white/15 hover:text-foreground"
               >
@@ -204,8 +246,10 @@ export default function TiposCambioPage() {
           </div>
         )}
 
+        {loadError && <div role="alert" className="rounded-xl border border-cyan-400/20 bg-card p-4"><p>{loadError}</p><Button type="button" variant="outline" onClick={cargar} disabled={loading} className="mt-3">Reintentar</Button></div>}
+
         {error && (
-          <div className="flex items-start gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3">
+          <div role="alert" className="flex items-start gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3">
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
             <p className="text-sm font-medium text-primary">{error}</p>
           </div>
@@ -219,6 +263,7 @@ export default function TiposCambioPage() {
             <div>
               <label htmlFor="tipos-cambio-moneda" className={labelClass}>Moneda</label>
               <input id="tipos-cambio-moneda"
+                disabled={guardando || importando || loading || !!loadError}
                 value={form.moneda_origen}
                 onChange={(e) => setForm({ ...form, moneda_origen: e.target.value })}
                 maxLength={3}
@@ -229,6 +274,7 @@ export default function TiposCambioPage() {
             <div>
               <label htmlFor="tipos-cambio-fecha" className={labelClass}>Fecha</label>
               <input id="tipos-cambio-fecha"
+                disabled={guardando || importando || loading || !!loadError}
                 type="date"
                 value={form.fecha}
                 onChange={(e) => setForm({ ...form, fecha: e.target.value })}
@@ -238,6 +284,7 @@ export default function TiposCambioPage() {
             <div>
               <label htmlFor="tipos-cambio-compra" className={labelClass}>Compra</label>
               <input id="tipos-cambio-compra"
+                disabled={guardando || importando || loading || !!loadError}
                 type="number"
                 step="0.000001"
                 value={form.compra}
@@ -249,6 +296,7 @@ export default function TiposCambioPage() {
             <div>
               <label htmlFor="tipos-cambio-venta" className={labelClass}>Venta</label>
               <input id="tipos-cambio-venta"
+                disabled={guardando || importando || loading || !!loadError}
                 type="number"
                 step="0.000001"
                 value={form.venta}
@@ -261,7 +309,7 @@ export default function TiposCambioPage() {
               <Button
                 type="button"
                 onClick={registrar}
-                disabled={guardando}
+                disabled={guardando || loading || !!loadError || importando}
                 className="w-full gap-2 bg-blue-600 text-white hover:bg-blue-500 disabled:bg-muted"
               >
                 {guardando ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />}
@@ -269,7 +317,7 @@ export default function TiposCambioPage() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground md:col-span-5">
-              Si informa solo un lado, se replica en el otro. Volver a registrar el mismo par y fecha
+              Fuente: MANUAL. Si informa solo un lado, se replica en el otro. Volver a registrar el mismo par y fecha
               reemplaza la cotización anterior.
             </p>
           </CardContent>
@@ -285,7 +333,7 @@ export default function TiposCambioPage() {
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 <span className="text-sm text-muted-foreground">Cargando cotizaciones...</span>
               </div>
-            ) : (
+            ) : loadError ? null : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[720px] border-collapse">
                   <thead className="bg-cyan-400/10">
@@ -317,6 +365,8 @@ export default function TiposCambioPage() {
                             <Button
                               type="button"
                               onClick={() => eliminar(tipo.id)}
+                              aria-label={`Eliminar cotización ${tipo.moneda_origen}/${tipo.moneda_destino} ${tipo.fecha}`}
+                              disabled={guardando || importando}
                               variant="outline"
                               className="gap-2 border-cyan-400/20 bg-white/5 text-primary hover:bg-white/10 hover:text-foreground"
                             >

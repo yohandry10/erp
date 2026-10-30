@@ -47,6 +47,10 @@ export default function ReportesPage() {
   })
 
   const [activeTab, setActiveTab] = useState('resumen-ventas')
+  const supportsCliente = ['resumen-ventas', 'ventas-cliente', 'cotizaciones', 'pedidos-estado', 'productos', 'aging'].includes(activeTab)
+  const supportsEstado = ['resumen-ventas', 'ventas-cliente'].includes(activeTab)
+  const activeFilters = { ...filters, cliente: supportsCliente ? filters.cliente : undefined,
+    estado: supportsEstado ? filters.estado : undefined }
 
   useEffect(() => {
     if (!isPeru && activeTab === 'sunat') {
@@ -100,12 +104,12 @@ export default function ReportesPage() {
         <div className="mb-4 flex items-center justify-between gap-4">
           <h2 className="m-0 text-lg font-bold text-foreground">
             <Calendar size={20} className="mr-2" />
-            Filtros Globales
+            Filtros del reporte
           </h2>
         </div>
         <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
           <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
-            <div>
+            {activeTab !== 'aging' && <div>
               <label htmlFor="reportes-fecha-desde" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Fecha Desde
               </label>
@@ -114,11 +118,11 @@ export default function ReportesPage() {
                 value={filters.fechaDesde}
                 onChange={(e) => handleFilterChange('fechaDesde', e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
               />
-            </div>
+            </div>}
 
             <div>
               <label htmlFor="reportes-fecha-hasta" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
-                Fecha Hasta
+                {activeTab === 'aging' ? 'Fecha de corte' : 'Fecha Hasta'}
               </label>
               <input id="reportes-fecha-hasta"
                 type="date"
@@ -127,7 +131,7 @@ export default function ReportesPage() {
               />
             </div>
 
-            <div>
+            {supportsCliente && <div>
               <label htmlFor="reportes-cliente-opcional" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Cliente (opcional)
               </label>
@@ -137,9 +141,9 @@ export default function ReportesPage() {
                 value={filters.cliente || ''}
                 onChange={(e) => handleFilterChange('cliente', e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
               />
-            </div>
+            </div>}
 
-            <div>
+            {supportsEstado && <div>
               <label htmlFor="reportes-estado-opcional" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Estado (opcional)
               </label>
@@ -148,13 +152,14 @@ export default function ReportesPage() {
                 onChange={(e) => handleFilterChange('estado', e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
               >
                 <option value="">Todos</option>
+                <option value="EMITIDO">Emitido</option>
                 <option value="PENDIENTE">Pendiente</option>
                 <option value="CONFIRMADO">Confirmado</option>
                 <option value="FACTURADO">Facturado</option>
                 <option value="COMPLETADO">Completado</option>
                 <option value="CANCELADO">Cancelado</option>
               </select>
-            </div>
+            </div>}
           </div>
         </div>
       </div>
@@ -193,17 +198,17 @@ export default function ReportesPage() {
 
         {/* Tab Content */}
         <div id={`report-panel-${activeTab}`} role="tabpanel">
-          {activeTab === 'ventas-cliente' && <VentasPorClienteReport filters={filters} />}
-          {activeTab === 'resumen-ventas' && <ResumenVentasReport filters={filters} />}
-          {activeTab === 'cotizaciones' && <CotizacionesPendientesReport filters={filters} />}
-          {activeTab === 'pedidos-estado' && <PedidosPorEstadoReport filters={filters} />}
-          {activeTab === 'productos' && <ProductosMasVendidosReport filters={filters} />}
-          {activeTab === 'top-clientes' && <TopClientesReport filters={filters} />}
-          {activeTab === 'lead-time' && <LeadTimeReport filters={filters} />}
-          {activeTab === 'pipeline' && <PipelineReport filters={filters} />}
-          {activeTab === 'fill-rate' && <FillRateReport filters={filters} />}
-          {activeTab === 'aging' && <AgingCxcReport filters={filters} />}
-          {activeTab === 'sunat' && <SunatMetricsReport filters={filters} />}
+          {activeTab === 'ventas-cliente' && <VentasPorClienteReport filters={activeFilters} />}
+          {activeTab === 'resumen-ventas' && <ResumenVentasReport filters={activeFilters} />}
+          {activeTab === 'cotizaciones' && <CotizacionesPendientesReport filters={activeFilters} />}
+          {activeTab === 'pedidos-estado' && <PedidosPorEstadoReport filters={activeFilters} />}
+          {activeTab === 'productos' && <ProductosMasVendidosReport filters={activeFilters} />}
+          {activeTab === 'top-clientes' && <TopClientesReport filters={activeFilters} />}
+          {activeTab === 'lead-time' && <LeadTimeReport filters={activeFilters} />}
+          {activeTab === 'pipeline' && <PipelineReport filters={activeFilters} />}
+          {activeTab === 'fill-rate' && <FillRateReport filters={activeFilters} />}
+          {activeTab === 'aging' && <AgingCxcReport filters={activeFilters} />}
+          {activeTab === 'sunat' && <SunatMetricsReport filters={activeFilters} />}
         </div>
       </div>
     </div>

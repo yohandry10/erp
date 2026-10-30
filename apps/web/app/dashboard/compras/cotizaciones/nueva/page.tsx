@@ -1,5 +1,6 @@
 'use client'
 
+import { requestConfirmation } from '@/lib/confirm-action'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { CotizacionCompraWizard } from '@/components/compras/CotizacionCompraWizard'
@@ -33,8 +34,8 @@ export default function NuevaCotizacionPage() {
     }
   }
 
-  const handleCancel = () => {
-    if (confirm('¿Está seguro de cancelar? Se perderán los datos ingresados.')) {
+  const handleCancel = async () => {
+    if ((await requestConfirmation('¿Está seguro de cancelar? Se perderán los datos ingresados.'))) {
       router.push('/dashboard/compras/cotizaciones')
     }
   }

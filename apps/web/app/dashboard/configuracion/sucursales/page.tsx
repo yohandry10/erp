@@ -19,6 +19,7 @@ import { useApi } from "@/hooks/use-api";
 import { GuiaEstablecimientos } from "./GuiaEstablecimientos";
 import { AsignacionUsuarios } from "./AsignacionUsuarios";
 import { ResumenSucursales } from "./ResumenSucursales";
+import { SeriesEstablecimientos } from "./SeriesEstablecimientos";
 
 type Sucursal = {
   id: string;
@@ -82,9 +83,8 @@ export default function SucursalesPage() {
     setError(null);
     try {
       const response = await get("/sucursales?incluir_inactivas=true");
-      setSucursales(
-        response?.success && Array.isArray(response.data) ? response.data : [],
-      );
+      if (response?.success !== true || !Array.isArray(response.data)) throw new Error('Respuesta de establecimientos incompleta');
+      setSucursales(response.data);
     } catch {
       setError(
         "No se pudieron cargar los establecimientos. Intenta nuevamente.",
@@ -212,8 +212,9 @@ export default function SucursalesPage() {
         <GuiaEstablecimientos />
 
         {error && (
-          <div className="rounded-lg border border-red-400/40 bg-red-500/10 p-4 text-sm font-medium text-red-600">
+          <div role="alert" className="rounded-lg border border-red-400/40 bg-red-500/10 p-4 text-sm font-medium text-red-600">
             {error}
+            <Button variant="outline" className="ml-3" onClick={() => void cargar()}>Reintentar lectura</Button>
           </div>
         )}
 
@@ -333,7 +334,7 @@ export default function SucursalesPage() {
           <p className="text-sm text-muted-foreground">
             Cargando establecimientos…
           </p>
-        ) : sucursales.length === 0 ? (
+        ) : error && sucursales.length === 0 ? null : sucursales.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Todavía no hay establecimientos.
           </p>
@@ -423,6 +424,10 @@ export default function SucursalesPage() {
           </ul>
         )}
         <ResumenSucursales />
+
+        <ProtectedComponent modulo="configuracion" recurso="" accion="read">
+          <SeriesEstablecimientos sucursales={sucursales} />
+        </ProtectedComponent>
 
         <ProtectedComponent
           modulo="configuracion"

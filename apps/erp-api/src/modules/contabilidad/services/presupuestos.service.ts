@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CreatePresupuestoDto, UpdatePresupuestoDto, EstadoPresupuesto } from '@erp-suite/dtos';
-import { createHash, randomUUID } from 'crypto';
+import { randomUUID } from 'crypto';
 import { lecturaContableFallida } from '../contabilidad-errors';
 
 /**
@@ -10,18 +10,21 @@ import { lecturaContableFallida } from '../contabilidad-errors';
  */
 function errorPresupuesto(error: { code?: string; message?: string }, accion: string): Error {
   const motivo = String(error?.message ?? '');
-  if (motivo.includes('BUDGET_NOT_FOUND')) return new NotFoundException('Presupuesto no encontrado');
+  if (/BUDGET.*(?:LEDGER|RECEIPT)_INVALID/.test(motivo)) return new ServiceUnavailableException(`No se pudo confirmar el recibo del presupuesto; conserva su clave y reintenta`);
+  if (error?.code === 'P0002' || /BUDGET(?:_UPDATE570|_DELETE570)?_NOT_FOUND/.test(motivo)) return new NotFoundException('Presupuesto no encontrado');
   if (error?.code === '23505' || /duplicate key|DUPLICATE/i.test(motivo)) {
     return new ConflictException('Ya existe un presupuesto para ese centro de costo, cuenta y período');
   }
-  if (motivo.includes('BUDGET_IDEMPOTENCY_CONFLICT')) return new ConflictException('Esta operación ya se registró con otros datos; recarga e inténtalo de nuevo');
-  if (motivo.includes('BUDGET_PERIOD_NOT_OPEN')) return new ConflictException('El período contable no está abierto');
+  if (/BUDGET.*IDEMPOTENCY_CONFLICT/.test(motivo)) return new ConflictException('Esta operación ya se registró con otros datos; recarga e inténtalo de nuevo');
+  if (['40001','40P01','55P03'].includes(String(error?.code))) return new ConflictException('El presupuesto cambió o está reservado. Conserva la solicitud original y revisa su resultado');
+  if (/BUDGET.*PERIOD_NOT_OPEN/.test(motivo)) return new ConflictException('El período contable no está abierto');
   if (motivo.includes('BUDGET_AMOUNT_INVALID') || motivo.includes('BUDGET_VALUES_INVALID') || motivo.includes('BUDGET_REQUEST_INVALID')) {
     return new BadRequestException('Revisa los datos del presupuesto: el monto debe ser mayor a cero y la cuenta, el centro y el período deben existir');
   }
   if (['22023', '23503', '23514', '22P02'].includes(String(error?.code))) return new BadRequestException(`No se pudo ${accion} el presupuesto: datos inválidos`);
   return new ServiceUnavailableException(`No se pudo ${accion} el presupuesto; reintenta`);
 }
+import { budgetCalendarWindow } from './budget-calendar-window';
 
 export interface Presupuesto {
   id: string;
@@ -49,6 +52,88 @@ export interface Presupuesto {
 export class PresupuestosService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
+  private validarFilaVistaEjecucion(row: any, tenantId: string) {
+    const uuid = (v: unknown) => typeof v === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v);
+    const money = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && Number.isSafeInteger(Math.round(v * 100)) && Math.abs(v * 100 - Math.round(v * 100)) < .00001;
+    if (!row || row.tenant_id !== tenantId || !['id','centro_costo_id','cuenta_id','periodo_contable_id'].every(k => uuid(row[k]))
+      || !['monto_presupuestado','monto_ejecutado','monto_comprometido','monto_disponible'].every(k => money(row[k]))
+      || row.monto_presupuestado <= 0 || row.monto_ejecutado < 0 || row.monto_comprometido < 0
+      || Math.abs(row.monto_disponible - (row.monto_presupuestado - row.monto_ejecutado - row.monto_comprometido)) > .00001
+      || typeof row.porcentaje_ejecutado !== 'number' || !Number.isFinite(row.porcentaje_ejecutado)
+      || Math.abs(row.porcentaje_ejecutado - row.monto_ejecutado / row.monto_presupuestado * 100) > .00501
+      || !['ACTIVO','BLOQUEADO','CERRADO'].includes(row.estado)
+      || !row.centro_costo || row.centro_costo.id !== row.centro_costo_id || !row.cuenta || row.cuenta.id !== row.cuenta_id
+      || !row.periodo || row.periodo.id !== row.periodo_contable_id
+      || !Number.isInteger(row.periodo.anio) || row.periodo.anio < 1900 || row.periodo.anio > 9999
+      || !Number.isInteger(row.periodo.mes) || row.periodo.mes < 1 || row.periodo.mes > 12
+      || !['ABIERTO','CERRADO','BLOQUEADO'].includes(row.periodo.estado)
+      || [row.codigo,row.nombre,row.centro_costo.codigo,row.centro_costo.nombre,row.cuenta.codigo,row.cuenta.nombre].some(v => typeof v !== 'string' || !v.trim())
+      || !row.metadata || typeof row.metadata !== 'object' || Array.isArray(row.metadata)
+      || !['created_at','updated_at'].every(k => typeof row[k] === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(row[k]) && Number.isFinite(Date.parse(row[k])))
+      || Date.parse(row.updated_at) < Date.parse(row.created_at)
+      || !Object.prototype.hasOwnProperty.call(row,'notas') || (row.notas !== null && typeof row.notas !== 'string')
+      || !['created_by','updated_by'].every(k => Object.prototype.hasOwnProperty.call(row,k) && (row[k] === null || uuid(row[k])))) {
+      throw new ServiceUnavailableException('No se pudo consultar la fotografía completa para la ejecución actual.');
+    }
+  }
+
+  private async calcularVistaEjecucion(row: any, tenantId: string) {
+    this.validarFilaVistaEjecucion(row, tenantId);
+    const ejecutado = await this.calcularMontoEjecutado(tenantId, row.centro_costo_id, row.cuenta_id, row.periodo_contable_id);
+    const disponibleCentavos = Math.round(row.monto_presupuestado * 100) - Math.round(ejecutado * 100) - Math.round(row.monto_comprometido * 100);
+    if (!Number.isFinite(ejecutado) || ejecutado < 0 || !Number.isSafeInteger(Math.round(ejecutado * 100))
+      || Math.abs(ejecutado * 100 - Math.round(ejecutado * 100)) > .00001 || !Number.isSafeInteger(disponibleCentavos)) {
+      throw new ServiceUnavailableException('No se pudo verificar el importe de ejecución actual.');
+    }
+    return { ...row, monto_ejecutado: ejecutado,
+      monto_disponible: disponibleCentavos / 100,
+      porcentaje_ejecutado: ejecutado / row.monto_presupuestado * 100,
+      fuente_ejecucion: 'ASIENTOS_CONFIRMADOS', fecha_calculo_ejecucion: new Date().toISOString() };
+  }
+
+  /** Read views never update stored execution or replace the row used by a writer. */
+  async listarVistaEjecucion(tenantId: string): Promise<any[]> {
+    try {
+    const rows: any[] = []; const ids = new Set<string>(); let expected: number | undefined; let previousId = '';
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error, count } = await this.supabaseService.getClient().from('presupuestos')
+        .select(`*,centro_costo:centros_costo!fk_presupuestos_centro_costo_id(id,codigo,nombre),cuenta:plan_cuentas!fk_presupuestos_cuenta_id(id,codigo,nombre),periodo:periodos_contables!fk_presupuestos_periodo_contable_id(id,anio,mes,estado)`, { count: 'exact' })
+        .eq('tenant_id', tenantId).order('id', { ascending: true }).range(offset, offset + 999);
+      if (error || !Array.isArray(data) || !Number.isSafeInteger(count) || (count as number) < 0
+        || (expected !== undefined && count !== expected)) throw new ServiceUnavailableException('No se pudo consultar la lista completa de ejecución actual.');
+      expected = count as number;
+      if (data.length !== Math.min(1000, Math.max(0, expected - offset))) throw new ServiceUnavailableException('La lista de ejecución actual está incompleta.');
+      for (const row of data) {
+        this.validarFilaVistaEjecucion(row, tenantId);
+        if (ids.has(row.id) || row.id <= previousId) throw new ServiceUnavailableException('La lista de ejecución actual cambió durante su consulta.');
+        ids.add(row.id); previousId = row.id; rows.push(row);
+      }
+      if (offset + data.length === expected) break;
+    }
+    // Complete the catalog before calculating; one failed expense read rejects the whole view.
+    const result: any[] = [];
+    for (const row of rows) result.push(await this.calcularVistaEjecucion(row, tenantId));
+    return result;
+    } catch {
+      throw new ServiceUnavailableException('No se pudo consultar la lista completa de ejecución actual.');
+    }
+  }
+
+  async obtenerVistaEjecucion(tenantId: string, presupuestoId: string): Promise<any> {
+    try {
+    const { data, error } = await this.supabaseService.getClient().from('presupuestos')
+      .select(`*,centro_costo:centros_costo!fk_presupuestos_centro_costo_id(id,codigo,nombre),cuenta:plan_cuentas!fk_presupuestos_cuenta_id(id,codigo,nombre),periodo:periodos_contables!fk_presupuestos_periodo_contable_id(id,anio,mes,estado)`)
+      .eq('tenant_id', tenantId).eq('id', presupuestoId).maybeSingle();
+    if (error) throw new ServiceUnavailableException('No se pudo consultar la ejecución actual del presupuesto.');
+    if (!data) throw new NotFoundException('Presupuesto no encontrado.');
+    if (data.id !== presupuestoId) throw new ServiceUnavailableException('La ejecución no corresponde al presupuesto consultado.');
+    return await this.calcularVistaEjecucion(data, tenantId);
+    } catch (cause) {
+      if (cause instanceof NotFoundException) throw cause;
+      throw new ServiceUnavailableException('No se pudo consultar la ejecución actual del presupuesto.');
+    }
+  }
+
   /**
    * Crea un nuevo presupuesto
    * @param tenantId - ID del tenant
@@ -65,15 +150,26 @@ export class PresupuestosService {
   ): Promise<Presupuesto> {
     if(!userId) throw new BadRequestException('Se requiere un usuario autenticado');
     if(createPresupuestoDto.monto_presupuestado<=0) throw new BadRequestException('El monto presupuestado debe ser mayor a cero');
-    // Sin Idempotency-Key cada petición es una intención nueva: derivarla del
-    // contenido hacía que recrear un presupuesto borrado devolviera el borrado.
-    const key=idempotencyKey?.trim()||`budget-create:${randomUUID()}`;
-    const {data:rpcData,error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_presupuesto_tx',{
-      p_tenant_id:tenantId,p_actor_id:userId,p_action:'CREATE',p_presupuesto_id:null,p_payload:createPresupuestoDto,p_idempotency_key:key,
-    });
-    if(rpcError) throw errorPresupuesto(rpcError,'crear');
-    const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData;
-    return result.record as Presupuesto;
+    const uuid=(value:unknown):value is string=>typeof value==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value);
+    const object=(value:unknown):value is Record<string,any>=>!!value&&typeof value==='object'&&!Array.isArray(value);
+    const live=(value:Record<string,any>)=>['cached','queued','offline','pending'].every(k=>value[k]===undefined||value[k]===false);
+    const money=createPresupuestoDto.monto_presupuestado;
+    if(!uuid(tenantId)||!uuid(userId)||![createPresupuestoDto.centro_costo_id,createPresupuestoDto.cuenta_id,createPresupuestoDto.periodo_contable_id].every(uuid)||!Number.isFinite(money)||!Number.isSafeInteger(Math.round(money*100))||Math.abs(money*100-Math.round(money*100))>.00001||typeof (createPresupuestoDto.notas??'')!=='string')throw new BadRequestException('Los datos del presupuesto no son válidos.');
+    const payload={centro_costo_id:createPresupuestoDto.centro_costo_id.toLowerCase(),cuenta_id:createPresupuestoDto.cuenta_id.toLowerCase(),periodo_contable_id:createPresupuestoDto.periodo_contable_id.toLowerCase(),monto_presupuestado:money,notas:(createPresupuestoDto.notas??'').trim(),estado:createPresupuestoDto.estado??EstadoPresupuesto.ACTIVO};
+    if(payload.notas.length>10000||!Object.values(EstadoPresupuesto).includes(payload.estado))throw new BadRequestException('Los datos del presupuesto no son válidos.');
+    const key=idempotencyKey===undefined?`budget-create:${randomUUID()}`:idempotencyKey.trim().toLowerCase();
+    if(key.length<8||key.length>200)throw new BadRequestException('La clave de la operación no es válida.');
+    let rpc:any;
+    try{rpc=await this.supabaseService.getClient().rpc('crear_presupuesto_tx_570',{p_tenant_id:tenantId,p_actor_id:userId,p_payload:payload,p_idempotency_key:key});}
+    catch{throw new ServiceUnavailableException('No se pudo confirmar el alta del presupuesto. Reintenta con su misma clave.');}
+    if(rpc?.error) throw errorPresupuesto(rpc.error, 'crear');
+    const result:any=Array.isArray(rpc?.data)?(rpc.data.length===1?rpc.data[0]:null):rpc?.data;
+    const row=result?.record;
+    const invalid=()=>{throw new ServiceUnavailableException('El recibo del presupuesto está incompleto. Reintenta con su misma clave.');};
+    if(!object(result)||!live(result)||!object(row)||!live(row)||result.success!==true||result.action!=='CREATE'||!uuid(result.operation_id)||typeof result.idempotent!=='boolean'||result.tenant_id!==tenantId||result.actor_id!==userId||result.idempotency_key!==key||!object(result.payload)||Object.keys(result.payload).length!==6||Object.entries(payload).some(([field,value])=>result.payload[field]!==value)||typeof result.request_fingerprint!=='string'||!/^[a-f0-9]{64}$/.test(result.request_fingerprint))invalid();
+    if(!uuid(row.id)||result.id!==row.id||row.tenant_id!==tenantId||row.created_by!==userId||row.updated_by!==userId||row.centro_costo_id!==payload.centro_costo_id||row.cuenta_id!==payload.cuenta_id||row.periodo_contable_id!==payload.periodo_contable_id||row.monto_presupuestado!==money||row.monto_ejecutado!==0||row.monto_comprometido!==0||row.monto_disponible!==money||row.porcentaje_ejecutado!==0||row.estado!==payload.estado||row.notas!==(payload.notas||null)||typeof row.codigo!=='string'||!row.codigo.trim()||typeof row.nombre!=='string'||!row.nombre.trim()||!object(row.metadata)||typeof row.created_at!=='string'||typeof row.updated_at!=='string'||!/^\d{4}-\d{2}-\d{2}T/.test(row.created_at)||!/^\d{4}-\d{2}-\d{2}T/.test(row.updated_at)||!Number.isFinite(Date.parse(row.created_at))||!Number.isFinite(Date.parse(row.updated_at))||Date.parse(row.updated_at)<Date.parse(row.created_at))invalid();
+    const operation={...result};delete operation.record;
+    return {...row,operation} as Presupuesto;
   }
 
   /**
@@ -123,9 +219,8 @@ export class PresupuestosService {
 
     const { data, error } = await query;
 
-    if (error) {
-      console.error('❌ [Presupuestos] Error obteniendo presupuestos:', error);
-      throw lecturaContableFallida(error, 'los presupuestos');
+    if (error || !Array.isArray(data)) {
+      throw new ServiceUnavailableException('No se pudieron consultar los presupuestos completos.');
     }
 
     console.log(`✅ [Presupuestos] ${data.length} presupuestos encontrados`);
@@ -185,15 +280,46 @@ export class PresupuestosService {
     userId?: string,
     idempotencyKey?: string,
   ): Promise<Presupuesto> {
-    if(!userId) throw new BadRequestException('Se requiere un usuario autenticado');
-    // Volver a un monto ya usado (A→B→A) sin clave no debe reproducir la primera edición.
-    const key=idempotencyKey?.trim()||`budget-update:${randomUUID()}`;
-    const {data:rpcData,error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_presupuesto_tx',{
-      p_tenant_id:tenantId,p_actor_id:userId,p_action:'UPDATE',p_presupuesto_id:presupuestoId,p_payload:updatePresupuestoDto,p_idempotency_key:key,
-    });
-    if(rpcError) throw errorPresupuesto(rpcError,'actualizar');
-    const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData;
-    return result.record as Presupuesto;
+    return this.ejecutarEdicionPresupuesto(tenantId,presupuestoId,updatePresupuestoDto,userId,idempotencyKey,false);
+  }
+
+  async resolverEdicionPresupuesto(tenantId:string,presupuestoId:string,payload:UpdatePresupuestoDto,userId:string,idempotencyKey:string) {
+    if (!idempotencyKey) throw new BadRequestException('La resolución exige la clave original de la edición.');
+    return this.ejecutarEdicionPresupuesto(tenantId,presupuestoId,payload,userId,idempotencyKey,true);
+  }
+
+  private async ejecutarEdicionPresupuesto(tenantId:string,presupuestoId:string,updatePresupuestoDto:UpdatePresupuestoDto,userId:string|undefined,idempotencyKey:string|undefined,resolve:boolean):Promise<any> {
+    const uuid=(value:unknown):value is string=>typeof value==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value);
+    const object=(value:unknown):value is Record<string,any>=>!!value&&typeof value==='object'&&!Array.isArray(value);
+    const live=(value:Record<string,any>)=>['cached','queued','offline','pending'].every(k=>value[k]===undefined||value[k]===false);
+    const stable=(value:any):string=>Array.isArray(value)?'['+value.map(stable).join(',')+']':object(value)?'{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+stable(value[k])).join(',')+'}':JSON.stringify(value);
+    const snapshot=updatePresupuestoDto.expected_snapshot;
+    if(!uuid(tenantId)||!uuid(userId)||!uuid(presupuestoId)||!object(snapshot)||!live(snapshot)||snapshot.id!==presupuestoId||snapshot.tenant_id!==tenantId||![snapshot.centro_costo_id,snapshot.cuenta_id,snapshot.periodo_contable_id].every(uuid)||typeof snapshot.updated_at!=='string'||!Number.isFinite(Date.parse(snapshot.updated_at)))throw new BadRequestException('Consulta la fotografía completa del presupuesto antes de editar.');
+    const required=['id','tenant_id','centro_costo_id','cuenta_id','periodo_contable_id','codigo','nombre','metadata','monto_presupuestado','monto_ejecutado','monto_comprometido','monto_disponible','porcentaje_ejecutado','estado','notas','created_by','created_at','updated_by','updated_at'];
+    if(!required.every(k=>Object.prototype.hasOwnProperty.call(snapshot,k))||!object(snapshot.metadata)||typeof snapshot.codigo!=='string'||!snapshot.codigo.trim()||typeof snapshot.nombre!=='string'||!snapshot.nombre.trim()||typeof snapshot.created_at!=='string'||!Number.isFinite(Date.parse(snapshot.created_at))||!['monto_presupuestado','monto_ejecutado','monto_comprometido','monto_disponible','porcentaje_ejecutado'].every(k=>typeof snapshot[k]==='number'&&Number.isFinite(snapshot[k])))throw new BadRequestException('La fotografía del presupuesto está incompleta.');
+    const payload={monto_presupuestado:updatePresupuestoDto.monto_presupuestado??snapshot.monto_presupuestado,notas:(updatePresupuestoDto.notas??snapshot.notas??''),estado:updatePresupuestoDto.estado??snapshot.estado,expected_snapshot:snapshot};
+    const money=payload.monto_presupuestado;
+    if(typeof money!=='number'||!Number.isFinite(money)||money<=0||!Number.isSafeInteger(Math.round(money*100))||Math.abs(money*100-Math.round(money*100))>.00001||typeof payload.notas!=='string'||payload.notas.trim()!==payload.notas||payload.notas.length>10000||!Object.values(EstadoPresupuesto).includes(payload.estado))throw new BadRequestException('Los cambios del presupuesto no son válidos.');
+    const key=idempotencyKey===undefined?`budget-update:${randomUUID()}`:idempotencyKey.trim().toLowerCase();
+    if(key.length<8||key.length>200)throw new BadRequestException('La clave de la edición no es válida.');
+    let rpc:any;
+    try{rpc=await this.supabaseService.getClient().rpc(resolve?'resolver_edicion_presupuesto_tx_570':'actualizar_presupuesto_tx_570',{p_tenant_id:tenantId,p_actor_id:userId,p_presupuesto_id:presupuestoId,p_payload:payload,p_idempotency_key:key});}
+    catch{throw new ServiceUnavailableException('No se pudo confirmar la edición del presupuesto. Conserva sus datos y reintenta con la misma clave.');}
+    if(rpc?.error) throw errorPresupuesto(rpc.error, 'actualizar');
+    const result:any=Array.isArray(rpc?.data)?(rpc.data.length===1?rpc.data[0]:null):rpc?.data,row=result?.record;
+    const invalid=()=>{throw new ServiceUnavailableException('El recibo de edición está incompleto. Conserva los datos y reintenta con la misma clave.');};
+    if(resolve && object(result) && result.action==='ABANDON_UPDATE') {
+      if(!live(result)||result.success!==true||result.id!==presupuestoId||!uuid(result.operation_id)||result.tenant_id!==tenantId||result.actor_id!==userId||result.idempotency_key!==key||typeof result.idempotent!=='boolean'||!object(result.payload)||stable(result.payload)!==stable(payload)||typeof result.request_fingerprint!=='string'||!/^[a-f0-9]{64}$/.test(result.request_fingerprint)||typeof result.abandoned_at!=='string'||!/^\d{4}-\d{2}-\d{2}T/.test(result.abandoned_at)||!Number.isFinite(Date.parse(result.abandoned_at)))invalid();
+      return {resolution:'ABANDONED',receipt:result};
+    }
+    if(!object(result)||!live(result)||!object(row)||!live(row)||result.success!==true||result.action!=='UPDATE'||result.id!==presupuestoId||!uuid(result.operation_id)||typeof result.idempotent!=='boolean'||result.tenant_id!==tenantId||result.actor_id!==userId||result.idempotency_key!==key||!object(result.payload)||stable(result.payload)!==stable(payload)||typeof result.request_fingerprint!=='string'||!/^[a-f0-9]{64}$/.test(result.request_fingerprint))invalid();
+    if(!required.every(k=>Object.prototype.hasOwnProperty.call(row,k))||!['monto_presupuestado','monto_ejecutado','monto_comprometido','monto_disponible','porcentaje_ejecutado'].every(k=>typeof row[k]==='number'&&Number.isFinite(row[k])))invalid();
+    const ignored=['monto_presupuestado','monto_disponible','porcentaje_ejecutado','notas','estado','updated_by','updated_at'];
+    const preserved=(value:Record<string,any>)=>Object.fromEntries(Object.entries(value).filter(([k])=>!ignored.includes(k)));
+    if(row.id!==presupuestoId||row.tenant_id!==tenantId||row.updated_by!==userId||row.monto_presupuestado!==money||row.estado!==payload.estado||row.notas!==(payload.notas||null)||stable(preserved(row))!==stable(preserved(snapshot))||typeof row.updated_at!=='string'||!Number.isFinite(Date.parse(row.updated_at))||Date.parse(row.updated_at)<Date.parse(snapshot.updated_at)||typeof row.monto_ejecutado!=='number'||typeof row.monto_comprometido!=='number'||!Number.isFinite(row.monto_ejecutado)||!Number.isFinite(row.monto_comprometido)||row.monto_ejecutado<0||row.monto_comprometido<0||Math.abs(row.monto_disponible-(money-row.monto_ejecutado-row.monto_comprometido))>.00001||Math.abs(row.porcentaje_ejecutado-row.monto_ejecutado/money*100)>.00501)invalid();
+    const operation={...result};delete operation.record;
+    const receipt={...row,operation} as Presupuesto;
+    return resolve?{resolution:'COMMITTED',receipt:{success:true,data:receipt}}:receipt;
   }
 
   /**
@@ -208,16 +334,26 @@ export class PresupuestosService {
     tenantId: string,
     presupuestoId: string,
     userId: string,
-    idempotencyKey?: string,
+    idempotencyKey: string | undefined,
+    payload: { expected_snapshot: Record<string, unknown> },
   ): Promise<Presupuesto> {
-    if(!userId) throw new BadRequestException('Se requiere un usuario autenticado');
-    const key=idempotencyKey?.trim()||`budget-delete:${createHash('sha256').update(JSON.stringify({tenantId,presupuestoId,userId})).digest('hex')}`;
-    const {data:rpcData,error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_presupuesto_tx',{
-      p_tenant_id:tenantId,p_actor_id:userId,p_action:'DELETE',p_presupuesto_id:presupuestoId,p_payload:{},p_idempotency_key:key,
-    });
-    if(rpcError) throw errorPresupuesto(rpcError,'eliminar');
-    const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData;
-    return result.record as Presupuesto;
+    const object=(v:unknown):v is Record<string,any>=>!!v&&typeof v==='object'&&!Array.isArray(v);
+    const uuid=(v:unknown)=>typeof v==='string'&&/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(v);
+    const live=(v:Record<string,any>)=>['cached','queued','offline','pending'].every(k=>v[k]===undefined||v[k]===false);
+    const stable=(v:any):string=>Array.isArray(v)?'['+v.map(stable).join(',')+']':object(v)?'{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stable(v[k])).join(',')+'}':JSON.stringify(v);
+    const required=['id','tenant_id','centro_costo_id','cuenta_id','periodo_contable_id','codigo','nombre','metadata','monto_presupuestado','monto_ejecutado','monto_comprometido','monto_disponible','porcentaje_ejecutado','estado','notas','created_by','created_at','updated_by','updated_at'];
+    const validSnapshot=(row:any)=>object(row)&&live(row)&&required.every(k=>Object.prototype.hasOwnProperty.call(row,k))&&row.id===presupuestoId&&row.tenant_id===tenantId&&['id','tenant_id','centro_costo_id','cuenta_id','periodo_contable_id'].every(k=>uuid(row[k]))&&['created_by','updated_by'].every(k=>row[k]===null||uuid(row[k]))&&typeof row.codigo==='string'&&!!row.codigo.trim()&&typeof row.nombre==='string'&&!!row.nombre.trim()&&object(row.metadata)&&['created_at','updated_at'].every(k=>typeof row[k]==='string'&&/^\d{4}-\d{2}-\d{2}T/.test(row[k])&&Number.isFinite(Date.parse(row[k])))&&Date.parse(row.updated_at)>=Date.parse(row.created_at)&&['ACTIVO','BLOQUEADO','CERRADO'].includes(row.estado)&&(row.notas===null||typeof row.notas==='string')&&['monto_presupuestado','monto_ejecutado','monto_comprometido','monto_disponible'].every(k=>typeof row[k]==='number'&&Number.isFinite(row[k])&&Number.isSafeInteger(Math.round(row[k]*100))&&Math.abs(row[k]*100-Math.round(row[k]*100))<.00001)&&row.monto_presupuestado>0&&row.monto_ejecutado>=0&&row.monto_comprometido>=0&&Math.abs(row.monto_disponible-(row.monto_presupuestado-row.monto_ejecutado-row.monto_comprometido))<.00001&&typeof row.porcentaje_ejecutado==='number'&&Number.isFinite(row.porcentaje_ejecutado)&&Math.abs(row.porcentaje_ejecutado-row.monto_ejecutado/row.monto_presupuestado*100)<.00501;
+    const key=idempotencyKey?.trim().toLowerCase();
+    if(!uuid(tenantId)||!uuid(userId)||!uuid(presupuestoId)||!uuid(key)||!object(payload)||Object.keys(payload).length!==1||!validSnapshot(payload.expected_snapshot))throw new BadRequestException('Consulta la fotografía completa y conserva una clave de baja válida antes de eliminar.');
+    let rpc:any;
+    try{rpc=await this.supabaseService.getClient().rpc('eliminar_presupuesto_tx_570',{p_tenant_id:tenantId,p_actor_id:userId,p_presupuesto_id:presupuestoId,p_payload:payload,p_idempotency_key:key});}
+    catch{throw new ServiceUnavailableException('No se pudo confirmar la baja del presupuesto. Conserva sus datos y reintenta con la misma clave.');}
+    if(rpc?.error) throw errorPresupuesto(rpc.error, 'eliminar');
+    const result:any=Array.isArray(rpc?.data)?(rpc.data.length===1?rpc.data[0]:null):rpc?.data,row=result?.record;
+    const invalid=()=>{throw new ServiceUnavailableException('El recibo de baja está incompleto. Conserva sus datos y reintenta con la misma clave.');};
+    if(!object(result)||!live(result)||result.success!==true||result.action!=='DELETE'||result.id!==presupuestoId||!uuid(result.operation_id)||typeof result.idempotent!=='boolean'||result.tenant_id!==tenantId||result.actor_id!==userId||result.idempotency_key!==key||typeof result.request_fingerprint!=='string'||!/^[a-f0-9]{64}$/.test(result.request_fingerprint)||!object(result.payload)||stable(result.payload)!==stable(payload)||!validSnapshot(row)||stable(row)!==stable(payload.expected_snapshot))invalid();
+    const operation={...result};delete operation.record;
+    return {...row,operation} as Presupuesto;
   }
 
   /**
@@ -243,48 +379,58 @@ export class PresupuestosService {
       .eq('tenant_id', tenantId)
       .maybeSingle();
 
-    if (errorPeriodo || !periodo) {
-      console.warn(`⚠️ [Presupuestos] Período ${periodoContableId} no encontrado`);
-      return 0;
+    if (errorPeriodo) throw new ServiceUnavailableException('No se pudo consultar el período para calcular la ejecución.');
+    if (!periodo) throw new NotFoundException('El período presupuestal no existe en esta empresa.');
+    if (!Number.isInteger(periodo.anio) || periodo.anio < 1900 || periodo.anio > 9999 || !Number.isInteger(periodo.mes) || periodo.mes < 1 || periodo.mes > 12) {
+      throw new ServiceUnavailableException('El período presupuestal está incompleto.');
     }
 
-    // Calcular el rango de fechas del período
-    const fechaInicio = new Date(periodo.anio, periodo.mes - 1, 1);
-    const fechaFin = new Date(periodo.anio, periodo.mes, 0, 23, 59, 59);
-
-    // Sumar todos los movimientos (debe - haber) de la cuenta en el período
-    const { data: movimientos, error: errorMovimientos } = await this.supabaseService
-      .getClient()
-      .from('detalle_asientos')
-      .select(`
-        debe,
-        haber,
-        asientos_contables!inner(
-          fecha,
-          tenant_id
-        )
-      `)
-      .eq('cuenta_id', cuentaId)
-      .eq('centro_costo_id', centroCostoId)
-      .eq('asientos_contables.tenant_id', tenantId)
-      .gte('asientos_contables.fecha', fechaInicio.toISOString())
-      .lte('asientos_contables.fecha', fechaFin.toISOString());
-
-    if (errorMovimientos) {
-      console.error('❌ [Presupuestos] Error calculando monto ejecutado:', errorMovimientos);
-      return 0;
+    // Calendar boundaries belong to the company, not to the server timezone.
+    let calendar: ReturnType<typeof budgetCalendarWindow>;
+    try {
+      const {data:country,error:countryError}=await this.supabaseService.getClient()
+        .from('empresa_config').select('pais').eq('tenant_id',tenantId).maybeSingle();
+      if(countryError||!country)throw new Error('Configuración de calendario no disponible');
+      calendar=budgetCalendarWindow(periodo.anio,periodo.mes,country.pais);
+    } catch {
+      throw new ServiceUnavailableException('No se pudo consultar el calendario completo del presupuesto.');
     }
 
-    if (!movimientos || movimientos.length === 0) {
-      return 0;
+    const uuid=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
+    const unavailable=()=>new ServiceUnavailableException('No se pudo consultar la ejecución presupuestal completa.');
+    const cents = (value: unknown): number => {
+      if (!['number','string'].includes(typeof value) || !/^-?\d+(?:\.\d{1,2})?$/.test(String(value))) throw new ServiceUnavailableException('La ejecución presupuestal contiene importes incompletos.');
+      const n=Number(value), c=Math.round(n*100);
+      if (!Number.isFinite(n) || !Number.isSafeInteger(c)) throw new ServiceUnavailableException('La ejecución presupuestal contiene importes inválidos.');
+      return c;
+    };
+    let total=0,expectedCount:number|null=null,previousId='';
+    const ids=new Set<string>();
+    for(let offset=0;;offset+=1000) {
+      let page:any;
+      try {
+        page=await this.supabaseService.getClient().from('detalle_asientos')
+          .select('id,debe,haber,asientos_contables!inner(fecha,tenant_id)',{count:'exact'})
+          .eq('cuenta_id',cuentaId).eq('centro_costo_id',centroCostoId).eq('tenant_id',tenantId)
+          .eq('asientos_contables.tenant_id',tenantId).eq('asientos_contables.estado','CONFIRMADO')
+          .gte('asientos_contables.fecha',calendar.desde).lt('asientos_contables.fecha',calendar.hasta)
+          .order('id',{ascending:true}).range(offset,offset+999);
+      } catch {throw unavailable();}
+      if(!page||page.error||!Array.isArray(page.data)||!Number.isSafeInteger(page.count)||page.count<0)throw unavailable();
+      if(expectedCount===null)expectedCount=page.count;
+      if(page.count!==expectedCount||page.data.length!==Math.min(1000,expectedCount-offset))throw unavailable();
+      for(const row of page.data) {
+        if(!row||typeof row!=='object'||typeof row.id!=='string'||!uuid.test(row.id))throw unavailable();
+        const id=row.id.toLowerCase();
+        if(ids.has(id)||id<=previousId)throw unavailable();
+        ids.add(id);previousId=id;
+        total+=cents(row.debe)-cents(row.haber);
+        if(!Number.isSafeInteger(total))throw new ServiceUnavailableException('La ejecución presupuestal excede la precisión admitida.');
+      }
+      if(ids.size===expectedCount)break;
     }
-
-    // Sumar debe y restar haber (para cuentas de gasto, debe es positivo)
-    const montoEjecutado = movimientos.reduce((sum, mov) => {
-      return sum + (mov.debe || 0) - (mov.haber || 0);
-    }, 0);
-
-    return Math.abs(montoEjecutado); // Retornar valor absoluto
+    // El normalizador vigente limita la ejecución a cero; no invierte un neto acreedor.
+    return Math.max(0,total)/100;
   }
 
   /**
@@ -336,7 +482,8 @@ export class PresupuestosService {
       throw lecturaContableFallida(error, 'los presupuestos');
     }
 
-    if (!presupuestos || presupuestos.length === 0) {
+    if (!Array.isArray(presupuestos)) throw new ServiceUnavailableException('No se pudieron consultar los presupuestos completos.');
+    if (presupuestos.length === 0) {
       console.log(`ℹ️ [Presupuestos] No se encontraron presupuestos para centro ${centroCostoId} y período ${periodoContableId}`);
       return [];
     }
@@ -521,12 +668,13 @@ export class PresupuestosService {
       .eq('periodo_contable_id', periodoContableId)
       .order('centro_costo_id', { ascending: true });
 
-    if (errorPresupuestos) {
+    if (errorPresupuestos || !Array.isArray(presupuestos)) {
       console.error('❌ [Presupuestos] Error obteniendo presupuestos:', errorPresupuestos);
       throw lecturaContableFallida(errorPresupuestos, 'los presupuestos');
     }
 
-    if (!presupuestos || presupuestos.length === 0) {
+    if (!Array.isArray(presupuestos)) throw new ServiceUnavailableException('No se pudieron consultar los presupuestos completos.');
+    if (presupuestos.length === 0) {
       console.log(`ℹ️ [Presupuestos] No se encontraron presupuestos para el período ${periodoContableId}`);
       return {
         periodo: periodo,
@@ -710,35 +858,38 @@ export class PresupuestosService {
    * @param periodoContableId - ID del período contable (opcional, si no se proporciona obtiene del período actual)
    * @returns Lista de alertas de presupuestos con advertencias o sobregiros
    */
-  async obtenerAlertasSobregiro(
-    tenantId: string,
-    periodoContableId?: string
-  ): Promise<any[]> {
-    console.log(`🚨 [Presupuestos] Obteniendo alertas de sobregiro para tenant ${tenantId}`);
-
-    let periodoId = periodoContableId;
-
-    // Si no se proporciona período, obtener el período actual (ABIERTO más reciente)
-    if (!periodoId) {
-      const { data: periodoActual, error: errorPeriodo } = await this.supabaseService
-        .getClient()
-        .from('periodos_contables')
-        .select('id, anio, mes')
-        .eq('tenant_id', tenantId)
-        .eq('estado', 'ABIERTO')
-        .order('anio', { ascending: false })
-        .order('mes', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (errorPeriodo || !periodoActual) {
-        console.log(`ℹ️ [Presupuestos] No hay período abierto para obtener alertas`);
-        return [];
-      }
-
-      periodoId = periodoActual.id;
-      console.log(`   Usando período actual: ${periodoActual.anio}-${String(periodoActual.mes).padStart(2, '0')}`);
+  private async resolverPeriodoAlertas(tenantId: string, periodoId?: string): Promise<any | null> {
+    if (periodoId !== undefined && !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(periodoId)) {
+      throw new BadRequestException('Selecciona un período válido.');
     }
+    let query = this.supabaseService.getClient().from('periodos_contables')
+      .select('id, tenant_id, anio, mes, estado').eq('tenant_id', tenantId);
+    if (periodoId) query = query.eq('id', periodoId);
+    else query = query.eq('estado', 'ABIERTO').order('anio', { ascending: false }).order('mes', { ascending: false }).limit(1);
+    const { data, error } = await query.maybeSingle();
+    if (error) throw new ServiceUnavailableException('No se pudo consultar el período de las alertas.');
+    if (!data) {
+      if (periodoId) throw new NotFoundException('El período consultado no existe en esta empresa.');
+      return null;
+    }
+    if (data.tenant_id !== tenantId || typeof data.id !== 'string' || !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(data.id)
+      || (periodoId && data.id !== periodoId) || !Number.isInteger(data.anio) || data.anio < 1900 || data.anio > 9999
+      || !Number.isInteger(data.mes) || data.mes < 1 || data.mes > 12 || !['ABIERTO', 'CERRADO', 'BLOQUEADO'].includes(data.estado)
+      || (!periodoId && data.estado !== 'ABIERTO')) {
+      throw new ServiceUnavailableException('No se pudo consultar el período completo de las alertas.');
+    }
+    return { id: data.id, anio: data.anio, mes: data.mes, estado: data.estado };
+  }
+
+  async obtenerAlertasSobregiro(tenantId: string, periodoContableId?: string): Promise<any[]> {
+    return (await this.leerAlertasConAlcance(tenantId, periodoContableId)).alertas;
+  }
+
+  private async leerAlertasConAlcance(tenantId: string, periodoContableId?: string): Promise<{ alertas: any[]; consulta: any }> {
+    const periodo = await this.resolverPeriodoAlertas(tenantId, periodoContableId);
+    const consulta = { tenant_id: tenantId, seleccion: periodoContableId ? 'EXPLICITO' : 'ULTIMO_ABIERTO', periodo, presupuestos_evaluados: 0 };
+    if (!periodo) return { alertas: [], consulta };
+    const periodoId = periodo.id;
 
     // Obtener todos los presupuestos activos del período
     const { data: presupuestos, error } = await this.supabaseService
@@ -772,13 +923,31 @@ export class PresupuestosService {
 
     if (error) {
       console.error('❌ [Presupuestos] Error obteniendo presupuestos:', error);
-      throw lecturaContableFallida(error, 'los presupuestos');
+      throw new ServiceUnavailableException('No se pudieron consultar los presupuestos de las alertas.');
     }
 
-    if (!presupuestos || presupuestos.length === 0) {
+    if (!Array.isArray(presupuestos)) throw new ServiceUnavailableException('No se pudieron consultar los presupuestos completos.');
+    if (presupuestos.length === 0) {
       console.log(`ℹ️ [Presupuestos] No hay presupuestos activos en el período`);
-      return [];
+      return { alertas: [], consulta };
     }
+
+    const money = (value: unknown) => typeof value === 'number' && Number.isFinite(value)
+      && Number.isSafeInteger(Math.round(value * 100)) && Math.abs(value * 100 - Math.round(value * 100)) < .00001;
+    const ids = new Set<string>();
+    for (const row of presupuestos) {
+      if (!row || typeof row.id !== 'string' || !row.id || ids.has(row.id) || row.tenant_id !== tenantId || row.periodo_contable_id !== periodoId
+        || row.estado !== EstadoPresupuesto.ACTIVO || !money(row.monto_presupuestado) || row.monto_presupuestado <= 0
+        || !money(row.monto_comprometido) || row.monto_comprometido < 0 || !row.centros_costo || !row.plan_cuentas || !row.periodos_contables
+        || row.centros_costo.id !== row.centro_costo_id || row.plan_cuentas.id !== row.cuenta_id || row.periodos_contables.id !== periodoId
+        || row.periodos_contables.anio !== periodo.anio || row.periodos_contables.mes !== periodo.mes
+        || ['codigo', 'nombre'].some(key => typeof row.centros_costo[key] !== 'string' || !row.centros_costo[key].trim()
+          || typeof row.plan_cuentas[key] !== 'string' || !row.plan_cuentas[key].trim())) {
+        throw new ServiceUnavailableException('No se pudieron consultar los presupuestos completos de las alertas.');
+      }
+      ids.add(row.id);
+    }
+    consulta.presupuestos_evaluados = presupuestos.length;
 
     // Calcular monto ejecutado y determinar alertas
     const alertas: any[] = [];
@@ -791,7 +960,7 @@ export class PresupuestosService {
         periodoId
       );
 
-      const montoDisponible = presupuesto.monto_presupuestado - montoEjecutado - (presupuesto.monto_comprometido || 0);
+      const montoDisponible = presupuesto.monto_presupuestado - montoEjecutado - presupuesto.monto_comprometido;
       const porcentajeEjecutado = presupuesto.monto_presupuestado > 0
         ? (montoEjecutado / presupuesto.monto_presupuestado) * 100
         : 0;
@@ -808,7 +977,7 @@ export class PresupuestosService {
           porcentaje_ejecutado: Math.round(porcentajeEjecutado * 100) / 100,
           monto_presupuestado: presupuesto.monto_presupuestado,
           monto_ejecutado: montoEjecutado,
-          monto_comprometido: presupuesto.monto_comprometido || 0,
+          monto_comprometido: presupuesto.monto_comprometido,
           monto_disponible: montoDisponible,
           excedente: montoEjecutado - presupuesto.monto_presupuestado,
           centro_costo: {
@@ -851,7 +1020,7 @@ export class PresupuestosService {
     console.log(`   Sobregiros (>100%): ${alertas.filter(a => a.nivel_alerta === 'SOBREGIRO').length}`);
     console.log(`   Advertencias (>90%): ${alertas.filter(a => a.nivel_alerta === 'ADVERTENCIA').length}`);
 
-    return alertas;
+    return { alertas, consulta };
   }
 
   /**
@@ -876,7 +1045,7 @@ export class PresupuestosService {
 
     if (nivelAlerta === 'SOBREGIRO') {
       const excedente = montoEjecutado - montoPresupuestado;
-      return `🚨 SOBREGIRO: El presupuesto del centro de costo "${centroCosto}" para la cuenta "${cuenta}" ha sido excedido en ${porcentajeRedondeado}% (S/ ${excedente.toFixed(2)} sobre el presupuesto de S/ ${montoPresupuestado.toFixed(2)})`;
+      return `🚨 SOBREGIRO: El presupuesto del centro de costo "${centroCosto}" para la cuenta "${cuenta}" está al ${porcentajeRedondeado}% de ejecución y excede el presupuesto en ${(porcentaje - 100).toFixed(2)}% (S/ ${excedente.toFixed(2)} sobre el presupuesto de S/ ${montoPresupuestado.toFixed(2)})`;
     } else {
       const disponible = montoPresupuestado - montoEjecutado;
       return `⚠️ ADVERTENCIA: El presupuesto del centro de costo "${centroCosto}" para la cuenta "${cuenta}" está al ${porcentajeRedondeado}% de ejecución (quedan S/ ${disponible.toFixed(2)} de S/ ${montoPresupuestado.toFixed(2)})`;
@@ -895,7 +1064,7 @@ export class PresupuestosService {
   ): Promise<any> {
     console.log(`📊 [Presupuestos] Obteniendo resumen de alertas para tenant ${tenantId}`);
 
-    const alertas = await this.obtenerAlertasSobregiro(tenantId, periodoContableId);
+    const { alertas, consulta } = await this.leerAlertasConAlcance(tenantId, periodoContableId);
 
     const sobregiros = alertas.filter(a => a.nivel_alerta === 'SOBREGIRO');
     const advertencias = alertas.filter(a => a.nivel_alerta === 'ADVERTENCIA');
@@ -904,6 +1073,7 @@ export class PresupuestosService {
     const totalEnRiesgo = advertencias.reduce((sum, a) => sum + a.monto_presupuestado, 0);
 
     const resumen = {
+      consulta,
       total_alertas: alertas.length,
       sobregiros: {
         cantidad: sobregiros.length,

@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { CotizacionCompra, Proveedor } from '@/types/compras'
-import toast from 'react-hot-toast'
 import { parseDateLocal } from '@/lib/date-utils'
 import { downloadCsv } from '@/lib/csv-export'
 import CompraEditarCabeceraModal from '@/components/modals/CompraEditarCabeceraModal'
@@ -26,12 +25,14 @@ import {
 
 export default function CotizacionesCompraPage() {
   const router = useRouter()
-  const { get } = useApi()
+  const { get } = useApi({ throwOnError: true, showErrorToast: false })
   const { formatCurrency: formatLocalizedCurrency, locale, taxIdLabel } = useLocalizedMoney()
 
   const [cotizaciones, setCotizaciones] = useState<CotizacionCompra[]>([])
   const [proveedores, setProveedores] = useState<Proveedor[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
+  const latestRead = useRef(0)
   const [searchTerm, setSearchTerm] = useState('')
   const [estadoFilter, setEstadoFilter] = useState<string>('')
   const [proveedorFilter, setProveedorFilter] = useState<string>('')
@@ -44,8 +45,10 @@ export default function CotizacionesCompraPage() {
   const [cotizacionEditando, setCotizacionEditando] = useState<CotizacionCompra | null>(null)
 
   const loadCotizaciones = useCallback(async () => {
+    const request = ++latestRead.current
     try {
       setLoading(true)
+      setLoadError(false)
       const params = new URLSearchParams()
 
       if (estadoFilter) params.append('estado', estadoFilter)
@@ -58,36 +61,26 @@ export default function CotizacionesCompraPage() {
       params.append('limit', itemsPerPage.toString())
       params.append('offset', offset.toString())
 
-      const response = await get(`/api/compras/cotizaciones?${params.toString()}`)
-
-      if (response?.success) {
-        const data = response.data || []
-        setCotizaciones(data)
-        setTotalCotizaciones(response.count || data.length)
-        setTotalPages(Math.ceil((response.count || data.length) / itemsPerPage))
+      const [response, suppliers] = await Promise.all([
+        get(`/api/compras/cotizaciones?${params.toString()}`),
+        get('/api/compras/proveedores?activo=true'),
+      ])
+      if (!response?.success || !Array.isArray(response.data)
+        || !Number.isSafeInteger(response.count) || response.count < response.data.length
+        || !suppliers?.success || !Array.isArray(suppliers.data)) {
+        throw new Error('Catálogo de compras incompleto')
       }
+      if (request !== latestRead.current) return
+      setCotizaciones(response.data)
+      setProveedores(suppliers.data)
+      setTotalCotizaciones(response.count)
+      setTotalPages(Math.max(1, Math.ceil(response.count / itemsPerPage)))
     } catch (error) {
-      console.error('Error loading cotizaciones:', error)
-      toast.error('Error: No se pudieron cargar las cotizaciones')
+      if (request === latestRead.current) setLoadError(true)
     } finally {
-      setLoading(false)
+      if (request === latestRead.current) setLoading(false)
     }
   }, [estadoFilter, proveedorFilter, fechaDesde, fechaHasta, currentPage, get])
-
-  const loadProveedores = useCallback(async () => {
-    try {
-      const response = await get('/api/compras/proveedores?activo=true')
-      if (response?.success) {
-        setProveedores(response.data || [])
-      }
-    } catch (error) {
-      console.error('Error loading proveedores:', error)
-    }
-  }, [get])
-
-  useEffect(() => {
-    loadProveedores()
-  }, [loadProveedores])
 
   useEffect(() => {
     loadCotizaciones()
@@ -162,6 +155,10 @@ export default function CotizacionesCompraPage() {
   }
 
   const isFilterActive = estadoFilter || proveedorFilter || fechaDesde || fechaHasta
+
+  if (loadError) return (
+    <div className="p-6"><h1>Cotizaciones de Compra</h1><div role="alert" className="my-4 rounded-lg border p-4">No se pudo cargar el catálogo de cotizaciones y proveedores. Reintenta para continuar.</div><button onClick={loadCotizaciones}>Reintentar</button></div>
+  )
 
   return (
     <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">

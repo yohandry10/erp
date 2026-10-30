@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React from 'react';
 import { cn } from '@/lib/utils'
-import { useApi } from '@/hooks/use-api';
+import { useCashRead } from '@/hooks/use-cash-read';
+import { readCashSessions } from '@/lib/cash-read-contract';
 import { useCountryContext } from '@/hooks/use-country-context';
 
 interface SesionCaja {
@@ -33,33 +34,8 @@ interface CashSessionSelectorProps {
 export function CashSessionSelector({ onSelect, onOpen, className = '' }: CashSessionSelectorProps) {
     const country = useCountryContext();
     const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$');
-    const { get } = useApi();
-    const [sesiones, setSesiones] = useState<SesionCaja[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    const cargarSesiones = useCallback(async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            // Fetch open sessions first, then closed ones
-            const response = await get('/cajas/sesiones');
-            if (response?.success) {
-                setSesiones(response.data || []);
-            } else {
-                throw new Error(response?.message || 'Error cargando sesiones');
-            }
-        } catch (err: any) {
-            console.warn('Error cargando sesiones:', err);
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    }, [get]);
-
-    useEffect(() => {
-        cargarSesiones();
-    }, [cargarSesiones]);
+    const { data, loading, error, reload: cargarSesiones } = useCashRead<SesionCaja[]>('/cajas/sesiones', readCashSessions);
+    const sesiones = data || [];
 
     const formatearFecha = (fecha: string) => {
         return new Date(fecha).toLocaleString(country.locale || 'es-PE', {

@@ -13,6 +13,8 @@ import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 import { cn } from '@/lib/utils'
 import { parseDateLocal } from '@/lib/date-utils'
 import { multiplicarMoneda, redondearMoneda } from '@/lib/format-utils'
+import { isPurchaseQuantity, isPurchaseUnitPrice } from '@/lib/compras/quantity'
+import type { PurchaseOrderCreateExpectation, PurchaseOrderCreatePayload } from '@/lib/compras/purchase-order-create-operation'
 
 const fieldLabelClass = 'mb-2 block text-sm font-medium text-foreground/85'
 const requiredMarkClass = 'text-muted-foreground'
@@ -48,7 +50,7 @@ interface ProductoDetalle {
 }
 
 interface OCWizardProps {
-  onSubmit: (data: any) => Promise<void>
+  onSubmit: (data: PurchaseOrderCreatePayload, expectation: PurchaseOrderCreateExpectation) => Promise<void>
   onCancel: () => void
   isLoading?: boolean
 }
@@ -198,23 +200,24 @@ export function OCWizard({
     }
     const ordenData = {
       idempotency_key: createIdempotencyKeyRef.current,
-      numero: formData.numero,
+      numero: formData.numero.trim(),
+      moneda: country.moneda,
       proveedor_id: formData.proveedor_id,
       fecha_orden: formData.fecha_orden,
       fecha_entrega_esperada: formData.fecha_entrega_esperada || undefined,
-      condiciones_pago: formData.condiciones_pago || undefined,
+      condiciones_pago: formData.condiciones_pago.trim() || undefined,
       dias_credito: formData.dias_credito || 0,
       almacen_destino_id: formData.almacen_destino_id || undefined,
-      observaciones: formData.observaciones || undefined,
+      observaciones: formData.observaciones.trim() || undefined,
       detalles: detalles.map(d => ({
         producto_id: d.producto_id,
-        descripcion: d.descripcion,
+        descripcion: d.descripcion.trim(),
         cantidad: d.cantidad,
         precio_unitario: d.precio_unitario
       }))
     }
 
-    await onSubmit(ordenData)
+    await onSubmit(ordenData, { taxRate: tasaIgv, affectations: detalles.map(d => String(d.afectacion_igv || '10').trim()) })
   }
 
   const formatCurrency = (amount: number) => {
@@ -492,12 +495,12 @@ function Step2AddProducts({
       setProductError('Seleccione un producto')
       return
     }
-    if (!Number.isFinite(cantidad) || cantidad <= 0) {
-      setProductError('La cantidad debe ser mayor a 0')
+    if (!isPurchaseQuantity(cantidad)) {
+      setProductError('La cantidad debe ser positiva y tener como máximo dos decimales.')
       return
     }
-    if (!Number.isFinite(precio) || precio < 0) {
-      setProductError('El precio no puede ser negativo')
+    if (!isPurchaseUnitPrice(precio)) {
+      setProductError('El precio debe ser no negativo y tener como máximo dos decimales.')
       return
     }
 

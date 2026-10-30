@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Banknote,
@@ -23,13 +23,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useApi } from "@/hooks/use-api";
+import { usePermission } from "@/hooks/use-permission";
 import { useCountryContext } from "@/hooks/use-country-context";
 import { useToast } from "@/components/ui/use-toast";
-
-const asList = (response: any): any[] => {
-  if (Array.isArray(response)) return response;
-  return Array.isArray(response?.data) ? response.data : [];
-};
+import { useAuth } from "@/contexts/AuthContext";
+import { customAuth } from "@/lib/auth-service";
+import { readBenefitsRows } from "@/lib/rrhh/benefits-read-contract";
+import { GratificacionPreviaForm, emptyGratificacionPrevia, gratificacionPreviaPayload, type GratificacionPreviaFormValue, RemuneracionPreviaForm, emptyRemuneracionPrevia, remuneracionPreviaPayload } from "@/components/rrhh/GratificacionPreviaForm";
 
 const normalizedStatus = (value: unknown) =>
   String(value || "")
@@ -43,7 +43,9 @@ const localCalendarDate = () => {
 };
 
 export default function LiquidacionesPage() {
-  const { get, post } = useApi({ throwOnError: true });
+  const { get } = useApi({ throwOnError: true, requireLive: true, showErrorToast: false });
+  const { post } = useApi({ throwOnError: true });
+  const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const country = useCountryContext();
   const isPeru = country.paisCodigo === "PE";
@@ -51,6 +53,12 @@ export default function LiquidacionesPage() {
     ? "Liquidaciones finales"
     : "Liquidaciones laborales";
   const { toast } = useToast();
+  const { hasPermission: canPayLiquidation, loading: loadingPayPermission } = usePermission('rrhh', 'pay', 'liquidaciones');
+  const { hasPermission: canDepositCts, loading: loadingCtsPermission } = usePermission('rrhh', 'deposit', 'cts');
+  const { hasPermission: canCalculateLiquidation, loading: loadingCalculatePermission } = usePermission('rrhh', 'calculate', 'liquidaciones');
+  const { hasPermission: canApproveLiquidation, loading: loadingApprovePermission } = usePermission('rrhh', 'approve', 'liquidaciones');
+  const { hasPermission: canReverseLiquidation, loading: loadingReversePermission } = usePermission('rrhh', 'reverse', 'liquidaciones');
+  const { hasPermission: canCalculateCts, loading: loadingCalculateCtsPermission } = usePermission('rrhh', 'calculate', 'cts');
   const [busy, setBusy] = useState(false);
   const [employeeId, setEmployeeId] = useState("");
   const [terminationDate, setTerminationDate] = useState(localCalendarDate);
@@ -61,15 +69,37 @@ export default function LiquidacionesPage() {
   const [reversalReason, setReversalReason] = useState("");
   const [ctsPeriod, setCtsPeriod] = useState(`${new Date().getFullYear()}-11`);
   const [ctsReference, setCtsReference] = useState("");
+  const [gratificacionPrevia, setGratificacionPrevia] = useState(emptyGratificacionPrevia);
+  const [gratificacionesCts, setGratificacionesCts] = useState<Record<string, GratificacionPreviaFormValue>>({});
+  const [remuneracionPrevia, setRemuneracionPrevia] = useState(emptyRemuneracionPrevia);
+  const [remuneracionesCts, setRemuneracionesCts] = useState<Record<string, ReturnType<typeof emptyRemuneracionPrevia>>>({});
+  useEffect(() => { setGratificacionPrevia(emptyGratificacionPrevia()); setRemuneracionPrevia(emptyRemuneracionPrevia()); }, [employeeId]);
+  const terminationParts = /^(\d{4})-(\d{2})-\d{2}$/.exec(terminationDate);
+  const priorGratificationPeriod = terminationParts
+    ? Number(terminationParts[2]) === 12 ? `${terminationParts[1]}-12`
+      : Number(terminationParts[2]) >= 7 ? `${terminationParts[1]}-07` : `${Number(terminationParts[1]) - 1}-12`
+    : "";
+  const ctsParts = /^(\d{4})-(05|11)$/.exec(ctsPeriod);
+  const priorSalaryPeriod = terminationParts
+    ? Number(terminationParts[2]) === 1 ? `${Number(terminationParts[1]) - 1}-12`
+      : `${terminationParts[1]}-${String(Number(terminationParts[2]) - 1).padStart(2, '0')}`
+    : "";
+  const ctsGratificationPeriod = ctsParts
+    ? ctsParts[2] === "11" ? `${ctsParts[1]}-07` : `${Number(ctsParts[1]) - 1}-12`
+    : "";
+  const ctsSalaryPeriod = ctsParts ? `${ctsParts[1]}-${ctsParts[2] === '05' ? '04' : '10'}` : '';
   const liquidationPaymentIntentRef = useRef<{
     fingerprint: string;
     key: string;
   } | null>(null);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["rrhh-liquidaciones-operativas", country.paisCodigo],
-    enabled: !country.loading,
+  const { data, isLoading, isFetching, error: loadError, refetch } = useQuery({
+    queryKey: ["rrhh-liquidaciones-operativas", user?.tenant_id, user?.id, country.paisCodigo, canPayLiquidation, canDepositCts],
+    enabled: !authLoading && !!user && !country.loading && !loadingPayPermission && !loadingCtsPermission,
+    retry: false,
     queryFn: async () => {
+      const actor = (await customAuth.getRequestSession()).session?.user;
+      if (!actor || actor.id !== user?.id || actor.tenant_id !== user.tenant_id) throw new Error('La sesión cambió. Consulte nuevamente los datos laborales.');
       const [
         employeesResponse,
         liquidationsResponse,
@@ -80,14 +110,17 @@ export default function LiquidacionesPage() {
         get("/rrhh/liquidaciones"),
         country.paisCodigo === "PE"
           ? get("/rrhh/cts/depositos")
-          : Promise.resolve([]),
-        get("/finanzas/bancos/cuentas").catch(() => []),
+          : Promise.resolve({ success: true, data: [] }),
+        canPayLiquidation ? get("/rrhh/liquidaciones/tesoreria/destinos")
+          : canDepositCts ? get("/rrhh/cts/tesoreria/destinos") : Promise.resolve({ success: true, data: [] }),
       ]);
+      const current = (await customAuth.getRequestSession()).session?.user;
+      if (current?.id !== actor.id || current.tenant_id !== actor.tenant_id) throw new Error('La sesión cambió durante la consulta. Consulte nuevamente los datos laborales.');
       return {
-        employees: asList(employeesResponse),
-        liquidations: asList(liquidationsResponse),
-        cts: asList(ctsResponse),
-        banks: asList(banksResponse),
+        employees: readBenefitsRows(employeesResponse, 'employees', actor.tenant_id),
+        liquidations: readBenefitsRows(liquidationsResponse, 'liquidations', actor.tenant_id),
+        cts: readBenefitsRows(ctsResponse, 'cts', actor.tenant_id),
+        banks: readBenefitsRows(banksResponse, 'banks', actor.tenant_id),
       };
     },
   });
@@ -106,6 +139,13 @@ export default function LiquidacionesPage() {
   const selectedLiquidation = liquidations.find(
     (item: any) => item.id === selectedLiquidationId,
   );
+  const readReady = !!data && !isLoading && !isFetching && !loadError && !authLoading && !country.loading && !loadingPayPermission && !loadingCtsPermission && !loadingCalculatePermission && !loadingApprovePermission && !loadingReversePermission && !loadingCalculateCtsPermission;
+  useEffect(() => {
+    if (!readReady) return;
+    if (employeeId && !activeEmployees.some((employee: any) => employee.id === employeeId)) setEmployeeId('');
+    if (selectedLiquidationId && !selectedLiquidation) setSelectedLiquidationId('');
+    if (bankAccountId && !banks.some((bank: any) => bank.id === bankAccountId)) setBankAccountId('');
+  }, [readReady, activeEmployees, employeeId, selectedLiquidationId, selectedLiquidation, bankAccountId, banks]);
 
   const formatter = useMemo(
     () =>
@@ -137,15 +177,24 @@ export default function LiquidacionesPage() {
     }
   };
 
-  const calculateLiquidation = () =>
-    run(
+  const calculateLiquidation = () => {
+    let source, salarySource;
+    try {
+      source = isPeru ? gratificacionPreviaPayload(gratificacionPrevia, priorGratificationPeriod) : undefined;
+      salarySource = isPeru ? remuneracionPreviaPayload(remuneracionPrevia, priorSalaryPeriod) : undefined;
+    }
+    catch (error) { toast({ title: "Revisa la gratificación anterior", description: (error as Error).message, variant: "destructive" }); return; }
+    return run(
       () =>
         post(`/rrhh/empleados/${employeeId}/liquidacion`, {
           motivo_terminacion: terminationReason,
           fecha_terminacion: terminationDate,
+          ...(source ? { gratificacion_previa: source } : {}),
+          ...(salarySource ? { remuneracion_gratificacion_previa: salarySource } : {}),
         }),
       "La liquidación quedó calculada. El empleado continúa activo hasta confirmar.",
     );
+  };
 
   const confirmLiquidation = (id: string) =>
     run(
@@ -187,11 +236,24 @@ export default function LiquidacionesPage() {
       "Pago revertido y obligación restaurada sin perder su trazabilidad.",
     );
 
-  const calculateCts = () =>
-    run(
-      () => post("/rrhh/cts/depositos", { periodo: ctsPeriod }),
+  const calculateCts = () => {
+    let sources;
+    let salarySources;
+    try {
+      sources = Object.entries(gratificacionesCts).flatMap(([empleado_id, value]) => {
+        const source = gratificacionPreviaPayload(value, ctsGratificationPeriod);
+        return source ? [{ empleado_id, ...source }] : [];
+      });
+      salarySources = activeEmployees.flatMap((employee: any) => {
+        const source = remuneracionPreviaPayload(remuneracionesCts[employee.id] || emptyRemuneracionPrevia(), ctsSalaryPeriod);
+        return source ? [{ empleado_id: employee.id, ...source }] : [];
+      });
+    } catch (error) { toast({ title: "Revisa las fuentes históricas", description: (error as Error).message, variant: "destructive" }); return; }
+    return run(
+      () => post("/rrhh/cts/depositos", { periodo: ctsPeriod, ...(sources.length ? { gratificaciones_previas: sources } : {}), ...(salarySources.length ? { remuneraciones_previas: salarySources } : {}) }),
       "CTS calculada para los trabajadores elegibles.",
     );
+  };
 
   const depositCts = (id: string) =>
     run(
@@ -203,6 +265,14 @@ export default function LiquidacionesPage() {
       "CTS depositada con movimiento de tesorería y asiento contable.",
     );
 
+  if (!readReady) return (
+    <PageShell title={pageTitle} description="Consulta actual de liquidaciones y depósitos laborales.">
+      <Card><CardContent className="p-5" role={loadError ? 'alert' : 'status'}>
+        {loadError ? <><p>No se pudieron consultar los datos laborales: {loadError instanceof Error ? loadError.message : 'Error de lectura'}</p><Button variant="outline" disabled={isFetching} onClick={() => void refetch()}>Reintentar consulta</Button></> : <p>Cargando datos laborales actuales…</p>}
+      </CardContent></Card>
+    </PageShell>
+  );
+
   return (
     <PageShell
       title={pageTitle}
@@ -213,7 +283,7 @@ export default function LiquidacionesPage() {
         <Button
           variant="outline"
           onClick={refresh}
-          disabled={isLoading || busy}
+          disabled={isFetching || busy}
         >
           <RefreshCw className="mr-2 h-4 w-4" />
           Actualizar
@@ -221,7 +291,7 @@ export default function LiquidacionesPage() {
       }
     >
       <div className="grid gap-5 xl:grid-cols-3">
-        <Card className="xl:col-span-2">
+        {canCalculateLiquidation && <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calculator className="h-5 w-5" />
@@ -271,6 +341,8 @@ export default function LiquidacionesPage() {
                 </SelectContent>
               </Select>
             </div>
+            {isPeru && employeeId && <div className="md:col-span-4"><GratificacionPreviaForm id="liquidation-gratification" periodo={priorGratificationPeriod} value={gratificacionPrevia} onChange={setGratificacionPrevia}/></div>}
+            {isPeru && employeeId && <div className="md:col-span-4"><RemuneracionPreviaForm periodo={priorSalaryPeriod} value={remuneracionPrevia} onChange={setRemuneracionPrevia}/></div>}
             <Button
               className="md:col-start-4"
               disabled={!employeeId || !terminationDate || busy}
@@ -283,7 +355,7 @@ export default function LiquidacionesPage() {
               permanecen activos hasta la confirmación explícita.
             </p>
           </CardContent>
-        </Card>
+        </Card>}
 
         <Card>
           <CardHeader>
@@ -348,7 +420,7 @@ export default function LiquidacionesPage() {
                       <Badge variant="outline">{status || "sin estado"}</Badge>
                     </td>
                     <td className="p-3 text-right">
-                      {status === "calculada" && (
+                      {status === "calculada" && canApproveLiquidation && (
                         <Button
                           size="sm"
                           disabled={busy}
@@ -357,7 +429,7 @@ export default function LiquidacionesPage() {
                           Confirmar
                         </Button>
                       )}
-                      {["aprobada", "pagada"].includes(status) && (
+                      {((status === "aprobada" && canPayLiquidation) || (status === "pagada" && canReverseLiquidation)) && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -389,7 +461,7 @@ export default function LiquidacionesPage() {
         </CardContent>
       </Card>
 
-      {selectedLiquidation && (
+      {selectedLiquidation && ((normalizedStatus(selectedLiquidation.estado) === 'aprobada' && canPayLiquidation) || (normalizedStatus(selectedLiquidation.estado) === 'pagada' && canReverseLiquidation)) && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -483,7 +555,7 @@ export default function LiquidacionesPage() {
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="grid gap-4 md:grid-cols-4">
-              <div>
+              {canCalculateCts && <div>
                 <Label htmlFor="cts-period">Período de depósito</Label>
                 <Input
                   id="cts-period"
@@ -491,8 +563,8 @@ export default function LiquidacionesPage() {
                   onChange={(event) => setCtsPeriod(event.target.value)}
                   placeholder="2026-05 o 2026-11"
                 />
-              </div>
-              <div>
+              </div>}
+              {canDepositCts && <div>
                 <Label>Cuenta bancaria de origen</Label>
                 <Select value={bankAccountId} onValueChange={setBankAccountId}>
                   <SelectTrigger aria-label="Cuenta bancaria de origen">
@@ -506,24 +578,33 @@ export default function LiquidacionesPage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <div>
+              </div>}
+              {canDepositCts && <div>
                 <Label htmlFor="cts-reference">Referencia de depósito</Label>
                 <Input
                   id="cts-reference"
                   value={ctsReference}
                   onChange={(event) => setCtsReference(event.target.value)}
                 />
-              </div>
-              <Button
+              </div>}
+              {canCalculateCts && <Button
                 className="self-end"
                 variant="outline"
                 disabled={busy || !/^\d{4}-(05|11)$/.test(ctsPeriod)}
                 onClick={calculateCts}
               >
                 Calcular período
-              </Button>
+              </Button>}
             </div>
+            {canCalculateCts && activeEmployees.length > 0 && <details className="rounded-xl border p-3">
+              <summary className="cursor-pointer text-sm font-medium">Remuneración computable de {ctsSalaryPeriod} anterior al ERP</summary>
+              <p className="my-2 text-xs text-muted-foreground">Se utiliza el contrato vigente al cierre de abril u octubre. Declara una fuente computable externa si falta historia o hay remuneración variable documentada. Incluye asignación familiar; excluye el sexto de gratificación, que se calcula por separado.</p>
+              <div className="space-y-3">{activeEmployees.map((employee: any) => <div key={employee.id}><p className="mb-1 text-sm font-medium">{employee.nombres} {employee.apellidos}</p><RemuneracionPreviaForm id={`cts-remuneracion-${employee.id}`} periodo={ctsSalaryPeriod} value={remuneracionesCts[employee.id] || emptyRemuneracionPrevia()} onChange={value => setRemuneracionesCts(current => ({...current,[employee.id]:value}))}/></div>)}</div>
+            </details>}
+            {canCalculateCts && activeEmployees.length > 0 && <details className="rounded-xl border p-3">
+              <summary className="cursor-pointer text-sm font-medium">Gratificaciones anteriores pagadas fuera del ERP</summary>
+              <div className="mt-3 space-y-3">{activeEmployees.map((employee: any) => <div key={employee.id}><p className="mb-1 text-sm font-medium">{employee.nombres} {employee.apellidos}</p><GratificacionPreviaForm id={`cts-gratification-${employee.id}`} periodo={ctsGratificationPeriod} value={gratificacionesCts[employee.id] || emptyGratificacionPrevia()} onChange={value => setGratificacionesCts(current => ({ ...current, [employee.id]: value }))}/></div>)}</div>
+            </details>}
             <div className="overflow-x-auto">
               <table className="w-full min-w-[760px] text-sm">
                 <thead>
@@ -559,7 +640,7 @@ export default function LiquidacionesPage() {
                         <Badge variant="outline">{deposit.estado}</Badge>
                       </td>
                       <td className="p-3 text-right">
-                        {normalizedStatus(deposit.estado) === "calculado" && (
+                        {canDepositCts && normalizedStatus(deposit.estado) === "calculado" && (
                           <Button
                             size="sm"
                             disabled={

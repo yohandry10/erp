@@ -1,60 +1,28 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Download, Edit, FileText, Plus, RefreshCw, Send, XCircle, type LucideIcon } from 'lucide-react'
 import { useApiCall } from '@/hooks/use-api'
+import { useFinanceReport } from '@/hooks/use-finance-report'
+import { readDocumentList, readDocumentStats, type OperationalDocument as Documento } from '@/lib/operational-read-contract'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { parseDateLocal } from '@/lib/date-utils'
 import DocumentoModal from '@/components/modals/DocumentoModal'
 import FiscalBajaPanel from '@/components/documentos/FiscalBajaPanel'
-import { apiSucceeded, unwrapApiArray, unwrapApiData, unwrapApiObject } from '@/lib/api-contract'
+import { apiSucceeded } from '@/lib/api-contract'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/use-toast'
-import { buildApiUrl } from '@/lib/api-url'
+import { downloadOperationalDocument } from '@/lib/documentos/download'
 import { formatFiscalDocumentNumber } from '@/lib/fiscal-document-number'
-
-interface Documento {
-  id: string
-  tipo_documento: string
-  serie?: string
-  numero: string
-  fecha_emision: string
-  receptor_numero_doc: string
-  receptor_razon_social: string
-  total: number
-  moneda: string
-  estado: 'BORRADOR' | 'EMITIDO' | 'ENVIADO_SUNAT' | 'ACEPTADO' | 'RECHAZADO' | 'ANULADO'
-  estado_sunat?: string
-  observaciones?: string
-  arca?: { cpe_id: string; codigo: number | null; estado: string; is_demo: boolean }
-}
-
-interface DocumentoStats {
-  totalDocumentos: number
-  facturas: number
-  boletas: number
-  notasCredito: number
-  contratos: number
-  pendientesEnvio: number
-}
 
 type StatCard = {
   label: string
   value: number
   description: string
   icon: LucideIcon
-}
-
-const emptyStats: DocumentoStats = {
-  totalDocumentos: 0,
-  facturas: 0,
-  boletas: 0,
-  notasCredito: 0,
-  contratos: 0,
-  pendientesEnvio: 0,
 }
 
 const inputClass =
@@ -78,8 +46,6 @@ export default function DocumentosPage() {
   const isPeru = country.paisCodigo === 'PE'
   const fiscalHistoryOnly = isArgentina || isColombia
   const { toast } = useToast()
-  const [documentos, setDocumentos] = useState<Documento[]>([])
-  const [stats, setStats] = useState<DocumentoStats | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedDocumento, setSelectedDocumento] = useState<Documento | null>(null)
   const [documentoAAnular, setDocumentoAAnular] = useState<Documento | null>(null)
@@ -94,46 +60,21 @@ export default function DocumentosPage() {
     serie: '',
   })
 
-  const {
-    get: getDocumentos,
-    post: postDocumentoAction,
-    loading: documentosLoading,
-  } = useApiCall<Documento[]>()
-  const { get: getStats } = useApiCall<DocumentoStats>()
-
-  const loadDocumentos = useCallback(async () => {
-    try {
-      const queryParams = new URLSearchParams()
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value) queryParams.append(key, value)
-      })
-
-      const response = await getDocumentos(`/api/documentos/lista?${queryParams}`)
-      const documentos = unwrapApiArray<Documento>(response)
-      setDocumentos(apiSucceeded(response) ? documentos : [])
-    } catch (error) {
-      console.error('Error al cargar documentos:', error)
-      setDocumentos([])
-    }
-  }, [filters, getDocumentos])
-
-  const loadStats = useCallback(async () => {
-    try {
-      const response = await getStats('/api/documentos/stats')
-      setStats(apiSucceeded(response) ? unwrapApiObject<DocumentoStats>(response, emptyStats) : emptyStats)
-    } catch (error) {
-      console.error('Error al cargar estadisticas:', error)
-      setStats(emptyStats)
-    }
-  }, [getStats])
-
+  const { post: postDocumentoAction } = useApiCall({ requireLive: true })
+  const listEndpoint = useMemo(() => {
+    const query = new URLSearchParams()
+    Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value) })
+    return `/api/documentos/lista?${query}`
+  }, [filters])
+  const list = useFinanceReport(listEndpoint, readDocumentList)
+  const metrics = useFinanceReport('/api/documentos/stats', readDocumentStats)
+  const documentos = list.data ?? []
+  const stats = metrics.data
+  const documentosLoading = list.loading
+  const loadDocumentos = list.reload
   const loadData = useCallback(async () => {
-    await Promise.all([loadDocumentos(), loadStats()])
-  }, [loadDocumentos, loadStats])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
+    await Promise.all([list.reload(), metrics.reload()])
+  }, [list.reload, metrics.reload])
 
   const showSuccessToast = (message: string) => toast({ title: 'Operacion completada', description: message })
   const showErrorToast = (message: string) => toast({ title: 'No se pudo completar', description: message, variant: 'destructive' })
@@ -176,39 +117,16 @@ export default function DocumentosPage() {
     }
   }
 
-  const descargarPDF = async (documentoId: string, filename: string) => {
-    const response = await getDocumentos(`/api/documentos/${documentoId}/descargar-pdf`)
-    const resolver = unwrapApiData<{ pdf_endpoint?: string } | null>(response, null)
-    if (apiSucceeded(response) && resolver?.pdf_endpoint) {
-      const target = buildApiUrl(resolver.pdf_endpoint)
-      const a = document.createElement('a')
-      a.href = target
-      a.download = filename
-      a.target = '_blank'
-      a.rel = 'noopener noreferrer'
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      showSuccessToast('Representación impresa solicitada')
+  const descargar = async (id: string, type: 'pdf' | 'xml', filename: string) => {
+    try {
+      await downloadOperationalDocument(id, type, filename)
+      showSuccessToast(`${type.toUpperCase()} descargado correctamente`)
+    } catch (error) {
+      showErrorToast(error instanceof Error ? error.message : 'No se pudo descargar el documento')
     }
   }
-
-  const descargarXML = async (documentoId: string, filename: string) => {
-    const response = await getDocumentos(`/api/documentos/${documentoId}/descargar-xml`)
-    const xml = unwrapApiData<string | Blob | null>(response, null)
-    if (apiSucceeded(response) && xml) {
-      const blob = new Blob([xml], { type: 'application/xml' })
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-      showSuccessToast('XML descargado correctamente')
-    }
-  }
+  const descargarPDF = (id: string, filename: string) => descargar(id, 'pdf', filename)
+  const descargarXML = (id: string, filename: string) => descargar(id, 'xml', filename)
 
   const anularDocumento = async () => {
     if (!documentoAAnular || !motivoAnulacion.trim()) return
@@ -297,17 +215,6 @@ export default function DocumentosPage() {
     }] : []),
   ]
 
-  if (documentosLoading && documentos.length === 0) {
-    return (
-      <div className="min-h-screen bg-background p-5 text-foreground">
-        <div className="mx-auto flex min-h-[420px] w-full max-w-[1600px] flex-col items-center justify-center gap-3 rounded-3xl border border-cyan-400/20 bg-card/75 shadow-2xl shadow-blue-950/30">
-          <RefreshCw className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Cargando documentos...</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-background px-4 py-5 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
@@ -331,7 +238,7 @@ export default function DocumentosPage() {
                 <RefreshCw className="h-4 w-4" />
                 Actualizar
               </Button>
-              <Button type="button" onClick={openNewDocumentFlow} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+              <Button type="button" onClick={openNewDocumentFlow} disabled={!list.data || documentosLoading} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
                 <Plus className="h-4 w-4" />
                 {isArgentina ? 'Emitir en ARCA' : isColombia ? 'Ir al Centro CPE' : 'Crear documento'}
               </Button>
@@ -339,7 +246,12 @@ export default function DocumentosPage() {
           </div>
         </section>
 
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+        {metrics.error && <div role="alert" className="rounded-xl border border-destructive p-4">
+          No se pudieron consultar las estadísticas de documentos.
+          <Button type="button" onClick={metrics.reload} variant="outline">Reintentar estadísticas</Button>
+        </div>}
+        {metrics.loading && <p role="status">Consultando estadísticas...</p>}
+        {stats && <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           {statCards.map(({ label, value, description, icon: Icon }) => (
             <Card key={label} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
               <CardContent className="flex h-full items-start justify-between gap-3 p-4">
@@ -354,7 +266,7 @@ export default function DocumentosPage() {
               </CardContent>
             </Card>
           ))}
-        </section>
+        </section>}
 
         <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
@@ -417,13 +329,20 @@ export default function DocumentosPage() {
               <CardTitle className="text-base text-foreground">Lista de documentos</CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">{documentos.length} registros cargados</p>
             </div>
-            <Button type="button" onClick={openNewDocumentFlow} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+            <Button type="button" onClick={openNewDocumentFlow} disabled={!list.data || documentosLoading} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
               <Plus className="h-4 w-4" />
               {isArgentina ? 'Emitir en ARCA' : isColombia ? 'Ir al Centro CPE' : 'Nuevo documento'}
             </Button>
           </CardHeader>
           <CardContent className="p-0">
-            {documentos.length === 0 && !documentosLoading ? (
+            {documentosLoading ? (
+              <div role="status" className="p-5 text-sm text-muted-foreground">Cargando documentos...</div>
+            ) : list.error ? (
+              <div role="alert" className="p-5">
+                No se pudieron consultar los documentos. Reintente para recuperar la lista actual.
+                <Button type="button" onClick={loadDocumentos} variant="outline">Reintentar</Button>
+              </div>
+            ) : documentos.length === 0 && !documentosLoading ? (
               <div className="flex min-h-[340px] flex-col items-center justify-center p-8 text-center">
                 <FileText className="mb-3 h-12 w-12 text-cyan-200/50" />
                 <h3 className="text-lg font-bold text-foreground">No hay documentos registrados</h3>
@@ -434,7 +353,7 @@ export default function DocumentosPage() {
                       ? 'Los comprobantes DIAN se crean en el Centro CPE y luego aparecen aquí como historial descargable.'
                       : 'Comienza creando tu primer documento.'}
                 </p>
-                <Button type="button" onClick={openNewDocumentFlow} className="mt-4 gap-2 bg-blue-600 text-white hover:bg-blue-500">
+                <Button type="button" onClick={openNewDocumentFlow} disabled={!list.data || documentosLoading} className="mt-4 gap-2 bg-blue-600 text-white hover:bg-blue-500">
                   <Plus className="h-4 w-4" />
                   {isArgentina ? 'Ir a Comprobantes ARCA' : isColombia ? 'Ir al Centro CPE' : 'Crear primer documento'}
                 </Button>

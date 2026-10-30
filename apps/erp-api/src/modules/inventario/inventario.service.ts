@@ -1,10 +1,12 @@
-import { Injectable, BadRequestException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, ForbiddenException, NotFoundException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { AuditService } from '../audit/audit.service';
 import { appendIntegrationLog } from '../../shared/utils/integration-log';
 import { EventBusService } from '../../shared/events/event-bus.service';
 import { OutboxEventBuilder } from '../../shared/outbox/outbox-event.interface';
 import { v4 as uuidv4 } from 'uuid';
+import { prepareInventoryReceiptContext, bindInventoryOperationReceipt } from './inventory-operation-receipt';
+import { bindInventoryResolution, inventoryResolutionKind } from './inventory-operation-resolution';
 import {
   RegistrarAjusteInventarioDto,
   TransferirInventarioDto,
@@ -76,6 +78,33 @@ interface KardexValorizadoFiltros {
   desde?: string;
   hasta?: string;
   limit?: number;
+}
+
+// El código de la base trae UUIDs que no le dicen nada a quien opera.
+const detalleInventario = (message: string) =>
+  message.startsWith('INVENTORY_EXISTENCE_REQUIRED')
+    ? 'el producto no tiene existencias registradas en ese almacén'
+    : message.startsWith('INVENTORY_TRANSFER_GRE_PRODUCT_MISMATCH')
+      ? 'la guía debe incluir el mismo producto de inventario y su unidad de medida'
+      : message.startsWith('INVENTORY_TRANSFER_GRE_QUANTITY_EXCEEDED')
+        ? 'la cantidad supera lo declarado en la guía, considerando los traslados ya registrados'
+    : message.startsWith('INVENTORY_TRANSFER_GRE_INVALID')
+      ? 'selecciona una guía firmada de esta empresa con los mismos establecimientos de origen y destino'
+      : message.startsWith('INVENTORY_TRANSFER_REQUIRES_GRE')
+        ? 'registra y selecciona la guía de remisión antes del traslado entre establecimientos'
+        : message;
+
+function rechazoOperacionInventario(error: { code?: string; message: string }, message: string) {
+  if (error.code === '40001' && error.message.startsWith('INVENTORY_RESOLUTION570_')) {
+    return new ConflictException('La operación original fue abandonada o su clave pertenece a otra intención. Conserve los datos y consulte el resultado original.');
+  }
+  // Sólo un rechazo SQL de la transacción acredita que no hubo commit. Errores
+  // de transporte, claves reutilizadas y recibos incompletos siguen ambiguos.
+  const notApplied = ['22023', '23503', '23514', 'P0001', 'P0002'].includes(error.code || '')
+    && !/IDEMPOTENCY|INCOMPLETE_RETRY/.test(error.message);
+  return new BadRequestException(notApplied
+    ? { statusCode: 400, error: 'INVENTORY_NOT_APPLIED', message }
+    : message);
 }
 
 /**
@@ -285,6 +314,7 @@ export class InventarioService {
     dto: RegistrarAjusteInventarioDto,
   ): Promise<any> {
     const { idempotency_key, ...payload } = dto;
+    const receiptContext = prepareInventoryReceiptContext(tenantId, actorId, idempotency_key, 'AJUSTE', payload);
     const { data, error } = await this.supabase.getClient().rpc(
       'registrar_ajuste_inventario_tx',
       {
@@ -296,12 +326,18 @@ export class InventarioService {
     );
 
     if (error) {
-      throw new BadRequestException(
-        `No se pudo registrar el ajuste de inventario: ${error.message}`,
+      throw rechazoOperacionInventario(error,
+        `No se pudo registrar el ajuste de inventario: ${detalleInventario(error.message)}`,
       );
     }
 
-    return data;
+    const { data: operation, error: readError } = await this.supabase.getClient()
+      .from('operaciones_inventario')
+      .select('id,tenant_id,tipo,idempotency_key,fingerprint,producto_id,almacen_origen_id,almacen_destino_id,ubicacion_origen_id,ubicacion_destino_id,cantidad,delta,costo_unitario,motivo,actor_id,movimiento_salida_id,movimiento_entrada_id,event_id,resultado,metadata,created_at')
+      .eq('tenant_id', receiptContext.tenantId).eq('tipo', receiptContext.type)
+      .eq('idempotency_key', receiptContext.key).eq('actor_id', receiptContext.actorId).maybeSingle();
+    if (readError) throw new ServiceUnavailableException('No se pudo confirmar el registro original de inventario. Conserve sus datos para recuperar el resultado.');
+    return bindInventoryOperationReceipt(data, operation, receiptContext);
   }
 
   /**
@@ -314,6 +350,7 @@ export class InventarioService {
     dto: TransferirInventarioDto,
   ): Promise<any> {
     const { idempotency_key, ...payload } = dto;
+    const receiptContext = prepareInventoryReceiptContext(tenantId, actorId, idempotency_key, 'TRANSFERENCIA', payload);
     const { data, error } = await this.supabase.getClient().rpc(
       'transferir_inventario_tx',
       {
@@ -325,12 +362,73 @@ export class InventarioService {
     );
 
     if (error) {
-      throw new BadRequestException(
-        `No se pudo transferir el inventario: ${error.message}`,
+      throw rechazoOperacionInventario(error,
+        `No se pudo transferir el inventario: ${detalleInventario(error.message)}`,
       );
     }
 
-    return data;
+    const { data: operation, error: readError } = await this.supabase.getClient()
+      .from('operaciones_inventario')
+      .select('id,tenant_id,tipo,idempotency_key,fingerprint,producto_id,almacen_origen_id,almacen_destino_id,ubicacion_origen_id,ubicacion_destino_id,cantidad,delta,costo_unitario,motivo,actor_id,movimiento_salida_id,movimiento_entrada_id,event_id,resultado,metadata,created_at')
+      .eq('tenant_id', receiptContext.tenantId).eq('tipo', receiptContext.type)
+      .eq('idempotency_key', receiptContext.key).eq('actor_id', receiptContext.actorId).maybeSingle();
+    if (readError) throw new ServiceUnavailableException('No se pudo confirmar el registro original de inventario. Conserve sus datos para recuperar el resultado.');
+    return bindInventoryOperationReceipt(data, operation, receiptContext);
+  }
+
+  /** Resuelve el commit original o registra abandono bajo el mismo lock; no ejecuta stock. */
+  async resolverOperacionInventario(
+    tenantId: string,
+    actorId: string,
+    type: 'AJUSTE' | 'TRANSFERENCIA',
+    dto: RegistrarAjusteInventarioDto | TransferirInventarioDto,
+  ): Promise<any> {
+    const { idempotency_key, ...payload } = dto;
+    const context = prepareInventoryReceiptContext(tenantId, actorId, idempotency_key, type, payload);
+    const client = this.supabase.getClient();
+    let response: any;
+    try {
+      response = await client.rpc('resolver_operacion_inventario_tx_570', {
+        p_tenant_id: context.tenantId, p_actor_id: context.actorId, p_type: context.type,
+        p_idempotency_key: context.key, p_payload: payload,
+      });
+    } catch {
+      throw new ServiceUnavailableException('No se pudo confirmar la resolución original. Conserve sus datos; no se repetirá la operación de inventario.');
+    }
+    const { data, error } = response || {};
+    if (error) {
+      if (error.code === '42501') throw new ForbiddenException('Se requiere permiso vigente para resolver la operación original de inventario.');
+      if (['40001', '23505'].includes(error.code || '')) throw new ConflictException('La clave original pertenece a otra identidad o intención. Conserve sus datos.');
+      if (error.code === '22023') throw new BadRequestException('La resolución requiere los datos originales completos de inventario.');
+      throw new ServiceUnavailableException('No se pudo confirmar la resolución original. Conserve sus datos; no se repetirá la operación de inventario.');
+    }
+    if (inventoryResolutionKind(data) === 'ABANDONED') return bindInventoryResolution(data, context);
+    const { data: operation, error: readError } = await client
+      .from('operaciones_inventario')
+      .select('id,tenant_id,tipo,idempotency_key,fingerprint,producto_id,almacen_origen_id,almacen_destino_id,ubicacion_origen_id,ubicacion_destino_id,cantidad,delta,costo_unitario,motivo,actor_id,movimiento_salida_id,movimiento_entrada_id,event_id,resultado,metadata,created_at')
+      .eq('tenant_id', context.tenantId).eq('tipo', context.type)
+      .eq('idempotency_key', context.key).eq('actor_id', context.actorId).maybeSingle();
+    if (readError) throw new ServiceUnavailableException('No se pudo confirmar el recibo original. Conserve los datos de la operación.');
+    return bindInventoryResolution(data, context, operation);
+  }
+
+  /** Recupera sólo el resultado inmutable; nunca vuelve a ejecutar la RPC de stock. */
+  async recuperarReciboInventario(
+    tenantId: string,
+    actorId: string,
+    type: 'AJUSTE' | 'TRANSFERENCIA',
+    dto: RegistrarAjusteInventarioDto | TransferirInventarioDto,
+  ): Promise<any> {
+    const { idempotency_key, ...payload } = dto;
+    const context = prepareInventoryReceiptContext(tenantId, actorId, idempotency_key, type, payload);
+    const { data: operation, error } = await this.supabase.getClient()
+      .from('operaciones_inventario')
+      .select('id,tenant_id,tipo,idempotency_key,fingerprint,producto_id,almacen_origen_id,almacen_destino_id,ubicacion_origen_id,ubicacion_destino_id,cantidad,delta,costo_unitario,motivo,actor_id,movimiento_salida_id,movimiento_entrada_id,event_id,resultado,metadata,created_at')
+      .eq('tenant_id', context.tenantId).eq('tipo', context.type)
+      .eq('idempotency_key', context.key).eq('actor_id', context.actorId).maybeSingle();
+    if (error) throw new ServiceUnavailableException('No se pudo consultar el recibo original de inventario. Conserve sus datos; no se repetirá la operación.');
+    // La ausencia no demuestra abandono y no autoriza retirar la intención original.
+    return bindInventoryOperationReceipt({ ...operation?.resultado, idempotent: true }, operation, context);
   }
 
   /**

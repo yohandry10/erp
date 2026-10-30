@@ -71,6 +71,8 @@ export default function ConciliacionDetailPage() {
   const [movimientosSistema, setMovimientosSistema] = useState<MovimientoBancario[]>([]);
   const [movimientosExtracto, setMovimientosExtracto] = useState<MovimientoBancario[]>([]);
   const [loading, setLoading] = useState(true);
+  const [movementsError, setMovementsError] = useState('');
+  const [loadError, setLoadError] = useState('');
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
@@ -89,6 +91,11 @@ export default function ConciliacionDetailPage() {
   );
 
   const loadMovimientos = useCallback(async (conciliacionData: Conciliacion) => {
+    setMovementsError('');
+    setSelectedSistemaId(null);
+    setSelectedExtractoId(null);
+    setMovimientosSistema([]);
+    setMovimientosExtracto([]);
     try {
       const cuentaBancariaId = conciliacionData.cuentas_bancarias?.id;
       if (!cuentaBancariaId) {
@@ -111,10 +118,9 @@ export default function ConciliacionDetailPage() {
         }
       );
 
-      if (sistemaResponse.ok) {
-        const sistemaData = await sistemaResponse.json();
-        setMovimientosSistema(Array.isArray(sistemaData.data) ? sistemaData.data : []);
-      }
+      if (!sistemaResponse.ok) throw new Error('Movimientos del sistema indisponibles');
+      const sistemaData = await sistemaResponse.json();
+      if (!Array.isArray(sistemaData.data)) throw new Error('Respuesta de movimientos inválida');
 
       // Load movimientos del extracto
       const extractoResponse = await fetchApi(
@@ -128,12 +134,14 @@ export default function ConciliacionDetailPage() {
         }
       );
 
-      if (extractoResponse.ok) {
-        const extractoData = await extractoResponse.json();
-        setMovimientosExtracto(Array.isArray(extractoData.data) ? extractoData.data : []);
-      }
+      if (!extractoResponse.ok) throw new Error('Extracto indisponible');
+      const extractoData = await extractoResponse.json();
+      if (!Array.isArray(extractoData.data)) throw new Error('Respuesta de extracto inválida');
+      setMovimientosSistema(sistemaData.data);
+      setMovimientosExtracto(extractoData.data);
     } catch (error) {
       console.error('Error loading movimientos:', error);
+      setMovementsError('No se pudieron cargar los movimientos y el extracto. Reintente antes de operar.');
     }
   }, [conciliacionId]);
 
@@ -141,6 +149,7 @@ export default function ConciliacionDetailPage() {
     if (!conciliacionId) return;
 
     setLoading(true);
+    setLoadError('');
     try {
       const response = await fetchApi(`/api/finanzas/conciliacion/${conciliacionId}`, {
         headers: {
@@ -155,6 +164,8 @@ export default function ConciliacionDetailPage() {
         setConciliacion(normalized);
         await loadMovimientos(normalized);
       } else {
+        setConciliacion(null);
+        setLoadError(response.status === 404 ? 'Conciliación no encontrada' : 'No se pudo cargar la conciliación. Reintente la consulta.');
         toast({
           title: 'No se pudo cargar la conciliación',
           description: 'Vuelva a intentarlo; la pantalla no refleja el estado real.',
@@ -163,6 +174,8 @@ export default function ConciliacionDetailPage() {
       }
     } catch (error) {
       console.error('Error loading conciliación:', error);
+      setConciliacion(null);
+      setLoadError('No se pudo cargar la conciliación. Reintente la consulta.');
     } finally {
       setLoading(false);
     }
@@ -260,6 +273,7 @@ export default function ConciliacionDetailPage() {
 
   const handleOpenCloseModal = async () => {
     setLoadingDiferencias(true);
+    setReporteDiferencias(null);
     setShowCloseModal(true);
 
     try {
@@ -316,7 +330,11 @@ export default function ConciliacionDetailPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al cerrar la conciliación');
+        throw new Error(
+          String(errorData.message || '').includes('BANK_RECONCILIATION_PERIOD_NOT_ENDED')
+            ? 'El período todavía no termina: la conciliación se cierra después de su último día, porque cerrada bloquea los movimientos del banco en ese mes.'
+            : errorData.message || 'Error al cerrar la conciliación',
+        );
       }
 
       // Success - reload data and close modal
@@ -352,7 +370,8 @@ export default function ConciliacionDetailPage() {
   if (!conciliacion) {
     return (
       <div className="p-6">
-        <div className="text-center text-foreground/80">Conciliación no encontrada</div>
+        <div className="text-center text-foreground/80">{loadError || 'Conciliación no encontrada'}</div>
+        <Button type="button" variant="outline" onClick={loadConciliacion}>Reintentar conciliación</Button>
       </div>
     );
   }
@@ -420,6 +439,8 @@ export default function ConciliacionDetailPage() {
         </Card>
       </div>
 
+      {movementsError && <div role="alert" className="rounded-md border border-destructive/30 p-4 text-destructive">{movementsError}<Button type="button" variant="outline" className="ml-3" onClick={loadConciliacion}>Reintentar movimientos</Button></div>}
+
       {/* Guide - Only show for open conciliaciones */}
       {conciliacion.estado !== 'CERRADA' && !showWizard && (
         <ConciliacionGuide />
@@ -431,7 +452,7 @@ export default function ConciliacionDetailPage() {
           onClick={() => setShowWizard(!showWizard)}
           variant={showWizard ? "default" : "outline"}
           className={showWizard ? "bg-purple-600 hover:bg-purple-700" : ""}
-          disabled={conciliacion.estado === 'CERRADA'}
+          disabled={Boolean(movementsError) || conciliacion.estado === 'CERRADA'}
         >
           {showWizard ? '📋 Vista Detallada' : '🧙 Modo Wizard'}
         </Button>
@@ -453,35 +474,35 @@ export default function ConciliacionDetailPage() {
           <div className="flex gap-3">
             <Button
               onClick={() => setShowImportModal(true)}
-              disabled={conciliacion.estado === 'CERRADA'}
+              disabled={Boolean(movementsError) || conciliacion.estado === 'CERRADA'}
               className="bg-blue-600 hover:bg-blue-700"
             >
               Importar Extracto CSV
             </Button>
             <Button
               onClick={handleMatchAutomatico}
-              disabled={conciliacion.estado === 'CERRADA' || matchEnCurso}
+              disabled={Boolean(movementsError) || conciliacion.estado === 'CERRADA' || matchEnCurso}
               variant="outline"
             >
               {matchEnCurso ? 'Conciliando…' : 'Match Automático'}
             </Button>
             <Button
               onClick={() => setShowMatchModal(true)}
-              disabled={conciliacion.estado === 'CERRADA'}
+              disabled={Boolean(movementsError) || conciliacion.estado === 'CERRADA'}
               variant="outline"
             >
               Match Manual
             </Button>
             <Button
               onClick={() => setShowAdjustmentModal(true)}
-              disabled={conciliacion.estado === 'CERRADA' || !conciliacion.cuentas_bancarias?.cuenta_contable_id}
+              disabled={Boolean(movementsError) || conciliacion.estado === 'CERRADA' || !conciliacion.cuentas_bancarias?.cuenta_contable_id}
               variant="outline"
             >
               Registrar ajuste
             </Button>
             <Button
               onClick={handleOpenCloseModal}
-              disabled={conciliacion.estado === 'CERRADA'}
+              disabled={Boolean(movementsError) || conciliacion.estado === 'CERRADA'}
               className="bg-green-600 hover:bg-green-700 ml-auto"
             >
               Cerrar Conciliación
@@ -489,7 +510,7 @@ export default function ConciliacionDetailPage() {
           </div>
 
           {/* Dual Table View */}
-          <ConciliacionTable
+          {!movementsError && <ConciliacionTable
             movimientosSistema={movimientosSistema}
             movimientosExtracto={movimientosExtracto}
             onSelectSistema={setSelectedSistemaId}
@@ -499,7 +520,7 @@ export default function ConciliacionDetailPage() {
             highlightMatches={true}
             readOnly={conciliacion.estado === 'CERRADA'}
             onDragMatch={handleDragMatch}
-          />
+          />}
         </>
       )}
 
@@ -542,9 +563,9 @@ export default function ConciliacionDetailPage() {
       {/* Close Confirmation Modal */}
       {showCloseModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div role="dialog" aria-modal="true" aria-labelledby="confirmar-cierre-conciliacion" className="bg-card rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
-              <h2 className="text-2xl font-bold text-foreground mb-4">
+              <h2 id="confirmar-cierre-conciliacion" className="text-2xl font-bold text-foreground mb-4">
                 Confirmar Cierre de Conciliación
               </h2>
 

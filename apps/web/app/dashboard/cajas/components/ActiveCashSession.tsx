@@ -68,10 +68,12 @@ export function ActiveCashSession({ sesion, onCloseSession, className = '' }: Ac
             </div>
 
             {/* Operations Panel */}
-            <CashOperationsPanel
-                sesionId={sesion.id}
-                onOperationComplete={onCloseSession}
-            />
+            {sesion.estado === 'ABIERTA' && (
+                <CashOperationsPanel
+                    sesionId={sesion.id}
+                    onOperationComplete={onCloseSession}
+                />
+            )}
 
             {/* Movements Table */}
             <div className="rounded-2xl shadow border overflow-hidden relative"

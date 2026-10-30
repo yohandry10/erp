@@ -3,7 +3,9 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import GreModal from '@/components/modals/GreModal'
-import { useApi } from '@/hooks/use-api'
+import { useAuth } from '@/contexts/AuthContext'
+import { useGreRead } from '@/hooks/use-gre-read'
+import { greOrderOrigin } from '@/lib/gre-order-origin-contract'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { ArrowLeft, Loader2, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -46,45 +48,21 @@ function NuevaGreContent() {
   const searchParams = useSearchParams()
   const pedidoId = searchParams.get('pedido_id')
   const despacho = searchParams.get('despacho')
-  const { get } = useApi()
+  const { session } = useAuth()
   const country = useCountryContext()
-  const isPeru = (country.paisCodigo || 'PE').toUpperCase() === 'PE'
+  const isPeru = country.paisCodigo?.toUpperCase() === 'PE'
   const [mounted, setMounted] = useState(false)
-  const [pedido, setPedido] = useState<PedidoOrigen | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const tenantId = session?.user?.tenant_id || ''
+  const validateOrder = useCallback((response: any): PedidoOrigen => greOrderOrigin(response, pedidoId || '', tenantId), [pedidoId, tenantId])
+  const orderRead = useGreRead(`/api/ventas/pedidos/${pedidoId || ''}`, validateOrder,
+    !country.loading && !country.requiresSetup && isPeru && Boolean(pedidoId))
+  const pedido = orderRead.data
+  const loading = Boolean(pedidoId) && orderRead.loading
+  const error = !pedidoId
+    ? 'Una guía de remisión se emite contra un pedido: es de ahí de donde salen el destinatario, los bultos y el punto de partida. Abra el pedido que va a despachar y genere la guía desde él.'
+    : orderRead.error
 
   useEffect(() => setMounted(true), [])
-
-  const loadPedido = useCallback(async () => {
-    if (!pedidoId) {
-      setError(
-        'Una guía de remisión se emite contra un pedido: es de ahí de donde salen ' +
-          'el destinatario, los bultos y el punto de partida. Abra el pedido que va a ' +
-          'despachar y genere la guía desde él.',
-      )
-      setLoading(false)
-      return
-    }
-
-    try {
-      setLoading(true)
-      setError(null)
-      const response = await get(`/ventas/pedidos/${pedidoId}`)
-      if (!response?.success || !response.data) {
-        throw new Error(response?.message || 'No se pudo cargar el pedido origen.')
-      }
-      setPedido(response.data)
-    } catch (err: any) {
-      setError(err?.message || 'No se pudo cargar el pedido origen.')
-    } finally {
-      setLoading(false)
-    }
-  }, [get, pedidoId])
-
-  useEffect(() => {
-    if (!country.loading && isPeru) loadPedido()
-  }, [country.loading, isPeru, loadPedido])
 
   const cliente = pedido?.cliente ?? pedido?.clientes ?? null
   const clienteDocumentoTipo = cliente?.documento_tipo || cliente?.tipo_documento || 'RUC'
@@ -112,6 +90,14 @@ function NuevaGreContent() {
           <Loader2 className="h-5 w-5 animate-spin" />
           Cargando país del tenant...
         </div>
+      </div>
+    )
+  }
+
+  if (country.requiresSetup) {
+    return (
+      <div role="alert" className="p-6">
+        Complete la configuración de la empresa antes de preparar una guía de remisión.
       </div>
     )
   }
@@ -147,9 +133,14 @@ function NuevaGreContent() {
   if (error || !pedido || !pedidoContext) {
     return (
       <div className="grid gap-4 p-6">
-        <div className="rounded-xl border border-cyan-300/20 bg-card/80 p-4 font-semibold text-primary">
+        <div role="alert" data-testid="gre-order-origin-error" className="rounded-xl border border-cyan-300/20 bg-card/80 p-4 font-semibold text-primary">
           {error || 'No se pudo preparar la GRE.'}
         </div>
+        {pedidoId && (
+          <Button onClick={() => void orderRead.reload()} className="w-fit">
+            Reintentar carga del pedido
+          </Button>
+        )}
         <Button
           onClick={() => router.push('/dashboard/ventas/pedidos')}
           className="w-fit gap-2 bg-blue-600 text-white hover:bg-blue-500"
@@ -189,6 +180,7 @@ function NuevaGreContent() {
       </div>
 
       <GreModal
+        key={`${tenantId}:${session?.user?.id || ''}:${pedidoId}:${despacho || ''}`}
         isOpen
         onClose={() => router.push('/dashboard/gre')}
         onSuccess={handleSuccess}

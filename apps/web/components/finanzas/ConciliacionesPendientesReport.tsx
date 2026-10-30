@@ -1,7 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { useApi } from '@/hooks/use-api'
+import { useFinanceReport } from '@/hooks/use-finance-report'
+import FinanceReportStatus from './FinanceReportStatus'
+import { readPendingReconciliations } from '@/lib/finanzas/report-read-contract'
 import { Calendar, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { formatDate } from '@/lib/format-utils'
@@ -28,31 +29,12 @@ interface ConciliacionPendiente {
   created_at: string
 }
 
-export default function ConciliacionesPendientesReport() {
-  const { get } = useApi()
+export default function ConciliacionesPendientesReport({ onReadyChange }: { onReadyChange?: (ready: boolean) => void }) {
   const { formatCurrency } = useLocalizedMoney()
   const router = useRouter()
-  const [conciliaciones, setConciliaciones] = useState<ConciliacionPendiente[]>([])
-  const [loading, setLoading] = useState(true)
-
-  const loadConciliaciones = useCallback(async () => {
-    try {
-      setLoading(true)
-      const response = await get('/api/finanzas/conciliacion/pendientes')
-
-      if (response?.success) {
-        setConciliaciones(response.data || [])
-      }
-    } catch (error) {
-      console.error('Error loading conciliaciones:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [get])
-
-  useEffect(() => {
-    loadConciliaciones()
-  }, [loadConciliaciones])
+  const { data, loading, error, reload: loadConciliaciones } = useFinanceReport<ConciliacionPendiente[]>(
+    '/api/finanzas/conciliacion/pendientes', readPendingReconciliations, onReadyChange)
+  const conciliaciones = data ?? []
 
   const getEstadoColor = (estado: string) => {
     switch (estado) {
@@ -73,14 +55,7 @@ export default function ConciliacionesPendientesReport() {
     return '#ef4444'
   }
 
-  if (loading) {
-    return (
-      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl p-8 text-center">
-        <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
-        <p className="text-muted-foreground">Cargando conciliaciones pendientes...</p>
-      </div>
-    )
-  }
+  if (loading || error) return <FinanceReportStatus loading={loading} retry={loadConciliaciones} />
 
   if (conciliaciones.length === 0) {
     return (
@@ -92,6 +67,7 @@ export default function ConciliacionesPendientesReport() {
         <p className="text-muted-foreground">
           Todas las conciliaciones están cerradas
         </p>
+        <button type="button" onClick={loadConciliaciones} className="mt-4 rounded border px-4 py-2">Actualizar</button>
       </div>
     )
   }
@@ -217,7 +193,7 @@ export default function ConciliacionesPendientesReport() {
                   </span>
                 </div>
                 <div className="w-[100%] h-2 bg-[rgba(0,0,0,0.05)] rounded-full overflow-hidden">
-                  <div className="h-[100%] transition" />
+                  <div className="h-[100%] transition" style={{ width: `${conciliacion.porcentaje_avance}%`, backgroundColor: avanceColor }} />
                 </div>
               </div>
 

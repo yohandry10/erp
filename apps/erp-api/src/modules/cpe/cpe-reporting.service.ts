@@ -4,12 +4,23 @@ import { CpeXmlBuilder } from './cpe-xml.builder';
 import { paisDelTenant, rangoDelDiaDelTenant } from '../../shared/utils/fecha-tenant.util';
 import { fechaDeDocumentoEnPais, zonaHorariaDePais } from '../../shared/utils/fecha-peru.util';
 import { isFiscalDemoRepresentation } from './historical-cpe-country.util';
+import Decimal from 'decimal.js';
 
 /** Consultas y exportaciones CPE; no participa en emisión ni anulación. */
 export class CpeReportingService {
   private readonly xmlBuilder = new CpeXmlBuilder();
 
   constructor(private readonly supabaseService: SupabaseService) {}
+
+  private isHistoricalImport(row: any): boolean {
+    const origin = row?.metadata;
+    return row?.estado === 'MIGRADO' && row.activo === false
+      && origin?.origen === 'migracion_historica'
+      && typeof origin.external_id === 'string' && origin.external_id.trim().length > 0
+      && typeof origin.run_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(origin.run_id)
+      && origin.no_sunat === true && origin.no_evento_factura === true && origin.solo_lectura === true
+      && row.idempotency_key === `migracion_historica:${origin.external_id}`;
+  }
 
 async getComprobantesFromDatabase(filters: any = {}, tenantId?: string) {
     const page = filters.page == null || filters.page === '' ? 1 : Number(filters.page);
@@ -30,11 +41,7 @@ async getComprobantesFromDatabase(filters: any = {}, tenantId?: string) {
       const client = this.supabaseService.getClient();
       if (!client) {
         console.error('❌ Cliente de Supabase no disponible');
-        return {
-          success: false,
-          message: 'Cliente de Supabase no configurado',
-          data: []
-        };
+        throw new ServiceUnavailableException('Cliente de Supabase no configurado');
       }
 
       // Paginación y rango
@@ -98,8 +105,28 @@ async getComprobantesFromDatabase(filters: any = {}, tenantId?: string) {
         });
         throw error;
       }
+      if (!Array.isArray(cpeData) || !Number.isSafeInteger(count) || count < 0
+        || cpeData.length !== Math.min(pageSize, Math.max(0, count - from))
+        || new Set(cpeData.map(row => row.id)).size !== cpeData.length) {
+        throw new ServiceUnavailableException('El listado de comprobantes está incompleto; reintente');
+      }
 
       console.log(`📊 Datos CPE encontrados:`, cpeData?.length || 0);
+
+      const documentoIds = paisTenant === 'PE'
+        ? cpeData.filter(c => ['01','03'].includes(c.tipo_documento) && c.documento_id).map(c => c.documento_id)
+        : [];
+      const cuentasPorDocumento = new Map<string, { id: string; saldo: number; numero_documento: string }>();
+      if (documentoIds.length) {
+        const cuentas = await client.from('cuentas_por_cobrar').select('id,documento_id,saldo,numero_documento', { count: 'exact' })
+          .eq('tenant_id', tenantId).in('documento_id', documentoIds);
+        if (cuentas.error || !Array.isArray(cuentas.data) || cuentas.count !== cuentas.data.length
+          || new Set(cuentas.data.map(row => row.documento_id)).size !== cuentas.data.length
+          || cuentas.data.some(row => !row.id || !row.numero_documento || row.saldo == null || !Number.isFinite(Number(row.saldo)) || Number(row.saldo) < 0)) {
+          throw new ServiceUnavailableException('No se pudo consultar el estado completo de cobro de los comprobantes; reintente');
+        }
+        for (const cuenta of cuentas.data) cuentasPorDocumento.set(cuenta.documento_id, { ...cuenta, saldo: Number(cuenta.saldo) });
+      }
 
       // La fecha del comprobante se presenta en la zona del contribuyente. Con
       // `toISOString()` se mostraba en UTC: a las 20:15 de Lima un comprobante
@@ -116,8 +143,15 @@ async getComprobantesFromDatabase(filters: any = {}, tenantId?: string) {
         fechaDeDocumentoEnPais(valor, zonaTenant);
 
       // Transformar datos al formato esperado por el frontend
-      const comprobantesFormateados = (cpeData || []).map(cpe => {
-        const isDemoRepresentation = isFiscalDemoRepresentation(cpe, paisTenant);
+      const comprobantesFormateados = cpeData.map(cpe => {
+        const isHistoricalImport = this.isHistoricalImport(cpe);
+        if (!cpe.id || !cpe.tipo_documento || cpe.serie == null || !/^\d+$/.test(String(cpe.numero)) || Number(cpe.numero) <= 0
+          || cpe.total_venta == null || !Number.isFinite(Number(cpe.total_venta)) || Number(cpe.total_venta) < 0
+          || !/^[A-Z]{3}$/.test(cpe.moneda || '') || !(['BORRADOR','FIRMADO','ENVIADO','ACEPTADO','ERROR','RECHAZADO','ANULADO'].includes(cpe.estado) || isHistoricalImport)
+          || !fechaLocal(cpe.fecha_emision ?? cpe.created_at) || !cpe.created_at) {
+          throw new ServiceUnavailableException('El comprobante consultado está incompleto; reintente');
+        }
+        const isDemoRepresentation = !isHistoricalImport && isFiscalDemoRepresentation(cpe, paisTenant);
         return {
           id: cpe.id,
           tipoDocumento: cpe.tipo_documento,
@@ -127,16 +161,23 @@ async getComprobantesFromDatabase(filters: any = {}, tenantId?: string) {
           fechaEmision: fechaLocal(cpe.fecha_emision ?? cpe.created_at),
           cliente: cpe.razon_social_receptor || 'Cliente General',
           clienteRuc: cpe.documento_receptor || '',
-          total: parseFloat(cpe.total_venta || 0),
-          moneda: cpe.moneda || 'PEN',
+          total: Number(cpe.total_venta),
+          moneda: cpe.moneda,
           // FIRMADO es el estado técnico que exige el writer atómico legado. En
           // una demo local el artefacto no tiene XMLDSig/XAdES, por lo que la
           // presentación debe decir explícitamente que sólo es una muestra local.
-          estado: cpe.estado || 'BORRADOR',
-          estadoSunat: isDemoRepresentation
+          estado: cpe.estado,
+          estadoSunat: isHistoricalImport ? 'NO_VERIFICADO' : isDemoRepresentation
             ? 'NO_TRANSMITIDO'
             : (cpe.estado_sunat || cpe.sunat_status || cpe.estado),
           isDemoRepresentation,
+          isHistoricalImport,
+          cxcId: cuentasPorDocumento.get(cpe.documento_id)?.id ?? null,
+          numeroDocumentoCxc: cuentasPorDocumento.get(cpe.documento_id)?.numero_documento ?? null,
+          saldoPorCobrar: cuentasPorDocumento.get(cpe.documento_id)?.saldo ?? null,
+          requiereVincularCobro: paisTenant === 'PE' && Boolean(cpe.metadata?.pe_direct_request_fingerprint)
+            && ['01','03'].includes(cpe.tipo_documento) && cpe.estado !== 'ANULADO'
+            && !cuentasPorDocumento.has(cpe.documento_id),
           observaciones: cpe.error_message || '',
           fechaCreacion: cpe.created_at
         };
@@ -149,7 +190,7 @@ async getComprobantesFromDatabase(filters: any = {}, tenantId?: string) {
         data: comprobantesFormateados,
         message: `Se encontraron ${comprobantesFormateados.length} comprobantes`,
         meta: {
-          total: count ?? comprobantesFormateados.length,
+          total: count,
           page,
           pageSize,
         }
@@ -165,9 +206,12 @@ async exportComprobantesCsv(filters: any = {}, tenantId?: string) {
     const data: any[] = [];
     let page = 1;
     let total = 0;
+    const ids = new Set<string>();
     do {
       const response = await this.getComprobantesFromDatabase({ ...filters, page, pageSize: 200 }, tenantId);
+      if (page > 1 && response.meta.total !== total || response.data.some(row => ids.has(row.id))) throw new ServiceUnavailableException('La exportación cambió durante la consulta; reintente');
       total = response.meta.total;
+      response.data.forEach(row => ids.add(row.id));
       data.push(...response.data);
       if (!response.data.length && data.length < total) throw new ServiceUnavailableException('La exportación cambió durante la consulta; reintente');
       page += 1;
@@ -258,7 +302,7 @@ async getStatsFromDatabase(tenantId?: string) {
       }
 
       const { count: cpeHoy, error: errorHoy } = await queryHoy;
-      if (errorHoy) throw errorHoy;
+      if (errorHoy || !Number.isSafeInteger(cpeHoy) || cpeHoy < 0) throw errorHoy || new Error('Conteo diario incompleto');
 
       // CPE del mes
       let queryMes = client
@@ -271,24 +315,24 @@ async getStatsFromDatabase(tenantId?: string) {
       }
 
       const { count: cpeMes, error: errorMes } = await queryMes;
-      if (errorMes) throw errorMes;
+      if (errorMes || !Number.isSafeInteger(cpeMes) || cpeMes < 0) throw errorMes || new Error('Conteo mensual incompleto');
 
       // Monto facturado del mes
-      let queryMonto = client
-        .from('cpe')
-        .select('total_venta')
-        .gte('created_at', inicioMes);
-
-      if (tenantId) {
-        queryMonto = queryMonto.eq('tenant_id', tenantId);
+      let montoFacturado = new Decimal(0);
+      const idsMonto = new Set<string>();
+      for (let offset = 0; offset < cpeMes || offset === 0; offset += 200) {
+        let queryMonto = client.from('cpe').select('id,total_venta', { count: 'exact' })
+          .gte('created_at', inicioMes).order('id', { ascending: true }).range(offset, offset + 199);
+        if (tenantId) queryMonto = queryMonto.eq('tenant_id', tenantId);
+        const { data: montoData, error: errorMonto, count: montoCount } = await queryMonto;
+        if (errorMonto || !Array.isArray(montoData) || montoCount !== cpeMes || montoData.length !== Math.min(200, cpeMes - offset)) throw errorMonto || new Error('Montos mensuales incompletos');
+        for (const cpe of montoData) {
+          if (!cpe.id || idsMonto.has(cpe.id) || cpe.total_venta == null) throw new Error('Monto mensual incompleto');
+          const amount = new Decimal(cpe.total_venta);
+          if (!amount.isFinite() || amount.isNegative()) throw new Error('Monto mensual inválido');
+          idsMonto.add(cpe.id); montoFacturado = montoFacturado.plus(amount);
+        }
       }
-
-      const { data: montoData, error: errorMonto } = await queryMonto;
-      if (errorMonto) throw errorMonto;
-
-      const montoFacturado = (montoData || []).reduce((sum, cpe) => 
-        sum + parseFloat(cpe.total_venta || 0), 0
-      );
 
       // CPE rechazados
       let queryRechazados = client
@@ -301,14 +345,15 @@ async getStatsFromDatabase(tenantId?: string) {
       }
 
       const { count: rechazados, error: errorRechazados } = await queryRechazados;
-      if (errorRechazados) throw errorRechazados;
+      if (errorRechazados || !Number.isSafeInteger(rechazados) || rechazados < 0) throw errorRechazados || new Error('Conteo de rechazos incompleto');
 
       const stats = {
-        cpeEmitidosHoy: cpeHoy || 0,
-        cpeDelMes: cpeMes || 0,
-        montoFacturado: Math.round(montoFacturado * 100) / 100,
-        rechazados: rechazados || 0
+        cpeEmitidosHoy: cpeHoy,
+        cpeDelMes: cpeMes,
+        montoFacturado: montoFacturado.toDecimalPlaces(2).toNumber(),
+        rechazados
       };
+      if (!Number.isFinite(stats.montoFacturado)) throw new Error('El monto mensual excede el rango de representación');
 
       console.log('✅ Estadísticas calculadas:', stats);
 

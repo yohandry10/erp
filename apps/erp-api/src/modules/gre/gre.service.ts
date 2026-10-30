@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, Logger, NotFoundException, ConflictException, ForbiddenException, HttpException, ServiceUnavailableException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
+import { readCompleteCatalog } from '../../shared/utils/complete-catalog-read';
 import {
   CreateGuiaRemisionDto,
   GreAutoConfigDto,
@@ -10,7 +11,8 @@ import {
 import { EventBusService } from '../../shared/events/event-bus.service';
 import { OseService } from '../ose/ose.service';
 import { ValidationService } from '../validations/validation.service';
-
+import { XMLParser } from 'fast-xml-parser';
+
 import { fechaHoyDelTenant, paisDelTenant } from '../../shared/utils/fecha-tenant.util';
 import { fechaHoyEnPais } from '../../shared/utils/fecha-peru.util';
 import { assertExternalFiscalTransportAllowed } from '../../shared/utils/fiscal-transport-guard';
@@ -243,6 +245,11 @@ export class GreService {
     return habilitar;
   }
 
+  async catalogoTraslados(tenantId:string){
+    return readCompleteCatalog(this.supabaseService.getClient(),'gre_guias','id,tenant_id,numero,estado,motivo',q=>q.eq('tenant_id',tenantId).eq('motivo','TRASLADO_ENTRE_ESTABLECIMIENTOS').in('estado',['FIRMADO','ENVIADO','ACEPTADO']),
+      r=>r.tenant_id===tenantId&&typeof r.numero==='string'&&!!r.numero.trim()&&r.motivo==='TRASLADO_ENTRE_ESTABLECIMIENTOS'&&['FIRMADO','ENVIADO','ACEPTADO'].includes(r.estado));
+  }
+
   async findAllGuias(
     tenantId: string,
     filters: GreListQueryDto = {},
@@ -266,11 +273,13 @@ export class GreService {
       }
     }
 
-    const { data, error } = await query;
-    if (error) {
-      throw new ServiceUnavailableException('No se pudieron consultar las guías de remisión; reintente');
+    try {
+      const { data, error } = await query;
+      if (error || !Array.isArray(data)) throw new Error('GRE source unavailable');
+      return data.map((gre: any) => this.mapGreRecordToResponse(gre));
+    } catch {
+      throw new ServiceUnavailableException('No se pudieron consultar las guías de remisión. Reintente.');
     }
-    return (data || []).map((gre: any) => this.mapGreRecordToResponse(gre));
   }
 
   async findGuiaById(id: string, tenantId: string): Promise<GuiaRemisionResponseDto> {
@@ -290,10 +299,10 @@ export class GreService {
         .eq('tenant_id', tenantId)
         .eq('estado', 'ACTIVO')
         .order('created_at', { ascending: true }),
-    ]);
-    if (error) throw new BadRequestException(`Error al consultar la GRE: ${error.message}`);
+    ]).catch(() => { throw new ServiceUnavailableException('No se pudo consultar la guía de remisión. Reintente.'); });
+    if (error) throw new ServiceUnavailableException('No se pudo consultar la guía de remisión. Reintente.');
     if (!data) throw new NotFoundException('Guía de remisión no encontrada');
-    if (detailsError) throw new BadRequestException(`Error al consultar líneas GRE: ${detailsError.message}`);
+    if (detailsError || !Array.isArray(details)) throw new ServiceUnavailableException('No se pudieron consultar los bienes de la guía. Reintente.');
 
     const response = this.mapGreRecordToResponse(data);
     response.items = (details || []).map((item: any) => ({
@@ -314,18 +323,15 @@ export class GreService {
 
     let query = supabase
       .from('gre_guias')
-      .select('serie,numero,fecha_emision,fecha_traslado,destinatario,direccion_destino,modalidad,motivo,peso_total,estado,sunat_status,numero_sunat,anio,mes')
+      .select('serie,numero,fecha_emision,created_at,xml_ubl,fecha_traslado,destinatario,direccion_destino,modalidad,motivo,peso_total,estado,sunat_status,numero_sunat,anio,mes')
       .eq('tenant_id', tenantId);
 
     if (anio) query = query.eq('anio', anio);
     if (mes) query = query.eq('mes', mes);
 
-    const { data, error } = await query;
+    const { data, error } = await Promise.resolve(query).catch(() => { throw new ServiceUnavailableException('No se pudo consultar el reporte completo de GRE. Reintente.'); });
 
-    if (error) {
-      this.logger.error('❌ Error consultando GREs para CSV:', error);
-      throw new Error(`Error generando CSV GRE: ${error.message}`);
-    }
+    if (error || !Array.isArray(data)) throw new ServiceUnavailableException('No se pudo consultar el reporte completo de GRE. Reintente.');
 
     const headers = ['serie','numero','fecha_emision','fecha_traslado','destinatario',
       'direccion_destino','modalidad','motivo','peso_total','estado','sunat_status','numero_sunat'];
@@ -333,7 +339,7 @@ export class GreService {
     const rows = (data || []).map((g: any) => [
       g.serie || '',
       g.numero || '',
-      (g.fecha_emision || '').split('T')[0],
+      this.greEmissionDate(g),
       (g.fecha_traslado || '').split('T')[0],
       g.destinatario || '',
       g.direccion_destino || '',
@@ -354,7 +360,23 @@ export class GreService {
 
   private formatNumber(value: any): string {
     const num = Number(value || 0);
-    return Number.isFinite(num) ? num.toFixed(2) : '0.00';
+    return Number.isFinite(num) ? num.toFixed(3) : '0.000';
+  }
+
+  private greEmissionDate(record: any): string {
+    let value = record.fecha_emision || record.created_at;
+    if (record.xml_ubl) {
+      try {
+        value = new XMLParser({ removeNSPrefix: true, parseTagValue: false }).parse(record.xml_ubl)?.DespatchAdvice?.IssueDate;
+      } catch {
+        throw new ServiceUnavailableException('No se pudo leer la fecha de emisión persistida de GRE.');
+      }
+    }
+    const date = typeof value === 'string' ? value.slice(0, 10) : '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date))) {
+      throw new ServiceUnavailableException('No se pudo leer la fecha de emisión persistida de GRE.');
+    }
+    return date;
   }
 
   async createGuia(
@@ -684,7 +706,34 @@ export class GreService {
       throw new BadRequestException('No se puede generar GRE: requiere al menos un ítem en gre_detalles');
     }
 
+    // Partida y llegada salen del establecimiento real, no siempre del
+    // domicilio fiscal: una guía emitida en un anexo declaraba que la
+    // mercadería salía de la casa matriz.
+    const establecimiento = async (sucursalId: unknown) => {
+      if (typeof sucursalId !== 'string' || !sucursalId) return null;
+      const { data, error } = await client
+        .from('sucursales')
+        .select('codigo_establecimiento, direccion, ubigeo, es_principal, activo')
+        .eq('tenant_id', tenantId)
+        .eq('id', sucursalId)
+        .maybeSingle();
+      if (error || !data || data.activo === false) {
+        throw new BadRequestException('No se puede generar GRE: el establecimiento indicado no está activo en la empresa');
+      }
+      const direccion = String(data.direccion ?? '').trim() || (data.es_principal ? empresa.direccion_fiscal : '');
+      const ubigeo = String(data.ubigeo ?? '').trim() || (data.es_principal ? empresa.ubigeo : '');
+      if (!direccion || !ubigeo) {
+        throw new BadRequestException('No se puede generar GRE: el establecimiento no tiene dirección y ubigeo registrados');
+      }
+      return { codigo: String(data.codigo_establecimiento), direccion, ubigeo };
+    };
+    const extras = greData.datos_adicionales || {};
+    const partida = await establecimiento(extras.partidaSucursalId);
+    const llegada = await establecimiento(extras.llegadaSucursalId);
+
     return {
+      partida,
+      llegada,
       emisor: {
         ruc: empresa.ruc,
         razonSocial: empresa.razon_social,
@@ -727,6 +776,13 @@ export class GreService {
       throw new BadRequestException('No se puede generar GRE: modalidad de transporte inválida');
     }
 
+    if (dto.motivo === 'TRASLADO_ENTRE_ESTABLECIMIENTOS'
+      && (!dto.sucursalLlegadaId || dto.sucursalLlegadaId === dto.sucursalPartidaId)) {
+      throw new BadRequestException(
+        'No se puede generar GRE: un traslado entre establecimientos requiere un establecimiento de llegada distinto al de partida',
+      );
+    }
+
     const fechaTraslado = new Date(dto.fechaTraslado);
     if (Number.isNaN(fechaTraslado.getTime())) {
       throw new BadRequestException('No se puede generar GRE: fecha de traslado inválida');
@@ -746,6 +802,8 @@ export class GreService {
    * Generar XML UBL para Guía de Remisión Electrónica
    */
   private generateGreXmlUbl(payload: {
+    partida?: { codigo: string; direccion: string; ubigeo: string } | null;
+    llegada?: { codigo: string; direccion: string; ubigeo: string } | null;
     emisor: {
       ruc: string;
       razonSocial: string;
@@ -780,13 +838,22 @@ export class GreService {
     const receptorDocTipo = this.escapeXmlText(payload.receptor.docTipo || '1');
     const receptorDocNumero = this.escapeXmlText(payload.receptor.docNumero || '00000000');
     const receptorNombre = payload.receptor.razonSocial || 'DESTINATARIO';
-    const receptorDireccion = payload.receptor.direccion || '';
-    const emisorUbigeo = this.resolveGreUbigeo(payload.emisor.ubigeo);
+    const receptorDireccion = payload.llegada?.direccion || payload.receptor.direccion || '';
+    const partidaDireccion = payload.partida?.direccion || payload.emisor.direccion;
+    const emisorUbigeo = this.resolveGreUbigeo(payload.partida?.ubigeo || payload.emisor.ubigeo);
     const destinoUbigeo = this.resolveGreUbigeo(
+      payload.llegada?.ubigeo ||
       greData.datos_adicionales?.destinoUbigeo ||
       greData.datos_adicionales?.ubigeoDestino ||
       greData.ubigeo_destino,
     );
+    // Código del establecimiento anexo (SUNAT lo exige en partida y llegada
+    // cuando el motivo es 04 y ambos son del remitente).
+    const codigoEstablecimiento = (codigo: string | undefined) => codigo
+      ? `
+        <cbc:AddressTypeCode listAgencyName="PE:SUNAT" listName="Establecimientos anexos" listID="${this.escapeXmlAttribute(payload.emisor.ruc)}">${this.escapeXmlText(codigo)}</cbc:AddressTypeCode>`
+      : '';
+    const partidaCodigo = payload.partida?.codigo || (motivoCode === '04' ? '0000' : undefined);
     const transportistaDocumento = this.normalizeDigits(
       greData.transportista_documento ||
       greData.datos_adicionales?.transportistaDocumento ||
@@ -918,7 +985,7 @@ export class GreService {
 ${transportHandlingUnitXml}
     <cac:Delivery>
       <cac:DeliveryAddress>
-        <cbc:ID schemeAgencyName="PE:INEI">${destinoUbigeo}</cbc:ID>
+        <cbc:ID schemeAgencyName="PE:INEI">${destinoUbigeo}</cbc:ID>${codigoEstablecimiento(payload.llegada?.codigo)}
         <cac:AddressLine>
           <cbc:Line>${this.wrapCdata(receptorDireccion)}</cbc:Line>
         </cac:AddressLine>
@@ -928,9 +995,9 @@ ${transportHandlingUnitXml}
       </cac:DeliveryAddress>
       <cac:Despatch>
         <cac:DespatchAddress>
-          <cbc:ID schemeAgencyName="PE:INEI">${emisorUbigeo}</cbc:ID>
+          <cbc:ID schemeAgencyName="PE:INEI">${emisorUbigeo}</cbc:ID>${codigoEstablecimiento(partidaCodigo)}
           <cac:AddressLine>
-            <cbc:Line>${this.wrapCdata(payload.emisor.direccion)}</cbc:Line>
+            <cbc:Line>${this.wrapCdata(partidaDireccion)}</cbc:Line>
           </cac:AddressLine>
           <cac:Country>
             <cbc:IdentificationCode listAgencyName="United Nations Economic Commission for Europe" listID="ISO 3166-1">PE</cbc:IdentificationCode>
@@ -1481,11 +1548,10 @@ ${lines}
     const gre = await this.findGuiaById(greId, tenantId);
     const client = this.supabaseService.getClient();
     const { data: source, error: sourceError } = await client.from('gre_guias')
-      .select('xml_ubl').eq('id', greId).eq('tenant_id', tenantId).maybeSingle();
+      .select('xml_ubl,fecha_emision,created_at').eq('id', greId).eq('tenant_id', tenantId).maybeSingle();
     if (sourceError) throw new ServiceUnavailableException('No se pudo leer la fuente de impresión GRE');
     let issuer: { ruc: string; name: string };
     if (source?.xml_ubl) {
-      const { XMLParser } = await import('fast-xml-parser');
       const parsed = new XMLParser({ removeNSPrefix: true, parseTagValue: false, processEntities: true }).parse(source.xml_ubl);
       const party = parsed?.DespatchAdvice?.DespatchSupplierParty?.Party;
       issuer = { ruc: String(party?.PartyIdentification?.ID || ''), name: String(party?.PartyLegalEntity?.RegistrationName || '') };
@@ -1496,6 +1562,7 @@ ${lines}
       if (error || !config?.ruc || !config?.razon_social) throw new ServiceUnavailableException('No se pudo leer el emisor de la GRE en borrador');
       issuer = { ruc: config.ruc, name: config.razon_social };
     }
+    const emissionDate = this.greEmissionDate({ ...source, created_at: source?.created_at || gre.fechaCreacion });
     const { default: PDFDocument } = await import('pdfkit');
     const content = await new Promise<Buffer>((resolve, reject) => {
       const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true, info: { Title: 'Guía de remisión ' + gre.numero, Creator: 'ERP GRE' } });
@@ -1507,7 +1574,7 @@ ${lines}
       doc.fontSize(14).text(gre.numero).moveDown();
       doc.font('Helvetica').fontSize(11).text(issuer.name).text('RUC: ' + issuer.ruc);
       doc.moveDown().font('Helvetica-Bold').text('Estado: ' + gre.estado);
-      doc.font('Helvetica').fontSize(10).text('Emisión: ' + String(gre.fechaCreacion).slice(0, 10));
+      doc.font('Helvetica').fontSize(10).text('Emisión: ' + emissionDate);
       doc.text('Fecha de traslado: ' + String(gre.fechaTraslado).slice(0, 10)).moveDown();
       doc.text('Destinatario: ' + gre.destinatario).text('Destino: ' + gre.direccionDestino);
       if (gre.ubigeoDestino) doc.text('Ubigeo destino: ' + gre.ubigeoDestino);
@@ -1522,7 +1589,12 @@ ${lines}
       doc.font('Helvetica');
       for (const [index, item] of (gre.items || []).entries()) {
         doc.text((index + 1) + '. ' + item.descripcion);
-        doc.text('Cantidad: ' + item.cantidad + ' ' + (item.unidadMedida || 'NIU') + (item.peso == null ? '' : ' · Peso: ' + item.peso + ' kg')).moveDown(0.5);
+        // El alta manual declara el peso total; el cero legacy del detalle no
+        // representa un peso medido ni permite repartir el total entre bienes.
+        const declaredWeight = Number(item.peso);
+        doc.text('Cantidad: ' + item.cantidad + ' ' + (item.unidadMedida || 'NIU')
+          + (Number.isFinite(declaredWeight) && declaredWeight > 0
+            ? ' · Peso: ' + declaredWeight + ' kg' : ' · Peso por bien: no declarado')).moveDown(0.5);
       }
       if (gre.observaciones) doc.moveDown().text('Observaciones: ' + gre.observaciones);
       doc.moveDown().fontSize(9).text('Representación del registro persistido. Estado fiscal: ' + (gre.sunatStatus || 'NOT_SENT') + '.');
@@ -1610,6 +1682,8 @@ ${lines}
 
     addIfPresent('transportistaDocumento', dto.transportistaDocumento);
     addIfPresent('destinoUbigeo', dto.ubigeoDestino);
+    addIfPresent('partidaSucursalId', dto.sucursalPartidaId);
+    addIfPresent('llegadaSucursalId', dto.sucursalLlegadaId);
     addIfPresent('conductorDocumentoTipo', dto.conductorDocumentoTipo);
     addIfPresent('conductorDocumentoNumero', dto.conductorDocumentoNumero);
     addIfPresent('conductorNombres', dto.conductorNombres);
@@ -1675,15 +1749,7 @@ ${lines}
         .select('estado, peso_total, created_at')
         .eq('tenant_id', tenantId);
 
-      if (error) {
-        console.error('Error obteniendo estadísticas GRE:', error);
-        return {
-          total: 0,
-          estados: {},
-          pesoTotal: 0,
-          tendencia: []
-        };
-      }
+      if (error || !Array.isArray(guias)) throw new Error('GRE source unavailable');
 
       // Procesar estadísticas
       const estados = guias.reduce((acc, guia) => {
@@ -1716,16 +1782,7 @@ ${lines}
       return stats;
     } catch (error) {
       console.error('Error calculando estadísticas GRE:', error);
-      return {
-        total: 0,
-        estados: {},
-        pesoTotal: 0,
-        tendencia: [],
-        greEmitidas: 0,
-        totalGre: 0,
-        enTransito: 0,
-        completados: 0,
-      };
+      throw new ServiceUnavailableException('No se pudieron consultar los indicadores completos de GRE. Reintente.');
     }
   }
 

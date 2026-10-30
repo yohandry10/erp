@@ -95,19 +95,18 @@ test('Facturar pedido: reintentar tras perder la respuesta muestra la factura em
     expect(emitted).toBe(1)
 
     await step('Tras perder la respuesta el usuario termina viendo la factura emitida, sin otro comprobante', async () => {
-      // La pantalla puede recargar el pedido sola; si aún ofrece generar, el
-      // reintento debe devolver la misma factura y no un error de estado.
-      const invoiceButton = page.getByRole('button', { name: 'Generar Factura', exact: true })
-      await page.waitForTimeout(3000)
-      if (await invoiceButton.isVisible()) {
-        const [retry] = await Promise.all([
-          page.waitForResponse(r => r.request().method() === 'POST' && /\/generar-factura\/?$/.test(new URL(r.url()).pathname)),
-          generate(),
-        ])
-        expect.soft(retry.status(), 'Reintento').toBeLessThan(300)
-        await expect.soft(page.getByText('Factura generada', { exact: true })).toBeVisible({ timeout: 15000 })
-        await expect.soft(page.getByText('No se puede generar factura para un pedido en estado', { exact: false })).toHaveCount(0)
-      }
+      const pending=page.getByRole('button',{name:'Verificar factura pendiente',exact:true})
+      await expect(pending).toBeEnabled()
+      const before=cpes();let generationPosts=0
+      const observe=(r:import('@playwright/test').Request)=>{if(r.method()==='POST'&&/\/generar-factura\/?$/.test(new URL(r.url()).pathname))generationPosts++}
+      page.on('request',observe)
+      await page.reload({waitUntil:'domcontentloaded'})
+      await expect(pending).toBeEnabled();expect(generationPosts).toBe(0)
+      await pending.click()
+      await expect(pending).toHaveCount(0)
+      expect(generationPosts).toBe(0);expect(cpes()).toBe(before)
+      page.off('request',observe)
+      await expect(page.getByText('No se puede generar factura para un pedido en estado', {exact:false})).toHaveCount(0)
       await expect.soft(page.getByRole('button', { name: 'Ver factura A4' })).toBeVisible({ timeout: 30000 })
       expect(cpes()).toBe(emitted)
       expect(estado()).toBe('FACTURADO')

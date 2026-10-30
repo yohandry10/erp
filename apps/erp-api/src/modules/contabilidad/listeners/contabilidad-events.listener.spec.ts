@@ -24,6 +24,8 @@ describe("ContabilidadEventsListener", () => {
       generarAsientoAjusteCxc: jest.fn(),
       generarAsientoReversaAjusteCxc: jest.fn(),
       generarAsientoAjusteCxp: jest.fn(),
+      generarAsientoReversaDetraccionProveedor: jest.fn(),
+      generarAsientoCreditoProveedor: jest.fn(),
       generarAsientoCompra: jest.fn(),
       generarAsientoRecepcion: jest.fn(),
       generarAsientoFacturaProveedor: jest.fn(),
@@ -167,6 +169,37 @@ describe("ContabilidadEventsListener", () => {
     if (testingModule) {
       await testingModule.close();
     }
+  });
+
+  it("completa el ajuste físico a costo cero confirmado sin fabricar un asiento", async () => {
+    const evento = {
+      id: "zero-inventory-outbox", event_id: "zero-inventory-event",
+      aggregate_type: "ajuste_inventario", aggregate_id: "zero-operation",
+      event_type: "ajuste.inventario.aplicado", retry_count: 0,
+      event_data: { tenantId: "tenant-001", valor: 0, costoUnitario: 0,
+        cantidad: 0.125, costoCeroConfirmado: true, schemaVersion: 570,
+        movimientoId: "zero-movement", operacionId: "zero-operation" },
+    } as OutboxEvent;
+    outboxEventsService.reclamarEventosContables.mockResolvedValue([evento]);
+    await listener.procesarEventosPendientes();
+    expect(asientosGenerator.generarAsientoAjusteInventario).not.toHaveBeenCalled();
+    expect(asientosGenerator.marcarEventoComoProcesado).toHaveBeenCalledWith("zero-inventory-event");
+  });
+
+  it.each([
+    { costoCeroConfirmado: false }, { costoCeroConfirmado: "true" },
+    { costoUnitario: 1 }, { costoUnitario: null }, { schemaVersion: 569 },
+    { cantidad: 0 }, { cantidad: Infinity }, { movimientoId: undefined },
+    { schemaVersion: undefined }, { costoUnitario: '' },
+  ])("rechaza un ajuste cero cuya evidencia está incompleta: %j", async (override) => {
+    const evento = { event_id: "zero-invalid", event_data: {
+      tenantId: "tenant-001", valor: 0, costoUnitario: 0, cantidad: 0.125,
+      costoCeroConfirmado: true, schemaVersion: 570, movimientoId: "movement",
+      operacionId: "operation", ...override,
+    } };
+    await expect((listener as any).handleAjusteInventario(evento)).rejects.toThrow("costo cero confirmado");
+    expect(asientosGenerator.generarAsientoAjusteInventario).not.toHaveBeenCalled();
+    expect(asientosGenerator.marcarEventoComoProcesado).not.toHaveBeenCalled();
   });
 
   it("should be defined", () => {
@@ -318,6 +351,20 @@ describe("ContabilidadEventsListener", () => {
     );
   });
 
+  it("procesa el redondeo570 aunque el arqueo físico esté cuadrado", async () => {
+    jest.spyOn(listener as any, "verificarAsientoCreado").mockResolvedValue(true);
+    asientosGenerator.generarAsientoCierreCaja.mockResolvedValue({ id: "asiento-close570" } as any);
+    await (listener as any).handleCajaCerrada({
+      event_id: "evt-close570", aggregate_id: "sesion-close570",
+      event_data: { tenantId: "tenant-001", sesionCajaId: "sesion-close570", fecha: "2026-10-07T18:00:00Z",
+        diferencia: 0, diferenciaNominal: -0.02, redondeoEfectivoDocumentado: 0.02, schemaVersion: 570,
+        tipoDiferencia: "REDONDEO_EFECTIVO_LEGAL", redondeoEfectivoLegal: true },
+    } as OutboxEvent);
+    expect(asientosGenerator.generarAsientoCierreCaja).toHaveBeenCalledWith(expect.objectContaining({
+      diferencia: 0, diferencia_nominal: -0.02, redondeo_efectivo_documentado: 0.02, schema_version: 570,
+    }));
+  });
+
   it("enruta movimiento y transferencia bancarios con tenant y event_id durables", async () => {
     jest.spyOn(listener as any, "verificarAsientoCreado").mockResolvedValue(true);
     asientosGenerator.generarAsientoMovimientoBancario.mockResolvedValue({
@@ -380,6 +427,33 @@ describe("ContabilidadEventsListener", () => {
       }),
     );
     expect((listener as any).verificarAsientoCreado).toHaveBeenCalledTimes(2);
+  });
+
+  describe('outbox de crédito y reversión tributaria proveedor 570', () => {
+    it.each(['nota_credito.proveedor.registrada', 'credito.proveedor.aplicado', 'credito.proveedor.reembolsado'])(
+      'consume %s mediante el generador financiero, con identidad real del evento', async (type) => {
+        const event = { id: 'row-credit-570', event_id: 'evt-credit-570', event_type: type,
+          event_data: { tenantId: 'tenant-001', fecha: '2026-10-07', monto: 118 }, retry_count: 0,
+          claim_token: 'claim-570', claimed_by: 'worker-570' } as any;
+        await (listener as any).procesarEvento(event);
+        expect(asientosGenerator.generarAsientoCreditoProveedor).toHaveBeenCalledWith(expect.objectContaining({
+          tenantId: 'tenant-001', eventId: 'evt-credit-570', tipoEvento: type,
+        }));
+        expect(asientosGenerator.marcarEventoComoProcesado).toHaveBeenCalledWith('evt-credit-570');
+        expect(asientosGenerator.generarAsientoFacturaProveedor).not.toHaveBeenCalled();
+      },
+    );
+
+    it('consume reversión de detracción pendiente sin llamar al generador de pago bancario', async () => {
+      await (listener as any).procesarEvento({ id: 'row-reverse-570', event_id: 'evt-reverse-570',
+        event_type: 'cxp.ajuste.revertido', retry_count: 0, claim_token: 'claim-570', claimed_by: 'worker-570',
+        event_data: { tenantId: 'tenant-001', monto: 118, cuentaProveedorId: 'pc-42', cuentaDetraccionId: 'pc-421' } });
+      expect(asientosGenerator.generarAsientoReversaDetraccionProveedor).toHaveBeenCalledWith(expect.objectContaining({
+        tenantId: 'tenant-001', eventId: 'evt-reverse-570', cuentaDetraccionId: 'pc-421',
+      }));
+      expect(asientosGenerator.generarAsientoPago).not.toHaveBeenCalled();
+      expect(asientosGenerator.marcarEventoComoProcesado).toHaveBeenCalledWith('evt-reverse-570');
+    });
   });
 
   describe("procesarEventosPendientes", () => {

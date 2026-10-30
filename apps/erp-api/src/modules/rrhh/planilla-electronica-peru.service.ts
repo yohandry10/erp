@@ -1,3 +1,4 @@
+import { ServiceUnavailableException } from '@nestjs/common';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { createHash, randomUUID } from 'crypto';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
@@ -148,6 +149,10 @@ export function construirPaquetePlanillaElectronicaPeru(fuente: FuentePlanillaPe
       const valor = String(ficha[campo] || (campo === 'regimen_laboral_codigo' ? '01' : campo === 'establecimiento_codigo' ? '0000' : ''));
       if (valor && !patron.test(valor)) bloqueos.push({ codigo: `FORMATO_${campo.toUpperCase()}`, mensaje: `Formato inválido de ${etiqueta} para ${documento}.`, empleado_id: empleadoId });
     }
+    if (['01', '03'].includes(String(ficha.regimen_salud_codigo || '').trim())
+      && !/^[1-6]$/.test(String(ficha.eps_servicios_propios_codigo || '').trim())) {
+      bloqueos.push({ codigo: 'EPS_TABLA_14_FALTANTE', mensaje: `El régimen de salud de ${documento} requiere entidad EPS/servicios propios de la Tabla 14.`, empleado_id: empleadoId });
+    }
     const paisEmisor = String(ficha.pais_emisor_documento || '604');
     const montoBase = Number(contrato?.sueldo_bruto || contrato?.salario || 0);
     const linea04 = lineaPvs([
@@ -219,6 +224,7 @@ export function construirPaquetePlanillaElectronicaPeru(fuente: FuentePlanillaPe
         categoria_ocupacional_codigo: ficha.categoria_ocupacional_codigo || '',
         tipo_trabajador_codigo: ficha.tipo_trabajador_codigo || '',
         regimen_salud_codigo: ficha.regimen_salud_codigo || '',
+        eps_servicios_propios_codigo: ficha.eps_servicios_propios_codigo || '',
         regimen_pensionario_codigo: ficha.regimen_pensionario_codigo || '',
         establecimiento_codigo: ficha.establecimiento_codigo || '0000',
         discapacidad: Boolean(ficha.discapacidad),
@@ -266,6 +272,14 @@ export function construirPaquetePlanillaElectronicaPeru(fuente: FuentePlanillaPe
     archivo(`PLAME_CONCEPTOS_${ruc || 'SIN_RUC'}_${periodo.replace('-', '')}.csv`, 'PAPEL_TRABAJO', `${detalleConceptosCsv.join('\r\n')}\r\n`),
     archivo(`PLAME_CUARTA_CATEGORIA_${ruc || 'SIN_RUC'}_${periodo.replace('-', '')}.csv`, 'PAPEL_TRABAJO', `${cuartaCategoriaCsv.join('\r\n')}\r\n`),
   ];
+  const eps = planilla.metadata?.eps_cobertura;
+  if (eps) {
+    const campos = ['periodo_aplicacion','periodo_cobertura','monto_pagado','fecha_pago','referencia',
+      'aporte_essalud_origen','trabajadores_cubiertos_origen','uit_origen','credito_generado',
+      'credito_arrastre_declarado','credito_aplicado','credito_saldo','aporte_essalud_bruto','aporte_essalud_neto','declarado_por'];
+    archivos.push(archivo(`PLAME_ESSALUD_EPS_${ruc || 'SIN_RUC'}_${periodo.replace('-', '')}.csv`, 'PAPEL_TRABAJO',
+      `${campos.map(csv).join(',')}\r\n${campos.map(c => csv(eps[c])).join(',')}\r\n`));
+  }
   if (bloqueosUnicos.length === 0 && e04.length > 0) {
     archivos.push(
       archivo(`RP_${ruc}.ide`, 'PVS_TREGISTRO_E04', `${e04.join('\r\n')}\r\n`),
@@ -320,7 +334,7 @@ export class PlanillaElectronicaPeruService {
     const client = this.supabase.getClient();
     const [empresaResult, planillaResult, detallesResult] = await Promise.all([
       client.from('empresa_config').select('ruc,razon_social,pais').eq('tenant_id', tenantId).maybeSingle(),
-      client.from('planillas').select('id,periodo,estado,pais_codigo,total_ingresos,total_descuentos,total_aportes,total_neto').eq('tenant_id', tenantId).eq('id', planillaId).maybeSingle(),
+      client.from('planillas').select('id,periodo,estado,pais_codigo,total_ingresos,total_descuentos,total_aportes,total_neto,metadata').eq('tenant_id', tenantId).eq('id', planillaId).maybeSingle(),
       client.from('empleado_planilla').select('id,empleado_id,id_empleado,dias_trabajados,horas_extras_25,horas_extras_35,faltas,tardanzas_minutos,total_ingresos,total_descuentos,total_aportes,neto_pagar,metadata').eq('tenant_id', tenantId).or(`planilla_id.eq.${planillaId},id_planilla.eq.${planillaId}`),
     ]);
     if (empresaResult.error) throw empresaResult.error;
@@ -410,6 +424,10 @@ export class PlanillaElectronicaPeruService {
       'direccion_nombre_via','direccion_numero_via','direccion_tipo_zona_codigo','direccion_nombre_zona',
       'direccion_referencia','telefono_cldn','metadata',
     ];
+    if (['01', '03'].includes(String(payload?.regimen_salud_codigo || '').trim())
+      && !/^[1-6]$/.test(String(payload?.eps_servicios_propios_codigo || '').trim())) {
+      throw new BadRequestException('El régimen de salud EPS requiere entidad EPS/servicios propios de la Tabla 14 (1 a 6)');
+    }
     const limpio = Object.fromEntries(Object.entries(payload || {}).filter(([key]) => campos.includes(key)));
     return this.escribirOperacion475(
       tenantId, userId, 'PERU_FICHA_UPSERT', { empleado_id: empleadoId, ...limpio }, idempotencyKey,
@@ -483,7 +501,7 @@ export class PlanillaElectronicaPeruService {
   async descargar(tenantId: string, id: string) {
     const { data, error } = await this.supabase.getClient().from('rrhh_peru_presentaciones_planilla')
       .select('periodo,version,resumen,archivos').eq('tenant_id', tenantId).eq('id', id).maybeSingle();
-    if (error) throw error;
+    if (error) throw new ServiceUnavailableException('No se pudo consultar el paquete de planilla; reintente');
     if (!data) throw new NotFoundException('Paquete no encontrado');
     const AdmZip = require('adm-zip');
     const zip = new AdmZip();

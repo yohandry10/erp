@@ -1,6 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 import { CreateFacturaDto } from '@erp-suite/dtos';
 import { DocumentoFiscal } from '../documentos/interfaces/documento-fiscal.interface';
+import { ACTIVE_COUNTRY_PROFILES } from '../paises/initial-country';
+import { sunatOperation } from '../../shared/utils/sunat-operation.util';
 import {
   AFECTACION_IGV,
   CategoriaAfectacion,
@@ -240,14 +242,28 @@ ${linesXml}
 </Invoice>`;
   }
 
+/**
+   * Precio unitario con impuestos (catálogo 16, tipo 01). `precio_venta` es
+   * unitario en pedidos y CPE, pero total de línea en documentos y no existe en
+   * las notas de RMA: si falta o coincide con el bruto de la línea se deriva.
+   */
+  private precioUnitarioConImpuestos(item: any, cantidad: number, brutoLinea: number): number {
+    const unidades = Math.abs(cantidad);
+    const derivado = unidades > 0 ? brutoLinea / unidades : brutoLinea;
+    const declarado = item?.precio_venta ?? item?.precioVenta;
+    if (declarado === undefined || declarado === null || declarado === '') return derivado;
+    const valor = this.toNumber(declarado, 0);
+    return unidades > 0 && unidades !== 1 && Math.abs(Math.abs(valor) - Math.abs(brutoLinea)) < 0.01 ? derivado : valor;
+  }
+
 private buildInvoiceLineXml(item: any, index: number, moneda: string): string {
     const cantidad = this.toNumber(item?.cantidad, 0);
     const valorVenta = this.toNumber(item?.valor_venta ?? item?.valorVenta, 0);
     const igv = this.toNumber(item?.igv ?? item?.impuesto_igv, 0);
-    const precioVenta = this.toNumber(item?.precio_venta ?? item?.precioVenta ?? valorVenta + igv, 0);
+    const precioVenta = this.precioUnitarioConImpuestos(item, cantidad, valorVenta + igv);
     const precioUnitario = this.toNumber(item?.precio_unitario ?? item?.precioUnitario, 0);
     const afectacionIgv = this.escapeXmlText(String(item?.tipo_afectacion_igv ?? item?.afectacion_igv ?? '10'));
-    const percent = valorVenta > 0 ? (igv / valorVenta) * 100 : 18;
+    const percent = this.resolveLineIgvPercent(item, afectacionIgv);
 
     return `  <cac:InvoiceLine>
     <cbc:ID>${index + 1}</cbc:ID>
@@ -436,10 +452,10 @@ private buildNoteLineXml(
     const cantidad = Math.abs(this.toNumber(item?.cantidad, 0));
     const valorVenta = Math.abs(this.toNumber(item?.valor_venta ?? item?.valorVenta, 0));
     const igv = Math.abs(this.toNumber(item?.igv ?? item?.impuesto_igv, 0));
-    const precioVenta = Math.abs(this.toNumber(item?.precio_venta ?? item?.precioVenta ?? valorVenta + igv, 0));
+    const precioVenta = Math.abs(this.precioUnitarioConImpuestos(item, cantidad, valorVenta + igv));
     const precioUnitario = Math.abs(this.toNumber(item?.precio_unitario ?? item?.precioUnitario, 0));
     const afectacionIgv = this.escapeXmlText(String(item?.tipo_afectacion_igv ?? item?.afectacion_igv ?? '10'));
-    const percent = valorVenta > 0 ? (igv / valorVenta) * 100 : 18;
+    const percent = this.resolveLineIgvPercent(item, afectacionIgv);
 
     return `  <cac:${lineTag}>
     <cbc:ID>${index + 1}</cbc:ID>
@@ -554,6 +570,21 @@ private categoriaTributariaUbl(afectacionIgv?: string | null): string {
   }
 
 /** TaxScheme por afectación: 1000 (IGV), 9997 (exonerado), 9998 (inafecto). */
+private resolveLineIgvPercent(item: any, afectacionIgv: string): number {
+    if (categoriaDeAfectacion(afectacionIgv) !== 'GRAVADO') return 0;
+    const rawRate = item?.tasa_igv ?? item?.tasaIgv ?? item?.tasa_impuesto ?? item?.tasaImpuesto;
+    // El builder es exclusivamente SUNAT. Los importes monetarios redondeados
+    // no son una fuente de tasa: 0.61 / 3.39 produciría un falso 17.99%.
+    if (rawRate === undefined || rawRate === null || rawRate === '') {
+      return ACTIVE_COUNTRY_PROFILES.PE.tasaImpuesto * 100;
+    }
+    const rate = Number(rawRate);
+    if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
+      throw new BadRequestException('La tasa de IGV de la línea no es válida');
+    }
+    return rate > 0 && rate <= 1 ? rate * 100 : rate;
+  }
+
 private buildTaxSchemePorAfectacionXml(afectacionIgv?: string | null): string {
     const esquema = ESQUEMA_TRIBUTARIO[categoriaDeAfectacion(afectacionIgv)];
     return `<cac:TaxScheme>
@@ -581,8 +612,8 @@ private buildTaxSubtotalsXml(factura: CreateFacturaDto, moneda: string): string 
 
 
     const bases: Array<{ categoria: CategoriaAfectacion; base: number; impuesto: number }> = [
-      // El bloque gravado se emite siempre: un comprobante sin operaciones
-      // gravadas igual debe declarar la base en cero.
+      // La exportación declara exclusivamente su tributo 9995; SUNAT rechaza
+      // un subtotal IGV 1000 incluso cuando su base e impuesto son cero.
       { categoria: 'GRAVADO', base: this.baseAbsoluta(anyFactura.total_gravadas), impuesto: Math.abs(igv) },
       { categoria: 'EXONERADO', base: this.baseAbsoluta(anyFactura.total_exoneradas), impuesto: 0 },
       { categoria: 'INAFECTO', base: this.baseAbsoluta(anyFactura.total_inafectas), impuesto: 0 },
@@ -590,7 +621,7 @@ private buildTaxSubtotalsXml(factura: CreateFacturaDto, moneda: string): string 
     ];
 
     return bases
-      .filter(({ categoria, base }) => categoria === 'GRAVADO' || base > 0)
+      .filter(({ categoria, base }) => base > 0 || (categoria === 'GRAVADO' && sunatOperation(factura) !== '0200'))
       .map(({ categoria, base, impuesto }) => {
         const esquema = ESQUEMA_TRIBUTARIO[categoria];
         return `    <cac:TaxSubtotal>
@@ -677,7 +708,7 @@ private buildOptionalNoteXml(factura: CreateFacturaDto): string {
   }
 
 private resolveTipoOperacionSunat(factura: CreateFacturaDto): string {
-    const value = String((factura as any).tipo_operacion ?? (factura as any).tipoOperacion ?? '0101').trim();
+    const value = sunatOperation(factura);
     return /^\d{4}$/.test(value) ? value : '0101';
   }
 

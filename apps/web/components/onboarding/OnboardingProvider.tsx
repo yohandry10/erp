@@ -26,7 +26,10 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) {
-        const completedTours = JSON.parse(stored)
+        const parsed: unknown = JSON.parse(stored)
+        const completedTours = Array.isArray(parsed)
+          ? [...new Set(parsed.filter((id): id is string => typeof id === 'string'))]
+          : []
         setState(prev => ({ ...prev, completedTours }))
       }
     } catch (error) {
@@ -71,7 +74,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       
       if (nextIndex >= prev.currentTour.pasos.length) {
         // Tour completado
-        const newCompletedTours = [...prev.completedTours, prev.currentTour.id]
+        const newCompletedTours = [...new Set([...prev.completedTours, prev.currentTour.id])]
         saveCompletedTours(newCompletedTours)
         
         return {
@@ -101,7 +104,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     setState(prev => {
       if (!prev.currentTour) return prev
 
-      const newCompletedTours = [...prev.completedTours, prev.currentTour.id]
+      const newCompletedTours = [...new Set([...prev.completedTours, prev.currentTour.id])]
       saveCompletedTours(newCompletedTours)
 
       return {

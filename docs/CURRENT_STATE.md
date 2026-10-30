@@ -1,6 +1,59 @@
 # Estado actual del ERP
 
-Actualizado: 2026-10-19.
+Actualizado: 2026-10-22.
+
+La meta GO_PROD sigue activa y la aceptación integral del candidato consolidado
+está pendiente. El alcance es producto antes del primer cliente: las conexiones
+SUNAT/SOL reales se acreditan con el contribuyente autorizado durante su onboarding.
+No tener un primer cliente no es un defecto de preparación del producto.
+
+PROD permanece en569. El runtime `57987d715ff998c2ba9dbe6c1dcb6bf9e4b016f4`
+(#146) pasó verificación de sólo lectura el20deoctubre. No hay autorización para
+migrar, desplegar ni publicar como parte de esta UAT.
+
+El candidato local reúne las correcciones de Claude con los cambios anteriores
+de recuperación Windows, intenciones originales y recibos durables. Conserva la570
+de estructura/operaciones, la571de edición de clientes, la572de estimaciones
+prospectivas de activos y la573de lectura auxiliar de RRHH. La573 sólo concede
+SELECT al servicio en cinco tablas; conserva RLS y los escritores autorizados.
+La574 corrige la fecha civil de CxC/CxP en sus normalizadores sin reescribir
+filas históricas. Su ensayo de compatibilidad, rollback y reaplicación conserva
+exactamente267tablas/5253filas. La575 prepara SELECT sólo para el backend en las siete fuentes del panel global
+de seguridad y completa sus contadores por tipo de violación, sin cambiar filas
+ni RLS. La API deja de ocultar errores como ceros y usa el agregado SQL completo;
+la pantalla muestra el fallo y permite reintentar, descartando respuestas de
+un período anterior. La576 conserva el precio cero de una línea de OC al cerrar
+su recepción: el Kardex ya no toma el costo del catálogo para esa línea gratuita.
+No revaloriza historia ni cambia ACL/RLS. Su ensayo aislado de compatibilidad,
+rollback y reaplicación preservó las268tablas; pasaron la regresión SQL,50pruebas
+API dirigidas y el flujo Web con Kardex y asiento contrastados. La recuperación
+Windows del cierre confirmado conservó recibo, actor y fecha sin efectos nuevos.
+El piso de readiness, Render y CI es576. La aceptación de los988requisitos y la
+única regresión integral final siguen pendientes; esta corrección no concede GO_PROD.
+La572 revalida el cálculo bajo los locks del lote atómico
+570; las cuotas históricas, los asientos y los recibos originales no se reescriben.
+La compilación, reconstrucción SQL, compatibilidad/rollback, pruebas funcionales,
+recuperación crítica y ensayo integral de esta combinación deben acreditarse de
+nuevo; los PASS de otros árboles no certifican sus fuentes actuales.
+
+El lock Windows usa Tauri2.12.4, con la corrección de confianza de origen de2.11.1,
+y actualiza anyhow, serde_with y el componente de notificaciones. El escaneo del
+grafo Windows de ejecución/compilación no mantiene avisos; siete observaciones
+de otras plataformas se clasifican por separado. Las46pruebasRust del candidato
+actualizado aprobaron. El control técnico con WebView2 y Rust reales admite el
+origen local y rechaza explícitamente un origen ajeno; usó HTML mínimo propio.
+El ensayo integral debe repetirlo sobre su binario completo de negocio. Su build
+usa una copia verificada para aislar la normalización CRLF/LF del CLI oficial.
+Faltan esa regresión integral y el resto de la aceptación exigible; no se hereda
+aceptación del SDK anterior.
+
+Se preservan C6, perfiles, binarios y once colasSQLite originales. Las pruebas con
+escritura sólo pueden usar infraestructura local efímera propia. La consolidación
+vive en `codex-uat-certification-20261020`, rama
+`codex/peru-certification-20261020`, base `2b72106f`; ambos árboles de origen
+permanecen intactos. Auditoría de reconciliación:
+`C:/Users/PC/Documents/Codex/2026-10-15/revi/work/reconciliation-20261020235943`.
+
 
 Corte vigente POS/CPE: #135 se integró como `8d717bcf` (fuente `c7e28691`) tras
 28 checks; sus dos CI (37150593171/37150595858) pasaron 342 escenarios HTTP y

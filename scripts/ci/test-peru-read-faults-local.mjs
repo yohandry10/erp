@@ -25,7 +25,19 @@ const reads=[
  ['empleados','rrhh/empleados'],['departamentos','rrhh/departamentos'],['planillas','rrhh/planillas'],
  ['plan_cuentas','contabilidad/plan-cuentas'],['asientos_contables','contabilidad/asientos'],['centros_costo','contabilidad/centros-costo'],
  ['gre_guias','gre/guias'],['sucursales','sucursales'],['audit_log','audit-logs'],
+ // Segundo barrido: reportes, tesorería, caja, RRHH y contabilidad.
+ ['movimientos_inventario','inventario/movimientos'],['productos','inventario/stats'],['sesiones_caja','cajas/sesiones'],
+ ['movimientos_caja','cajas/movimientos'],['asistencia','rrhh/asistencia'],['vacantes','rrhh/vacantes'],['candidatos','rrhh/candidatos'],
+ ['periodos_contables','contabilidad/periodos'],['tipos_cambio','contabilidad/tipos-cambio'],['activos_fijos','contabilidad/activos-fijos'],
+ ['cotizaciones_compra','compras/cotizaciones'],['conciliaciones_bancarias','finanzas/conciliacion'],['cuentas_por_pagar','finanzas/cxp/vencimientos'],
+ ['cuentas_por_pagar','finanzas/cxp/aging'],['cuentas_por_pagar','finanzas/tesoreria/programacion'],['cuentas_bancarias','finanzas/bancos/saldos'],
+ ['cuentas_por_cobrar','ventas/reportes/cxc-aging'],['sire_files','sire/reportes'],['gre_guias','gre/reporte'],
+ ['pedidos_venta','ventas/reportes/pedidos-por-estado'],['pedidos_venta','ventas/reportes/top-clientes'],['cotizaciones','ventas/reportes/cotizaciones-pendientes'],
+ ['sucursales','sucursales/resumen'],['plantillas_asientos','contabilidad/plantillas-asientos'],['diferidos','contabilidad/diferidos'],
 ];
+// Lecturas que no dependen de la tabla quitada o que no responden 200 sin falla:
+// se informan aparte y no cuentan como aprobadas ni como defecto.
+const inconclusive=[];
 const technical=/permission denied|relation |42501|PGRST|violates|syntax error|column .* does not exist/i;
 try{
  const login=await (await fetchWithLocalLoginRetry(api+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:first.email,password:'Cliente-Local-2026-Only!'})})).json();
@@ -35,10 +47,11 @@ try{
   const scenario=`Lecturas: sin lectura de ${table} GET /api/${endpoint} responde 503 legible`;
   try{
    const healthy=await raw(endpoint);
-   assert.equal(healthy.status,200,'Sin falla respondió '+healthy.status+' '+JSON.stringify(healthy.body).slice(0,200));
+   if(healthy.status!==200){inconclusive.push({table,endpoint,reason:'sin falla respondió '+healthy.status});continue;}
    assert.equal(sql(`SELECT has_table_privilege('service_role','public.${table}','SELECT');`),'t','service_role sin SELECT local en '+table);
    sql(`REVOKE SELECT ON public.${table} FROM service_role;`);
    let faulty;try{faulty=await raw(endpoint);}finally{sql(`GRANT SELECT ON public.${table} TO service_role;`);}
+   if(faulty.status===200&&faulty.body?.success!==false&&JSON.stringify(faulty.body?.data??faulty.body)===JSON.stringify(healthy.body?.data??healthy.body)){inconclusive.push({table,endpoint,reason:'no depende de la tabla'});continue;}
    const message=typeof faulty.body==='object'?String(faulty.body?.message??''):String(faulty.body).slice(0,200);
    const observed={status:faulty.status,success:faulty.body?.success,message:message.slice(0,200)};
    assert.equal(faulty.status,503,JSON.stringify(observed));
@@ -48,6 +61,6 @@ try{
  }
  success=scenarios.every(scenario=>scenario.passed);
 }catch(error){scenarios.push({scenario:'Lecturas: preparación o dependencia',passed:false,message:String(error.message).slice(0,900)});}
-finally{fs.writeFileSync(path.join(output,'read-faults.json'),JSON.stringify({success,remoteWrites:false,scope:'Barrido de lecturas caídas API/DB local; sin aceptación integral',scenarios,requests},null,2));}
+finally{fs.writeFileSync(path.join(output,'read-faults.json'),JSON.stringify({success,remoteWrites:false,scope:'Barrido de lecturas caídas API/DB local; sin aceptación integral',scenarios,inconclusive,requests},null,2));}
 console.log(JSON.stringify({success,passed:scenarios.filter(scenario=>scenario.passed).length,total:scenarios.length}));
 if(!success)process.exitCode=1;

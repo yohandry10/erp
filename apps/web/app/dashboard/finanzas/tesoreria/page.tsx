@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   AlertCircle,
@@ -28,41 +28,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { useApi } from '@/hooks/use-api'
+import { useFinanceReport } from '@/hooks/use-finance-report'
+import { loadTreasuryDashboard, readTreasuryDashboard } from '@/lib/finanzas/report-read-contract'
+import FinanceReportStatus from '@/components/finanzas/FinanceReportStatus'
 import { cn } from '@/lib/utils'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
-
-interface CuentaBancaria {
-  id: string
-  nombre: string
-  banco: string
-  numero_cuenta: string
-  moneda: string
-  saldo: number
-}
-
-interface PagoProximo {
-  id: string
-  numero_documento: string
-  fecha_vencimiento: string
-  saldo: number
-  moneda: string
-  dias_hasta_vencimiento: number
-  urgencia: string
-  proveedor: {
-    razon_social: string
-  }
-}
-
-interface ResumenFlujo {
-  moneda: string
-  saldo_actual: number
-  total_ingresos: number
-  total_egresos: number
-  flujo_neto: number
-  saldo_proyectado: number
-  alerta: string | null
-}
 
 const URGENCIA_CONFIG = {
   VENCIDA: {
@@ -90,47 +60,17 @@ const URGENCIA_CONFIG = {
 export default function TesoreriaPage() {
   const { currency, locale, formatCurrency: formatLocalizedCurrency } = useLocalizedMoney()
   const router = useRouter()
-  const { get } = useApi({ retries: 1, timeoutMs: 8000 })
-
-  const [cuentas, setCuentas] = useState<CuentaBancaria[]>([])
-  const [proximosPagos, setProximosPagos] = useState<PagoProximo[]>([])
-  const [resumenFlujo, setResumenFlujo] = useState<ResumenFlujo[]>([])
-  const [loading, setLoading] = useState(true)
-
-  const loadDashboardData = useCallback(async () => {
-    try {
-      setLoading(true)
-
-      const cuentasResponse = await get('/api/finanzas/bancos/cuentas')
-      if (cuentasResponse?.success) {
-        setCuentas(cuentasResponse.data || [])
-      }
-
-      const hoy = new Date()
-      const en15Dias = new Date()
-      en15Dias.setDate(hoy.getDate() + 15)
-
-      const programacionResponse = await get(
-        `/api/finanzas/tesoreria/programacion?fecha_hasta=${en15Dias.toISOString().split('T')[0]}&limit=10`,
-      )
-      if (programacionResponse?.success) {
-        setProximosPagos(programacionResponse.data || [])
-      }
-
-      const flujoResponse = await get('/api/finanzas/tesoreria/flujo-caja?dias_proyeccion=30')
-      if (flujoResponse?.success && flujoResponse.data?.resumen) {
-        setResumenFlujo(flujoResponse.data.resumen || [])
-      }
-    } catch (error) {
-      console.error('Error loading dashboard data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [get])
-
-  useEffect(() => {
-    loadDashboardData()
-  }, [loadDashboardData])
+  const fechaLimite = useMemo(() => {
+    const date = new Date()
+    date.setDate(date.getDate() + 15)
+    return date.toISOString().split('T')[0]
+  }, [])
+  const { data, loading, error, reload: loadDashboardData } = useFinanceReport(
+    `/api/finanzas/tesoreria/programacion?fecha_hasta=${fechaLimite}&limit=10`,
+    readTreasuryDashboard, undefined, loadTreasuryDashboard)
+  const cuentas = data?.cuentas ?? []
+  const proximosPagos = data?.proximosPagos ?? []
+  const resumenFlujo = data?.resumenFlujo ?? []
 
   const formatCurrency = (amount: number, moneda: string = currency) => {
     return formatLocalizedCurrency(amount, moneda || currency)
@@ -164,17 +104,10 @@ export default function TesoreriaPage() {
   const pagosVencidos = proximosPagos.filter((p) => p.urgencia === 'VENCIDA').length
   const pagosUrgentes = proximosPagos.filter((p) => p.urgencia === 'HOY' || p.urgencia === 'URGENTE').length
 
-  if (loading) {
-    return (
-      <div className="min-h-full bg-background p-6 text-foreground">
-        <Card className="border-cyan-400/20 bg-card/70">
-          <CardContent className="flex min-h-80 flex-col items-center justify-center gap-4">
-            <RefreshCw className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Cargando información de tesorería...</p>
-          </CardContent>
-        </Card>
-      </div>
-    )
+  if (loading || error) {
+    return <div className="min-h-full bg-background p-6 text-foreground">
+      <FinanceReportStatus loading={loading} retry={loadDashboardData} />
+    </div>
   }
 
   return (
@@ -305,10 +238,10 @@ export default function TesoreriaPage() {
                         <div className="text-sm text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">{formatDate(pago.fecha_vencimiento)}</div>
                         <div className={cn('mt-1 text-xs', pago.dias_hasta_vencimiento < 0 ? 'text-amber-400 dark:text-amber-200' : 'text-muted-foreground')}>
                           {pago.dias_hasta_vencimiento < 0
-                            ? `Vencido hace ${Math.abs(pago.dias_hasta_vencimiento)} días`
+                            ? `Vencido hace ${Math.abs(pago.dias_hasta_vencimiento)} ${pago.dias_hasta_vencimiento === -1 ? 'día' : 'días'}`
                             : pago.dias_hasta_vencimiento === 0
                               ? 'Vence hoy'
-                              : `Vence en ${pago.dias_hasta_vencimiento} días`}
+                              : `Vence en ${pago.dias_hasta_vencimiento} ${pago.dias_hasta_vencimiento === 1 ? 'día' : 'días'}`}
                         </div>
                       </TableCell>
                       <TableCell className="text-right font-semibold text-amber-400 dark:text-amber-200">

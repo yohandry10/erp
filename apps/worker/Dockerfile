@@ -1,5 +1,5 @@
 # Multi-stage build for production
-FROM node:24-alpine AS base
+FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS base
 
 RUN npm install -g pnpm@9.15.4
 
@@ -16,7 +16,7 @@ RUN pnpm --filter=@erp-suite/dtos build
 RUN pnpm --filter=@erp-suite/crypto build
 RUN pnpm --filter=@erp-suite/worker build
 
-FROM node:24-alpine AS production
+FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS production
 
 RUN npm install -g pnpm@9.15.4
 

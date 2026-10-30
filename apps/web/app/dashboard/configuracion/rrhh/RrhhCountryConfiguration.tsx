@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
+import { NormativaPeruForm } from '@/components/rrhh/NormativaPeruForm'
 
 const EMPTY = {
   tipo_empleador: 'GENERAL',
@@ -279,6 +280,8 @@ export default function RrhhCountryConfiguration() {
             <Rule label="IGV de referencia" value={percentage(peruNormativa?.igv_tasa)} />
           </dl>
         </section>
+
+        <NormativaPeruForm vigente={peruNormativa} />
 
         <section className="rounded-2xl border border-border bg-card p-6 shadow-md">
           <h2 className="text-lg font-bold">Datos particulares por trabajador</h2>

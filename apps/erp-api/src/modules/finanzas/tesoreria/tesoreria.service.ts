@@ -326,7 +326,7 @@ export class TesoreriaService {
     }
 
     // Ordenar por fecha de vencimiento ascendente (próximos vencimientos primero)
-    queryBuilder = queryBuilder.order('fecha_vencimiento', { ascending: true });
+    queryBuilder = queryBuilder.order('fecha_vencimiento', { ascending: true }).order('id', { ascending: true });
 
     // Aplicar paginación
     queryBuilder = queryBuilder.range(offset, offset + limit - 1);
@@ -334,7 +334,7 @@ export class TesoreriaService {
     // Ejecutar query
     const { data, error, count } = await queryBuilder;
 
-    if (error) {
+    if (error || !Array.isArray(data) || !Number.isSafeInteger(count) || count < 0) {
       console.error('Error obteniendo programación de pagos:', error);
       throw lecturaFinancieraFallida('la programación de pagos');
     }
@@ -346,7 +346,7 @@ export class TesoreriaService {
     const [hoyY, hoyM, hoyD] = hoyISO.split('-').map(Number);
     const hoyUTC = Date.UTC(hoyY, hoyM - 1, hoyD);
 
-    const dataEnriquecida = (data || []).map((cxp) => {
+    const dataEnriquecida = data.map((cxp) => {
       const fechaStr: string = (cxp as any).fecha_vencimiento;
       const [year, month, day] = fechaStr.split('-').map(Number);
       const fechaVencimientoUTC = Date.UTC(year, month - 1, day);
@@ -383,7 +383,7 @@ export class TesoreriaService {
     return {
       success: true,
       data: dataEnriquecida,
-      total: count || 0,
+      total: count,
       page,
       limit,
     };
@@ -549,7 +549,7 @@ export class TesoreriaService {
       throw lecturaFinancieraFallida('las cuentas por pagar');
     }
 
-    // 3. Obtener CxC pendientes (ingresos proyectados) si la tabla existe
+    // 3. Obtener CxC pendientes; un fallo de lectura no equivale a cero ingresos.
     let cxcPendientes: any[] = [];
     try {
       let queryCxC = client
@@ -573,12 +573,13 @@ export class TesoreriaService {
 
       const { data: cxc, error: errorCxC } = await queryCxC;
 
-      if (!errorCxC && cxc) {
-        cxcPendientes = cxc;
+      if (errorCxC || !Array.isArray(cxc)) {
+        throw lecturaFinancieraFallida('las cuentas por cobrar');
       }
-    } catch (error) {
-      // Si la tabla no existe o hay error, continuar sin CxC
-      console.log('CxC no disponible para proyección de flujo de caja');
+      cxcPendientes = cxc;
+    } catch {
+      this.logger.warn('No se pudieron consultar las cuentas por cobrar para flujo de caja');
+      throw lecturaFinancieraFallida('las cuentas por cobrar');
     }
 
     // 4. Agrupar movimientos por fecha y moneda

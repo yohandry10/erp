@@ -1,5 +1,6 @@
 'use client'
 
+import { requestConfirmation } from '@/lib/confirm-action'
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { parseDateLocal } from '@/lib/date-utils'
@@ -83,6 +84,7 @@ export default function PlantillasAsientosPage() {
   const [guardando, setGuardando] = useState(false)
   const [generando, setGenerando] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [catalogError, setCatalogError] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
   const [mostrarAlta, setMostrarAlta] = useState(false)
   const [form, setForm] = useState(plantillaInicial)
@@ -92,15 +94,20 @@ export default function PlantillasAsientosPage() {
     try {
       setLoading(true)
       setError(null)
+      setCatalogError(false)
       const [response, cuentasResponse, centrosResponse] = await Promise.all([
         get('/api/contabilidad/plantillas-asientos'),
         get('/api/contabilidad/plan-cuentas'),
         get('/api/contabilidad/centros-costo'),
       ])
+      if ([response, cuentasResponse, centrosResponse].some(result => !result?.success || !Array.isArray(result.data))) {
+        throw new Error('No se pudieron cargar las plantillas y sus catálogos. Reintente la carga completa.')
+      }
       if (response?.success) setPlantillas(response.data || [])
       if (cuentasResponse?.success) setCuentas(cuentasResponse.data || [])
       if (centrosResponse?.success) setCentrosCosto(centrosResponse.data || [])
     } catch (err: any) {
+      setCatalogError(true)
       setError(err.message || 'Error al cargar las plantillas')
     } finally {
       setLoading(false)
@@ -179,7 +186,7 @@ export default function PlantillasAsientosPage() {
         ? 'Se creará un asiento en borrador que podrá revisar antes de confirmarlo.'
         : 'Se creará un asiento confirmado, que entra directamente en los libros.'
 
-    if (!confirm(`Generar un asiento desde "${plantilla.nombre}".\n\n${destino}\n\n¿Continuar?`)) {
+    if (!(await requestConfirmation(`Generar un asiento desde "${plantilla.nombre}".\n\n${destino}\n\n¿Continuar?`))) {
       return
     }
 
@@ -198,7 +205,7 @@ export default function PlantillasAsientosPage() {
   }
 
   const eliminar = async (plantilla: Plantilla) => {
-    if (!confirm(`¿Eliminar la plantilla "${plantilla.nombre}"? Los asientos ya generados se conservan.`)) {
+    if (!(await requestConfirmation(`¿Eliminar la plantilla "${plantilla.nombre}"? Los asientos ya generados se conservan.`))) {
       return
     }
     try {
@@ -247,7 +254,7 @@ export default function PlantillasAsientosPage() {
               <RefreshCw className="h-4 w-4" />
               Actualizar
             </Button>
-            <Button type="button" onClick={() => setMostrarAlta((actual) => !actual)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+            <Button type="button" disabled={loading || (!mostrarAlta && catalogError)} onClick={() => setMostrarAlta((actual) => !actual)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
               {mostrarAlta ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
               {mostrarAlta ? 'Cerrar alta' : 'Nueva plantilla'}
             </Button>
@@ -273,7 +280,7 @@ export default function PlantillasAsientosPage() {
               <div className="overflow-x-auto rounded-xl border border-cyan-400/15">
                 <table className="w-full min-w-[980px]"><thead className="bg-cyan-400/10"><tr><th className="px-3 py-2 text-left">Cuenta</th><th className="px-3 py-2 text-right">Debe</th><th className="px-3 py-2 text-right">Haber</th><th className="px-3 py-2 text-left">Concepto de línea</th><th className="px-3 py-2 text-left">Centro</th><th /></tr></thead><tbody>{detalles.map((detalle, indice) => <tr key={indice} className="border-t border-cyan-400/10"><td className="p-2"><select aria-label={`Cuenta de línea ${indice + 1}`} required value={detalle.cuenta_id} onChange={(e) => actualizarDetalle(indice, 'cuenta_id', e.target.value)} className="w-full rounded-lg border border-cyan-400/20 bg-card px-2 py-2 text-sm"><option value="">Seleccione…</option>{cuentas.map((cuenta) => <option key={cuenta.id} value={cuenta.id}>{cuenta.codigo} — {cuenta.nombre}</option>)}</select></td><td className="p-2"><input aria-label={`Debe línea ${indice + 1}`} type="number" min="0" step="0.01" value={detalle.debe} onChange={(e) => actualizarDetalle(indice, 'debe', e.target.value)} className="w-28 rounded-lg border border-cyan-400/20 bg-card px-2 py-2 text-right text-sm" /></td><td className="p-2"><input aria-label={`Haber línea ${indice + 1}`} type="number" min="0" step="0.01" value={detalle.haber} onChange={(e) => actualizarDetalle(indice, 'haber', e.target.value)} className="w-28 rounded-lg border border-cyan-400/20 bg-card px-2 py-2 text-right text-sm" /></td><td className="p-2"><input aria-label={`Concepto línea ${indice + 1}`} value={detalle.concepto} onChange={(e) => actualizarDetalle(indice, 'concepto', e.target.value)} placeholder="Usa el concepto general" className="w-full rounded-lg border border-cyan-400/20 bg-card px-2 py-2 text-sm" /></td><td className="p-2"><select aria-label={`Centro línea ${indice + 1}`} value={detalle.centro_costo_id} onChange={(e) => actualizarDetalle(indice, 'centro_costo_id', e.target.value)} className="w-full rounded-lg border border-cyan-400/20 bg-card px-2 py-2 text-sm"><option value="">Sin centro</option>{centrosCosto.map((centro) => <option key={centro.id} value={centro.id}>{centro.codigo ? `${centro.codigo} — ` : ''}{centro.nombre}</option>)}</select></td><td className="p-2">{detalles.length > 2 && <Button type="button" variant="outline" aria-label={`Eliminar línea ${indice + 1}`} onClick={() => setDetalles((actuales) => actuales.filter((_, i) => i !== indice))}><Trash2 className="h-4 w-4" /></Button>}</td></tr>)}</tbody></table>
               </div>
-              <div className="flex flex-wrap justify-between gap-3"><Button type="button" variant="outline" onClick={() => setDetalles((actuales) => [...actuales, detalleInicial()])} className="gap-2"><Plus className="h-4 w-4" />Agregar línea</Button><Button type="submit" form="plantilla-form" disabled={guardando} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">{guardando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Guardar plantilla</Button></div>
+              <div className="flex flex-wrap justify-between gap-3"><Button type="button" variant="outline" onClick={() => setDetalles((actuales) => [...actuales, detalleInicial()])} className="gap-2"><Plus className="h-4 w-4" />Agregar línea</Button><Button type="submit" form="plantilla-form" disabled={guardando || loading || catalogError} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">{guardando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Guardar plantilla</Button></div>
               <p className="text-xs text-muted-foreground">Por seguridad, el estado predeterminado es BORRADOR. Debe y haber deben cuadrar al céntimo.</p>
             </CardContent>
           </Card>
@@ -340,7 +347,7 @@ export default function PlantillasAsientosPage() {
                               <Button
                                 type="button"
                                 onClick={() => generar(plantilla)}
-                                disabled={!plantilla.activa || generando !== null}
+                                disabled={catalogError || !plantilla.activa || generando !== null}
                                 className="gap-2 bg-blue-600 text-white hover:bg-blue-500 disabled:bg-muted"
                               >
                                 {generando === plantilla.id ? (
@@ -352,6 +359,7 @@ export default function PlantillasAsientosPage() {
                               </Button>
                               <Button
                                 type="button"
+                                aria-label={`Eliminar plantilla ${plantilla.nombre}`}
                                 onClick={() => eliminar(plantilla)}
                                 variant="outline"
                                 className="gap-2 border-cyan-400/20 bg-white/5 text-primary hover:bg-white/10 hover:text-foreground"

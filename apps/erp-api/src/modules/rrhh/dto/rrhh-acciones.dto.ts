@@ -9,9 +9,13 @@ import {
   Max,
   MaxLength,
   IsUUID,
+  IsArray,
+  IsDateString,
+  ValidateNested,
+  ArrayMaxSize,
   Min,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { IsUuidOpcional } from './uuid-opcional.decorator';
 
 /**
@@ -79,9 +83,38 @@ export class InscribirCapacitacionDto {
   @IsUuidOpcional() capacitacion_id?: string;
 }
 
+export class GratificacionPreviaDto {
+  @Matches(/^\d{4}-(07|12)$/) periodo!: string;
+  @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(999999999) monto!: number;
+  @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(999999999)
+  bonificacion_extraordinaria?: number;
+  @IsDateString({ strict: true }) fecha_pago!: string;
+  @IsString() @IsNotEmpty() @MaxLength(500) referencia!: string;
+}
+
+export class GratificacionPreviaEmpleadoDto extends GratificacionPreviaDto {
+  @IsUUID('4') empleado_id!: string;
+}
+
+/** Base computable histórica, declarada cuando el contrato del ERP no la cubre. */
+export class RemuneracionGratificacionPreviaDto {
+  @Matches(/^\d{4}-(0[1-9]|1[0-2])$/) periodo!: string;
+  @IsNumber({ maxDecimalPlaces: 2 }) @Min(0.01) @Max(999999999) monto!: number;
+  @IsString() @IsNotEmpty() @MaxLength(500) referencia!: string;
+}
+
+export class RemuneracionPreviaEmpleadoDto extends RemuneracionGratificacionPreviaDto {
+  @IsUUID('4') empleado_id!: string;
+}
+
 export class CalcularLiquidacionDto {
-  @IsString() @IsNotEmpty() @MaxLength(1000) motivo_terminacion!: string;
-  @IsString() @IsNotEmpty() @MaxLength(30) fecha_terminacion!: string;
+  @IsIn(['renuncia', 'despido', 'fin_contrato', 'mutuo_acuerdo', 'abandono', 'fallecimiento', 'otro'])
+  motivo_terminacion!: string;
+  @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true }) fecha_terminacion!: string;
+  @IsOptional() @ValidateNested() @Type(() => GratificacionPreviaDto)
+  gratificacion_previa?: GratificacionPreviaDto;
+  @IsOptional() @ValidateNested() @Type(() => RemuneracionGratificacionPreviaDto)
+  remuneracion_gratificacion_previa?: RemuneracionGratificacionPreviaDto;
 }
 
 export class PagarLiquidacionDto {
@@ -100,6 +133,12 @@ export class CalcularDepositosCtsDto {
   /** Periodo CTS en formato AAAA-MM. */
   @Matches(/^\d{4}-(0[1-9]|1[0-2])$/, { message: 'El periodo debe tener el formato AAAA-MM' })
   periodo!: string;
+  @IsOptional() @IsArray() @ArrayMaxSize(1000)
+  @ValidateNested({ each: true }) @Type(() => GratificacionPreviaEmpleadoDto)
+  gratificaciones_previas?: GratificacionPreviaEmpleadoDto[];
+  @IsOptional() @IsArray() @ArrayMaxSize(1000)
+  @ValidateNested({ each: true }) @Type(() => RemuneracionPreviaEmpleadoDto)
+  remuneraciones_previas?: RemuneracionPreviaEmpleadoDto[];
 }
 
 export class DepositarCtsDto {

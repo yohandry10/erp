@@ -1,3 +1,5 @@
+import { readCompleteCatalog } from '../../../shared/utils/complete-catalog-read';
+import { requireTenantRecord } from '../../../shared/utils/require-tenant-record';
 import { Injectable, BadRequestException, ConflictException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { Decimal } from 'decimal.js';
@@ -1616,11 +1618,9 @@ export class PedidosService {
    */
   async obtenerGreAsociadas(pedidoId: string, tenantId: string) {
     const client = this.supabase.getClient();
-
-    const { data, error } = await client
-      .from('pedido_gres')
-      .select(`
-        id,
+    await requireTenantRecord(client, 'pedidos_venta', tenantId, pedidoId, 'Pedido');
+    const data = await readCompleteCatalog(client, 'pedido_gres', `
+        id,tenant_id,pedido_id,
         estado,
         notas,
         creado_en,
@@ -1638,16 +1638,11 @@ export class PedidosService {
           placa_vehiculo,
           licencia_conducir
         )
-      `)
-      .eq('tenant_id', tenantId)
-      .eq('pedido_id', pedidoId)
-      .order('creado_en', { ascending: false });
-
-    if (error) {
-      throw new BadRequestException('Error al obtener las GRE asociadas al pedido');
-    }
-
-    return (data || []).map((item: any) => ({
+      `,
+      query => query.eq('tenant_id', tenantId).eq('pedido_id', pedidoId),
+      row => row.tenant_id === tenantId && row.pedido_id === pedidoId,
+      [['creado_en', false], ['id', false]]);
+    return data.map((item: any) => ({
       id: item.id,
       estado: item.estado,
       notas: item.notas ?? null,

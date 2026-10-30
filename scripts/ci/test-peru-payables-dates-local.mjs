@@ -32,6 +32,12 @@ try{
  const provider=await call('compras/proveedores',{ruc:base+String(d===10?0:d===11?1:d),razon_social:'Proveedor fechas local',direccion:'Av. Local 456',email:'prov-fechas-'+randomUUID().slice(0,6)+'@example.test'});
  const payable=(numero,vence)=>call('finanzas/cxp',{proveedor_id:provider.id,numero_documento:numero,serie:'F001',tipo_documento:'FACTURA',fecha_emision:shift(today,-20),fecha_vencimiento:vence,condiciones_pago:'CREDITO_30',subtotal:100,igv:18,total:118,moneda:'PEN',tipo_cambio:1,destino_credito_fiscal:'GRAVADAS'});
  const dueToday=await payable('00000101',today),dueYesterday=await payable('00000102',shift(today,-1));
+ await check('Fechas SQL CxP: el normalizador conserva hoy pendiente y ayer vencida en la fecha del contribuyente',async()=>{
+  for(const [id,expected] of [[dueToday.id,'PENDIENTE'],[dueYesterday.id,'VENCIDA']]) {
+   assert.match(id,/^[0-9a-f-]{36}$/i);
+   assert.equal(sql(`SELECT estado FROM cuentas_por_pagar WHERE tenant_id='${first.tenant}'::uuid AND id='${id}'::uuid;`),expected);
+  }
+ });
  await check('Fechas CxP: la deuda que vence hoy en Lima aparece en próximos vencimientos con 0 días',async()=>{
   const result=await call('finanzas/cxp/vencimientos?dias=30');
   const item=(result.vencimientos||[]).find(row=>row.id===dueToday.id);

@@ -1,9 +1,17 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { SecurityDashboardService } from './security-dashboard.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
+
+function queryInteger(value: string | undefined, fallback: number, maximum: number): number {
+  if (value === undefined) return fallback;
+  if (typeof value !== 'string' || !/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) < 1 || Number(value) > maximum) {
+    throw new BadRequestException('El período o límite de seguridad no es válido');
+  }
+  return Number(value);
+}
 
 @Controller('security')
 @UseGuards(JwtAuthGuard, PermissionGuard, SuperAdminGuard) // HARDENING: seguridad requiere superadmin + permiso.
@@ -14,7 +22,7 @@ export class SecurityController {
   @RequirePermission('security.audit.read') // HARDENING: permisos granulares en dashboard.
   @UseGuards(SuperAdminGuard)
   async getDashboardStats(@Query('days') days?: string) {
-    const daysNum = days ? parseInt(days, 10) : 7;
+    const daysNum = queryInteger(days, 7, 365);
     return this.securityService.getDashboardStats(daysNum);
   }
 
@@ -29,7 +37,7 @@ export class SecurityController {
   @RequirePermission('security.audit.read')
   @UseGuards(SuperAdminGuard)
   async getRecentViolations(@Query('limit') limit?: string) {
-    const limitNum = limit ? parseInt(limit, 10) : 50;
+    const limitNum = queryInteger(limit, 50, 1000);
     return this.securityService.getRecentViolations(limitNum);
   }
 
@@ -59,7 +67,7 @@ export class SecurityController {
   // HARDENING: endpoint explícito de monitoreo RLS solo para superadmin con permiso.
   @UseGuards(SuperAdminGuard)
   async listRlsViolations(@Query('limit') limit?: string) {
-    const limitNum = limit ? parseInt(limit, 10) : 100;
+    const limitNum = queryInteger(limit, 100, 1000);
     return this.securityService.getRecentViolations(limitNum);
   }
 
@@ -74,7 +82,7 @@ export class SecurityController {
   @RequirePermission('security.audit.read')
   @UseGuards(SuperAdminGuard)
   async getSecurityReport(@Query('days') days?: string) {
-    const daysNum = days ? parseInt(days, 10) : 7;
+    const daysNum = queryInteger(days, 7, 365);
     return this.securityService.getSecurityReport(daysNum);
   }
 }

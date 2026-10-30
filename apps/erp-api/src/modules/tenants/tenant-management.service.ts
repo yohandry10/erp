@@ -52,6 +52,9 @@ export class TenantManagementService {
       .eq('id', paisIdInput)
       .single();
 
+    if (paisError && paisError.code !== 'PGRST116') {
+      throw new ServiceUnavailableException('No se pudo consultar el catálogo de países. Reintenta la consulta.');
+    }
     if (paisError || !paisData?.id) {
       throw new BadRequestException(`pais_id no válido: ${tenantData.pais_id}`);
     }
@@ -129,7 +132,7 @@ export class TenantManagementService {
       // (timeout o caída) el alta pudo completarse: 503, y reintentar con la misma
       // Idempotency-Key la recupera sin duplicar. Antes era 400 «AbortError».
       const motivo = String(atomicError.message ?? '');
-      if (atomicError.code === '42501' && motivo.includes('CONFIGURATION_ACTOR')) {
+      if (atomicError.code === '42501') {
         throw new ForbiddenException('Sólo un superadministrador activo puede crear empresas');
       }
       if (atomicError.code === '23505') {

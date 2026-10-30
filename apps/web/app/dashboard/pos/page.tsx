@@ -63,6 +63,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { multiplicarMoneda, redondearMoneda } from '@/lib/format-utils'
+import { reviewCommercialPrices } from '@/lib/ventas/commercial-prices'
 
 interface ItemVenta {
   producto: ProductoPOS
@@ -200,6 +201,7 @@ export default function POSPage() {
   // causa exacta. El resto del POS conserva su política histórica de errores.
   const cashCloseApi = useApi({ throwOnError: true })
   const posSaleApi = useApi({ retries: 1, timeoutMs: 30000 })
+  const commercialPriceApi = useApi({ throwOnError: true, showErrorToast: false })
   const { user } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
@@ -313,6 +315,9 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
   // se apoyan sólo en ella—, de modo que perderla entre dos intentos del cajero
   // significa registrar la venta dos veces.
   const intencionVentaRef = useRef<IntencionRegistrada | null>(null);
+  const precioIntencionRef = useRef<string | null>(null);
+  const revisandoPreciosRef = useRef(false);
+  const [revisandoPrecios, setRevisandoPrecios] = useState(false);
   const cargandoRef = useRef(false);
   const sesionGuardadaRef = useRef<string | null>(null);
   const busquedaInputRef = useRef<HTMLInputElement>(null)
@@ -333,6 +338,67 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
   };
   const formatCurrency = (value: any): string => `${currencySymbol} ${formatMoney(value)}`;
 
+  function priceInputSignature() {
+    return JSON.stringify({ user: user?.id, session: sesionCajaId, client: clienteSeleccionado,
+      currency: country.moneda, document: tipoComprobante, globalDiscount: descuentoGlobal,
+      items: carrito.map(item => ({ product: item.producto.id,
+        quantity: item.cantidad, unitPrice: item.precio_unitario, originalPrice: item.precio_original,
+        discount: item.descuento_monto, percent: item.descuento_porcentaje })) })
+  }
+
+  const precioEntradaActualRef = useRef('')
+  precioEntradaActualRef.current = priceInputSignature()
+
+  async function abrirCheckout() {
+    if (revisandoPreciosRef.current || !clienteListoParaCobrar()) return
+    // Un ACK perdido debe recuperar la misma intención sin aplicar reglas nuevas.
+    if (!isPeru || (intencionVentaRef.current && precioIntencionRef.current === priceInputSignature())) {
+      setMostrarCheckout(true)
+      return
+    }
+    revisandoPreciosRef.current = true
+    setRevisandoPrecios(true)
+    try {
+      const requestedInput = priceInputSignature()
+      const lines = carrito.map(item => ({ producto_id: item.producto.id, cantidad: item.cantidad,
+        precio_unitario: item.precio_unitario, subtotal: item.subtotal }))
+      const response = await commercialPriceApi.post('/api/ventas/comercial/precios/resolver', {
+        cliente_id: clienteSeleccionado || undefined, moneda: country.moneda,
+        detalle: lines.map(({ producto_id, cantidad, precio_unitario }) => ({ producto_id, cantidad, precio_unitario })),
+      })
+      if (precioEntradaActualRef.current !== requestedInput) {
+        toast({ title: 'El carrito cambió', description: 'Vuelve a pulsar Cobrar para verificar los precios de la venta actual.' })
+        return
+      }
+      const review = reviewCommercialPrices(lines, response)
+      if (review.changed) {
+        setCarrito(carrito.map((item, index) => {
+          const price = review.lines[index].precio_unitario
+          const discount = item.descuento_porcentaje > 0
+            ? redondearMoneda(price * item.cantidad * item.descuento_porcentaje / 100) : item.descuento_monto
+          return { ...item, precio_unitario: price, precio_original: price, descuento_monto: discount,
+            subtotal: Math.max(0, multiplicarMoneda(item.cantidad, price) - discount) }
+        }))
+        toast({ title: 'Precios vigentes actualizados', description: 'Revisa el total del carrito y vuelve a pulsar Cobrar.' })
+        return
+      }
+      setMostrarCheckout(true)
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'No se pudieron verificar los precios',
+        description: error instanceof Error ? error.message : 'Reintenta antes de cobrar.' })
+    } finally {
+      revisandoPreciosRef.current = false
+      setRevisandoPrecios(false)
+    }
+  }
+
+  const checkoutShortcut = useRef<() => boolean>(() => false)
+  checkoutShortcut.current = () => {
+    if (carrito.length === 0 || !clienteListoParaCobrar()) return false
+    void abrirCheckout()
+    return true
+  }
+
   useEffect(() => {
     const handlePosShortcut = (event: KeyboardEvent) => {
       if (event.key === 'F2') {
@@ -349,9 +415,8 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
         return
       }
 
-      if (event.key === 'F8' && carrito.length > 0 && clienteSeleccionado) {
+      if (event.key === 'F8' && checkoutShortcut.current()) {
         event.preventDefault()
-        setMostrarCheckout(true)
         return
       }
 
@@ -362,7 +427,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
 
     window.addEventListener('keydown', handlePosShortcut)
     return () => window.removeEventListener('keydown', handlePosShortcut)
-  }, [carrito.length, clienteSeleccionado, modoCajaEnfocado, mostrarCheckout])
+  }, [modoCajaEnfocado, mostrarCheckout])
 
   // Alertar si se intenta cerrar/recargar la pestaña con caja abierta
   useEffect(() => {
@@ -1063,7 +1128,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
       return
     }
 
-    if (!clienteSeleccionado || (!pagosMixtos && !metodoPagoSeleccionado)) {
+    if (!clienteListoParaCobrar() || (!pagosMixtos && !metodoPagoSeleccionado)) {
       toast({
         variant: 'destructive',
         title: '❌ Datos incompletos',
@@ -1076,7 +1141,8 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
     const clienteActual = clientes.find(c => c.id === clienteSeleccionado)
     const documento = getClienteDocumento(clienteActual)
     const minDocumentLength = isColombia ? 5 : 8
-    if (!documento || documento.replace(/[.\s-]/g, '').length < minDocumentLength) {
+    // "Clientes varios" no tiene documento: sólo ticket o boleta hasta S/ 700.
+    if (clienteSeleccionado && (!documento || documento.replace(/[.\s-]/g, '').length < minDocumentLength)) {
       toast({
         variant: 'destructive',
         title: '❌ Documento inválido',
@@ -1279,12 +1345,13 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
         () => crearClaveIdempotenciaPos('pos-venta'),
       )
       const idempotencyKey = intencionVentaRef.current.clave
+      precioIntencionRef.current = priceInputSignature()
 
       const ventaData: any = {
         idempotency_key: idempotencyKey,
         sesion_caja_id: sesionCajaId,
-        cliente_id: clienteSeleccionado,
-        cliente_nombre: clienteActual?.razon_social || `${clienteActual?.nombres || ''} ${clienteActual?.apellidos || ''}`.trim() || 'Cliente General',
+        cliente_id: clienteSeleccionado || undefined,
+        cliente_nombre: clienteActual?.razon_social || `${clienteActual?.nombres || ''} ${clienteActual?.apellidos || ''}`.trim() || 'Clientes varios',
         cliente_documento: getClienteDocumento(clienteActual) || '00000000',
         cliente_direccion: clienteActual?.direccion || '',
         cliente_tipo_documento: inferirTipoDocumentoFiscal(
@@ -1436,7 +1503,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
           factura_electronica: ventaInfo.factura_electronica || false,
           facturacion_pendiente: ventaInfo.facturacion_pendiente || ventaInfo.cpe_pendiente || false,
           cpe_id: ventaInfo.cpe_id,
-          cliente_id: clienteSeleccionado,
+          cliente_id: clienteSeleccionado || undefined,
           cliente_documento: getClienteDocumento(clienteActual),
           cliente_nombre: clienteActual?.razon_social || clienteActual?.nombres || 'Cliente General',
           fecha: new Date().toISOString(),
@@ -1543,6 +1610,12 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
     // exacto cae justo en el medio céntimo.
     return multiplicarMoneda(Math.max(0, baseGravada), taxRate)
   }
+
+  // Venta de mostrador: en Perú el ticket y la boleta hasta S/ 700 no exigen
+  // identificar al adquirente; la factura siempre exige un cliente con RUC.
+  const clienteListoParaCobrar = () =>
+    Boolean(clienteSeleccionado)
+    || (isPeru && (tipoComprobante === 'TICKET' || (tipoComprobante === '03' && calcularTotal() <= 700)))
 
   const calcularTotal = () => {
     const base = calcularSubtotal() - calcularDescuentoGlobalMonto()
@@ -2420,7 +2493,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                     onChange={(event) => setClienteSeleccionado(event.target.value)}
                     className={`${posInputClass} h-10 w-full py-2 pl-9 pr-3 text-sm`}
                   >
-                    <option value="">Seleccionar cliente</option>
+                    <option value="">{isPeru && tipoComprobante !== '01' ? 'Clientes varios (sin documento)' : 'Seleccionar cliente'}</option>
                     {clientes.map((cliente) => (
                       <option key={cliente.id} value={cliente.id}>
                         {(cliente.razon_social || `${cliente.nombres || ''} ${cliente.apellidos || ''}`.trim() || 'Cliente')} · {getClienteDocumento(cliente)}
@@ -2608,8 +2681,12 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                       </div>
                     </div>
                   )}
-                  {!clienteSeleccionado && (
-                    <p className="mt-3 text-xs font-medium text-destructive">Seleccione un cliente para continuar.</p>
+                  {!clienteListoParaCobrar() && (
+                    <p className="mt-3 text-xs font-medium text-destructive">
+                      {isPeru && tipoComprobante === '03'
+                        ? 'Las boletas mayores a S/ 700 requieren un cliente identificado.'
+                        : 'Seleccione un cliente para continuar.'}
+                    </p>
                   )}
                   <Button
                     type="button"
@@ -2624,8 +2701,8 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                     type="button"
                     size="lg"
                     className="mt-2 min-h-12 w-full justify-between text-base"
-                    onClick={() => setMostrarCheckout(true)} data-tour="btn-procesar-venta"
-                    disabled={!clienteSeleccionado}
+                    onClick={() => void abrirCheckout()} data-tour="btn-procesar-venta"
+                    disabled={!clienteListoParaCobrar() || revisandoPrecios}
                   >
                     <span className="flex items-center gap-2"><WalletCards className="h-5 w-5" /> Cobrar</span>
                     <span className="flex items-center gap-1">{formatCurrency(calcularTotal())}<ChevronRight className="h-4 w-4" /></span>

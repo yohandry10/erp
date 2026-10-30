@@ -1,16 +1,19 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { parseDateLocal } from "@/lib/date-utils";
+import { escapeHtml, generarBoletaPlanillaHtml } from "@/lib/rrhh/boleta-planilla";
 import PlanillaModal from "@/components/modals/PlanillaModal";
 import PlanillaCalcularModal from "@/components/modals/PlanillaCalcularModal";
 import PlanillaEditarModal from "@/components/modals/PlanillaEditarModal";
 import PlanillaPagarModal from "@/components/modals/PlanillaPagarModal";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import { useApi } from "@/hooks/use-api";
+import PlanillaAprobarModal from "@/components/modals/PlanillaAprobarModal";
 import { usePermission } from "@/hooks/use-permission";
-import { apiSucceeded, unwrapApiArray } from "@/lib/api-contract";
 import { fetchApi } from "@/lib/api-fetch";
+import { useAuth } from "@/contexts/AuthContext";
+import { payrollPaymentIntentKey, readPayrollPaymentIntent, type PayrollPaymentIntent } from "@/lib/rrhh/payroll-payment-operation";
+import { usePayrollCalculationOperation } from "@/hooks/use-payroll-calculation-operation";
+import { readLivePayroll, readPayrollList, readPayrollDetail, readPayrollBoleta } from "@/lib/rrhh/payroll-read-contract";
 import {
   BadgeCheck,
   Banknote,
@@ -36,13 +39,18 @@ const PlanillasPage = () => {
   const currencySymbol = country.simboloMoneda || "S/";
   const locale = country.locale || "es-PE";
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED !== "false";
-  const { get } = useApi();
+  const { session } = useAuth();
+  const tenantId = session?.user?.tenant_id || '', actorId = session?.user?.id || '';
+  const paymentScope = `${tenantId}:${actorId}`;
+  const [pendingPayment, setPendingPayment] = useState<PayrollPaymentIntent | null>(null);
+  const [paymentRecoveryError, setPaymentRecoveryError] = useState('');
+  const [paymentRecoveryScope, setPaymentRecoveryScope] = useState('');
   const { hasPermission: canCreatePayroll } = usePermission(
     "rrhh",
     "create",
     "planillas",
   );
-  const { hasPermission: canCalculatePayroll } = usePermission(
+  const { hasPermission: canCalculatePayroll, loading: checkingCalculatePayroll } = usePermission(
     "rrhh",
     "calculate",
     "planillas",
@@ -58,7 +66,18 @@ const PlanillasPage = () => {
     "planillas",
   );
   const [planillas, setPlanillas] = useState<any[]>([]);
+  const calculationOperation=usePayrollCalculationOperation({tenantId,actorId},canCalculatePayroll,!!tenantId && !!actorId && !checkingCalculatePayroll);
   const [loading, setLoading] = useState(true);
+  const [readError, setReadError] = useState<string | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const retryAction = useRef<(() => void) | null>(null);
+  const listGeneration = useRef(0);
+  const detailGeneration = useRef(0);
+  const actionGeneration = useRef(0);
   const [detallePlanilla, setDetallePlanilla] = useState<any[]>([]);
   const [showDetalle, setShowDetalle] = useState(false);
   const [showPlanillaModal, setShowPlanillaModal] = useState(false);
@@ -66,23 +85,24 @@ const PlanillasPage = () => {
   const [showPagarModal, setShowPagarModal] = useState(false);
   const [showEditarModal, setShowEditarModal] = useState(false);
   const [planillaSeleccionada, setPlanillaSeleccionada] = useState<any>(null);
+  const visiblePendingPayment = canPayPayroll && pendingPayment?.tenantId === tenantId && pendingPayment.actorId === actorId ? pendingPayment : null;
+  const refreshPendingPayment = useCallback(() => {
+    setPendingPayment(null); setPaymentRecoveryError(''); setPaymentRecoveryScope('');
+    if (!tenantId || !actorId || !canPayPayroll) return;
+    try { setPendingPayment(readPayrollPaymentIntent(localStorage.getItem(payrollPaymentIntentKey({ tenantId, actorId })), { tenantId, actorId })); }
+    catch (error: any) { setPaymentRecoveryError(error?.message || 'No se pudo recuperar el pago pendiente. Sus datos se conservan.'); }
+    setPaymentRecoveryScope(paymentScope);
+  }, [tenantId, actorId, canPayPayroll, paymentScope]);
+  useEffect(() => {
+    refreshPendingPayment();
+    window.addEventListener('storage', refreshPendingPayment); window.addEventListener('focus', refreshPendingPayment);
+    return () => { window.removeEventListener('storage', refreshPendingPayment); window.removeEventListener('focus', refreshPendingPayment); };
+  }, [refreshPendingPayment]);
 
-  // Estado para diálogo de confirmación
-  const [confirmDialog, setConfirmDialog] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    onConfirm: () => void | Promise<void>;
-    variant?: "default" | "danger" | "warning";
-  }>({
-    isOpen: false,
-    title: "",
-    message: "",
-    onConfirm: () => {},
-    variant: "default",
-  });
+  const [approvalRequest, setApprovalRequest] = useState<any>(null);
 
   const loadPlanillas = useCallback(async () => {
+    const current = ++listGeneration.current;
     if (!rrhhEnabled) {
       setPlanillas([]);
       setLoading(false);
@@ -90,21 +110,20 @@ const PlanillasPage = () => {
     }
     try {
       setLoading(true);
-      const response = await get("/api/rrhh/planillas");
-      if (apiSucceeded(response)) {
-        setPlanillas(unwrapApiArray(response));
-      } else {
-        setPlanillas([]);
-      }
-    } catch {
+      setReadError(null);
       setPlanillas([]);
+      const data = await readLivePayroll("/api/rrhh/planillas", readPayrollList);
+      if (current === listGeneration.current) setPlanillas(data);
+    } catch {
+      if (current === listGeneration.current) setReadError("No se pudo consultar la lista completa de planillas. Reintente para recuperar los datos actuales.");
     } finally {
-      setLoading(false);
+      if (current === listGeneration.current) setLoading(false);
     }
-  }, [get, rrhhEnabled]);
+  }, [rrhhEnabled]);
 
   useEffect(() => {
     loadPlanillas();
+    return () => { listGeneration.current++; detailGeneration.current++; actionGeneration.current++; };
   }, [loadPlanillas]);
 
   const abrirModalPlanilla = () => {
@@ -123,11 +142,14 @@ const PlanillasPage = () => {
   };
 
   const abrirCalcularPlanilla = (planilla: any) => {
+    if (!calculationOperation.ready || calculationOperation.recoveryError || calculationOperation.busy
+      || calculationOperation.pending && calculationOperation.pending.payroll.id !== planilla.id) return;
     setPlanillaSeleccionada(planilla);
     setShowCalcularModal(true);
   };
 
   const abrirPagarPlanilla = (planilla: any) => {
+    if (!canPayPayroll || paymentRecoveryScope !== paymentScope || paymentRecoveryError || (visiblePendingPayment && visiblePendingPayment.payroll.id !== planilla.id)) return;
     setPlanillaSeleccionada(planilla);
     setShowPagarModal(true);
   };
@@ -150,47 +172,46 @@ const PlanillasPage = () => {
   };
 
   const verDetallePlanilla = async (planillaId: string) => {
+    const current = ++detailGeneration.current;
+    actionGeneration.current++;
+    setActionError(null); setActionLoading(false);
+    setDetailId(planillaId); setDetallePlanilla([]); setDetailError(null); setDetailLoading(true); setShowDetalle(true);
     try {
-      setLoading(true);
-      const response = await fetchApi(
-        `/api/rrhh/planillas/${planillaId}/detalle`,
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setDetallePlanilla(Array.isArray(data) ? data : []);
-        setShowDetalle(true);
-      } else {
-        alert("Error cargando detalle de planilla");
-      }
-    } catch (error: any) {
-      alert("Error cargando detalle: " + error.message);
+      const planilla = planillas.find(row => row.id === planillaId);
+      const data = await readLivePayroll(`/api/rrhh/planillas/${planillaId}/detalle`, value => readPayrollDetail(value, planilla));
+      if (current === detailGeneration.current) setDetallePlanilla(data);
+    } catch {
+      if (current === detailGeneration.current) setDetailError("No se pudo consultar el detalle completo de la planilla. Reintente.");
     } finally {
-      setLoading(false);
+      if (current === detailGeneration.current) setDetailLoading(false);
     }
+  };
+
+  const cerrarDetalle = () => {
+    detailGeneration.current++; actionGeneration.current++;
+    setShowDetalle(false); setActionError(null); setActionLoading(false);
   };
 
   const generarReporteProfesional = async (
     planillaId: string,
     periodo: string,
   ) => {
+    const current = ++actionGeneration.current;
+    setActionError(null); setActionLoading(true);
+    retryAction.current = () => { void generarReporteProfesional(planillaId, periodo); };
     try {
-      const response = await fetchApi(
-        `/api/rrhh/planillas/${planillaId}/detalle`,
-      );
-
-      if (response.ok) {
-        const data = await response.json();
+        const planilla = planillas.find(row => row.id === planillaId);
+        const data = await readLivePayroll(`/api/rrhh/planillas/${planillaId}/detalle`, value => readPayrollDetail(value, planilla));
 
         if (!data || !Array.isArray(data) || data.length === 0) {
-          alert(
-            "⚠️ Esta planilla no tiene empleados calculados. Primero calcule la planilla.",
-          );
-          return;
+          throw new Error("Esta planilla aún no tiene empleados calculados. Calcule la planilla para emitir el reporte.");
         }
 
         // Generar reporte HTML profesional
-        const html = generarReporteHTML(data, periodo);
+        const boleta = await readLivePayroll(`/api/rrhh/boleta/${data[0].id}`, value => readPayrollBoleta(value, data[0], planilla));
+        if (current !== actionGeneration.current) return;
+        const empresa = boleta.empresa;
+        const html = generarReporteHTML(data, periodo, empresa);
 
         // Crear y descargar
         const blob = new Blob([html], { type: "text/html;charset=utf-8" });
@@ -202,13 +223,15 @@ const PlanillasPage = () => {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-      }
+        URL.revokeObjectURL(url);
     } catch (error: any) {
-      alert("Error generando reporte: " + error.message);
+      if (current === actionGeneration.current) setActionError("No se pudo generar el reporte completo. " + error.message);
+    } finally {
+      if (current === actionGeneration.current) setActionLoading(false);
     }
   };
 
-  const generarReporteHTML = (empleados: any[], periodo: string) => {
+  const generarReporteHTML = (empleados: any[], periodo: string, empresa: any) => {
     if (!Array.isArray(empleados)) {
       empleados = [];
     }
@@ -231,12 +254,25 @@ const PlanillasPage = () => {
     <html>
     <head>
         <meta charset="UTF-8">
-        <title>Reporte de Planilla ${periodo}</title>
+        <title>Reporte de Planilla ${escapeHtml(periodo)}</title>
+        <style>
+          @page{size:A4 landscape;margin:12mm}
+          body{font:12px Arial,sans-serif;color:#172033;margin:0;line-height:1.45}
+          .header{margin-bottom:18px}.company{font-size:16px;font-weight:700}
+          .title{font-size:20px;font-weight:700;margin:8px 0}
+          .summary{padding:12px 16px;background:#f1f5f9;margin-bottom:20px;break-inside:avoid}
+          .summary h3{margin:0 0 8px}.summary p{margin:4px 0}
+          table{width:100%;border-collapse:collapse}thead{display:table-header-group}
+          th,td{padding:8px 10px;border-bottom:1px solid #cbd5e1;text-align:left}
+          th{background:#e2e8f0}.number{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+          tr{break-inside:avoid}.total-row{font-weight:700;background:#f1f5f9}
+        </style>
     </head>
     <body>
         <div class="header">
-            <div class="company">NEON SYSTEM</div>
-            <div class="title">Reporte de Planilla - Período ${periodo}</div>
+            <div class="company">${escapeHtml(empresa?.razon_social)}</div>
+            <div>${isArgentina ? 'CUIT' : isColombia ? 'NIT' : 'RUC'}: ${escapeHtml(empresa?.ruc)}</div>
+            <div class="title">Reporte de Planilla - Período ${escapeHtml(periodo)}</div>
             <div>Generado el: ${new Date().toLocaleDateString(locale)}</div>
         </div>
 
@@ -264,8 +300,8 @@ const PlanillasPage = () => {
                   .map(
                     (emp) => `
                     <tr>
-                        <td>${emp?.empleados?.nombres || "N/A"} ${emp?.empleados?.apellidos || ""}</td>
-                        <td>${emp?.empleados?.numero_documento || "N/A"}</td>
+                        <td>${escapeHtml(emp?.empleados?.nombres || "N/A")} ${escapeHtml(emp?.empleados?.apellidos || "")}</td>
+                        <td>${escapeHtml(emp?.empleados?.numero_documento || "N/A")}</td>
                         <td class="number">${emp?.dias_trabajados || 0}</td>
                         <td class="number">${currencySymbol} ${(parseFloat(emp?.total_ingresos) || 0).toFixed(2)}</td>
                         <td class="number">${currencySymbol} ${(parseFloat(emp?.total_descuentos) || 0).toFixed(2)}</td>
@@ -286,45 +322,21 @@ const PlanillasPage = () => {
     </html>`;
   };
 
-  const aprobarPlanilla = async (planillaId: string) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: "Aprobar Planilla",
-      message:
-        "¿Está seguro de aprobar esta planilla?\n\nUna vez aprobada no se podrá modificar.",
-      variant: "warning",
-      onConfirm: async () => {
-        try {
-          const response = await fetchApi(
-            `/api/rrhh/planillas/${planillaId}/aprobar`,
-            {
-              method: "POST",
-            },
-          );
-
-          if (response.ok) {
-            alert("✅ Planilla aprobada exitosamente");
-            loadPlanillas();
-          } else {
-            // Aprobar una planilla es consecuente. El `catch {}` se tragaba el
-            // fallo y la pantalla no cambiaba: el usuario no podía saber si había
-            // aprobado, y volvía a pulsar.
-            const detalle = await response.text().catch(() => '');
-            alert(`No se pudo aprobar la planilla. ${detalle || 'Vuelva a intentarlo.'}`);
-          }
-        } catch (error: any) {
-          alert(`No se pudo aprobar la planilla: ${error?.message || 'error de red'}`);
-        }
-      },
-    });
+  const aprobarPlanilla = (planillaId: string) => {
+    if (!canApprovePayroll) return;
+    const current = planillas.find(row => row.id === planillaId && row.tenant_id === tenantId);
+    if (current) setApprovalRequest(current);
   };
 
   const descargarBoleta = async (empleadoPlanillaId: string) => {
+    const current = ++actionGeneration.current;
+    setActionError(null); setActionLoading(true);
+    retryAction.current = () => { void descargarBoleta(empleadoPlanillaId); };
     try {
-      const response = await fetchApi(`/api/rrhh/boleta/${empleadoPlanillaId}`);
-
-      if (response.ok) {
-        const data = await response.json();
+        const detail = detallePlanilla.find(row => row.id === empleadoPlanillaId);
+        const planilla = planillas.find(row => row.id === detailId);
+        const data = await readLivePayroll(`/api/rrhh/boleta/${empleadoPlanillaId}`, value => readPayrollBoleta(value, detail, planilla));
+        if (current !== actionGeneration.current) return;
 
         // Generar boleta HTML
         const html = generarBoletaHTML(data);
@@ -342,100 +354,17 @@ const PlanillasPage = () => {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-      }
+        URL.revokeObjectURL(url);
     } catch (error: any) {
-      alert("Error descargando boleta: " + error.message);
+      if (current === actionGeneration.current) setActionError("No se pudo descargar la boleta completa. " + error.message);
+    } finally {
+      if (current === actionGeneration.current) setActionLoading(false);
     }
   };
 
-  const generarBoletaHTML = (data: any) => {
-    if (!data) {
-      data = {};
-    }
-
-    return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <title>${isColombia ? "Desprendible de nómina" : isArgentina ? "Recibo de sueldo" : "Boleta de pago"}</title>
-    </head>
-    <body>
-        <div class="boleta">
-            <div class="header">
-                <div class="company">NEON SYSTEM</div>
-                <div class="title">${isColombia ? "Desprendible de nómina" : isArgentina ? "Recibo de sueldo" : "Boleta de pago"}</div>
-                <div>Período: ${data?.planillas?.periodo || "N/A"}</div>
-            </div>
-
-            <div class="empleado">
-                <strong>Empleado:</strong> ${data?.empleados?.nombres || "N/A"} ${data?.empleados?.apellidos || ""}<br>
-                <strong>Documento:</strong> ${data?.empleados?.numero_documento || "N/A"}<br>
-                <strong>Puesto:</strong> ${data?.empleados?.puesto || "N/A"}<br>
-                <strong>Fecha de Pago:</strong> ${data?.planillas?.fecha_pago ? parseDateLocal(data.planillas.fecha_pago).toLocaleDateString(locale) : "N/A"}
-            </div>
-
-            <div class="section">
-                <div class="section-title">💰 INGRESOS</div>
-                <div class="item">
-                    <span>Sueldo Base</span>
-                    <span class="amount positive">${currencySymbol} ${(parseFloat(data?.sueldo_base) || 0).toFixed(2)}</span>
-                </div>
-                <div class="item">
-                    <span>Horas Extras ${isArgentina ? "50" : "25"}%</span>
-                    <span class="amount positive">${currencySymbol} ${(parseFloat(data?.horas_extras_25) || 0).toFixed(2)}</span>
-                </div>
-                <div class="item">
-                    <span>Horas Extras ${isArgentina ? "100" : isColombia ? "75" : "35"}%</span>
-                    <span class="amount positive">${currencySymbol} ${(parseFloat(data?.horas_extras_35) || 0).toFixed(2)}</span>
-                </div>
-                <div class="item">
-                    <span>${isColombia ? "Otros devengados" : isArgentina ? "Adicionales" : "Bonos adicionales"}</span>
-                    <span class="amount positive">${currencySymbol} ${(parseFloat(data?.bonos_adicionales) || 0).toFixed(2)}</span>
-                </div>
-                <div class="item total">
-                    <span>TOTAL INGRESOS</span>
-                    <span class="amount positive">${currencySymbol} ${(parseFloat(data?.total_ingresos) || 0).toFixed(2)}</span>
-                </div>
-            </div>
-
-            <div class="section">
-                <div class="section-title">📉 DESCUENTOS</div>
-                <div class="item">
-                    <span>${isArgentina ? "SIPA / INSSJP / obra social" : isColombia ? "Salud / pensión" : "AFP/ONP"}</span>
-                    <span class="amount negative">${currencySymbol} ${(parseFloat(data?.descuento_afp) || 0).toFixed(2)}</span>
-                </div>
-                <div class="item">
-                    <span>${isArgentina ? "Ganancias / sindicato" : isColombia ? "FSP / retención" : "ESSALUD (9%)"}</span>
-                    <span class="amount negative">${currencySymbol} ${(parseFloat(data?.descuento_essalud) || 0).toFixed(2)}</span>
-                </div>
-                <div class="item">
-                    <span>Tardanzas</span>
-                    <span class="amount negative">${currencySymbol} ${(parseFloat(data?.descuento_tardanzas) || 0).toFixed(2)}</span>
-                </div>
-                <div class="item">
-                    <span>Faltas</span>
-                    <span class="amount negative">${currencySymbol} ${(parseFloat(data?.descuento_faltas) || 0).toFixed(2)}</span>
-                </div>
-                <div class="item total">
-                    <span>TOTAL DESCUENTOS</span>
-                    <span class="amount negative">${currencySymbol} ${(parseFloat(data?.total_descuentos) || 0).toFixed(2)}</span>
-                </div>
-            </div>
-
-            <div class="item total">
-                <span>NETO A PAGAR</span>
-                <span class="amount">${currencySymbol} ${(parseFloat(data?.neto_pagar) || 0).toFixed(2)}</span>
-            </div>
-
-            <div>
-                <p>Este documento es generado automáticamente por NEON SYSTEM</p>
-                <p>Fecha de generación: ${new Date().toLocaleDateString(locale)} ${new Date().toLocaleTimeString(locale)}</p>
-            </div>
-        </div>
-    </body>
-    </html>`;
-  };
+  const generarBoletaHTML = (data: any) => generarBoletaPlanillaHtml(data, {
+    currencySymbol, locale, countryCode: country.paisCodigo || 'PE',
+  });
 
   const formatCurrency = (amount: number) => {
     if (isNaN(amount)) amount = 0;
@@ -496,6 +425,8 @@ const PlanillasPage = () => {
     );
   }
 
+  if (readError) return <div className="p-6"><h1 className="text-2xl font-bold">Planillas</h1><div role="alert" className="my-4 rounded-xl border border-destructive p-4">{readError}</div><button onClick={() => void loadPlanillas()} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">Reintentar</button></div>;
+
   if (!rrhhEnabled) {
     return (
       <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
@@ -521,6 +452,7 @@ const PlanillasPage = () => {
 
   return (
     <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+      {actionError && !showDetalle && <div role="alert" className="mb-4 rounded-xl border border-destructive p-4">{actionError}<button disabled={actionLoading} onClick={() => retryAction.current?.()} className="ml-4 rounded-lg bg-primary px-4 py-2 text-primary-foreground">Reintentar descarga</button></div>}
       {/* Header */}
       <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div>
@@ -607,6 +539,34 @@ const PlanillasPage = () => {
       </div>
 
       {/* Lista de Planillas */}
+      <PlanillaAprobarModal request={approvalRequest} planillas={planillas} listLoading={loading} listError={readError} onClose={() => setApprovalRequest(null)} onSuccess={() => { void loadPlanillas(); }} />
+
+      {canCalculatePayroll && calculationOperation.recoveryError && <div role="alert" className="mb-4 rounded-xl border border-destructive/40 p-4 text-sm">
+        <p>{calculationOperation.recoveryError}</p><button type="button" onClick={calculationOperation.recover} className="mt-2 rounded-md border px-3 py-2">Reintentar recuperación del cálculo</button>
+      </div>}
+      {canCalculatePayroll && calculationOperation.pending && <div role="status" className="mb-4 rounded-xl border border-amber-500/40 p-4 text-sm">
+        <p className="font-semibold">Cálculo pendiente de confirmación · {calculationOperation.pending.payroll.period}</p>
+        <p>{calculationOperation.pending.employees.length} empleados · Se conserva la solicitud original para un reintento o conciliación manual.</p>
+        <button type="button" disabled={calculationOperation.busy} className="mt-2 rounded-md border px-3 py-2" onClick={() => {
+          const intent=calculationOperation.pending!;
+          setPlanillaSeleccionada(planillas.find(row => row.id === intent.payroll.id && row.tenant_id === tenantId)
+            || {id:intent.payroll.id,tenant_id:intent.tenantId,periodo:intent.payroll.period,moneda:intent.payroll.currency});setShowCalcularModal(true);
+        }}>Retomar cálculo pendiente</button>
+      </div>}
+
+      {canPayPayroll && paymentRecoveryScope === paymentScope && paymentRecoveryError && <div role="alert" className="mb-4 rounded-xl border border-destructive/40 p-4 text-sm">
+        <p>{paymentRecoveryError}</p><button type="button" onClick={refreshPendingPayment} className="mt-2 rounded-md border px-3 py-2">Reintentar recuperación del pago</button>
+      </div>}
+      {visiblePendingPayment && <div role="status" className="mb-4 rounded-xl border border-amber-500/40 p-4 text-sm">
+        <p className="font-semibold">Pago pendiente de confirmación · {visiblePendingPayment.payroll.period}</p>
+        <p>{visiblePendingPayment.payroll.currency} {visiblePendingPayment.payroll.total.toFixed(2)} · {visiblePendingPayment.payroll.employees.length} empleados · {visiblePendingPayment.payload.metodo_pago}</p>
+        {visiblePendingPayment.payload.referencia && <p>Referencia: {visiblePendingPayment.payload.referencia}</p>}
+        <p>La operación se conserva y requiere un reintento manual.</p>
+        <button type="button" className="mt-2 rounded-md border px-3 py-2" disabled={loading || !!readError || !planillas.some(row => row.id === visiblePendingPayment.payroll.id && row.tenant_id === tenantId)} onClick={() => {
+          const row = planillas.find(item => item.id === visiblePendingPayment.payroll.id && item.tenant_id === tenantId);
+          if (row) abrirPagarPlanilla(row);
+        }}>Retomar pago pendiente</button>
+      </div>}
       <div className="relative rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl">
         <div className="mb-4 flex items-center justify-between gap-4">
           <h2 className="m-0 text-lg font-bold text-foreground">
@@ -885,7 +845,7 @@ const PlanillasPage = () => {
                 Detalle de planilla
               </h2>
               <button
-                onClick={() => setShowDetalle(false)}
+                onClick={cerrarDetalle}
                 className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-accent hover:text-foreground"
                 aria-label="Cerrar detalle de planilla"
               >
@@ -893,7 +853,8 @@ const PlanillasPage = () => {
               </button>
             </div>
 
-            {detallePlanilla.length === 0 ? (
+            {actionError && <div role="alert" className="mb-4 rounded-xl border border-destructive p-4">{actionError}<button disabled={actionLoading} onClick={() => retryAction.current?.()} className="ml-4 rounded-lg bg-primary px-4 py-2 text-primary-foreground">Reintentar descarga</button></div>}
+            {detailLoading ? <p>Cargando detalle de planilla...</p> : detailError ? <div role="alert">{detailError}<button onClick={() => detailId && void verDetallePlanilla(detailId)} className="ml-4 rounded-lg bg-primary px-4 py-2 text-primary-foreground">Reintentar detalle</button></div> : detallePlanilla.length === 0 ? (
               <div className="text-center p-8">
                 <FileEdit
                   className="mx-auto mb-4 h-12 w-12 text-muted-foreground"
@@ -965,6 +926,7 @@ const PlanillasPage = () => {
                           <button
                             className="inline-flex size-10 items-center justify-center rounded-lg border border-border bg-background text-foreground transition-colors hover:bg-accent"
                             onClick={() => descargarBoleta(empleado?.id)}
+                            disabled={actionLoading}
                             title={
                               isColombia
                                 ? "Descargar desprendible de nómina"
@@ -985,7 +947,7 @@ const PlanillasPage = () => {
 
             <div className="flex justify-end gap-4">
               <button
-                onClick={() => setShowDetalle(false)}
+                onClick={cerrarDetalle}
                 className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-4 py-2.5 text-sm font-semibold leading-5 text-secondary-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
               >
                 Cerrar
@@ -1011,11 +973,13 @@ const PlanillasPage = () => {
         <PlanillaCalcularModal
           isOpen={showCalcularModal}
           onClose={() => {
+            calculationOperation.invalidate();
             setShowCalcularModal(false);
             setPlanillaSeleccionada(null);
           }}
           onSuccess={handleCalcularSuccess}
           planilla={planillaSeleccionada}
+          operation={calculationOperation}
         />
       )}
 
@@ -1042,17 +1006,11 @@ const PlanillasPage = () => {
           }}
           onSuccess={handlePagarSuccess}
           planilla={planillaSeleccionada}
+          onPendingChange={refreshPendingPayment}
         />
       )}
 
-      <ConfirmDialog
-        isOpen={confirmDialog.isOpen}
-        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
-        onConfirm={confirmDialog.onConfirm}
-        title={confirmDialog.title}
-        message={confirmDialog.message}
-        variant={confirmDialog.variant}
-      />
+
     </div>
   );
 };

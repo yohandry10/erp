@@ -697,6 +697,10 @@ export class ConfigurationController {
           ruc: data.ruc,
           razonSocial: data.razon_social,
           nombreComercial: data.nombre_comercial,
+          habilitar_dashboards_otif: data.habilitar_dashboards_otif === true,
+          habilitar_dashboards_sunat: data.habilitar_dashboards_sunat === true,
+          objetivo_otif: data.objetivo_otif ?? 95,
+          frecuencia_actualizacion_dashboards: data.frecuencia_actualizacion_dashboards ?? 60,
           direccion: data.direccion_fiscal,
           pais: data.pais,
           pais_id: paisId,
@@ -887,6 +891,18 @@ export class ConfigurationController {
       datosEmpresa = this.normalizeArcaEndpoints(
         datosEmpresa as unknown as Record<string, unknown>,
       ) as unknown as ActualizarEmpresaConfigurationDto;
+      for (const [key, label] of [['razonSocial', 'Razón social'], ['direccion', 'Dirección fiscal']] as const) {
+        const value = datosEmpresa[key];
+        if (value !== undefined && (typeof value !== 'string' || !value.trim())) {
+          throw new BadRequestException(`${label} no puede quedar vacío.`);
+        }
+      }
+      for (const key of ['nombreComercial', 'telefono', 'email'] as const) {
+        const value = datosEmpresa[key];
+        if (value !== undefined && value !== null && typeof value !== 'string') {
+          throw new BadRequestException(`${key} debe ser texto o null.`);
+        }
+      }
       const updateData: any = {};
       let resolvedPaisId: number | null = null;
       let resolvedPaisCodigo: string | null = null;
@@ -1044,17 +1060,17 @@ export class ConfigurationController {
 
       // Mapear campos camelCase a snake_case
       if (datosEmpresa.ruc) updateData.ruc = datosEmpresa.ruc;
-      if (datosEmpresa.razonSocial) updateData.razon_social = datosEmpresa.razonSocial;
-      if (datosEmpresa.nombreComercial) updateData.nombre_comercial = datosEmpresa.nombreComercial;
-      if (datosEmpresa.direccion) updateData.direccion_fiscal = datosEmpresa.direccion;
+      if (datosEmpresa.razonSocial !== undefined) updateData.razon_social = datosEmpresa.razonSocial.trim();
+      if (datosEmpresa.nombreComercial !== undefined) updateData.nombre_comercial = datosEmpresa.nombreComercial?.trim() || null;
+      if (datosEmpresa.direccion !== undefined) updateData.direccion_fiscal = datosEmpresa.direccion.trim();
       if (resolvedPaisCodigo) updateData.pais = resolvedPaisCodigo;
       if (resolvedPaisId) updateData.pais_id = resolvedPaisId;
       if (datosEmpresa.ubigeo) updateData.ubigeo = datosEmpresa.ubigeo;
       if (datosEmpresa.departamento) updateData.departamento = datosEmpresa.departamento;
       if (datosEmpresa.provincia) updateData.provincia = datosEmpresa.provincia;
       if (datosEmpresa.distrito) updateData.distrito = datosEmpresa.distrito;
-      if (datosEmpresa.telefono) updateData.telefono = datosEmpresa.telefono;
-      if (datosEmpresa.email) updateData.email = datosEmpresa.email;
+      if (datosEmpresa.telefono !== undefined) updateData.telefono = datosEmpresa.telefono?.trim() || null;
+      if (datosEmpresa.email !== undefined) updateData.email = datosEmpresa.email?.trim() || null;
       if (datosEmpresa.sitioWeb) updateData.sitio_web = datosEmpresa.sitioWeb;
       if (datosEmpresa.representanteLegal) updateData.representante_legal = datosEmpresa.representanteLegal;
       if (datosEmpresa.dniRepresentante) updateData.dni_representante = datosEmpresa.dniRepresentante;
@@ -1079,6 +1095,9 @@ export class ConfigurationController {
       }
       if (datosEmpresa.actividadEconomica) updateData.actividad_economica = datosEmpresa.actividadEconomica;
       if (datosEmpresa.igvPorcentaje !== undefined) updateData.igv_porcentaje = datosEmpresa.igvPorcentaje;
+      for (const field of ['habilitar_dashboards_otif', 'habilitar_dashboards_sunat', 'objetivo_otif', 'frecuencia_actualizacion_dashboards'] as const) {
+        if (datosEmpresa[field] !== undefined) updateData[field] = datosEmpresa[field];
+      }
       if (datosEmpresa.tipo_empresa) updateData.tipo_empresa = datosEmpresa.tipo_empresa;
       if (datosEmpresa.usar_flujo_logistica !== undefined) updateData.usar_flujo_logistica = datosEmpresa.usar_flujo_logistica;
       if (datosEmpresa.gre_obligatorio !== undefined) updateData.gre_obligatorio = datosEmpresa.gre_obligatorio;

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { customAuth } from '@/lib/auth-service'
+import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/components/ui/use-toast'
 import { cn } from '@/lib/utils'
 import {
@@ -552,6 +552,7 @@ const MenuItemContent = memo(function MenuItemContent({
     return (
       <div className="my-1">
         <button
+          data-tour={getDataTour(item.title)}
           onClick={() => setIsExpanded(!isExpanded)}
           className={cn(
             'flex min-h-11 w-full items-center justify-between rounded-xl border border-transparent transition duration-300',
@@ -658,6 +659,7 @@ function SidebarMenuLoading({ isTablet }: { isTablet: boolean }) {
 }
 
 export default function Sidebar() {
+  const { signOut } = useAuth()
   const pathname = usePathname()
   const router = useRouter()
   const { toast } = useToast()
@@ -813,20 +815,14 @@ export default function Sidebar() {
 
   const handleLogout = async () => {
     try {
-      const { error } = await customAuth.signOut()
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "No se pudo cerrar sesión",
-        })
-      } else {
-        toast({
-          title: "Sesión cerrada",
-          description: "Has cerrado sesión exitosamente",
-        })
-        router.push('/login')
-      }
+      await signOut()
+      toast({
+        title: "Sesión cerrada",
+        description: "Has cerrado sesión exitosamente",
+      })
+      // Renovar también el contexto de React y la navegación validada por cookie;
+      // una ruta precargada no debe conservar la identidad que acaba de salir.
+      window.location.replace('/login/')
     } catch (error) {
       toast({
         variant: "destructive",

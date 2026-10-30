@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { inspectLocalAssetCreation } from './inspect-peru-asset-create-receipt-local.mjs';
 
 // El primer ADMIN opera el API real. SQL sólo contrasta agregados locales.
 export async function testPeruAccountingLifecycle({ request, sql, uuid, results,
@@ -74,10 +75,24 @@ export async function testPeruAccountingLifecycle({ request, sql, uuid, results,
   await request(`contabilidad/asientos/${manual.id}`, undefined, 404, { authorization: `Bearer ${otherTenantToken}` });
   results.push({ scenario: 'contabilidad primer cliente: asiento manual validado, replay sin duplicar, borrador editado, confirmado inmutable y reversado una vez', passed: true });
 
+  const assetOriginal = async (id, original) => {
+    const current = row(await request(`contabilidad/activos-fijos/${id}`));
+    const fields = ['id','tenant_id','codigo','nombre','descripcion','fecha_adquisicion','fecha_inicio_depreciacion',
+      'valor_adquisicion','valor_residual','vida_util_meses','depreciacion_acumulada','centro_costo_id','situacion',
+      'updated_at','asiento_baja_id','estado','activo','created_at','created_by'];
+    assert.ok(fields.every(field => Object.hasOwn(current, field)), 'Fotografía completa del activo');
+    return { expected: Object.fromEntries(fields.map(field => [field,current[field]])), original };
+  };
   const assetPayload = { codigo: `AF-${suffix}`, nombre: 'Activo lineal local', fecha_adquisicion: periods[0].fecha,
     valor_adquisicion: 1001, valor_residual: 1, vida_util_meses: 3 };
   const assetKey = key();
-  const asset = row(await request('contabilidad/activos-fijos', assetPayload, 201, assetKey));
+  let asset;
+  try { asset = row(await request('contabilidad/activos-fijos', assetPayload, 201, assetKey)); }
+  catch(error) {
+    const actor=sql(`SELECT created_by FROM activos_fijos WHERE tenant_id=${uuid(tenantId)} AND codigo=upper('${assetPayload.codigo}');`);
+    await inspectLocalAssetCreation({sql,tenant:tenantId,actor,key:assetKey['idempotency-key'],payload:assetPayload});
+    throw error;
+  }
   assert.equal(row(await request('contabilidad/activos-fijos', assetPayload, 201, assetKey)).id, asset.id);
   await request('contabilidad/asiento-contable', { fecha: periods[0].fecha, concepto: 'Adquisición contable del activo local',
     referencia: assetPayload.codigo, detalles: [
@@ -88,25 +103,45 @@ export async function testPeruAccountingLifecycle({ request, sql, uuid, results,
   await request('contabilidad/activos-fijos', assetPayload, 403, { ...key(), ...readerHeaders });
   await request(`contabilidad/activos-fijos/${asset.id}`, undefined, 200, readerHeaders);
   await request(`contabilidad/activos-fijos/${asset.id}`, { nombre: 'Cambio sin permiso' }, 403, readerHeaders, 'PUT');
-  await request(`contabilidad/activos-fijos/${asset.id}`, { nombre: 'Activo lineal editado' }, 200, key(), 'PUT');
+  const updateOriginal = await assetOriginal(asset.id, { nombre: 'Activo lineal editado', vida_util_meses: 3, valor_residual: 1 });
+  const updateKey = key();
+  const updateReceipt = await request(`contabilidad/activos-fijos/${asset.id}`, updateOriginal, 200, updateKey, 'PUT');
+  assert.equal(updateReceipt.complete, true);
+  assert.equal((await request(`contabilidad/activos-fijos/${asset.id}`, updateOriginal, 200, updateKey, 'PUT')).operation.operation_id, updateReceipt.operation.operation_id);
   assert.equal(row(await request(`contabilidad/activos-fijos/${asset.id}`)).nombre, 'Activo lineal editado');
   const schedule = row(await request(`contabilidad/activos-fijos/${asset.id}/cronograma`));
   assert.deepEqual(schedule.map(item => cents(item.cuota)), [33333, 33333, 33334]);
+  const batchOriginals = [];
   for (const [index, period] of periods.entries()) {
     const { anio, mes } = period;
-    const depreciation = row(await request('contabilidad/activos-fijos/depreciar', { anio, mes }));
+    const batchKey = key();
+    const batchReceipt = await request('contabilidad/activos-fijos/depreciar', { anio, mes }, 201, batchKey);
+    assert.equal(batchReceipt.complete, true);
+    const depreciation = row(batchReceipt);
+    batchOriginals.push({body:{anio,mes},key:batchKey,operation:batchReceipt.operation.operation_id});
+    const batchReplay = await request('contabilidad/activos-fijos/depreciar', { anio, mes }, 201, batchKey);
+    assert.equal(batchReplay.operation.operation_id, batchReceipt.operation.operation_id);
+    assert.deepEqual(row(batchReplay), depreciation);
     assert.equal(depreciation.activos_depreciados, 1);
     assert.equal(cents(depreciation.total_depreciado), index === 2 ? 33334 : 33333);
-    assert.equal(row(await request('contabilidad/activos-fijos/depreciar', { anio, mes })).activos_depreciados, 0);
+    assert.equal(row(await request('contabilidad/activos-fijos/depreciar', { anio, mes }, 201, key())).activos_depreciados, 0);
   }
   processAccounting('accounting-first-client-assets');
   const depreciated = row(await request(`contabilidad/activos-fijos/${asset.id}`));
   assert.equal(cents(depreciated.depreciacion_acumulada), 100000);
   assert.equal(cents(depreciated.valor_neto), 100);
   assert.equal(depreciated.situacion, 'DEPRECIADO');
-  const disposal = row(await request(`contabilidad/activos-fijos/${asset.id}/baja`, { fecha: date, tipo: 'BAJA', motivo: 'Retiro local' }));
-  assert.equal(disposal.situacion, 'BAJA');
-  await request(`contabilidad/activos-fijos/${asset.id}/baja`, { fecha: date, tipo: 'BAJA' }, 400);
+  const retireOriginal = await assetOriginal(asset.id, { fecha: date, tipo: 'BAJA', motivo: 'Retiro local' });
+  const retireKey = key();
+  const retireReceipt = await request(`contabilidad/activos-fijos/${asset.id}/baja`, retireOriginal, 201, retireKey);
+  assert.equal(row(retireReceipt).situacion, 'BAJA');
+  assert.equal(retireReceipt.complete, true);
+  assert.equal(retireReceipt.journal.estado, 'CONFIRMADO');
+  assert.equal((await request(`contabilidad/activos-fijos/${asset.id}/baja`, retireOriginal, 201, retireKey)).operation.operation_id, retireReceipt.operation.operation_id);
+  await request(`contabilidad/activos-fijos/${asset.id}/baja`, await assetOriginal(asset.id, { fecha: date, tipo: 'BAJA' }), 400, key());
+  // Replays committed originals even though the current asset is retired.
+  assert.deepEqual(row(await request(`contabilidad/activos-fijos/${asset.id}`, updateOriginal, 200, updateKey, 'PUT')), row(updateReceipt));
+  for (const batch of batchOriginals) assert.equal((await request('contabilidad/activos-fijos/depreciar', batch.body, 201, batch.key)).operation.operation_id, batch.operation);
   await request(`contabilidad/activos-fijos/${asset.id}`, undefined, 404, { authorization: `Bearer ${otherTenantToken}` });
   assert.equal(sql(`SELECT count(*) FROM depreciaciones WHERE activo_id=${uuid(asset.id)} AND tenant_id=${uuid(tenantId)};`), '3');
   assert.equal(sql(`SELECT count(*) FROM asientos_contables WHERE tenant_id=${uuid(tenantId)} AND origen='BAJA_ACTIVO_FIJO' AND estado='CONFIRMADO' AND total_debe=total_haber;`), '1');

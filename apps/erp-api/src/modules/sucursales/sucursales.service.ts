@@ -11,6 +11,7 @@ import { SupabaseService } from "../../shared/supabase/supabase.service";
 import {
   AsignarSucursalesDto,
   CreateSucursalDto,
+  RegistrarSerieEstablecimientoDto,
   UpdateSucursalDto,
 } from "./dto/sucursales.dto";
 
@@ -172,6 +173,47 @@ export class SucursalesService {
       );
     }
     return data;
+  }
+
+  async registrarSerie(
+    tenantId: string,
+    sucursalId: string,
+    dto: RegistrarSerieEstablecimientoDto,
+    actorId: string,
+    key: string,
+  ): Promise<{ serie: Record<string, unknown>; idempotent: boolean }> {
+    if (!actorId) throw new ForbiddenException("Se requiere un actor autenticado");
+    const { data, error } = await this.supabase
+      .getClient()
+      .rpc("registrar_serie_establecimiento_tx", {
+        p_tenant_id: tenantId,
+        p_actor_id: actorId,
+        p_sucursal_id: sucursalId,
+        p_tipo_documento: dto.tipo_documento,
+        p_serie: dto.serie.toUpperCase(),
+        p_idempotency_key: key,
+      });
+    if (error) {
+      const message = String(error.message || "");
+      if (message.includes("ESTABLISHMENT_NOT_ACTIVE_IN_TENANT"))
+        throw new NotFoundException("Establecimiento no encontrado o inactivo");
+      if (message.includes("DOCUMENT_SERIES_RESERVED_FOR_MAIN_ESTABLISHMENT"))
+        throw new ConflictException(
+          "Esa serie es la de la casa matriz en la configuración de la empresa; use otra para este establecimiento",
+        );
+      if (message.includes("DOCUMENT_SERIES_ALREADY_USED_IN_OTHER_ESTABLISHMENT"))
+        throw new ConflictException(
+          "La serie ya tiene comprobantes emitidos en otro establecimiento",
+        );
+      if (message.includes("DOCUMENT_SERIES_REQUEST_INVALID"))
+        throw new BadRequestException(
+          "Serie inválida: las facturas empiezan con F y las boletas con B",
+        );
+      if (error.code === "42501" || message.includes("ACTOR"))
+        throw new ForbiddenException("No autorizado para registrar series");
+      throw new ServiceUnavailableException("No se pudo registrar la serie; reintente");
+    }
+    return data as { serie: Record<string, unknown>; idempotent: boolean };
   }
 
   async crear(

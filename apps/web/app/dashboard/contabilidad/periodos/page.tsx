@@ -1,30 +1,49 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
+import { usePermission } from '@/hooks/use-permission'
+import { readPeriodCatalog, type PeriodSnapshot } from '@/lib/accounting-period-read'
 import { parseDateLocal } from '@/lib/date-utils'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, Calendar, Lock, Loader2, PlusCircle, RefreshCw, ShieldAlert, Unlock } from 'lucide-react'
+import { usePeriodTransitionOperations } from '@/hooks/use-period-transition-operation'
+import { periodProvisionDays } from '@/lib/accounting-period-provision'
+import { usePeriodProvisionOperation } from '@/hooks/use-period-provision-operation'
+import PeriodTransitionRecovery from '@/components/contabilidad/PeriodTransitionRecovery'
 import PeriodoCierreWizard from '@/components/contabilidad/PeriodoCierreWizard'
 import { useApi } from '@/hooks/use-api'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-interface Periodo {
-  id: string
-  tenant_id: string
-  anio: number
-  mes: number
-  estado: 'ABIERTO' | 'CERRADO' | 'BLOQUEADO'
-  fecha_cierre?: string
-  cerrado_por?: string
-  created_at: string
-  updated_at: string
-}
+type Periodo = PeriodSnapshot
 
 const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-primary/80'
 
 export default function PeriodosPage() {
+  const { session } = useAuth()
+  return <PeriodosWorkspace key={`${session?.user?.tenant_id || ''}:${session?.user?.id || ''}`} />
+}
+
+function PeriodosWorkspace() {
+  const { session, loading: authLoading } = useAuth()
+  const tenantId = session?.user?.tenant_id || '', actorId = session?.user?.id || ''
+  const scopeIdentity = `${tenantId}:${actorId}`
+  const scopeReady = !authLoading && !!tenantId && !!actorId
+  const activeScope = useRef(scopeIdentity); activeScope.current = scopeIdentity
+  const readEpoch = useRef(0)
+  const createPermission = usePermission('contabilidad', 'crear', 'periodos')
+  const closePermission = usePermission('contabilidad', 'cerrar', 'periodos')
+  const validatePermission = usePermission('contabilidad', 'validar', 'periodos')
+  const provisionPermission = usePermission('contabilidad', 'crear', 'asientos')
+  const canCreate = scopeReady && !createPermission.loading && createPermission.hasPermission
+  const canClose = scopeReady && !closePermission.loading && closePermission.hasPermission && !validatePermission.loading && validatePermission.hasPermission
+  const canProvision = scopeReady && !provisionPermission.loading && provisionPermission.hasPermission
+  const transition = usePeriodTransitionOperations()
+  const hasUnconfirmedPeriods = !transition.ready || !!transition.recoveryError || transition.pending.length > 0
+  const uncertainPeriod = (id: string) => !transition.ready || !!transition.recoveryError || transition.pending.some(row => row.intent.snapshot.id === id)
+  const provision = usePeriodProvisionOperation({tenantId,actorId},canProvision,scopeReady)
   const country = useCountryContext()
   const router = useRouter()
   const [periodos, setPeriodos] = useState<Periodo[]>([])
@@ -34,9 +53,10 @@ export default function PeriodosPage() {
   const [selectedPeriodo, setSelectedPeriodo] = useState<Periodo | null>(null)
   const [periodoAProvisionar, setPeriodoAProvisionar] = useState<Periodo | null>(null)
   const [diasVencido, setDiasVencido] = useState('360')
-  const [provisionando, setProvisionando] = useState(false)
+  const provisionando = provision.busy
   const [resultadoProvision, setResultadoProvision] = useState<string | null>(null)
-  const { apiCall } = useApi<any>({ retries: 2, timeoutMs: 12000, showErrorToast: false })
+  const [provisionError, setProvisionError] = useState<string | null>(null)
+  const { apiCall: readApi } = useApi<unknown>({ requireLive: true, throwOnError: true, retries: 0, timeoutMs: 30000, showErrorToast: false })
 
   /**
    * Estimación de cuentas de cobranza dudosa del periodo (artículo 37 inciso i
@@ -44,56 +64,39 @@ export default function PeriodosPage() {
    * el detalle documento a documento que pide el Libro de Inventarios y
    * Balances. Ejecutarlo dos veces no duplica.
    */
-  const provisionar = async () => {
-    if (!periodoAProvisionar) return
-    const periodo = `${periodoAProvisionar.anio}-${String(periodoAProvisionar.mes).padStart(2, '0')}`
+  const provisionar = async (recover = false) => {
+    if (!canProvision || loading || error || provisionando || (!recover && (!periodoAProvisionar || uncertainPeriod(periodoAProvisionar.id)))) return
+    setResultadoProvision(null); setProvisionError(null)
     try {
-      setProvisionando(true)
-      setResultadoProvision(null)
-      const resultado = await apiCall(
-        `/contabilidad/periodos/${periodo}/provision-cobranza-dudosa?dias_vencido=${Number(diasVencido) || 360}`,
-        { method: 'POST' },
-      )
-      const datos = resultado?.data ?? resultado
-      const documentos = Number(datos?.documentos ?? 0)
-      setResultadoProvision(
-        documentos > 0
-          ? `Provisionados S/ ${Number(datos?.monto_provisionado ?? 0).toFixed(2)} sobre ${documentos} documento(s).`
-          : 'No había deuda vencida sin provisionar con ese criterio: no se generó ningún asiento.',
-      )
-      // No se recarga la lista a propósito: la estimación no cambia ninguna
-      // columna de la tabla, y `loading` desmonta la página entera --hay un
-      // `return` temprano-- llevándose por delante el resultado que hay que leer.
-    } catch (err: any) {
-      setResultadoProvision(err?.message || 'No se pudo generar la estimación')
-    } finally {
-      setProvisionando(false)
-    }
+      const payload = recover ? undefined : {periodo:periodoAProvisionar!.codigo,periodoId:periodoAProvisionar!.id,diasVencido:periodProvisionDays(diasVencido)}
+      const receipt = await provision.perform(payload)
+      if (receipt) setResultadoProvision(receipt.documentos > 0
+        ? `Provisionados S/ ${receipt.monto_provisionado.toFixed(2)} sobre ${receipt.documentos} documento(s).`
+        : 'No había deuda vencida sin provisionar con ese criterio: no se generó ningún asiento.')
+    } catch (cause) { setProvisionError(cause instanceof Error ? cause.message : 'No se pudo confirmar la estimación.') }
   }
 
   const fetchPeriodos = useCallback(async () => {
+    const run = ++readEpoch.current
+    provision.invalidate(); setProvisionError(null)
+    const current = () => run === readEpoch.current && activeScope.current === scopeIdentity
+    setLoading(true); setError(null); setPeriodos([])
+    setShowWizard(false); setSelectedPeriodo(null); setPeriodoAProvisionar(null); setResultadoProvision(null)
+    if (!scopeReady) return
     try {
-      setLoading(true)
-      setError(null)
-
-      const result = await apiCall('/contabilidad/periodos')
-      const periodosData = result?.data || []
-      const sorted = [...periodosData].sort((a: Periodo, b: Periodo) => {
-        if (a.anio !== b.anio) return b.anio - a.anio
-        return b.mes - a.mes
-      })
-
-      setPeriodos(sorted)
+      const result = await readApi('/contabilidad/periodos')
+      const rows = readPeriodCatalog(result, tenantId)
+      if (current()) setPeriodos(rows)
     } catch (err) {
-      console.error('Error fetching periodos:', err)
-      setError('Error al cargar los periodos contables')
+      if (current()) setError(err instanceof Error ? err.message : 'Error al cargar los periodos contables')
     } finally {
-      setLoading(false)
+      if (current()) setLoading(false)
     }
-  }, [apiCall])
+  }, [readApi, scopeReady, scopeIdentity, tenantId])
 
   useEffect(() => {
-    fetchPeriodos()
+    void fetchPeriodos()
+    return () => { readEpoch.current += 1 }
   }, [fetchPeriodos])
 
   const formatPeriodo = (anio: number, mes: number) => {
@@ -179,14 +182,14 @@ export default function PeriodosPage() {
                 <RefreshCw className="h-4 w-4" />
                 Actualizar
               </Button>
-              <Button
+              {canCreate && !error && <Button
                 type="button"
                 onClick={() => router.push('/dashboard/contabilidad/periodos/nuevo')}
                 className="gap-2 bg-blue-600 text-white hover:bg-blue-500"
               >
                 <PlusCircle className="h-4 w-4" />
                 Crear periodo
-              </Button>
+              </Button>}
             </div>
           </div>
         </section>
@@ -205,7 +208,18 @@ export default function PeriodosPage() {
           </Card>
         )}
 
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {!error && <>
+        {canProvision && !provision.ready && <p role="status">Recuperando estimación pendiente...</p>}
+        {canProvision && provision.recoveryError && <p role="alert">{provision.recoveryError}</p>}
+        {canProvision && provision.pending && <Card data-testid="period-provision-pending"><CardContent className="space-y-3 p-4">
+          <h2 className="font-semibold">Estimación pendiente de confirmar</h2>
+          <p>Período {provision.pending.payload.periodo}, deuda vencida al menos {provision.pending.payload.diasVencido} día(s). Se conserva el criterio; el reintento recupera el mismo resultado.</p>
+          {provision.error && <p role="alert" className="text-destructive">{provision.error}</p>}
+          <Button disabled={provisionando} onClick={() => void provisionar(true)}>Reintentar estimación pendiente</Button>
+          {resultadoProvision && <p role="status">{resultadoProvision}</p>}
+        </CardContent></Card>}
+        {canProvision && resultadoProvision && !periodoAProvisionar && !provision.pending && <p role="status">{resultadoProvision}</p>}
+        {!hasUnconfirmedPeriods && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {stats.map(([label, value]) => (
             <Card key={label} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
               <CardContent className="p-4">
@@ -214,7 +228,8 @@ export default function PeriodosPage() {
               </CardContent>
             </Card>
           ))}
-        </section>
+        </section>}
+        {hasUnconfirmedPeriods && <p role="status" className="rounded-xl border border-border bg-card p-4 text-sm">{transition.ready ? 'Hay transiciones pendientes de confirmar. Las filas muestran la última lectura; verifica el resultado antes de realizar otra operación.' : 'Comprobando transiciones pendientes...'}</p>}
 
         <Card className="overflow-hidden border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
@@ -229,16 +244,16 @@ export default function PeriodosPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-foreground">No hay periodos contables</h3>
-                  <p className="mt-2 text-sm text-muted-foreground">Crea el primer periodo para habilitar control de cierre.</p>
+                  <p className="mt-2 text-sm text-muted-foreground">{canCreate ? 'Crea el primer periodo para habilitar control de cierre.' : 'No hay períodos registrados en esta empresa.'}</p>
                 </div>
-                <Button
+                {canCreate && <Button
                   type="button"
                   onClick={() => router.push('/dashboard/contabilidad/periodos/nuevo')}
                   className="gap-2 bg-blue-600 text-white hover:bg-blue-500"
                 >
                   <PlusCircle className="h-4 w-4" />
                   Crear periodo
-                </Button>
+                </Button>}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -269,7 +284,7 @@ export default function PeriodosPage() {
                         </td>
                         <td className="px-4 py-3 font-semibold text-foreground">{periodo.anio}</td>
                         <td className="px-4 py-3 font-semibold text-foreground">{String(periodo.mes).padStart(2, '0')}</td>
-                        <td className="px-4 py-3">{getEstadoBadge(periodo.estado)}</td>
+                        <td className="px-4 py-3">{uncertainPeriod(periodo.id) ? <span className="text-sm font-semibold text-amber-300">Pendiente de confirmar</span> : getEstadoBadge(periodo.estado)}</td>
                         <td className="px-4 py-3 text-muted-foreground">
                           {periodo.fecha_cierre
                             ? parseDateLocal(periodo.fecha_cierre).toLocaleDateString(country.locale, {
@@ -281,7 +296,7 @@ export default function PeriodosPage() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex justify-end gap-2">
-                            {periodo.estado === 'ABIERTO' && (
+                            {periodo.estado === 'ABIERTO' && canClose && !uncertainPeriod(periodo.id) && (
                               <Button
                                 type="button"
                                 size="sm"
@@ -295,7 +310,7 @@ export default function PeriodosPage() {
                                 Cerrar
                               </Button>
                             )}
-                            {periodo.estado === 'ABIERTO' && (
+                            {periodo.estado === 'ABIERTO' && canProvision && provision.ready && !provision.pending && !provision.recoveryError && !uncertainPeriod(periodo.id) && (
                               <Button
                                 type="button"
                                 size="sm"
@@ -303,7 +318,7 @@ export default function PeriodosPage() {
                                 title="Estimación de cuentas de cobranza dudosa (Dr 68 / Cr 19)"
                                 onClick={() => {
                                   setPeriodoAProvisionar(periodo)
-                                  setResultadoProvision(null)
+                                  setResultadoProvision(null); setProvisionError(null)
                                 }}
                                 className="gap-2 border-amber-400/30 bg-amber-400/5 text-amber-300 hover:bg-amber-400/10"
                               >
@@ -331,6 +346,7 @@ export default function PeriodosPage() {
           </CardContent>
         </Card>
 
+        </>}
         <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardContent className="grid gap-3 p-5 md:grid-cols-3">
             {[
@@ -346,8 +362,11 @@ export default function PeriodosPage() {
           </CardContent>
         </Card>
 
-        {showWizard && selectedPeriodo && (
+        <PeriodTransitionRecovery onConfirmed={() => { void fetchPeriodos() }} />
+
+        {showWizard && selectedPeriodo && canClose && !error && (
           <PeriodoCierreWizard
+            periodo={selectedPeriodo}
             periodoId={selectedPeriodo.id}
             anio={selectedPeriodo.anio}
             mes={selectedPeriodo.mes}
@@ -363,7 +382,7 @@ export default function PeriodosPage() {
           />
         )}
 
-        {periodoAProvisionar && (
+        {periodoAProvisionar && canProvision && !error && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
             <Card className="w-full max-w-lg border-amber-400/25">
               <CardHeader>
@@ -386,6 +405,8 @@ export default function PeriodosPage() {
                     type="number"
                     min={1}
                     value={diasVencido}
+                    disabled={provisionando || !!provision.pending}
+                    step={1}
                     onChange={(e) => setDiasVencido(e.target.value)}
                     className="w-full rounded-xl border border-cyan-400/20 bg-card/80 px-3 py-3 text-sm text-foreground outline-none focus:border-cyan-300"
                   />
@@ -395,6 +416,7 @@ export default function PeriodosPage() {
                   </span>
                 </label>
 
+                {(provisionError || provision.error) && <p role="alert" className="rounded-xl border border-destructive p-3 text-sm text-destructive">{provisionError || provision.error}</p>}
                 {resultadoProvision && (
                   <p className="rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-3 text-sm text-foreground">
                     {resultadoProvision}
@@ -406,8 +428,9 @@ export default function PeriodosPage() {
                     type="button"
                     variant="outline"
                     onClick={() => {
+                      provision.invalidate()
                       setPeriodoAProvisionar(null)
-                      setResultadoProvision(null)
+                      setResultadoProvision(null); setProvisionError(null)
                     }}
                     className="border-cyan-400/20 bg-white/5"
                   >
@@ -415,12 +438,12 @@ export default function PeriodosPage() {
                   </Button>
                   <Button
                     type="button"
-                    disabled={provisionando}
-                    onClick={provisionar}
+                    disabled={provisionando || !canProvision || loading || !!error || uncertainPeriod(periodoAProvisionar.id)}
+                    onClick={() => void provisionar(!!provision.pending)}
                     className="gap-2 bg-amber-500 text-black hover:bg-amber-400"
                   >
                     {provisionando ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldAlert className="h-4 w-4" />}
-                    {provisionando ? 'Calculando…' : 'Generar estimación'}
+                    {provisionando ? 'Calculando…' : provision.pending ? 'Reintentar estimación pendiente' : 'Generar estimación'}
                   </Button>
                 </div>
               </CardContent>

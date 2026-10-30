@@ -1,33 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { requestConfirmation } from '@/lib/confirm-action'
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useApi } from "@/hooks/use-api";
+import { useAuth } from '@/contexts/AuthContext';
+import { usePermission } from '@/hooks/use-permission';
+import { productDeactivateIntentKey, newProductDeactivateIntent, readProductDeactivateIntent, readProductDeactivateCandidate, readProductDeactivateCatalog, confirmProductDeactivated, type ProductDeactivateIntent } from '@/lib/product-deactivate-operation';
+import type { ProductSnapshot } from '@/lib/product-update-operation';
 import { useCountryContext } from "@/hooks/use-country-context";
 import { Package, Plus, Edit, Trash2, Search, Filter } from "lucide-react";
 
-type Producto = {
-  id: string;
-  codigo: string;
-  nombre: string;
-  marca?: string;
-  descripcion?: string;
-  categoria?: string;
-  precio_venta: number;
-  precio_compra: number;
-  stock_actual: number;
-  stock?: number;
-  stock_minimo: number;
-  stock_reservado: number;
-  codigo_barras?: string;
-  impuesto: number;
-  activo: boolean;
-  created_at: string;
-  updated_at: string;
-  imagen_url?: string;
-};
+type Producto = ProductSnapshot;
 
 type Filters = {
   search: string;
@@ -37,10 +23,44 @@ type Filters = {
 };
 
 export default function ProductosPage() {
+  const { session } = useAuth();
+  return <ProductosWorkspace key={`${session?.user?.tenant_id || ''}:${session?.user?.id || ''}`} />;
+}
+
+function ProductosWorkspace() {
+  const { session, loading: authLoading } = useAuth();
+  const tenantId = session?.user?.tenant_id || '', actorId = session?.user?.id || '';
+  const scopeIdentity = `${tenantId}:${actorId}`;
+  const createPermission = usePermission('inventario', 'create', 'productos');
+  const updatePermission = usePermission('inventario', 'update', 'productos');
+  const deletePermission = usePermission('inventario', 'delete', 'productos');
+  const canCreate = createPermission.hasPermission && !createPermission.loading;
+  const canUpdate = updatePermission.hasPermission && !updatePermission.loading;
+  const canDelete = deletePermission.hasPermission && !deletePermission.loading;
+  const deleteAllowed = useRef(canDelete); deleteAllowed.current = canDelete;
+  const activeScope = useRef(scopeIdentity); activeScope.current = scopeIdentity;
+  const writeEpoch = useRef(0), inFlight = useRef(false), pendingRaw = useRef<string | null>(null);
+  const [intentReady, setIntentReady] = useState('');
+  const [pendingIntent, setPendingIntent] = useState<ProductDeactivateIntent | null>(null);
+  const [recoveryBlocked, setRecoveryBlocked] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
+  const [operationError, setOperationError] = useState('');
+  const [operationNotice, setOperationNotice] = useState('');
+  const scopeReady = !authLoading && !!tenantId && !!actorId && intentReady === scopeIdentity;
+  const visibleIntent = scopeReady && pendingIntent?.tenantId === tenantId && pendingIntent?.actorId === actorId ? pendingIntent : null;
+  useEffect(() => {
+    writeEpoch.current += 1; inFlight.current = false; pendingRaw.current = null;
+    setPendingIntent(null); setIntentReady(''); setRecoveryBlocked(false); setDeactivating(false); setOperationError(''); setOperationNotice('');
+    if (authLoading || !tenantId || !actorId) return;
+    try {
+      const raw = window.localStorage.getItem(productDeactivateIntentKey({ tenantId, actorId }));
+      if (raw !== null) { const intent = readProductDeactivateIntent(raw, { tenantId, actorId }); pendingRaw.current = raw; setPendingIntent(intent); }
+      setIntentReady(scopeIdentity);
+    } catch (err) { setRecoveryBlocked(true); setOperationError(err instanceof Error ? err.message : 'No se pudo recuperar la baja pendiente. Se conserva sin reemplazarla.'); }
+    return () => { writeEpoch.current += 1; };
+  }, [tenantId, actorId, authLoading, scopeIdentity]);
   const router = useRouter();
-  const { get, del } = useApi();
-  const { get: getProductos } = useApi({ throwOnError: true, showErrorToast: false });
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const { get, del } = useApi({ requireLive: true, throwOnError: true, showErrorToast: false, retries: 0 });
   const country = useCountryContext();
   const formatMoney = (value: number) =>
     new Intl.NumberFormat(country.locale || "es-PE", {
@@ -49,6 +69,8 @@ export default function ProductosPage() {
     }).format(value);
   const [loading, setLoading] = useState(true);
   const [productos, setProductos] = useState<Producto[]>([]);
+  const [loadError, setLoadError] = useState(false);
+  const loadSequence = useRef(0);
   const [filters, setFilters] = useState<Filters>({
     search: "",
     categoria: "",
@@ -57,46 +79,72 @@ export default function ProductosPage() {
   });
 
   const loadProductos = useCallback(async () => {
+    const sequence = ++loadSequence.current;
+    setProductos([]);
+    setLoadError(false);
     setLoading(true);
     try {
-      const response = await getProductos("/inventario/productos");
-      if (response?.success && Array.isArray(response.data)) {
-        setProductos(response.data);
-      }
-      setLoadError(null);
+      const [activeResponse, inactiveResponse] = await Promise.all([
+        get("/inventario/productos", { params: { estado: 'ACTIVO' } }),
+        get("/inventario/productos", { params: { estado: 'INACTIVO' } }),
+      ]);
+      const activeRows = readProductDeactivateCatalog(activeResponse, { tenantId, actorId });
+      const inactiveRows = readProductDeactivateCatalog(inactiveResponse, { tenantId, actorId });
+      if (activeRows.some(row => !row.activo) || inactiveRows.some(row => row.activo)) throw new Error('El catálogo no coincide con el estado consultado');
+      const rows = readProductDeactivateCatalog({ success: true, data: [...activeRows, ...inactiveRows] }, { tenantId, actorId });
+      if (sequence !== loadSequence.current) return;
+      setProductos(rows);
     } catch (error) {
-      // Una carga fallida no es un catálogo vacío: antes se veía «No se
-      // encontraron productos».
+      if (sequence !== loadSequence.current) return;
+      setLoadError(true);
       console.error("Error cargando productos:", error);
-      setLoadError(error instanceof Error && error.message ? error.message : "Inténtalo nuevamente en unos minutos.");
     } finally {
-      setLoading(false);
+      if (sequence === loadSequence.current) setLoading(false);
     }
-  }, [getProductos]);
+  }, [get, tenantId, actorId]);
 
   useEffect(() => {
     loadProductos();
+    return () => { loadSequence.current += 1; };
   }, [loadProductos]);
 
-  const handleDelete = async (id: string, nombre: string) => {
-    if (!confirm(`¿Está seguro de eliminar el producto "${nombre}"?`)) return;
-
+  const writerBlocked = !scopeReady || recoveryBlocked || deactivating || !!visibleIntent;
+  const handleDelete = async (selected?: Producto) => {
+    if (!canDelete || !scopeReady || recoveryBlocked || inFlight.current || loading || loadError) return;
+    if (!visibleIntent && (!selected || !(await requestConfirmation(`¿Dar de baja el producto "${selected.nombre}"? Se conservarán sus datos e historial.`)))) return;
+    const run = writeEpoch.current;
+    const current = () => run === writeEpoch.current && activeScope.current === scopeIdentity && deleteAllowed.current;
+    const scope = { tenantId, actorId }, key = productDeactivateIntentKey(scope);
+    inFlight.current = true; setDeactivating(true); setOperationError(''); setOperationNotice('');
     try {
-      const response = await del(`/inventario/productos/${id}`, {
-        headers: {
-          "Idempotency-Key": `inventory-product-deactivate:${id}:${crypto.randomUUID()}`,
-        },
-      });
-      if (response?.success) {
-        alert("✅ Producto eliminado exitosamente");
-        loadProductos();
-      } else {
-        throw new Error(response?.message || "Error al eliminar");
+      const raw = window.localStorage.getItem(key);
+      if (raw !== pendingRaw.current) throw new Error('La baja pendiente cambió en otra ventana. Se conserva; recargue para revisarla.');
+      let intent = raw === null ? null : readProductDeactivateIntent(raw, scope);
+      if (!intent) {
+        if (!selected) return;
+        const response = await get(`/inventario/productos/${selected.id}`);
+        const candidate = readProductDeactivateCandidate(response, scope, selected.id, selected);
+        if (!current()) return;
+        intent = newProductDeactivateIntent(candidate, scope);
+        if (window.localStorage.getItem(key) !== null) throw new Error('Otra ventana guardó una baja pendiente. Se conserva sin reemplazarla.');
+        const nextRaw = JSON.stringify(intent); readProductDeactivateIntent(nextRaw, scope);
+        window.localStorage.setItem(key, nextRaw);
+        if (window.localStorage.getItem(key) !== nextRaw) throw new Error('No se pudo guardar y verificar la baja pendiente. No se envió.');
+        pendingRaw.current = nextRaw; setPendingIntent(intent);
       }
-    } catch (error: any) {
-      console.error("Error eliminando producto:", error);
-      alert(`❌ Error: ${error.message}`);
-    }
+      if (!current()) return;
+      if (window.localStorage.getItem(key) !== pendingRaw.current) throw new Error('La baja pendiente cambió en otra ventana. Se conserva sin reemplazarla.');
+      const response = await del(`/inventario/productos/${intent.snapshot.id}`, { headers: { 'Idempotency-Key': intent.idempotencyKey } });
+      if (!current()) return;
+      const row = confirmProductDeactivated(response, intent);
+      if (window.localStorage.getItem(key) !== pendingRaw.current) throw new Error('La baja pendiente cambió en otra ventana. Se conserva sin retirarla.');
+      window.localStorage.removeItem(key);
+      if (window.localStorage.getItem(key) !== null) throw new Error('La baja se confirmó, pero no se pudo retirar la intención. Reintente su recuperación.');
+      pendingRaw.current = null; setPendingIntent(null);
+      setOperationNotice(`Producto "${row.nombre}" dado de baja. Su historial se conserva.`);
+      await loadProductos();
+    } catch (err) { if (current()) setOperationError(err instanceof Error ? err.message : 'No se pudo confirmar la baja. Se conserva para reintentar.'); }
+    finally { if (current()) { inFlight.current = false; setDeactivating(false); } }
   };
 
   const categorias = Array.from(
@@ -142,14 +190,24 @@ export default function ProductosPage() {
             Administra el catálogo de productos del inventario
           </p>
         </div>
-        <Link
+        {canCreate && !writerBlocked && !loadError && !loading && <Link
           href="/dashboard/inventario/productos/nuevo"
           className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
         >
           <Plus size={20} />
           Nuevo Producto
-        </Link>
+        </Link>}
       </div>
+
+      {operationError && <div role="alert" className="mb-4 rounded-lg border border-destructive p-4 text-destructive">{operationError}</div>}
+      {operationNotice && <div role="status" className="mb-4 rounded-lg border border-border p-4">{operationNotice}</div>}
+      {visibleIntent && <div data-testid="product-deactivate-pending" className="mb-6 rounded-xl border border-border bg-card p-5">
+        <h2 className="text-lg font-semibold">Baja de producto pendiente de confirmar</h2>
+        <p>{visibleIntent.snapshot.codigo} — {visibleIntent.snapshot.nombre}</p>
+        <p>Se conservarán los datos y el historial del producto. Stock {visibleIntent.snapshot.stock_actual}; reservado {visibleIntent.snapshot.stock_reservado}.</p>
+        <p>No se envía automáticamente. Reintente con conexión para confirmar la misma baja.</p>
+        {canDelete && <button type="button" disabled={deactivating || loading || loadError || recoveryBlocked} onClick={() => handleDelete()} className="mt-3 rounded-lg border px-4 py-2 disabled:opacity-50">{deactivating ? 'Confirmando baja…' : 'Reintentar baja pendiente'}</button>}
+      </div>}
 
       {/* Filtros */}
       <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl mb-8">
@@ -229,7 +287,7 @@ export default function ProductosPage() {
       <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
         <div className="flex justify-between items-center mb-4">
           <h2 className="m-0 text-lg font-bold text-foreground">
-            Productos ({productosFiltrados.length})
+            {loadError ? 'Productos no disponibles' : `Productos (${productosFiltrados.length})`}
           </h2>
           <button onClick={loadProductos} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-4 py-2.5 text-sm font-semibold leading-5 text-secondary-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50">
             Actualizar
@@ -242,9 +300,9 @@ export default function ProductosPage() {
             <p>Cargando productos...</p>
           </div>
         ) : loadError ? (
-          <div id="productos-load-error" role="alert" className="m-6 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            <strong className="block font-semibold">No se pudieron cargar los productos.</strong>
-            <span>{loadError}</span>
+          <div role="alert" className="rounded-lg border border-destructive p-4 text-destructive">
+            <p>No se pudo cargar el catálogo de productos. Reintente para consultar o editar.</p>
+            <button type="button" onClick={loadProductos} className="mt-3 rounded-lg border px-4 py-2">Reintentar</button>
           </div>
         ) : productosFiltrados.length === 0 ? (
           <div className="text-center p-12 text-[var(--primary-500)]">
@@ -357,7 +415,7 @@ export default function ProductosPage() {
                             : critico
                               ? "⚠️ Crítico"
                               : "✅ Disponible"}{" "}
-                          {Number(disponible).toFixed(2)}
+                          {Number(disponible).toLocaleString('es-PE', { maximumFractionDigits: 6 })}
                         </div>
                         {reservado > 0 && (
                           <div className="text-xs text-[var(--amber-600)] mt-[0.15rem]">
@@ -379,7 +437,8 @@ export default function ProductosPage() {
                       </td>
                       <td>
                         <div className="flex gap-2">
-                          <button
+                          {canUpdate && <button
+                            disabled={writerBlocked}
                             onClick={() =>
                               router.push(
                                 `/dashboard/inventario/productos/${producto.id}/editar`,
@@ -389,16 +448,18 @@ export default function ProductosPage() {
                             title="Editar"
                           >
                             <Edit size={16} />
-                          </button>
-                          <button
+                          </button>}
+                          {canDelete && producto.activo && <button
+                            disabled={writerBlocked || producto.stock_actual !== 0 || producto.stock_reservado !== 0}
                             onClick={() =>
-                              handleDelete(producto.id, producto.nombre)
+                              handleDelete(producto)
                             }
                             className="inline-flex size-10 items-center justify-center rounded-lg border border-border bg-background text-destructive transition-colors hover:bg-destructive hover:text-destructive-foreground"
-                            title="Eliminar"
+                            title="Dar de baja"
+                            aria-label={`Dar de baja ${producto.codigo}`}
                           >
                             <Trash2 size={16} />
-                          </button>
+                          </button>}
                         </div>
                       </td>
                     </tr>

@@ -1,4 +1,4 @@
-import { IsUUID, IsNumber, IsOptional, IsString, IsEnum, Min } from 'class-validator';
+import { IsUUID, IsNumber, IsOptional, IsString, IsEnum, IsObject, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum EstadoPresupuesto {
@@ -57,6 +57,10 @@ export class CreatePresupuestoDto {
 }
 
 export class UpdatePresupuestoDto {
+  @ApiProperty({description:'Fotografía completa consultada antes de editar; rechaza cambios concurrentes'})
+  @IsObject()
+  expected_snapshot: Record<string, any>;
+
   @ApiPropertyOptional({
     description: 'Monto total presupuestado para el período',
     example: 60000.00,

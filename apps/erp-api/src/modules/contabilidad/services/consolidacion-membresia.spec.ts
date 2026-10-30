@@ -31,11 +31,18 @@ describe('ConsolidacionReportesService: membresía y visibilidad del grupo', () 
         in: () => cadena,
         or: () => cadena,
         order: () => cadena,
+        range: () => cadena,
         maybeSingle: async () =>
           tabla === 'grupos_consolidacion'
             ? { data: { id: GRUPO, tenant_id: CONTROLADORA, nombre: 'Grupo' }, error: null }
             : { data: estadoMembresia ? { estado: estadoMembresia } : null, error: null },
-        then: (r: any) => r({ data: [], error: null }),
+        then: (r: any) => {
+          const data = tabla === 'grupos_consolidacion_miembros'
+            ? [{ id: 'member-1', grupo_id: GRUPO, tenant_id: CONTROLADORA, estado: 'ACTIVO' },
+              { id: 'member-2', grupo_id: GRUPO, tenant_id: INVITADA, estado: estadoMembresia || 'PENDIENTE' }]
+            : [{ tenant_id: CONTROLADORA }, { tenant_id: INVITADA }];
+          return r({ data, count: data.length, error: null });
+        },
       };
       return cadena;
     };

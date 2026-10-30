@@ -58,7 +58,8 @@ for (const rel of listar(api, 'src').filter((f) => f.endsWith('.ts') && !f.inclu
       i += 1
     }
     const props = new Set()
-    const prop = /^[ \t]{2,4}(?:readonly\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*[?!]?\s*:/gm
+    // Los campos inferidos con inicializador también forman parte del DTO.
+    const prop = /^[ \t]{2,4}(?:readonly\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*[?!]?\s*(?::|=)/gm
     for (const pm of txt.slice(ini, i - 1).matchAll(prop)) props.add(pm[1])
     dtos.set(m[1], { props, extiende: m[2] || null })
   }

@@ -35,7 +35,13 @@ try{
  const company=await call('pos/empresa-config');for(const key of ['certificado_pfx','certificado_password','sunat_password','ose_api_key'])assert.equal(key in company,false);scenarios.push({scenario:'POS: configuración pública no expone secretos',passed:true});
  const category=await call('inventario/categorias',{idempotency_key:randomUUID(),codigo:'POS-LOCAL',nombre:'Servicios POS locales'});
  product=await call('inventario/productos',{idempotency_key:randomUUID(),codigo:'POS-SERVICIO-LOCAL',nombre:'Servicio POS local',categoria:'Servicios POS locales',unidad_medida:'ZZ',precio_compra:10,precio_venta:20,es_servicio:true,controla_stock:false,afectacion_igv:'10'});
- let cajas=await call('cajas');if(!cajas.length){let warehouses=await call('inventario/almacenes');if(!warehouses.length)warehouses=[await call('inventario/almacenes',{idempotency_key:randomUUID(),codigo:'POS-LOCAL',nombre:'Almacén POS local',es_principal:true})];const sucursal=await call('sucursales',{nombre:'Sucursal POS local',codigo:'POS-LOCAL',direccion:'Origen local 123',ubigeo:'150101'});cajas=[await call('cajas',{nombre:'Caja POS local',almacen_id:warehouses[0].id,sucursal_id:sucursal.id})];}
+ let cajas=await call('cajas');if(!cajas.length){
+  const warehouses=await call('inventario/almacenes');
+  const sucursal=await call('sucursales',{nombre:'Sucursal POS local',codigo:'POS-LOCAL',direccion:'Origen local 123',ubigeo:'150101'});
+  const warehouse=await call('inventario/almacenes',{idempotency_key:randomUUID(),codigo:'POS-LOCAL',nombre:'Almacén POS local',es_principal:warehouses.length===0,sucursal_id:sucursal.id});
+  assert.equal(sql(`SELECT sucursal_id FROM almacenes WHERE tenant_id=${q(first.tenant)} AND id=${q(warehouse.id)};`),sucursal.id,'Almacén y caja deben pertenecer a la misma sucursal');
+  cajas=[await call('cajas',{nombre:'Caja POS local',almacen_id:warehouse.id,sucursal_id:sucursal.id})];
+ }
  let methods=await call('pos/metodos-pago');await check('POS: primera empresa configurada dispone de catálogo de medios de pago',async()=>{assert.ok(methods.some(m=>m.codigo.toUpperCase()==='EFECTIVO'),'Catálogo POS vacío después del wizard');assert.ok(methods.some(m=>m.tipo==='TARJETA'));});
  if(!methods.length){sql(`INSERT INTO metodos_pago(tenant_id,codigo,nombre,tipo,estado,activo) SELECT ${q(first.tenant)},x.codigo,x.nombre,x.tipo,'ACTIVO',true FROM (VALUES ('EFECTIVO','Efectivo','EFECTIVO'),('TARJETA','Tarjeta','TARJETA')) x(codigo,nombre,tipo);`);scenarios.push({scenario:'Fixture diagnóstico: catálogo local de pago insertado para continuar variantes; no acredita onboarding',passed:true,acceptance:false});methods=await call('pos/metodos-pago');}
  cash=methods.find(m=>m.codigo.toUpperCase()==='EFECTIVO');card=methods.find(m=>m.tipo==='TARJETA'||m.codigo.toUpperCase().includes('TARJETA'));assert.ok(cash);
@@ -56,5 +62,6 @@ try{
  success=scenarios.every(s=>s.passed);
 }catch(error){scenarios.push({scenario:'POS: preparación o dependencia',passed:false,message:error.message});}
 finally{fs.writeFileSync(path.join(output,'pos-operations.json'),JSON.stringify({success,remoteWrites:false,scope:'POS API/DB local no demo; subconjunto sin aceptación SUNAT ni global',scenarios,requests},null,2));}
-// El diagnóstico conserva todos los resultados y permite al runner comprobar
-// la restauración posterior antes de comunicar los defectos reproducidos.
+// Conserva todos los resultados e impide ejecutar fases dependientes con un
+// fixture incompleto. El ejecutor conserva el fallo y limpia sólo sus recursos.
+if(!success)process.exitCode=1;

@@ -1,3 +1,5 @@
+import { purchaseOrderCreatedFixture } from './fixtures/purchase-order'
+import { fiscalCountryFixture } from './fixtures/fiscal-country'
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { SignJWT } from 'jose'
 import fs from 'node:fs/promises'
@@ -48,7 +50,7 @@ test('Reportes Perú mantienen separados los totales PEN y USD', async ({ contex
       '/demo/status': { is_demo: false, is_expired: false },
       '/notifications/unread': { data: [], count: 0 },
       '/usuarios-sistema/me/permissions': { data: [] },
-      '/configuration/context/country': { data: { pais_id: 1, pais: 'PE', paisCodigo: 'PE', moneda: 'PEN', monedaDefecto: 'PEN', locale: 'es-PE', timezone: 'America/Lima' } },
+      '/configuration/context/country': fiscalCountryFixture(user.tenant_id, { pais_id: 1, pais: 'PE', paisCodigo: 'PE', moneda: 'PEN', monedaDefecto: 'PEN', locale: 'es-PE', timezone: 'America/Lima' }),
       '/configuration/empresa': { success: true, data: { pais: 'PE', paisCodigo: 'PE', razonSocial: 'Empresa Perú', monedaDefecto: 'PEN' } },
       '/configuration/status': { success: true, data: { isComplete: true, isDemo: false, completionPercentage: 100 } },
     }
@@ -93,7 +95,11 @@ for (const resumeStep of [4, 6]) {
           validFrom: '2026-01-01T00:00:00Z', validTo: '2027-12-31T00:00:00Z' }
       } else if (endpoint === '/configuration/complete') {
         completed = route.request().postDataJSON().configuration
-        data = { completed: true }
+        data = { completedAt: '2026-10-09T10:00:00.000Z' }
+      } else if (endpoint === '/configuration/wizard/step') {
+        const saved = route.request().postDataJSON()
+        data = { pasoActual: saved.pasoActual, pasosCompletados: Array.from({ length: saved.pasoActual }, (_, i) => i + 1),
+          configuracionTemporal: draft, completado: false }
       }
       const payloads: Record<string, unknown> = {
         '/auth/profile': clientUser,
@@ -101,9 +107,10 @@ for (const resumeStep of [4, 6]) {
         '/demo/status': { is_demo: false, is_expired: false },
         '/notifications/unread': { data: [], count: 0 },
         '/usuarios-sistema/me/permissions': { data: ['configuracion.read', 'configuracion.write'] },
-        '/configuration/context/country': { data: { pais_id: 1, paisCodigo: 'PE', moneda: 'PEN', monedaDefecto: 'PEN', locale: 'es-PE', timezone: 'America/Lima' } },
-        '/configuration/empresa': { success: true, data: { ...draft, ruc: completed ? draft.ruc : '20123456786', monedaDefecto: 'PEN' } },
-        '/configuration/status': { success: true, data: { isComplete: Boolean(completed), isDemo: false, ruc: { isConfigured: Boolean(completed) } } },
+        '/configuration/context/country': fiscalCountryFixture(user.tenant_id, { pais_id: 1, paisCodigo: 'PE', moneda: 'PEN', monedaDefecto: 'PEN', locale: 'es-PE', timezone: 'America/Lima' }),
+        '/configuration/empresa': { success: true, data: { ...draft, ruc: completed ? draft.ruc : '20123456786', monedaDefecto: 'PEN',
+          isDemo: false, certificateConfigured: Boolean(completed), igvPorcentaje: 18, serieFactura: 'F001', serieBoleta: 'B001', serieNotaCredito: 'FC01' } },
+        '/configuration/status': { success: true, data: { isComplete: Boolean(completed), isDemo: false, ruc: { isConfigured: Boolean(completed), missingFields: [] } } },
         '/configuration/wizard/progress': { success: true, data: { pasoActual: resumeStep, pasosCompletados: Array.from({ length: resumeStep }, (_, i) => i + 1),
           configuracionTemporal: draft, completado: false } },
       }
@@ -156,7 +163,7 @@ for (const laborReady of [false, true]) {
         '/demo/status': { is_demo: false, is_expired: false },
         '/notifications/unread': { data: [], count: 0 },
         '/usuarios-sistema/me/permissions': { data: [] },
-        '/configuration/context/country': { data: { pais_id: 1, pais: 'PE', paisCodigo: 'PE', paisNombre: 'Perú', moneda: 'PEN', monedaDefecto: 'PEN', locale: 'es-PE', timezone: 'America/Lima' } },
+        '/configuration/context/country': fiscalCountryFixture(user.tenant_id, { pais_id: 1, pais: 'PE', paisCodigo: 'PE', paisNombre: 'Perú', moneda: 'PEN', monedaDefecto: 'PEN', locale: 'es-PE', timezone: 'America/Lima' }),
         '/configuration/empresa': { success: true, data: empresa },
         '/configuration/status': { success: true, data: {
           isComplete: true, isDemo: false, completionPercentage: 100,
@@ -213,7 +220,7 @@ for (const entity of ['clientes', 'proveedores'] as const) {
       if (endpoint === '/demo/status') return json({ is_demo: false, is_expired: false })
       if (endpoint === '/notifications/unread') return json({ data: [], count: 0 })
       if (endpoint === '/usuarios-sistema/me/permissions') return json({ data: [] })
-      if (endpoint === '/configuration/context/country') return json({ data: { pais_id: 1, pais: 'PE', monedaDefecto: 'PEN' } })
+      if (endpoint === '/configuration/context/country') return json(fiscalCountryFixture(user.tenant_id, { pais_id: 1, pais: 'PE', monedaDefecto: 'PEN' }))
       if (endpoint === `/ventas/${entity}` || endpoint === `/compras/${entity}`) {
         lists++
         return json({ success: true, data: [record], count: 1, pagination: { total: 1, totalPages: 1 } })
@@ -272,6 +279,12 @@ for (const view of ['reportes', 'orden'] as const) {
     const failures: string[] = []
     page.on('pageerror', error => failures.push(error.message))
     const orderId = '53300000-0000-4000-8000-000000000001'
+    const providerId='53300000-0000-4000-8000-000000000002',productId='53300000-0000-4000-8000-000000000003'
+    const purchase=purchaseOrderCreatedFixture({idempotency_key:'print-fixture-only',numero:'OC-LOCAL-1',proveedor_id:providerId,moneda:'PEN',fecha_orden:'2026-09-05',dias_credito:0,detalles:[{producto_id:productId,descripcion:'Producto local',cantidad:2,precio_unitario:50}]},user,orderId,0.18)
+    purchase.data.estado='RECIBIDA';purchase.data.proveedor={id:providerId,razon_social:'Proveedor local',ruc:'20123456786'}
+    purchase.data.detalles[0].cantidad_recibida=2;purchase.data.detalles[0].cantidad_pendiente=0
+    const receipt={success:true,count:1,data:[{id:'53300000-0000-4000-8000-000000000004',tenant_id:user.tenant_id,orden_id:orderId,numero:'REC-LOCAL-1',fecha_recepcion:'2026-09-05T12:00:00Z',created_at:'2026-09-05T12:00:00Z',created_by:user.id,estado:'CERRADA',cerrado_por:user.id,cerrado_at:'2026-09-05T12:00:00Z',recepcion_items:[{id:'53300000-0000-4000-8000-000000000005',producto_id:productId,almacen_id:null,cantidad_recibida:2,calidad:'OK'}]}]}
+
     await page.route('**/*', async route => {
       const url = new URL(route.request().url())
       if (!['localhost', '127.0.0.1', '::1'].includes(url.hostname)) { failures.push(`Origen no local: ${url.origin}`); return route.abort() }
@@ -283,12 +296,12 @@ for (const view of ['reportes', 'orden'] as const) {
         '/demo/status': { is_demo: false, is_expired: false },
         '/notifications/unread': { data: [], count: 0 },
         '/usuarios-sistema/me/permissions': { data: [] },
-        '/configuration/context/country': { data: { pais_id: 1, pais: 'PE', monedaDefecto: 'PEN' } },
+        '/configuration/context/country': fiscalCountryFixture(user.tenant_id, { pais_id: 1, pais: 'PE', monedaDefecto: 'PEN' }),
         '/configuracion-fiscal': { success: true, data: { tasa_igv: 0.18, moneda_principal: 'PEN', pais_id: 1, impuesto_principal_nombre: 'IGV', impuesto_principal_porcentaje: 0.18 } },
-        '/reports/ventas': { data: [{ id: 'local-sale', fecha: '2026-09-05', estado: 'ACEPTADO', numero_documento: 'F001-1', tipo_documento: 'FACTURA', subtotal: 100, igv: 18, total: 118, moneda: 'PEN', clientes: { nombre: 'Cliente local', numero_documento: '20123456786' } }], resumen: { subtotal: 100, igv: 18, total: 118 } },
-        [`/compras/ordenes/${orderId}`]: { success: true, data: { id: orderId, numero: 'OC-LOCAL-1', fecha_orden: '2026-09-05', created_at: '2026-09-05T10:00:00Z', updated_at: '2026-09-05T10:00:00Z', estado: 'RECIBIDA', subtotal: 100, igv: 18, total: 118, moneda: 'PEN', proveedor: { razon_social: 'Proveedor local', ruc: '20123456786' }, detalles: [{ id: 'line-1', producto_id: 'local-product', descripcion: 'Producto local', cantidad: 2, cantidad_recibida: 2, precio_unitario: 50, subtotal: 100 }] } },
-        [`/compras/ordenes/${orderId}/aprobaciones`]: { success: true, data: [] },
-        [`/compras/ordenes/${orderId}/recepciones`]: { success: true, data: [] },
+        '/reports/ventas': { success:true,resumenPorMoneda:[{moneda:'PEN',subtotal:100,igv:18,total:118,exoneradas:0,inafectas:0,exportacion:0}], data: [{ id: 'local-sale', fecha: '2026-09-05', estado: 'ACEPTADO', numero_documento: 'F001-1', tipo_documento: 'FACTURA', subtotal: 100, igv: 18, total: 118, moneda: 'PEN', clientes: { nombre: 'Cliente local', numero_documento: '20123456786' } }], resumen: { subtotal: 100, igv: 18, total: 118 } },
+        [`/compras/ordenes/${orderId}`]: purchase,
+        [`/compras/ordenes/${orderId}/aprobaciones`]: {success:true,count:0,data:[]},
+        [`/compras/ordenes/${orderId}/recepciones`]: receipt,
       }
       if (!(endpoint in payloads)) { failures.push(`API no prevista: ${endpoint}`); return route.fulfill({ status: 404, json: {} }) }
       return route.fulfill({ status: 200, json: payloads[endpoint] })

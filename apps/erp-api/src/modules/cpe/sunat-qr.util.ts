@@ -1,4 +1,9 @@
+import { sunatOperation } from '../../shared/utils/sunat-operation.util';
+
 export interface SunatQrInput {
+  tipo_operacion?: unknown;
+  tipoOperacion?: unknown;
+  metadata?: Record<string, unknown>;
   ruc_emisor?: unknown;
   tipo_documento?: unknown;
   serie?: unknown;
@@ -103,9 +108,13 @@ function validateSunatQrIdentity(data: SunatQrInput): void {
     throw new Error('No se puede generar el QR SUNAT: documento del receptor incompleto');
   }
 
-  // Las series F corresponden a facturas o notas vinculadas a factura y
-  // requieren identificar al adquirente con RUC.
-  if (series.startsWith('F') && (receiverType !== '6' || !/^\d{11}$/.test(receiverDocument))) {
+  // Las facturas de exportación conservan la identidad del no domiciliado;
+  // la exigencia de RUC corresponde a las ventas internas.
+  const exportReceiver = sunatOperation(data) === '0200'
+    && ['1', '4', '7'].includes(receiverType)
+    && /^[0-9A-Z]{6,20}$/i.test(receiverDocument)
+    && (receiverType !== '1' || /^\d{8}$/.test(receiverDocument));
+  if (series.startsWith('F') && !exportReceiver && (receiverType !== '6' || !/^\d{11}$/.test(receiverDocument))) {
     throw new Error('No se puede generar el QR SUNAT: la serie F requiere RUC válido del receptor');
   }
 

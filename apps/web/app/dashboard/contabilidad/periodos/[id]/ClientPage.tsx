@@ -1,41 +1,54 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { usePermission } from '@/hooks/use-permission'
+import { readPeriodDetail, type PeriodSnapshot } from '@/lib/accounting-period-read'
 import { parseDateLocal } from '@/lib/date-utils'
 import { useRouter, useParams } from 'next/navigation'
 import { Calendar, Lock, Unlock, AlertCircle, ArrowLeft, CheckCircle } from 'lucide-react'
+import PeriodTransitionRecovery from '@/components/contabilidad/PeriodTransitionRecovery'
+import { usePeriodTransitionOperations } from '@/hooks/use-period-transition-operation'
 import PeriodoCierreWizard from '@/components/contabilidad/PeriodoCierreWizard'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import { useApi } from '@/hooks/use-api'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCountryContext } from '@/hooks/use-country-context'
 
-interface Periodo {
-  id: string
-  tenant_id: string
-  anio: number
-  mes: number
-  estado: 'ABIERTO' | 'CERRADO' | 'BLOQUEADO'
-  fecha_cierre?: string
-  cerrado_por?: string
-  created_at: string
-  updated_at: string
-}
+type Periodo = PeriodSnapshot
 
 export default function PeriodoDetailPage() {
+  const { session } = useAuth()
+  const params = useParams()
+  return <PeriodoDetailWorkspace key={`${session?.user?.tenant_id || ''}:${session?.user?.id || ''}:${String(params.id || '')}`} />
+}
+
+function PeriodoDetailWorkspace() {
   const router = useRouter()
   const country = useCountryContext()
-  const { user, loading: authLoading } = useAuth()
-  const canReopen = !authLoading && user?.is_super_admin === true
+  const { user, session, loading: authLoading } = useAuth()
+  const tenantId = session?.user?.tenant_id || '', actorId = session?.user?.id || ''
+  const scopeReady = !authLoading && !!tenantId && !!actorId
+  const reopenPermission = usePermission('contabilidad', 'reabrir', 'periodos')
+  const closePermission = usePermission('contabilidad', 'cerrar', 'periodos')
+  const validatePermission = usePermission('contabilidad', 'validar', 'periodos')
+  const canReopen = scopeReady && user?.is_super_admin === true && !reopenPermission.loading && reopenPermission.hasPermission
+  const canClose = scopeReady && !closePermission.loading && closePermission.hasPermission && !validatePermission.loading && validatePermission.hasPermission
   const params = useParams()
   const periodoId = params.id as string | undefined
+  const scopeIdentity = `${tenantId}:${actorId}:${periodoId || ''}`
+  const activeScope = useRef(scopeIdentity); activeScope.current = scopeIdentity
+  const readEpoch = useRef(0)
 
   const [periodo, setPeriodo] = useState<Periodo | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showWizard, setShowWizard] = useState(false)
   const [reopening, setReopening] = useState(false)
-  const { apiCall } = useApi<any>({ retries: 2, timeoutMs: 12000, showErrorToast: false, throwOnError: true })
+  const transition = usePeriodTransitionOperations()
+  const hasPendingTransition = !transition.ready || !!transition.recoveryError || transition.pending.some(row => row.intent.snapshot.id === periodoId)
+  const writeEpoch = useRef(0)
+  useEffect(() => () => { writeEpoch.current++ }, [])
+  const { apiCall: readApi } = useApi<unknown>({ requireLive: true, throwOnError: true, retries: 0, timeoutMs: 30000, showErrorToast: false })
 
   // Estado para diálogo de confirmación
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -53,21 +66,22 @@ export default function PeriodoDetailPage() {
   })
 
   const fetchPeriodo = useCallback(async () => {
-    if (!periodoId) return
-
+    const run = ++readEpoch.current
+    const current = () => run === readEpoch.current && activeScope.current === scopeIdentity
+    setLoading(true); setError(null); setPeriodo(null); setShowWizard(false)
+    setConfirmDialog(dialog => ({ ...dialog, isOpen: false }))
+    if (!scopeReady) return
     try {
-      setLoading(true)
-      setError(null)
-
-      const result = await apiCall(`/contabilidad/periodos/${periodoId}`)
-      setPeriodo(result?.data)
+      if (!periodoId) throw new Error('Período no identificado')
+      const result = await readApi(`/contabilidad/periodos/${periodoId}`)
+      const row = readPeriodDetail(result, tenantId, periodoId)
+      if (current()) setPeriodo(row)
     } catch (err) {
-      console.error('Error fetching período:', err)
-      setError('Error al cargar el período contable')
+      if (current()) setError(err instanceof Error ? err.message : 'Error al cargar el período contable')
     } finally {
-      setLoading(false)
+      if (current()) setLoading(false)
     }
-  }, [apiCall, periodoId])
+  }, [readApi, periodoId, tenantId, scopeReady, scopeIdentity])
 
   const formatPeriodo = (anio: number, mes: number) => {
     const meses = [
@@ -104,26 +118,24 @@ export default function PeriodoDetailPage() {
   }
 
   const handleReabrirPeriodo = async () => {
-    if (!canReopen) return
+    if (!canReopen || loading || error || reopening || periodo?.estado !== 'CERRADO' || !transition.ready || transition.recoveryError || transition.pending.some(row => row.intent.snapshot.id === periodoId)) return
+    const run = ++writeEpoch.current, requestedScope = scopeIdentity
+    const current = () => run === writeEpoch.current && activeScope.current === requestedScope
     setReopening(true)
-    setError(null)
-
     try {
-      const response = await apiCall(`/contabilidad/periodos/${periodoId}/reabrir`, { method: 'POST' })
-      if (!response?.success || !response.data) {
-        throw new Error(response?.message || 'Error al reabrir el período')
-      }
-      await fetchPeriodo()
-    } catch (err: any) {
-      console.error('Error reopening período:', err)
-      setError(err.message || 'Error al reabrir el período contable')
+      const confirmed = await transition.perform(periodo, 'REOPEN')
+      if (current() && confirmed) await fetchPeriodo()
     } finally {
-      setReopening(false)
+      if (current()) {
+        setReopening(false)
+        setConfirmDialog(previous => ({ ...previous, isOpen: false }))
+      }
     }
   }
 
   useEffect(() => {
-    fetchPeriodo()
+    void fetchPeriodo()
+    return () => { readEpoch.current += 1 }
   }, [fetchPeriodo])
 
   if (loading) {
@@ -143,7 +155,10 @@ export default function PeriodoDetailPage() {
     return (
       <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
         <div className="p-8 bg-[#fee2e2] border rounded-xl text-destructive">
-          <p className="m-0 font-semibold">⚠️ {error || 'Período no encontrado'}</p>
+          {transition.error && <p role="alert" className="mb-4 text-destructive">{transition.error}</p>}
+      <PeriodTransitionRecovery onConfirmed={() => { void fetchPeriodo() }} />
+          <p role="alert" className="m-0 font-semibold">⚠️ {error || 'Período no encontrado'}</p>
+          <button onClick={fetchPeriodo} className="mt-4 mr-3 py-2 px-4 bg-blue-600 text-white rounded-[6px]">Reintentar</button>
           <button
             onClick={() => router.push('/dashboard/contabilidad/periodos')} className="mt-4 py-2 px-4 bg-red-600 text-white border-0 rounded-[6px] cursor-pointer font-semibold"
           >
@@ -181,7 +196,7 @@ export default function PeriodoDetailPage() {
           </p>
         </div>
         <div className="flex gap-4">
-          {periodo.estado === 'ABIERTO' && (
+          {periodo.estado === 'ABIERTO' && canClose && !error && !hasPendingTransition && (
             <button
               onClick={() => setShowWizard(true)} className="flex items-center gap-2 py-3 px-6 text-white border-0 rounded-lg cursor-pointer font-semibold text-[0.875rem] transition shadow"
               onMouseEnter={(e) => {
@@ -197,7 +212,7 @@ export default function PeriodoDetailPage() {
               Cerrar Período
             </button>
           )}
-          {periodo.estado === 'CERRADO' && canReopen && (
+          {periodo.estado === 'CERRADO' && canReopen && !error && transition.ready && !transition.recoveryError && !transition.pending.some(row => row.intent.snapshot.id === periodoId) && (
             <button
               onClick={() => {
                 setConfirmDialog({
@@ -239,7 +254,7 @@ export default function PeriodoDetailPage() {
               </p>
               <div className="inline-flex items-center gap-2 py-2 px-4 rounded-lg text-[0.875rem] font-semibold">
                 {getEstadoIcon(periodo.estado)}
-                {periodo.estado}
+                {hasPendingTransition ? 'Pendiente de confirmar' : periodo.estado}
               </div>
             </div>
 
@@ -349,9 +364,15 @@ export default function PeriodoDetailPage() {
         </div>
       </div>
 
+      {transition.error && <p role="alert" className="mb-4 text-destructive">{transition.error}</p>}
+      <PeriodTransitionRecovery onConfirmed={() => { void fetchPeriodo() }} />
+
+      {hasPendingTransition && <p role="status" className="mb-6 rounded-xl border border-border bg-card p-4 text-sm">La transición está pendiente de confirmar. La información mostrada corresponde a la última lectura; verifica el resultado antes de realizar otra operación.</p>}
+
       {/* Wizard Modal */}
-      {showWizard && (
+      {showWizard && canClose && !error && (
         <PeriodoCierreWizard
+          periodo={periodo}
           periodoId={periodo.id}
           anio={periodo.anio}
           mes={periodo.mes}

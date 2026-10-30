@@ -34,10 +34,16 @@ test('Dashboard: una lectura caída se informa y no se muestra como ventas en ce
       const invalidated = await request.post(`${api}/api/dashboard/cache/invalidate/`, { headers: { authorization: `Bearer ${token}` } })
       expect(invalidated.status()).toBeLessThan(300)
       await page.goto('/dashboard/', { timeout: 120000 })
-      await expect.soft(page.getByText('No se pudieron actualizar las métricas', { exact: false })).toBeVisible({ timeout: 60000 })
+      await expect(page.getByRole('alert').filter({hasText:'Dashboard sin sincronización completa'})).toBeVisible()
+      await expect(page.getByText('No se pudo consultar el panel completo. Reintente para recuperar las métricas y actividades actuales.', {exact:true})).toBeVisible()
+      for (const label of ['Ventas registradas','Compras del periodo','Inventario total']) await expect(page.getByText(label,{exact:true})).toHaveCount(0)
     } finally {
       sql('GRANT SELECT ON public.cpe TO service_role;')
     }
+    await page.getByRole('button',{name:'Reintentar',exact:true}).click()
+    await expect(page.getByText('Datos reales del tenant',{exact:true})).toBeVisible()
+    await expect(page.getByText('Ventas registradas',{exact:true})).toBeVisible()
+    await expect(page.getByText('Dashboard sin sincronización completa',{exact:true})).toHaveCount(0)
     checks.push({ operation: 'Sin lectura de comprobantes el inicio avisa en vez de mostrar ventas en cero', passed: test.info().errors.length === before })
     proof.success = checks.every(check => check.passed)
   } finally {

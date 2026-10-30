@@ -280,6 +280,37 @@ BEGIN
     RAISE EXCEPTION 'El retry de calculo duplico la liquidacion: %', v_result;
   END IF;
 
+  IF EXISTS(SELECT 1 FROM supabase_migrations.schema_migrations
+      WHERE version ~ '^[0-9]+$' AND version::integer>=570) THEN
+  BEGIN
+    SELECT public.guardar_liquidacion_calculada_tx(
+      v_tenant_id,
+      jsonb_build_object(
+        'id_empleado', v_empleado_id, 'motivo_terminacion', 'renuncia',
+        'fecha_terminacion', '2026-08-09', 'monto_cts', 500,
+        'vacaciones_pendientes', 10, 'indemnizacion', 0, 'dias_cts', 180,
+        'total_liquidacion', 1501, 'pais_codigo', 'PE', 'moneda', 'PEN',
+        'metadata', jsonb_build_object('monto_cts_semestres_pendientes', 500)
+      ),
+      v_user_id
+    ) INTO v_result;
+    IF (v_result->'data'->>'id')::uuid=v_liquidacion_id
+       OR (SELECT lower(estado::text) FROM public.liquidaciones WHERE id=v_liquidacion_id)<>'anulada'
+       OR (v_result->'data'->>'total_liquidacion')::numeric<>1501
+       OR lower(v_result->'data'->>'estado')<>'calculada'
+       OR (SELECT metadata->>'anulada_por_recalculo' FROM public.liquidaciones WHERE id=v_liquidacion_id) IS DISTINCT FROM v_user_id::text THEN
+      RAISE EXCEPTION 'VERIFY449_CURRENT_DRAFT_RECALCULATION_INVALID';
+    END IF;
+    -- El subbloque revierte únicamente esta sonda para que el resto de la
+    -- regresión confirme y pague el borrador original, sin cambiar sus importes.
+    RAISE EXCEPTION USING ERRCODE='Z4490', MESSAGE='VERIFY449_RECALCULATION_PROBE_ROLLBACK';
+  EXCEPTION WHEN SQLSTATE 'Z4490' THEN NULL;
+  END;
+    IF (SELECT lower(estado::text) FROM public.liquidaciones WHERE id=v_liquidacion_id)<>'calculada'
+       OR (SELECT count(*) FROM public.liquidaciones WHERE tenant_id=v_tenant_id AND id_empleado=v_empleado_id)<>1 THEN
+      RAISE EXCEPTION 'VERIFY449_RECALCULATION_PROBE_DID_NOT_ROLLBACK';
+    END IF;
+  ELSE
   BEGIN
     PERFORM public.guardar_liquidacion_calculada_tx(
       v_tenant_id,
@@ -296,6 +327,7 @@ BEGIN
   EXCEPTION WHEN OTHERS THEN
     IF SQLERRM = 'El retry de calculo con payload distinto debio fallar' THEN RAISE; END IF;
   END;
+  END IF;
 
   BEGIN
     PERFORM app.confirmar_liquidacion_tx(v_tenant_id, v_liquidacion_id, NULL);

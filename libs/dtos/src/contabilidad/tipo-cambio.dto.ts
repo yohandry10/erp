@@ -44,7 +44,7 @@ export class CreateTipoCambioDto {
     example: 3.742
   })
   @IsOptional()
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 6 })
   @IsPositive()
   compra?: number;
 
@@ -53,7 +53,7 @@ export class CreateTipoCambioDto {
     example: 3.749
   })
   @IsOptional()
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 6 })
   @IsPositive()
   venta?: number;
 

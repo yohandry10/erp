@@ -1,3 +1,4 @@
+import { UuidParamPipe } from '../../common/pipes/uuid-param.pipe';
 import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Put, Query, Req, UseGuards, BadRequestException, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { CajasService } from './cajas.service';
@@ -90,7 +91,7 @@ export class CajasController {
   async actualizar(
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Body() dto: UpdateCajaDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
@@ -119,7 +120,7 @@ export class CajasController {
   async abrir(
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Body() dto: AbrirCajaDto,
     @Req() req: any,
   ) {
@@ -133,7 +134,7 @@ export class CajasController {
   async cerrar(
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Body() dto: CerrarCajaDto
   ) {
     // Normalizar alias provenientes del frontend/POS
@@ -417,6 +418,21 @@ export class CajasController {
     return { success: true, data };
   }
 
+  /**
+   * Quién puede recibir la caja. La cajera inicia el cambio de turno sin
+   * permiso de administrar usuarios, así que no puede leer /usuarios.
+   */
+  @Get('sesiones/:sesionId/candidatos-turno')
+  @RequirePermission('cajas.cambios_turno.iniciar')
+  async listarCandidatosTurno(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+    @Param('sesionId', new ParseUUIDPipe()) sesionId: string,
+  ) {
+    const data = await this.service.candidatosCambioTurno(tenantId, sesionId, user?.id);
+    return { success: true, data };
+  }
+
   @Get('sesiones/:sesionId/cambios-turno')
   @RequirePermission('cajas.cambios_turno.ver')
   async listarCambiosTurno(
@@ -484,10 +500,10 @@ export class CajasController {
   @RequirePermission('cajas.corte_z.ver')
   async obtenerCorteZ(
     @CurrentTenant() tenantId: string,
-    @Param('id') cajaId: string,
-    @Query('sesionId') sesionId: string,
+    @Param('id', UuidParamPipe) cajaId: string,
+    @Query('sesionId', UuidParamPipe) sesionId: string,
   ) {
-    const data = await this.service.obtenerCorteZ(tenantId, sesionId);
+    const data = await this.service.obtenerCorteZ(tenantId, sesionId, cajaId);
     return { success: true, data, cajaId, sesionId };
   }
 }

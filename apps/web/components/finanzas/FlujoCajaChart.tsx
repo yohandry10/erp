@@ -1,9 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AlertTriangle, Calendar, RefreshCw, TrendingDown, TrendingUp } from 'lucide-react'
 
-import { useApi } from '@/hooks/use-api'
+import { useFinanceReport } from '@/hooks/use-finance-report'
+import FinanceReportStatus from './FinanceReportStatus'
+import { groupCashflowWeeks, readCashflowReport } from '@/lib/finanzas/report-read-contract'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import { parseDateLocal } from '@/lib/date-utils'
 
@@ -62,6 +64,7 @@ interface FlujoCajaData {
 interface FlujoCajaChartProps {
   diasProyeccion?: number
   cuentaBancariaId?: string
+  onReadyChange?: (ready: boolean) => void
 }
 
 const panelClass = 'rounded-2xl border border-cyan-400/20 bg-card/65 p-5 text-foreground shadow-xl shadow-blue-950/20'
@@ -73,43 +76,19 @@ const tableClass = '!m-0 w-full min-w-full table-fixed border-collapse !bg-card/
 const thClass = '!border-cyan-400/10 !bg-card/90 px-3 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-primary/80'
 const tdClass = '!border-cyan-400/10 !bg-transparent px-3 py-3 text-foreground/90'
 
-export default function FlujoCajaChart({ diasProyeccion = 90, cuentaBancariaId }: FlujoCajaChartProps) {
-  const { get } = useApi()
+export default function FlujoCajaChart({ diasProyeccion = 90, cuentaBancariaId, onReadyChange }: FlujoCajaChartProps) {
   const { country, currency, formatCurrency } = useLocalizedMoney()
-  const [flujoCaja, setFlujoCaja] = useState<FlujoCajaData | null>(null)
-  const [loading, setLoading] = useState(true)
   const [selectedMoneda, setSelectedMoneda] = useState<string>(currency)
   const [vistaDetallada, setVistaDetallada] = useState(false)
 
-  const loadFlujoCaja = useCallback(async () => {
-    try {
-      setLoading(true)
-      const params = new URLSearchParams()
-      params.append('dias_proyeccion', diasProyeccion.toString())
-      if (cuentaBancariaId) params.append('cuenta_bancaria_id', cuentaBancariaId)
-
-      const response = await get(`/api/finanzas/tesoreria/flujo-caja?${params.toString()}`)
-
-      if (response?.success) {
-        setFlujoCaja(response.data)
-        if (response.data.resumen.length > 0) {
-          setSelectedMoneda(response.data.resumen[0].moneda)
-        }
-      }
-    } catch (error) {
-      console.error('Error loading flujo caja:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [cuentaBancariaId, diasProyeccion, get])
+  const params = new URLSearchParams({ dias_proyeccion: String(diasProyeccion) })
+  if (cuentaBancariaId) params.append('cuenta_bancaria_id', cuentaBancariaId)
+  const { data: flujoCaja, loading, error, reload: loadFlujoCaja } = useFinanceReport<FlujoCajaData>(
+    `/api/finanzas/tesoreria/flujo-caja?${params.toString()}`, readCashflowReport, onReadyChange)
 
   useEffect(() => {
-    loadFlujoCaja()
-  }, [loadFlujoCaja])
-
-  useEffect(() => {
-    if (!flujoCaja?.resumen.length && currency) setSelectedMoneda(currency)
-  }, [currency, flujoCaja?.resumen.length])
+    if (flujoCaja?.resumen.length && !flujoCaja.resumen.some(row => row.moneda === selectedMoneda)) setSelectedMoneda(flujoCaja.resumen[0].moneda)
+  }, [flujoCaja, selectedMoneda])
 
   const formatDate = (dateString: string) =>
     parseDateLocal(dateString).toLocaleDateString(country.locale || 'es-PE', {
@@ -118,14 +97,7 @@ export default function FlujoCajaChart({ diasProyeccion = 90, cuentaBancariaId }
       year: 'numeric',
     })
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-cyan-400/20 bg-card/65 p-8 text-center text-muted-foreground">
-        <div className="mb-4 size-10 animate-spin rounded-full border-4 border-border border-t-cyan-300" />
-        <p>Cargando proyeccion de flujo de caja...</p>
-      </div>
-    )
-  }
+  if (loading || error) return <FinanceReportStatus loading={loading} retry={loadFlujoCaja} />
 
   if (!flujoCaja || flujoCaja.resumen.length === 0) {
     return (
@@ -133,6 +105,7 @@ export default function FlujoCajaChart({ diasProyeccion = 90, cuentaBancariaId }
         <TrendingUp className="mb-4 h-12 w-12 text-cyan-200/50" />
         <h3 className="text-lg font-bold text-white">No hay datos para proyectar</h3>
         <p className="mt-2 text-sm text-muted-foreground">No se encontraron cuentas bancarias activas o movimientos pendientes.</p>
+        <button type="button" onClick={loadFlujoCaja} className="mt-4 rounded border px-4 py-2">Actualizar</button>
       </div>
     )
   }
@@ -140,30 +113,13 @@ export default function FlujoCajaChart({ diasProyeccion = 90, cuentaBancariaId }
   const resumenSeleccionado = flujoCaja.resumen.find((resumen) => resumen.moneda === selectedMoneda) || flujoCaja.resumen[0]
   const proyeccionFiltrada = flujoCaja.proyeccion.filter((dia) => dia.moneda === selectedMoneda)
 
-  const proyeccionSemanal = proyeccionFiltrada.reduce((acc, dia, index) => {
-    const semana = Math.floor(index / 7)
-    if (!acc[semana]) {
-      acc[semana] = {
-        fecha_inicio: dia.fecha,
-        fecha_fin: dia.fecha,
-        ingresos: 0,
-        egresos: 0,
-        flujo_neto: 0,
-        saldo_final: dia.saldo_final,
-      }
-    }
-    acc[semana].fecha_fin = dia.fecha
-    acc[semana].ingresos += dia.ingresos
-    acc[semana].egresos += dia.egresos
-    acc[semana].flujo_neto += dia.flujo_neto
-    acc[semana].saldo_final = dia.saldo_final
-    return acc
-  }, [] as any[])
+  const proyeccionSemanal = groupCashflowWeeks(
+    proyeccionFiltrada, flujoCaja.periodo.fecha_desde, flujoCaja.periodo.fecha_hasta)
 
   const hasAlert = resumenSeleccionado.alerta !== null
 
   return (
-    <div className={panelClass}>
+    <div data-finance-cashflow className={panelClass}>
       <div className="mb-5 flex flex-col gap-3 border-b border-cyan-400/10 pb-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex items-start gap-3">
           <TrendingUp className="mt-1 h-6 w-6 text-primary" />
@@ -251,12 +207,12 @@ export default function FlujoCajaChart({ diasProyeccion = 90, cuentaBancariaId }
               const TrendIcon = isPositive ? TrendingUp : TrendingDown
 
               return (
-                <div key={index} className="rounded-xl border border-cyan-400/15 bg-card/45 p-4">
+                <div key={index} data-finance-week className="rounded-xl border border-cyan-400/15 bg-card/45 p-4">
                   <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                     <div>
                       <div className="flex items-center gap-2 text-sm font-bold text-white">
                         <Calendar className="h-4 w-4 text-primary" />
-                        Semana {index + 1}
+                        Semana {semana.numero}
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">{formatDate(semana.fecha_inicio)} - {formatDate(semana.fecha_fin)}</div>
                     </div>

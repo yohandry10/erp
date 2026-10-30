@@ -431,6 +431,57 @@ describe('RrhhService liquidaciones — frontera transaccional', () => {
     },
   );
 
+  it('liquida en Perú con el día de cese trabajado, asignación familiar y sin repetir la CTS depositada', async () => {
+    const tabla = (data: any, single?: any) => {
+      const q: any = {};
+      for (const m of ['select', 'eq', 'in', 'lt', 'lte', 'gte', 'order', 'limit', 'is']) q[m] = jest.fn(() => q);
+      q.maybeSingle = jest.fn().mockResolvedValue({ data: single, error: null });
+      q.single = jest.fn().mockResolvedValue({ data: single, error: null });
+      q.then = (resolve: any) => resolve({ data, error: null });
+      return q;
+    };
+    const empleado = {
+      id: 'emp-pe', fecha_ingreso: '2026-03-01', tiene_hijos: true,
+      contratos: [{ id: 'c-pe', fecha_inicio: '2026-03-01', estado: 'vigente', sueldo_bruto: 1800, tipo_contrato: 'indefinido', metadata: {} }],
+    };
+    const rpc = jest.fn().mockResolvedValue({ data: { success: true, data: { id: 'liq-pe' } }, error: null });
+    const client = {
+      from: jest.fn((table: string) => {
+        if (table === 'empleados') return tabla(null, empleado);
+        if (table === 'solicitudes') return tabla([]);
+        if (table === 'planillas') return tabla([]);
+        if (table === 'normativa_peru_periodos') return tabla(null, { rmv: 1130 });
+        if (table === 'depositos_cts') {
+          return tabla([{ id: 'd1', estado: 'DEPOSITADO', semestre_fin: '2026-10-31', monto: 1062.78, meses_computables: 6, dias_computables: 0 }]);
+        }
+        throw new Error(`Tabla inesperada: ${table}`);
+      }),
+      rpc,
+    };
+    const service = new RrhhService(
+      { getClient: jest.fn(() => client) } as any,
+      undefined,
+      { obtenerContexto: jest.fn().mockResolvedValue({ codigo: 'PE' }) } as any,
+    );
+
+    await service.calcularLiquidacion('emp-pe', 'renuncia', '2026-10-31', 'tenant-1', 'actor-1', {
+      periodo: '2026-07', monto: 1275.33, fecha_pago: '2026-07-15', referencia: 'Boleta histórica julio',
+    });
+
+    const liquidacion = rpc.mock.calls[0][1].p_liquidacion;
+    // 1 800 + 113 de asignación familiar; julio-octubre son cuatro meses completos.
+    expect(liquidacion.metadata.remuneracion_mensual).toBe(1913);
+    expect(liquidacion.metadata.gratificacion_cts).toMatchObject({
+      monto: 1275.33, fuente: 'FUENTE_EXTERNA_DECLARADA', declarado_por: 'actor-1',
+    });
+    expect(liquidacion.metadata.gratificacion_trunca).toBe(1275.33);
+    expect(liquidacion.metadata.bonificacion_extraordinaria_9).toBe(114.78);
+    expect(liquidacion.metadata.monto_vacaciones_truncas).toBe(1275.33);
+    // Mayo-octubre ya se depositó: no hay CTS trunca.
+    expect(liquidacion.monto_cts).toBe(0);
+    expect(liquidacion.total_liquidacion).toBe(2665.44);
+  });
+
   it('delega confirmación, pago, reversa y depósito CTS a sus RPC atómicas con actor', async () => {
     const rpc = jest.fn().mockResolvedValue({ data: { success: true }, error: null });
     const service = new RrhhService({

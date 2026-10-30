@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useApi } from '@/hooks/use-api';
+import { useCountryContext } from '@/hooks/use-country-context';
+import { fiscalDateForCountry } from '@/lib/fiscal-date';
 
 type Cuenta = { id: string; moneda: string; cuenta_contable_id?: string };
 
@@ -22,10 +24,11 @@ export function MovimientoBancarioModal({
   onSuccess: () => void;
 }) {
   const { get, post } = useApi({ throwOnError: true, showErrorToast: false });
+  const country = useCountryContext();
   const [cuentas, setCuentas] = useState<any[]>([]);
   const [tipo, setTipo] = useState<'ABONO' | 'CARGO'>('CARGO');
   const [monto, setMonto] = useState('');
-  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(() => fiscalDateForCountry(country.paisCodigo));
   const [descripcion, setDescripcion] = useState('');
   const [referencia, setReferencia] = useState('');
   const [categoria, setCategoria] = useState(conciliacionId ? 'AJUSTE_CONCILIACION' : 'OTRO_EGRESO');
@@ -80,7 +83,10 @@ export function MovimientoBancarioModal({
       setIntentKey(`bank-movement:${crypto.randomUUID()}`);
       onSuccess();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No se pudo registrar el movimiento');
+      const mensaje = cause instanceof Error ? cause.message : '';
+      setError(mensaje.includes('BANK_CLOSED_RECONCILIATION_PERIOD_IS_IMMUTABLE')
+        ? 'La conciliación de ese período ya está cerrada: no admite movimientos nuevos en esa fecha.'
+        : mensaje || 'No se pudo registrar el movimiento');
     } finally {
       setSubmitting(false);
     }

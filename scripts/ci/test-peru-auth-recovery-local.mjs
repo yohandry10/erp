@@ -6,7 +6,7 @@ import {fetchWithLocalLoginRetry} from './peru-local-http.mjs';
 // API/PostgreSQL locales efímeros y un buzón SMTP local. Nunca envía correo real.
 assert.equal(process.env.E2E_EPHEMERAL_LOCAL_DB,'1');assert.equal(process.env.PGHOST,'127.0.0.1');assert.equal(process.env.PGDATABASE,'erp_e2e');
 const api=process.env.LOCAL_API_URL;assert.equal(new URL(api).hostname,'127.0.0.1');const output=process.env.LOCAL_INTEGRATED_OUTPUT_DIR;
-const web=new URL(process.env.LOCAL_WEB_URL);assert.equal(web.hostname,'127.0.0.1');
+const web=new URL(process.env.LOCAL_WEB_URL);assert.ok(['127.0.0.1','localhost'].includes(web.hostname));
 assert.ok(process.env.LOCAL_SMTP_PORT,'El ensayo exige el buzón SMTP local');
 const first=JSON.parse(fs.readFileSync(path.join(output,'auth-first-fixture.json'))),other=JSON.parse(fs.readFileSync(path.join(output,'auth-other-fixture.json')));
 const sql=query=>execFileSync(process.env.PSQL_BIN,['-XqAt','-h','127.0.0.1','-p',process.env.PGPORT,'-U','postgres','-d','erp_e2e','-v','ON_ERROR_STOP=1'],{input:query,encoding:'utf8',windowsHide:true}).trim();

@@ -36,6 +36,26 @@ describe('PeriodosService — frontera atómica 458', () => {
     service = module.get(PeriodosService);
   });
 
+  it('consulta condiciones de cierre con el actor y sin lecturas parciales', async () => {
+    const report = { puedeCerrar: false, previos: { valido: false, periodos: [{ anio: 2026, mes: 5 }] } };
+    client.rpc.mockResolvedValueOnce({ data: report, error: null });
+    await expect(service.validarCierre('tenant-1', 'period-1', 'user-1')).resolves.toEqual(report);
+    expect(client.rpc).toHaveBeenCalledWith('validar_cierre_periodo_contable_570', {
+      p_tenant_id: 'tenant-1', p_periodo_id: 'period-1', p_actor_id: 'user-1',
+    });
+    expect(client.from).not.toHaveBeenCalled();
+  });
+
+  it('falla cerrado si la consulta de condiciones está indisponible', async () => {
+    client.rpc.mockResolvedValueOnce({ data: null, error: { message: 'private SQL failure' } });
+    await expect(service.validarCierre('tenant-1', 'period-1', 'user-1')).rejects.toMatchObject({ status: 503 });
+  });
+
+  it('devuelve 404 por período inexistente o ajeno', async () => {
+    client.rpc.mockResolvedValueOnce({ data: null, error: null });
+    await expect(service.validarCierre('tenant-1', 'period-other', 'user-1')).rejects.toMatchObject({ status: 404 });
+  });
+
   it('crea un período abierto si todavía no existe', async () => {
     client.rpc.mockResolvedValueOnce({data:{record:{id:'period-1',tenant_id:'tenant-1',anio:2026,mes:8,estado:'ABIERTO'}},error:null});
 
@@ -134,4 +154,49 @@ describe('PeriodosService — frontera atómica 458', () => {
       p_tenant_id: 'tenant-1', p_anio: 2026, p_mes: 8, p_actor_id: 'user-1',
     });
   });
+  it('la estimación usa el RPC controlado y conserva clave, actor y criterio', async () => {
+    const receipt = { operation_id: 'operation-1', documentos: 0, idempotent: false };
+    client.rpc.mockResolvedValueOnce({ data: receipt, error: null });
+    await expect(service.provisionarCobranzaDudosa('tenant-1', '2026-10', 'user-1', 1, '  Provision-570-Key  ')).resolves.toEqual(receipt);
+    expect(client.rpc).toHaveBeenCalledWith('provisionar_cobranza_dudosa_tx_570', {
+      p_tenant_id: 'tenant-1', p_periodo: '2026-10', p_actor_id: 'user-1', p_dias_vencido: 1, p_idempotency_key: 'provision-570-key',
+    });
+    expect(client.from).not.toHaveBeenCalled();
+  });
+  it('recupera el recibo idempotente sin rearmar un resultado parcial', async () => {
+    const receipt = { operation_id: 'original-operation', asiento: {id:'original-journal'}, detalles:[{id:'line'}], provisiones:[{id:'document'}], idempotent:true };
+    client.rpc.mockResolvedValueOnce({data:receipt,error:null});
+    await expect(service.provisionarCobranzaDudosa('tenant-1','2026-10','user-1',1,'provision-key')).resolves.toEqual(receipt);
+    expect(client.rpc).toHaveBeenCalledTimes(1);
+  });
+  it('la compatibilidad sin header mantiene una identidad estable por actor y criterio', async () => {
+    client.rpc.mockResolvedValue({data:{documentos:0},error:null});
+    await service.provisionarCobranzaDudosa('tenant-1','2026-10','user-1',1);
+    await service.provisionarCobranzaDudosa('tenant-1','2026-10','user-1',1);
+    await service.provisionarCobranzaDudosa('tenant-1','2026-10','user-2',1);
+    expect(client.rpc.mock.calls[0][1].p_idempotency_key).toEqual(client.rpc.mock.calls[1][1].p_idempotency_key);
+    expect(client.rpc.mock.calls[0][1].p_idempotency_key).not.toEqual(client.rpc.mock.calls[2][1].p_idempotency_key);
+  });
+  it('rechaza criterios que perderían precisión o excederían int32 antes de RPC', async () => {
+    for (const days of [0,-1,1.5,2147483648,NaN,Infinity]) await expect(service.provisionarCobranzaDudosa('tenant-1','2026-10','user-1',days,'valid-key')).rejects.toBeInstanceOf(BadRequestException);
+    for (const period of ['2026-00','2026-13','bad','1999-10']) await expect(service.provisionarCobranzaDudosa('tenant-1',period,'user-1',1,'valid-key')).rejects.toBeInstanceOf(BadRequestException);
+    for (const key of ['','short','x'.repeat(201)]) await expect(service.provisionarCobranzaDudosa('tenant-1','2026-10','user-1',1,key)).rejects.toBeInstanceOf(BadRequestException);
+    expect(client.rpc).not.toHaveBeenCalled();
+  });
+  it('una falla SQL privada no se expone como éxito ni devuelve el mensaje interno', async () => {
+    client.rpc.mockResolvedValueOnce({data:null,error:{code:'PGRST202',message:'private SQL password failure'}});
+    await expect(service.provisionarCobranzaDudosa('tenant-1','2026-10','user-1',1,'valid-key')).rejects.toMatchObject({status:503});
+  });
+  it('un conflicto transaccional se devuelve sin reintento automático', async () => {
+    client.rpc.mockResolvedValueOnce({data:null,error:{code:'22023',message:'PROVISION570_IDEMPOTENCY_CONFLICT'}});
+    await expect(service.provisionarCobranzaDudosa('tenant-1','2026-10','user-1',1,'valid-key')).rejects.toMatchObject({status:400});
+    expect(client.rpc).toHaveBeenCalledTimes(1);
+  });
+  it('no acepta un recibo ausente ni un array del RPC', async () => {
+    for (const data of [null,[], 'invalid']) {
+      client.rpc.mockResolvedValueOnce({data,error:null});
+      await expect(service.provisionarCobranzaDudosa('tenant-1','2026-10','user-1',1,'valid-key')).rejects.toMatchObject({status:503});
+    }
+  });
+
 });

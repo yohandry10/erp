@@ -14,6 +14,7 @@ import { CacheInvalidationService } from '../../shared/cache/cache-invalidation.
 import { PdfGeneratorService } from './pdf-generator.service';
 import { FiscalAdapterService } from './fiscal-adapter.service';
 import { CpeXmlBuilder } from './cpe-xml.builder';
+import { sunatOperation } from '../../shared/utils/sunat-operation.util';
 import { SucursalesService } from '../sucursales/sucursales.service';
 import { CpeCertificateService } from './cpe-certificate.service';
 import { CpeReportingService } from './cpe-reporting.service';
@@ -333,6 +334,22 @@ private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
     }
   }
 
+  private assertPeruOperation(dto: CreateFacturaDto, totals: { exportacion: number; totalIgv: number }) {
+    const operation = sunatOperation(dto);
+    if (!['0101', '0200'].includes(operation)) {
+      throw new BadRequestException('Seleccione venta interna o exportación de bienes; otras operaciones requieren su contrato fiscal específico');
+    }
+    const exportLines = dto.items.filter(item =>
+      categoriaDeAfectacion((item as any).tipo_afectacion_igv ?? (item as any).afectacion_igv) === 'EXPORTACION');
+    if (operation === '0101' && exportLines.length) {
+      throw new BadRequestException('Las líneas de exportación requieren la operación0200 de exportación de bienes');
+    }
+    if (operation === '0200' && (!dto.items.length || exportLines.length !== dto.items.length
+      || totals.exportacion <= 0 || totals.totalIgv !== 0)) {
+      throw new BadRequestException('La exportación de bienes exige todas las líneas con afectación40 e IGV cero');
+    }
+  }
+
   private assertReceptorValido(dto: CreateFacturaDto, paisCodigo = 'PE') {
     const tipo = String((dto as any).tipo_documento_receptor ?? '').trim();
     const documento = String((dto as any).documento_receptor ?? '').trim();
@@ -404,8 +421,11 @@ private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
       throw new BadRequestException('El DNI del receptor debe tener 8 dígitos');
     }
 
-    if (tipoDocumento === '01' && tipo !== '6') {
+    if (tipoDocumento === '01' && tipo !== '6' && sunatOperation(dto) !== '0200') {
       throw new BadRequestException('La factura requiere receptor con RUC');
+    }
+    if (sunatOperation(dto) === '0200' && tipo === '6') {
+      throw new BadRequestException('La exportación de bienes requiere identificar al receptor no domiciliado; no admite RUC sin la excepción fiscal correspondiente');
     }
 
     // SUNAT (Reglamento de Comprobantes de Pago): la boleta cuyo importe total
@@ -777,14 +797,15 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
     dto: CreateFacturaDto,
     tenantId: string,
     total: number,
+    contadoDirectoConCliente = false,
   ): Promise<Record<string, unknown> | null> {
     const esCredito =
       (dto as any).condicion_pago === 'CREDITO' || (dto as any).es_credito === true;
-    if (!esCredito) return null;
+    if (!esCredito && !contadoDirectoConCliente) return null;
 
     const clienteId = String((dto as any).cliente_id ?? '').trim();
     if (!clienteId) {
-      throw new BadRequestException('Una venta a crédito requiere cliente_id');
+      throw new BadRequestException('La cuenta por cobrar requiere un cliente maestro');
     }
 
     const client = this.supabaseService.getClient();
@@ -1670,6 +1691,9 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
         ? ''
         : this.resolveIssueTime((createFacturaDto as any).fecha_emision);
       let dueDate = this.resolveDueDate(emissionDate, (createFacturaDto as any).fecha_vencimiento);
+      if (paisCodigo === 'PE' && eligibleDirectRetry && String((createFacturaDto as any).condicion_pago ?? 'CONTADO').toUpperCase() === 'CONTADO') {
+        dueDate = emissionDate;
+      }
       if (paisCodigo === 'CO') {
         const paymentForm = this.normalizeDianPaymentForm((createFacturaDto as any).condicion_pago);
         const paymentTermDays = Number((createFacturaDto as any).plazo_pago_dias ?? 0);
@@ -1698,6 +1722,7 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       const totalesCalculados = this.recalculateTotals(createFacturaDto, paisCodigo);
       const { subtotal, totalIgv, totalIsc, total, gravadas, exoneradas, inafectas, exportacion } =
         totalesCalculados;
+      if (paisCodigo === 'PE') this.assertPeruOperation(createFacturaDto, totalesCalculados);
       this.assertProvidedTotalsMatch(createFacturaDto, totalesCalculados);
       // Los guards jurisdiccionales evalúan el total recalculado por el
       // servidor, aunque el navegador omita o intente manipular `total_venta`.
@@ -2055,7 +2080,8 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
           ...(directRequestFingerprint
             ? { dian_direct_request_fingerprint: directRequestFingerprint }
             : {}),
-        } : {},
+        } : paisCodigo === 'PE' && sunatOperation(createFacturaDto) !== '0101'
+          ? { sunat_tipo_operacion: sunatOperation(createFacturaDto) } : {},
         // producto_id queda en documento_detalles. Se excluye del JSON legado
         // de CPE para que un retry posterior al despliegue pueda reconciliar
         // comprobantes creados por el payload histórico sin cambiar su huella.
@@ -2082,7 +2108,8 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       if (usaEmisionAtomica) {
         const requiereTransporte = this.evaluarSiRequiereTransporte(createFacturaDto, paisCodigo);
         const detalles = this.construirDetallesAtomicos(createFacturaDto);
-        const cxc = await this.prepararCxcAtomica(createFacturaDto, tenantId, total);
+        const cxc = await this.prepararCxcAtomica(createFacturaDto, tenantId, total,
+          Boolean(directPeruRequestFingerprint && (createFacturaDto as any).cliente_id));
         const monedaFuncional = paisCodigo === 'CO' ? 'COP' : paisCodigo === 'AR' ? 'ARS' : 'PEN';
         const tipoCambio = String(createFacturaDto.moneda ?? monedaFuncional).toUpperCase() === monedaFuncional
           ? 1
@@ -2277,26 +2304,48 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       ?? payload?.clienteDocumento
       ?? '',
     ).trim();
-    const tipoDocumentoReceptor = this.resolveTipoDocumentoReceptor(
-      tipoDocumento,
-      clienteMaestro?.documentoTipo
-        ?? payload?.tipo_documento_receptor
-        ?? payload?.clienteTipoDocumento,
-      documentoReceptor,
-      emisor.pais,
-    );
-    const razonSocialReceptor = String(
-      clienteMaestro?.razonSocial
-      ?? payload?.razon_social_receptor
-      ?? payload?.clienteRazonSocial
-      ?? payload?.clienteNombre
-      ?? '',
-    ).trim();
-    if (!razonSocialReceptor) {
-      throw new BadRequestException('El receptor del CPE requiere razón social o nombre');
-    }
+    // Esta normalización es pura: todavía no se ha consultado/reservado un
+    // correlativo ni invocado el escritor. Sólo una intención nueva de la UI
+    // puede corregirse; un CPE existente o una lectura incierta conserva retry.
+    const normalizeInput = () => {
+      const tipoDocumentoReceptor = this.resolveTipoDocumentoReceptor(
+        tipoDocumento,
+        clienteMaestro?.documentoTipo
+          ?? payload?.tipo_documento_receptor
+          ?? payload?.clienteTipoDocumento,
+        documentoReceptor,
+        emisor.pais,
+        String(payload?.tipo_operacion ?? payload?.tipoOperacion ?? '0101').trim(),
+      );
+      const razonSocialReceptor = String(
+        clienteMaestro?.razonSocial
+        ?? payload?.razon_social_receptor
+        ?? payload?.clienteRazonSocial
+        ?? payload?.clienteNombre
+        ?? '',
+      ).trim();
+      if (!razonSocialReceptor) {
+        throw new BadRequestException('El receptor del CPE requiere razón social o nombre');
+      }
 
-    const items = this.normalizeComprobanteItems(payload?.items);
+      const items = this.normalizeComprobanteItems(payload?.items);
+      return { tipoDocumentoReceptor, razonSocialReceptor, items };
+    };
+    let input: ReturnType<typeof normalizeInput>;
+    try {
+      input = normalizeInput();
+    } catch (error) {
+      if (emisor.pais === 'PE' && !existingIntent
+          && /^cpe-ui-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(providedIdempotencyKey)
+          && error instanceof BadRequestException) {
+        throw new BadRequestException({
+          error: 'CPE_CREATION_INPUT_NOT_APPLIED',
+          message: error.message,
+        });
+      }
+      throw error;
+    }
+    const { tipoDocumentoReceptor, razonSocialReceptor, items } = input;
     const basesPorAfectacion = items.reduce(
       (totals, item) => {
         const value = Number(item.valor_venta ?? 0);
@@ -2433,6 +2482,10 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
         `cpe.ui:${tenantId}:${tipoDocumento}:${serie}:${numero}`,
     } as CreateFacturaDto;
 
+    if (emisor.pais === 'PE') {
+      (dto as any).tipo_operacion = String(payload?.tipo_operacion ?? payload?.tipoOperacion ?? '0101').trim();
+    }
+
     if (emisor.pais === 'AR') {
       (dto as any).arca_concepto = (argentinaFiscalFields as any).arca_concepto;
       (dto as any).arca_fecha_servicio_desde =
@@ -2470,6 +2523,8 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       version: 565, serie: String(dto.serie ?? '').trim().toUpperCase(),
       requestedNumber: includeNumber ? Number(dto.numero) : requestedNumber == null ? null : Number(requestedNumber),
       request: this.buildDirectDianRequestFingerprint(dto, tenantId),
+      // Conserva las huellas domésticas565; una exportación es otra intención.
+      ...(sunatOperation(dto) !== '0101' ? { sunatOperation: sunatOperation(dto) } : {}),
     }), 'utf8').digest('hex');
   }
 
@@ -2534,7 +2589,9 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       .eq('tenant_id', tenantId)
       .eq('idempotency_key', idempotencyKey)
       .maybeSingle();
-    if (!queryResult) return null;
+    if (!queryResult || !('data' in queryResult) || !('error' in queryResult)) {
+      throw new BadRequestException('No se pudo reconciliar la intención de emisión: respuesta incompleta');
+    }
     const { data, error } = queryResult;
     if (error) {
       throw new BadRequestException(`No se pudo reconciliar la intención de emisión: ${error.message}`);
@@ -3202,7 +3259,25 @@ async retrySendToOse(
 
 async getComprobantesFromDatabase(filters: any = {}, tenantId?: string) {
     return this.reportingService.getComprobantesFromDatabase(filters, tenantId);
+}
+
+async vincularCxcContado(cpeId: string, clienteId: string, tenantId: string, actorId: string, key?: string) {
+  if (!key || key.trim().length < 8 || key.trim().length > 160) {
+    throw new BadRequestException('Conserve una intención válida para vincular el comprobante');
   }
+  const { data, error } = await this.supabaseService.getClient().rpc('vincular_cxc_cpe_contado_tx_570', {
+    p_tenant_id: tenantId, p_actor_id: actorId, p_cpe_id: cpeId,
+    p_cliente_id: clienteId, p_idempotency_key: key.trim(),
+  });
+  if (error) {
+    if (error.code === 'P0002') throw new NotFoundException('El comprobante no existe o no admite esta vinculación');
+    if (error.code === '42501') throw new ForbiddenException('No tiene permiso para gestionar el cobro');
+    if (error.code === '23505') throw new ConflictException('El comprobante ya está vinculado a otra intención o cliente');
+    if (['22023','23514','23503'].includes(error.code)) throw new BadRequestException('El cliente debe coincidir con el documento del receptor y el comprobante debe estar vigente');
+    throw new ServiceUnavailableException('No se pudo confirmar la vinculación; conserve la intención y reintente');
+  }
+  return { success: true, data };
+}
 
 async exportComprobantesCsv(filters: any = {}, tenantId?: string) {
     return this.reportingService.exportComprobantesCsv(filters, tenantId);
@@ -3228,8 +3303,8 @@ private resolveNumeroCpe(tenantId: string, tipoDocumento: string, serie: string,
     return this.registrationService.resolveNumeroCpe(tenantId, tipoDocumento, serie, provided);
   }
 
-private resolveTipoDocumentoReceptor(tipoDocumento: string, provided: any, documento: string, pais = 'PE'): string {
-    return this.registrationService.resolveTipoDocumentoReceptor(tipoDocumento, provided, documento, pais);
+private resolveTipoDocumentoReceptor(tipoDocumento: string, provided: any, documento: string, pais = 'PE', operation = '0101'): string {
+    return this.registrationService.resolveTipoDocumentoReceptor(tipoDocumento, provided, documento, pais, operation);
 }
 
 private normalizeComprobanteItems(itemsInput: any): any[] {

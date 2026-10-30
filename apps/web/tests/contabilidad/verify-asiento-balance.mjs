@@ -39,8 +39,12 @@ const casos = [
     debe: 100,
     haber: 99.995,
     esperado: "BALANCEADO",
-    escenario: "tolerancia menor a un céntimo",
+    escenario: "totales que redondean al mismo céntimo",
   },
+  { debe: 7.85, haber: 7.84, esperado: "DESCUADRADO", escenario: "un céntimo pese a la resta binaria" },
+  { debe: 7.84, haber: 7.85, esperado: "DESCUADRADO", escenario: "un céntimo en sentido contrario" },
+  { debe: 100, haber: 99.994, esperado: "DESCUADRADO", escenario: "redondeo monetario distinto aunque la diferencia sea menor a un céntimo" },
+  { debe: 0.1+0.2, haber: 0.3, esperado: "BALANCEADO", escenario: "suma binaria con el mismo total monetario" },
   {
     debe: Number.NaN,
     haber: 0,

@@ -431,6 +431,13 @@ describe('OseService certificate path resolution', () => {
     expect((service as any).shouldUseHttpBasicAuth('ose-demo.local')).toBe(true);
   });
 
+  it('compone el usuario SOL del primer cliente una sola vez con su RUC', () => {
+    const service = new OseService(createConfigService() as any, circuitBreaker as any);
+    expect((service as any).normalizeSunatUsername(' erpclient ', '20123456786')).toBe('20123456786ERPCLIENT');
+    expect((service as any).normalizeSunatUsername('20123456786ERPCLIENT', '20123456786')).toBe('20123456786ERPCLIENT');
+    expect((service as any).normalizeSunatUsername('', '20123456786')).toBe('');
+  });
+
   it('prefiere credenciales SUNAT explicitas sobre aliases OSE legacy', () => {
     const service = new OseService(
       createConfigService({

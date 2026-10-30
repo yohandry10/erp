@@ -509,173 +509,33 @@ export class ContabilidadEstadosFinancierosController {
     @CurrentTenant() tenantId: string,
     @Body() body: PeriodoContableDto,
   ): Promise<{ success: boolean; message: string; data?: any }> {
+    const { anio, mes } = body;
+    if (!Number.isInteger(anio) || anio < 2000 || anio > 2100 ||
+        !Number.isInteger(mes) || mes < 1 || mes > 12) {
+      throw new BadRequestException("Año o mes inválido para refrescar estados financieros");
+    }
+
+    const startedAt = Date.now();
     try {
-      const { anio, mes } = body;
-
-      // Validar parámetros requeridos
-      if (!anio || !mes) {
-        return {
-          success: false,
-          message: "Los parámetros anio y mes son requeridos",
-        };
-      }
-
-      // Validar rangos
-      if (isNaN(anio) || isNaN(mes) || mes < 1 || mes > 12) {
-        return {
-          success: false,
-          message:
-            "Parámetros inválidos: anio debe ser un número y mes debe estar entre 1 y 12",
-        };
-      }
-
-      console.log(
-        `🔄 [Contabilidad] Refrescando estados financieros para ${anio}-${mes}, tenant: ${tenantId}`,
-      );
-
-      const startTime = Date.now();
-
-      // Verificar si existen vistas materializadas
-      const { data: views, error: viewsError } = await this.supabaseService
-        .getClient()
-        .from("pg_matviews")
-        .select("matviewname")
-        .in("matviewname", [
-          "mv_balance_comprobacion",
-          "mv_estado_resultados",
-          "mv_balance_general",
-        ]);
-
-      if (viewsError) {
-        console.warn(
-          "⚠️ No se pudieron verificar las vistas materializadas:",
-          viewsError,
-        );
-      }
-
-      const existingViews = views?.map((v) => v.matviewname) || [];
-      const refreshedViews: string[] = [];
-      const errors: string[] = [];
-
-      // Refrescar cada vista materializada si existe
-      for (const viewName of [
-        "mv_balance_comprobacion",
-        "mv_estado_resultados",
-        "mv_balance_general",
-      ]) {
-        if (existingViews.includes(viewName)) {
-          try {
-            console.log(`🔄 Refrescando vista: ${viewName}`);
-
-            // Ejecutar REFRESH MATERIALIZED VIEW
-            const { error: refreshError } = await this.supabaseService
-              .getClient()
-              .rpc("refresh_materialized_view", {
-                view_name: viewName,
-                tenant_id: tenantId,
-                p_anio: anio,
-                p_mes: mes,
-              });
-
-            if (refreshError) {
-              console.error(`❌ Error refrescando ${viewName}:`, refreshError);
-              errors.push(`${viewName}: ${refreshError.message}`);
-            } else {
-              refreshedViews.push(viewName);
-              console.log(`✅ Vista ${viewName} refrescada exitosamente`);
-            }
-          } catch (error) {
-            console.error(`❌ Error refrescando ${viewName}:`, error);
-            errors.push(`${viewName}: ${error.message}`);
-          }
-        } else {
-          console.log(`ℹ️ Vista ${viewName} no existe, se omite`);
-        }
-      }
-
-      const endTime = Date.now();
-      const duration = endTime - startTime;
-
-      // Si no hay vistas materializadas, informar al usuario
-      if (existingViews.length === 0) {
-        console.log(
-          "ℹ️ No se encontraron vistas materializadas. Los estados financieros se calculan en tiempo real.",
-        );
-        return {
-          success: true,
-          message:
-            "No hay vistas materializadas configuradas. Los estados financieros se calculan en tiempo real desde las tablas base.",
-          data: {
-            periodo: {
-              anio,
-              mes,
-              descripcion: `${anio}-${String(mes).padStart(2, "0")}`,
-            },
-            vistas_materializadas: false,
-            duracion_ms: duration,
-            nota: "Para mejorar el rendimiento, considere crear vistas materializadas ejecutando la migración correspondiente.",
-          },
-        };
-      }
-
-      // Si hubo errores pero también éxitos
-      if (errors.length > 0 && refreshedViews.length > 0) {
-        return {
-          success: true,
-          message: `Vistas refrescadas parcialmente. ${refreshedViews.length} exitosas, ${errors.length} con errores.`,
-          data: {
-            periodo: {
-              anio,
-              mes,
-              descripcion: `${anio}-${String(mes).padStart(2, "0")}`,
-            },
-            vistas_refrescadas: refreshedViews,
-            errores: errors,
-            duracion_ms: duration,
-          },
-        };
-      }
-
-      // Si solo hubo errores
-      if (errors.length > 0 && refreshedViews.length === 0) {
-        return {
-          success: false,
-          message: "Error al refrescar las vistas materializadas",
-          data: {
-            periodo: {
-              anio,
-              mes,
-              descripcion: `${anio}-${String(mes).padStart(2, "0")}`,
-            },
-            errores: errors,
-            duracion_ms: duration,
-          },
-        };
-      }
-
-      // Todo exitoso
+      // La RPC existente refresca las tres proyecciones en una transacción.
+      // No inferir ausencia de vistas de un catálogo que el rol no puede leer.
+      await this.estadosFinancierosService.refrescarEstadosFinancieros(tenantId, anio, mes);
       return {
         success: true,
-        message: `${refreshedViews.length} vistas materializadas refrescadas exitosamente`,
+        message: "3 vistas materializadas refrescadas exitosamente",
         data: {
-          periodo: {
-            anio,
-            mes,
-            descripcion: `${anio}-${String(mes).padStart(2, "0")}`,
-          },
-          vistas_refrescadas: refreshedViews,
-          duracion_ms: duration,
+          periodo: { anio, mes, descripcion: `${anio}-${String(mes).padStart(2, "0")}` },
+          vistas_materializadas: true,
+          vistas_refrescadas: [
+            "mv_balance_comprobacion",
+            "mv_estado_resultados",
+            "mv_balance_general",
+          ],
+          duracion_ms: Date.now() - startedAt,
         },
       };
     } catch (error) {
-      console.error(
-        "❌ [Contabilidad] Error refrescando estados financieros:",
-        error,
-      );
-      return {
-        success: false,
-        message: `Error al refrescar estados financieros: ${error.message}`,
-      };
+      throw lecturaContableFallida(error, "el refresco de estados financieros");
     }
   }
 

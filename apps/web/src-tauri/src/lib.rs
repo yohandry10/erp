@@ -13,6 +13,7 @@ use uuid::Uuid;
 
 mod crypto;
 mod printer;
+mod static_routes;
 
 static OFFLINE_QUEUE_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
@@ -208,6 +209,27 @@ fn now_ms() -> i64 {
 
 fn open_local_db(app: &AppHandle) -> Result<Connection, String> {
     let path = offline_db_path(app)?;
+    let conn = open_local_db_at(path)?;
+    migrate_legacy_json_outbox(app, &conn)?;
+    Ok(conn)
+}
+
+fn actor_db_name(tenant: &str, user: &str) -> Result<String, String> {
+    if tenant.trim().is_empty() || user.trim().is_empty() {
+        return Err("No hay empresa o usuario activos para SQLite local".to_string());
+    }
+    let identity = serde_json::to_vec(&(tenant, user)).map_err(|e| e.to_string())?;
+    Ok(format!("{:x}.sqlite", Sha256::digest(identity)))
+}
+
+fn open_actor_db(app: &AppHandle, tenant: Option<&str>, user: Option<&str>) -> Result<Connection, String> {
+    let name = actor_db_name(tenant.unwrap_or_default(), user.unwrap_or_default())?;
+    let directory = offline_db_path(app)?.parent().ok_or("Directorio SQLite inválido")?.join("actors");
+    fs::create_dir_all(&directory).map_err(|e| format!("No se pudo crear SQLite por actor: {e}"))?;
+    open_local_db_at(directory.join(name))
+}
+
+fn open_local_db_at(path: PathBuf) -> Result<Connection, String> {
     let conn = Connection::open(path).map_err(|e| format!("No se pudo abrir SQLite local: {e}"))?;
     conn.pragma_update(None, "journal_mode", "WAL")
         .map_err(|e| format!("No se pudo activar WAL en SQLite local: {e}"))?;
@@ -437,8 +459,35 @@ fn open_local_db(app: &AppHandle) -> Result<Connection, String> {
     ensure_text_column(&conn, "local_fiscal_documents", "tenant_id")?;
     migrate_fiscal_tables_tenant_scope(&conn)?;
 
-    migrate_legacy_json_outbox(app, &conn)?;
     Ok(conn)
+}
+
+fn read_authorization_matches(conn: &Connection, authorization: &str) -> Result<bool, String> {
+    let stored: Option<String> = conn.query_row("SELECT value FROM local_metadata WHERE key = 'read_authorization'", [], |row| row.get(0))
+        .optional().map_err(|e| e.to_string())?;
+    Ok(!authorization.is_empty() && stored.as_deref() == Some(authorization))
+}
+
+fn initialize_read_authorization(conn: &Connection, authorization: &str) -> Result<bool, String> {
+    if authorization.is_empty() { return Ok(false); }
+    conn.execute("INSERT OR IGNORE INTO local_metadata(key,value,updated_at) VALUES('read_authorization',?1,?2)", params![authorization, now_ms()]).map_err(|e| e.to_string())?;
+    read_authorization_matches(conn, authorization)
+}
+
+fn invalidate_actor_reads(conn: &Connection, authorization: &str) -> Result<(), String> {
+    if authorization.is_empty() { return Err("Autorización local incompleta".to_string()); }
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    tx.execute("DELETE FROM local_api_snapshots", []).map_err(|e| e.to_string())?;
+    tx.execute("DELETE FROM local_binary_cache", []).map_err(|e| e.to_string())?;
+    tx.execute("INSERT OR REPLACE INTO local_metadata(key,value,updated_at) VALUES('read_authorization',?1,?2)", params![authorization, now_ms()]).map_err(|e| e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn invalidate_local_read_cache(app: AppHandle, tenant_id: String, user_id: String, authorization: String) -> Result<(), String> {
+    let _guard = lock_offline_queue()?;
+    let conn = open_actor_db(&app, Some(&tenant_id), Some(&user_id))?;
+    invalidate_actor_reads(&conn, &authorization)
 }
 
 fn ensure_text_column(conn: &Connection, table: &str, column: &str) -> Result<(), String> {
@@ -3674,7 +3723,8 @@ fn process_local_customer(
         parse_json_body(&input.body)?
     };
 
-    let customer = normalize_customer_payload(&payload, id.clone(), method == "DELETE");
+    let mut customer = normalize_customer_payload(&payload, id.clone(), method == "DELETE");
+    customer["tenant_id"] = serde_json::json!(input.tenant_id);
     let documento = value_string(&customer, "ruc")
         .or_else(|| value_string(&customer, "codigo"))
         .or_else(|| value_string(&customer, "documento_numero"))
@@ -3698,9 +3748,19 @@ fn process_local_customer(
         ],
     )
     .map_err(|e| format!("No se pudo guardar cliente local: {e}"))?;
-    let queued_input = with_local_sync_contract(input, &id, "customer")?;
-    enqueue_offline_request_with_conn(conn, &queued_input)?;
-    json_success_response(customer, "Cliente guardado localmente; pendiente de sincronizacion")
+    // El DTO de clientes no admite metadatos locales en el cuerpo. El mapeo
+    // local/remoto viaja en headers y no modifica el contrato del maestro.
+    let queued_input = with_local_entity_headers(input, &id, "customer");
+    let queued = enqueue_offline_request_with_conn(conn, &queued_input)?;
+    let mut pending_customer = customer;
+    pending_customer["offline_queue_id"] = serde_json::json!(queued.id);
+    let mut response = json_success_response(pending_customer, "Cliente guardado localmente; pendiente de sincronizacion")?;
+    let mut payload: Value = serde_json::from_str(&response.body).map_err(|e| e.to_string())?;
+    payload["queued"] = serde_json::json!(true);
+    response.body = serde_json::to_string(&payload).map_err(|e| e.to_string())?;
+    response.status = 202;
+    response.headers.push(HeaderPair { name: "x-erp-offline-queued".to_string(), value: "true".to_string() });
+    Ok(response)
 }
 
 fn calculate_document_totals(payload: &Value) -> (f64, f64, f64) {
@@ -4134,12 +4194,15 @@ fn hydrate_local_first_response(
     endpoint: String,
     url: String,
     tenant_id: Option<String>,
+    user_id: Option<String>,
+    authorization: String,
     status: u16,
     headers: Vec<HeaderPair>,
     body: String,
 ) -> Result<(), String> {
     let _guard = lock_offline_queue()?;
-    let conn = open_local_db(&app)?;
+    let conn = open_actor_db(&app, tenant_id.as_deref(), user_id.as_deref())?;
+    if !initialize_read_authorization(&conn, &authorization)? { return Err("El acceso local cambió durante la consulta".to_string()); }
     let tenant = tenant_id.as_deref();
     upsert_snapshot(&conn, &endpoint, &url, tenant, status, &headers, &body)?;
 
@@ -4161,9 +4224,15 @@ fn get_local_first_response(
     endpoint: String,
     url: String,
     tenant_id: Option<String>,
+    user_id: Option<String>,
+    authorization: String,
 ) -> Result<Option<LocalFirstResponse>, String> {
     let _guard = lock_offline_queue()?;
-    let conn = open_local_db(&app)?;
+    let conn = open_actor_db(&app, tenant_id.as_deref(), user_id.as_deref())?;
+    if !read_authorization_matches(&conn, &authorization)? { return Ok(None); }
+    // Las proyecciones sobreviven para conservar pendientes, pero requieren una
+    // lectura autorizada en esta sesión antes de volver a entregarse.
+    if read_local_snapshot(&conn, &endpoint, &url, tenant_id.as_deref())?.is_none() { return Ok(None); }
     let config = load_config(app.clone()).unwrap_or_default();
     let tenant = tenant_id.as_deref();
 
@@ -4290,7 +4359,7 @@ fn process_local_first_write(
 
     let _guard = lock_offline_queue()?;
     let config = load_config(app.clone()).unwrap_or_default();
-    let conn = open_local_db(&app)?;
+    let conn = open_actor_db(&app, request.tenant_id.as_deref(), request.user_id.as_deref())?;
     let tx = conn
         .unchecked_transaction()
         .map_err(|e| format!("No se pudo iniciar transaccion local-first: {e}"))?;
@@ -4392,7 +4461,7 @@ fn migrate_legacy_json_outbox(app: &AppHandle, conn: &Connection) -> Result<(), 
             &item.method,
             item.body.as_deref(),
         )
-        .is_some()
+        .is_some() && !is_document_center_fiscal_manual_request(&item.endpoint, &item.url, &item.method)
         {
             continue;
         }
@@ -4781,19 +4850,24 @@ fn update_local_first_sync_status(
 
 fn read_offline_queue(app: &AppHandle) -> Result<Vec<OfflineQueueItem>, String> {
     let conn = open_local_db(app)?;
+    read_offline_queue_from_conn(&conn, None, None)
+}
+
+fn read_offline_queue_from_conn(conn: &Connection, tenant: Option<&str>, user: Option<&str>) -> Result<Vec<OfflineQueueItem>, String> {
     let mut stmt = conn
         .prepare(
             r#"
             SELECT id, endpoint, method, url, headers_json, body, tenant_id, user_id,
                    status, attempts, created_at, updated_at, last_error, response_status, response_body
             FROM offline_requests
+            WHERE (?1 IS NULL OR tenant_id = ?1) AND (?2 IS NULL OR user_id = ?2)
             ORDER BY created_at ASC, rowid ASC
             "#,
         )
         .map_err(|e| format!("No se pudo preparar lectura offline SQLite: {e}"))?;
 
     let rows = stmt
-        .query_map([], |row| {
+        .query_map(params![tenant, user], |row| {
             let headers_json: String = row.get(4)?;
             let headers: Vec<HeaderPair> = serde_json::from_str(&headers_json).unwrap_or_default();
             Ok(OfflineQueueItem {
@@ -4824,6 +4898,15 @@ fn read_offline_queue(app: &AppHandle) -> Result<Vec<OfflineQueueItem>, String> 
 
     let mut items = Vec::new();
     for item in loaded_items {
+        // Un cobro o ajuste CxC legacy se conserva para revisión manual; leer la cola no
+        // constituye una autorización para borrarlo ni volver a enviarlo.
+        if is_cxc_manual_confirmation_request(&item.endpoint, &item.url, &item.method)
+            || is_depreciation_batch_manual_request(&item.endpoint, &item.url, &item.method)
+            || is_asset_lifecycle_manual_request(&item.endpoint, &item.url, &item.method)
+            || is_document_center_fiscal_manual_request(&item.endpoint, &item.url, &item.method) {
+            items.push(item);
+            continue;
+        }
         if non_queueable_offline_error(
             &item.endpoint,
             &item.url,
@@ -4849,6 +4932,25 @@ fn read_offline_queue(app: &AppHandle) -> Result<Vec<OfflineQueueItem>, String> 
         .map_err(|e| format!("No se pudo limpiar header sensible legacy: {e}"))?;
     }
     Ok(items)
+}
+
+fn actor_offline_queue(app: &AppHandle, tenant: &str, user: &str) -> Result<Vec<OfflineQueueItem>, String> {
+    let conn = open_actor_db(app, Some(tenant), Some(user))?;
+    let mut items = read_offline_queue_from_conn(&conn, Some(tenant), Some(user))?;
+    // La cola anterior se conserva en su archivo original. Sólo su propietario
+    // puede verla o completar su sincronización; no importamos cachés compartidas.
+    let legacy = open_local_db(app)?;
+    items.extend(read_offline_queue_from_conn(&legacy, Some(tenant), Some(user))?);
+    items.sort_by_key(|item| item.created_at);
+    Ok(items)
+}
+
+fn actor_queue_connection(app: &AppHandle, tenant: &str, user: &str, id: &str) -> Result<Connection, String> {
+    for conn in [open_actor_db(app, Some(tenant), Some(user))?, open_local_db(app)?] {
+        let owned: bool = conn.query_row("SELECT EXISTS(SELECT 1 FROM offline_requests WHERE id=?1 AND tenant_id=?2 AND user_id=?3)", params![id, tenant, user], |row| row.get(0)).map_err(|e| e.to_string())?;
+        if owned { return Ok(conn); }
+    }
+    Err("No existe operación offline para la empresa y usuario actuales".to_string())
 }
 
 fn write_file_replace(path: &PathBuf, raw: String) -> std::io::Result<()> {
@@ -4888,7 +4990,7 @@ const FISCAL_OFFLINE_ERROR: &str =
     "La emision fiscal requiere conexion en vivo. No se guarda en la cola offline ni se considera emitida.";
 
 fn offline_endpoint_path(endpoint: &str) -> String {
-    let without_query = endpoint.split('?').next().unwrap_or(endpoint).trim();
+    let without_query = endpoint.split(|character| matches!(character, '?' | '#')).next().unwrap_or(endpoint).trim();
     let path = if let Some(scheme) = without_query.find("://") {
         without_query[(scheme + 3)..]
             .find('/')
@@ -4948,6 +5050,30 @@ fn is_sensitive_offline_request(endpoint: &str, url: &str, method: &str) -> bool
         || is_sensitive_non_queueable_endpoint(url, method)
 }
 
+fn is_invoice_generation_offline_request(endpoint: &str, url: &str, method: &str) -> bool {
+    if !method.trim().eq_ignore_ascii_case("POST") { return false; }
+    [endpoint, url].iter().any(|endpoint| {
+        let path = offline_endpoint_path(endpoint);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        let Some(rest) = path.strip_prefix("/ventas/pedidos/") else { return false; };
+        let parts: Vec<&str> = rest.split('/').collect();
+        parts.len() == 2 && !parts[0].is_empty() && parts[1] == "generar-factura"
+    })
+}
+
+fn is_document_center_fiscal_manual_request(endpoint: &str, url: &str, method: &str) -> bool {
+    if !method.trim().eq_ignore_ascii_case("POST") { return false; }
+    [endpoint, url].iter().any(|value| {
+        let path = offline_endpoint_path(value);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+        parts.len() == 3 && parts[0] == "documentos" && !parts[1].is_empty()
+            && matches!(parts[2], "generar-xml" | "enviar-sunat")
+    })
+}
+
 fn is_fiscal_emission_endpoint(endpoint: &str, method: &str) -> bool {
     if matches!(
         method.trim().to_ascii_uppercase().as_str(),
@@ -5005,6 +5131,41 @@ fn is_fiscal_offline_request(
         || is_pos_fiscal_intent(endpoint, url, method, body)
 }
 
+fn is_cxc_manual_confirmation_request(endpoint: &str, url: &str, method: &str) -> bool {
+    if matches!(method.trim().to_ascii_uppercase().as_str(), "GET" | "HEAD" | "OPTIONS") {
+        return false;
+    }
+    [endpoint, url].iter().any(|value| {
+        let path = offline_endpoint_path(value);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+        parts.len() == 4 && parts[0] == "finanzas" && parts[1] == "cxc"
+            && !parts[2].is_empty() && matches!(parts[3], "pagos" | "reprogramar" | "notas-credito")
+    })
+}
+
+fn is_asset_lifecycle_manual_request(endpoint: &str, url: &str, method: &str) -> bool {
+    [endpoint, url].iter().any(|value| {
+        let path = offline_endpoint_path(value);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+        parts.len() >= 3 && parts[0] == "contabilidad" && parts[1] == "activos-fijos" && !parts[2].is_empty()
+            && (parts.len() == 3 && parts[2] != "depreciar" && method.trim().eq_ignore_ascii_case("PUT")
+                || parts.len() == 4 && parts[3] == "baja" && method.trim().eq_ignore_ascii_case("POST"))
+    })
+}
+
+fn is_depreciation_batch_manual_request(endpoint: &str, url: &str, method: &str) -> bool {
+    method.trim().eq_ignore_ascii_case("POST") && [endpoint, url].iter().any(|value| {
+        let path = offline_endpoint_path(value);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        path == "/contabilidad/activos-fijos/depreciar"
+    })
+}
+
 fn non_queueable_offline_error(
     endpoint: &str,
     url: &str,
@@ -5013,7 +5174,220 @@ fn non_queueable_offline_error(
 ) -> Option<&'static str> {
     if is_sensitive_offline_request(endpoint, url, method) {
         Some(SENSITIVE_OFFLINE_ERROR)
-    } else if is_fiscal_offline_request(endpoint, url, method, body) {
+    } else if !matches!(method.trim().to_ascii_uppercase().as_str(), "GET" | "HEAD" | "OPTIONS") && [endpoint, url].iter().any(|value| {
+        let path = offline_endpoint_path(value);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        matches!(path, "/rrhh/planillas/crear-con-calculo" | "/rrhh/planillas/crear-con-calculo/resolver")
+            || (method.trim().eq_ignore_ascii_case("POST") && path == "/rrhh/planillas")
+    }) {
+        Some("El alta de planilla y su conciliación requieren confirmación del servidor. La solicitud original de alta y cálculo se conserva para continuar o conciliar con conexión.")
+    } else if !matches!(method.trim().to_ascii_uppercase().as_str(), "GET" | "HEAD" | "OPTIONS") && [endpoint, url].iter().any(|value| {
+        let path = offline_endpoint_path(value);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+        parts.len() >= 4 && parts.len() <= 5 && parts[0] == "rrhh" && parts[1] == "planillas" && !parts[2].is_empty()
+            && matches!(parts[3], "calcular" | "calcular-personalizada") && (parts.len() == 4 || parts[4] == "resolver")
+    }) {
+        Some("El cálculo y su conciliación requieren confirmación del servidor. La solicitud original se conserva para un reintento manual con conexión.")
+    } else if is_asset_lifecycle_manual_request(endpoint, url, method) {
+        Some("La edición o baja del activo requiere confirmación del servidor. La solicitud original se conserva para reintento manual con conexión.")
+    } else if method.trim().eq_ignore_ascii_case("POST") && [endpoint, url].iter().any(|value| {
+        let path = offline_endpoint_path(value);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        matches!(path, "/contabilidad/activos-fijos" | "/contabilidad/activos-fijos/depreciar")
+    }) {
+        Some("El alta de activo o lote de depreciación requiere confirmación del servidor. Reintenta la misma solicitud pendiente con conexión.")
+    } else if method.trim().eq_ignore_ascii_case("POST") && [endpoint, url].iter().any(|value| {
+        let path = offline_endpoint_path(value);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        path == "/contabilidad/revaluacion"
+    }) {
+        Some("El registro de revaluación requiere confirmación del servidor. Reintenta la misma intención pendiente con conexión.")
+    } else if method.trim().eq_ignore_ascii_case("POST") && [endpoint, url].iter().any(|value| {
+        let path = offline_endpoint_path(value);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        path == "/contabilidad/diferidos/devengar"
+    }) {
+        Some("El devengo requiere verificar el asiento y el período pendiente con conexión.")
+    } else if method.trim().eq_ignore_ascii_case("DELETE") && [endpoint, url].iter().any(|value| {
+        let path = offline_endpoint_path(value);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        let Some(rest) = path.strip_prefix("/contabilidad/diferidos/") else { return false; };
+        !rest.is_empty() && !rest.contains('/') && rest != "devengar"
+    }) {
+        Some("La cancelación del diferido requiere confirmación del servidor. Reintenta la cancelación pendiente con conexión.")
+    } else if method.trim().eq_ignore_ascii_case("POST") && [endpoint, url].iter().any(|value| {
+        let path = offline_endpoint_path(value);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        path == "/contabilidad/diferidos"
+    }) {
+        Some("El alta del diferido requiere confirmación del servidor. Reintenta el alta pendiente con conexión.")
+    } else if method.trim().eq_ignore_ascii_case("POST") && [endpoint, url].iter().any(|value| {
+        let path = offline_endpoint_path(value);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        path == "/contabilidad/periodos"
+    }) {
+        Some("La creación del período requiere confirmación del servidor. Reintenta la creación pendiente con conexión.")
+    } else if method.trim().eq_ignore_ascii_case("POST") && [endpoint, url].iter().any(|value| {
+        let path = offline_endpoint_path(value);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+        parts.len() == 4 && parts[0] == "contabilidad" && parts[1] == "periodos" && !parts[2].is_empty() && matches!(parts[3], "cerrar" | "reabrir")
+    }) {
+        Some("La transición del período requiere confirmación del servidor. Verifica la transición pendiente con conexión.")
+    } else if method.trim().eq_ignore_ascii_case("POST") && [endpoint, url].iter().any(|value| {
+        let path = offline_endpoint_path(value);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+        parts.len() == 4 && parts[0] == "contabilidad" && parts[1] == "periodos" && !parts[2].is_empty() && parts[3] == "provision-cobranza-dudosa"
+    }) {
+        Some("La estimación requiere confirmación del servidor. Verifica el resultado con conexión antes de reintentar.")
+    } else if method.trim().eq_ignore_ascii_case("POST") && [endpoint, url].iter().any(|value| {
+        let path = offline_endpoint_path(value);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        path == "/contabilidad/presupuestos"
+    }) {
+        Some("El alta del presupuesto requiere confirmación del servidor. Reintenta el alta pendiente con conexión.")
+    } else if method.trim().eq_ignore_ascii_case("DELETE") && [endpoint, url].iter().any(|value| {
+        let path = offline_endpoint_path(value);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+        parts.len() == 3 && parts[0] == "contabilidad" && parts[1] == "presupuestos" && !parts[2].is_empty()
+    }) {
+        Some("La baja del presupuesto requiere confirmación del servidor. Reintenta la baja pendiente con conexión.")
+    } else if method.trim().eq_ignore_ascii_case("POST") && [endpoint, url].iter().any(|value| {
+        let path = offline_endpoint_path(value);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+        parts.len() == 4 && parts[0] == "contabilidad" && parts[1] == "presupuestos" && !parts[2].is_empty() && parts[3] == "resolver-edicion"
+    }) {
+        Some("La resolución del presupuesto requiere confirmación del servidor. Conserva la edición pendiente y verifica con conexión.")
+    } else if method.trim().eq_ignore_ascii_case("PUT") && [endpoint, url].iter().any(|value| {
+        let path = offline_endpoint_path(value);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+        parts.len() == 3 && parts[0] == "contabilidad" && parts[1] == "presupuestos" && !parts[2].is_empty()
+    }) {
+        Some("La edición del presupuesto requiere confirmación del servidor. Reintenta la edición pendiente con conexión.")
+    } else if method.trim().eq_ignore_ascii_case("POST") && [endpoint, url].iter().any(|value| {
+        let path = offline_endpoint_path(value);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+        parts.len() == 4 && parts[0] == "inventario" && parts[1] == "logistica" && !parts[2].is_empty() && parts[3] == "registrar-entrega"
+    }) {
+        Some("La entrega requiere confirmación del servidor. Reintenta la entrega pendiente con conexión.")
+    } else if !matches!(method.trim().to_ascii_uppercase().as_str(), "GET" | "HEAD" | "OPTIONS") && [endpoint, url].iter().any(|value| {
+        let path = offline_endpoint_path(value);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        matches!(path, "/inventario/movimientos" | "/inventario/transferencias" | "/inventario/movimientos/resolver" | "/inventario/transferencias/resolver")
+    }) {
+        Some("La operación original de inventario requiere confirmación del servidor. Conserva el pendiente y verifica con conexión.")
+    } else if is_invoice_generation_offline_request(endpoint, url, method) {
+        Some("La generación de factura requiere confirmación del servidor. Verifica la generación pendiente con conexión.")
+    } else if !matches!(method.trim().to_ascii_uppercase().as_str(), "GET" | "HEAD" | "OPTIONS")
+        && [endpoint, url].iter().any(|value| {
+            let path = offline_endpoint_path(value);
+            let path = path.strip_prefix("/backend").unwrap_or(&path);
+            let path = path.strip_prefix("/api").unwrap_or(path);
+            let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+            (parts.len() == 4 && parts[0] == "rrhh" && parts[1] == "planillas" && !parts[2].is_empty() && parts[3] == "aprobar")
+                || (method.trim().eq_ignore_ascii_case("PUT") && parts.len() == 3 && parts[0] == "rrhh" && parts[1] == "planillas" && !parts[2].is_empty()
+                    && body.and_then(|v| serde_json::from_str::<serde_json::Value>(v).ok()).and_then(|v| v.get("estado").and_then(|s| s.as_str()).map(|s| s.trim().eq_ignore_ascii_case("aprobada"))).unwrap_or(false))
+        })
+    {
+        Some("La aprobación de planilla requiere confirmación del servidor. Reintenta la aprobación pendiente con conexión.")
+    } else if !matches!(method.trim().to_ascii_uppercase().as_str(), "GET" | "HEAD" | "OPTIONS")
+        && [endpoint, url].iter().any(|value| {
+            let path = offline_endpoint_path(value);
+            let path = path.strip_prefix("/backend").unwrap_or(&path);
+            let path = path.strip_prefix("/api").unwrap_or(path);
+            let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+            parts.len() == 4 && parts[0] == "rrhh" && parts[1] == "planillas" && !parts[2].is_empty()
+                && matches!(parts[3], "pagar" | "pagar-empleados")
+        })
+    {
+        Some("El pago de planilla requiere confirmación del servidor. Reintenta el pago pendiente con conexión.")
+    } else if matches!(method.trim().to_ascii_uppercase().as_str(), "POST" | "PUT" | "DELETE")
+        && [endpoint, url].iter().any(|value| {
+            let path = offline_endpoint_path(value);
+            let path = path.strip_prefix("/backend").unwrap_or(&path);
+            let path = path.strip_prefix("/api").unwrap_or(path);
+            let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+            (method.trim().eq_ignore_ascii_case("POST") && path == "/inventario/productos")
+                || (matches!(method.trim().to_ascii_uppercase().as_str(), "POST" | "DELETE") && parts.len() == 4
+                    && parts[0] == "inventario" && parts[1] == "productos" && !parts[2].is_empty() && parts[3] == "imagen")
+                || (matches!(method.trim().to_ascii_uppercase().as_str(), "PUT" | "DELETE") && parts.len() == 3
+                    && parts[0] == "inventario" && parts[1] == "productos" && !parts[2].is_empty())
+        })
+    {
+        Some("El producto requiere confirmación del servidor. Reintenta el producto pendiente con conexión.")
+    } else if method.trim().eq_ignore_ascii_case("POST")
+        && [endpoint, url].iter().any(|value| {
+            let path = offline_endpoint_path(value);
+            let path = path.strip_prefix("/backend").unwrap_or(&path);
+            let path = path.strip_prefix("/api").unwrap_or(path);
+            let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+            parts.len() == 4 && parts[0] == "compras" && parts[1] == "recepciones"
+                && ((parts[2] == "ordenes" && !parts[3].is_empty())
+                    || (!parts[2].is_empty() && parts[3] == "cerrar"))
+        })
+    {
+        Some("La recepción requiere confirmación del servidor. Reintenta la recepción pendiente con conexión.")
+    } else if method.trim().eq_ignore_ascii_case("POST")
+        && [endpoint, url].iter().any(|value| {
+            let path = offline_endpoint_path(value);
+            matches!(path.as_str(), "/api/compras/ordenes" | "/compras/ordenes" | "/backend/api/compras/ordenes" | "/backend/compras/ordenes")
+        })
+    {
+        Some("La orden requiere confirmación del servidor. Reintenta la orden pendiente con conexión.")
+    } else if [endpoint, url].iter().any(|value| {
+        let path = offline_endpoint_path(value);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+        (method.trim().eq_ignore_ascii_case("POST") && path == "/rrhh/solicitudes")
+            || (method.trim().eq_ignore_ascii_case("PUT") && parts.len() == 4
+                && parts[0] == "rrhh" && parts[1] == "solicitudes" && !parts[2].is_empty()
+                && matches!(parts[3], "aprobar" | "rechazar"))
+    }) {
+        Some("La solicitud requiere confirmación del servidor. Reintenta la operación pendiente con conexión.")
+    } else if method.trim().eq_ignore_ascii_case("POST")
+        && [endpoint, url].iter().any(|value| {
+            let path = offline_endpoint_path(value);
+            matches!(path.as_str(), "/api/finanzas/cxp" | "/finanzas/cxp" | "/backend/api/finanzas/cxp" | "/backend/finanzas/cxp")
+        })
+    {
+        Some("El documento requiere confirmación del servidor. Reintenta el registro pendiente con conexión.")
+    } else if !matches!(method.trim().to_ascii_uppercase().as_str(), "GET" | "HEAD" | "OPTIONS")
+        && [endpoint, url].iter().any(|value| {
+            let path = offline_endpoint_path(value);
+            let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+            let parts = if parts.first() == Some(&"api") { &parts[1..] } else { &parts[..] };
+            parts.len() == 4 && parts[0] == "finanzas" && parts[1] == "cxp"
+                && !parts[2].is_empty() && parts[3] == "aplicar-pago"
+        })
+    {
+        Some("El pago requiere confirmación del servidor. Reintenta el pago pendiente con conexión.")
+    } else if is_cxc_manual_confirmation_request(endpoint, url, method) {
+        Some("El cobro o ajuste CxC requiere confirmación del servidor. Conserva la solicitud original para reintentar con conexión.")
+    } else if is_fiscal_offline_request(endpoint, url, method, body)
+        || is_document_center_fiscal_manual_request(endpoint, url, method) {
         Some(FISCAL_OFFLINE_ERROR)
     } else {
         None
@@ -5255,7 +5629,7 @@ fn enqueue_offline_request(
     }
 
     let _guard = lock_offline_queue()?;
-    let conn = open_local_db(&app)?;
+    let conn = open_actor_db(&app, request.tenant_id.as_deref(), request.user_id.as_deref())?;
     let timestamp = now_ms();
     let item = OfflineQueueItem {
         id: Uuid::new_v4().to_string(),
@@ -5280,20 +5654,22 @@ fn enqueue_offline_request(
 }
 
 #[tauri::command]
-fn list_offline_requests(app: AppHandle) -> Result<Vec<OfflineQueueItem>, String> {
+fn list_offline_requests(app: AppHandle, tenant_id: String, user_id: String) -> Result<Vec<OfflineQueueItem>, String> {
     let _guard = lock_offline_queue()?;
-    read_offline_queue(&app)
+    actor_offline_queue(&app, &tenant_id, &user_id)
 }
 
 #[tauri::command]
 fn mark_offline_request_synced(
     app: AppHandle,
+    tenant_id: String,
+    user_id: String,
     id: String,
     response_status: u16,
     response_body: Option<String>,
 ) -> Result<(), String> {
     let _guard = lock_offline_queue()?;
-    let conn = open_local_db(&app)?;
+    let conn = actor_queue_connection(&app, &tenant_id, &user_id, &id)?;
     let changed = conn
         .execute(
             r#"
@@ -5321,12 +5697,14 @@ fn mark_offline_request_synced(
 #[tauri::command]
 fn mark_offline_request_failed(
     app: AppHandle,
+    tenant_id: String,
+    user_id: String,
     id: String,
     error: String,
     response_status: Option<u16>,
 ) -> Result<(), String> {
     let _guard = lock_offline_queue()?;
-    let conn = open_local_db(&app)?;
+    let conn = actor_queue_connection(&app, &tenant_id, &user_id, &id)?;
     let changed = conn
         .execute(
             r#"
@@ -5352,9 +5730,9 @@ fn mark_offline_request_failed(
 }
 
 #[tauri::command]
-fn delete_offline_request(app: AppHandle, id: String) -> Result<(), String> {
+fn delete_offline_request(app: AppHandle, id: String, tenant_id: String, user_id: String) -> Result<(), String> {
     let _guard = lock_offline_queue()?;
-    let conn = open_local_db(&app)?;
+    let conn = actor_queue_connection(&app, &tenant_id, &user_id, &id)?;
     let changed = conn
         .execute("DELETE FROM offline_requests WHERE id = ?1", params![&id])
         .map_err(|e| format!("No se pudo eliminar operacion offline: {e}"))?;
@@ -5367,9 +5745,18 @@ fn delete_offline_request(app: AppHandle, id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn list_local_id_mappings(app: AppHandle) -> Result<Vec<LocalIdMapping>, String> {
+fn list_local_id_mappings(app: AppHandle, tenant_id: String, user_id: String) -> Result<Vec<LocalIdMapping>, String> {
     let _guard = lock_offline_queue()?;
-    let conn = open_local_db(&app)?;
+    let actor = open_actor_db(&app, Some(&tenant_id), Some(&user_id))?;
+    let mut mappings = local_id_mappings_from_conn(&actor)?;
+    let legacy = open_local_db(&app)?;
+    let own_legacy = read_offline_queue_from_conn(&legacy, Some(&tenant_id), Some(&user_id))?;
+    let references = serde_json::to_string(&own_legacy).map_err(|e| e.to_string())?;
+    mappings.extend(local_id_mappings_from_conn(&legacy)?.into_iter().filter(|mapping| references.contains(&mapping.local_id)));
+    Ok(mappings)
+}
+
+fn local_id_mappings_from_conn(conn: &Connection) -> Result<Vec<LocalIdMapping>, String> {
     let mut stmt = conn
         .prepare(
             r#"
@@ -5405,12 +5792,15 @@ fn cache_binary_response(
     endpoint: String,
     url: String,
     tenant_id: Option<String>,
+    user_id: Option<String>,
+    authorization: String,
     status: u16,
     headers: Vec<HeaderPair>,
     body_base64: String,
 ) -> Result<(), String> {
     let _guard = lock_offline_queue()?;
-    let conn = open_local_db(&app)?;
+    let conn = open_actor_db(&app, tenant_id.as_deref(), user_id.as_deref())?;
+    if !initialize_read_authorization(&conn, &authorization)? { return Err("El acceso local cambió durante la consulta".to_string()); }
     let tenant = tenant_id.as_deref();
     conn.execute(
         r#"
@@ -5439,9 +5829,12 @@ fn get_binary_response(
     endpoint: String,
     url: String,
     tenant_id: Option<String>,
+    user_id: Option<String>,
+    authorization: String,
 ) -> Result<Option<BinaryLocalResponse>, String> {
     let _guard = lock_offline_queue()?;
-    let conn = open_local_db(&app)?;
+    let conn = open_actor_db(&app, tenant_id.as_deref(), user_id.as_deref())?;
+    if !read_authorization_matches(&conn, &authorization)? { return Ok(None); }
     let tenant = tenant_id.as_deref();
     let mut stmt = conn
         .prepare(
@@ -5601,10 +5994,13 @@ fn generate_offline_fiscal_document(
 }
 
 #[tauri::command]
-fn get_offline_status(app: AppHandle) -> Result<OfflineStatus, String> {
+fn get_offline_status(app: AppHandle, tenant_id: Option<String>, user_id: Option<String>) -> Result<OfflineStatus, String> {
     let config = load_config(app.clone()).unwrap_or_default();
     let _guard = lock_offline_queue()?;
-    let queue = read_offline_queue(&app)?;
+    let queue = match (tenant_id.as_deref(), user_id.as_deref()) {
+        (Some(tenant), Some(user)) if !tenant.is_empty() && !user.is_empty() => actor_offline_queue(&app, tenant, user)?,
+        _ => Vec::new(),
+    };
     Ok(OfflineStatus {
         offline_mode: config.offline_mode,
         total: queue.len(),
@@ -5799,6 +6195,7 @@ async fn export_sire_data(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .setup(|app| { static_routes::create_windows(app)?; Ok(()) })
         .plugin(
             tauri_plugin_log::Builder::default()
                 .level(log::LevelFilter::Info)
@@ -5824,6 +6221,7 @@ pub fn run() {
             get_binary_response,
             generate_offline_fiscal_document,
             hydrate_local_first_response,
+            invalidate_local_read_cache,
             get_local_first_response,
             process_local_first_write,
             get_printers,
@@ -5839,12 +6237,474 @@ pub fn run() {
 }
 
 #[cfg(test)]
+mod actor_storage_tests {
+    use super::*;
+
+    #[test]
+    fn partitions_actors_and_preserves_pending_work_when_reads_are_revoked() {
+        let directory = std::env::temp_dir().join(format!("erp-actor-storage-test-{}", Uuid::new_v4()));
+        fs::create_dir_all(&directory).unwrap();
+        let owner_name = actor_db_name("tenant", "owner").unwrap();
+        assert_ne!(owner_name, actor_db_name("tenant", "reader").unwrap());
+        assert_ne!(owner_name, actor_db_name("other", "owner").unwrap());
+        assert_ne!(actor_db_name("a|b", "c").unwrap(), actor_db_name("a", "b|c").unwrap());
+        assert!(actor_db_name("tenant", "").is_err());
+        let owner = open_local_db_at(directory.join(owner_name)).unwrap();
+        let reader = open_local_db_at(directory.join(actor_db_name("tenant", "reader").unwrap())).unwrap();
+        assert!(initialize_read_authorization(&owner, "login-before").unwrap());
+        assert!(initialize_read_authorization(&reader, "reader-login").unwrap());
+        upsert_snapshot(&owner, "/api/ventas/clientes", "http://local/clients", Some("tenant"), 200, &[], r#"{"success":true,"data":[{"id":"owner-client"}]}"#).unwrap();
+        assert!(read_local_snapshot(&reader, "/api/ventas/clientes", "http://local/clients", Some("tenant")).unwrap().is_none());
+        owner.execute("INSERT INTO offline_requests(id,endpoint,method,url,tenant_id,user_id,status,created_at,updated_at) VALUES('pending-owner','/api/ventas/clientes','PUT','http://local/clients','tenant','owner','pending',1,1)", []).unwrap();
+        owner.execute("INSERT INTO local_binary_cache(cache_key,endpoint,url,tenant_id,status,headers_json,body_base64,cached_at) VALUES('binary','/api/report/pdf','http://local/pdf','tenant',200,'[]','cGRm',1)", []).unwrap();
+        invalidate_actor_reads(&owner, "login-after").unwrap();
+        assert!(!initialize_read_authorization(&owner, "login-before").unwrap(), "Una respuesta vieja no debe reautorizar la caché");
+        assert!(read_authorization_matches(&owner, "login-after").unwrap());
+        assert!(read_local_snapshot(&owner, "/api/ventas/clientes", "http://local/clients", Some("tenant")).unwrap().is_none());
+        assert_eq!(owner.query_row("SELECT count(*) FROM local_binary_cache", [], |row| row.get::<_, i64>(0)).unwrap(), 0);
+        assert_eq!(read_offline_queue_from_conn(&owner, Some("tenant"), Some("owner")).unwrap().len(), 1);
+        assert_eq!(read_offline_queue_from_conn(&owner, Some("tenant"), Some("reader")).unwrap().len(), 0);
+        assert_eq!(read_offline_queue_from_conn(&owner, Some("other"), Some("owner")).unwrap().len(), 0);
+        let update = LocalFirstWriteInput {
+            endpoint: "/api/ventas/clientes/customer-id".to_string(), method: "PUT".to_string(),
+            url: "http://local/clients/customer-id".to_string(), headers: vec![],
+            body: Some(r#"{"razon_social":"Cliente local","telefono":"987000001"}"#.to_string()),
+            tenant_id: Some("tenant".to_string()), user_id: Some("owner".to_string()),
+        };
+        let pending = process_local_customer(&owner, &update).unwrap();
+        assert_eq!(pending.status, 202);
+        let result: Value = serde_json::from_str(&pending.body).unwrap();
+        assert_eq!(result["queued"], true);
+        assert_eq!(result["data"]["tenant_id"], "tenant");
+        assert!(result["data"]["offline_queue_id"].as_str().is_some());
+        let queued = read_offline_queue_from_conn(&owner, Some("tenant"), Some("owner")).unwrap();
+        let body: Value = serde_json::from_str(queued.last().unwrap().body.as_deref().unwrap()).unwrap();
+        assert!(body.get("local_id").is_none() && body.get("offline_entity_type").is_none());
+        owner.execute_batch("CREATE TRIGGER reject_test_queue BEFORE INSERT ON offline_requests BEGIN SELECT RAISE(ABORT,'test queue failure'); END;").unwrap();
+        let tx = owner.unchecked_transaction().unwrap();
+        let mut failed_update = update.clone(); failed_update.endpoint = "/api/ventas/clientes/failed-customer".to_string();
+        assert!(process_local_customer(&tx, &failed_update).is_err()); drop(tx);
+        assert_eq!(owner.query_row("SELECT count(*) FROM local_customers WHERE id='failed-customer'", [], |row| row.get::<_, i64>(0)).unwrap(), 0);
+        drop(owner); drop(reader);
+        assert_eq!(fs::canonicalize(&directory).unwrap().parent(), Some(fs::canonicalize(std::env::temp_dir()).unwrap().as_path()));
+        fs::remove_dir_all(directory).unwrap();
+    }
+}
+
+#[cfg(test)]
 mod offline_secret_policy_tests {
     use super::{
         is_fiscal_emission_endpoint, is_pos_fiscal_intent,
         is_sensitive_non_queueable_endpoint, non_queueable_offline_error,
         offline_endpoint_path, FISCAL_OFFLINE_ERROR,
     };
+
+    #[test]
+    fn employee_request_operations_cannot_enter_generic_queue_by_endpoint_or_url() {
+        for endpoint in ["/api/rrhh/solicitudes/", "/rrhh/solicitudes", "https://erp.test/backend/api/rrhh/solicitudes/?retry=1"] {
+            assert!(non_queueable_offline_error(endpoint, "/unrelated", "POST", Some("{}")).is_some());
+            assert!(non_queueable_offline_error("/unrelated", endpoint, "post", Some("{}")).is_some());
+            assert!(non_queueable_offline_error(endpoint, endpoint, "GET", None).is_none());
+            for action in ["aprobar", "rechazar"] {
+                let decision = format!("{}/{}/{}", endpoint.split('?').next().unwrap().trim_end_matches('/'), "request-id", action);
+                assert!(non_queueable_offline_error(&decision, "/unrelated", "PUT", Some("{}")).is_some());
+                assert!(non_queueable_offline_error("/unrelated", &decision, "put", Some("{}")).is_some());
+                assert!(non_queueable_offline_error(&decision, &decision, "GET", None).is_none());
+            }
+        }
+        assert!(non_queueable_offline_error("/api/rrhh/asistencias/marcar", "/api/rrhh/asistencias/marcar", "POST", Some("{}")).is_none());
+        assert!(non_queueable_offline_error("/api/rrhh/solicitudes/request-id", "/api/rrhh/solicitudes/request-id", "PUT", Some("{}")).is_none());
+    }
+
+    #[test]
+    fn payroll_payment_cannot_enter_generic_queue_through_endpoint_or_url() {
+        for endpoint in ["/api/rrhh/planillas/payroll-id/pagar/", "/rrhh/planillas/payroll-id/pagar", "https://erp.test/backend/api/rrhh/planillas/payroll-id/pagar/?retry=1", "/backend/rrhh/planillas/payroll-id/pagar-empleados"] {
+            for method in ["POST", "PUT", "DELETE"] {
+                assert!(non_queueable_offline_error(endpoint, "/unrelated", method, Some("{}")).is_some());
+                assert!(non_queueable_offline_error("/unrelated", endpoint, method, Some("{}")).is_some());
+            }
+            assert!(non_queueable_offline_error(endpoint, endpoint, "GET", None).is_none());
+        }
+        assert!(non_queueable_offline_error("/api/rrhh/planillas/payroll-id", "/api/rrhh/planillas/payroll-id", "GET", None).is_none());
+        assert!(non_queueable_offline_error("/api/rrhh/asistencias/marcar", "/api/rrhh/asistencias/marcar", "POST", Some("{}")).is_none());
+    }
+
+    #[test]
+    fn payroll_creation_and_resolution_never_use_generic_offline_queue() {
+        for endpoint in ["/api/rrhh/planillas/crear-con-calculo/", "/rrhh/planillas/crear-con-calculo/resolver", "https://erp.test/backend/api/rrhh/planillas/crear-con-calculo/resolver/?retry=1", "/backend/rrhh/planillas", "/api/rrhh/planillas"] {
+            assert!(non_queueable_offline_error(endpoint, "/unrelated", "POST", Some("{}")).unwrap().contains("alta de planilla"));
+            assert!(non_queueable_offline_error("/unrelated", endpoint, "POST", Some("{}")).is_some());
+            for method in ["GET", "HEAD", "OPTIONS"] { assert!(non_queueable_offline_error(endpoint, endpoint, method, None).is_none()); }
+        }
+        assert!(non_queueable_offline_error("/api/rrhh/planillas/id/detalle", "/unrelated", "GET", None).is_none());
+        assert!(non_queueable_offline_error("/api/rrhh/contratos", "/unrelated", "POST", Some("{}")).is_none());
+    }
+
+    #[test]
+    fn payroll_calculation_and_resolution_cannot_enter_generic_queue() {
+        for endpoint in ["/api/rrhh/planillas/payroll-id/calcular/", "/rrhh/planillas/payroll-id/calcular-personalizada", "https://erp.test/backend/api/rrhh/planillas/payroll-id/calcular-personalizada/resolver/?retry=1", "/backend/rrhh/planillas/payroll-id/calcular-personalizada/resolver"] {
+            for method in ["POST", "post", "PUT", "DELETE"] {
+                assert!(non_queueable_offline_error(endpoint, "/unrelated", method, Some("{}")).is_some());
+                assert!(non_queueable_offline_error("/unrelated", endpoint, method, Some("{}")).is_some());
+            }
+            for method in ["GET", "HEAD", "OPTIONS"] {
+                assert!(non_queueable_offline_error(endpoint, endpoint, method, None).is_none());
+            }
+        }
+        assert!(non_queueable_offline_error("/api/rrhh/planillas/payroll-id/detalle", "/unrelated", "GET", None).is_none());
+        assert!(non_queueable_offline_error("/api/rrhh/planillas", "/api/rrhh/planillas", "POST", Some("{}")).is_some());
+    }
+
+    #[test]
+    fn product_deactivation_never_enters_generic_offline_queue() {
+        for path in ["/inventario/productos/id", "/api/inventario/productos/id/", "/backend/api/inventario/productos/id", "https://erp.test/backend/inventario/productos/id/?retry=1"] {
+            assert!(non_queueable_offline_error(path, "/other", "DELETE", None).is_some());
+            assert!(non_queueable_offline_error("/other", path, "delete", None).is_some());
+            assert!(non_queueable_offline_error(path, path, "GET", None).is_none());
+            assert!(non_queueable_offline_error(path, path, "PATCH", None).is_none());
+        }
+        assert!(non_queueable_offline_error("/inventario/productos", "/inventario/productos", "DELETE", None).is_none());
+        assert!(non_queueable_offline_error("/inventario/productos/id/precios", "/inventario/productos/id/precios", "DELETE", None).is_none());
+    }
+
+    #[test]
+    fn payroll_approval_cannot_enter_generic_queue_through_endpoint_url_or_legacy_body() {
+        for endpoint in ["/api/rrhh/planillas/payroll-id/aprobar/", "/rrhh/planillas/payroll-id/aprobar", "https://erp.test/backend/api/rrhh/planillas/payroll-id/aprobar/?retry=1", "/backend/rrhh/planillas/payroll-id/aprobar"] {
+            assert!(non_queueable_offline_error(endpoint, "/unrelated", "POST", None).is_some());
+            assert!(non_queueable_offline_error("/unrelated", endpoint, "POST", None).is_some());
+            assert!(non_queueable_offline_error(endpoint, endpoint, "GET", None).is_none());
+        }
+        for endpoint in ["/api/rrhh/planillas/payroll-id", "/backend/rrhh/planillas/payroll-id"] {
+            assert!(non_queueable_offline_error(endpoint, "/unrelated", "PUT", Some("{\"estado\":\" APROBADA \"}")).is_some());
+            assert!(non_queueable_offline_error("/unrelated", endpoint, "PUT", Some("{\"estado\":\"aprobada\"}")).is_some());
+            assert!(non_queueable_offline_error(endpoint, endpoint, "PUT", Some("{\"periodo\":\"2026-12\"}")).is_none());
+        }
+        assert!(non_queueable_offline_error("/api/rrhh/asistencias/marcar", "/api/rrhh/asistencias/marcar", "POST", Some("{}")).is_none());
+    }
+
+    #[test]
+    fn supplier_payment_cannot_create_an_offline_intent_but_reads_and_other_writes_remain_available() {
+        for endpoint in ["/api/finanzas/cxp/account-id/aplicar-pago/", "https://erp.test/finanzas/cxp/account-id/aplicar-pago?retry=1"] {
+            assert!(non_queueable_offline_error(endpoint, "https://erp.test/unrelated", "POST", Some("{}")).is_some());
+            assert!(non_queueable_offline_error("/unrelated", endpoint, "POST", Some("{}")).is_some());
+            assert!(non_queueable_offline_error(endpoint, endpoint, "GET", None).is_none());
+        }
+        assert!(non_queueable_offline_error("/api/finanzas/cxp/account-id", "/api/finanzas/cxp/account-id", "GET", None).is_none());
+        assert!(non_queueable_offline_error("/api/ventas/clientes/customer-id", "/api/ventas/clientes/customer-id", "PUT", Some("{}")).is_none());
+    }
+
+    #[test]
+    fn collection_cannot_enter_generic_or_local_first_queue_through_endpoint_or_url() {
+        for prefix in ["", "/api", "/backend/api", "https://erp.test/backend/api"] {
+            let endpoint = format!("{}/finanzas/cxc/account-id/pagos/?retry=1", prefix);
+            for method in ["POST", " post ", "PUT", "DELETE"] {
+                assert!(non_queueable_offline_error(&endpoint, "/other", method, Some("{}")).unwrap().contains("cobro"));
+                assert!(non_queueable_offline_error("/other", &endpoint, method, Some("{}")).is_some());
+            }
+            for method in ["GET", "HEAD", "OPTIONS"] {
+                assert!(non_queueable_offline_error(&endpoint, &endpoint, method, None).is_none());
+            }
+        }
+        assert!(non_queueable_offline_error("/api/finanzas/cxc/id/pagos/extra", "", "POST", None).is_none());
+    }
+
+    #[test]
+    fn reading_legacy_collection_queue_never_purges_original_request() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE offline_requests (id TEXT, endpoint TEXT, method TEXT, url TEXT, headers_json TEXT, body TEXT, tenant_id TEXT, user_id TEXT, status TEXT, attempts INTEGER, created_at INTEGER, updated_at INTEGER, last_error TEXT, response_status INTEGER, response_body TEXT);
+            INSERT INTO offline_requests VALUES ('own-legacy', '/api/finanzas/cxc/account-id/pagos', 'POST', 'https://erp.test/api/finanzas/cxc/account-id/pagos', '[]', '{\"monto\":0.01,\"idempotency_key\":\"original-key\"}', 'tenant', 'actor', 'pending', 0, 1, 1, NULL, NULL, NULL);").unwrap();
+        let items = super::read_offline_queue_from_conn(&conn, Some("tenant"), Some("actor")).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].body.as_deref(), Some("{\"monto\":0.01,\"idempotency_key\":\"original-key\"}"));
+        assert_eq!(conn.query_row("SELECT count(*) FROM offline_requests", [], |row| row.get::<_, i64>(0)).unwrap(), 1);
+    }
+
+    #[test]
+    fn cxc_adjustments_require_manual_confirmation_and_legacy_requests_are_preserved() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE offline_requests (id TEXT, endpoint TEXT, method TEXT, url TEXT, headers_json TEXT, body TEXT, tenant_id TEXT, user_id TEXT, status TEXT, attempts INTEGER, created_at INTEGER, updated_at INTEGER, last_error TEXT, response_status INTEGER, response_body TEXT);").unwrap();
+        for action in ["reprogramar", "notas-credito"] {
+            for prefix in ["", "/api", "/backend/api", "https://erp.test/backend/api"] {
+                let endpoint = format!("{}/finanzas/cxc/account-id/{}/?retry=1", prefix, action);
+                assert!(non_queueable_offline_error(&endpoint, "", "POST", Some("{}")).is_some());
+                assert!(non_queueable_offline_error("", &endpoint, "POST", Some("{}")).is_some());
+                assert!(non_queueable_offline_error(&endpoint, "", "GET", None).is_none());
+            }
+            let endpoint = format!("/api/finanzas/cxc/account-id/{}", action);
+            conn.execute("INSERT INTO offline_requests VALUES (?1,?2,'POST',?2,'[]','original-body','tenant','actor','pending',0,1,1,NULL,NULL,NULL)", rusqlite::params![action, endpoint]).unwrap();
+        }
+        let items = super::read_offline_queue_from_conn(&conn, Some("tenant"), Some("actor")).unwrap();
+        assert_eq!(items.len(), 2);
+        assert!(items.iter().all(|item| item.body.as_deref() == Some("original-body") && item.attempts == 0 && item.status == "pending"));
+        assert_eq!(conn.query_row("SELECT count(*) FROM offline_requests", [], |r| r.get::<_, i64>(0)).unwrap(), 2);
+    }
+
+    #[test]
+    fn supplier_invoice_cannot_enter_generic_queue_through_endpoint_or_url() {
+        for endpoint in ["/api/finanzas/cxp/", "/finanzas/cxp", "https://erp.test/backend/api/finanzas/cxp/?retry=1"] {
+            assert!(non_queueable_offline_error(endpoint, "/unrelated", "POST", Some("{}")).is_some());
+            assert!(non_queueable_offline_error("/unrelated", endpoint, "post", Some("{}")).is_some());
+            assert!(non_queueable_offline_error(endpoint, endpoint, "GET", None).is_none());
+        }
+        assert!(non_queueable_offline_error("/api/finanzas/cxp/account-id", "/api/finanzas/cxp/account-id", "PUT", Some("{}")).is_none());
+        assert!(non_queueable_offline_error("/api/compras/proveedores", "/api/compras/proveedores", "POST", Some("{}")).is_none());
+    }
+
+    #[test]
+    fn deferred_accrue_cannot_enter_generic_queue_by_endpoint_or_url() {
+        for endpoint in ["/contabilidad/diferidos/devengar", "/api/contabilidad/diferidos/devengar/", "/backend/api/contabilidad/diferidos/devengar", "https://erp.test/backend/contabilidad/diferidos/devengar/?retry=1"] {
+            assert!(non_queueable_offline_error(endpoint, "", "POST", None).is_some());
+            assert!(non_queueable_offline_error("/unrelated", endpoint, "post", None).is_some());
+            assert!(non_queueable_offline_error(endpoint, "", "GET", None).is_none());
+        }
+        assert!(non_queueable_offline_error("/api/contabilidad/diferidos/devengar/extra", "", "POST", None).is_none());
+    }
+
+    #[test]
+    fn deferred_cancel_cannot_enter_generic_queue_by_endpoint_or_url() {
+        for endpoint in ["/contabilidad/diferidos/record-id", "/api/contabilidad/diferidos/record-id/", "/backend/api/contabilidad/diferidos/record-id", "https://erp.test/backend/contabilidad/diferidos/record-id/?retry=1"] {
+            assert!(non_queueable_offline_error(endpoint, "/unrelated", "DELETE", None).is_some());
+            assert!(non_queueable_offline_error("/unrelated", endpoint, "delete", None).is_some());
+            for method in ["GET", "HEAD", "PUT", "POST"] { assert!(non_queueable_offline_error(endpoint, endpoint, method, None).is_none()); }
+        }
+        for endpoint in ["/api/contabilidad/diferidos", "/api/contabilidad/diferidos/devengar", "/api/contabilidad/diferidos/record-id/extra"] {
+            assert!(non_queueable_offline_error(endpoint, endpoint, "DELETE", None).is_none());
+        }
+    }
+
+    #[test]
+    fn sales_delivery_cannot_enter_generic_queue_by_endpoint_or_url() {
+        for endpoint in ["/inventario/logistica/id/registrar-entrega", "/api/inventario/logistica/id/registrar-entrega/", "/backend/api/inventario/logistica/id/registrar-entrega", "https://erp.test/backend/inventario/logistica/id/registrar-entrega/?uat=570"] {
+            assert!(non_queueable_offline_error(endpoint, "/other", "POST", None).unwrap().contains("confirmación"));
+            assert!(non_queueable_offline_error("/other", endpoint, " post ", None).unwrap().contains("confirmación"));
+            for method in ["GET", "HEAD", "OPTIONS", "PUT", "DELETE"] { assert!(non_queueable_offline_error(endpoint, endpoint, method, None).is_none()); }
+        }
+        for endpoint in ["/api/inventario/logistica/id/tracking", "/api/inventario/logistica/id/preparar", "/api/inventario/logistica/id/registrar-entrega/extra"] {
+            assert!(non_queueable_offline_error(endpoint, endpoint, "POST", None).is_none());
+        }
+    }
+
+    #[test]
+    fn budget_update_cannot_enter_generic_queue_by_endpoint_or_url() {
+        for endpoint in ["/contabilidad/presupuestos/id", "/api/contabilidad/presupuestos/id/", "/backend/api/contabilidad/presupuestos/id", "https://erp.test/backend/contabilidad/presupuestos/id/?uat=570"] {
+            assert!(non_queueable_offline_error(endpoint, "/other", "PUT", None).unwrap().contains("confirmación"));
+            assert!(non_queueable_offline_error("/other", endpoint, "put", None).unwrap().contains("confirmación"));
+            for method in ["GET", "HEAD", "POST"] {
+                assert!(non_queueable_offline_error(endpoint, "/other", method, None).is_none());
+            }
+        }
+        for endpoint in ["/api/contabilidad/presupuestos", "/api/contabilidad/presupuestos/comparacion/id"] {
+            assert!(non_queueable_offline_error(endpoint, "/other", "PUT", None).is_none());
+        }
+    }
+
+    #[test]
+    fn budget_resolution_cannot_enter_generic_queue_by_endpoint_or_url() {
+        for endpoint in ["/contabilidad/presupuestos/id/resolver-edicion", "/api/contabilidad/presupuestos/id/resolver-edicion/", "/backend/api/contabilidad/presupuestos/id/resolver-edicion", "https://erp.test/backend/contabilidad/presupuestos/id/resolver-edicion/?uat=570"] {
+            assert!(non_queueable_offline_error(endpoint, "/other", "POST", None).unwrap().contains("confirmación"));
+            assert!(non_queueable_offline_error("/other", endpoint, "post", None).unwrap().contains("confirmación"));
+            for method in ["GET", "HEAD", "PUT"] { assert!(non_queueable_offline_error(endpoint, endpoint, method, None).is_none()); }
+        }
+        assert!(non_queueable_offline_error("/api/contabilidad/presupuestos/id/other", "/other", "POST", None).is_none());
+    }
+
+    #[test]
+    fn budget_delete_cannot_enter_generic_queue_by_endpoint_or_url() {
+        for endpoint in ["/contabilidad/presupuestos/id", "/api/contabilidad/presupuestos/id/", "/backend/api/contabilidad/presupuestos/id", "https://erp.test/backend/contabilidad/presupuestos/id/?uat=570"] {
+            assert!(non_queueable_offline_error(endpoint, "/other", "DELETE", None).unwrap().contains("confirmación"));
+            assert!(non_queueable_offline_error("/other", endpoint, "delete", None).unwrap().contains("confirmación"));
+            for method in ["GET", "HEAD", "POST"] { assert!(non_queueable_offline_error(endpoint, "/other", method, None).is_none()); }
+        }
+        for endpoint in ["/api/contabilidad/presupuestos", "/api/contabilidad/presupuestos/comparacion/id"] { assert!(non_queueable_offline_error(endpoint, "/other", "DELETE", None).is_none()); }
+    }
+
+    #[test]
+    fn asset_create_cannot_enter_generic_queue_by_endpoint_or_url() {
+        for endpoint in ["/contabilidad/activos-fijos", "/api/contabilidad/activos-fijos/", "/backend/api/contabilidad/activos-fijos", "https://erp.test/backend/contabilidad/activos-fijos/?uat=570"] {
+            assert!(non_queueable_offline_error(endpoint, "/unrelated", "POST", Some("{}")).is_some());
+            assert!(non_queueable_offline_error("/unrelated", endpoint, " post ", Some("{}")).is_some());
+            for method in ["GET", "HEAD", "OPTIONS", "PUT", "DELETE"] { assert!(non_queueable_offline_error(endpoint, endpoint, method, None).is_none()); }
+        }
+        for endpoint in ["/api/contabilidad/activos-fijos/id/baja"] {
+            assert!(non_queueable_offline_error(endpoint, "/unrelated", "POST", Some("{}")).is_some());
+        }
+    }
+
+    #[test]
+    fn depreciation_batch_requires_manual_confirmation_by_endpoint_or_url() {
+        for endpoint in ["/contabilidad/activos-fijos/depreciar", "/api/contabilidad/activos-fijos/depreciar/", "/backend/api/contabilidad/activos-fijos/depreciar", "https://erp.test/backend/contabilidad/activos-fijos/depreciar/?uat=570"] {
+            assert!(non_queueable_offline_error(endpoint, "/other", "POST", Some("{}")).is_some());
+            assert!(non_queueable_offline_error("/other", endpoint, " post ", Some("{}")).is_some());
+            for method in ["GET", "HEAD", "OPTIONS", "PUT", "DELETE"] { assert!(non_queueable_offline_error(endpoint, endpoint, method, None).is_none()); }
+        }
+    }
+
+    #[test]
+    fn reading_legacy_depreciation_preserves_original_request() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(r#"CREATE TABLE offline_requests (id TEXT, endpoint TEXT, method TEXT, url TEXT, headers_json TEXT, body TEXT, tenant_id TEXT, user_id TEXT, status TEXT, attempts INTEGER, created_at INTEGER, updated_at INTEGER, last_error TEXT, response_status INTEGER, response_body TEXT);
+            INSERT INTO offline_requests VALUES ('batch', '/api/contabilidad/activos-fijos/depreciar', 'POST', 'https://erp.test/api/contabilidad/activos-fijos/depreciar', '[{"name":"Idempotency-Key","value":"original-key"}]', '{"anio":2025,"mes":7}', 'tenant', 'actor', 'pending', 0, 1, 1, NULL, NULL, NULL);"#).unwrap();
+        let items = super::read_offline_queue_from_conn(&conn, Some("tenant"), Some("actor")).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].body.as_deref(), Some("{\"anio\":2025,\"mes\":7}"));
+        assert_eq!(conn.query_row("SELECT headers_json FROM offline_requests WHERE id='batch'", [], |row| row.get::<_, String>(0)).unwrap(), "[{\"name\":\"Idempotency-Key\",\"value\":\"original-key\"}]");
+        assert_eq!(conn.query_row("SELECT count(*) FROM offline_requests", [], |row| row.get::<_, i64>(0)).unwrap(), 1);
+    }
+
+    #[test]
+    fn asset_update_retirement_require_manual_confirmation() {
+        for prefix in ["", "/api", "/backend/api", "https://erp.test/backend/api"] {
+            for (suffix, method) in [("/asset-id", "PUT"), ("/asset-id/baja", "POST")] {
+                let endpoint = format!("{}/contabilidad/activos-fijos{}/?retry=1", prefix, suffix);
+                assert!(non_queueable_offline_error(&endpoint, "/other", method, Some("{}")).is_some());
+                assert!(non_queueable_offline_error("/other", &endpoint, method, Some("{}")).is_some());
+                for read in ["GET", "HEAD", "OPTIONS"] { assert!(non_queueable_offline_error(&endpoint, "", read, None).is_none()); }
+            }
+        }
+    }
+
+    #[test]
+    fn reading_legacy_asset_lifecycle_preserves_original_body_and_key() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE offline_requests (id TEXT, endpoint TEXT, method TEXT, url TEXT, headers_json TEXT, body TEXT, tenant_id TEXT, user_id TEXT, status TEXT, attempts INTEGER, created_at INTEGER, updated_at INTEGER, last_error TEXT, response_status INTEGER, response_body TEXT);").unwrap();
+        for (suffix, method) in [("/asset-id", "PUT"), ("/asset-id/baja", "POST")] {
+            let endpoint = format!("/api/contabilidad/activos-fijos{}", suffix);
+            conn.execute("INSERT INTO offline_requests VALUES (?1,?2,?3,?2,'[{\"name\":\"Idempotency-Key\",\"value\":\"original-asset-key\"}]','{\"original\":true}','tenant','actor','pending',0,1,1,NULL,NULL,NULL)", rusqlite::params![method,endpoint,method]).unwrap();
+        }
+        let items = super::read_offline_queue_from_conn(&conn, Some("tenant"), Some("actor")).unwrap();
+        assert_eq!(items.len(), 2);
+        for item in items { assert_eq!(item.body.as_deref(), Some("{\"original\":true}")); }
+        assert_eq!(conn.query_row("SELECT count(*) FROM offline_requests WHERE headers_json LIKE '%original-asset-key%'", [], |row| row.get::<_, i64>(0)).unwrap(), 2);
+    }
+
+    #[test]
+    fn revaluation_registration_cannot_enter_generic_queue_by_endpoint_or_url() {
+        for endpoint in ["/contabilidad/revaluacion", "/api/contabilidad/revaluacion/", "/backend/api/contabilidad/revaluacion", "https://erp.test/backend/contabilidad/revaluacion/?uat=570"] {
+            assert!(non_queueable_offline_error(endpoint, "/unrelated", "POST", Some("{}")).is_some());
+            assert!(non_queueable_offline_error("/unrelated", endpoint, " post ", Some("{}")).is_some());
+            for method in ["GET", "HEAD", "OPTIONS", "PUT", "DELETE"] { assert!(non_queueable_offline_error(endpoint, endpoint, method, None).is_none()); }
+        }
+        assert!(non_queueable_offline_error("/api/contabilidad/revaluacion/simular", "/unrelated", "POST", Some("{}")).is_none());
+    }
+
+    #[test]
+    fn budget_create_cannot_enter_generic_queue_by_endpoint_or_url() {
+        for endpoint in ["/contabilidad/presupuestos", "/api/contabilidad/presupuestos/", "/backend/api/contabilidad/presupuestos", "https://erp.test/backend/contabilidad/presupuestos/?uat=570"] {
+            assert!(non_queueable_offline_error(endpoint, "/unrelated", "POST", Some("{}")).is_some());
+            assert!(non_queueable_offline_error("/unrelated", endpoint, " post ", Some("{}")).is_some());
+            for method in ["GET", "HEAD", "OPTIONS", "PUT", "DELETE"] { assert!(non_queueable_offline_error(endpoint, endpoint, method, None).is_none()); }
+        }
+        for endpoint in ["/api/contabilidad/presupuestos/id", "/api/contabilidad/presupuestos/comparacion/id"] {
+            assert!(non_queueable_offline_error(endpoint, endpoint, "POST", Some("{}")).is_none());
+        }
+    }
+
+    #[test]
+    fn accounting_period_provision_cannot_enter_generic_queue_by_endpoint_or_url() {
+        for prefix in ["/", "/api/", "/backend/api/", "https://erp.test/backend/"] {
+            let endpoint = format!("{}contabilidad/periodos/2024-11/provision-cobranza-dudosa/?dias_vencido=360", prefix);
+            assert!(non_queueable_offline_error(&endpoint, "/unrelated", "POST", None).is_some());
+            assert!(non_queueable_offline_error("/unrelated", &endpoint, "post", None).is_some());
+            for method in ["GET", "HEAD", "PUT", "DELETE"] { assert!(non_queueable_offline_error(&endpoint, &endpoint, method, None).is_none()); }
+        }
+        assert!(non_queueable_offline_error("/api/contabilidad/periodos/2024-11/provision-cobranza-dudosa/extra", "", "POST", None).is_none());
+    }
+
+    #[test]
+    fn accounting_period_close_reopen_cannot_enter_generic_queue_by_endpoint_or_url() {
+        for action in ["cerrar", "reabrir"] {
+            for prefix in ["/", "/api/", "/backend/api/", "https://erp.test/backend/"] {
+                let endpoint = format!("{}contabilidad/periodos/id/{}/?uat=570", prefix, action);
+                assert!(non_queueable_offline_error(&endpoint, "/unrelated", "POST", None).is_some());
+                assert!(non_queueable_offline_error("/unrelated", &endpoint, " post ", None).is_some());
+                for method in ["GET", "HEAD", "PUT", "DELETE"] { assert!(non_queueable_offline_error(&endpoint, &endpoint, method, None).is_none()); }
+            }
+        }
+        for endpoint in ["/api/contabilidad/periodos/id/validar-cierre", "/api/contabilidad/periodos/id/cerrar/extra"] {
+            assert!(non_queueable_offline_error(endpoint, endpoint, "POST", None).is_none());
+        }
+    }
+
+    #[test]
+    fn accounting_period_create_cannot_enter_generic_queue_by_endpoint_or_url() {
+        for endpoint in ["/contabilidad/periodos", "/api/contabilidad/periodos/", "/backend/api/contabilidad/periodos", "https://erp.test/backend/contabilidad/periodos/?uat=570"] {
+            assert!(non_queueable_offline_error(endpoint, "/unrelated", "POST", Some("{}")).is_some());
+            assert!(non_queueable_offline_error("/unrelated", endpoint, " post ", Some("{}")).is_some());
+            for method in ["GET", "HEAD", "PUT", "DELETE"] { assert!(non_queueable_offline_error(endpoint, endpoint, method, None).is_none()); }
+        }
+        for endpoint in ["/api/contabilidad/periodos/id/validar-cierre"] {
+            assert!(non_queueable_offline_error(endpoint, endpoint, "POST", Some("{}")).is_none());
+        }
+    }
+
+    #[test]
+    fn deferred_create_cannot_enter_generic_queue_by_endpoint_or_url() {
+        for endpoint in ["/contabilidad/diferidos", "/api/contabilidad/diferidos/", "/backend/api/contabilidad/diferidos", "https://erp.test/backend/contabilidad/diferidos/?retry=1"] {
+            assert!(non_queueable_offline_error(endpoint, "/unrelated", "POST", Some("{}")).is_some());
+            assert!(non_queueable_offline_error("/unrelated", endpoint, "post", Some("{}")).is_some());
+            for method in ["GET", "HEAD", "PUT", "DELETE"] { assert!(non_queueable_offline_error(endpoint, endpoint, method, None).is_none()); }
+        }
+        for endpoint in ["/api/contabilidad/diferidos/record-id", "/api/contabilidad/diferidos/extra"] {
+            assert!(non_queueable_offline_error(endpoint, endpoint, "POST", Some("{}")).is_none());
+        }
+    }
+
+    #[test]
+    fn invoice_generation_cannot_enter_generic_queue_by_endpoint_or_url() {
+        for endpoint in ["/ventas/pedidos/order-id/generar-factura", "/api/ventas/pedidos/order-id/generar-factura/", "/backend/api/ventas/pedidos/order-id/generar-factura", "https://erp.test/backend/ventas/pedidos/order-id/generar-factura/?retry=1"] {
+            assert!(non_queueable_offline_error(endpoint, "/unrelated", "POST", Some("{}")).is_some());
+            assert!(non_queueable_offline_error("/unrelated", endpoint, "post", Some("{}")).is_some());
+            for method in ["GET", "HEAD", "PUT"] { assert!(non_queueable_offline_error(endpoint, endpoint, method, None).is_none()); }
+        }
+        for endpoint in ["/api/ventas/pedidos/order-id/confirmar", "/api/ventas/pedidos/order-id/generar-factura/extra"] {
+            assert!(non_queueable_offline_error(endpoint, endpoint, "POST", Some("{}")).is_none());
+        }
+    }
+
+    #[test]
+    fn purchase_order_create_cannot_enter_generic_queue_through_endpoint_or_url() {
+        for endpoint in ["/api/compras/ordenes/", "/compras/ordenes", "https://erp.test/backend/api/compras/ordenes/?retry=1"] {
+            assert!(non_queueable_offline_error(endpoint, "/unrelated", "POST", Some("{}")).is_some());
+            assert!(non_queueable_offline_error("/unrelated", endpoint, "post", Some("{}")).is_some());
+            assert!(non_queueable_offline_error(endpoint, endpoint, "GET", None).is_none());
+        }
+        assert!(non_queueable_offline_error("/api/compras/ordenes/order-id", "/api/compras/ordenes/order-id", "PUT", Some("{}")).is_none());
+        assert!(non_queueable_offline_error("/api/compras/recepciones/ordenes/order-id", "/api/compras/recepciones/ordenes/order-id", "GET", None).is_none());
+        assert!(non_queueable_offline_error("/api/compras/proveedores", "/api/compras/proveedores", "POST", Some("{}")).is_none());
+    }
+
+    #[test]
+    fn purchase_receipt_create_and_close_cannot_enter_generic_queue() {
+        for endpoint in ["/api/compras/recepciones/ordenes/order-id/", "/compras/recepciones/receipt-id/cerrar", "https://erp.test/backend/api/compras/recepciones/receipt-id/cerrar/?retry=1"] {
+            assert!(non_queueable_offline_error(endpoint, endpoint, "POST", Some("{}")).is_some());
+            assert!(non_queueable_offline_error("/unrelated", endpoint, "POST", Some("{}")).is_some());
+            assert!(non_queueable_offline_error(endpoint, endpoint, "GET", None).is_none());
+            assert!(non_queueable_offline_error(endpoint, endpoint, "PUT", Some("{}")).is_none());
+        }
+        assert!(non_queueable_offline_error("/api/compras/recepciones/receipt-id", "/api/compras/recepciones/receipt-id", "PUT", Some("{}")).is_none());
+    }
+
+    #[test]
+    fn product_create_and_image_cannot_enter_generic_queue() {
+        for endpoint in ["/inventario/productos", "/api/inventario/productos/", "/backend/api/inventario/productos/id/imagen", "https://erp.test/backend/inventario/productos/id/imagen/?retry=1"] {
+            assert!(non_queueable_offline_error(endpoint, "https://erp.test/unrelated", "POST", Some("{}")).is_some());
+            assert!(non_queueable_offline_error("/unrelated", endpoint, "POST", None).is_some());
+            assert!(non_queueable_offline_error(endpoint, endpoint, "GET", None).is_none());
+        }
+        assert!(non_queueable_offline_error("/inventario/productos/id", "/inventario/productos/id", "PATCH", Some("{}")).is_none());
+    }
+
+    #[test]
+    fn product_update_and_image_delete_cannot_enter_generic_queue() {
+        for prefix in ["/api", "", "/backend/api", "/backend"] {
+            let product = format!("{}/inventario/productos/id/", prefix);
+            let image = format!("{}imagen/?retry=1", product);
+            assert!(non_queueable_offline_error(&product, "/unrelated", "PUT", Some("{}")).is_some());
+            assert!(non_queueable_offline_error("/unrelated", &image, "DELETE", None).is_some());
+            assert!(non_queueable_offline_error(&product, &product, "GET", None).is_none());
+        }
+        assert!(non_queueable_offline_error("/inventario/categorias/id", "/inventario/categorias/id", "PUT", Some("{}")).is_none());
+    }
 
     #[test]
     fn blocks_sensitive_configuration_writes_but_not_reads() {
@@ -5903,6 +6763,33 @@ mod offline_secret_policy_tests {
     }
 
     #[test]
+    fn blocks_original_inventory_writes_and_resolvers_before_sqlite() {
+        for base in ["/inventario/movimientos", "/inventario/transferencias", "/inventario/movimientos/resolver", "/inventario/transferencias/resolver"] {
+            for prefix in ["", "/api", "/backend/api", "https://erp.test/backend/api"] {
+                let endpoint = format!("{}{}/?retry=1", prefix, base);
+                for method in ["POST", "PUT", "DELETE"] {
+                    assert!(non_queueable_offline_error(&endpoint, "/unrelated", method, Some("{}")).is_some());
+                    assert!(non_queueable_offline_error("/unrelated", &endpoint, method, Some("{}")).is_some());
+                }
+                for method in ["GET", "HEAD", "OPTIONS"] {
+                    assert!(non_queueable_offline_error(&endpoint, &endpoint, method, None).is_none());
+                }
+            }
+        }
+        for endpoint in ["/inventario/movimientos/recibo", "/inventario/transferencias/recibo", "/inventario/movimientos/resolver/extra"] {
+            assert!(non_queueable_offline_error(endpoint, endpoint, "POST", Some("{}")).is_none());
+        }
+    }
+
+    #[test]
+    fn inventory_resolution_fragment_or_alias_cannot_enter_the_queue() {
+        for endpoint in ["/API/INVENTARIO/MOVIMIENTOS/RESOLVER/#original", "https://erp.test/backend/api/inventario/transferencias/resolver#original"] {
+            assert!(non_queueable_offline_error(endpoint, "/other", " post ", Some("{}")).is_some());
+            assert!(non_queueable_offline_error("/other", endpoint, "POST", Some("{}")).is_some());
+        }
+    }
+
+    #[test]
     fn blocks_pos_fiscal_intent_before_it_reaches_sqlite() {
         let body = r#"{"emitir_cpe":true,"tipo_comprobante":"01"}"#;
         assert!(is_pos_fiscal_intent(
@@ -5933,4 +6820,36 @@ mod offline_secret_policy_tests {
             Some("{payload-invalido"),
         ));
     }
+
+    #[test]
+    fn document_center_fiscal_aliases_require_live_confirmation() {
+        for action in ["generar-xml", "enviar-sunat"] {
+            for prefix in ["", "/api", "/backend/api", "https://erp.test/backend/api"] {
+                let endpoint = format!("{}/documentos/document-id/{}/?retry=1", prefix, action);
+                assert_eq!(super::non_queueable_offline_error(&endpoint, "/unrelated", "POST", Some("{}")), Some(super::FISCAL_OFFLINE_ERROR));
+                assert_eq!(super::non_queueable_offline_error("/unrelated", &endpoint, " post ", Some("{}")), Some(super::FISCAL_OFFLINE_ERROR));
+                for method in ["GET", "HEAD", "OPTIONS", "PUT", "DELETE"] {
+                    assert!(super::non_queueable_offline_error(&endpoint, &endpoint, method, None).is_none());
+                }
+            }
+        }
+        for endpoint in ["/api/documentos/crear", "/api/documentos/id", "/api/documentos/id/anular", "/api/documentos/id/generar-xml/extra"] {
+            assert!(super::non_queueable_offline_error(endpoint, endpoint, "POST", Some("{}")).is_none());
+        }
+    }
+
+    #[test]
+    fn document_center_fiscal_legacy_originals_survive_queue_read() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE offline_requests (id TEXT, endpoint TEXT, method TEXT, url TEXT, headers_json TEXT, body TEXT, tenant_id TEXT, user_id TEXT, status TEXT, attempts INTEGER, created_at INTEGER, updated_at INTEGER, last_error TEXT, response_status INTEGER, response_body TEXT);").unwrap();
+        for action in ["generar-xml", "enviar-sunat"] {
+            let endpoint = format!("/backend/api/documentos/document-id/{}", action);
+            conn.execute("INSERT INTO offline_requests VALUES (?1,?2,'POST',?2,'[]','{\"idempotency_key\":\"document-original\"}','tenant','actor','pending',0,1,1,NULL,NULL,NULL)", rusqlite::params![action,endpoint]).unwrap();
+        }
+        let items = super::read_offline_queue_from_conn(&conn, Some("tenant"), Some("actor")).unwrap();
+        assert_eq!(items.len(), 2);
+        for item in items { assert_eq!(item.body.as_deref(), Some("{\"idempotency_key\":\"document-original\"}")); }
+        assert_eq!(conn.query_row("SELECT count(*) FROM offline_requests", [], |r| r.get::<_, i64>(0)).unwrap(), 2);
+    }
+
 }

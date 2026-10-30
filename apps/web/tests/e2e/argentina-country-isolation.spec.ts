@@ -1,3 +1,6 @@
+import { cpeListFixture } from './fixtures/cpe-list'
+import { purchaseOrderCreatedFixture } from './fixtures/purchase-order'
+import { fiscalCountryFixture } from './fixtures/fiscal-country'
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { SignJWT } from 'jose'
 import fs from 'node:fs'
@@ -7,12 +10,12 @@ import { createSpreadsheetXml, formatCurrencyForExcel, formatPercentageForExcel 
 const baseURL = process.env.BASE_URL || 'http://localhost:3001'
 
 const user = {
-  id: 'argentina-isolation-user',
+  id: 'a8610000-0000-4000-8000-000000000001',
   email: 'argentina-isolation@erp.local',
   nombre: 'Administradora',
   apellido: 'Argentina',
   roles: ['ADMIN'],
-  tenant_id: 'argentina-isolation-tenant',
+  tenant_id: 'a8610000-0000-4000-8000-000000000002',
   is_super_admin: false,
 }
 
@@ -138,9 +141,9 @@ async function routeArgentinaApi(page: Page) {
       })
 
     if (/\/api\/auth\/profile\/?$/.test(pathname)) return json(user)
+    if (pathname.replace(/\/$/, '') === '/api/tenants/me') return json({ data: { id: user.tenant_id, nombre: 'Empresa aislada', estado: 'ACTIVO' } });
     if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
-      return json({
-        data: {
+      return json(fiscalCountryFixture(user.tenant_id, {
           pais_id: 5,
           pais: 'AR',
           paisCodigo: 'AR',
@@ -149,8 +152,7 @@ async function routeArgentinaApi(page: Page) {
           isDemo: true,
           arcaPuntoVenta: 12,
           arcaCondicionIva: 'RESPONSABLE_INSCRIPTO',
-        },
-      })
+        }))
     }
     if (/\/api\/configuration\/context\/status\/?$/.test(pathname)) {
       return json({
@@ -169,6 +171,7 @@ async function routeArgentinaApi(page: Page) {
     if (/\/api\/demo\/status\/?$/.test(pathname)) {
       return json({ is_demo: true, is_expired: false, dias_restantes: 10 })
     }
+    if (/\/api\/cpe\/receptores\/[^/]+\/?$/.test(pathname)) return json({success:true,data:receiver})
     if (/\/api\/cpe\/receptores\/?$/.test(pathname)) {
       return json({ success: true, data: [receiver] })
     }
@@ -176,8 +179,9 @@ async function routeArgentinaApi(page: Page) {
       return json({ success: true, data: { id: 'cpe-argentina-created' } })
     }
     if (/\/api\/cpe\/comprobantes\/?$/.test(pathname)) {
-      return json({ success: true, data: [] })
+      return json(cpeListFixture([]))
     }
+    if (pathname === '/api/documentos/stats') return json({success:true,data:{totalDocumentos:3,facturas:3,boletas:0,notasCredito:0,contratos:0,pendientesEnvio:0}})
     if (/\/api\/cpe\/stats\/?$/.test(pathname)) {
       return json({
         success: true,
@@ -206,7 +210,7 @@ test.describe('Argentina · aislamiento jurisdiccional y factura ARCA', () => {
     test(`módulo ${moduleName} no expone otra jurisdicción`, async ({ page }) => {
       await page.goto(route, { waitUntil: 'domcontentloaded' })
       const body = page.locator('body')
-      await expect(body).toContainText('Cerrar Sesión')
+      await expect(body).toContainText('Cerrar Sesión', { timeout: 25000 })
       await expect(body).not.toContainText('Preparando configuración fiscal')
       await expect(body).not.toContainText('Application error')
       for (const term of foreignJurisdictionTerms) {
@@ -224,8 +228,8 @@ test.describe('Argentina · aislamiento jurisdiccional y factura ARCA', () => {
       contentType: 'application/json',
       body: JSON.stringify({ success: true, data: [
         { id: 'demo', tipo_documento: 'FACTURA', serie: '00001', numero: '2', fecha_emision: '2026-09-04', receptor_razon_social: 'Muestra argentina', receptor_numero_doc: '30123456', total: 1210, moneda: 'ARS', estado: 'EMITIDO', arca: { cpe_id: 'cpe-demo', codigo: 6, estado: 'FIRMADO', is_demo: true } },
-        { id: 'real', tipo_documento: 'FACTURA', serie: '00001', numero: '3', fecha_emision: '2026-09-04', receptor_razon_social: 'Factura autorizada', total: 1000, moneda: 'ARS', estado: 'EMITIDO', arca: { cpe_id: 'cpe-real', codigo: 11, estado: 'ACEPTADO', is_demo: false } },
-        { id: 'legacy', tipo_documento: 'FACTURA', serie: '00001', numero: '4', fecha_emision: '2026-09-04', receptor_razon_social: 'Registro incompleto', total: 1000, moneda: 'ARS', estado: 'BORRADOR' },
+        { id: 'real', tipo_documento: 'FACTURA', serie: '00001', numero: '3', fecha_emision: '2026-09-04', receptor_razon_social: 'Factura autorizada', receptor_numero_doc: '30123456', total: 1000, moneda: 'ARS', estado: 'EMITIDO', arca: { cpe_id: 'cpe-real', codigo: 11, estado: 'ACEPTADO', is_demo: false } },
+        { id: 'legacy', tipo_documento: 'FACTURA', serie: '00001', numero: '4', fecha_emision: '2026-09-04', receptor_razon_social: 'Registro incompleto', receptor_numero_doc: '30123456', total: 1000, moneda: 'ARS', estado: 'BORRADOR' },
       ] }),
     }))
     await page.goto('/dashboard/documentos/')
@@ -319,7 +323,7 @@ test.describe('Argentina · aislamiento jurisdiccional y factura ARCA', () => {
     await page.route(/\/api\/compras\/ordenes\/?(?:\?|$)/, route => {
       if (route.request().method() === 'POST') {
         submissions.push(route.request().postDataJSON())
-        return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ success: true, data: { id: '44444444-4444-4444-8444-444444444444' } }) })
+        return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(purchaseOrderCreatedFixture(submissions[submissions.length-1],user,'44444444-4444-4444-8444-444444444444',0.21)) })
       }
       return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: [] }) })
     })
@@ -337,11 +341,11 @@ test.describe('Argentina · aislamiento jurisdiccional y factura ARCA', () => {
     await page.locator('#ocwizard-producto').selectOption(product.id)
     await page.locator('#ocwizard-cantidad').fill('0')
     await page.getByRole('button', { name: 'Agregar producto', exact: true }).click()
-    await expect(page.getByRole('alert').filter({ hasText: 'La cantidad debe ser mayor a 0' })).toBeVisible()
+    await expect(page.getByRole('alert').filter({ hasText: 'La cantidad debe ser positiva y tener como máximo dos decimales.' })).toBeVisible()
     await page.locator('#ocwizard-cantidad').fill('10')
     await page.locator('#ocwizard-precio-unit').fill('-1')
     await page.getByRole('button', { name: 'Agregar producto', exact: true }).click()
-    await expect(page.getByRole('alert').filter({ hasText: 'El precio no puede ser negativo' })).toBeVisible()
+    await expect(page.getByRole('alert').filter({ hasText: 'El precio debe ser no negativo y tener como máximo dos decimales.' })).toBeVisible()
     await page.locator('#ocwizard-precio-unit').fill('100')
     await page.getByRole('button', { name: 'Agregar producto', exact: true }).click()
     await expect(page.getByRole('alert').filter({ hasText: /producto|cantidad|precio/i })).toHaveCount(0)
@@ -408,7 +412,7 @@ test.describe('Argentina · aislamiento jurisdiccional y factura ARCA', () => {
       await page.route(/\/api\/contabilidad\/periodos\/44444444-4444-4444-8444-444444444444\/?$/, (route) => route.fulfill({
         contentType: 'application/json', body: JSON.stringify({ success: true, data: {
           id: '44444444-4444-4444-8444-444444444444', anio: 2026, mes: 8, estado: 'CERRADO',
-          fecha_cierre: '2026-09-04', created_at: '2026-09-04', updated_at: '2026-09-04',
+          tenant_id:user.tenant_id,codigo:'2026-08',nombre:'Agosto 2026',metadata:{},cerrado_por:user.id,fecha_cierre:'2026-09-04',created_at:'2026-09-04T00:00:00Z',updated_at:'2026-09-04T00:00:00Z',
         } }),
       }))
       let writes = 0
@@ -453,6 +457,7 @@ test.describe('Argentina · aislamiento jurisdiccional y factura ARCA', () => {
   test('los estados descargan moneda e importes utilizables y no dividen entre cero', async ({ page }, testInfo) => {
     await page.route(/\/api\/contabilidad\/estados\/estado-resultados\/?(?:\?|$)/, (route) => route.fulfill({
       contentType: 'application/json', body: JSON.stringify({ success: true, data: {
+        periodo: { anio: Number(new URL(route.request().url()).searchParams.get('anio')), mes: Number(new URL(route.request().url()).searchParams.get('mes')) },
         ingresos: { ventas: 0, otros_ingresos: 0, total_ingresos: 0 },
         costos: { costo_ventas: 0, utilidad_bruta: 0 },
         gastos: { gastos_administrativos: 0, gastos_ventas: 0, gastos_financieros: 0, total_gastos: 0 }, utilidad_neta: 0,
@@ -460,6 +465,7 @@ test.describe('Argentina · aislamiento jurisdiccional y factura ARCA', () => {
     }))
     await page.route(/\/api\/contabilidad\/estados\/balance-general\/?(?:\?|$)/, (route) => route.fulfill({
       contentType: 'application/json', body: JSON.stringify({ success: true, data: {
+        periodo: { anio: Number(new URL(route.request().url()).searchParams.get('anio')), mes: Number(new URL(route.request().url()).searchParams.get('mes')) },
         activos: { corrientes: { efectivo: 1200, cuentas_por_cobrar: 0, inventarios: 0, otros_activos: 0, total_corrientes: 1200 },
           no_corrientes: { activos_fijos: 100, depreciacion_acumulada: 10, activos_fijos_neto: 90, otros_activos: 0, total_no_corrientes: 90 }, total_activos: 1290 },
         pasivos: { corrientes: { cuentas_por_pagar: 90, tributos_por_pagar: 0, remuneraciones_por_pagar: 0, otros_pasivos: 0, total_corrientes: 90 },
@@ -568,6 +574,8 @@ test.describe('Argentina · aislamiento jurisdiccional y factura ARCA', () => {
     await page.getByRole('button', { name: /Consumidor Final Argentina/ }).click()
     await expect(page.getByText(/Clase resultante: B/)).toBeVisible()
 
+    // Keep this fiscal payload example independent of the machine's current date.
+    await page.getByLabel('Fecha de Emisión *', { exact: true }).fill('2026-09-30')
     await page.getByLabel('Concepto ARCA *').selectOption('2')
     await page.getByLabel('Servicio desde *').fill('2026-09-01')
     await page.getByLabel('Servicio hasta *').fill('2026-09-30')

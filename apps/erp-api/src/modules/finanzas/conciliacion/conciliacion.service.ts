@@ -1,5 +1,6 @@
 import Decimal from 'decimal.js';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { lecturaFinancieraFallida } from '../finanzas-errors';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import {
   CerrarConciliacionDto,
@@ -44,7 +45,7 @@ export class ConciliacionService {
 
     const { data, error } = await builder;
     if (error) {
-      throw new BadRequestException('No se pudieron obtener las conciliaciones');
+      throw lecturaFinancieraFallida('las conciliaciones');
     }
     return { success: true, data: data || [] };
   }
@@ -205,7 +206,7 @@ export class ConciliacionService {
       .in('estado', ['ABIERTA', 'EN_PROCESO'])
       .order('created_at', { ascending: false });
     if (error) {
-      throw new BadRequestException('No se pudieron obtener las conciliaciones pendientes');
+      throw lecturaFinancieraFallida('las conciliaciones pendientes');
     }
 
     const conciliaciones = data || [];

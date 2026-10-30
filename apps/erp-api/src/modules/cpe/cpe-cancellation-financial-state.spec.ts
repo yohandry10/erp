@@ -3,16 +3,16 @@ import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { AuditService } from '../audit/audit.service';
 
 describe('CpeCancellationService - estado financiero 466', () => {
-  const query = (rows: any[]) => {
+  const query = (rows: any[] | null, count = rows?.length ?? null) => {
     const chain: any = {
       select: jest.fn(() => chain),
       eq: jest.fn(() => chain),
       or: jest.fn(() => chain),
       order: jest.fn(() => chain),
       limit: jest.fn(() => chain),
-      maybeSingle: jest.fn(async () => ({ data: rows[0] ?? null, error: null })),
+      maybeSingle: jest.fn(async () => ({ data: rows?.[0] ?? null, error: null })),
       then: (resolve: (value: any) => any) =>
-        Promise.resolve({ data: rows, error: null }).then(resolve),
+        Promise.resolve({ data: rows, count, error: null }).then(resolve),
     };
     return chain;
   };
@@ -70,5 +70,25 @@ describe('CpeCancellationService - estado financiero 466', () => {
         operacion_fiscal: expect.objectContaining({ id: 'operacion-fiscal-1' }),
       }),
     ]);
+  });
+
+  it.each(['cxc_pagos','cxc_cobro_reversas','operaciones_fiscales_financieras','sesiones_caja'])('rechaza una lectura truncada de %s antes de anunciar el flujo', async (table) => {
+    const from = jest.fn((name: string) => {
+      if (name === 'cpe') return query([{ id: 'cpe-1', documento_id: 'doc-1', estado: 'FIRMADO' }]);
+      if (name === 'cuentas_por_cobrar') return query([{ id: 'cxc-1', documento_id: 'doc-1' }]);
+      return query([], name === table ? 1 : 0);
+    });
+    const service = new CpeCancellationService({ getClient: () => ({ from }) } as unknown as SupabaseService, {} as AuditService);
+    await expect(service.obtenerEstadoFinanciero('cpe-1','tenant-1','actor-1')).rejects.toMatchObject({ status: 503 });
+  });
+
+  it('rechaza pagos nulos y no los transforma en ausencia de cobros', async () => {
+    const from = jest.fn((name: string) => {
+      if (name === 'cpe') return query([{ id: 'cpe-1', documento_id: 'doc-1', estado: 'FIRMADO' }]);
+      if (name === 'cuentas_por_cobrar') return query([{ id: 'cxc-1', documento_id: 'doc-1' }]);
+      return query(name === 'cxc_pagos' ? null : []);
+    });
+    const service = new CpeCancellationService({ getClient: () => ({ from }) } as unknown as SupabaseService, {} as AuditService);
+    await expect(service.obtenerEstadoFinanciero('cpe-1','tenant-1','actor-1')).rejects.toMatchObject({ status: 503 });
   });
 });

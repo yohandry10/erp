@@ -14,6 +14,8 @@ const thenableQuery = (result: any) => {
     select: jest.fn(() => query),
     order: jest.fn(() => query),
     eq: jest.fn(() => query),
+    gte: jest.fn(() => query),
+    lt: jest.fn(() => query),
     then: (resolve: any, reject: any) => Promise.resolve(result).then(resolve, reject),
   };
   return query;
@@ -22,7 +24,7 @@ const thenableQuery = (result: any) => {
 describe('PlanillasService approval persistence', () => {
   it('crea siempre en borrador y descarta campos de ciclo/totales enviados por el cliente', async () => {
     const rpc = jest.fn().mockResolvedValue({
-      data: { id: 'plan-1', estado: 'borrador', success: true },
+      data: { id: '11000000-0000-4000-8000-000000000003', tenant_id: '11000000-0000-4000-8000-000000000001', periodo: '2026-08', pais_codigo: 'PE', moneda: 'PEN', estado: 'borrador', estado_pago: 'pendiente', success: true, idempotent: false, metadata: { observaciones: 'Alta segura', creada_por: '11000000-0000-4000-8000-000000000002', creada_en: '2026-10-14T12:00:00.000Z' } },
       error: null,
     });
     const service = new PlanillasService(
@@ -41,15 +43,15 @@ describe('PlanillasService approval persistence', () => {
       metodo_pago: 'efectivo',
       observaciones: 'Alta segura',
       idempotency_key: '11111111-1111-4111-8111-111111111111',
-    }, 'tenant-1', 'user-1')).resolves.toMatchObject({ id: 'plan-1' });
+    }, '11000000-0000-4000-8000-000000000001', '11000000-0000-4000-8000-000000000002')).resolves.toMatchObject({ id: '11000000-0000-4000-8000-000000000003' });
 
     expect(rpc).toHaveBeenCalledWith('crear_planilla_tx_495', {
-      p_tenant_id: 'tenant-1',
+      p_tenant_id: '11000000-0000-4000-8000-000000000001',
       p_planilla: {
         periodo: '2026-08', pais_codigo: 'PE', moneda: 'PEN',
         metadata: { observaciones: 'Alta segura' },
       },
-      p_actor_id: 'user-1',
+      p_actor_id: '11000000-0000-4000-8000-000000000002',
       p_idempotency_key: '11111111-1111-4111-8111-111111111111',
     });
   });
@@ -238,11 +240,13 @@ function buildHarness(country: Country) {
       }
       calculationRpcPayload = payload;
       employeePlanillaPayload = payload.p_empleados?.[0];
-      return Promise.resolve({ data: { success: true, total_empleados: 1 }, error: null });
+      return Promise.resolve({ data: { success: true, planillaId: payload.p_planilla_id, idempotent: false, totalEmpleados: payload.p_empleados.length,
+        totalIngresos: payload.p_empleados.reduce((sum: number, row: any) => sum + row.total_ingresos, 0), totalDescuentos: payload.p_empleados.reduce((sum: number, row: any) => sum + row.total_descuentos, 0),
+        totalAportes: payload.p_empleados.reduce((sum: number, row: any) => sum + row.total_aportes, 0), totalNeto: payload.p_empleados.reduce((sum: number, row: any) => sum + row.neto_pagar, 0) }, error: null });
     }),
     from: jest.fn((table: string) => {
       if (table === 'planillas') {
-        const query = thenableQuery({ error: null });
+        const query = thenableQuery({ data: [], error: null });
         query.single = jest.fn().mockResolvedValue({ data: planilla, error: null });
         return query;
       }

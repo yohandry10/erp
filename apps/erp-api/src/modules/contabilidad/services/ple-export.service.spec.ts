@@ -1,4 +1,5 @@
 import { PleExportService } from "./ple-export.service";
+import { BadRequestException } from '@nestjs/common';
 import { SupabaseService } from "../../../shared/supabase/supabase.service";
 import { TenantContextService } from "../../../shared/tenant/tenant-context.service";
 
@@ -74,7 +75,7 @@ describe("PleExportService", () => {
     expect(fields[14]).toBe("05/10/2024");
   });
 
-  const montarServicio = (tabla: string, filas: any[]) => {
+  const montarServicio = (tabla: string, filas: any[], originales: any[] = []) => {
     const supabase = {
       getClient: jest.fn(() => ({
         rpc: jest.fn(() => createQuery({ data: filas, error: null })),
@@ -86,7 +87,10 @@ describe("PleExportService", () => {
             });
           }
           if (nombre === tabla) {
-            return createQuery({ data: filas, error: null });
+            const query = createQuery({ data: filas, error: null });
+            query.select = jest.fn((campos: string) => campos.startsWith('id, tenant_id,')
+              ? createQuery({ data: originales, error: null }) : query);
+            return query;
           }
           return createQuery({ data: [], error: null });
         }),
@@ -171,6 +175,31 @@ describe("PleExportService", () => {
       expect(campos).toHaveLength(41);
     });
 
+    it('excluye facturas y notas borrador antes de resolver referencias y conserva la venta emitida', async () => {
+      const rows = [boletaMixta, { ...boletaMixta, estado: 'BORRADOR', id: 'draft-invoice' },
+        { ...boletaMixta, tipo_documento: 'NOTA_CREDITO', estado: ' borrador ', id: 'draft-note', documento_origen_id: 'not-issued' }];
+      const result = await montarServicio('documentos', rows).exportarRegistroVentas(2026, 8);
+      expect(result.content.trim().split('\n')).toHaveLength(1);
+      expect(result.content).toBe((await montarServicio('documentos', [boletaMixta]).exportarRegistroVentas(2026, 8)).content);
+    });
+
+    it('convierte cada base extranjera a soles con su cotización y redondeo documental', async () => {
+      const doc = { ...boletaMixta, moneda: 'USD', tipo_cambio: 3.75, total_gravadas: 10,
+        impuesto_igv: 1.8, total_exoneradas: 2, total_inafectas: 1, total_exportacion: 4, total: 18.8 };
+      const fields = (await montarServicio('documentos', [doc]).exportarRegistroVentas(2026, 8)).content.split('|');
+      expect([fields[13], fields[14], fields[16], fields[18], fields[19], fields[24]])
+        .toEqual(['15.00','37.50','6.75','7.50','3.75','70.50']);
+      expect([fields[25], fields[26]]).toEqual(['USD','3.750']);
+      const rounding = (await montarServicio('documentos', [{ ...doc, tipo_cambio: 1.5, total_gravadas: .01 }])
+        .exportarRegistroVentas(2026, 8)).content.split('|');
+      expect(rounding[14]).toBe('0.02');
+    });
+
+    it('rechaza ventas extranjeras sin una cotización documental válida', async () => {
+      await expect(montarServicio('documentos', [{ ...boletaMixta, moneda: 'USD', tipo_cambio: null }])
+        .exportarRegistroVentas(2026, 8)).rejects.toThrow(BadRequestException);
+    });
+
     it("usa el codigo de libro 140100 en el nombre del archivo", async () => {
       const service = montarServicio("documentos", [boletaMixta]);
 
@@ -188,6 +217,31 @@ describe("PleExportService", () => {
       const campos = result.content.split("|");
 
       expect(campos[35]).toBe("2");
+      expect(campos[14]).toBe('0.00');
+      expect(campos[16]).toBe('0.00');
+      expect(campos[24]).toBe('0.00');
+    });
+
+    it('resta todas las bases y el total de NC y recupera referencia de RMA', async () => {
+      const service = montarServicio('documentos', [{ ...boletaMixta,
+        tipo_documento: 'NOTA_CREDITO', serie: 'BC01',
+        total_exportacion: 2, total_inafectas: 1, total: 36,
+        metadata: { source_document_id: 'original-1' },
+      }], [{ id: 'original-1', tenant_id: 'tenant-1', tipo_documento: 'BOLETA',
+        serie: 'B001', numero: '00000001', fecha_emision: '2026-08-01' }]);
+      const campos = (await service.exportarRegistroVentas(2026, 8)).content.split('|');
+      expect([campos[13], campos[14], campos[16], campos[18], campos[19], campos[24]])
+        .toEqual(['-2.00', '-25.00', '-4.50', '-3.50', '-1.00', '-36.00']);
+      expect([campos[27], campos[28], campos[29], campos[31]])
+        .toEqual(['01/08/2026', '03', 'B001', '00000001']);
+    });
+
+    it('no genera una nota con referencia ajena o ausente', async () => {
+      const nota = { ...boletaMixta, tipo_documento: 'NOTA_CREDITO', documento_origen_id: 'original-1' };
+      for (const originales of [[], [{ id: 'original-1', tenant_id: 'otro-tenant' }]]) {
+        await expect(montarServicio('documentos', [nota], originales).exportarRegistroVentas(2026, 8))
+          .rejects.toThrow('Referencia del comprobante original requerida');
+      }
     });
 
     it("reconoce el RUC como documento tipo 6 aunque el registro diga otra cosa", async () => {
@@ -208,6 +262,23 @@ describe("PleExportService", () => {
   });
 
   describe("Registro de Compras 8.1", () => {
+    it('conserva la factura original y la NC de devolución separadas con sus importes fiscales', async () => {
+      const service = montarServicio('cuentas_por_pagar', [{
+        ...facturaCompra, subtotal: 80, igv: 14.4, total: 94.4,
+        original_fiscal_amounts: { subtotal: 100, igv: 18, total: 118 },
+        metadata: { ultima_devolucion_id: 'return-1', ultima_devolucion_total: 23.6 },
+      }, { ...facturaCompra, id: 'nc-1', tipo_documento: 'NOTA_CREDITO',
+        numero_documento: 'FC01-00000001', subtotal: 20, igv: 3.6, total: 23.6,
+      }]);
+      const result = await service.exportarRegistroCompras(2026, 8);
+      const [invoice, note] = result.content.split('\r\n').map((row) => row.split('|'));
+      expect(invoice[13]).toBe('100.00');
+      expect(invoice[14]).toBe('18.00');
+      expect(invoice[22]).toBe('118.00');
+      expect(note[13]).toBe('-20.00');
+      expect(note[14]).toBe('-3.60');
+      expect(note[22]).toBe('-23.60');
+    });
     it("separa serie y numero del comprobante del proveedor", async () => {
       const service = montarServicio("cuentas_por_pagar", [facturaCompra]);
 
@@ -354,6 +425,18 @@ describe("PleExportService", () => {
       await expect(service.exportarRegistroCompras(2026, 8)).rejects.toThrow(
         'Tipo de cambio requerido',
       );
+    });
+
+    it.each(['FACTURA', 'NOTA_CREDITO'])('exporta %s USD en soles con el cambio documental congelado', async tipo => {
+      const service = montarServicio('cuentas_por_pagar', [{
+        ...facturaCompra, tipo_documento: tipo, moneda: 'USD', subtotal: 10, igv: 1.8, total: 11.8,
+        tipo_cambio_origen: 3.75, fiscal_metadata: { tipo_cambio: 3.75 },
+        metadata: { tipo_cambio_liquidacion: 3.780001 },
+      }]);
+      const campos = (await service.exportarRegistroCompras(2026, 8)).content.split('|');
+      const sign = tipo === 'NOTA_CREDITO' ? '-' : '';
+      expect(campos[13]).toBe(sign + '37.50');expect(campos[14]).toBe(sign + '6.75');expect(campos[22]).toBe(sign + '44.25');
+      expect(campos[23]).toBe('USD');expect(campos[24]).toBe('3.750');
     });
   });
 });

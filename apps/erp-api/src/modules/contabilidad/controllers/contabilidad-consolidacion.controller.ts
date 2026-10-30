@@ -26,7 +26,8 @@ export class ContabilidadConsolidacionController {
   @RequirePermission('contabilidad.reportes.read')
   @ApiOperation({ summary: 'Listar grupos propios e invitaciones de consolidación' })
   async listarGrupos(@CurrentTenant() tenantId: string) {
-    return { success: true, data: await this.service.listarGrupos(tenantId) };
+    const data=await this.service.listarGrupos(tenantId);
+    return { success: true,complete: true,tenant_id:tenantId,total:data.length,data };
   }
 
   @Post('consolidacion/grupos')
@@ -131,7 +132,8 @@ export class ContabilidadConsolidacionController {
   @RequirePermission('contabilidad.reportes.read')
   @ApiOperation({ summary: 'Listar definiciones de reportes contables' })
   async listarReportes(@CurrentTenant() tenantId: string) {
-    return { success: true, data: await this.service.listarReportes(tenantId) };
+    const data=await this.service.listarReportes(tenantId);
+    return { success: true,complete: true,tenant_id:tenantId,total:data.length,data };
   }
 
   @Post('reportes-configurables')
@@ -158,7 +160,7 @@ export class ContabilidadConsolidacionController {
     @Query() query: GenerarReporteConfigurableQueryDto,
   ) {
     return {
-      success: true,
+      success: true, complete: true, tenant_id: tenantId,
       data: await this.service.generarReporte(
         tenantId,
         reporteId,

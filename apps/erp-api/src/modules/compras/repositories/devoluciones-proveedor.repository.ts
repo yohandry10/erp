@@ -16,7 +16,7 @@ export class DevolucionesProveedorRepository {
         *,
         orden:ordenes_compra(id, numero),
         proveedor:proveedores(id, razon_social, ruc),
-        recepcion:recepciones(id, numero),
+        recepcion:recepciones(id, numero, fecha_recepcion),
         items:devolucion_items(
           *,
           producto:productos(id, codigo, nombre)
@@ -46,7 +46,7 @@ export class DevolucionesProveedorRepository {
         *,
         orden:ordenes_compra(id, numero),
         proveedor:proveedores(id, razon_social, ruc),
-        recepcion:recepciones(id, numero)
+        recepcion:recepciones(id, numero, fecha_recepcion)
       `)
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false });

@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -122,8 +123,9 @@ export class ClientesController {
     @Body() updateClienteDto: UpdateClienteDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.clientesService.update(id, updateClienteDto, tenantId, user?.id);
+    return this.clientesService.update(id, updateClienteDto, tenantId, user?.id, idempotencyKey);
   }
 
   /**

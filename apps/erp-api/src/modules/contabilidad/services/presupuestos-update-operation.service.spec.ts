@@ -1,0 +1,29 @@
+import { BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { EstadoPresupuesto } from '@erp-suite/dtos';
+import { PresupuestosService } from './presupuestos.service';
+const tenant='55555555-5555-4555-8555-555555555555',actor='66666666-6666-4666-8666-666666666666',id='88888888-8888-4888-8888-888888888888',key='budget-update-fixture-key';
+const snapshot={id,tenant_id:tenant,centro_costo_id:'11111111-1111-4111-8111-111111111111',cuenta_id:'22222222-2222-4222-8222-222222222222',periodo_contable_id:'33333333-3333-4333-8333-333333333333',codigo:'PR-FIXTURE',nombre:'Presupuesto fixture',metadata:{tags:['a','b']},monto_presupuestado:3.17,monto_ejecutado:0,monto_comprometido:0,monto_disponible:3.17,porcentaje_ejecutado:0,notas:'Alta previa',estado:EstadoPresupuesto.ACTIVO,created_by:actor,updated_by:actor,created_at:'2026-10-12T09:00:00Z',updated_at:'2026-10-12T09:00:00Z'};
+const payload={monto_presupuestado:3.29,notas:'Edición fixture',estado:EstadoPresupuesto.ACTIVO,expected_snapshot:snapshot};
+function receipt(){return {success:true,id,action:'UPDATE',operation_id:'77777777-7777-4777-8777-777777777777',tenant_id:tenant,actor_id:actor,idempotency_key:key,request_fingerprint:'a'.repeat(64),idempotent:false,payload:structuredClone(payload),record:{...structuredClone(snapshot),monto_presupuestado:3.29,monto_disponible:3.29,notas:payload.notas,updated_at:'2026-10-12T09:01:00Z'}};}
+describe('Presupuesto edición: fotografía y resultado original de operación',()=>{
+ let rpc:jest.Mock,service:PresupuestosService;
+ beforeEach(()=>{rpc=jest.fn();service=new PresupuestosService({getClient:()=>({rpc})} as any);});
+ it('envía snapshot, actor e id para compare y conserva recibo completo',async()=>{
+  const result=receipt();rpc.mockResolvedValue({data:result,error:null});const actual:any=await service.actualizarPresupuesto(tenant,id,payload,actor,key.toUpperCase());expect(rpc).toHaveBeenCalledWith('actualizar_presupuesto_tx_570',{p_tenant_id:tenant,p_actor_id:actor,p_presupuesto_id:id,p_payload:payload,p_idempotency_key:key});expect(actual.monto_presupuestado).toBe(3.29);expect(actual.operation.operation_id).toBe(result.operation_id);expect(actual.metadata).toEqual(snapshot.metadata);expect(actual.operation).not.toHaveProperty('record');
+ });
+ it('replay retorna fotografía original; acepta ordenJSONB distinto sin reemplazar body',async()=>{
+  const result=receipt();result.idempotent=true;result.payload=Object.fromEntries(Object.entries(result.payload).reverse()) as any;rpc.mockResolvedValue({data:[result],error:null});const actual:any=await service.actualizarPresupuesto(tenant,id,payload,actor,key);expect(actual.operation.idempotent).toBe(true);expect(actual.monto_presupuestado).toBe(3.29);
+ });
+ it.each([
+  ['incomplete record',(r:any)=>{r.record={id};}],['missing money',(r:any)=>{delete r.record.monto_disponible;}],['foreign tenant',(r:any)=>{r.record.tenant_id='99999999-9999-4999-8999-999999999999';}],['foreign actor',(r:any)=>{r.record.updated_by='99999999-9999-4999-8999-999999999999';}],['changed account',(r:any)=>{r.record.cuenta_id='99999999-9999-4999-8999-999999999999';}],['changed metadata',(r:any)=>{r.record.metadata={tags:['other']};}],['wrong amount',(r:any)=>{r.record.monto_presupuestado=4;}],['wrong available',(r:any)=>{r.record.monto_disponible=0;}],['wrong echo',(r:any)=>{r.payload.expected_snapshot.notas='other';}],['wrong key',(r:any)=>{r.idempotency_key='another-operation-key';}],['missing operation',(r:any)=>{r.operation_id=null;}],['cached result',(r:any)=>{r.cached=true;}],['queued row',(r:any)=>{r.record.queued=true;}],['old update time',(r:any)=>{r.record.updated_at='2026-10-11T09:01:00Z';}],
+ ])('no confirma %s',async(_name,mutate:any)=>{const result=receipt();mutate(result);rpc.mockResolvedValue({data:result,error:null});await expect(service.actualizarPresupuesto(tenant,id,payload,actor,key)).rejects.toThrow(ServiceUnavailableException);});
+ it('409 distingue snapshot rechazado atómicamente; 404 registro ajeno ausente',async()=>{
+  rpc.mockResolvedValue({data:null,error:{code:'40001',message:'PRIVATE_CONCURRENT_ROW'}});await expect(service.actualizarPresupuesto(tenant,id,payload,actor,key)).rejects.toThrow(ConflictException);rpc.mockResolvedValue({data:null,error:{code:'P0002',message:'PRIVATE_ROW'}});await expect(service.actualizarPresupuesto(tenant,id,payload,actor,key)).rejects.toThrow(NotFoundException);
+ });
+ it('infraestructura/resultados incompletos conservan incertidumbre503',async()=>{
+  rpc.mockResolvedValue({data:null,error:{code:'42883',message:'PRIVATE_BACKEND_DETAIL'}});await expect(service.actualizarPresupuesto(tenant,id,payload,actor,key)).rejects.toThrow(ServiceUnavailableException);rpc.mockResolvedValue({data:null,error:null});await expect(service.actualizarPresupuesto(tenant,id,payload,actor,key)).rejects.toThrow(ServiceUnavailableException);rpc.mockRejectedValue(new Error('PRIVATE_BACKEND_DETAIL'));await expect(service.actualizarPresupuesto(tenant,id,payload,actor,key)).rejects.toThrow(ServiceUnavailableException);
+ });
+ it('rechaza snapshot ajeno/incompleto, precisión y clave vacía antes delRPC',async()=>{
+  await expect(service.actualizarPresupuesto(tenant,id,{...payload,expected_snapshot:{id}},actor,key)).rejects.toThrow(BadRequestException);await expect(service.actualizarPresupuesto(tenant,id,{...payload,monto_presupuestado:3.291},actor,key)).rejects.toThrow(BadRequestException);await expect(service.actualizarPresupuesto(tenant,id,payload,actor,' ')).rejects.toThrow(BadRequestException);expect(rpc).not.toHaveBeenCalled();
+ });
+});
