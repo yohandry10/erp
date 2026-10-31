@@ -189,6 +189,8 @@ END $depreciation_write570$;
 
 REVOKE ALL ON FUNCTION app.cuota_activo_572(public.activos_fijos,integer,integer),app.calcular_revision_activo_572(public.activos_fijos),app.revisar_estimacion_activo_572(),app.validar_cuota_revisada_572()
 FROM PUBLIC,anon,authenticated,service_role;
+-- Supabase concede escritura por defecto; la depreciación sólo se escribe por su RPC.
+REVOKE INSERT,UPDATE,DELETE,TRUNCATE ON public.depreciaciones FROM service_role;
 GRANT SELECT ON public.depreciaciones TO service_role;
 
 COMMENT ON FUNCTION app.revisar_estimacion_activo_572() IS
