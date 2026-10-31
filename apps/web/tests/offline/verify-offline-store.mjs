@@ -434,7 +434,7 @@ delete window.__TAURI_INTERNALS__
   }
   assert((await mod.listOfflineRequests()).length === queueBeforeSensitiveAttempts, 'Las decisiones por lote offline no deben entrar al outbox')
 
-  for (const [method, endpoint] of [['POST', '/api/reportes/suministro/cortes'], ['POST', '/api/integraciones/bi/credenciales'], ['POST', '/api/integraciones/bi/credenciales/cred-1/revocar'], ['POST', '/api/migration/contratos-suministro/import'], ['POST', '/api/migration/fox/ensayo']]) {
+  for (const [method, endpoint] of [['POST', '/api/reportes/suministro/cortes'], ['POST', '/api/integraciones/bi/credenciales'], ['POST', '/api/integraciones/bi/credenciales/cred-1/revocar'], ['POST', '/api/migration/contratos-suministro/import'], ['POST', '/api/migration/origen/ensayo']]) {
     let rejected = false
     try {
       await mod.fetchWithOfflineSupport('http://api.test' + endpoint,

@@ -1,17 +1,17 @@
-// Pruebas de las herramientas FOX con tablas Visual FoxPro sintéticas (sólo locales).
+// Pruebas de las herramientas de migración con extractos sintéticos de varios formatos (sólo locales).
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { leerDbf, leerCsv } from './fox-dbf.mjs';
+import { leerDbf, leerCsv } from './leer-extracto.mjs';
 import { escribirDbf } from './escribir-dbf.mjs';
-import { perfilarCarpeta, perfilMarkdown } from './perfilar-fox.mjs';
-import { cargarTablas, COLUMNAS, escribir, transformar } from './transformar-fox.mjs';
-import { archivarCarpeta } from './archivar-fox.mjs';
+import { perfilarCarpeta, perfilMarkdown } from './perfilar.mjs';
+import { cargarTablas, COLUMNAS, escribir, transformar } from './transformar.mjs';
+import { archivarCarpeta } from './archivar.mjs';
 
 function extractoSintetico() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fox-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'extracto-'));
   escribirDbf(path.join(dir, 'CONTRATO.DBF'), [
     { nombre: 'IDCONT', tipo: 'I', largo: 4 }, { nombre: 'NUMERO', tipo: 'C', largo: 20 }, { nombre: 'CODCLI', tipo: 'C', largo: 10 },
     { nombre: 'DESCRIP', tipo: 'C', largo: 40 }, { nombre: 'MONEDA', tipo: 'C', largo: 1 }, { nombre: 'FECINI', tipo: 'D', largo: 8 },
@@ -62,7 +62,7 @@ function extractoSintetico() {
 const ALMACEN = '58000000-0000-4000-8000-000000000004';
 const SUCURSAL = '58000000-0000-4000-8000-000000000005';
 function mapeo() {
-  const m = JSON.parse(fs.readFileSync(new URL('./mapeo-fox.ejemplo.json', import.meta.url), 'utf8'));
+  const m = JSON.parse(fs.readFileSync(new URL('./mapeo.ejemplo.json', import.meta.url), 'utf8'));
   m.salidas.stock.columnas.sucursal_id = { valor: SUCURSAL };
   m.salidas.stock.columnas.almacen_id = { mapa: 'CODALM', valores: { '01': ALMACEN } };
   return m;
@@ -118,7 +118,7 @@ test('transforma a las plantillas del ERP con totales de control de saldos abier
   });
   assert.equal(r.extracto.contratos.descartadas, 1);
 
-  const salida = fs.mkdtempSync(path.join(os.tmpdir(), 'fox-salida-'));
+  const salida = fs.mkdtempSync(path.join(os.tmpdir(), 'migracion-salida-'));
   escribir(r, salida, mapeo());
   const contratos = fs.readFileSync(path.join(salida, 'contratos_suministro.csv'), 'utf8').split('\n');
   assert.equal(contratos[0], COLUMNAS.contratos.join(','));
@@ -151,13 +151,13 @@ test('archiva el extracto completo en tandas, con borrados, redacción y cierre 
       : ruta.endsWith('/filas') ? { nuevas: cuerpo.filas.length, existentes: 0 } : { estado: 'COMPLETO' };
     return { ok: true, status: 200, text: async () => JSON.stringify({ success: true, data }) };
   };
-  const r = await archivarCarpeta({ carpeta: dir, api: 'http://127.0.0.1:1/api', token: 't0k3n', lote: 'fox-2026-10', tanda: 2, fetch });
+  const r = await archivarCarpeta({ carpeta: dir, api: 'http://127.0.0.1:1/api', token: 't0k3n', lote: 'origen-2026-10', tanda: 2, fetch });
   assert.equal(r.estado, 'COMPLETO');
   // CONTRATO incluye su registro borrado: el archivo es íntegro.
   assert.equal(r.tablas.CONTRATO, 3);
   assert.equal(r.borrados.CONTRATO, 1);
   assert.deepEqual(r.redactados, { USUARIOS: ['CLAVE'] });
-  const { CAMPO_SENSIBLE } = await import('./archivar-fox.mjs');
+  const { CAMPO_SENSIBLE } = await import('./archivar.mjs');
   assert.deepEqual(['USR_CLAVE', 'PASSWD2', 'PIN', 'API_KEY', 'NROTARJETA', 'SPINNER', 'KEYWORD', 'CODPRO'].filter((c) => CAMPO_SENSIBLE.test(c)),
     ['USR_CLAVE', 'PASSWD2', 'PIN', 'API_KEY', 'NROTARJETA']);
   const contrato = llamadas.filter((l) => l.cuerpo?.tabla === 'CONTRATO').flatMap((l) => l.cuerpo.filas);
@@ -166,9 +166,9 @@ test('archiva el extracto completo en tandas, con borrados, redacción y cierre 
   const usuarios = llamadas.filter((l) => l.cuerpo?.tabla === 'USUARIOS').flatMap((l) => l.cuerpo.filas);
   assert.deepEqual(usuarios.map((f) => f.fila.CLAVE), ['[REDACTADO]', '']);
   assert.ok(llamadas.filter((l) => l.ruta.endsWith('/filas')).every((l) => l.cuerpo.filas.length <= 2));
-  assert.equal(llamadas[0].clave, 'fox-2026-10:crear');
+  assert.equal(llamadas[0].clave, 'origen-2026-10:crear');
   const cierre = llamadas.at(-1);
-  assert.equal(cierre.clave, 'fox-2026-10:cerrar');
+  assert.equal(cierre.clave, 'origen-2026-10:cerrar');
   assert.deepEqual(cierre.cuerpo.tablas, r.tablas);
   assert.ok(llamadas.every((l) => l.auth === 'Bearer t0k3n'));
 });
@@ -188,7 +188,7 @@ test('reintenta lo transitorio y detiene el lote ante un rechazo de negocio', as
 });
 
 test('transforma maestros y saldos con control en moneda local y sólo lo abierto', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fox-maestros-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'migracion-maestros-'));
   escribirDbf(path.join(dir, 'BANCOS.DBF'), [{ nombre: 'CODBAN', tipo: 'C', largo: 4 }, { nombre: 'MONEDA', tipo: 'C', largo: 1 },
     { nombre: 'SALDO', tipo: 'N', largo: 14, decimales: 2 }, { nombre: 'TC', tipo: 'N', largo: 8, decimales: 4 }],
   [{ CODBAN: 'B1', MONEDA: 'S', SALDO: 1000, TC: 0 }, { CODBAN: 'B2', MONEDA: 'D', SALDO: 100, TC: 3.75 }]);
@@ -205,11 +205,11 @@ test('transforma maestros y saldos con control en moneda local y sólo lo abiert
   assert.equal(r.salidas.cuentas_bancarias[1].tipo_cambio, 3.75);
 });
 
-test('el ERP FOX sintético es determinista y su balance cuadra con bancos, cartera, stock y proveedores', async () => {
-  const { generarExtracto } = await import('./simulacion/generar-fox.mjs');
+test('el ERP sintético es determinista y su balance cuadra con bancos, cartera, stock y proveedores', async () => {
+  const { generarExtracto } = await import('./simulacion/generar-extracto.mjs');
   const mapeoSim = JSON.parse(fs.readFileSync(new URL('./simulacion/mapeo-simulacion.json', import.meta.url), 'utf8'));
   const variante = (op) => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fox-sim-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mig-sim-'));
     const g = generarExtracto(dir, { escala: 0.1, ...op });
     return { g, r: transformar(mapeoSim, cargarTablas(dir, { codificacion: 'cp850' })) };
   };
@@ -234,5 +234,55 @@ test('el ERP FOX sintético es determinista y su balance cuadra con bancos, cart
   assert.equal(linea('1212'), c.cxc.saldo);
   assert.equal(-linea('4212'), c.cxp.saldo);
   assert.equal(linea('2011'), c.stock.valor);
-  assert.ok(v2.r.salidas.stock.every((s) => s.almacen_codigo.startsWith('FOX-')));
+  assert.ok(v2.r.salidas.stock.every((s) => s.almacen_codigo.startsWith('ORI-')));
+});
+
+test('dos ERP con otros formatos y otras columnas llegan a las mismas plantillas', async () => {
+  const { createRequire } = await import('node:module');
+  const { transformar, cargarTablas } = await import('./transformar.mjs');
+  const { perfilarCarpeta } = await import('./perfilar.mjs');
+  const ExcelJS = createRequire(new URL('../../apps/erp-api/package.json', import.meta.url))('exceljs');
+
+  // Un ERP entrega CSV con punto y coma y JSONL; otro, Excel y TSV. Mismos datos, distinta forma.
+  const a = fs.mkdtempSync(path.join(os.tmpdir(), 'erp-a-'));
+  fs.writeFileSync(path.join(a, 'TERCEROS.csv'), 'COD;RUC;NOMBRE;CLASE\nC1;20100070970;Clínica Norte;C\nP1;20100070971;Laboratorio Sur;P\n');
+  fs.writeFileSync(path.join(a, 'ARTICULOS.jsonl'), '{"SKU":"A-1","DESC":"Guantes","UM":"NIU","PV":12.5,"PC":8}\n{"SKU":"A-2","DESC":"Mascarillas","UM":"CJA","PV":30,"PC":21.5}\n');
+  fs.writeFileSync(path.join(a, 'control.json'), '{"ignorar":"no es una tabla"}');
+  const b = fs.mkdtempSync(path.join(os.tmpdir(), 'erp-b-'));
+  const libro = new ExcelJS.Workbook();
+  const hoja = libro.addWorksheet('Socios');
+  hoja.addRows([['business_partner', 'tax_id', 'legal_name'], ['C1', '20100070970', 'Clínica Norte']]);
+  await libro.xlsx.writeFile(path.join(b, 'SOCIOS.xlsx'));
+  fs.writeFileSync(path.join(b, 'ITEMS.tsv'), 'item\tname\tuom\tsale_price\tcost\nA-1\tGuantes\tNIU\t12.5\t8\nA-2\tMascarillas\tCJA\t30\t21.5\n');
+
+  const cliente = (id, doc, nombre) => ({ external_id: id, tipo: { valor: 'JURIDICA' }, tipo_documento: { valor: 'RUC' }, numero_documento: doc, razon_social: nombre });
+  const producto = (sku, nombre, um, pv, pc) => ({ id_origen_producto: sku, codigo: sku, nombre, unidad_medida: um, precio_venta: pv, precio_compra: pc });
+  const mapeoA = { salidas: {
+    clientes: { tabla: 'TERCEROS', filtro: [{ campo: 'CLASE', en: ['C'] }], columnas: cliente('COD', 'RUC', 'NOMBRE') },
+    productos: { tabla: 'ARTICULOS', columnas: producto('SKU', 'DESC', 'UM', 'PV', 'PC') },
+  } };
+  const mapeoB = { salidas: {
+    clientes: { tabla: 'SOCIOS', columnas: cliente('business_partner', 'tax_id', 'legal_name') },
+    productos: { tabla: 'ITEMS', columnas: producto('item', 'name', 'uom', 'sale_price', 'cost') },
+  } };
+  const texto = (o) => JSON.stringify(o, (_, v) => (typeof v === 'number' ? String(v) : v));
+  const ra = transformar(mapeoA, cargarTablas(a));
+  const rb = transformar(mapeoB, cargarTablas(b));
+  assert.equal(texto(ra.salidas), texto(rb.salidas));
+  assert.equal(ra.salidas.clientes.length, 1);
+  assert.equal(ra.salidas.productos.length, 2);
+  assert.deepEqual(ra.control.clientes, rb.control.clientes);
+  assert.deepEqual(ra.control.productos, rb.control.productos);
+
+  // El perfil también lee todos los formatos y no confunde control.json con una tabla.
+  assert.deepEqual(perfilarCarpeta(a).tablas.map((x) => x.archivo).sort(), ['ARTICULOS.jsonl', 'TERCEROS.csv']);
+  assert.deepEqual(perfilarCarpeta(b).tablas.map((x) => x.archivo).sort(), ['ITEMS.tsv', 'SOCIOS.xlsx']);
+
+  // Un Excel con varias hojas con datos no se lee a medias.
+  const varias = new ExcelJS.Workbook();
+  varias.addWorksheet('Uno').addRow(['a']);
+  varias.addWorksheet('Dos').addRow(['b']);
+  const c = fs.mkdtempSync(path.join(os.tmpdir(), 'erp-c-'));
+  await varias.xlsx.writeFile(path.join(c, 'LIBRO.xlsx'));
+  assert.throws(() => cargarTablas(c), /guarde cada tabla en su archivo/);
 });

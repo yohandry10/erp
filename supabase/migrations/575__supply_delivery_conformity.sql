@@ -1,6 +1,6 @@
 -- ============================================================================
 -- 575__supply_delivery_conformity.sql
--- F03 ALKHOFAR: recepción y conformidad del cliente sobre los despachos.
+-- F03 suministro: recepción y conformidad del cliente sobre los despachos.
 --
 -- Cadena trazable: contrato → OC → programación → pedido vinculado (572) →
 -- despacho parcial (442) → movimiento y lotes (574) → recepción del cliente.

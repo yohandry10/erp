@@ -347,7 +347,7 @@ Alcance del respaldo productivo:
   y su custodia es del responsable de la cuenta. Los certificados digitales
   que guarda la aplicación viajan con el respaldo de la base.
 
-Objetivos propuestos, pendientes de aprobación de ALKHOFAR en la implantación:
+Objetivos propuestos, pendientes de aprobación del cliente en la implantación:
 respaldo diario de base y archivos (RPO 24 horas; menor sólo con PITR del
 proveedor, que no está contratado), restauración completa en un proyecto
 nuevo en 8 horas (RTO) y retención de 35 copias diarias y 12 mensuales,
@@ -375,58 +375,66 @@ lectura. Las columnas de credenciales y secretos se entregan vacías. Borrar
 la empresa después de confirmar la entrega exige autorización explícita y el
 procedimiento de operaciones destructivas.
 
-## Migración desde FOX
+## Migración desde otro sistema
 
-Dos capas con la misma fecha de corte (580–582): el archivo íntegro guarda cada
-tabla del extracto tal cual; la migración operativa carga terceros, maestros y
-saldos abiertos por los writers del ERP.
+Proceso estándar para pasar a este ERP desde cualquier sistema. Nada depende del
+origen salvo el mapeo del paso 2. Dos capas con la misma fecha de corte (580–582):
+el archivo íntegro guarda cada tabla del extracto tal cual; la migración operativa
+carga terceros, maestros y saldos abiertos por los writers del ERP.
 
-1. Perfil del extracto, sólo lectura: `node scripts/fox/perfilar-fox.mjs <carpeta>`
-   lee tablas FoxPro/Visual FoxPro (.dbf con memo .fpt) y CSV y escribe
-   `perfil-fox.json` y `perfil-fox.md`: formato y página de códigos, volumen y
+El extracto es una carpeta con un archivo por tabla, exportado del sistema anterior
+en cualquiera de estos formatos: DBF (dBase, FoxPro, Clipper, con memo .fpt), CSV,
+TSV, JSON, JSONL o Excel de una hoja. Si el cliente ya entrega sus datos en las
+plantillas del ERP, se omiten los pasos 1 a 3 y se empieza por el 4 o el 5. Cada
+migración declara el sistema de origen (`sistemaOrigen`, en la pantalla "Sistema de
+origen"): los registros de dos sistemas se siguen y concilian por separado.
+
+1. Perfil del extracto, sólo lectura: `node scripts/migracion/perfilar.mjs <carpeta>`
+   escribe
+   `perfil-extracto.json` y `perfil-extracto.md`: formato y página de códigos, volumen y
    borrados, campos, vacíos, claves candidatas, rango histórico y alertas,
    incluidas las columnas sensibles (claves, PIN, tarjetas). Si el byte de
-   página de códigos no es confiable, forzar `--codificacion cp850`.
-2. Mapeo: partir de `scripts/fox/simulacion/mapeo-simulacion.json` (las 16
+   página de códigos de un DBF no es confiable, forzar `--codificacion cp850`.
+2. Mapeo, lo único propio de cada sistema: partir de `scripts/migracion/simulacion/mapeo-simulacion.json` (las 16
    salidas) y reemplazar tablas, uniones, filtros y campos por los del perfil.
    Las unidades se homologan a NIU, KGM, LTR, MTR o ZZ sin convertir
    cantidades; un valor sin correspondencia detiene la transformación con el
    valor exacto. El stock usa `almacen_codigo` del almacén migrado y toma su
    sucursal o la principal.
-3. Transformación: `node scripts/fox/transformar-fox.mjs <mapeo> <extracto> <salida>`
+3. Transformación: `node scripts/migracion/transformar.mjs <mapeo> <extracto> <salida>`
    produce las plantillas en el orden de importación, `control.json` (totales
    con las reglas de la conciliación 582) y `extracto.json` (filas leídas,
    descartadas y por qué).
-4. Archivo íntegro: `ERP_API_TOKEN=<token de un ADMIN> node scripts/fox/archivar-fox.mjs
-   <extracto> --api <url>/api --lote <clave estable> [--fecha-corte AAAA-MM-DD]`
+4. Archivo íntegro: `ERP_API_TOKEN=<token de un ADMIN> node scripts/migracion/archivar.mjs
+   <extracto> --api <url>/api --lote <clave estable> --origen "<sistema>" [--fecha-corte AAAA-MM-DD]`
    carga todas las tablas, también los registros borrados, en tandas
    idempotentes de hasta 2000 filas; la base redacta las columnas de
    credenciales y medios de pago aunque la tanda llegue directo al API. El lote
    cierra sólo si lo cargado coincide con lo leído y queda inmutable; repetir
    con la misma `--lote` reanuda una carga cortada y una fila que cambió se
    rechaza. Un extracto que no sirve se descarta con motivo
-   (`POST /api/migration/fox/archivo/lotes/:id/descartar`). Se consulta en la
+   (`POST /api/migration/origen/archivo/lotes/:id/descartar`). Se consulta en la
    pantalla por texto, tabla y página con `migration.archivo.read`.
-5. Ensayo integral en `/dashboard/migracion-fox`: adjuntar las plantillas, la
-   fecha de corte y `control.json`. Corre todo en la base en el orden real y
+5. Ensayo integral en `/dashboard/migracion`: indicar el sistema de origen y
+   adjuntar las plantillas, la fecha de corte y `control.json`. Corre todo en la base en el orden real y
    se revierte. Repetir hasta cero errores, conciliación cuadrada y cruce de
    bancos con el asiento de apertura cuadrado en moneda local; los errores se
-   devuelven al cliente para corregir FOX y reentregar el extracto.
+   devuelven al cliente para corregir en su sistema y reentregar el extracto.
 6. Importación en orden: clientes, proveedores, almacenes, plan de cuentas,
    productos, cuentas bancarias, listas de precios, CxC, CxP, balance de
    apertura, contratos, OC del cliente, cronograma, OC de compra, pedidos de
    venta y stock; después, conciliación con el mismo `control.json`. Un
-   reintento no duplica y un dato cambiado en FOX se rechaza por registro. Las
+   reintento no duplica y un dato cambiado en el sistema anterior se rechaza por registro. Las
    OC de compra quedan en borrador y las aprueba alguien distinto de quien
    migró.
 
 Simulación local completa (Docker, sin nada remoto):
-`PSQL_BIN=<psql> node scripts/fox/simulacion/simular-migracion-fox-local.mjs`.
-Levanta PostgreSQL 16 con la cadena, PostgREST y el API Nest real; un ERP FOX
+`PSQL_BIN=<psql> node scripts/migracion/simulacion/simular-migracion-local.mjs`.
+Levanta PostgreSQL 16 con la cadena, PostgREST y el API Nest real; un ERP
 sintético entrega un extracto con errores sembrados y se recorre perfil,
 archivo, ensayo, reentrega, importación, conciliación, reintento, origen
 cambiado, aprobación y aislamiento. Evidencia en
-`artifacts/alkhofar-fox-simulacion/evidence.json`; también `pnpm simulate:fox`.
+`artifacts/migracion-simulacion/evidence.json`; también `pnpm simulate:migracion`.
 
 El ensayo integral, la conciliación y el archivo usan un cliente de datos sin
 reintentos con `SUPABASE_LONG_FETCH_TIMEOUT_MS` (10 minutos por defecto, entre 1
@@ -434,8 +442,9 @@ y 30); el resto del API conserva `SUPABASE_FETCH_TIMEOUT_MS`. La pantalla espera
 hasta 15 minutos por operación.
 
 El extracto y sus salidas pueden contener datos del cliente: se procesan fuera
-del repositorio y no se versionan. `pnpm test:fox` prueba las herramientas con
-tablas sintéticas.
+del repositorio y no se versionan. `pnpm test:migracion` prueba las herramientas con
+extractos sintéticos, incluidos dos ERP con otros formatos y columnas que llegan a
+las mismas plantillas.
 
 ## Operaciones destructivas en PROD
 

@@ -166,7 +166,7 @@ for (const mobile of [false, true])
     await expect(region.getByRole("cell", { name: /^Aprobado\s*PEN 16\.67$/ })).toBeVisible();
     expect(api.intents).toHaveLength(4);
     await region.scrollIntoViewIfNeeded();
-    await page.screenshot({ path: `../../artifacts/alkhofar-f06-penalidades/browser/${mobile ? "movil" : "escritorio"}-penalidades.png`, fullPage: true });
+    await page.screenshot({ path: `../../artifacts/suministro-f06-penalidades/browser/${mobile ? "movil" : "escritorio"}-penalidades.png`, fullPage: true });
     expect(errors).toEqual([]);
   });
 

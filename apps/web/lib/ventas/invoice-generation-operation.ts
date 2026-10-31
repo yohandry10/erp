@@ -16,6 +16,8 @@ const uuid = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{8}
 const text = (v: unknown): v is string => typeof v === 'string' && !!v.trim()
 const amount = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0 && Math.abs(v * 100 - Math.round(v * 100)) < 0.00001
 const sameMoney = (a: number, b: number) => Math.round(a * 100) === Math.round(b * 100)
+// El subtotal se calcula con el precio recibido y la columna guarda el precio a 2 decimales.
+const lineAmountMatches = (subtotal: number, quantity: number, price: number) => Math.abs(subtotal - quantity * price) <= quantity * 0.005 + 0.005
 const live = (v: Record<string, any>) => ['cached', 'queued', 'offline', 'pending'].every(k => v[k] === undefined || v[k] === false)
 const civilDate = (v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}(?:$|T)/.test(v) && Number.isFinite(Date.parse(v)) && new Date(v.slice(0, 10) + 'T00:00:00Z').toISOString().slice(0, 10) === v.slice(0, 10)
 const invoiceNumber = (v: unknown) => typeof v === 'number' && Number.isInteger(v) && v > 0 || typeof v === 'string' && /^\d{1,8}$/.test(v) && Number(v) > 0
@@ -37,7 +39,7 @@ function validSnapshot(v: unknown, s: InvoiceScope): v is InvoiceSnapshot {
   for (const l of v.lines) {
     if (!object(l) || !exactKeys(l, ['id','productId','description','quantity','price','subtotal']) || !uuid(l.id) || seen.has(l.id) ||
         !uuid(l.productId) || !text(l.description) || !amount(l.quantity) || l.quantity <= 0 || !amount(l.price) || !amount(l.subtotal) ||
-        !sameMoney(l.subtotal, l.quantity * l.price)) return false
+        !lineAmountMatches(l.subtotal, l.quantity, l.price)) return false
     seen.add(l.id)
   }
   return sameMoney(v.subtotal, v.lines.reduce((sum: number, l: InvoiceLine) => sum + l.subtotal, 0))

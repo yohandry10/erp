@@ -5,24 +5,24 @@ import { MigrationRunsService } from '../migration-runs.service';
 import { ParsedCsv, nonEmpty, validateHeaders } from '../util/csv-parser.util';
 import { Importer, ImporterContext, emptyResult } from './importer.interface';
 
-/** Registro FOX agrupado: un contrato u OC reúne varias filas (una por línea). */
-export interface RegistroFox {
+/** Registro de origen agrupado: un contrato u OC reúne varias filas (una por línea). */
+export interface RegistroOrigen {
   id_origen: string;
   fila: number;
   filas: number[];
   payload: Record<string, unknown>;
 }
 
-type EntidadFox = 'CONTRATO' | 'OC' | 'ENTREGA';
-/** Plantilla FOX: columnas, validación por fila, armado del registro y su RPC. */
-export type SpecFox = {
+type EntidadOrigen = 'CONTRATO' | 'OC' | 'ENTREGA';
+/** Plantilla de origen: columnas, validación por fila, armado del registro y su RPC. */
+export type SpecOrigen = {
   runType: string;
   entidad: string;
   tabla: string;
   clave: string;
   /** Clave del registro en el lote del ensayo integral. */
   claveLote: string;
-  rpc: 'importar_suministro_fox_580' | 'importar_maestro_fox_582';
+  rpc: 'importar_suministro_origen_580' | 'importar_maestro_origen_582';
   requeridas: string[];
   opcionales: string[];
   cabecera: string[];
@@ -34,36 +34,36 @@ export type SpecFox = {
   /** Un registro por fila: una clave repetida es error. */
   unaFila?: boolean;
   validarFila?: (row: Record<string, string>, err: (field: string, message: string) => void) => void;
-  ordenar?: (a: RegistroFox, b: RegistroFox) => number;
+  ordenar?: (a: RegistroOrigen, b: RegistroOrigen) => number;
   ejemplo: string[][];
   armar: (filas: Record<string, string>[]) => Record<string, unknown>;
 };
-type Spec = SpecFox;
+type Spec = SpecOrigen;
 
 const MENSAJES: Record<string, string> = {
-  MIGRATION_FOX_CLIENT_NOT_FOUND: 'El cliente no existe o es ambiguo: importe antes los clientes con su código FOX',
-  MIGRATION_FOX_PRODUCT_NOT_FOUND: 'El producto no existe o es ambiguo en el ERP',
-  MIGRATION_FOX_PARENT_NOT_FOUND: 'Falta migrar antes el contrato, la OC o la línea de la que depende',
-  MIGRATION_FOX_SOURCE_CHANGED: 'Ya se migró con otros datos; el registro cambió en FOX',
-  MIGRATION_FOX_NOTHING_OPEN: 'No tiene saldo abierto: queda como historia en FOX',
-  MIGRATION_FOX_QUANTITY_INVALID: 'Cantidades inválidas: lo ejecutado no puede superar lo original',
-  MIGRATION_FOX_DUPLICATE_LINE: 'La OC repite una línea del contrato',
-  MIGRATION_FOX_RESPONSIBLE_NOT_FOUND: 'El responsable no es un usuario activo de la empresa',
-  MIGRATION_FOX_LINES_REQUIRED: 'El registro no trae líneas',
-  MIGRATION_FOX_INPUT_INVALID: 'Datos inválidos',
-  MIGRATION_FOX_AMBIGUOUS_CODE: 'El código coincide con más de un registro del ERP: corrija el duplicado antes de migrar',
-  MIGRATION_FOX_REFERENCE_NOT_FOUND: 'La referencia no existe en el ERP: migre antes el maestro del que depende',
-  MIGRATION_FOX_TARGET_ALREADY_LINKED: 'Ese registro del ERP ya quedó enlazado a otro código FOX: hay un duplicado en el origen',
-  MIGRATION_FOX_ACCOUNT_INVALID: 'Código contable inválido: sólo dígitos, de 2 a 20',
-  MIGRATION_FOX_ACCOUNT_PARENT_NOT_FOUND: 'No existe una cuenta padre por prefijo en el plan del ERP',
-  MIGRATION_FOX_ACCOUNT_NOT_FOUND: 'La cuenta contable no existe en el plan: migre antes el plan de cuentas',
-  MIGRATION_FOX_BANK_ACCOUNT_IN_USE: 'La cuenta bancaria ya opera en el ERP: su saldo de apertura se duplicaría',
-  MIGRATION_FOX_BANK_OPENING_DATE_REQUIRED: 'El saldo de apertura exige fecha_apertura',
-  MIGRATION_FOX_BANK_EXCHANGE_RATE_REQUIRED: 'La cuenta en moneda extranjera exige tipo_cambio de la fecha de apertura',
-  MIGRATION_FOX_SUPPLIER_NOT_FOUND: 'El proveedor no existe o es ambiguo: importe antes los proveedores con su código FOX',
-  MIGRATION_FOX_PARTY_NOT_FOUND: 'El cliente o proveedor no existe: impórtelo antes con su código FOX',
-  MIGRATION_FOX_CUTOFF_REQUIRED: 'El balance de apertura exige fecha de corte',
-  MIGRATION_FOX_WRITER_RESULT_MISSING: 'El ERP no devolvió el registro creado; reintente',
+  MIGRATION_SOURCE_CLIENT_NOT_FOUND: 'El cliente no existe o es ambiguo: importe antes los clientes con su código de origen',
+  MIGRATION_SOURCE_PRODUCT_NOT_FOUND: 'El producto no existe o es ambiguo en el ERP',
+  MIGRATION_SOURCE_PARENT_NOT_FOUND: 'Falta migrar antes el contrato, la OC o la línea de la que depende',
+  MIGRATION_SOURCE_CHANGED: 'Ya se migró con otros datos; el registro cambió en el sistema anterior',
+  MIGRATION_SOURCE_NOTHING_OPEN: 'No tiene saldo abierto: queda como historia en el sistema anterior',
+  MIGRATION_SOURCE_QUANTITY_INVALID: 'Cantidades inválidas: lo ejecutado no puede superar lo original',
+  MIGRATION_SOURCE_DUPLICATE_LINE: 'La OC repite una línea del contrato',
+  MIGRATION_SOURCE_RESPONSIBLE_NOT_FOUND: 'El responsable no es un usuario activo de la empresa',
+  MIGRATION_SOURCE_LINES_REQUIRED: 'El registro no trae líneas',
+  MIGRATION_SOURCE_INPUT_INVALID: 'Datos inválidos',
+  MIGRATION_SOURCE_AMBIGUOUS_CODE: 'El código coincide con más de un registro del ERP: corrija el duplicado antes de migrar',
+  MIGRATION_SOURCE_REFERENCE_NOT_FOUND: 'La referencia no existe en el ERP: migre antes el maestro del que depende',
+  MIGRATION_SOURCE_TARGET_ALREADY_LINKED: 'Ese registro del ERP ya quedó enlazado a otro código de origen: hay un duplicado en el origen',
+  MIGRATION_SOURCE_ACCOUNT_INVALID: 'Código contable inválido: sólo dígitos, de 2 a 20',
+  MIGRATION_SOURCE_ACCOUNT_PARENT_NOT_FOUND: 'No existe una cuenta padre por prefijo en el plan del ERP',
+  MIGRATION_SOURCE_ACCOUNT_NOT_FOUND: 'La cuenta contable no existe en el plan: migre antes el plan de cuentas',
+  MIGRATION_SOURCE_BANK_ACCOUNT_IN_USE: 'La cuenta bancaria ya opera en el ERP: su saldo de apertura se duplicaría',
+  MIGRATION_SOURCE_BANK_OPENING_DATE_REQUIRED: 'El saldo de apertura exige fecha_apertura',
+  MIGRATION_SOURCE_BANK_EXCHANGE_RATE_REQUIRED: 'La cuenta en moneda extranjera exige tipo_cambio de la fecha de apertura',
+  MIGRATION_SOURCE_SUPPLIER_NOT_FOUND: 'El proveedor no existe o es ambiguo: importe antes los proveedores con su código de origen',
+  MIGRATION_SOURCE_PARTY_NOT_FOUND: 'El cliente o proveedor no existe: impórtelo antes con su código de origen',
+  MIGRATION_SOURCE_CUTOFF_REQUIRED: 'El balance de apertura exige fecha de corte',
+  MIGRATION_SOURCE_WRITER_RESULT_MISSING: 'El ERP no devolvió el registro creado; reintente',
   INVENTORY_MASTER_PRODUCT_UNIT_UNSUPPORTED: 'Unidad de medida no admitida: homologue a NIU, KGM, LTR, MTR o ZZ',
   BANK_ACCOUNT_LEDGER_INVALID: 'La cuenta bancaria exige una cuenta contable activa que acepte movimientos',
   BANK_ACCOUNT_REQUIRED_FIELDS_MISSING: 'La cuenta bancaria exige nombre, banco y número',
@@ -87,7 +87,7 @@ const MENSAJES: Record<string, string> = {
 };
 
 /** Traduce el código de la base a un mensaje para quien migra, conservando el detalle. */
-export function mensajeFox(raw: string) {
+export function mensajeOrigen(raw: string) {
   if (/suministro_contratos_tenant_id_numero_key/.test(raw)) return 'Ya existe un contrato con ese número en la empresa';
   const [codigo, ...resto] = raw.split(':');
   const base = MENSAJES[codigo.trim()];
@@ -106,14 +106,14 @@ function fechaValida(v: string) {
 }
 const num = (v: string | undefined) => (nonEmpty(v) === null ? 0 : Number(v));
 
-export const SPECS: Record<EntidadFox, Spec> = {
+export const SPECS: Record<EntidadOrigen, Spec> = {
   CONTRATO: {
     runType: 'contratos_suministro',
     entidad: 'CONTRATO',
     tabla: 'suministro_contratos',
     clave: 'id_origen_contrato',
     claveLote: 'contratos',
-    rpc: 'importar_suministro_fox_580',
+    rpc: 'importar_suministro_origen_580',
     requeridas: ['id_origen_contrato', 'numero', 'cliente_codigo', 'asunto', 'moneda', 'vigencia_desde', 'vigencia_hasta',
       'id_origen_linea', 'producto_codigo', 'cantidad_original', 'cantidad_ejecutada', 'precio_unitario'],
     opcionales: ['estado', 'responsable_email', 'observaciones'],
@@ -151,7 +151,7 @@ export const SPECS: Record<EntidadFox, Spec> = {
     tabla: 'suministro_ordenes_cliente',
     clave: 'id_origen_oc',
     claveLote: 'oc',
-    rpc: 'importar_suministro_fox_580',
+    rpc: 'importar_suministro_origen_580',
     requeridas: ['id_origen_oc', 'id_origen_contrato', 'numero', 'fecha_emision', 'id_origen_linea', 'id_origen_linea_contrato',
       'cantidad_original', 'cantidad_entregada'],
     opcionales: [],
@@ -173,7 +173,7 @@ export const SPECS: Record<EntidadFox, Spec> = {
     tabla: 'suministro_entregas_programadas',
     clave: 'id_origen_entrega',
     claveLote: 'entregas',
-    rpc: 'importar_suministro_fox_580',
+    rpc: 'importar_suministro_origen_580',
     unaFila: true,
     requeridas: ['id_origen_entrega', 'id_origen_oc', 'id_origen_linea_oc', 'fecha_programada', 'cantidad', 'destino'],
     opcionales: ['cantidad_entregada'],
@@ -194,16 +194,16 @@ export const esVerdadero = (v: string | undefined) => /^(si|sí|true|1|s)$/i.tes
 const DECIMAL_SIGNO = /^-?\d+(\.\d{1,6})?$/;
 
 /**
- * Valida el archivo y agrupa sus filas en registros FOX. Las filas de un mismo
+ * Valida el archivo y agrupa sus filas en registros de origen. Las filas de un mismo
  * contrato u OC repiten la cabecera y deben coincidir en ella.
  */
-export function construirLoteFox(entidad: EntidadFox, parsed: ParsedCsv) {
+export function construirLoteOrigen(entidad: EntidadOrigen, parsed: ParsedCsv) {
   return construirLote(SPECS[entidad], parsed);
 }
 
 export function construirLote(spec: Spec, parsed: ParsedCsv) {
   const errores: ImporterRowError[] = validateHeaders(parsed.headers, spec.requeridas).map((message) => ({ rowIndex: 1, message }));
-  if (errores.length) return { registros: [] as RegistroFox[], errores };
+  if (errores.length) return { registros: [] as RegistroOrigen[], errores };
   const grupos = new Map<string, Array<{ fila: number; row: Record<string, string> }>>();
   parsed.rows.forEach((row, i) => {
     const fila = i + 2;
@@ -233,7 +233,7 @@ export function construirLote(spec: Spec, parsed: ParsedCsv) {
     grupo.push({ fila, row });
     grupos.set(id, grupo);
   });
-  const registros: RegistroFox[] = [];
+  const registros: RegistroOrigen[] = [];
   const conError = new Set(errores.map((e) => e.rowIndex));
   for (const [id, grupo] of grupos) {
     if (grupo.some((g) => conError.has(g.fila))) continue;
@@ -244,12 +244,12 @@ export function construirLote(spec: Spec, parsed: ParsedCsv) {
 }
 
 /**
- * Importador FOX: un registro por id de origen contra su RPC idempotente.
+ * Importador del sistema anterior: un registro por id de origen contra su RPC idempotente.
  * @Injectable en la base: las subclases sin constructor heredan de aquí los
  * tipos de sus dependencias; sin él Nest las construye sin base de datos.
  */
 @Injectable()
-export abstract class FoxImporterBase implements Importer {
+export abstract class OrigenImporterBase implements Importer {
   abstract readonly runType: Importer['runType'];
   protected abstract readonly spec: Spec;
 
@@ -287,15 +287,16 @@ export abstract class FoxImporterBase implements Importer {
     result.errorRows = filasConError.size;
     const client = this.supabase.getClient();
     const spec = this.spec;
+    const origen = ctx.sistemaOrigen ? { p_origen: ctx.sistemaOrigen } : {};
 
     if (ctx.dryRun) {
       const largo = this.supabase.getLongRunningClient();
       // Ensayo en la base, revertido: valida productos, padres y saldos sin escribir.
       const lote = { [spec.claveLote]: registros.map((r) => ({ id_origen: r.id_origen, fila: r.fila, payload: r.payload })) };
-      const { data, error } = spec.rpc === 'importar_suministro_fox_580'
-        ? await largo.rpc('ensayar_migracion_fox_580', { p_tenant_id: ctx.tenantId, p_actor_id: ctx.startedBy, p_lote: lote, p_control: null })
-        : await largo.rpc('ensayar_migracion_fox_582', {
-          p_tenant_id: ctx.tenantId, p_actor_id: ctx.startedBy, p_lote: lote, p_control: null, p_fecha_corte: ctx.fechaCorte ?? null,
+      const { data, error } = spec.rpc === 'importar_suministro_origen_580'
+        ? await largo.rpc('ensayar_migracion_origen_580', { p_tenant_id: ctx.tenantId, p_actor_id: ctx.startedBy, p_lote: lote, p_control: null, ...origen })
+        : await largo.rpc('ensayar_migracion_origen_582', {
+          p_tenant_id: ctx.tenantId, p_actor_id: ctx.startedBy, p_lote: lote, p_control: null, p_fecha_corte: ctx.fechaCorte ?? null, ...origen,
         });
       if (error) throw new Error(error.message);
       for (const r of registros) {
@@ -303,7 +304,7 @@ export abstract class FoxImporterBase implements Importer {
         if (res?.ok) result.okRows += r.filas.length;
         else {
           result.errorRows += r.filas.length;
-          result.errors.push({ rowIndex: r.fila, externalId: r.id_origen, message: res?.error ? mensajeFox(res.error) : 'Sin resultado del ensayo' });
+          result.errors.push({ rowIndex: r.fila, externalId: r.id_origen, message: res?.error ? mensajeOrigen(res.error) : 'Sin resultado del ensayo' });
         }
       }
       return result;
@@ -320,10 +321,11 @@ export abstract class FoxImporterBase implements Importer {
         p_entidad: spec.entidad,
         p_id_origen: r.id_origen,
         p_payload: r.payload,
+        ...origen,
       });
       if (error) {
         status = 'error';
-        message = mensajeFox(error.message);
+        message = mensajeOrigen(error.message);
         result.errorRows += r.filas.length;
         result.errors.push({ rowIndex: r.fila, externalId: r.id_origen, message });
       } else if (data?.action === 'IDEMPOTENT') {
@@ -371,19 +373,19 @@ export abstract class FoxImporterBase implements Importer {
 }
 
 @Injectable()
-export class ContratosSuministroImporter extends FoxImporterBase {
+export class ContratosSuministroImporter extends OrigenImporterBase {
   readonly runType = 'contratos_suministro' as const;
   protected readonly spec = SPECS.CONTRATO;
 }
 
 @Injectable()
-export class OcSuministroImporter extends FoxImporterBase {
+export class OcSuministroImporter extends OrigenImporterBase {
   readonly runType = 'oc_suministro' as const;
   protected readonly spec = SPECS.OC;
 }
 
 @Injectable()
-export class CronogramaSuministroImporter extends FoxImporterBase {
+export class CronogramaSuministroImporter extends OrigenImporterBase {
   readonly runType = 'cronograma_suministro' as const;
   protected readonly spec = SPECS.ENTREGA;
 }

@@ -5,8 +5,8 @@ import { PermissionsModule } from '../permissions/permissions.module';
 import { MigrationController } from './migration.controller';
 import { MigrationService } from './migration.service';
 import { MigrationRunsService } from './migration-runs.service';
-import { FoxArchivoService } from './fox-archivo.service';
-import { MaestrosFoxImporters } from './importers/maestros-fox.importer';
+import { OrigenArchivoService } from './archivo-origen.service';
+import { MaestrosOrigenImporters } from './importers/maestros-origen.importer';
 import { ClientesImporter } from './importers/clientes.importer';
 import { ProveedoresImporter } from './importers/proveedores.importer';
 import { CxcAbiertasImporter } from './importers/cxc-abiertas.importer';
@@ -18,7 +18,7 @@ import {
   ContratosSuministroImporter,
   CronogramaSuministroImporter,
   OcSuministroImporter,
-} from './importers/suministro-fox.importer';
+} from './importers/suministro-origen.importer';
 
 @Module({
   imports: [SupabaseModule, AuthModule, PermissionsModule],
@@ -36,8 +36,8 @@ import {
     ContratosSuministroImporter,
     OcSuministroImporter,
     CronogramaSuministroImporter,
-    MaestrosFoxImporters,
-    FoxArchivoService,
+    MaestrosOrigenImporters,
+    OrigenArchivoService,
   ],
   exports: [MigrationService],
 })

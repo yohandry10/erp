@@ -1,6 +1,6 @@
 -- ============================================================================
 -- 581__supply_access_profiles.sql
--- F09/F10 ALKHOFAR: perfil del responsable de suministro.
+-- F09/F10 suministro: perfil del responsable de suministro.
 --
 -- SUMINISTRO gestiona contratos, OC, cronogramas, recepciones, pedidos
 -- vinculados, reglas y cálculos de penalidad, alertas, lotes (lectura) y el

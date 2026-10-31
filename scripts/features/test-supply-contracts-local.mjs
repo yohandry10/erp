@@ -9,7 +9,7 @@ import path from "node:path";
 const [target, secondArg, thirdArg] = process.argv.slice(2);
 const nativeMode = target === "--native";
 const output = path.resolve(
-  (nativeMode ? thirdArg : secondArg) || "artifacts/alkhofar-f01",
+  (nativeMode ? thirdArg : secondArg) || "artifacts/suministro-f01",
 );
 assert.ok(output.startsWith(path.resolve("artifacts") + path.sep));
 let operationalFixture, amendmentFixture, executable, psql, native;
@@ -17,7 +17,7 @@ if (nativeMode) {
   const marker = realpathSync(secondArg);
   assert.ok(
     marker.startsWith(
-      path.resolve("artifacts/alkhofar-f01-expediente") + path.sep,
+      path.resolve("artifacts/suministro-f01-expediente") + path.sep,
     ),
   );
   native = JSON.parse(readFileSync(marker, "utf8"));
@@ -26,7 +26,7 @@ if (nativeMode) {
   const root = realpathSync(native.root);
   assert.ok(
     root.startsWith(
-      path.resolve("artifacts/alkhofar-f01-expediente") + path.sep,
+      path.resolve("artifacts/suministro-f01-expediente") + path.sep,
     ),
   );
   assert.match(root, /[\\/]native-pg-[0-9]+[\\/]data$/);
@@ -51,13 +51,13 @@ if (nativeMode) {
   )[0];
   assert.equal(info.Config.Image, "postgres:16");
   operationalFixture =
-    info.Config.Labels["com.erp.feature"] === "alkhofar-f01-pedidos";
+    info.Config.Labels["com.erp.feature"] === "suministro-f01-pedidos";
   amendmentFixture =
     operationalFixture ||
-    info.Config.Labels["com.erp.feature"] === "alkhofar-f01-adendas";
+    info.Config.Labels["com.erp.feature"] === "suministro-f01-adendas";
   assert.ok(
     amendmentFixture ||
-      info.Config.Labels["com.erp.feature"] === "alkhofar-f01",
+      info.Config.Labels["com.erp.feature"] === "suministro-f01",
   );
   assert.match(
     info.Name,

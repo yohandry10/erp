@@ -1,7 +1,17 @@
-// Lector de tablas FoxPro / Visual FoxPro (.dbf con memo .fpt) y CSV.
-// Sólo lee: no modifica el extracto. Devuelve filas con valores ya tipados.
+// Lector de extractos de cualquier sistema: DBF (dBase, FoxPro, Clipper, con memo .fpt),
+// CSV, TSV, JSON, JSONL y Excel. Sólo lee: no modifica el extracto. Cada archivo es una tabla.
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+const ES_EXTRACTO = /\.(dbf|csv|tsv|json|jsonl|xlsx)$/i;
+const NO_ES_TABLA = /^(control\.json|perfil-extracto\.|mapeo.*\.json$)/i;
+
+/** Archivos de datos de una carpeta, sin los totales, perfiles ni mapeos que la acompañan. */
+export function archivosExtracto(carpeta) {
+  return fs.readdirSync(carpeta).filter((f) => ES_EXTRACTO.test(f) && !NO_ES_TABLA.test(f)).sort();
+}
 
 const VERSIONES = {
   0x02: 'FoxBASE',
@@ -201,7 +211,46 @@ export function leerCsv(archivo, { separador, codificacion = 'utf-8' } = {}) {
   };
 }
 
+/** Tabla desde objetos ya leídos: los campos son la unión de sus claves, en orden de aparición. */
+function tablaDeObjetos(archivo, version, objetos) {
+  const nombres = [...new Set(objetos.flatMap((o) => Object.keys(o)))];
+  return {
+    archivo: path.basename(archivo),
+    version,
+    actualizada: null,
+    codificacion: 'utf-8',
+    registros_declarados: objetos.length,
+    borrados: 0,
+    campos: nombres.map((nombre) => ({ nombre, tipo: 'C' })),
+    filas: objetos.map((o, r) => marcar(Object.fromEntries(nombres.map((n) => [n, o[n] ?? ''])), r + 1, false)),
+  };
+}
+
+/** JSON (arreglo de objetos) o JSONL (un objeto por línea). */
+export function leerJson(archivo) {
+  const texto = fs.readFileSync(archivo, 'utf8').replace(/^\uFEFF/, '');
+  const jsonl = /\.jsonl$/i.test(archivo);
+  const objetos = jsonl ? texto.split(/\r?\n/).filter((l) => l.trim()).map((l) => JSON.parse(l)) : JSON.parse(texto);
+  if (!Array.isArray(objetos) || objetos.some((o) => !o || typeof o !== 'object' || Array.isArray(o)))
+    throw new Error(`${path.basename(archivo)}: se esperaba una lista de objetos`);
+  return tablaDeObjetos(archivo, jsonl ? 'JSONL' : 'JSON', objetos);
+}
+
+/** Excel: una hoja con datos y encabezado en la primera fila. */
+export function leerXlsx(archivo) {
+  const ayudante = fileURLToPath(new URL('./leer-xlsx.cjs', import.meta.url));
+  const res = spawnSync(process.execPath, [ayudante, archivo], { encoding: 'utf8', maxBuffer: 1 << 30 });
+  if (res.status !== 0) throw new Error(`${path.basename(archivo)}: ${res.stderr || 'no se pudo leer'}`);
+  const [cabecera = [], ...datos] = JSON.parse(res.stdout);
+  const nombres = cabecera.map((h) => String(h).trim());
+  return tablaDeObjetos(archivo, 'XLSX', datos.map((v) => Object.fromEntries(nombres.map((n, i) => [n, typeof v[i] === 'string' ? v[i].trim() : v[i]]))));
+}
+
 /** Abre un archivo del extracto según su extensión. */
 export function leerTabla(archivo, opciones = {}) {
-  return /\.dbf$/i.test(archivo) ? leerDbf(archivo, opciones) : leerCsv(archivo, opciones);
+  if (/\.dbf$/i.test(archivo)) return leerDbf(archivo, opciones);
+  if (/\.jsonl?$/i.test(archivo)) return leerJson(archivo);
+  if (/\.xlsx$/i.test(archivo)) return leerXlsx(archivo);
+  if (/\.tsv$/i.test(archivo)) return leerCsv(archivo, { separador: '\t', ...opciones });
+  return leerCsv(archivo, opciones);
 }

@@ -2,14 +2,14 @@
 
 Actualizado: 2026-10-30.
 
-Candidato integrado en la rama `claude/alkhofar-supply-20261027` (PR #149). Reúne
-el suministro ALKHOFAR y la migración FOX (570–582) con las correcciones Perú del
-UAT de Codex (583–590) y los PR #147 y #148. PROD sigue en 569: nada se aplicó ni
-se desplegó, y `render.yaml` y CI exigen 590, así que hay que promover 570–590
-DB-first antes de fusionar a `main` (`RELEASE.md`).
+Candidato integrado en el PR #149. Reúne el suministro y la migración desde otro
+sistema (570–582) con las correcciones Perú del UAT de Codex (583–590) y los PR #147
+y #148. PROD sigue en 569: nada se aplicó ni se desplegó, y `render.yaml` y CI exigen
+590, así que hay que promover 570–590 DB-first antes de fusionar a `main`
+(`RELEASE.md`).
 
 Numeración: el candidato de Codex usaba 570–577 para migraciones distintas de las
-de ALKHOFAR. Al integrarlo pasaron a 583 (estructura de establecimientos y
+de suministro. Al integrarlo pasaron a 583 (estructura de establecimientos y
 operaciones), 584 (edición de clientes), 585 (estimaciones de activos), 586
 (lectura auxiliar de RRHH), 587 (fecha civil de CxC y CxP), 588 (panel de
 seguridad), 589 (recepción a costo cero) y 590 (movimiento bancario activo por
@@ -34,7 +34,7 @@ resto por evidencia conservada. No se repitió. Lo que acredita esta integració
   Corregido en esas migraciones.
 
 Sigue sin acreditarse: SUNAT, SOL y SIRE reales (van con el onboarding de cada
-contribuyente), extracto FOX real, piloto y firma de ALKHOFAR, binario Windows
+contribuyente), extracto real, piloto y firma del primer cliente, binario Windows
 firmado, RTO de PROD y objetos de Storage. Antes de promover hay que repetir el
 ensayo sobre un respaldo nuevo. Queda como mejora: 143 tablas conservan permiso de
 escritura para `anon`; RLS forzado las frena y no es explotable hoy.
@@ -1964,9 +1964,8 @@ Cambios recientes principales:
   verificadores vigentes y 67 históricos. PR/CI, preflight, respaldo, promoción
   DB-first y despliegues están cerrados; el retest visible de la muestra CPE CO
   quedó cerrado en el hotfix #99 sobre `dd813ab`.
-- `570..582`: suministro ALKHOFAR F01–F10 y migración integral FOX, NO
-  aplicadas en PROD. Verificadas sólo en PostgreSQL 16 efímero (578
-  migraciones hasta 582, 91 verificadores).
+- `570..582`: suministro F01–F10 y migración integral desde otro sistema, NO
+  aplicadas en PROD. Verificadas sólo en PostgreSQL 16 efímero.
   574 redefine `aplicar_movimiento_inventario_tx` y el despacho para asignar
   lotes (FEFO); 575 redefine el sembrado operativo para no conceder a VENDEDOR
   gestión ni conformidad de contratos, y 578 lo extiende a penalidades. 580
@@ -1975,7 +1974,7 @@ Cambios recientes principales:
   `app.seed_rbac_comercial_469` para que GERENCIA no calcule penalidades. 582
   amplía otra vez `migration_runs.run_type` y la entidad de
   `migracion_correspondencias`, crea el archivo íntegro (RLS forzada, sin
-  privilegios de tabla) y siembra `migration.fox.import`,
+  privilegios de tabla) y siembra `migration.origen.import`,
   `migration.archivo.import` y `migration.archivo.read`. Su promoción exige
   preflight, respaldo, ensayo con `ROLLBACK` y readiness 582.
 
@@ -3041,20 +3040,20 @@ tenants donde tiene los 256 permisos, así que ninguno perdió acceso.
   demo no transmite nómina electrónica ni planillas PILA.
 - Validar impresora física, `.exe` Tauri y carga final.
 
-### Suministro ALKHOFAR
+### Suministro y migración
 
-- Promover 570–582 a PROD (DB-first) antes de desplegar el API que exige 582.
-- FOX: recibir el extracto real, perfilarlo, adaptar el mapeo y archivarlo;
+- Promover 570–590 a PROD (DB-first) antes de desplegar el API que exige 590.
+- Migración: recibir el extracto real del cliente, perfilarlo, escribir su mapeo y archivarlo;
   cerrar el ensayo integral con cero errores, conciliación y cruce bancario
-  cuadrados antes del corte. Todo se probó sólo con un FOX sintético.
+  cuadrados antes del corte. Todo se probó sólo con extractos sintéticos.
 - Medir en PROD la duración del ensayo integral con el volumen real: corre en
   una transacción con `SUPABASE_LONG_FETCH_TIMEOUT_MS` (10 min por defecto). Si
   la supera, ensayar por etapas en el orden de importación.
 - Activos fijos, empleados e historia contable o de ventas no tienen
   importador: quedan en el archivo íntegro, consultables.
-- Aprobar con ALKHOFAR RPO, RTO y retención propuestos y programar el respaldo
+- Aprobar con el cliente RPO, RTO y retención propuestos y programar el respaldo
   diario de Storage; el RTO de PROD no está medido.
-- Piloto con usuarios de ALKHOFAR, aceptación firmada y anexos comerciales
+- Piloto con usuarios del cliente, aceptación firmada y anexos comerciales
   (equipo, licencias, costos, exclusiones, SLA) con datos reales del negocio.
 - El correo de alertas (577) se encola en el outbox; enviarlo exige el correo
   productivo configurado y comprobado.

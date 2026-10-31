@@ -260,8 +260,8 @@ jobs:
       - name: Rebuild and verify the required database contract
         run: node scripts/ci/verify-database-contracts.mjs
 
-      - name: Verify FOX migration tooling
-        run: node --test scripts/fox/fox.test.mjs
+      - name: Verify data migration tooling
+        run: node --test scripts/migracion/migracion.test.mjs
 
       - name: Verify tenant data export
         env:

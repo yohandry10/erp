@@ -178,7 +178,7 @@ for (const mobile of [false, true])
     expect(api.intents[3]).toMatchObject({ path: `/backend/api/integraciones/bi/credenciales/${uuid(600)}/revocar`, body: { motivo: "Rotación trimestral" } });
     await bi.getByText("Últimas lecturas (1)").click();
     await expect(bi.getByRole("row", { name: /Power BI gerencia.*Leído/ })).toBeVisible();
-    await page.screenshot({ path: `../../artifacts/alkhofar-f07-tableros/browser/${mobile ? "movil" : "escritorio"}-tablero.png`, fullPage: true });
+    await page.screenshot({ path: `../../artifacts/suministro-f07-tableros/browser/${mobile ? "movil" : "escritorio"}-tablero.png`, fullPage: true });
 
     // La fila lleva al expediente del contrato.
     await indicadores.getByRole("button", { name: /Entregas atrasadas/ }).click();

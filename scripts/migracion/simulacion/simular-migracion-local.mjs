@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Simulación integral de la migración desde FOX contra infraestructura efímera:
+// Simulación integral de la migración desde otro sistema contra infraestructura efímera:
 // PostgreSQL 16 con la cadena completa de migraciones, PostgREST y el API Nest
-// real (guards, permisos, ValidationPipe). Un ERP FOX sintético entrega su
+// real (guards, permisos, ValidationPipe). Un ERP sintético entrega su
 // extracto con errores reales; se perfila, transforma, archiva, ensaya,
 // corrige, importa, concilia, se reintenta y se comprueba el aislamiento.
 // Nunca usa .env ni secretos operativos y sólo habla con 127.0.0.1.
 //
-// Uso: PSQL_BIN=<psql> node scripts/fox/simulacion/simular-migracion-fox-local.mjs
+// Uso: PSQL_BIN=<psql> node scripts/migracion/simulacion/simular-migracion-local.mjs
 import assert from 'node:assert/strict';
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -16,21 +16,21 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
-import { generarExtracto } from './generar-fox.mjs';
-import { perfilarCarpeta } from '../perfilar-fox.mjs';
-import { ARCHIVOS, cargarTablas, escribir, transformar } from '../transformar-fox.mjs';
-import { archivarCarpeta } from '../archivar-fox.mjs';
+import { generarExtracto } from './generar-extracto.mjs';
+import { perfilarCarpeta } from '../perfilar.mjs';
+import { ARCHIVOS, cargarTablas, escribir, transformar } from '../transformar.mjs';
+import { archivarCarpeta } from '../archivar.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const runId = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14) + '-' + process.pid;
-const trabajo = fs.mkdtempSync(path.join(os.tmpdir(), 'fox-simulacion-'));
-const evidenciaDir = path.join(root, 'artifacts', 'alkhofar-fox-simulacion');
+const trabajo = fs.mkdtempSync(path.join(os.tmpdir(), 'migracion-simulacion-'));
+const evidenciaDir = path.join(root, 'artifacts', 'migracion-simulacion');
 fs.mkdirSync(evidenciaDir, { recursive: true });
 const PG = '55482', REST = '55483', API_PORT = '3182';
 const API = `http://127.0.0.1:${API_PORT}`;
-const red = `erp-fox-simulacion-${runId}`;
+const red = `erp-migracion-simulacion-${runId}`;
 const PSQL = process.env.PSQL_BIN || 'psql';
-const CLAVE_LOCAL = 'Local-Fox-2026-Only!';
+const CLAVE_LOCAL = 'Local-Migracion-2026-Only!';
 const apiDir = path.join(root, 'apps/erp-api');
 const apiRequire = createRequire(path.join(apiDir, 'package.json'));
 
@@ -57,12 +57,12 @@ const fases = [];
 const trazas = [];
 async function fase(nombre, fn) {
   const t0 = Date.now();
-  console.log(`[fox-simulacion] ${nombre}`);
+  console.log(`[migracion-simulacion] ${nombre}`);
   const resultado = await fn();
   // Una fase que devuelve datos de trabajo declara aparte lo que va a la evidencia.
   const { resumen, ...resto } = resultado ?? {};
   fases.push({ fase: nombre, ms: Date.now() - t0, ...(resumen ?? resto) });
-  console.log(`[fox-simulacion]   ok en ${Math.round((Date.now() - t0) / 1000)} s`);
+  console.log(`[migracion-simulacion]   ok en ${Math.round((Date.now() - t0) / 1000)} s`);
   return resultado;
 }
 
@@ -137,15 +137,16 @@ async function limpiar() {
 for (const [s, c] of [['SIGINT', 130], ['SIGTERM', 143]]) process.once(s, async () => { await limpiar(); process.exit(c); });
 
 const b64 = (archivo) => fs.readFileSync(archivo).toString('base64');
-const mapeo = JSON.parse(fs.readFileSync(path.join(root, 'scripts/fox/simulacion/mapeo-simulacion.json'), 'utf8'));
+const mapeo = JSON.parse(fs.readFileSync(path.join(root, 'scripts/migracion/simulacion/mapeo-simulacion.json'), 'utf8'));
 const FECHA_CORTE = mapeo.fechaCorte;
+const ORIGEN = 'ERP SINTETICO';
 // Ruta de importación de cada salida del transformador, en el orden real.
 const IMPORTAR = [
-  ['clientes', 'clientes/import'], ['proveedores', 'proveedores/import'], ['almacenes', 'fox/almacenes/import'],
-  ['plan_cuentas', 'fox/plan_cuentas/import'], ['productos', 'fox/productos/import'], ['cuentas_bancarias', 'fox/cuentas_bancarias/import'],
-  ['listas_precios', 'fox/listas_precios/import'], ['cxc', 'cxc/import', true], ['cxp', 'cxp/import', true],
+  ['clientes', 'clientes/import'], ['proveedores', 'proveedores/import'], ['almacenes', 'origen/almacenes/import'],
+  ['plan_cuentas', 'origen/plan_cuentas/import'], ['productos', 'origen/productos/import'], ['cuentas_bancarias', 'origen/cuentas_bancarias/import'],
+  ['listas_precios', 'origen/listas_precios/import'], ['cxc', 'cxc/import', true], ['cxp', 'cxp/import', true],
   ['balance', 'balance-apertura/import', true], ['contratos', 'contratos-suministro/import'], ['oc', 'oc-suministro/import'],
-  ['cronograma', 'cronograma-suministro/import'], ['oc_compra', 'fox/oc_compra/import'], ['pedidos_venta', 'fox/pedidos_venta/import'],
+  ['cronograma', 'cronograma-suministro/import'], ['oc_compra', 'origen/oc_compra/import'], ['pedidos_venta', 'origen/pedidos_venta/import'],
   ['stock', 'stock-inicial/import', true],
 ];
 const ENSAYO_CLAVE = { clientes: 'clientes', proveedores: 'proveedores', almacenes: 'almacenes', plan_cuentas: 'plan_cuentas', productos: 'productos',
@@ -163,11 +164,11 @@ function entrega(nombre, opciones) {
 const ensayoBody = (e) => ({ ...Object.fromEntries(Object.keys(ENSAYO_CLAVE).map((s) => [ENSAYO_CLAVE[s], b64(e.archivo(s))])),
   fechaCorte: FECHA_CORTE, control: e.resultado.control });
 
-const evidencia = { alcance: 'Simulación integral de la migración desde FOX', fecha: new Date().toISOString().slice(0, 10),
-  entorno: 'PostgreSQL 16, PostgREST y API Nest efímeros en 127.0.0.1; ERP FOX sintético; nada remoto', remoteWrites: false };
+const evidencia = { alcance: 'Simulación integral de la migración desde otro sistema', fecha: new Date().toISOString().slice(0, 10),
+  entorno: 'PostgreSQL 16, PostgREST y API Nest efímeros en 127.0.0.1; ERP sintético; nada remoto', remoteWrites: false };
 let exito = false;
 try {
-  const v1 = await fase('Extracto FOX v1: generar, perfilar y transformar', async () => {
+  const v1 = await fase('Extracto v1: generar, perfilar y transformar', async () => {
     const extracto = path.join(trabajo, 'extracto-v1');
     generarExtracto(extracto, { fechaCorte: FECHA_CORTE });
     const perfil = perfilarCarpeta(extracto, { codificacion: 'cp850' });
@@ -193,7 +194,7 @@ try {
       redCreada = true;
     } catch (error) {
       if (!/address pools/.test(String(error.stderr ?? error.message))) throw error;
-      console.log('[fox-simulacion]   sin rangos de red libres: se usa la red bridge por defecto');
+      console.log('[migracion-simulacion]   sin rangos de red libres: se usa la red bridge por defecto');
     }
     const enRed = redCreada ? ['--network', red] : [];
     const pg = `${red}-pg`;
@@ -204,7 +205,7 @@ try {
     const ok = /OK PostgreSQL 16: (\d+) migraciones hasta (\d+), (\d+) verificadores/.exec(cadena);
     assert.ok(ok, 'La cadena de migraciones no terminó en verde');
     assert.equal(ok[2], '590');
-    const usuarios = JSON.parse(sql(fs.readFileSync(path.join(root, 'scripts/fox/simulacion/fixture-simulacion.sql'), 'utf8')).split('\n').at(-1));
+    const usuarios = JSON.parse(sql(fs.readFileSync(path.join(root, 'scripts/migracion/simulacion/fixture-simulacion.sql'), 'utf8')).split('\n').at(-1));
     const pgHost = redCreada ? pg : docker(['inspect', '-f', '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}', contenedores[0]]);
     contenedores.push(docker(['run', '--rm', '--detach', '--name', `${red}-rest`, ...enRed, '--publish', `127.0.0.1:${REST}:3000`,
       '--env', `PGRST_DB_URI=postgres://postgres@${pgHost}:5432/erp_e2e`, '--env', 'PGRST_DB_ANON_ROLE=anon', '--env', 'PGRST_DB_SCHEMAS=public',
@@ -224,7 +225,7 @@ try {
 
   const sesiones = {};
   for (const quien of ['admin-1', 'aprobador-1', 'auditor-1', 'vendedor-1', 'admin-2']) {
-    const r = await llamar('POST', 'auth/login', { body: { email: `fox-sim-${quien}@example.test`, password: CLAVE_LOCAL } });
+    const r = await llamar('POST', 'auth/login', { body: { email: `mig-sim-${quien}@example.test`, password: CLAVE_LOCAL } });
     sesiones[quien] = { token: r.data.access_token, tenant: r.data.user.tenant_id };
     assert.ok(sesiones[quien].token, `Sin sesión para ${quien}`);
   }
@@ -238,18 +239,18 @@ try {
       if (url.endsWith('/filas') && ++tandas > 3) throw new Error('corte de red simulado');
       return fetchApi(url, init);
     };
-    await assert.rejects(archivarCarpeta({ carpeta: v1.extracto, api: `${API}/api`, token: adm.token, lote: `sim-${runId}-v1`, tanda: 2000, fetch: cortado }),
+    await assert.rejects(archivarCarpeta({ origen: ORIGEN, carpeta: v1.extracto, api: `${API}/api`, token: adm.token, lote: `sim-${runId}-v1`, tanda: 2000, fetch: cortado }),
       /corte de red simulado/);
     const lote = JSON.parse(sql(`SELECT jsonb_build_object('id', id, 'estado', estado) FROM public.migracion_archivo_lotes WHERE tenant_id='${T1}' ORDER BY created_at LIMIT 1;`));
     assert.equal(lote.estado, 'CARGANDO');
-    const r = await llamar('POST', `migration/fox/archivo/lotes/${lote.id}/descartar`, { ...adm, body: { motivo: 'Primera entrega con errores; el cliente reenvía el extracto' },
+    const r = await llamar('POST', `migration/origen/archivo/lotes/${lote.id}/descartar`, { ...adm, body: { motivo: 'Primera entrega con errores; el cliente reenvía el extracto' },
       headers: { 'idempotency-key': `sim-${runId}-v1:descartar` } });
     assert.equal(r.data.data.estado, 'DESCARTADO');
     return { tandas_antes_del_corte: 3, estado: 'DESCARTADO' };
   });
 
   const ensayoV1 = await fase('Ensayo integral v1: errores reales detectados, nada persiste', async () => {
-    const r = await llamar('POST', 'migration/fox/ensayo', { ...adm, body: ensayoBody(v1) });
+    const r = await llamar('POST', 'migration/origen/ensayo', { ...adm, body: { ...ensayoBody(v1), sistemaOrigen: ORIGEN } });
     const d = r.data.data;
     fs.writeFileSync(path.join(trabajo, 'ensayo-v1.json'), JSON.stringify(d, null, 1));
     const errores = d.registros.filter((x) => !x.ok);
@@ -267,7 +268,7 @@ try {
     assert.deepEqual(sinExplicar, [], 'Errores del ensayo sin causa sembrada');
     const buscar = (entidad, id, patron) => assert.ok(errores.some((x) => x.entidad === entidad && String(x.id_origen) === id && patron.test(x.error)),
       `Falta el error ${entidad} ${id} ${patron}`);
-    buscar('PRODUCTO', 'med-0099', /enlazado a otro código FOX/);
+    buscar('PRODUCTO', 'med-0099', /enlazado a otro código de origen/);
     buscar('CONTRATO', '3', /No tiene saldo abierto/);
     buscar('CXC', 'CXC-199999', /no existe/);
     const [sinLote, repetido] = v1.generado.plantados.filter((p) => p.archivo === 'stock').map((p) => p.id);
@@ -288,7 +289,7 @@ try {
   });
   evidencia.ensayo_v1 = fases.at(-1);
 
-  const v2 = await fase('Extracto FOX v2: reentrega corregida por el cliente', async () => {
+  const v2 = await fase('Extracto v2: reentrega corregida por el cliente', async () => {
     const e = entrega('v2', { corregido: true });
     assert.deepEqual(e.generado.plantados, []);
     return { ...e, resumen: { plantados: 0, control: e.resultado.control } };
@@ -301,25 +302,25 @@ try {
       if (url.endsWith('/filas') && ++tandas === 12) throw new Error('corte de red simulado');
       return fetchApi(url, init);
     };
-    await assert.rejects(archivarCarpeta({ carpeta: v2.extracto, api: `${API}/api`, token: adm.token, lote, tanda: 2000, fetch: cortado }), /corte/);
-    const r = await archivarCarpeta({ carpeta: v2.extracto, api: `${API}/api`, token: adm.token, lote, tanda: 2000, fetch: fetchApi });
+    await assert.rejects(archivarCarpeta({ origen: ORIGEN, carpeta: v2.extracto, api: `${API}/api`, token: adm.token, lote, tanda: 2000, fetch: cortado }), /corte/);
+    const r = await archivarCarpeta({ origen: ORIGEN, carpeta: v2.extracto, api: `${API}/api`, token: adm.token, lote, tanda: 2000, fetch: fetchApi });
     assert.equal(r.estado, 'COMPLETO');
     const total = Object.values(r.tablas).reduce((s, n) => s + n, 0);
     assert.ok(r.existentes > 0, 'La reanudación debe reconocer lo ya cargado');
     assert.equal(r.nuevas + r.existentes, total);
     assert.equal(cuenta(`SELECT count(*) FROM public.migracion_archivo a JOIN public.migracion_archivo_lotes l ON l.id=a.lote_id WHERE l.tenant_id='${T1}' AND l.estado='COMPLETO';`), total);
     assert.deepEqual(r.redactados, { USUARIOS: ['CLAVE'] });
-    const usuarios = await llamar('GET', 'migration/fox/archivo?tabla=USUARIOS&limite=50', adm);
+    const usuarios = await llamar('GET', 'migration/origen/archivo?tabla=USUARIOS&limite=50', adm);
     assert.ok(usuarios.data.data.filas.length > 0 && usuarios.data.data.filas.every((f) => f.fila.CLAVE === '[REDACTADO]'));
-    // Los borrados de FOX quedan en el archivo, en su orden de registro: los de CLIENTES son los últimos.
-    const borradas = await llamar('GET', `migration/fox/archivo?tabla=CLIENTES&limite=200&pagina=4`, adm);
+    // Los borrados del sistema anterior quedan en el archivo, en su orden de registro: los de CLIENTES son los últimos.
+    const borradas = await llamar('GET', `migration/origen/archivo?tabla=CLIENTES&limite=200&pagina=4`, adm);
     assert.deepEqual(borradas.data.data.filas.map((f) => [f.clave, f.fila._borrado === true]), [['601', true], ['602', true], ['603', true]]);
     const totalBorrados = Object.values(r.borrados).reduce((s, n) => s + n, 0);
     assert.equal(cuenta(`SELECT count(*) FROM public.migracion_archivo a JOIN public.migracion_archivo_lotes l ON l.id=a.lote_id
       WHERE l.tenant_id='${T1}' AND l.estado='COMPLETO' AND a.fila->>'_borrado'='true';`), totalBorrados);
-    const busqueda = await llamar('GET', `migration/fox/archivo?${new URLSearchParams({ tabla: 'KARDEX', texto: '"ingreso por compra" importación', limite: '5' })}`, adm);
+    const busqueda = await llamar('GET', `migration/origen/archivo?${new URLSearchParams({ tabla: 'KARDEX', texto: '"ingreso por compra" importación', limite: '5' })}`, adm);
     assert.ok(busqueda.data.data.total > 0 && busqueda.data.data.filas.every((f) => /importación/.test(f.fila.GLOSA)));
-    const porDefecto = await llamar('GET', 'migration/fox/archivo?limite=1', { token: sesiones['auditor-1'].token });
+    const porDefecto = await llamar('GET', 'migration/origen/archivo?limite=1', { token: sesiones['auditor-1'].token });
     assert.equal(porDefecto.data.data.lote_id, r.lote_id);
     evidencia.archivo = { tablas: Object.keys(r.tablas).length, filas: total, tandas: r.tandas, redactados: r.redactados,
       busqueda_kardex: busqueda.data.data.total };
@@ -327,7 +328,7 @@ try {
   });
 
   await fase('Ensayo integral v2: sin errores, conciliación y cruce bancario cuadran', async () => {
-    const r = await llamar('POST', 'migration/fox/ensayo', { ...adm, body: ensayoBody(v2) });
+    const r = await llamar('POST', 'migration/origen/ensayo', { ...adm, body: { ...ensayoBody(v2), sistemaOrigen: ORIGEN } });
     const d = r.data.data;
     fs.writeFileSync(path.join(trabajo, 'ensayo-v2.json'), JSON.stringify(d, null, 1));
     const errores = d.registros.filter((x) => !x.ok);
@@ -345,7 +346,7 @@ try {
     const resumen = [];
     for (const [salida, ruta, corte] of IMPORTAR) {
       const t0 = Date.now();
-      const r = await llamar('POST', `migration/${ruta}`, { ...adm, body: { fileBase64: b64(v2.archivo(salida)), filename: ARCHIVOS[salida],
+      const r = await llamar('POST', `migration/${ruta}`, { ...adm, body: { sistemaOrigen: ORIGEN, fileBase64: b64(v2.archivo(salida)), filename: ARCHIVOS[salida],
         ...(corte ? { fechaCorte: FECHA_CORTE } : {}) } });
       const x = r.data.result;
       assert.equal(r.data.status, 'completed', `${salida}: ${JSON.stringify(x.errors.slice(0, 5))}`);
@@ -357,7 +358,7 @@ try {
   });
 
   const conciliado = await fase('Conciliación por HTTP y verificación independiente en SQL', async () => {
-    const r = await llamar('POST', 'migration/fox/conciliacion', { ...adm, body: { control: v2.resultado.control } });
+    const r = await llamar('POST', 'migration/origen/conciliacion', { ...adm, body: { sistemaOrigen: ORIGEN, control: v2.resultado.control } });
     const d = r.data.data;
     assert.equal(d.cuadra, true, JSON.stringify(d.entidades.filter((x) => !x.cuadra)));
     assert.equal(d.cruces.bancos_vs_apertura.cuadra, true);
@@ -398,7 +399,7 @@ try {
   await fase('Reintento completo: todo omitido, nada duplicado', async () => {
     const totales = { filas: 0, omitidas: 0 };
     for (const [salida, ruta, corte] of IMPORTAR) {
-      const r = await llamar('POST', `migration/${ruta}`, { ...adm, body: { fileBase64: b64(v2.archivo(salida)), filename: ARCHIVOS[salida],
+      const r = await llamar('POST', `migration/${ruta}`, { ...adm, body: { sistemaOrigen: ORIGEN, fileBase64: b64(v2.archivo(salida)), filename: ARCHIVOS[salida],
         ...(corte ? { fechaCorte: FECHA_CORTE } : {}) } });
       const x = r.data.result;
       assert.equal(x.errorRows, 0, `${salida} reintento: ${JSON.stringify(x.errors.slice(0, 3))}`);
@@ -406,15 +407,15 @@ try {
       totales.filas += x.totalRows;
       totales.omitidas += x.skippedRows;
     }
-    const r = await llamar('POST', 'migration/fox/conciliacion', { ...adm, body: { control: v2.resultado.control } });
+    const r = await llamar('POST', 'migration/origen/conciliacion', { ...adm, body: { sistemaOrigen: ORIGEN, control: v2.resultado.control } });
     assert.equal(r.data.data.cuadra, true);
-    assert.deepEqual(r.data.data.erp, (await llamar('POST', 'migration/fox/conciliacion', { ...adm, body: { control: {} } })).data.data.erp);
+    assert.deepEqual(r.data.data.erp, (await llamar('POST', 'migration/origen/conciliacion', { ...adm, body: { sistemaOrigen: ORIGEN, control: {} } })).data.data.erp);
     return totales;
   });
 
-  await fase('Origen cambiado: FOX altera un precio ya migrado y se rechaza', async () => {
+  await fase('Origen cambiado: el sistema anterior altera un precio ya migrado y se rechaza', async () => {
     const v3 = entrega('v3', { corregido: true, cambio: true });
-    const r = await llamar('POST', 'migration/fox/productos/import', { ...adm, body: { fileBase64: b64(v3.archivo('productos')), filename: 'productos.csv' } });
+    const r = await llamar('POST', 'migration/origen/productos/import', { ...adm, body: { sistemaOrigen: ORIGEN, fileBase64: b64(v3.archivo('productos')), filename: 'productos.csv' } });
     const x = r.data.result;
     assert.equal(x.errorRows, 1);
     assert.match(x.errors[0].message, /Ya se migró con otros datos/);
@@ -426,7 +427,7 @@ try {
     const [oc1, oc2] = sql(`SELECT erp_id FROM public.migracion_correspondencias WHERE tenant_id='${T1}' AND entidad='OC_COMPRA' ORDER BY id_origen LIMIT 2;`).split('\n');
     const propio = await llamar('POST', `compras/ordenes/${oc2}/aprobar`, { ...adm, body: { comentarios: 'Autoaprobación' } }, null);
     assert.ok(propio.status >= 400, 'Quien migró no aprueba su propia OC');
-    const r = await llamar('POST', `compras/ordenes/${oc1}/aprobar`, { token: sesiones['aprobador-1'].token, body: { comentarios: 'OC migrada de FOX revisada' } }, [200]);
+    const r = await llamar('POST', `compras/ordenes/${oc1}/aprobar`, { token: sesiones['aprobador-1'].token, body: { comentarios: 'OC migrada del sistema anterior revisada' } }, [200]);
     assert.equal(sql(`SELECT estado FROM public.ordenes_compra WHERE id='${oc1}';`), 'APROBADA');
     assert.equal(sql(`SELECT estado FROM public.ordenes_compra WHERE id='${oc2}';`), 'BORRADOR');
     return { autoaprobacion: propio.status, aprobacion_tercero: r.status };
@@ -434,16 +435,16 @@ try {
 
   await fase('Permisos y aislamiento entre empresas', async () => {
     const aud = { token: sesiones['auditor-1'].token };
-    await llamar('GET', 'migration/fox/archivo?limite=1', aud, [200]);
-    await llamar('POST', 'migration/fox/productos/import', { ...aud, body: { fileBase64: b64(v2.archivo('productos')), filename: 'p.csv' } }, [403]);
-    await llamar('POST', 'migration/fox/ensayo', { ...aud, body: { productos: b64(v2.archivo('productos')) } }, [403]);
-    await llamar('GET', 'migration/fox/archivo?limite=1', { token: sesiones['vendedor-1'].token }, [403]);
+    await llamar('GET', 'migration/origen/archivo?limite=1', aud, [200]);
+    await llamar('POST', 'migration/origen/productos/import', { ...aud, body: { sistemaOrigen: ORIGEN, fileBase64: b64(v2.archivo('productos')), filename: 'p.csv' } }, [403]);
+    await llamar('POST', 'migration/origen/ensayo', { ...aud, body: { productos: b64(v2.archivo('productos')) } }, [403]);
+    await llamar('GET', 'migration/origen/archivo?limite=1', { token: sesiones['vendedor-1'].token }, [403]);
     const otro = { token: sesiones['admin-2'].token };
-    const propio = await llamar('GET', 'migration/fox/archivo?limite=1', otro, [200]);
+    const propio = await llamar('GET', 'migration/origen/archivo?limite=1', otro, [200]);
     assert.equal(propio.data.data.lotes.length, 0);
     const lote = sql(`SELECT id FROM public.migracion_archivo_lotes WHERE tenant_id='${T1}' AND estado='COMPLETO';`);
-    await llamar('GET', `migration/fox/archivo?loteId=${lote}`, otro, [404]);
-    const conc = await llamar('POST', 'migration/fox/conciliacion', { ...otro, body: { control: {} } });
+    await llamar('GET', `migration/origen/archivo?loteId=${lote}`, otro, [404]);
+    const conc = await llamar('POST', 'migration/origen/conciliacion', { ...otro, body: { sistemaOrigen: ORIGEN, control: {} } });
     assert.equal(conc.data.data.erp.productos.registros, 0);
     assert.equal(conc.data.data.erp.clientes.registros, 0);
     return { auditor_lee: true, auditor_importa: 403, vendedor_lee: 403, otra_empresa: 'sin lotes, 404 al lote ajeno, conciliación vacía' };
@@ -459,5 +460,5 @@ try {
   for (const t of trazas) estados[t.status] = (estados[t.status] ?? 0) + 1;
   fs.writeFileSync(path.join(evidenciaDir, 'evidence.json'), JSON.stringify({ ...evidencia, exito, fases,
     http: { solicitudes: trazas.length, por_estado: estados } }, null, 2) + '\n');
-  console.log(`[fox-simulacion] ${exito ? 'PASS' : 'FAIL'}: evidencia en ${path.relative(root, evidenciaDir)}/evidence.json; trabajo en ${trabajo}`);
+  console.log(`[migracion-simulacion] ${exito ? 'PASS' : 'FAIL'}: evidencia en ${path.relative(root, evidenciaDir)}/evidence.json; trabajo en ${trabajo}`);
 }

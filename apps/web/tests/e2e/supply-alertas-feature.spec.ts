@@ -109,7 +109,7 @@ for (const mobile of [false, true])
       incluir_responsable: true, enviar_correo: false, version: 0,
     });
     await expect(reglas.getByText(/Activa · 1 destinatarios \+ responsable del contrato · escala a los 2 días · sin correo/)).toBeVisible();
-    await page.screenshot({ path: `../../artifacts/alkhofar-f05-alertas/browser/${mobile ? "movil" : "escritorio"}-reglas.png`, fullPage: true });
+    await page.screenshot({ path: `../../artifacts/suministro-f05-alertas/browser/${mobile ? "movil" : "escritorio"}-reglas.png`, fullPage: true });
     expect(errors).toEqual([]);
   });
 

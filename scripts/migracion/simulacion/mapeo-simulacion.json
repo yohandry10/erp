@@ -1,5 +1,5 @@
 {
-  "descripcion": "Mapeo del extracto FOX sintético de la simulación local. Decisiones: los inactivos, cerrados, anulados y documentos sin saldo quedan sólo en el archivo; las unidades se homologan sin convertir cantidades (CJA, PAR y GLN son la unidad comercial: NIU); ningún almacén FOX reemplaza al principal del ERP.",
+  "descripcion": "Mapeo del extracto sintético de la simulación local. Decisiones: los inactivos, cerrados, anulados y documentos sin saldo quedan sólo en el archivo; las unidades se homologan sin convertir cantidades (CJA, PAR y GLN son la unidad comercial: NIU); ningún almacén de origen reemplaza al principal del ERP.",
   "fechaCorte": "2026-10-31",
   "codificacion": "cp850",
   "salidas": {
@@ -40,7 +40,7 @@
       "tabla": "ALMACEN",
       "columnas": {
         "id_origen_almacen": "CODALM",
-        "codigo": { "concat": [{ "valor": "FOX-" }, "CODALM"] },
+        "codigo": { "concat": [{ "valor": "ORI-" }, "CODALM"] },
         "nombre": "NOMBRE",
         "direccion": "DIRECC",
         "es_principal": { "valor": "NO" }
@@ -91,7 +91,7 @@
       "unir": [{ "tabla": "LISTAPRE", "campo": "IDLIS", "con": "IDLIS", "como": "L" }],
       "columnas": {
         "id_origen_lista": "IDLIS",
-        "codigo": { "concat": [{ "valor": "FOX-" }, "IDLIS"] },
+        "codigo": { "concat": [{ "valor": "ORI-" }, "IDLIS"] },
         "nombre": "L.NOMBRE",
         "moneda": { "mapa": "L.MONEDA", "valores": { "S": "PEN", "D": "USD" } },
         "vigencia_desde": "L.FECINI",
@@ -200,7 +200,7 @@
         "cantidad_recibida": "CANREC",
         "precio_unitario": "PRECIO",
         "fecha_entrega_esperada": "O.FECENT",
-        "almacen_codigo": { "concat": [{ "valor": "FOX-" }, "O.CODALM"] }
+        "almacen_codigo": { "concat": [{ "valor": "ORI-" }, "O.CODALM"] }
       }
     },
     "pedidos_venta": {
@@ -227,7 +227,7 @@
         "costo_unitario": "COSTO",
         "lote": "LOTE",
         "fecha_vencimiento": "FECVEN",
-        "almacen_codigo": { "concat": [{ "valor": "FOX-" }, "CODALM"] }
+        "almacen_codigo": { "concat": [{ "valor": "ORI-" }, "CODALM"] }
       }
     }
   }

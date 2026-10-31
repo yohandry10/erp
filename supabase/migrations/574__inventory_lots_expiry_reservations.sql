@@ -1,6 +1,6 @@
 -- ============================================================================
 -- 574__inventory_lots_expiry_reservations.sql
--- F02 ALKHOFAR: existencias por lote, vencimiento y ubicación; reservas por lote.
+-- F02 suministro: existencias por lote, vencimiento y ubicación; reservas por lote.
 --
 -- producto_existencias sigue siendo el saldo físico por almacén y el kardex sigue
 -- proyectando movimientos_inventario. Para los productos con control de lote,

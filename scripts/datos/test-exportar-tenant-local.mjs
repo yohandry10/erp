@@ -103,7 +103,7 @@ const informe = {
   controles: ['sin filas de otra empresa en ningún archivo', 'conteos de la misma instantánea', 'hash por archivo y del manifiesto',
     'secretos vacíos', 'sesión de sólo lectura'],
 };
-const evidencia = path.join(root, 'artifacts', 'alkhofar-f09-recuperacion');
+const evidencia = path.join(root, 'artifacts', 'suministro-f09-recuperacion');
 fs.mkdirSync(evidencia, { recursive: true });
 fs.writeFileSync(path.join(evidencia, 'exportacion-tenant-local.json'), JSON.stringify(informe, null, 2));
 console.log(JSON.stringify(informe, null, 2));

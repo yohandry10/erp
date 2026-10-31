@@ -71,7 +71,7 @@ BEGIN
   BEGIN PERFORM public.operar_credenciales_bi_579(t,s,'CREAR',jsonb_build_object('nombre','Power BI','datasets',jsonb_build_array('entregas'),
       'expira_en',hoy+30,'token_digest',repeat('a',64),'prefijo','aaaaaaaa'),'581-bi'); RAISE EXCEPTION 'VERIFY581_PROFILE_BI';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
-  BEGIN PERFORM public.ensayar_migracion_fox_580(t,s,'{}','{}'); RAISE EXCEPTION 'VERIFY581_PROFILE_MIGRATES';
+  BEGIN PERFORM public.ensayar_migracion_origen_580(t,s,'{}','{}'); RAISE EXCEPTION 'VERIFY581_PROFILE_MIGRATES';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   PERFORM public.registrar_corte_tablero_579(t,s,'581-cutoff');
 

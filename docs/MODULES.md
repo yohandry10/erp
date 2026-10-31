@@ -20,7 +20,7 @@ respondan sin permiso ni expongan errores internos de PostgreSQL.
 
 ### Contratos de suministro y OC del cliente
 
-La feature F01 para ALKHOFAR vive en `/dashboard/ventas/contratos`
+La feature F01 vive en `/dashboard/ventas/contratos`
 y `ventas/contratos` del API. Requiere las migraciones 570–573; su presencia en la
 rama no acredita promoción ni disponibilidad en producción. Este desarrollo
 se gestiona como feature independiente de la matriz de aceptación existente.
@@ -178,7 +178,7 @@ se gestiona como feature independiente de la matriz de aceptación existente.
   revocable. El token se muestra una sola vez y la base guarda su hash. Cada
   lectura, también las rechazadas, queda registrada con corte, hash, filas y
   origen; cada fila lleva `corte_id` y `fecha_corte`.
-- Migración desde FOX (F08, migración 580) en `/dashboard/migracion-fox`:
+- Migración desde otro sistema (F08, migración 580) en `/dashboard/migracion`:
   plantillas de contratos, OC, cronograma y stock inicial; ensayo completo que
   importa todo en orden en la base y lo revierte, con error por registro y
   conciliación; importación por archivo con lote y fila registrados, e
@@ -189,24 +189,24 @@ se gestiona como feature independiente de la matriz de aceptación existente.
   stock inicial acepta lote y vencimiento y los exige si el producto controla
   lotes; un lote vencido también se registra. Nada migrado crea pedidos,
   despachos, comprobantes, cobranza ni asientos. Los clientes y productos se
-  importan antes con los importadores existentes (`external_id` = código FOX).
+  importan antes con los importadores existentes (`external_id` = código de origen).
   Importar exige `migration.suministro.import` (ADMIN) y conciliar
   `migration.validar.read`.
-- Migración integral desde FOX (migración 582), en la misma pantalla:
+- Migración integral desde otro sistema (migración 582), en la misma pantalla:
   - Archivo íntegro: cada tabla del extracto tal cual, con los registros
-    borrados en FOX, en lotes inmutables que cierran por conteo y se consultan
+    borrados en origen, en lotes inmutables que cierran por conteo y se consultan
     por texto, tabla y página. La base redacta credenciales y medios de pago
     al cargar, llegue la tanda por la CLI o directo al API. Leer
     exige `migration.archivo.read` (ADMIN, GERENCIA, CONTADOR, AUDITOR) y
     cargar `migration.archivo.import` (ADMIN).
-  - Maestros y saldos abiertos que faltaban, con `migration.fox.import`
+  - Maestros y saldos abiertos que faltaban, con `migration.origen.import`
     (ADMIN): almacenes, plan de cuentas (lo existente se enlaza; lo nuevo cuelga
     de la cuenta con el prefijo más largo), productos con política de lote,
     cuentas bancarias con saldo de apertura, listas de precios, OC de compra
     (sólo lo pendiente de recibir, en borrador) y pedidos de venta (sólo lo
-    pendiente de despachar, al precio pactado en FOX).
+    pendiente de despachar, al precio pactado en el sistema anterior).
   - Lo que ya existe en el ERP se adopta por código; un código que coincide con
-    dos registros o un registro del ERP ya enlazado a otro código FOX se
+    dos registros o un registro del ERP ya enlazado a otro código de origen se
     rechazan en vez de adivinar.
   - El ensayo integral recorre terceros, maestros, saldos, balance, suministro
     y stock en el orden real. La conciliación compara todo contra el extracto y

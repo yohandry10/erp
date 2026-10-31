@@ -200,6 +200,7 @@ export async function doble(
         success: true,
         data: {
           id: uuid(40),
+          tenant_id: user.tenant_id,
           numero: "PV-2026-0040",
           cliente_id: uuid(3),
           estado: "PENDIENTE",
@@ -217,10 +218,14 @@ export async function doble(
           detalle: [
             {
               id: uuid(41),
+              pedido_id: uuid(40),
+              tenant_id: user.tenant_id,
+              cantidad_facturada: 0,
+              cantidad_despachada: 0,
               producto_id: uuid(4),
               descripcion: "Producto de suministro",
               cantidad: 30,
-              precio_unitario: 12.345678,
+              precio_unitario: 12.35,
               subtotal: 370.37,
             },
           ],

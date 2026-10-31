@@ -11,7 +11,7 @@ import path from "node:path";
 
 const [pg, outputArg] = process.argv.slice(2);
 assert.match(pg || "", /^[a-f0-9]{64}$/);
-const output = path.resolve(outputArg || "artifacts/alkhofar-f01-expediente");
+const output = path.resolve(outputArg || "artifacts/suministro-f01-expediente");
 assert.ok(output.startsWith(path.resolve("artifacts") + path.sep));
 mkdirSync(output, { recursive: true });
 const docker = (args) =>
@@ -22,7 +22,7 @@ const docker = (args) =>
   }).trim();
 const info = JSON.parse(docker(["inspect", pg]))[0];
 assert.equal(info.Config.Image, "postgres:16");
-assert.equal(info.Config.Labels["com.erp.feature"], "alkhofar-f01-pedidos");
+assert.equal(info.Config.Labels["com.erp.feature"], "suministro-f01-pedidos");
 assert.match(info.Name, /^\/erp-alk-pedidos-/);
 assert.equal(info.NetworkSettings.Ports["5432/tcp"][0].HostIp, "127.0.0.1");
 const sql = (s) =>
@@ -78,7 +78,7 @@ const start = (name, image, environment, port) => {
     "--name",
     name,
     "--label",
-    "com.erp.feature=alkhofar-f01-storage",
+    "com.erp.feature=suministro-f01-storage",
     "--network",
     network,
     "--publish",
@@ -112,7 +112,7 @@ try {
     "network",
     "create",
     "--label",
-    "com.erp.feature=alkhofar-f01-storage",
+    "com.erp.feature=suministro-f01-storage",
     network,
   ]);
   docker(["network", "connect", "--alias", "supply-pg", network, pg]);
@@ -374,7 +374,7 @@ try {
   if (server) await new Promise((resolve) => server.close(resolve));
   for (const container of created.reverse()) {
     const i = JSON.parse(docker(["inspect", container]))[0];
-    assert.equal(i.Config.Labels["com.erp.feature"], "alkhofar-f01-storage");
+    assert.equal(i.Config.Labels["com.erp.feature"], "suministro-f01-storage");
     docker(["rm", "--force", "--volumes", container]);
   }
   if (networkId) {

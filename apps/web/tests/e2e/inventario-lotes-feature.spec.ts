@@ -224,7 +224,7 @@ for (const mobile of [false, true]) {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     const shot = (name: string) =>
-      page.screenshot({ path: `../../artifacts/alkhofar-f02-lotes/browser/${mobile ? "movil" : "escritorio"}-${name}.png`, fullPage: true });
+      page.screenshot({ path: `../../artifacts/suministro-f02-lotes/browser/${mobile ? "movil" : "escritorio"}-${name}.png`, fullPage: true });
 
     await page.goto("/dashboard/inventario/lotes/");
     const main = page.getByRole("main").filter({ has: page.getByRole("heading", { name: "Lotes y vencimientos", exact: true }) });
