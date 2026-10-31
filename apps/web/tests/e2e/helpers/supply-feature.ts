@@ -1,4 +1,5 @@
 import type { Page, BrowserContext } from "@playwright/test";
+import { fiscalCountryFixture } from "../fixtures/fiscal-country";
 import { SignJWT } from "jose";
 import type { Contrato } from "../../../app/dashboard/ventas/contratos/types";
 
@@ -178,17 +179,7 @@ export async function doble(
           ),
         ],
       },
-      "/configuration/context/country": {
-        data: {
-          pais_id: 1,
-          pais: "PE",
-          paisCodigo: "PE",
-          moneda: "PEN",
-          monedaDefecto: "PEN",
-          locale: "es-PE",
-          timezone: "America/Lima",
-        },
-      },
+      "/configuration/context/country": fiscalCountryFixture(user.tenant_id, { pais_id: 1, pais: "PE", monedaDefecto: "PEN" }),
       "/configuration/empresa": {
         success: true,
         data: {
