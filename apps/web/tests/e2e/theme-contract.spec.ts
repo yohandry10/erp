@@ -26,6 +26,7 @@ async function waitForThemeRouteReady(page: Page) {
 }
 
 function readJwtSecret(): string {
+  if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
   for (const envPath of [
     path.resolve(process.cwd(), ".env.local"),
     path.resolve(process.cwd(), "../../.env"),

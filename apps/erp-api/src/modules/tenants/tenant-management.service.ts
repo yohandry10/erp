@@ -557,10 +557,10 @@ export class TenantManagementService {
     }
     const dias = dto.dias_duracion ?? 15;
     const passwordHash = await bcrypt.hash(dto.password, 12);
+    // Huella estable para reconocer el reintento; se guarda, por eso usa una KDF con sal por empresa.
     const passwordFingerprint = crypto
-      .createHash('sha256')
-      .update(dto.password, 'utf8')
-      .digest('hex');
+      .scryptSync(dto.password, `demo-password-fingerprint:v2:${tenantId}`, 32)
+      .toString('hex');
     const { data: result, error } = await client.rpc('configurar_demo_tenant_tx', {
       p_tenant_id: tenantId,
       p_actor_id: actorId,
