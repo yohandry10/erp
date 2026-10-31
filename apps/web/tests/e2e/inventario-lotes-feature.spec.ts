@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { fiscalCountryFixture } from "./fixtures/fiscal-country";
 import { sesion, user } from "./helpers/supply-feature";
 
 const id = (n: number) => `57400000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -118,9 +119,7 @@ async function dobleLotes(page: Page, options: { readOnly?: boolean } = {}) {
           accion,
         })),
       },
-      "/configuration/context/country": {
-        data: { pais_id: 1, pais: "PE", paisCodigo: "PE", moneda: "PEN", monedaDefecto: "PEN", locale: "es-PE", timezone: "America/Lima" },
-      },
+      "/configuration/context/country": fiscalCountryFixture(user.tenant_id, { pais_id: 1, pais: "PE", monedaDefecto: "PEN" }),
       "/configuration/empresa": { success: true, data: { pais: "PE", paisCodigo: "PE", razonSocial: "Empresa local", monedaDefecto: "PEN" } },
       "/configuration/status": { success: true, data: { isComplete: true, isDemo: false, completionPercentage: 100 } },
     };
