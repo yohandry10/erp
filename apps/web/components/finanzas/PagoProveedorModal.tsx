@@ -227,6 +227,8 @@ export default function PagoProveedorModal({
       const stored = readCxpPaymentIntent(localStorage.getItem(storageKey), tenantId, actorId, cxpId);
       if (stored && JSON.stringify(stored) !== JSON.stringify(intent)) throw new Error('Hay otro pago pendiente. Su intención se conserva.');
       if (intent.number !== cxpNumero || intent.currency !== moneda || intent.providerId !== proveedorId || intent.total !== total) throw new Error('El documento cambió. Se conserva el pago pendiente para revisar su contexto.');
+      // Intención durable: datos de negocio e ids de empresa y usuario, sin token ni contraseña.
+      // codeql[js/clear-text-storage-of-sensitive-data]
       localStorage.setItem(storageKey, JSON.stringify(intent)); setPending(intent);
       const response = await post(`/api/finanzas/cxp/${cxpId}/aplicar-pago`, intent.payload);
       if (activeScope.current !== context || revision.current !== generation) return;

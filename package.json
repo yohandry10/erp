@@ -69,7 +69,7 @@
       "browserslist": "4.28.9",
       "dompurify": "3.4.17",
       "fflate": "0.8.3",
-      "joi@17": "17.13.8",
+      "joi@17": "17.13.9",
       "@xmldom/xmldom@0.8": "0.8.15",
       "ajv@<6.14.0": "6.15.0",
       "ajv@>=7.0.0-alpha.0 <8.20.0": "8.20.0",
@@ -94,7 +94,6 @@
       "source-map-js": "1.2.2"
     },
     "patchedDependencies": {
-      "node-forge@1.4.0": "patches/node-forge@1.4.0.patch",
       "braces@3.0.3": "patches/braces@3.0.3.patch"
     }
   }

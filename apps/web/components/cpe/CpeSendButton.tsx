@@ -34,6 +34,8 @@ function SendAction({ cpeId, enabled, canRecover, title, onSent, tenantId, actor
       // Usa la clave canónica del backend: una sola operación SEND por CPE,
       // incluso después de que el servidor haya procesado un envío anterior.
       const request = intentRef.current ?? { version: 1 as const, cpeId, key: cpeSendKey(tenantId, cpeId), payload: {} }
+      // Intención durable: datos de negocio e ids de empresa y usuario, sin token ni contraseña.
+      // codeql[js/clear-text-storage-of-sensitive-data]
       localStorage.setItem(scope, JSON.stringify(request)); intentRef.current = request; setIntent(request)
       const receipt = cpeSendReceipt(await post(`/api/cpe/comprobantes/${encodeURIComponent(cpeId)}/enviar-sunat`, request.payload, { headers: { 'Idempotency-Key': request.key } }), cpeId)
       const after = await customAuth.getRequestSession()

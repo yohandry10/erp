@@ -57,7 +57,7 @@
     "ioredis": "^5.7.0",
     "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
-    "node-forge": "^1.4.0",
+    "node-forge": "^1.4.2",
     "nodemailer": "^10.0.9",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",

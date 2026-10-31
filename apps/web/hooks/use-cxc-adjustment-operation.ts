@@ -67,6 +67,8 @@ export function useCxcAdjustmentOperation(action: CxcAdjustmentKind, cuenta: Cxc
           if (stored) { restore(); throw new Error('Existe un ajuste pendiente. Recupera la solicitud original antes de preparar otra.') }
           intent = newCxcAdjustmentIntent(action, cuenta, country.paisCodigo, fields, { tenantId, actorId }); original = JSON.stringify(intent)
           try {
+            // Intención durable: datos de negocio e ids de empresa y usuario, sin token ni contraseña.
+            // codeql[js/clear-text-storage-of-sensitive-data]
             localStorage.setItem(key, original)
             if (localStorage.getItem(key) !== original) throw new Error('Original sin lectura confirmada')
           } catch { restore(); changed(); throw new Error('No se pudo confirmar el almacenamiento del original; no se envió otro ajuste.') }

@@ -193,6 +193,8 @@ export default function EditarProductoPage() {
       const file=intent.image?await recoveredProductImage(intent):null;if(!current())return;
       const persist=(value:ProductUpdateIntent,expected:string|null)=>{
         if(localStorage.getItem(key)!==expected)throw new Error('El cambio pendiente del producto cambió. Sus datos se conservan.');
+        // Intención durable: datos de negocio e ids de empresa y usuario, sin token ni contraseña.
+        // codeql[js/clear-text-storage-of-sensitive-data]
         const raw=JSON.stringify(value);localStorage.setItem(key,raw);
         if(localStorage.getItem(key)!==raw)throw new Error('No se pudo conservar el cambio antes del envío.');
         setPendingIntent(value);return raw;

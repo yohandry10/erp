@@ -27,7 +27,7 @@ overrides:
   browserslist: 4.28.9
   dompurify: 3.4.17
   fflate: 0.8.3
-  joi@17: 17.13.8
+  joi@17: 17.13.9
   '@xmldom/xmldom@0.8': 0.8.15
   ajv@<6.14.0: 6.15.0
   ajv@>=7.0.0-alpha.0 <8.20.0: 8.20.0
@@ -55,9 +55,6 @@ patchedDependencies:
   braces@3.0.3:
     hash: yoco2kisy6ui2aeks4wz6urc44
     path: patches/braces@3.0.3.patch
-  node-forge@1.4.0:
-    hash: wvikv3di5njctolqvyfwq6w6va
-    path: patches/node-forge@1.4.0.patch
 
 importers:
 
@@ -169,14 +166,14 @@ importers:
         specifier: ^5.7.0
         version: 5.7.0
       joi:
-        specifier: 17.13.8
-        version: 17.13.8
+        specifier: 17.13.9
+        version: 17.13.9
       jsonwebtoken:
         specifier: ^9.0.2
         version: 9.0.2
       node-forge:
-        specifier: ^1.4.0
-        version: 1.4.0(patch_hash=wvikv3di5njctolqvyfwq6w6va)
+        specifier: ^1.4.2
+        version: 1.4.2
       nodemailer:
         specifier: ^10.0.9
         version: 10.0.13
@@ -294,7 +291,7 @@ importers:
     dependencies:
       '@hookform/resolvers':
         specifier: ^5.9.2
-        version: 5.9.2(@sinclair/typebox@0.34.41)(@standard-schema/spec@1.0.0)(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(class-transformer@0.5.1)(class-validator@0.14.2)(joi@17.13.8)(react-hook-form@7.57.0(react@18.3.1))(zod@4.6.7)
+        version: 5.9.2(@sinclair/typebox@0.34.41)(@standard-schema/spec@1.0.0)(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(class-transformer@0.5.1)(class-validator@0.14.2)(joi@17.13.9)(react-hook-form@7.57.0(react@18.3.1))(zod@4.6.7)
       '@radix-ui/react-accordion':
         specifier: ^1.2.12
         version: 1.2.12(@types/react-dom@18.3.7(@types/react@18.3.23))(@types/react@18.3.23)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -466,8 +463,8 @@ importers:
         specifier: 0.8.15
         version: 0.8.15
       node-forge:
-        specifier: ^1.4.0
-        version: 1.4.0(patch_hash=wvikv3di5njctolqvyfwq6w6va)
+        specifier: ^1.4.2
+        version: 1.4.2
       xml-crypto:
         specifier: 6.1.2
         version: 6.1.2
@@ -815,7 +812,7 @@ packages:
       fluentvalidation-ts: ^3.0.0
       fp-ts: ^2.7.0
       io-ts: ^2.0.0
-      joi: 17.13.8
+      joi: 17.13.9
       nope-validator: '>=0.12.0'
       react-hook-form: ^7.55.0
       superstruct: '>=0.12.0'
@@ -4583,8 +4580,8 @@ packages:
     resolution: {integrity: sha512-/imKNG4EbWNrVjoNC/1H5/9GFy+tqjGBHCaSsN+P2RnPqjsLmv6UD3Ej+Kj8nBWaRAwyk7kK5ZUc+OEatnTR3A==}
     hasBin: true
 
-  joi@17.13.8:
-    resolution: {integrity: sha512-iPKOGmiRw1jxf/JOPwxmCcUQAOdF359mdzYiP2DJ+TMX0YK2zjK3D+zYOaGjpumWxOFF/l2xVWjRVK5bGSLdEw==}
+  joi@17.13.9:
+    resolution: {integrity: sha512-llFCT2rVtfwgBCaIqxtjim+iHqrgss4ONiGSYiiGH9jnjWq90ppSRffqmqKvwpa8W+YfILyQV6XyGcegXX2T4g==}
 
   jose@6.2.3:
     resolution: {integrity: sha512-YYVDInQKFJfR/xa3ojUTl8c2KoTwiL1R5Wg9YCydwH0x0B9grbzlg5HC7mMjCtUJjbQ/YnGEZIhI5tCgfTb4Hw==}
@@ -5021,8 +5018,8 @@ packages:
   node-emoji@1.11.0:
     resolution: {integrity: sha512-wo2DpQkQp7Sjm2A0cq+sN7EHKO6Sl0ctXeBdFZrL9T9+UywORbufTcTZxom8YqpLQt/FqNMUkOpkZrJVYSKD3A==}
 
-  node-forge@1.4.0:
-    resolution: {integrity: sha512-LarFH0+6VfriEhqMMcLX2F7SwSXeWwnEAJEsYm5QKWchiVYVvJyV9v7UDvUv+w5HO23ZpQTXDv/GxdDdMyOuoQ==}
+  node-forge@1.4.2:
+    resolution: {integrity: sha512-rRtAR5XLJ8gCKd9du4qrKAsgCG1ObGP4gLeNJMa4vYSeq4bmBMOJk5IHkrviBV0q7uoAJlVd8HEQYQSVUb4FGQ==}
     engines: {node: '>= 6.13.0'}
 
   node-gyp-build-optional-packages@5.2.2:
@@ -6827,7 +6824,7 @@ snapshots:
     dependencies:
       '@hapi/hoek': 9.3.0
 
-  '@hookform/resolvers@5.9.2(@sinclair/typebox@0.34.41)(@standard-schema/spec@1.0.0)(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(class-transformer@0.5.1)(class-validator@0.14.2)(joi@17.13.8)(react-hook-form@7.57.0(react@18.3.1))(zod@4.6.7)':
+  '@hookform/resolvers@5.9.2(@sinclair/typebox@0.34.41)(@standard-schema/spec@1.0.0)(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(class-transformer@0.5.1)(class-validator@0.14.2)(joi@17.13.9)(react-hook-form@7.57.0(react@18.3.1))(zod@4.6.7)':
     dependencies:
       '@standard-schema/utils': 0.3.0
       react-hook-form: 7.57.0(react@18.3.1)
@@ -6838,7 +6835,7 @@ snapshots:
       ajv-formats: 2.1.1(ajv@8.20.0)
       class-transformer: 0.5.1
       class-validator: 0.14.2
-      joi: 17.13.8
+      joi: 17.13.9
       zod: 4.6.7
 
   '@humanwhocodes/config-array@0.13.0':
@@ -11149,7 +11146,7 @@ snapshots:
 
   jiti@1.21.7: {}
 
-  joi@17.13.8:
+  joi@17.13.9:
     dependencies:
       '@hapi/hoek': 9.3.0
       '@hapi/topo': 5.1.0
@@ -11559,7 +11556,7 @@ snapshots:
     dependencies:
       lodash: 4.18.1
 
-  node-forge@1.4.0(patch_hash=wvikv3di5njctolqvyfwq6w6va): {}
+  node-forge@1.4.2: {}
 
   node-gyp-build-optional-packages@5.2.2:
     dependencies:

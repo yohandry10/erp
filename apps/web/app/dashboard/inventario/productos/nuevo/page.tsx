@@ -254,6 +254,8 @@ export default function NuevoProductoPage() {
       if (!current()) return;
       const persist = (value: ProductCreateIntent, expected: string | null) => {
         if (localStorage.getItem(key) !== expected) throw new Error('El producto pendiente cambió. Sus datos se conservan.');
+        // Intención durable: datos de negocio e ids de empresa y usuario, sin token ni contraseña.
+        // codeql[js/clear-text-storage-of-sensitive-data]
         const raw = JSON.stringify(value); localStorage.setItem(key, raw);
         if (localStorage.getItem(key) !== raw) throw new Error('No se pudo conservar el producto antes del envío.');
         setPendingIntent(value); return raw;

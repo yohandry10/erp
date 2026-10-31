@@ -7,7 +7,15 @@ const uuid = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9
 const live = (v: any) => object(v) && ['cached', 'offline', 'queued', 'pending', 'from_cache'].every(k => v[k] === undefined || v[k] === false);
 const money = (v: any) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && Number.isSafeInteger(Math.round(v * 100)) && Math.abs(v * 100 - Math.round(v * 100)) < 0.000001;
 const date = (v: any) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && Number.isFinite(Date.parse(v)) && new Date(v + 'T00:00:00Z').toISOString().slice(0, 10) === v;
-const pgText = (v: string | undefined) => v?.replace(/^ +| +$/g, '') || null;
+// btrim de PostgreSQL: sólo espacios, en tiempo lineal.
+const btrim = (v: string) => {
+  let inicio = 0;
+  let fin = v.length;
+  while (inicio < fin && v[inicio] === ' ') inicio += 1;
+  while (fin > inicio && v[fin - 1] === ' ') fin -= 1;
+  return v.slice(inicio, fin);
+};
+const pgText = (v: string | undefined) => (v === undefined ? null : btrim(v) || null);
 const fail = (): never => { throw new BadRequestException('No se pudo verificar el recibo original del ajuste CxC. Conserva la solicitud para confirmar su resultado.'); };
 const original = (v: any) => {
   const value = Array.isArray(v) && v.length === 1 ? v[0] : v;

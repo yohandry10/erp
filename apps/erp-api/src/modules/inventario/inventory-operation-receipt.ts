@@ -9,7 +9,14 @@ const uuid = (v: any): v is string => typeof v === 'string' && /^[0-9a-f]{8}-[0-
 const finite = (v: any): v is number => typeof v === 'number' && Number.isFinite(v);
 const canonical = (v: any) => JSON.stringify(v, (_key, value) => object(value) ? Object.fromEntries(Object.keys(value).sort().map(k => [k, value[k]])) : value);
 const live = (v: any) => object(v) && ['cached', 'queued', 'offline', 'pending', 'from_cache'].every(k => v[k] === undefined || v[k] === false);
-const trim = (v: string) => v.replace(/^ +| +$/g, ''); // PostgreSQL btrim(text), preserving the existing canonical request.
+// PostgreSQL btrim(text), preserving the existing canonical request. Linear on any input.
+const trim = (v: string) => {
+  let start = 0;
+  let end = v.length;
+  while (start < end && v[start] === ' ') start += 1;
+  while (end > start && v[end - 1] === ' ') end -= 1;
+  return v.slice(start, end);
+};
 const unknown = (): never => { throw new ServiceUnavailableException('No se pudo confirmar el recibo completo de la operación original de inventario. Conserve sus datos para recuperar el resultado.'); };
 const invalid = (): never => { throw new BadRequestException('La operación de inventario requiere identidad y datos originales confirmados'); };
 const id = (v: any) => uuid(v) ? v.toLowerCase() : invalid();

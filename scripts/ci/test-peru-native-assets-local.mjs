@@ -93,7 +93,7 @@ try{
   const deadline=Date.now()+60000;let ready=false;
   while(Date.now()<deadline){
     if(native.exitCode!==null)throw Error('La instancia efímera Windows terminó antes del CDP');
-    try{const result=await fetch('http://127.0.0.1:9333/json/list',{signal:AbortSignal.timeout(1500)});const pages=await result.json();if(pages.some(p=>p.type==='page'&&p.url.startsWith('http://tauri.localhost'))){ready=true;break}}catch{}
+    try{const result=await fetch('http://127.0.0.1:9333/json/list',{signal:AbortSignal.timeout(1500)});const pages=await result.json();if(pages.some(p=>p.type==='page'&&URL.canParse(p.url)&&new URL(p.url).origin==='http://tauri.localhost')){ready=true;break}}catch{}
     await delay(500);
   }
   assert(ready,'CDP de la instancia propia no disponible');
@@ -106,7 +106,7 @@ try{
     const secondDeadline=Date.now()+60000;let twoPages=false;
     while(Date.now()<secondDeadline){
       if(secondNative.exitCode!==null)throw Error('La segunda ventana propia terminó antes del CDP');
-      try{const response=await fetch('http://127.0.0.1:9333/json/list',{signal:AbortSignal.timeout(1500)});const pages=await response.json();if(pages.filter(p=>p.type==='page'&&p.url.startsWith('http://tauri.localhost')).length===2){twoPages=true;break}}catch{}
+      try{const response=await fetch('http://127.0.0.1:9333/json/list',{signal:AbortSignal.timeout(1500)});const pages=await response.json();if(pages.filter(p=>p.type==='page'&&URL.canParse(p.url)&&new URL(p.url).origin==='http://tauri.localhost').length===2){twoPages=true;break}}catch{}
       await delay(500);
     }
     assert(twoPages,'No se observaron dos ventanas Windows propias');

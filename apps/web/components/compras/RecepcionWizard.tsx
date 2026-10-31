@@ -471,6 +471,8 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
       const persist = (value: PurchaseReceiptIntent, expected: string | null) => {
         if (localStorage.getItem(key) !== expected) throw new Error('La recepción pendiente cambió. Se conserva para revisar su resultado.')
         const raw = JSON.stringify(value)
+        // Intención durable: datos de negocio e ids de empresa y usuario, sin token ni contraseña.
+        // codeql[js/clear-text-storage-of-sensitive-data]
         localStorage.setItem(key,raw)
         if (localStorage.getItem(key) !== raw) throw new Error('No se pudo conservar la recepción antes del envío.')
         setPendingIntent(value)

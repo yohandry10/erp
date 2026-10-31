@@ -165,6 +165,8 @@ export default function GenerarFacturaButton({
       if (!current()) return false;
       if (window.localStorage.getItem(key) !== expected) throw new Error('La generación pendiente cambió en otra ventana. Se conserva; recargue para revisarla.');
       const raw = JSON.stringify(intent); readInvoiceIntent(raw, scope);
+      // Intención durable: datos de negocio e ids de empresa y usuario, sin token ni contraseña.
+      // codeql[js/clear-text-storage-of-sensitive-data]
       window.localStorage.setItem(key, raw);
       if (window.localStorage.getItem(key) !== raw) throw new Error('No se pudo guardar y verificar la generación pendiente. No se envió otra operación.');
       storedRaw.current = raw; setPending(intent); return true;
