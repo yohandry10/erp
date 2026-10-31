@@ -20,7 +20,7 @@ output = pathlib.Path(os.environ['LOCAL_INTEGRATED_OUTPUT_DIR'])
 fixture = json.loads((output / 'asset-browser-fixture.json').read_bytes())
 
 def sql(query):
-    return subprocess.check_output([os.environ['PSQL_BIN'], '-XqAt', '-h', '127.0.0.1', '-p', os.environ['PGPORT'], '-U', 'postgres', '-d', 'erp_e2e', '-v', 'ON_ERROR_STOP=1'], input=query, text=True, creationflags=subprocess.CREATE_NO_WINDOW).strip()
+    return subprocess.check_output([os.environ['PSQL_BIN'], '-XqAt', '-h', '127.0.0.1', '-p', os.environ['PGPORT'], '-U', 'postgres', '-d', 'erp_e2e', '-v', 'ON_ERROR_STOP=1'], input=query, text=True, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)).strip()
 
 assert sql("SELECT current_database()||'|'||environment||'|'||project_ref FROM app.deployment_environment WHERE singleton;") == 'erp_e2e|DEV|localerpephemeralqax'
 tenant = fixture['tenant']
