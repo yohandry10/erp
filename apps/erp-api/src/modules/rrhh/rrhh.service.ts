@@ -148,7 +148,7 @@ export class RrhhService {
   }
 
   async getNormativaPeruPeriodo(tenantId: string, periodo: string) {
-    if (!tenantId || !/^\d{4}-(0[1-9]|1[0-2])$/.test(String(periodo || ''))) {
+    if (!tenantId || typeof periodo !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(periodo)) {
       throw new BadRequestException('Empresa y período YYYY-MM válido son obligatorios');
     }
     if (await this.obtenerPaisLaboral(tenantId) !== 'PE') {
