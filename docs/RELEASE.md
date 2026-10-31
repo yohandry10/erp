@@ -316,7 +316,8 @@ Reglas:
 
 ## Puesta en marcha de un cliente con suministro y migración
 
-1. Promoción DB-first de 570..590 con el procedimiento de esta guía: respaldo
+1. Promoción DB-first de 570..590, ya aplicada el 31-oct-2026 (`CURRENT_STATE.md`); el
+   procedimiento queda para el siguiente lote, cambiando el rango: respaldo
    nuevo de base y de Storage, ensayo sobre ese respaldo con
    `node scripts/rehearse-promotion-local.mjs --dump <respaldo> --desde 570 --hasta 590`,
    preflight, lote transaccional y readiness 590. El ensayo corre sin red, fuerza

@@ -1,12 +1,14 @@
 # Estado actual del ERP
 
-Actualizado: 2026-10-30.
+Actualizado: 2026-10-31.
 
 Candidato integrado en el PR #149. Reúne el suministro y la migración desde otro
 sistema (570–582) con las correcciones Perú del UAT de Codex (583–590) y los PR #147
-y #148. PROD sigue en 569: nada se aplicó ni se desplegó, y `render.yaml` y CI exigen
-590, así que hay que promover 570–590 DB-first antes de fusionar a `main`
-(`RELEASE.md`).
+y #148. PROD quedó en 590 el 31-oct-2026: el lote 570–590 se aplicó una sola vez, en una
+transacción de 121,6 s, con CI completo en verde en `9f5798a5`
+(`artifacts/promocion-prod-570-590-20261031100508614.json`). NO reaplicar. El API y la web de `main` siguen siendo los
+anteriores hasta fusionar este PR; `render.yaml` exige 590 y Render despliega `main`
+en cuanto pasan los checks.
 
 Numeración: el candidato de Codex usaba 570–577 para migraciones distintas de las
 de suministro. Al integrarlo pasaron a 583 (estructura de establecimientos y
@@ -21,11 +23,15 @@ sobre el candidato anterior a esta integración, con 153 requisitos repetidos y 
 resto por evidencia conservada. No se repitió. Lo que acredita esta integración:
 
 - Cadena PostgreSQL 16 desde cero hasta 590: 99 verificadores y 67 históricos.
+- Corrida Perú en CI sobre `9f5798a5`: fases HTTP, 71 de 71 pruebas de navegador,
+  asistente fiscal, 106 módulos y 22 rutas con registros sin errores, invariantes
+  financieros (0 movimientos bancarios inactivos, 0 asientos confirmados descuadrados)
+  y restauración de 298 tablas.
 - Ensayo de promoción con `scripts/rehearse-promotion-local.mjs` sobre el respaldo
-  PROD del 16-oct-2026 (esquema 569) en un contenedor sin red: rollback forzado sin
+  PROD del 31-oct-2026 (esquema 569) en un contenedor sin red: rollback forzado sin
   rastro, lote aplicado en una transacción, 21 de 21 verificadores en verde sobre
   esos datos, sin perder tablas ni columnas. Evidencia en
-  `artifacts/promocion-ensayo-570-590-*`.
+  `artifacts/promocion-ensayo-570-590-20261031095727/informe.json`. En PROD no apareció ningún cambio que el ensayo no hubiera mostrado.
 - Cambios sobre filas existentes en ese ensayo: 242 productos con costo nulo o cero
   toman el costo promedio del kardex (ningún costo previo se altera), un activo fijo
   recibe metadatos, y se añaden permisos, el rol SUMINISTRO y cuentas contables POS.
@@ -35,8 +41,8 @@ resto por evidencia conservada. No se repitió. Lo que acredita esta integració
 
 Sigue sin acreditarse: SUNAT, SOL y SIRE reales (van con el onboarding de cada
 contribuyente), extracto real, piloto y firma del primer cliente, binario Windows
-firmado, RTO de PROD y objetos de Storage. Antes de promover hay que repetir el
-ensayo sobre un respaldo nuevo. Queda como mejora: 143 tablas conservan permiso de
+firmado, RTO de PROD y objetos de Storage (los buckets de PROD no tienen ninguno).
+Queda como mejora: 143 tablas conservan permiso de
 escritura para `anon`; RLS forzado las frena y no es explotable hoy.
 
 
