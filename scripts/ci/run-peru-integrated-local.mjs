@@ -455,6 +455,13 @@ try {
     await run('native-assets',process.execPath,['scripts/ci/test-peru-native-assets-local.mjs']);
   }
   }
+  // Invariantes tras todos los escritores reales de la corrida: cobros, pagos,
+  // planilla, CTS y tesorería. Ningún movimiento nace inactivo y todo asiento confirmado cuadra.
+  const invariantes = docker(['exec', pg, 'psql', '-XAt', '-U', 'postgres', '-d', 'erp_e2e', '-c',
+    `SELECT (SELECT count(*) FROM public.movimientos_bancarios)||'|'||(SELECT count(*) FROM public.movimientos_bancarios WHERE activo IS NOT TRUE)||'|'||(SELECT count(*) FROM public.asientos_contables WHERE lower(estado::text)='confirmado')||'|'||(SELECT count(*) FROM (SELECT a.id FROM public.asientos_contables a JOIN public.detalle_asientos d ON d.asiento_id=a.id WHERE lower(a.estado::text)='confirmado' GROUP BY a.id HAVING round(sum(d.debe)-sum(d.haber),2)<>0) q);`]).trim();
+  const [bancos, inactivos, confirmados, descuadrados] = invariantes.split('|').map(Number);
+  console.log(`[peru-integrated] invariantes: ${bancos} movimientos bancarios, ${inactivos} inactivos; ${confirmados} asientos confirmados, ${descuadrados} descuadrados`);
+  if (inactivos !== 0 || descuadrados !== 0) throw new Error('Invariantes financieros rotos: ' + invariantes);
   await run('backup-restore', process.execPath, ['scripts/ci/test-peru-backup-restore-local.mjs', pg, path.join(output, 'backup')]);
   success = true;
   console.log('[peru-integrated] PASS: contratos SQL, HTTP y contabilidad; alcance ' + (focusPrintCorrections?'impresiones RRHH/finanzas':focusReviewCorrections?'correcciones de revisión':focusCustomerRecovery?'edición de cliente con COMMIT/ACK perdido y replay':focusAuxiliary?'partidas, analítica y transferencia bancaria UI/API/SQL':focusInventoryMasters?'maestros de inventario UI/API/SQL':focusVacations?'planilla ligada a doce solicitudes':focusDocuments?'documentos manuales UI/API/SQL':focusSurveys?'barridos de pantallas y registros':focusImportedRecovery?'CPE histórico/CxC inicial/inventario':focusNativeConcurrency?'dos ventanas Windows originales':focusBrowserRecovery ? 'nueve recuperaciones UI/API/SQL aisladas' : focusAssets ? 'activos UI aislados' : focusCash ? 'POS/caja API/SQL aislados' : focusReports ? 'reportes/consolidación API/SQL aislado' : focusOnboarding ? 'onboarding/inventario/contabilidad' : recordsOnly ? 'pantallas con registros' : 'completo') + (withBrowser ? ', con recorridos de navegador' : ''));
