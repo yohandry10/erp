@@ -2,13 +2,16 @@
 
 Actualizado: 2026-10-31.
 
-Candidato integrado en el PR #149. Reúne el suministro y la migración desde otro
+PR #149 integrado en `main` como `ba9493a2` y desplegado. Reúne el suministro y la migración desde otro
 sistema (570–582) con las correcciones Perú del UAT de Codex (583–590) y los PR #147
 y #148. PROD quedó en 590 el 31-oct-2026: el lote 570–590 se aplicó una sola vez, en una
 transacción de 121,6 s, con CI completo en verde en `9f5798a5`
-(`artifacts/promocion-prod-570-590-20261031100508614.json`). NO reaplicar. El API y la web de `main` siguen siendo los
-anteriores hasta fusionar este PR; `render.yaml` exige 590 y Render despliega `main`
-en cuanto pasan los checks.
+(`artifacts/promocion-prod-570-590-20261031100508614.json`). NO reaplicar. El runtime
+`ba9493a2`/590 pasó la verificación de sólo lectura con CI, E2E, seguridad e Infra de
+`main` en verde (`artifacts/peru-production-verification-590-20261031.json`); no
+acredita flujos con sesión en PROD. Render sirvió ese commit con la CI de `main` aún en
+curso: `autoDeployTrigger: checksPass` no garantiza que espere a toda la CI, así que el
+esquema debe estar promovido antes de fusionar.
 
 Numeración: el candidato de Codex usaba 570–577 para migraciones distintas de las
 de suministro. Al integrarlo pasaron a 583 (estructura de establecimientos y
