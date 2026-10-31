@@ -1,7 +1,7 @@
 {
-  "alcance": "Simulación integral de la migración desde FOX",
-  "fecha": "2026-10-28",
-  "entorno": "PostgreSQL 16, PostgREST y API Nest efímeros en 127.0.0.1; ERP FOX sintético; nada remoto",
+  "alcance": "Simulación integral de la migración desde otro sistema",
+  "fecha": "2026-10-31",
+  "entorno": "PostgreSQL 16, PostgREST y API Nest efímeros en 127.0.0.1; ERP sintético; nada remoto",
   "remoteWrites": false,
   "extracto": {
     "tablas": 27,
@@ -11,12 +11,12 @@
       {
         "archivo": "clientes",
         "id": "C00007",
-        "causa": "email inválido en FOX"
+        "causa": "email inválido en el sistema anterior"
       },
       {
         "archivo": "proveedores",
         "id": "P0003",
-        "causa": "proveedor sin correo en FOX"
+        "causa": "proveedor sin correo en el sistema anterior"
       },
       {
         "archivo": "productos",
@@ -31,28 +31,28 @@
       {
         "archivo": "contratos",
         "id": "3",
-        "causa": "contrato ejecutado al 100% pero vigente en FOX"
+        "causa": "contrato ejecutado al 100% pero vigente en el sistema anterior"
       },
       {
         "archivo": "stock",
-        "id": "stock:MED-0001:FOX-01:2026-10-31",
-        "causa": "producto con control de lote sin lote ni vencimiento en FOX"
+        "id": "stock:MED-0001:ORI-01:2026-10-31",
+        "causa": "producto con control de lote sin lote ni vencimiento en el sistema anterior"
       },
       {
         "archivo": "stock",
-        "id": "stock:MED-0001:L2349B:FOX-04:2026-10-31",
+        "id": "stock:MED-0001:L2349B:ORI-04:2026-10-31",
         "causa": "mismo lote con otro vencimiento en otro almacén"
       }
     ]
   },
   "base": {
-    "migraciones": 578,
-    "hasta": 582,
-    "verificadores": 91
+    "migraciones": 586,
+    "hasta": 590,
+    "verificadores": 99
   },
   "ensayo_v1": {
     "fase": "Ensayo integral v1: errores reales detectados, nada persiste",
-    "ms": 94184,
+    "ms": 54061,
     "registros": 8028,
     "errores": 6,
     "errores_archivo": 2,
@@ -85,7 +85,7 @@
       "creadas": 570,
       "enlazadas": 0,
       "errores": 0,
-      "ms": 5032
+      "ms": 5114
     },
     {
       "archivo": "proveedores.csv",
@@ -94,7 +94,7 @@
       "creadas": 144,
       "enlazadas": 0,
       "errores": 0,
-      "ms": 1263
+      "ms": 1307
     },
     {
       "archivo": "almacenes.csv",
@@ -103,7 +103,7 @@
       "creadas": 4,
       "enlazadas": 0,
       "errores": 0,
-      "ms": 135
+      "ms": 141
     },
     {
       "archivo": "plan_cuentas.csv",
@@ -112,7 +112,7 @@
       "creadas": 12,
       "enlazadas": 8,
       "errores": 0,
-      "ms": 255
+      "ms": 253
     },
     {
       "archivo": "productos.csv",
@@ -121,7 +121,7 @@
       "creadas": 1450,
       "enlazadas": 0,
       "errores": 0,
-      "ms": 12807
+      "ms": 15157
     },
     {
       "archivo": "cuentas_bancarias.csv",
@@ -130,7 +130,7 @@
       "creadas": 4,
       "enlazadas": 0,
       "errores": 0,
-      "ms": 135
+      "ms": 128
     },
     {
       "archivo": "listas_precios.csv",
@@ -139,7 +139,7 @@
       "creadas": 3,
       "enlazadas": 0,
       "errores": 0,
-      "ms": 3709
+      "ms": 3971
     },
     {
       "archivo": "cxc_abiertas.csv",
@@ -148,7 +148,7 @@
       "creadas": 517,
       "enlazadas": 0,
       "errores": 0,
-      "ms": 3584
+      "ms": 4490
     },
     {
       "archivo": "cxp_abiertas.csv",
@@ -157,7 +157,7 @@
       "creadas": 180,
       "enlazadas": 0,
       "errores": 0,
-      "ms": 1332
+      "ms": 1598
     },
     {
       "archivo": "balance_apertura.csv",
@@ -166,7 +166,7 @@
       "creadas": 1,
       "enlazadas": 0,
       "errores": 0,
-      "ms": 117
+      "ms": 111
     },
     {
       "archivo": "contratos_suministro.csv",
@@ -175,7 +175,7 @@
       "creadas": 34,
       "enlazadas": 0,
       "errores": 0,
-      "ms": 1068
+      "ms": 1064
     },
     {
       "archivo": "oc_suministro.csv",
@@ -184,7 +184,7 @@
       "creadas": 71,
       "enlazadas": 0,
       "errores": 0,
-      "ms": 1094
+      "ms": 1153
     },
     {
       "archivo": "cronograma_suministro.csv",
@@ -193,7 +193,7 @@
       "creadas": 546,
       "enlazadas": 0,
       "errores": 0,
-      "ms": 4182
+      "ms": 4337
     },
     {
       "archivo": "oc_compra.csv",
@@ -202,7 +202,7 @@
       "creadas": 38,
       "enlazadas": 0,
       "errores": 0,
-      "ms": 850
+      "ms": 806
     },
     {
       "archivo": "pedidos_venta.csv",
@@ -211,7 +211,7 @@
       "creadas": 132,
       "enlazadas": 0,
       "errores": 0,
-      "ms": 2664
+      "ms": 2490
     },
     {
       "archivo": "stock_inicial.csv",
@@ -220,7 +220,7 @@
       "creadas": 4313,
       "enlazadas": 0,
       "errores": 0,
-      "ms": 44355
+      "ms": 55962
     }
   ],
   "conciliacion": {
@@ -410,8 +410,8 @@
   "exito": true,
   "fases": [
     {
-      "fase": "Extracto FOX v1: generar, perfilar y transformar",
-      "ms": 2563,
+      "fase": "Extracto v1: generar, perfilar y transformar",
+      "ms": 2663,
       "tablas": 27,
       "alertas_sensibles": [
         "USUARIOS.DBF: CLAVE: dato sensible (credencial o medio de pago); se redacta en el archivo y no se migra"
@@ -494,21 +494,21 @@
     },
     {
       "fase": "Infraestructura efímera: PostgreSQL 16 con la cadena, PostgREST y API Nest",
-      "ms": 567834,
-      "migraciones": 578,
-      "hasta": 582,
-      "verificadores": 91,
+      "ms": 308781,
+      "migraciones": 586,
+      "hasta": 590,
+      "verificadores": 99,
       "usuarios": 8
     },
     {
       "fase": "Archivo íntegro v1: carga interrumpida y descarte con motivo",
-      "ms": 2549,
+      "ms": 1656,
       "tandas_antes_del_corte": 3,
       "estado": "DESCARTADO"
     },
     {
       "fase": "Ensayo integral v1: errores reales detectados, nada persiste",
-      "ms": 94184,
+      "ms": 54061,
       "registros": 8028,
       "errores": 6,
       "errores_archivo": 2,
@@ -523,8 +523,8 @@
       "persistido": 0
     },
     {
-      "fase": "Extracto FOX v2: reentrega corregida por el cliente",
-      "ms": 1021,
+      "fase": "Extracto v2: reentrega corregida por el cliente",
+      "ms": 1024,
       "plantados": 0,
       "control": {
         "clientes": {
@@ -602,8 +602,8 @@
     },
     {
       "fase": "Archivo íntegro v2: carga reanudable, cierre por conteo y consulta",
-      "ms": 26791,
-      "lote": "952fbebb-e261-4809-9180-cbb67152c5eb",
+      "ms": 28155,
+      "lote": "2a7aeca5-6d85-409b-8dee-a34b2a149ea1",
       "tablas": 27,
       "filas": 88443,
       "nuevas": 68938,
@@ -611,7 +611,7 @@
     },
     {
       "fase": "Ensayo integral v2: sin errores, conciliación y cruce bancario cuadran",
-      "ms": 110673,
+      "ms": 85520,
       "registros": 8027,
       "errores": 0,
       "cruce_bancos": {
@@ -652,13 +652,13 @@
     },
     {
       "fase": "Importación real v2 por HTTP, archivo por archivo y en orden",
-      "ms": 82583,
+      "ms": 98082,
       "archivos": 16,
       "filas": 9469
     },
     {
       "fase": "Conciliación por HTTP y verificación independiente en SQL",
-      "ms": 143,
+      "ms": 221,
       "cuadra": true,
       "entidades": 16,
       "independiente": {
@@ -673,32 +673,32 @@
     },
     {
       "fase": "Sin efectos: ni eventos, ni comprobantes, un solo asiento (apertura)",
-      "ms": 60,
+      "ms": 64,
       "asientos_nuevos": 1,
       "eventos_nuevos": 0,
       "comprobantes_nuevos": 0
     },
     {
       "fase": "Reintento completo: todo omitido, nada duplicado",
-      "ms": 59501,
+      "ms": 52958,
       "filas": 9469,
       "omitidas": 9469
     },
     {
-      "fase": "Origen cambiado: FOX altera un precio ya migrado y se rechaza",
-      "ms": 16035,
+      "fase": "Origen cambiado: el sistema anterior altera un precio ya migrado y se rechaza",
+      "ms": 10139,
       "rechazados": 1,
       "omitidos": 1449
     },
     {
       "fase": "Operación sobre lo migrado: la OC la aprueba otra persona",
-      "ms": 463,
+      "ms": 278,
       "autoaprobacion": 400,
       "aprobacion_tercero": 200
     },
     {
       "fase": "Permisos y aislamiento entre empresas",
-      "ms": 712,
+      "ms": 404,
       "auditor_lee": true,
       "auditor_importa": 403,
       "vendedor_lee": 403,
