@@ -36,8 +36,9 @@ try{
  const attrs=[{name:'commonName',value:'CERTIFICADO LOCAL '+first.ruc},{name:'countryName',value:'PE'},{name:'organizationName',value:'Ensayo caja ERP'},{type:'2.5.4.5',value:first.ruc}];cert.setSubject(attrs);cert.setIssuer(attrs);cert.sign(keys.privateKey,forge.md.sha256.create());
  const p12=forge.pkcs12.toPkcs12Asn1(keys.privateKey,[cert],'Clave-Caja-local',{algorithm:'3des'});
  await call('configuration/complete',{configuration:{ruc:first.ruc,pais:'PE',pais_id:1,razonSocial:'Empresa caja local configurada',direccion:'Origen local 123',ubigeo:'150101',tipo_empresa:'MICRO',regimen_tributario:'GENERAL',serie_factura:'F001',serie_boleta:'B001',serie_guia_remision:'T001',certificateBase64:Buffer.from(forge.asn1.toDer(p12).getBytes(),'binary').toString('base64'),certificatePassword:'Clave-Caja-local',sunat_environment:'homologacion'}});
- const warehouse=await call('inventario/almacenes',{idempotency_key:randomUUID(),codigo:'CAJA-LOCAL',nombre:'Almacén caja local',es_principal:true});
  const branch=await call('sucursales',{nombre:'Sucursal caja local',codigo:'CAJA-LOCAL',direccion:'Av. Local 123',ubigeo:'150101'});
+ const warehouse=await call('inventario/almacenes',{idempotency_key:randomUUID(),codigo:'CAJA-LOCAL',nombre:'Almacén caja local',es_principal:true,sucursal_id:branch.id});
+ assert.equal(sql(`SELECT sucursal_id FROM almacenes WHERE tenant_id=${q(first.tenant)} AND id=${q(warehouse.id)};`),branch.id,'Almacén y caja deben pertenecer a la misma sucursal');
  const roles=await call('roles'),admin=roles.find(role=>role.nombre==='ADMIN');assert.ok(admin);
  user=await call('users',{nombre:'Cajero entrante local',email:'cajero-entrante-local@example.test',password:'Caja-Entrante-Local-2026!',roles:[admin.id],idempotency_key:randomUUID()});
  supervisor=await call('users',{nombre:'Supervisor caja local',email:'supervisor-caja-local@example.test',password:'Caja-Supervisor-Local-2026!',roles:[admin.id],idempotency_key:randomUUID()});
@@ -167,3 +168,4 @@ try{
 }catch(error){scenarios.push({scenario:'Caja: preparación o dependencia',passed:false,message:error.message});}
 finally{fs.writeFileSync(path.join(output,'cash-operations.json'),JSON.stringify({success,remoteWrites:false,scope:'Caja API/DB real local; sin aceptación integral',scenarios,requests},null,2));}
 console.log(JSON.stringify({success,passed:scenarios.filter(s=>s.passed).length,failed:scenarios.filter(s=>!s.passed).map(s=>s.scenario),complete_acceptance:false}));
+if(!success)process.exitCode=1;

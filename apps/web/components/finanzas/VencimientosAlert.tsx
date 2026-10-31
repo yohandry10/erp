@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import { useApi } from "@/hooks/use-api";
+import { useState, useEffect } from "react";
+import { sumReportMoney } from '@/lib/finanzas/report-read-contract';
 import { AlertTriangle, X, ChevronDown, ChevronUp, Clock } from "lucide-react";
 import { useLocalizedMoney } from "@/hooks/use-localized-money";
 import { parseDateLocal } from '@/lib/date-utils'
@@ -19,66 +19,31 @@ interface VencimientoItem {
 interface VencimientosAlertProps {
   diasAdelante?: number;
   proveedorId?: string;
+  data: VencimientoItem[] | null;
+  loading: boolean;
+  error: boolean;
+  retry: () => void;
   onCuentaClick?: (cuentaId: string) => void;
 }
 
 export default function VencimientosAlert({
   diasAdelante = 7,
   proveedorId,
+  data,
+  loading,
+  error,
+  retry,
   onCuentaClick,
 }: VencimientosAlertProps) {
-  const { get } = useApi();
   const { country, formatCurrency } = useLocalizedMoney();
-  const [vencimientos, setVencimientos] = useState<VencimientoItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const vencimientos = data ?? [];
   const [expanded, setExpanded] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
-  const loadVencimientos = useCallback(async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams();
-      params.append("dias", diasAdelante.toString());
-      if (proveedorId) {
-        params.append("proveedor_id", proveedorId);
-      }
-
-      const response = await get(
-        `/api/finanzas/cxp/vencimientos?${params.toString()}`,
-      );
-
-      if (response?.success && response.data?.vencimientos) {
-        // Si el API no trae dias_restantes, se calcula desde fecha_vencimiento para que
-        // los contadores del banner no queden en 0 con saldo > 0.
-        const hoy = new Date();
-        hoy.setHours(0, 0, 0, 0);
-        setVencimientos(
-          response.data.vencimientos.map((v: VencimientoItem) => {
-            if (typeof v.dias_restantes === "number") return v;
-            const [y, m, d] = String(v.fecha_vencimiento)
-              .slice(0, 10)
-              .split("-")
-              .map(Number);
-            const vence = new Date(y, (m || 1) - 1, d || 1);
-            return {
-              ...v,
-              dias_restantes: Math.round(
-                (vence.getTime() - hoy.getTime()) / 86400000,
-              ),
-            };
-          }),
-        );
-      }
-    } catch (error) {
-      console.error("Error loading vencimientos:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [diasAdelante, get, proveedorId]);
-
   useEffect(() => {
-    loadVencimientos();
-  }, [loadVencimientos]);
+    setDismissed(false);
+    setExpanded(false);
+  }, [proveedorId, data]);
 
   const formatDate = (dateString: string) => {
     return parseDateLocal(dateString).toLocaleDateString(country.locale || "es-PE", {
@@ -96,7 +61,12 @@ export default function VencimientosAlert({
     return { bg: "#dbeafe", border: "#3b82f6", text: "#1e40af" };
   };
 
-  if (loading || dismissed || vencimientos.length === 0) {
+  if (loading) return <p role="status" className="text-sm text-muted-foreground">Consultando próximos vencimientos...</p>;
+  if (error) return <div className="rounded-xl border border-border p-4">
+    <p role="alert">No se pudieron consultar los próximos vencimientos.</p>
+    <button type="button" onClick={retry} className="mt-2 rounded border px-4 py-2">Reintentar vencimientos</button>
+  </div>;
+  if (dismissed || vencimientos.length === 0) {
     return null;
   }
 
@@ -104,7 +74,9 @@ export default function VencimientosAlert({
   const proximosCount = vencimientos.filter(
     (v) => v.dias_restantes >= 0,
   ).length;
-  const totalSaldo = vencimientos.reduce((sum, v) => sum + v.saldo, 0);
+  const totalSaldo = [...new Set(vencimientos.map(v => v.moneda))].map(moneda =>
+    formatCurrency(sumReportMoney(vencimientos.filter(v => v.moneda === moneda).map(v => v.saldo)), moneda)
+  ).join(' · ');
 
   const alertColor =
     vencidosCount > 0
@@ -131,7 +103,7 @@ export default function VencimientosAlert({
                   : `Vence${proximosCount > 1 ? "n" : ""} en los próximos ${diasAdelante} días`}
               {" • "}
               <strong>
-                {formatCurrency(totalSaldo, vencimientos[0]?.moneda || "PEN")}
+                {totalSaldo}
               </strong>{" "}
               total
             </p>

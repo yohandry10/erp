@@ -1,12 +1,12 @@
 import { Type, Transform } from 'class-transformer';
-import { IsOptional, IsString, IsArray, IsUUID, IsNumber, Min, MinLength, MaxLength, ValidateNested } from 'class-validator';
+import { IsOptional, IsString, IsArray, IsUUID, IsNumber, Min, MinLength, MaxLength, ValidateNested, ValidateIf } from 'class-validator';
 
 export class ItemDespachadoDto {
   @IsUUID('4', { message: 'detalle_id debe ser un UUID válido' })
   detalle_id!: string;
 
-  @IsOptional()
-  @IsNumber({}, { message: 'La cantidad debe ser numérica' })
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'La cantidad debe ser numérica y tener hasta dos decimales' })
   @Min(0.01, { message: 'La cantidad debe ser mayor a cero' })
   cantidad?: number;
 

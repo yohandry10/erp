@@ -1,3 +1,4 @@
+import { requireTenantRecord } from '../../shared/utils/require-tenant-record';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EventBusService, PlanillaCalculadaEvent } from '../../shared/events/event-bus.service';
@@ -11,11 +12,14 @@ import {
 import { OutboxEventBuilder } from '../../shared/outbox/outbox-event.interface';
 import {
   calcularGratificacionTrunca,
-  diasEnPeriodo,
+  regimenBonificacionGratificacionPeru,
   dividirRemuneracionPorVacaciones,
   mesesGratificablesDelPeriodo,
   parseFechaLocal,
 } from './liquidacion-peru.util';
+import { aplicarCreditoEpsPlanilla } from './planillas-eps.util';
+import type { CoberturaEpsPlanillaDto, RemuneracionGratificacionPlanillaEmpleadoDto } from './dto/planilla-eps.dto';
+import type { RemuneracionGratificacionPreviaDto } from './dto/rrhh-acciones.dto';
 import {
   calcularPlanillaArgentina,
   NORMATIVA_ARGENTINA_2026_DEFAULT,
@@ -27,7 +31,12 @@ import {
   NormativaColombiaPeriodo,
 } from './planillas-colombia.util';
 import { RrhhCountryService } from './rrhh-country.service';
-import { lecturaRrhhFallida } from './rrhh-errors';
+import { lecturaRrhhFallida, relanzarLecturaRrhh } from './rrhh-errors';
+import { readCompleteCatalog } from '../../shared/utils/complete-catalog-read';
+import { expectedCalculationReceipt, assertCalculationRpcReceipt } from './rrhh-calculation-receipt';
+import { CalculationOperationIntent, prepareCalculationOperation, assertCalculationOperation } from './rrhh-calculation-operation';
+import { expectedPayrollCreateReceipt, assertPayrollCreateRpcReceipt } from './rrhh-payroll-create-receipt';
+import { preparePayrollCreationOperation, assertPayrollCreationOperation } from './rrhh-payroll-creation-operation';
 
 const CONCEPTOS_PLANILLA_BASE = [
   { codigo: '001', nombre: 'Sueldo basico', tipo: 'ingreso' },
@@ -90,11 +99,13 @@ const CONCEPTOS_PLANILLA_COLOMBIA = [
 ];
 
 type NormativaPeruPeriodo = {
+  id?: string;
   uit: number;
   rmv: number;
   asignacionFamiliar: number;
   afpAporte: number;
   afpPrimaSeguro: number;
+  afpRemuneracionMaxAsegurable?: number | null;
   afpComisionFlujoDefault: number;
   onpAporte: number;
   essaludAporte: number;
@@ -112,6 +123,7 @@ type CalculoEmpleadoPersistencia = {
   total_descuentos: number;
   total_aportes: number;
   neto_pagar: number;
+  metadata?: Record<string, any>;
   conceptos: Array<{
     concepto_id: string;
     monto: number;
@@ -211,53 +223,140 @@ export class PlanillasService {
     throw error;
   }
 
+  private async aplicarCreditoEpsPeru(
+    periodo: string, tenantId: string | undefined, actorId: string, empleados: any[],
+    calculos: CalculoEmpleadoPersistencia[], conceptos: any[], normativa: NormativaPeruPeriodo | null,
+    declaracion?: CoberturaEpsPlanillaDto,
+  ) {
+    let uitOrigen = normativa?.uit ?? 0;
+    if (declaracion && declaracion.periodo_cobertura !== periodo) {
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(declaracion.periodo_cobertura) || declaracion.periodo_cobertura > periodo) {
+        throw new BadRequestException('El período de cobertura EPS debe ser válido y no posterior a la planilla');
+      }
+      uitOrigen = (await this.obtenerNormativaPeruPeriodo(declaracion.periodo_cobertura, tenantId)).uit;
+    }
+    return aplicarCreditoEpsPlanilla({ periodo, actorId, empleados, calculos,
+      conceptoEssaludId: conceptos.find(c => c.codigo === '201')?.id,
+      uitOrigen, declaracion });
+  }
+
+  private async obtenerBasesGratificacionOrdinaria(
+    periodo: string, tenantId: string, actorId: string, empleados: any[],
+    declaraciones: Array<RemuneracionGratificacionPreviaDto & { empleado_id: string }>,
+  ): Promise<Map<string, Record<string, any>>> {
+    const bases = new Map<string, Record<string, any>>();
+    const mes = Number(periodo.slice(5, 7));
+    if (![7, 12].includes(mes)) {
+      if (declaraciones.length) throw new BadRequestException('La base de gratificación ordinaria corresponde sólo a planillas de julio o diciembre');
+      return bases;
+    }
+    const periodoBase = `${periodo.slice(0, 4)}-${mes === 7 ? '06' : '11'}`;
+    const fechaBase = `${periodoBase}-30`;
+    const ids = new Set(empleados.map(e => e.id));
+    const porEmpleado = new Map<string, RemuneracionGratificacionPreviaDto>();
+    for (const dec of declaraciones) {
+      if (!ids.has(dec.empleado_id) || porEmpleado.has(dec.empleado_id)
+        || dec.periodo !== periodoBase || !Number.isFinite(dec.monto) || dec.monto <= 0
+        || Math.abs(dec.monto * 100 - Math.round(dec.monto * 100)) > 1e-6 || !String(dec.referencia || '').trim()) {
+        throw new BadRequestException(`La base de gratificación requiere empleado único, período ${periodoBase}, importe positivo y referencia`);
+      }
+      porEmpleado.set(dec.empleado_id, dec);
+    }
+    const normativaBase = await this.obtenerNormativaPeruPeriodo(periodoBase, tenantId);
+    for (const empleado of empleados) {
+      if (!(mesesGratificablesDelPeriodo(periodo, parseFechaLocal(empleado.fecha_ingreso)) ?? 0)) continue;
+      const dec = porEmpleado.get(empleado.id);
+      if (dec) {
+        bases.set(empleado.id, { periodo: periodoBase, monto: dec.monto, referencia: dec.referencia.trim(),
+          fuente: 'FUENTE_EXTERNA_DECLARADA', declarado_por: actorId });
+        continue;
+      }
+      const candidatos = (empleado.contratos || []).filter((c: any) =>
+        /^\d{4}-\d{2}-\d{2}$/.test(String(c.fecha_inicio || '')) && c.fecha_inicio <= fechaBase
+        && (!c.fecha_fin || c.fecha_fin >= fechaBase)
+        && !['borrador', 'anulado', 'cancelado'].includes(String(c.estado || '').toLowerCase()),
+      ).sort((a: any, b: any) => String(b.fecha_inicio).localeCompare(String(a.fecha_inicio)));
+      const contrato = candidatos[0];
+      const salario = Number(contrato?.sueldo_bruto);
+      if (!contrato || !Number.isFinite(salario) || salario <= 0
+        || (candidatos[1]?.fecha_inicio === contrato.fecha_inicio && Number(candidatos[1].sueldo_bruto) !== salario)) {
+        throw new ConflictException(`No hay remuneración histórica verificable de ${periodoBase} para ${empleado.nombres || empleado.id}; declare su base computable y referencia`);
+      }
+      const familiar = this.tieneHijos(empleado) ? normativaBase.asignacionFamiliar : 0;
+      bases.set(empleado.id, { periodo: periodoBase, monto: new Decimal(salario).plus(familiar).toDecimalPlaces(2).toNumber(),
+        sueldo_bruto: salario, asignacion_familiar: familiar, contrato_id: contrato.id,
+        fuente: 'CONTRATO_HISTORICO', declarado_por: actorId,
+        ...(normativaBase.id ? {normativa_base_id: normativaBase.id} : {}) });
+    }
+    return bases;
+  }
+
   private async guardarCalculoPlanillaAtomico(
     planillaId: string,
     tenantId: string | undefined,
     empleados: CalculoEmpleadoPersistencia[],
     actorId: string,
+    epsSnapshot?: Record<string, any>,
+    normativa?: NormativaPeruPeriodo,
+    intent?: CalculationOperationIntent,
   ) {
     if (!tenantId) {
       throw new BadRequestException('El tenant es obligatorio para calcular una planilla');
     }
 
+    if (normativa?.id) {
+      for (const empleado of empleados) empleado.metadata = {...empleado.metadata, normativa_periodo_id: normativa.id};
+    }
+    const receiptContext = { planillaId, tenantId, actorId, empleados };
+    expectedCalculationReceipt(receiptContext);
+    if (intent) {
+      const { data, error } = await this.supabaseService.getClient().rpc('guardar_calculo_planilla_operacion_tx_570', {
+        p_tenant_id: tenantId, p_actor_id: actorId, p_planilla_id: planillaId,
+        p_key: intent.key, p_request: intent.request, p_empleados: empleados,
+        p_kind: epsSnapshot ? 'EPS' : empleados.some(e => e.metadata?.base_gratificacion_ordinaria) ? 'GRATIFICATION' : 'ORDINARY',
+        p_eps: epsSnapshot ?? null,
+      });
+      if (error) this.throwPlanillaRpcError(error);
+      return assertCalculationOperation(data, { ...intent, tenantId, actorId, planillaId }, empleados);
+    }
     const { data, error } = await this.supabaseService.getClient().rpc(
-      'guardar_calculo_planilla_tx',
+      epsSnapshot ? 'guardar_calculo_planilla_eps_tx_570'
+        : empleados.some(e => e.metadata?.base_gratificacion_ordinaria)
+          ? 'guardar_calculo_planilla_gratificacion_tx_570' : 'guardar_calculo_planilla_tx',
       {
         p_tenant_id: tenantId,
         p_planilla_id: planillaId,
         p_empleados: empleados,
         p_actor_id: actorId,
+        ...(epsSnapshot ? { p_eps: epsSnapshot } : {}),
       },
     );
 
     if (error) this.throwPlanillaRpcError(error);
 
-    if (!data?.success) {
-      throw new Error('La transaccion de calculo de planilla no confirmo su finalizacion');
-    }
-
-    return data;
+    return assertCalculationRpcReceipt(data, receiptContext);
   }
 
   // Obtener todas las planillas
   // ✅ FIX: Agregar soporte multi-tenant
   async getPlanillas(tenantId?: string) {
-    let query = this.supabaseService.getClient()
-      .from('planillas')
-      .select('*')
-      .order('periodo', { ascending: false });
-    
-    // ✅ Filtrar por tenant si se proporciona
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
-    }
-    
-    const { data, error } = await query;
-    if (error) throw lecturaRrhhFallida('las planillas');
+    if (!tenantId) throw lecturaRrhhFallida('las planillas');
+    const currentTenantId = tenantId;
+    const data = await readCompleteCatalog(this.supabaseService.getClient(), 'planillas', '*',
+      query => query.eq('tenant_id', currentTenantId), row => row.tenant_id === currentTenantId,
+      [['periodo', false], ['id', true]]);
+    const fuentesConsumidas = new Set(data
+      .filter((p: any) => String(p.estado).toLowerCase() !== 'anulada')
+      .map((p: any) => p.metadata?.eps_cobertura?.planilla_arrastre_id).filter(Boolean));
     return {
       success: true,
-      data: data || []
+      tenant_id: currentTenantId,
+      total: data.length,
+      fuentes_planillas: { complete: true, total: data.length, page_size: 1000 },
+      data: data.map((p: any) => ({ ...p,
+        eps_arrastre_disponible: String(p.estado).toLowerCase() !== 'anulada' && !fuentesConsumidas.has(p.id)
+          ? Number(p.metadata?.eps_cobertura?.credito_saldo ?? 0) : 0,
+      })),
     };
   }
 
@@ -281,13 +380,13 @@ export class PlanillasService {
           `cajero_id.eq.${actorId},usuario_id.eq.${actorId},abierto_por.eq.${actorId},usuario_apertura.eq.${actorId}`,
         ),
     ]);
-    if (cuentasResult.error) throw cuentasResult.error;
-    if (sesionesResult.error) throw sesionesResult.error;
+    if (cuentasResult.error || !Array.isArray(cuentasResult.data)) throw lecturaRrhhFallida('los destinos bancarios de planilla');
+    if (sesionesResult.error || !Array.isArray(sesionesResult.data)) throw lecturaRrhhFallida('las sesiones de caja del pagador');
     return {
       success: true,
       data: {
-        cuentas_bancarias: cuentasResult.data || [],
-        sesiones_caja: sesionesResult.data || [],
+        cuentas_bancarias: cuentasResult.data,
+        sesiones_caja: sesionesResult.data,
       },
     };
   }
@@ -313,6 +412,8 @@ export class PlanillasService {
     };
 
     const paisLaboral = await this.obtenerPaisLaboral(tenantId);
+    const receiptContext = { tenantId, actorId, period: periodo, country: paisLaboral, currency: this.monedaPais(paisLaboral), idempotencyKey: String(planillaData?.idempotency_key || ''), metadata };
+    expectedPayrollCreateReceipt(receiptContext);
     const { data, error } = await this.supabaseService.getClient().rpc(
       'crear_planilla_tx_495',
       {
@@ -328,13 +429,45 @@ export class PlanillasService {
       },
     );
     if (error) this.throwPlanillaRpcError(error);
-    if (!data?.success) throw new Error('La creación atómica de planilla no confirmó su resultado');
-    return data;
+    return assertPayrollCreateRpcReceipt(data, receiptContext);
+  }
+
+  async crearPlanillaConCalculo(data: any, tenantId: string, actorId: string) {
+    const intent = preparePayrollCreationOperation(data, tenantId, actorId);
+    const client = this.supabaseService.getClient();
+    const previous = await client.rpc('leer_recibo_alta_planilla_570', {
+      p_tenant_id: tenantId, p_actor_id: actorId, p_key: intent.key, p_request: intent.request,
+    });
+    if (previous.error) this.throwPlanillaRpcError(previous.error);
+    if (previous.data !== null) {
+      const receipt = assertPayrollCreationOperation(previous.data, intent);
+      if (receipt.creation_operation.action === 'ABANDON_CREATION') throw new ConflictException('La solicitud original de alta fue abandonada; conserve el recibo y use una solicitud nueva');
+      return receipt;
+    }
+    const country = await this.obtenerPaisLaboral(tenantId);
+    if (country !== intent.request.pais_codigo || this.monedaPais(country) !== intent.request.moneda) throw new ConflictException('La configuración laboral cambió. La solicitud original se conserva para conciliación');
+    const { data: receipt, error } = await client.rpc('crear_planilla_operacion_tx_570', {
+      p_tenant_id: tenantId, p_actor_id: actorId, p_key: intent.key, p_request: intent.request, p_planilla: intent.planilla,
+    });
+    if (error) this.throwPlanillaRpcError(error);
+    const confirmed = assertPayrollCreationOperation(receipt, intent);
+    if (confirmed.creation_operation.action !== 'CREATE_WITH_CALCULATION') throw new ConflictException('La respuesta no confirma el alta original de la planilla');
+    return confirmed;
+  }
+
+  async resolverAltaPlanilla(data: any, tenantId: string, actorId: string) {
+    const intent = preparePayrollCreationOperation(data, tenantId, actorId);
+    const { data: receipt, error } = await this.supabaseService.getClient().rpc('resolver_alta_planilla_tx_570', {
+      p_tenant_id: tenantId, p_actor_id: actorId, p_key: intent.key, p_request: intent.request,
+    });
+    if (error) this.throwPlanillaRpcError(error);
+    return assertPayrollCreationOperation(receipt, intent);
   }
 
   // Calcular planilla mensual para todos los empleados activos
   // ✅ FIX: Agregar soporte multi-tenant
-  async calcularPlanillaMensual(planillaId: string, tenantId?: string, actorId?: string) {
+  async calcularPlanillaMensual(planillaId: string, tenantId?: string, actorId?: string, epsCobertura?: CoberturaEpsPlanillaDto,
+    remuneracionesGratificacionPrevias?: RemuneracionGratificacionPlanillaEmpleadoDto[]) {
     if (!actorId) throw new BadRequestException('El actor es obligatorio para calcular planilla');
     this.logger.debug(`🧮 Iniciando cálculo de planilla: ${planillaId}`);
     const client = this.supabaseService.getClient();
@@ -360,7 +493,7 @@ export class PlanillasService {
     // Obtener empleados activos
     let empleadosQuery = client
       .from('empleados')
-      .select('*, contratos(*)')
+      .select('*, contratos(*), rrhh_peru_fichas_laborales(regimen_salud_codigo,regimen_laboral_codigo,eps_servicios_propios_codigo,activo)')
       .order('fecha_inicio', { referencedTable: 'contratos', ascending: false })
       .eq('estado', 'activo');
     
@@ -434,8 +567,15 @@ export class PlanillasService {
         )
       : new Map<string, { percibido: number; retenido: number }>();
 
+    const basesGratificacion = paisLaboral === 'PE'
+      ? await this.obtenerBasesGratificacionOrdinaria(planillaEstado.periodo, tenantId!, actorId,
+          empleados.filter((empleado: any) => contratoVigenteDe(empleado, planillaEstado.periodo)),
+          remuneracionesGratificacionPrevias || [])
+      : new Map<string, Record<string, any>>();
+
     // Procesar cada empleado
-    for (const empleado of empleados) {
+    for (const empleadoOriginal of empleados) {
+      const empleado = { ...empleadoOriginal, base_gratificacion_ordinaria: basesGratificacion.get(empleadoOriginal.id) };
       const contratoActual = contratoVigenteDe(empleado, paisLaboral === 'PE' ? planillaEstado.periodo : undefined);
       if (!contratoActual) {
         this.logger.debug(`Empleado sin contrato vigente: ID=${empleado.id}`);
@@ -483,6 +623,7 @@ export class PlanillasService {
         total_descuentos: calculoEmpleado.totalDescuentos,
         total_aportes: calculoEmpleado.totalAportes,
         neto_pagar: calculoEmpleado.netoPagar,
+        ...(empleado.base_gratificacion_ordinaria ? { metadata: { base_gratificacion_ordinaria: empleado.base_gratificacion_ordinaria } } : {}),
         conceptos: calculoEmpleado.conceptosDetalle.map((concepto: any) => ({
           concepto_id: concepto.id,
           monto: concepto.monto,
@@ -508,11 +649,19 @@ export class PlanillasService {
       });
     }
 
+    const epsSnapshot = paisLaboral === 'PE'
+      ? await this.aplicarCreditoEpsPeru(planillaEstado.periodo, tenantId, actorId, empleados,
+          calculosPersistencia, conceptos, normativaPeru!, epsCobertura)
+      : undefined;
+    totalAportes = calculosPersistencia.reduce((s, fila) => s + fila.total_aportes, 0);
+    for (const e of empleadosCalculados) e.aportes = calculosPersistencia.find(f => f.empleado_id === e.empleadoId)!.total_aportes;
     await this.guardarCalculoPlanillaAtomico(
       planillaId,
       tenantId,
       calculosPersistencia,
       actorId,
+      epsSnapshot,
+      normativaPeru ?? undefined,
     );
 
     this.logger.debug(`✅ Planilla calculada exitosamente:`);
@@ -568,10 +717,13 @@ export class PlanillasService {
         return value;
       };
       return {
+        ...(data.id ? {id: String(data.id)} : {}),
         uit: number('uit', true), rmv: number('rmv', true),
         asignacionFamiliar: number('asignacion_familiar'),
         afpAporte: number('afp_aporte', false, true),
         afpPrimaSeguro: number('afp_prima_seguro', false, true),
+        afpRemuneracionMaxAsegurable: data.afp_remuneracion_max_asegurable == null
+          ? null : number('afp_remuneracion_max_asegurable', true),
         afpComisionFlujoDefault: number('afp_comision_flujo_default', false, true),
         onpAporte: number('onp_aporte', false, true),
         essaludAporte: number('essalud_aporte', false, true),
@@ -584,7 +736,7 @@ export class PlanillasService {
         const { data, error } = await client
           .from('normativa_peru_periodos')
           .select(
-            'uit, rmv, asignacion_familiar, afp_aporte, afp_prima_seguro, afp_comision_flujo_default, onp_aporte, essalud_aporte, quinta_deduccion_uit',
+            'id, uit, rmv, asignacion_familiar, afp_aporte, afp_prima_seguro, afp_comision_flujo_default, afp_remuneracion_max_asegurable, onp_aporte, essalud_aporte, quinta_deduccion_uit',
           )
           .eq('tenant_id', tenantId)
           .eq('periodo', periodoNormalizado)
@@ -600,7 +752,7 @@ export class PlanillasService {
       const { data, error } = await client
         .from('normativa_peru_periodos')
         .select(
-          'uit, rmv, asignacion_familiar, afp_aporte, afp_prima_seguro, afp_comision_flujo_default, onp_aporte, essalud_aporte, quinta_deduccion_uit',
+          'id, uit, rmv, asignacion_familiar, afp_aporte, afp_prima_seguro, afp_comision_flujo_default, afp_remuneracion_max_asegurable, onp_aporte, essalud_aporte, quinta_deduccion_uit',
         )
         .is('tenant_id', null)
         .eq('periodo', periodoNormalizado)
@@ -749,37 +901,49 @@ export class PlanillasService {
     tenantId?: string,
   ): Promise<Map<string, number>> {
     const porEmpleado = new Map<string, number>();
-    if (!periodo || empleadoIds.length === 0) return porEmpleado;
-
-    let query = this.supabaseService.getClient()
-      .from('solicitudes')
-      .select('id_empleado, fecha_inicio, fecha_fin')
-      .in('id_empleado', empleadoIds)
-      .eq('tipo', 'vacaciones')
-      .eq('estado', 'aprobada');
-
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
+    const partes = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(periodo);
+    if (!partes) throw new BadRequestException('Período de planilla inválido');
+    if (!tenantId || !Array.isArray(empleadoIds) || !empleadoIds.every(id=>typeof id==='string'&&!!id) || new Set(empleadoIds).size!==empleadoIds.length) throw new BadRequestException('La empresa y los empleados de la planilla deben estar confirmados');
+    if (empleadoIds.length === 0) return porEmpleado;
+    const data:any[]=[];const ids=new Set<string>();let total:number|undefined;
+    for(let offset=0;;offset+=1000){
+      const query:any=this.supabaseService.getClient().from('solicitudes')
+        .select('id,tenant_id,id_empleado,tipo,estado,fecha_inicio,fecha_fin',{count:'exact'})
+        .in('id_empleado',empleadoIds).eq('tenant_id',tenantId).eq('tipo','vacaciones').eq('estado','aprobada')
+        .order('id',{ascending:true}).range(offset,offset+999);
+      const {data:page,error,count}=(await query)||{};
+      if(error||!Array.isArray(page)||!Number.isSafeInteger(count)||count<0||(total!==undefined&&count!==total)||page.length!==Math.min(1000,Math.max(0,count-offset)))throw new ServiceUnavailableException('No se pudieron completar las vacaciones aprobadas del período');
+      total=count;
+      for(const solicitud of page){
+        if(!solicitud||typeof solicitud.id!=='string'||!solicitud.id||ids.has(solicitud.id)||solicitud.tenant_id!==tenantId||solicitud.tipo!=='vacaciones'||solicitud.estado!=='aprobada')throw new ServiceUnavailableException('Las vacaciones aprobadas son incompletas, repetidas o ajenas');
+        ids.add(solicitud.id);data.push(solicitud);
+      }
+      if(data.length===total)break;
     }
-
-    const { data, error } = await query;
-    if (error) {
-      this.logger.warn(`No se pudieron leer las vacaciones del periodo ${periodo}: ${error.message}`);
-      throw new ServiceUnavailableException('No se pudieron consultar las vacaciones aprobadas del período');
+    const ultimoDia = new Date(Date.UTC(Number(partes[1]), Number(partes[2]), 0)).getUTCDate();
+    const empleados = new Set(empleadoIds);
+    const diasPorEmpleado = new Map<string, Set<number>>();
+    const fechaValida = (value: unknown): value is string => {
+      if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+      const fecha = new Date(`${value}T00:00:00.000Z`);
+      return Number.isFinite(fecha.getTime()) && fecha.toISOString().slice(0, 10) === value;
+    };
+    for (const solicitud of data) {
+      if (!solicitud || !empleados.has(solicitud.id_empleado)
+        || !fechaValida(solicitud.fecha_inicio) || !fechaValida(solicitud.fecha_fin)
+        || solicitud.fecha_inicio > solicitud.fecha_fin) {
+        throw new ServiceUnavailableException('No se pudieron verificar las vacaciones aprobadas del período');
+      }
+      const dias = diasPorEmpleado.get(solicitud.id_empleado) ?? new Set<number>();
+      // Cada fecha del mes cuenta una sola vez aunque haya solicitudes duplicadas,
+      // contenidas o superpuestas. El cruce de mes conserva sólo su intersección.
+      for (let dia = 1; dia <= ultimoDia; dia++) {
+        const fecha = `${periodo}-${String(dia).padStart(2, '0')}`;
+        if (solicitud.fecha_inicio <= fecha && fecha <= solicitud.fecha_fin) dias.add(dia);
+      }
+      diasPorEmpleado.set(solicitud.id_empleado, dias);
     }
-
-    for (const solicitud of data || []) {
-      const dias = diasEnPeriodo(
-        periodo,
-        parseFechaLocal((solicitud as any).fecha_inicio),
-        parseFechaLocal((solicitud as any).fecha_fin),
-      );
-      if (dias <= 0) continue;
-
-      const clave = (solicitud as any).id_empleado;
-      porEmpleado.set(clave, (porEmpleado.get(clave) ?? 0) + dias);
-    }
-
+    for (const [empleado, dias] of diasPorEmpleado) if (dias.size) porEmpleado.set(empleado, dias.size);
     return porEmpleado;
   }
 
@@ -857,7 +1021,8 @@ export class PlanillasService {
     );
 
     if (mesesGratificables !== null && mesesGratificables > 0) {
-      const gratificacion = calcularGratificacionTrunca(baseAsegurable, mesesGratificables);
+      const regimenBonificacion = regimenBonificacionGratificacionPeru(empleado);
+      const gratificacion = calcularGratificacionTrunca(empleado.base_gratificacion_ordinaria?.monto ?? baseAsegurable, mesesGratificables, regimenBonificacion);
 
       const conceptoGratificacion = conceptos.find(c => c.codigo === '006');
       if (conceptoGratificacion) {
@@ -874,7 +1039,7 @@ export class PlanillasService {
         conceptosDetalle.push({
           id: conceptoBonificacion.id,
           monto: gratificacion.bonificacionExtraordinaria,
-          observaciones: 'Bonificación extraordinaria 9% (Ley 30334)',
+          observaciones: `Bonificación extraordinaria ${regimenBonificacion === 'EPS' ? '6.75' : '9'}% (Ley 30334)`,
         });
         totalIngresos += gratificacion.bonificacionExtraordinaria;
       }
@@ -931,7 +1096,7 @@ export class PlanillasService {
       const tasaSeguroAFP = contratoActual?.tasa_seguro_afp ??
         contratoActual?.metadata?.tasa_seguro_afp ??
         normativa.afpPrimaSeguro;
-      const seguroAFP = new Decimal(baseAsegurable).times(tasaSeguroAFP).toDecimalPlaces(2).toNumber();
+      const seguroAFP = this.calcularPrimaSeguroAfp(baseAsegurable, tasaSeguroAFP, normativa, periodo);
       const conceptoSeguroAFP = conceptos.find(c => c.codigo === '103');
       if (conceptoSeguroAFP) {
         conceptosDetalle.push({
@@ -966,6 +1131,7 @@ export class PlanillasService {
       remuneracionOrdinariaMes: baseAsegurable,
       gratificacionesDelMes: Math.max(0, totalIngresos - baseAsegurable),
       historial: historialQuinta,
+      empleado,
       normativa,
     });
     if (impuestoRenta > 0) {
@@ -1132,9 +1298,8 @@ export class PlanillasService {
    * calculaba con el ingreso del mes aislado. Se resuelven en una sola pasada
    * antes del bucle de empleados para no disparar una consulta por trabajador.
    *
-   * Ante cualquier fallo se devuelve un historial vacío. Eso equivale a tratar el
-   * mes como el primero del ejercicio, que es el criterio conservador: proyecta
-   * sobre el sueldo del mes y no descuenta retenciones que no se pudieron probar.
+   * Una lectura fallida bloquea el cálculo: no equivale a historia verificada en
+   * cero. Las retenciones se acumulan hasta el mes que exige el artículo40.
    */
   private async obtenerHistorialQuintaEjercicio(
     tenantId: string,
@@ -1148,12 +1313,13 @@ export class PlanillasService {
     try {
       const client = this.supabaseService.getClient();
 
-      const { data: planillasPrevias } = await client
+      const { data: planillasPrevias, error: planillasError } = await client
         .from('planillas')
         .select('id, periodo, estado')
         .eq('tenant_id', tenantId)
         .gte('periodo', `${anio}-01`)
         .lt('periodo', periodo);
+      if (planillasError) throw planillasError;
 
       const idsPlanilla = (planillasPrevias || [])
         .filter((fila: any) => !['anulada', 'anulado'].includes(String(fila?.estado ?? '').toLowerCase()))
@@ -1161,10 +1327,11 @@ export class PlanillasService {
         .filter(Boolean);
       if (idsPlanilla.length === 0) return historial;
 
-      const { data: detalles } = await client
+      const { data: detalles, error: detallesError } = await client
         .from('empleado_planilla')
         .select('id, empleado_id, id_empleado, planilla_id, id_planilla, total_ingresos')
         .eq('tenant_id', tenantId);
+      if (detallesError) throw detallesError;
 
       const detallesPrevios = (detalles || []).filter((fila: any) => {
         const planilla = String(fila?.planilla_id ?? fila?.id_planilla ?? '');
@@ -1174,32 +1341,41 @@ export class PlanillasService {
       if (detallesPrevios.length === 0) return historial;
 
       const empleadoPorDetalle = new Map<string, string>();
+      const mes = mesDelPeriodo(periodo)!;
+      const mesCorteRetencion = mes <= 3 ? 0 : mes === 4 ? 3 : mes <= 7 ? 4 : mes === 8 ? 7 : mes <= 11 ? 8 : 11;
+      const periodoPorPlanilla = new Map<string,string>((planillasPrevias || []).map((row:any)=>[row.id,row.periodo]));
+      const detallesRetencion = new Set<string>();
       for (const fila of detallesPrevios) {
         const empleado = String((fila as any).empleado_id ?? (fila as any).id_empleado ?? '');
         empleadoPorDetalle.set(String((fila as any).id), empleado);
+        const previo = periodoPorPlanilla.get(String((fila as any).planilla_id ?? (fila as any).id_planilla));
+        if (previo && Number(previo.slice(5,7)) <= mesCorteRetencion) detallesRetencion.add(String((fila as any).id));
         const acumulado = historial.get(empleado) ?? { percibido: 0, retenido: 0 };
         acumulado.percibido += Number((fila as any).total_ingresos ?? 0) || 0;
         historial.set(empleado, acumulado);
       }
 
-      const { data: conceptoRenta } = await client
+      const { data: conceptoRenta, error: conceptoError } = await client
         .from('conceptos_planilla')
         .select('id')
         .eq('tenant_id', tenantId)
         .eq('codigo', CODIGO_CONCEPTO_QUINTA)
         .maybeSingle();
+      if (conceptoError) throw conceptoError;
       const conceptoRentaId = (conceptoRenta as any)?.id;
       if (!conceptoRentaId) return historial;
 
-      const { data: montos } = await client
+      const { data: montos, error: montosError } = await client
         .from('empleado_planilla_conceptos')
         .select('empleado_planilla_id, id_empleado_planilla, concepto_id, id_concepto, monto')
         .eq('tenant_id', tenantId);
+      if (montosError) throw montosError;
 
       for (const fila of montos || []) {
         const concepto = String((fila as any).concepto_id ?? (fila as any).id_concepto ?? '');
         if (concepto !== String(conceptoRentaId)) continue;
         const detalle = String((fila as any).empleado_planilla_id ?? (fila as any).id_empleado_planilla ?? '');
+        if (!detallesRetencion.has(detalle)) continue;
         const empleado = empleadoPorDetalle.get(detalle);
         if (!empleado) continue;
         const acumulado = historial.get(empleado) ?? { percibido: 0, retenido: 0 };
@@ -1209,10 +1385,7 @@ export class PlanillasService {
 
       return historial;
     } catch (error) {
-      this.logger.warn(
-        `No se pudo leer el historial de quinta del ejercicio; se calcula sin acumulado previo: ${(error as Error)?.message ?? error}`,
-      );
-      return new Map();
+      relanzarLecturaRrhh(error, 'el historial de renta y retenciones de quinta categoría');
     }
   }
 
@@ -1231,6 +1404,7 @@ export class PlanillasService {
     ingresosExtraordinariosMes?: number;
     gratificacionesDelMes?: number;
     historial?: { percibido: number; retenido: number };
+    empleado?: any;
     normativa: NormativaPeruPeriodo;
   }): number {
     const mes = mesDelPeriodo(params.periodo);
@@ -1247,10 +1421,15 @@ export class PlanillasService {
     // Las gratificaciones del propio mes ya vienen calculadas por el motor (pueden
     // ser truncas); las de los meses que faltan se estiman sobre la ordinaria.
     const delMes = Number(params.gratificacionesDelMes ?? 0) || 0;
-    const pendientesEstimadas = gratificacionesPendientesDelEjercicio(
-      mes === 7 || mes === 12 ? mes + 1 : mes,
-      ordinaria,
-    );
+    const mesDesde = mes === 7 || mes === 12 ? mes + 1 : mes;
+    const fechaIngreso = String(params.empleado?.fecha_ingreso || '');
+    const pendientesEstimadas = /^\d{4}-\d{2}-\d{2}$/.test(fechaIngreso)
+      ? [7,12].filter(m => m >= mesDesde).reduce((total,m) => {
+          const periodoGrat = `${String(params.periodo).slice(0,4)}-${String(m).padStart(2,'0')}`;
+          const meses = mesesGratificablesDelPeriodo(periodoGrat, parseFechaLocal(fechaIngreso)) ?? 0;
+          return total + calcularGratificacionTrunca(ordinaria, meses, regimenBonificacionGratificacionPeru(params.empleado)).total;
+        },0)
+      : gratificacionesPendientesDelEjercicio(mesDesde, ordinaria);
 
     const resultado = calcularRetencionQuintaPeru({
       mes,
@@ -1318,10 +1497,11 @@ export class PlanillasService {
   // Obtener detalle de planilla por empleado
   async getDetallePlanilla(planillaId: string, tenantId: string) {
     this.logger.debug(`📊 Obteniendo detalle de planilla: ${planillaId}`);
-
-    const { data, error } = await this.supabaseService.getClient()
-      .from('empleado_planilla')
-      .select(`
+    if (!planillaId || !tenantId) throw lecturaRrhhFallida('el detalle de la planilla');
+    const currentTenantId = tenantId;
+    const currentPlanillaId = planillaId;
+    await requireTenantRecord(this.supabaseService.getClient(), 'planillas', currentTenantId, currentPlanillaId, 'Planilla');
+    const data = await readCompleteCatalog(this.supabaseService.getClient(), 'empleado_planilla', `
         *,
         empleados(nombres, apellidos, numero_documento),
         empleado_planilla_conceptos(
@@ -1329,17 +1509,22 @@ export class PlanillasService {
           observaciones,
           conceptos_planilla(codigo, nombre, metadata)
         )
-      `)
-      .eq('id_planilla', planillaId)
-      .eq('tenant_id', tenantId);
+      `, query => query.eq('id_planilla', currentPlanillaId).eq('tenant_id', currentTenantId),
+      row => row.tenant_id === currentTenantId && row.id_planilla === currentPlanillaId);
 
-    if (error) {
-      console.error('❌ Error obteniendo detalle de planilla:', error);
-      throw error;
+    if (data.some((row: any) =>
+      !row?.empleados || !Array.isArray(row.empleado_planilla_conceptos)
+      || row.empleado_planilla_conceptos.some((item: any) => !item?.conceptos_planilla))) {
+      throw lecturaRrhhFallida('el detalle de la planilla');
     }
 
+    // Los conceptos anidados no acreditan su totalidad. Leer cada fuente hija
+    // por su empresa y padre, con conteo exacto, antes de publicar el detalle.
+    for (const row of data) {
+      row.empleado_planilla_conceptos = await this.obtenerConceptosPlanillaCompletos(currentTenantId, row.id);
+    }
     this.logger.debug(`📋 Detalle obtenido: ${data?.length || 0} empleados`);
-    return (data || []).map((empleadoPlanilla: any) => ({
+    return data.map((empleadoPlanilla: any) => ({
       ...empleadoPlanilla,
       empleado_planilla_conceptos: (empleadoPlanilla.empleado_planilla_conceptos || []).map((concepto: any) => ({
         ...concepto,
@@ -1353,8 +1538,20 @@ export class PlanillasService {
     }));
   }
 
+  private async obtenerConceptosPlanillaCompletos(tenantId: string, parentId: string) {
+    if (!tenantId || !parentId) throw lecturaRrhhFallida('los conceptos de la planilla');
+    const concepts = await readCompleteCatalog(this.supabaseService.getClient(), 'empleado_planilla_conceptos',
+      'id, tenant_id, empleado_planilla_id, monto, observaciones, conceptos_planilla(codigo, nombre, metadata)',
+      query => query.eq('tenant_id', tenantId).eq('empleado_planilla_id', parentId),
+      concept => concept.tenant_id === tenantId && concept.empleado_planilla_id === parentId && !!concept.conceptos_planilla);
+    return concepts.map(concept => ({
+      monto: concept.monto, observaciones: concept.observaciones, conceptos_planilla: concept.conceptos_planilla,
+    }));
+  }
+
   // Generar boleta de pago individual
   async getBoleta(empleadoPlanillaId: string, tenantId: string) {
+    if (!empleadoPlanillaId || !tenantId) throw lecturaRrhhFallida('la boleta');
     const { data, error } = await this.supabaseService.getClient()
       .from('empleado_planilla')
       .select(`
@@ -1371,9 +1568,24 @@ export class PlanillasService {
       .eq('tenant_id', tenantId)
       .single();
 
-    if (error) throw error;
+    if (error?.code === 'PGRST116' || (!error && !data)) throw new NotFoundException('Boleta no encontrada');
+    if (error) throw new ServiceUnavailableException('No se pudo consultar la boleta persistida');
+    if (data.id !== empleadoPlanillaId || data.tenant_id !== tenantId
+      || data.planillas?.id !== data.id_planilla || data.planillas?.tenant_id !== tenantId
+      || data.empleados?.id !== data.id_empleado || data.empleados?.tenant_id !== tenantId) {
+      throw lecturaRrhhFallida('la boleta de esta empresa y empleado');
+    }
+    const empresaResult = await this.supabaseService.getClient().from('empresa_config')
+      .select('ruc,razon_social,pais').eq('tenant_id', tenantId).maybeSingle();
+    if (empresaResult.error) throw new ServiceUnavailableException('No se pudo consultar la empresa de la boleta');
+    if (!String(empresaResult.data?.ruc || '').trim() || !String(empresaResult.data?.razon_social || '').trim()) {
+      throw new ConflictException('Configure la razón social y el documento tributario de la empresa para emitir la boleta');
+    }
+    data.empleado_planilla_conceptos = await this.obtenerConceptosPlanillaCompletos(tenantId, empleadoPlanillaId);
     return {
       ...data,
+      empresa: empresaResult.data,
+      fuentes_conceptos: { complete: true, total: data.empleado_planilla_conceptos.length, page_size: 1000 },
       empleado_planilla_conceptos: (data.empleado_planilla_conceptos || []).map((concepto: any) => ({
         ...concepto,
         conceptos_planilla: concepto.conceptos_planilla
@@ -1525,6 +1737,8 @@ export class PlanillasService {
     empleadosPersonalizados: any[],
     tenantId?: string,
     actorId?: string,
+    epsCobertura?: CoberturaEpsPlanillaDto,
+    originalIntent?: CalculationOperationIntent,
   ) {
     this.logger.debug(`🧮 Iniciando cálculo personalizado de planilla: ${planillaId}`);
     if (!Array.isArray(empleadosPersonalizados) || empleadosPersonalizados.length === 0) {
@@ -1535,6 +1749,19 @@ export class PlanillasService {
     }
     if (!actorId) {
       throw new BadRequestException('El actor es obligatorio para calcular una planilla');
+    }
+
+    const intent = originalIntent ? prepareCalculationOperation(originalIntent.key, originalIntent.request, empleadosPersonalizados, epsCobertura) : undefined;
+    if (intent) {
+      const { data, error } = await this.supabaseService.getClient().rpc('leer_recibo_calculo_planilla_570', {
+        p_tenant_id: tenantId, p_actor_id: actorId, p_planilla_id: planillaId, p_key: intent.key, p_request: intent.request,
+      });
+      if (error) this.throwPlanillaRpcError(error);
+      if (data !== null) {
+        const receipt = assertCalculationOperation(data, { ...intent, tenantId, actorId, planillaId });
+        if (receipt.calculation_operation.action === 'ABANDON_CALCULATION') throw new ConflictException('Esta intención de cálculo fue abandonada; conserve su recibo y use una solicitud nueva');
+        return receipt;
+      }
     }
 
     this.logger.debug(`👥 Empleados personalizados: ${empleadosPersonalizados.length}`);
@@ -1573,7 +1800,7 @@ export class PlanillasService {
 
     const { data: empleadosCanonicos, error: empleadosError } = await client
       .from('empleados')
-      .select('*, contratos(*)')
+      .select('*, contratos(*), rrhh_peru_fichas_laborales(regimen_salud_codigo,regimen_laboral_codigo,eps_servicios_propios_codigo,activo)')
       .in('id', [...entradasPorId.keys()])
       .eq('tenant_id', tenantId)
       .eq('estado', 'activo');
@@ -1620,6 +1847,19 @@ export class PlanillasService {
         )
       : new Map<string, { percibido: number; retenido: number }>();
 
+    const basesGratificacionPersonalizada = paisLaboral === 'PE'
+      ? await this.obtenerBasesGratificacionOrdinaria(planillaInfo.periodo, tenantId, actorId, empleadosCanonicos,
+          empleadosPersonalizados.filter(e => e.remuneracion_gratificacion_previa)
+            .map(e => ({ ...e.remuneracion_gratificacion_previa, empleado_id: e.empleado_id ?? e.id })))
+      : new Map<string, Record<string, any>>();
+
+    const vacacionesPersonalizadas = paisLaboral === 'PE'
+      ? await this.obtenerDiasVacacionesDelPeriodo(
+          (empleadosCanonicos || []).map((e: any) => String(e.id)),
+          String(planillaInfo.periodo), tenantId,
+        )
+      : new Map<string, number>();
+
     for (const empleadoCanonico of empleadosCanonicos || []) {
       const entrada = entradasPorId.get(empleadoCanonico.id);
       const contrato = contratoVigenteDe(empleadoCanonico, paisLaboral === 'PE' ? planillaInfo.periodo : undefined);
@@ -1631,7 +1871,9 @@ export class PlanillasService {
 
       const empleado = {
         ...empleadoCanonico,
+        base_gratificacion_ordinaria: basesGratificacionPersonalizada.get(empleadoCanonico.id),
         dias_trabajados: entrada.dias_trabajados,
+        dias_vacaciones: vacacionesPersonalizadas.get(empleadoCanonico.id) ?? 0,
         horas_extras_25: entrada.horas_extras_25,
         horas_extras_35: entrada.horas_extras_35,
         tardanzas_minutos: entrada.tardanzas_minutos,
@@ -1676,6 +1918,7 @@ export class PlanillasService {
         total_descuentos: calculoEmpleado.totalDescuentos,
         total_aportes: calculoEmpleado.totalAportes,
         neto_pagar: calculoEmpleado.netoPagar,
+        ...(empleado.base_gratificacion_ordinaria ? { metadata: { base_gratificacion_ordinaria: empleado.base_gratificacion_ordinaria } } : {}),
         conceptos: calculoEmpleado.conceptosDetalle.map((concepto: any) => ({
           concepto_id: concepto.id,
           monto: concepto.monto,
@@ -1684,11 +1927,18 @@ export class PlanillasService {
       });
     }
 
+    const epsSnapshot = paisLaboral === 'PE'
+      ? await this.aplicarCreditoEpsPeru(planillaInfo.periodo, tenantId, actorId, empleadosCanonicos,
+          calculosPersistencia, conceptos, normativa!, epsCobertura)
+      : undefined;
     const resultado = await this.guardarCalculoPlanillaAtomico(
       planillaId,
       tenantId,
       calculosPersistencia,
       actorId,
+      epsSnapshot,
+      normativa ?? undefined,
+      intent,
     );
 
     this.logger.debug(`✅ Planilla personalizada calculada exitosamente:`);
@@ -1699,6 +1949,15 @@ export class PlanillasService {
     this.logger.debug(`   - Total neto: ${monedaLog} ${Number(resultado.totalNeto).toFixed(2)}`);
 
     return resultado;
+  }
+
+  async resolverCalculoPlanilla(planillaId: string, tenantId: string, actorId: string, key: string, request: any) {
+    const intent = prepareCalculationOperation(key, request, request?.empleados, request?.eps_cobertura);
+    const { data, error } = await this.supabaseService.getClient().rpc('resolver_calculo_planilla_tx_570', {
+      p_tenant_id: tenantId, p_actor_id: actorId, p_planilla_id: planillaId, p_key: intent.key, p_request: intent.request,
+    });
+    if (error) this.throwPlanillaRpcError(error);
+    return assertCalculationOperation(data, { ...intent, tenantId, actorId, planillaId });
   }
 
   // Lógica de cálculo personalizada por empleado
@@ -1850,16 +2109,31 @@ export class PlanillasService {
 
     // 1. INGRESOS
 
-    // Sueldo básico (proporcional a días trabajados)
+    // La pantalla cuenta días remunerados; las vacaciones aprobadas se separan
+    // sin añadir un segundo sueldo ni cambiar la base de aportes.
+    const diasVacaciones = Math.min(diasTrabajados, Math.max(0, Number(empleado.dias_vacaciones ?? 0)));
+    const remuneracion = new Decimal(sueldoBasico).times(diasTrabajados).div(30).toDecimalPlaces(2);
+    const vacacional = new Decimal(sueldoBasico).times(diasVacaciones).div(30).toDecimalPlaces(2);
     const conceptoBasico = conceptos.find(c => c.codigo === '001');
+    const conceptoVacacional = conceptos.find(c => c.codigo === '008');
+    if (diasVacaciones > 0 && !conceptoVacacional) {
+      throw new BadRequestException('Falta el concepto de remuneración vacacional 008');
+    }
     if (conceptoBasico) {
-      const sueldoProporcional = (sueldoBasico / 30) * diasTrabajados;
+      const sueldoProporcional = remuneracion.minus(vacacional).toNumber();
       conceptosDetalle.push({
         id: conceptoBasico.id,
         monto: sueldoProporcional,
-        observaciones: `Sueldo ${diasTrabajados} días`
+        observaciones: `Sueldo ${diasTrabajados - diasVacaciones} días`
       });
       totalIngresos += sueldoProporcional;
+    }
+    if (conceptoVacacional && diasVacaciones > 0) {
+      conceptosDetalle.push({
+        id: conceptoVacacional.id, monto: vacacional.toNumber(),
+        observaciones: `Remuneración vacacional por ${diasVacaciones} días`,
+      });
+      totalIngresos += vacacional.toNumber();
     }
 
     // Asignación familiar: 10% de la RMV vigente (Ley 25129).
@@ -1981,7 +2255,7 @@ export class PlanillasService {
         normativa.afpPrimaSeguro;
       const aporteAFP = new Decimal(totalIngresos).times(normativa.afpAporte).toDecimalPlaces(2).toNumber();
       const comisionAFP = new Decimal(totalIngresos).times(tasaComisionAFP2).toDecimalPlaces(2).toNumber();
-      const seguroAFP = new Decimal(totalIngresos).times(tasaSeguroAFP2).toDecimalPlaces(2).toNumber();
+      const seguroAFP = this.calcularPrimaSeguroAfp(totalIngresos, tasaSeguroAFP2, normativa, periodo);
 
       const conceptoAporteAFP = conceptos.find(c => c.codigo === '101');
       if (conceptoAporteAFP) {
@@ -2025,12 +2299,34 @@ export class PlanillasService {
       }
     }
 
-    // Esta ruta no liquida gratificaciones, así que el total del mes es la
-    // remuneración ordinaria sobre la que se proyecta el ejercicio.
+    // La planilla personalizada de la UI liquida las mismas gratificaciones
+    // legales que la mensual. Se conserva la base ordinaria de aportes antes
+    // de sumar ingresos inafectos y se usa la remuneración contractual mensual.
+    const baseAsegurable = totalIngresos;
+    const mesesGratificables = mesesGratificablesDelPeriodo(
+      periodo ?? '', parseFechaLocal(empleado.fecha_ingreso),
+    );
+    if (mesesGratificables !== null && mesesGratificables > 0) {
+      const regimen = regimenBonificacionGratificacionPeru(empleado);
+      const baseGratificacion = empleado.base_gratificacion_ordinaria?.monto ?? new Decimal(sueldoBasico)
+        .plus(this.tieneHijos(empleado) ? normativa.asignacionFamiliar : 0).toDecimalPlaces(2).toNumber();
+      const gratificacion = calcularGratificacionTrunca(baseGratificacion, mesesGratificables, regimen);
+      for (const [codigo, monto, observaciones] of [
+        ['006', gratificacion.gratificacion, `Gratificación ${mesesGratificables}/6 del semestre`],
+        ['007', gratificacion.bonificacionExtraordinaria, `Bonificación extraordinaria ${regimen === 'EPS' ? '6.75' : '9'}% (Ley 30334)`],
+      ] as const) {
+        const concepto = conceptos.find(c => c.codigo === codigo);
+        if (!concepto) throw new ConflictException(`Falta el concepto ${codigo} para liquidar la gratificación`);
+        conceptosDetalle.push({ id: concepto.id, monto, observaciones });
+        totalIngresos = new Decimal(totalIngresos).plus(monto).toDecimalPlaces(2).toNumber();
+      }
+    }
     const impuestoRenta = this.calcularRetencionQuintaDelMes({
       periodo,
-      remuneracionOrdinariaMes: totalIngresos,
+      remuneracionOrdinariaMes: baseAsegurable,
+      gratificacionesDelMes: Math.max(0, totalIngresos - baseAsegurable),
       historial: historialQuinta,
+      empleado,
       normativa,
     });
     const conceptoImpuesto = conceptos.find(c => c.codigo === CODIGO_CONCEPTO_QUINTA);
@@ -2043,7 +2339,7 @@ export class PlanillasService {
       totalDescuentos += impuestoRenta;
     }
 
-    const aporteESSALUD = this.calcularAporteEssaludPeru(totalIngresos, normativa);
+    const aporteESSALUD = this.calcularAporteEssaludPeru(baseAsegurable, normativa);
     const conceptoESSALUD = conceptos.find(c => c.codigo === '201');
     if (conceptoESSALUD && aporteESSALUD > 0) {
       conceptosDetalle.push({
@@ -2068,6 +2364,18 @@ export class PlanillasService {
       totalAportes,
       netoPagar
     };
+  }
+
+  private calcularPrimaSeguroAfp(baseAsegurable: number, tasa: number, normativa: NormativaPeruPeriodo, periodo?: string): number {
+    if (!Number.isFinite(tasa) || tasa < 0 || tasa > 1) throw new BadRequestException('Tasa de prima AFP inválida');
+    if (baseAsegurable <= 0 || tasa === 0) return 0;
+    const limite = normativa.afpRemuneracionMaxAsegurable;
+    if (limite == null || !Number.isFinite(limite) || limite <= 0) {
+      throw new BadRequestException(`Configure la remuneración máxima asegurable AFP de ${periodo || 'este período'} en Configuración > RRHH antes de calcular la prima de seguro`);
+    }
+    // El máximo SBS se aplica a la prima del seguro, no al aporte obligatorio
+    // ni a la comisión sobre remuneración. No se toma el tope de otro período.
+    return Decimal.min(baseAsegurable, limite).times(tasa).toDecimalPlaces(2).toNumber();
   }
 
   private calcularAporteEssaludPeru(remuneracionAsegurable: number, normativa: NormativaPeruPeriodo): number {

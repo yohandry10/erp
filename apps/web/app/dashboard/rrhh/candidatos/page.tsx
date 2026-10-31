@@ -26,6 +26,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCountryContext } from '@/hooks/use-country-context';
+import { CrearDepartamentoButton } from '@/components/rrhh/CrearDepartamentoButton';
 
 const CandidatosPage = () => {
   const [candidatos, setCandidatos] = useState<any[]>([]);
@@ -34,18 +35,24 @@ const CandidatosPage = () => {
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [filtroVacante, setFiltroVacante] = useState('todas');
   const [showModal, setShowModal] = useState(false);
+  const [showVacanteModal, setShowVacanteModal] = useState(false);
   const [candidatoEdit, setCandidatoEdit] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const { get, post } = useApi();
   const { toast } = useToast();
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED !== 'false';
+  const loadSequence = useRef(0);
 
   const loadData = useCallback(async () => {
+    const sequence = ++loadSequence.current;
+    setCandidatos([]);
+    setVacantes([]);
+    setDepartamentos([]);
+    setShowModal(false);
+    setShowVacanteModal(false);
+    setCandidatoEdit(null);
     if (!rrhhEnabled) {
-      setCandidatos([]);
-      setVacantes([]);
-      setDepartamentos([]);
       setLoading(false);
       return;
     }
@@ -53,37 +60,36 @@ const CandidatosPage = () => {
       setLoading(true);
       setLoadError(false);
 
-      // Cargar candidatos
-      const candidatosData = await get('/api/rrhh/candidatos');
-      // El API responde { success, data: [...] }; hay que desempaquetar `.data`.
-      // Antes se hacía Array.isArray(respuestaCruda) → siempre false → nunca cargaba.
-      const asList = (r: any) => {
-        if (r?.success !== false && Array.isArray(r)) return r;
-        if (r?.success !== false && Array.isArray(r?.data)) return r.data;
-        throw new Error('Respuesta incompleta al cargar reclutamiento');
+      const asList = (response: any, fields: string[]) => {
+        const rows = Array.isArray(response) ? response : response?.data;
+        if (response?.success === false || !Array.isArray(rows) || rows.some(row =>
+          !row || typeof row.id !== 'string' || !row.id.trim() || fields.some(field => typeof row[field] !== 'string')
+        )) throw new Error('Respuesta incompleta al cargar reclutamiento');
+        return rows;
       };
-      setCandidatos(asList(candidatosData));
-
-      // Cargar vacantes
-      const vacantesData = await get('/api/rrhh/vacantes');
-      setVacantes(asList(vacantesData));
-
-      // Cargar departamentos
-      const departamentosData = await get('/api/rrhh/departamentos');
-      setDepartamentos(asList(departamentosData));
+      const nextCandidatos = asList(await get('/api/rrhh/candidatos'), ['nombres', 'apellidos']);
+      if (sequence !== loadSequence.current) return;
+      const nextVacantes = asList(await get('/api/rrhh/vacantes'), ['titulo']);
+      if (sequence !== loadSequence.current) return;
+      const nextDepartamentos = asList(await get('/api/rrhh/departamentos'), ['nombre']);
+      if (sequence !== loadSequence.current) return;
+      setCandidatos(nextCandidatos);
+      setVacantes(nextVacantes);
+      setDepartamentos(nextDepartamentos);
     } catch (error) {
+      if (sequence !== loadSequence.current) return;
       setLoadError(true);
       console.error('Error cargando candidatos:', error);
     } finally {
-      setLoading(false);
+      if (sequence === loadSequence.current) setLoading(false);
     }
   }, [get, rrhhEnabled]);
 
   useEffect(() => {
     loadData();
+    return () => { loadSequence.current += 1; };
   }, [loadData]);
 
-  const [showVacanteModal, setShowVacanteModal] = useState(false);
   const [vacanteData, setVacanteData] = useState({
     titulo: '',
     descripcion: '',
@@ -186,6 +192,18 @@ const CandidatosPage = () => {
     );
   }
 
+  if (loadError) {
+    return (
+      <div className="mx-auto w-full max-w-[1600px] p-4 md:p-6">
+        <h1 className="mb-6 text-2xl font-bold">CVs & Candidatos</h1>
+        <div role="alert" className="rounded-lg border border-destructive p-4">
+          <p>No se pudo completar la carga de candidatos y vacantes. Reintente para consultar o editar el reclutamiento.</p>
+          <Button type="button" variant="outline" className="mt-3" onClick={loadData}>Reintentar carga</Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
       {/* Header */}
@@ -195,6 +213,7 @@ const CandidatosPage = () => {
           <p className="mt-2 text-base text-muted-foreground">Gestión de reclutamiento y selección</p>
         </div>
         <div className="flex gap-4">
+          <CrearDepartamentoButton onCreated={loadData}/>
           <button
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
             onClick={() => setShowVacanteModal(true)}
@@ -212,12 +231,6 @@ const CandidatosPage = () => {
         </div>
       </div>
 
-      {loadError && (
-        <div role="alert" className="mb-6 rounded-lg border border-destructive p-4">
-          <p>No se pudo completar la carga de candidatos y vacantes. La información puede estar incompleta.</p>
-          <Button type="button" variant="outline" onClick={loadData}>Reintentar carga</Button>
-        </div>
-      )}
       {/* Estadísticas */}
       <div className="mb-8 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-5 mb-6">
         <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">

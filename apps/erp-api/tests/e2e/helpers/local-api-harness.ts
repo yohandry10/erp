@@ -10,6 +10,7 @@ const port = Number(process.env.LOCAL_API_PORT || 3122);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Puerto local inválido');
 const webUrl = new URL(process.env.LOCAL_WEB_URL || 'http://127.0.0.1:3121');
 if (!['127.0.0.1', 'localhost', '[::1]'].includes(webUrl.hostname)) throw new Error('La web debe ser local');
+const localAllowedOrigins = [webUrl.origin, ...(process.env.E2E_TAURI_STATIC === '1' ? ['http://tauri.localhost'] : [])];
 
 // La configuración Joi del runtime conserva su contrato PROD-only. El test no
 // configura un destino Supabase operativo: inyecta la dependencia local explícita.
@@ -20,7 +21,7 @@ Object.assign(process.env, {
   NODE_ENV: 'test', DEPLOYMENT_ENV: 'PROD',
   EMAIL_DISABLED: 'true', EMAIL_PROVIDER: 'smtp',
   FRONTEND_URL: webUrl.origin,
-  ALLOWED_ORIGINS: webUrl.origin,
+  ALLOWED_ORIGINS: localAllowedOrigins.join(','),
   ENCRYPTION_KEY: 'local-integration-encryption-key-20260905-only',
   JWT_SECRET: 'local-api-integration-jwt-key-20260905-never-production',
   JWT_REFRESH_SECRET: 'local-api-refresh-jwt-key-20260905-never-production',
@@ -28,7 +29,7 @@ Object.assign(process.env, {
   CSRF_SECRET: 'local-api-csrf-key-20260905-never-production',
   AUTH_SIGNATURE_SECRET: 'local-api-signature-key-20260905-never-production',
   REDIS_REQUIRED: 'false', BACKGROUND_JOBS_ENABLED: 'false',
-  OUTBOX_WORKER_CRON_ENABLED: 'false', ACCOUNTING_OUTBOX_WORKER_CRON_ENABLED: 'false',
+  OUTBOX_WORKER_CRON_ENABLED: 'false', ACCOUNTING_OUTBOX_WORKER_CRON_ENABLED: process.argv.includes('--automatic-accounting') ? 'true' : 'false',
   DEMO_API_ENABLED: 'false', LOG_LEVEL: 'warn',
 });
 // Con un buzón SMTP local (scripts/ci/peru-local-smtp-sink.mjs) el correo queda
@@ -44,7 +45,23 @@ const storageContractOrigin = process.env.LOCAL_STORAGE_PUBLIC_ORIGIN;
 if (storageContractOrigin && storageContractOrigin !== 'https://wypnbcptofqdmoynlonq.supabase.co') {
   throw new Error('Origen público Storage contractual inválido');
 }
-const nativeFetch = globalThis.fetch;
+const untracedFetch = globalThis.fetch;
+// Diagnóstico opt-in sólo en el arnés efímero: ruta/método/tiempo, nunca
+// cabeceras, consultas, cuerpos ni credenciales. No altera respuestas ni retries.
+const nativeFetch: typeof fetch = process.env.LOCAL_RETAIN_FAILED_EPHEMERAL_STACK === '1'
+  ? async (input, init) => {
+    const url=new URL(typeof input==='string'||input instanceof URL?input:input.url);
+    const started=Date.now(), operation={host:url.host,path:url.pathname,method:init?.method||(input instanceof Request?input.method:'GET')};
+    process.stdout.write('LOCAL_TRANSPORT_START '+JSON.stringify(operation)+'\n');
+    try {
+      const response=await untracedFetch(input,init);
+      process.stdout.write('LOCAL_TRANSPORT_END '+JSON.stringify({...operation,status:response.status,elapsedMs:Date.now()-started})+'\n');
+      return response;
+    } catch(error) {
+      process.stdout.write('LOCAL_TRANSPORT_ERROR '+JSON.stringify({...operation,kind:error?.name,elapsedMs:Date.now()-started})+'\n');
+      throw error;
+    }
+  } : untracedFetch;
 globalThis.fetch = async (input, init) => {
   const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
   // Sólo el ensayo Storage conserva el origen contractual del SQL; antes de
@@ -106,7 +123,7 @@ async function main() {
   const accounting = moduleRef.get(ContabilidadEventsListener);
   // La prueba decide cuándo consumir el outbox y puede observar primero la
   // transacción de venta. El procesador invocado sigue siendo el servicio real.
-  accounting.onApplicationBootstrap = () => undefined;
+  if (!process.argv.includes('--automatic-accounting')) accounting.onApplicationBootstrap = () => undefined;
   if (process.argv.includes('--accounting-once') || process.argv.includes('--accounting-drain')) {
     try {
       if (process.argv.includes('--accounting-drain')) {
@@ -139,7 +156,7 @@ async function main() {
   const app = moduleRef.createNestApplication({ logger: ['error', 'warn'] });
   app.use('/api/migration', migrationBodyParser());
   app.setGlobalPrefix('api');
-  app.enableCors({ origin: webUrl.origin, credentials: true });
+  app.enableCors({ origin: localAllowedOrigins, credentials: true });
   app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true, transformOptions: { enableImplicitConversion: true } }));
   await app.listen(port, '127.0.0.1');

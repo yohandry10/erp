@@ -12,6 +12,7 @@ interface ErrorResponse {
   statusCode: number;
   message: string;
   error: string;
+  code?: string;
   timestamp: string;
   path: string;
   tenantId?: string;
@@ -76,10 +77,13 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
 
     // Build error response
+    const internalCode = this.internalCode(message);
     const errorResponse: ErrorResponse = {
       statusCode,
       message: this.sanitizeMessage(message, statusCode),
       error,
+      // El código interno sigue disponible para quien lo necesite, fuera del texto.
+      ...(internalCode ? { code: internalCode } : {}),
       timestamp: new Date().toISOString(),
       path: request.url,
     };
@@ -131,19 +135,37 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         : 'Ocurrió un error inesperado. Inténtalo de nuevo más tarde.';
     }
 
-    // Sanitize database error messages
+    // Textos de PostgreSQL: llegan a una UI en español (antes se traducían al inglés).
     if (message.includes('duplicate key value')) {
-      return 'A record with this information already exists';
+      return 'Ya existe un registro con estos datos';
     }
 
     if (message.includes('foreign key constraint')) {
-      return 'Cannot perform this operation due to related records';
+      return 'No se puede completar la operación porque hay registros relacionados';
     }
 
     if (message.includes('violates check constraint')) {
-      return 'Invalid data provided';
+      return 'Los datos enviados no son válidos';
+    }
+
+    if (/invalid input syntax for type uuid/i.test(message)) {
+      return 'El identificador no es válido';
+    }
+
+    // Un código interno (p. ej. INVENTORY_MASTER_PRODUCT_NOT_FOUND) no es un texto
+    // para el usuario: se reemplaza según el estado y se conserva en `code`.
+    if (this.internalCode(message)) {
+      if (statusCode === 404) return 'No se encontró el registro solicitado';
+      if (statusCode === 409) return 'La operación no es compatible con el estado actual del registro';
+      if (statusCode === 403) return 'No tienes permiso para realizar esta operación';
+      return 'La solicitud no se pudo procesar con los datos enviados';
     }
 
     return message;
+  }
+
+  private internalCode(message: string | string[]): string | null {
+    const text = Array.isArray(message) ? message.join(', ') : String(message ?? '');
+    return /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/.test(text.trim()) ? text.trim() : null;
   }
 }

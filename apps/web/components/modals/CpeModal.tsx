@@ -1,6 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
+import { customAuth } from '@/lib/auth-service'
+import { useToast } from '@/components/ui/use-toast'
+import { readCpeCreationDraft, cpeCreationReceipt, cpeCreationInputNotApplied, type CpeCreationIntent } from '@/lib/cpe-creation-contract'
 import { useApiCall } from '@/hooks/use-api'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
 import { useCountryContext } from '@/hooks/use-country-context'
@@ -47,7 +51,14 @@ function argentinaDocumentLabel(value: string): string {
   } as Record<string, string>)[normalized] || normalized
 }
 
-export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) {
+export default function CpeModal(props: CpeModalProps) {
+  const { session } = useAuth()
+  if (!props.isOpen || !session?.user?.tenant_id || !session.user.id) return null
+  const actor = `${session.user.tenant_id}:${session.user.id}`
+  return <CpeCreationDialog key={actor} {...props} actor={actor} />
+}
+
+function CpeCreationDialog({ isOpen, onClose, onSuccess, actor }: CpeModalProps & { actor: string }) {
   const country = useCountryContext()
   const isArgentina = country.paisCodigo === 'AR'
   const isColombia = country.paisCodigo === 'CO'
@@ -107,10 +118,46 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
   // cold start. La intención se conserva ante un timeout para que un reintento
   // no pueda emitir un segundo comprobante si el servidor sí alcanzó a guardar
   // el primero.
-  const api = useApiCall({ throwOnError: true, timeoutMs: 30_000 })
+  const api = useApiCall({ requireLive: true, throwOnError: true, showErrorToast: false, retries: 0, timeoutMs: 30_000 })
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [selectedFiscalClient, setSelectedFiscalClient] = useState<Cliente | null>(null)
   const idempotencyKeyRef = useRef<string | null>(null)
+  const { toast } = useToast()
+  const scope = `erp.cpe-creation-draft.${actor.replace(':', '.')}.${country.paisCodigo}`
+  const activeScope = useRef('')
+  const restoredDraft = useRef(false)
+  const confirmed = useRef(false)
+  const writing = useRef(false)
+  const [draftReady, setDraftReady] = useState('')
+  const [pending, setPending] = useState<CpeCreationIntent | null>(null)
+  const pendingRef = useRef<CpeCreationIntent | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const locked = Boolean(pending || submitting) || draftReady !== scope
+
+  useEffect(() => {
+    if (country.loading || !country.paisCodigo || country.requiresSetup) return
+    activeScope.current = scope
+    try {
+      const draft = readCpeCreationDraft(localStorage.getItem(scope))
+      if (draft) {
+        restoredDraft.current = true
+        setFormData(draft.form as typeof formData)
+        setSelectedFiscalClient(draft.client)
+        pendingRef.current = draft.intent
+        setPending(draft.intent)
+        idempotencyKeyRef.current = draft.intent?.key ?? null
+      }
+      setDraftReady(scope)
+    } catch (error) { setSubmitError(error instanceof Error ? error.message : 'No se pudo recuperar el borrador.') }
+    return () => { activeScope.current = '' }
+  }, [scope, country.loading, country.paisCodigo, country.requiresSetup])
+
+  useEffect(() => {
+    if (draftReady !== scope || activeScope.current !== scope || confirmed.current) return
+    try { localStorage.setItem(scope, JSON.stringify({ version: 1, form: formData, client: selectedFiscalClient, intent: pending })) }
+    catch { setSubmitError('No se pudo conservar el borrador en este dispositivo. Verifique el almacenamiento antes de emitir.') }
+  }, [draftReady, scope, formData, selectedFiscalClient, pending])
+
   const resolvedArgentinaClass = isArgentina
     ? argentinaInvoiceClass(country.arcaCondicionIva, selectedFiscalClient?.arca_condicion_iva)
     : null
@@ -120,7 +167,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
   useEffect(() => {
     const opening = isOpen && !wasOpenRef.current
     wasOpenRef.current = isOpen
-    if (!country.moneda || !isOpen) return
+    if (!country.moneda || !isOpen || draftReady !== scope || restoredDraft.current) return
     const fiscalToday = fiscalDateForCountry(country.paisCodigo)
     setFormData((current) => ({
       ...current,
@@ -143,11 +190,59 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
           : current.fechaEmision,
     }))
     automaticEmissionDateRef.current = fiscalToday
-  }, [country.arcaPuntoVenta, country.moneda, country.paisCodigo, isArgentina, isColombia, isOpen])
+  }, [country.arcaPuntoVenta, country.moneda, country.paisCodigo, isArgentina, isColombia, isOpen, draftReady, scope])
+
+  const executeCreation = async (intent: CpeCreationIntent) => {
+    if (writing.current || draftReady !== scope || country.loading || country.requiresSetup) return
+    writing.current = true; setSubmitting(true); setSubmitError(null)
+    const current = scope
+    try {
+      const before = await customAuth.getRequestSession()
+      if (activeScope.current !== current || `${before.session?.user?.tenant_id || ''}:${before.session?.user?.id || ''}` !== actor) return
+      localStorage.setItem(scope, JSON.stringify({ version: 1, form: formData, client: selectedFiscalClient, intent }))
+      pendingRef.current = intent; setPending(intent)
+      const receipt = cpeCreationReceipt(await api.post('/api/cpe/comprobantes', intent.payload, { headers: { 'Idempotency-Key': intent.key } }), intent)
+      const canonical = await customAuth.getRequestSession()
+      if (activeScope.current !== current || `${canonical.session?.user?.tenant_id || ''}:${canonical.session?.user?.id || ''}` !== actor) return
+      confirmed.current = true
+      localStorage.removeItem(scope); pendingRef.current = null; setPending(null); idempotencyKeyRef.current = null
+      toast({ title: `Comprobante ${receipt.serie}-${receipt.numero} creado`, description: `Estado: ${receipt.estado}.` })
+      onSuccess(); onClose()
+    } catch (error) {
+      if (activeScope.current !== current) return
+      if (country.paisCodigo === 'PE' && cpeCreationInputNotApplied(error)) {
+        const canonical = await customAuth.getRequestSession()
+        if (activeScope.current !== current || pendingRef.current?.key !== intent.key
+            || `${canonical.session?.user?.tenant_id || ''}:${canonical.session?.user?.id || ''}` !== actor) return
+        localStorage.setItem(scope, JSON.stringify({ version: 1, form: formData, client: selectedFiscalClient, intent: null }))
+        pendingRef.current = null; setPending(null); idempotencyKeyRef.current = null
+        setSubmitError(`${error instanceof Error ? error.message : 'El comprobante no se creó.'} Corrija los datos y vuelva a emitir.`)
+      } else {
+        setSubmitError(`${error instanceof Error ? error.message : 'No se pudo confirmar la emisión.'} Se conserva el intento; reintente con los mismos datos.`)
+      }
+    } finally {
+      writing.current = false
+      if (activeScope.current === current) setSubmitting(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (writing.current || draftReady !== scope) return
+    if (pendingRef.current) { await executeCreation(pendingRef.current); return }
     setSubmitError(null)
+
+    if (country.paisCodigo === 'PE') {
+      const exportLines = formData.items.filter(item => item.afectacionIgv === '40');
+      if (formData.tipoOperacion === '0200' && (exportLines.length !== formData.items.length || formData.clienteTipoDocumento === 'RUC')) {
+        setSubmitError('La exportación de bienes requiere todas las líneas de exportación y un receptor no domiciliado identificado sin RUC.');
+        return;
+      }
+      if (formData.tipoOperacion === '0101' && exportLines.length) {
+        setSubmitError('Seleccione exportación de bienes para emitir líneas con afectación40.');
+        return;
+      }
+    }
 
     if (isArgentina && (!country.arcaPuntoVenta || !country.arcaCondicionIva)) {
       setSubmitError(
@@ -232,84 +327,19 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
       idempotency_key: currentIdempotencyKey,
       items: formData.items.map(({ afectacionIgv, ...item }) => ({
         ...item,
-        ...(isArgentina || isColombia
-          ? {
-              afectacion_igv: afectacionIgv,
-              tipo_afectacion_igv: afectacionIgv,
-            }
-          : {}),
+        afectacion_igv: afectacionIgv,
+        tipo_afectacion_igv: afectacionIgv,
       })),
       subtotal,
       totalIgv,
       total,
     }
 
-    try {
-      const result = await api.post('/api/cpe/comprobantes', cpeData, {
-        headers: { 'Idempotency-Key': currentIdempotencyKey },
-      })
-
-      if (!result) return
-
-      idempotencyKeyRef.current = null
-      setSelectedFiscalClient(null)
-      onSuccess()
-      onClose()
-      // Reset form
-      const fiscalToday = fiscalDateForCountry(country.paisCodigo)
-      automaticEmissionDateRef.current = fiscalToday
-      setFormData({
-        tipoComprobante: '01',
-        serie: isArgentina && country.arcaPuntoVenta
-          ? String(country.arcaPuntoVenta).padStart(5, '0')
-          : isColombia ? '' : 'F001',
-        clienteId: '',
-        clienteTipoDocumento: isArgentina ? 'CUIT' : isColombia ? 'NIT' : 'RUC',
-        clienteRuc: '',
-        clienteRazonSocial: '',
-        clienteDireccion: '',
-        fechaEmision: fiscalToday,
-        fechaVencimiento: '',
-        // Sin `|| 'PEN'`: esto es el estado inicial de un comprobante y viaja al
-        // servidor. Con el país sin resolver `country.moneda` es cadena vacía, y el
-        // respaldo emitía en soles para cualquier contribuyente.
-        moneda: country.moneda,
-        arcaConcepto: 1,
-        arcaFechaServicioDesde: '',
-        arcaFechaServicioHasta: '',
-        arcaFechaVencimientoPago: '',
-        arcaPagoMismaMoneda: 'S',
-        arcaTributos: [],
-        condicionPago: 'CONTADO',
-        medioPago: '10',
-        plazoPagoDias: 0,
-        tipoOperacion: '0101',
-        observaciones: '',
-        items: [
-          {
-            codigo: '',
-            descripcion: '',
-            cantidad: 1,
-            unidadMedida: 'NIU',
-            afectacionIgv: '10',
-            valorUnitario: 0,
-            precioUnitario: 0,
-            descuento: 0,
-            igv: 0,
-            total: 0
-          }
-        ]
-      })
-    } catch (error) {
-      setSubmitError(
-        error instanceof Error
-          ? error.message
-          : 'No se pudo crear el comprobante. Puedes reintentar sin duplicarlo.',
-      )
-    }
+    await executeCreation({ key: currentIdempotencyKey, payload: cpeData })
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    if (locked) return
     const { name, value } = e.target
     const normalizedValue = name === 'plazoPagoDias' || name === 'arcaConcepto'
       ? Number(value)
@@ -392,11 +422,13 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
   // La fuente registral auxiliar avisa antes de emitir y propone la razón
   // social. No sustituye la validación oficial que hará SUNAT al recibir el CPE.
   const rellenarConElPadron = (dato: ContribuyenteConsultado) => {
+    if (locked) return
     if (!dato.razonSocial) return
     setFormData(prev => (prev.clienteRazonSocial?.trim() ? prev : { ...prev, clienteRazonSocial: dato.razonSocial! }))
   }
 
   const seleccionarClienteFiscal = (clienteId: string, cliente?: Cliente) => {
+    if (locked) return
     idempotencyKeyRef.current = null
     setSubmitError(null)
     setSelectedFiscalClient(cliente ?? null)
@@ -417,7 +449,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
           const igv = item.afectacionIgv === '10' ? subtotalItem * nextTaxRate : 0
           return {
             ...item,
-            precioUnitario: isColombia
+            precioUnitario: isColombia || item.afectacionIgv !== '10'
               ? item.valorUnitario
               : item.valorUnitario * (1 + nextTaxRate),
             igv,
@@ -429,6 +461,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
   }
 
   const handleItemChange = (index: number, field: string, value: any) => {
+    if (locked) return
     const numericFields = new Set([
       'cantidad',
       'valorUnitario',
@@ -457,7 +490,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
         // En DIAN PriceAmount es el precio base de la línea. Mantener el valor
         // con IVA aquí produciría una Invoice que declara 119 como precio y
         // 100 como extensión para una unidad gravada al 19 %.
-        precioUnitario: isColombia ? valorUnitario : valorUnitario * (1 + effectiveTaxRate),
+        precioUnitario: isColombia || afectacionIgv !== '10' ? valorUnitario : valorUnitario * (1 + effectiveTaxRate),
         igv: igvItem,
         total: totalItem
       }
@@ -467,6 +500,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
   }
 
   const addItem = () => {
+    if (locked) return
     idempotencyKeyRef.current = null
     setSubmitError(null)
     setFormData(prev => ({
@@ -476,7 +510,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
         descripcion: '',
         cantidad: 1,
         unidadMedida: 'NIU',
-        afectacionIgv: '10',
+        afectacionIgv: prev.tipoOperacion === '0200' ? '40' : '10',
         valorUnitario: 0,
         precioUnitario: 0,
         descuento: 0,
@@ -487,6 +521,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
   }
 
   const removeItem = (index: number) => {
+    if (locked) return
     if (formData.items.length > 1) {
       idempotencyKeyRef.current = null
       setSubmitError(null)
@@ -498,6 +533,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
   }
 
   const addArcaTribute = () => {
+    if (locked) return
     idempotencyKeyRef.current = null
     setFormData((prev) => ({
       ...prev,
@@ -512,6 +548,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
   }
 
   const updateArcaTribute = (index: number, field: string, rawValue: string) => {
+    if (locked) return
     idempotencyKeyRef.current = null
     const canonicalDescriptions: Record<number, string> = {
       1: 'Impuestos nacionales',
@@ -534,6 +571,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
   }
 
   const removeArcaTribute = (index: number) => {
+    if (locked) return
     idempotencyKeyRef.current = null
     setFormData((prev) => ({
       ...prev,
@@ -552,24 +590,44 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
   const total = subtotal + totalIgv + totalOtrosTributos
 
   return (
-    <div className="fixed inset-0 z-[1100] flex items-center justify-center overflow-y-auto bg-[rgba(0,_0,_0,_0.5)] p-4">
+    <div role="dialog" aria-modal="true" aria-label="Nuevo comprobante electrónico" data-testid="cpe-creation-dialog" className="fixed inset-0 z-[1100] flex items-center justify-center overflow-y-auto bg-[rgba(0,_0,_0,_0.5)] p-4">
       <div className="max-h-[calc(100dvh-2rem)] w-[95%] max-w-[900px] overflow-y-auto rounded-xl bg-card p-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-semibold text-foreground">Nuevo Comprobante Electrónico</h2>
           <button
-            onClick={onClose} className="border-0 text-2xl cursor-pointer text-muted-foreground"
+            onClick={onClose} disabled={submitting} className="border-0 text-2xl cursor-pointer text-muted-foreground"
           >
             ×
           </button>
         </div>
 
         <form onSubmit={handleSubmit}>
+          {pending && <div role="status" data-testid="cpe-creation-pending-intent" className="mb-5 rounded-md border border-amber-500/40 bg-amber-500/10 p-4 text-sm">Hay un comprobante pendiente de confirmación. Reintentar conserva los datos enviados y evita otra emisión.</div>}
+          <fieldset disabled={locked} className="min-w-0 border-0 p-0">
           {/* Datos del Comprobante */}
           <div className="mb-8">
             <h3 className="text-xl font-semibold mb-4 text-foreground/85">
               Datos del Comprobante
             </h3>
             <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
+              {country.paisCodigo === 'PE' && (
+                <div>
+                  <label htmlFor="cpe-modal-tipo-operacion" className="block mb-2 font-semibold text-foreground/85">Tipo de operación *</label>
+                  <select id="cpe-modal-tipo-operacion" name="tipoOperacion" value={formData.tipoOperacion} onChange={e => {
+                    idempotencyKeyRef.current = null;
+                    setSubmitError(null);
+                    const operation = e.target.value;
+                    setFormData(prev => ({ ...prev, tipoOperacion: operation, items: prev.items.map(item => {
+                      const affectation = operation === '0200' ? '40' : item.afectacionIgv === '40' ? '10' : item.afectacionIgv;
+                      const igv = affectation === '10' ? item.cantidad * item.valorUnitario * effectiveTaxRate : 0;
+                      return { ...item, afectacionIgv: affectation, igv, precioUnitario: affectation === '10' ? item.valorUnitario * (1 + effectiveTaxRate) : item.valorUnitario, total: item.cantidad * item.valorUnitario + igv };
+                    }) }));
+                  }} required className="w-[100%] p-3 border rounded-[6px] text-sm">
+                    <option value="0101">Venta interna</option>
+                    <option value="0200">Exportación de bienes</option>
+                  </select>
+                </div>
+              )}
               <div>
                 <label htmlFor="cpe-modal-tipo-comprobante" className="block mb-2 font-semibold text-foreground/85">
                   Tipo de Comprobante *
@@ -835,10 +893,10 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
             <h3 className="text-xl font-semibold mb-4 text-foreground/85">
               Datos del Cliente
             </h3>
-            {(isArgentina || isColombia || formData.condicionPago === 'CREDITO') && (
+            {(isArgentina || isColombia || country.paisCodigo === 'PE' || formData.condicionPago === 'CREDITO') && (
               <div className="mb-4">
                 <label className="block mb-2 font-semibold text-foreground/85">
-                  {isArgentina ? 'Cliente maestro con condición IVA' : isColombia ? 'Cliente maestro con perfil DIAN' : 'Cliente maestro para crédito'} *
+                  {isArgentina ? 'Cliente maestro con condición IVA' : isColombia ? 'Cliente maestro con perfil DIAN' : 'Cliente para cobranza'}{isArgentina || isColombia || formData.condicionPago === 'CREDITO' ? ' *' : ' (opcional)'}
                 </label>
                 <ClienteSelector
                   value={formData.clienteId}
@@ -851,7 +909,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                     ? 'El documento, nombre y condición IVA se tomarán del maestro para resolver la clase A/B/C.'
                     : isColombia
                       ? 'El NIT, nombre y perfil tributario se tomarán del maestro para evitar inconsistencias ante DIAN.'
-                      : 'Selecciona el cliente al que se registrará la cuenta por cobrar.'}
+                      : 'Selecciona el cliente para generar su cuenta por cobrar. Si ingresas el receptor manualmente, vincúlalo desde el comprobante antes de cobrar.'}
                 </p>
                 {isArgentina && selectedFiscalClient?.arca_condicion_iva && (
                   <p className="mt-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
@@ -894,6 +952,8 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                     <>
                       <option value="RUC">RUC</option>
                       <option value="DNI">DNI</option>
+                      {country.paisCodigo === 'PE' && <option value="CE">Carné de extranjería</option>}
+                      {country.paisCodigo === 'PE' && <option value="PASAPORTE">Pasaporte</option>}
                     </>
                     )}
                   </select>
@@ -1140,13 +1200,13 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                     />
                   </div>
 
-                  {(isArgentina || isColombia) && (
+                  {(isArgentina || isColombia || country.paisCodigo === 'PE') && (
                     <div>
                       <label
                         htmlFor={`cpe-item-afectacion-${index}`}
                         className="block mb-2 font-semibold text-foreground/85"
                       >
-                        {isArgentina ? 'Tratamiento IVA ARCA *' : 'Afectación IVA DIAN *'}
+                        {isArgentina ? 'Tratamiento IVA ARCA *' : isColombia ? 'Afectación IVA DIAN *' : 'Afectación IGV SUNAT *'}
                       </label>
                       <select
                         id={`cpe-item-afectacion-${index}`}
@@ -1156,9 +1216,10 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                         required
                         className="w-[100%] p-2 border rounded-[4px] text-sm"
                       >
-                        <option value="10">10 - Gravado con IVA</option>
-                        <option value="20">20 - Exento de IVA</option>
-                        <option value="30">30 - {isArgentina ? 'No gravado' : 'Excluido de IVA'}</option>
+                        <option value="10">10 - Gravado con {nombreImpuesto}</option>
+                        <option value="20">20 - {country.paisCodigo === 'PE' ? 'Exonerado de IGV' : 'Exento de IVA'}</option>
+                        <option value="30">30 - {isArgentina ? 'No gravado' : country.paisCodigo === 'PE' ? 'Inafecto de IGV' : 'Excluido de IVA'}</option>
+                        {country.paisCodigo === 'PE' && formData.tipoOperacion === '0200' && <option value="40">40 - Exportación de bienes</option>}
                       </select>
                     </div>
                   )}
@@ -1218,9 +1279,10 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
             />
           </div>
 
+          </fieldset>
           {submitError && (
             <div
-              role="alert"
+              role="alert" data-testid="cpe-creation-error"
               className="mb-6 rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-800"
             >
               {submitError}
@@ -1230,15 +1292,15 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
           <div className="flex gap-4 justify-end">
             <button
               type="button"
-              onClick={onClose} className="py-3 px-6 border rounded-[6px] bg-card text-foreground/85 cursor-pointer font-semibold"
+              onClick={onClose} disabled={submitting} className="py-3 px-6 border rounded-[6px] bg-card text-foreground/85 cursor-pointer font-semibold"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={api.loading} className="py-3 px-6 border-0 rounded-[6px] text-white font-semibold"
+              disabled={submitting || draftReady !== scope || country.loading || country.requiresSetup} className="py-3 px-6 border-0 rounded-[6px] text-white font-semibold"
             >
-              {api.loading ? 'Creando...' : 'Crear Comprobante'}
+              {submitting ? 'Verificando...' : pending ? 'Reintentar emisión' : 'Crear Comprobante'}
             </button>
           </div>
         </form>

@@ -1,3 +1,6 @@
+import { cpeCreatedFixture } from './fixtures/cpe-create'
+import { cpeListFixture } from './fixtures/cpe-list'
+import { fiscalCountryFixture } from './fixtures/fiscal-country'
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { SignJWT } from 'jose'
 import fs from 'node:fs'
@@ -143,16 +146,15 @@ async function prepareColombiaSession(
       })
 
     if (/\/api\/auth\/profile\/?$/.test(pathname)) return json(user)
+    if (pathname.replace(/\/$/, '') === '/api/tenants/me') return json({ data: { id: user.tenant_id, nombre: 'Empresa aislada', estado: 'ACTIVO' } });
     if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
-      return json({
-        data: {
+      return json(fiscalCountryFixture(user.tenant_id, {
           pais_id: 2,
           pais: 'CO',
           paisCodigo: 'CO',
           monedaDefecto: 'COP',
           locale: 'es-CO',
-        },
-      })
+        }))
     }
     if (/\/api\/configuration\/status\/?$/.test(pathname)) {
       return json({ success: true, data: fiscalStatus })
@@ -165,7 +167,7 @@ async function prepareColombiaSession(
           body: JSON.stringify({ success: false, message: 'Estado demo no disponible' }),
         })
       }
-      return json({ is_demo: fiscalStatus.isDemo, is_expired: false })
+      return json({ is_demo: fiscalStatus.isDemo === true, is_expired: false, dias_restantes:10, expires_at:'2027-01-01T00:00:00Z' })
     }
     if (/\/api\/usuarios-sistema\/me\/permissions\/?$/.test(pathname)) {
       return json({ data: permissions })
@@ -191,9 +193,7 @@ async function prepareColombiaSession(
       })
     }
     if (/\/api\/cpe\/comprobantes\/?$/.test(pathname)) {
-      return json({
-        success: true,
-        data: [
+      return json(cpeListFixture([
           {
             id: '52600000-0000-4000-8000-000000000001',
             tipoDocumento: '01',
@@ -209,8 +209,7 @@ async function prepareColombiaSession(
             isDemoRepresentation: fiscalStatus.isDemo === true,
             fechaCreacion: '2026-08-29T12:00:00-05:00',
           },
-        ],
-      })
+        ]))
     }
     if (/\/api\/documentos\/lista\/?$/.test(pathname)) {
       return json({ success: true, data: colombiaLegacyDocuments })
@@ -494,9 +493,11 @@ test.describe('habilitación fiscal DIAN en CPE', () => {
     await prepareColombiaSession(context, page, {
       isDemo: true,
       fiscal: { isReady: false, missingItems: ['Modo demo'] },
-    })
+    }, [...dianAdminPermissions,{id:'p-order-invoice',tenant_id:user.tenant_id,modulo:'ventas',accion:'generar_factura',recurso:'pedidos'}])
 
     const pedidoId = '52600000-0000-4000-8000-000000000533'
+    let generatedDemoOrder=false
+    await page.route('**/api/cpe/comprobantes/52600000-0000-4000-8000-000000000534**',route=>route.fulfill({json:{success:true,data:{id:'52600000-0000-4000-8000-000000000534',documento_id:'52600000-0000-4000-8000-000000000536',tipo_documento:'01',serie:'FE01',numero:1,fecha_emision:'2026-09-04',estado:'BORRADOR',moneda:'COP',total_venta:119000,total_igv:19000,total_gravadas:100000,total_exoneradas:0,total_inafectas:0,total_exportacion:0,documento_receptor:'9001234568',simulated_origin:true,pais_codigo:'CO',items:[{codigo:'CO-LOCAL',unidad:'NIU',igv:19000,descripcion:'Producto demo Colombia',cantidad:1,precio_unitario:100000,valor_venta:100000}]}}}))
     await page.route(`**/api/ventas/pedidos/${pedidoId}**`, async (route) => {
       const request = route.request()
       const pathname = new URL(request.url()).pathname
@@ -507,6 +508,7 @@ test.describe('habilitación fiscal DIAN en CPE', () => {
       })
 
       if (request.method() === 'POST' && /\/generar-factura\/?$/.test(pathname)) {
+        generatedDemoOrder=true
         return json({
           success: true,
           factura_id: '52600000-0000-4000-8000-000000000534',
@@ -522,11 +524,11 @@ test.describe('habilitación fiscal DIAN en CPE', () => {
       return json({
         success: true,
         data: {
-          id: pedidoId,
+          id: pedidoId, tenant_id:user.tenant_id, cliente_id:'52600000-0000-4000-8000-000000000537', moneda:'COP',
           numero: 'PED-CO-0533',
-          estado: 'LISTO_FACTURAR',
+          estado: generatedDemoOrder?'FACTURADO':'LISTO_FACTURAR',
           created_at: '2026-09-04T10:00:00-05:00',
-          factura_id: null,
+          factura_id: generatedDemoOrder?'52600000-0000-4000-8000-000000000534':null,
           subtotal: 100_000,
           igv: 19_000,
           total: 119_000,
@@ -536,7 +538,7 @@ test.describe('habilitación fiscal DIAN en CPE', () => {
             razon_social: 'Cliente Demo Colombia S.A.S.',
           },
           detalle: [{
-            id: 'detalle-533',
+            id: '52600000-0000-4000-8000-000000000538', producto_id:'52600000-0000-4000-8000-000000000539', pedido_id:pedidoId, tenant_id:user.tenant_id, cantidad_facturada:generatedDemoOrder?1:0,
             descripcion: 'Producto demo Colombia',
             cantidad: 1,
             cantidad_despachada: 1,
@@ -716,7 +718,7 @@ test.describe('habilitación fiscal DIAN en CPE', () => {
       return route.fulfill({
         status: 201,
         contentType: 'application/json',
-        body: JSON.stringify({ success: true, data: { id: 'cpe-demo-colombia' } }),
+        body: JSON.stringify(cpeCreatedFixture(requests[requests.length-1].body)),
       })
     })
 
@@ -761,7 +763,7 @@ test.describe('habilitación fiscal DIAN en CPE', () => {
     await expect(excluido.getByRole('spinbutton', { name: 'IVA', exact: true })).toHaveValue('0.00')
 
     await page.getByRole('button', { name: 'Crear Comprobante' }).click()
-    await expect(page.locator('form [role="alert"]')).toHaveText('Fallo controlado de emisión')
+    await expect(page.locator('form [role="alert"]')).toHaveText('Fallo controlado de emisión Se conserva el intento; reintente con los mismos datos.')
 
     expect(requests).toHaveLength(1)
     const first = requests[0]?.body as {
@@ -801,7 +803,7 @@ test.describe('habilitación fiscal DIAN en CPE', () => {
       }),
     ])
 
-    await page.getByRole('button', { name: 'Crear Comprobante' }).click()
+    await page.getByRole('button', { name: 'Reintentar emisión', exact:true }).click()
     await expect(page.getByRole('heading', { name: 'Nuevo Comprobante Electrónico' })).toBeHidden()
 
     expect(requests).toHaveLength(2)
@@ -992,9 +994,7 @@ test.describe('habilitación fiscal DIAN en CPE', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          data: [{
+        body: JSON.stringify(cpeListFixture([{
             id: issuedInvoiceId,
             tipoDocumento: '01',
             tipoComprobante: 'Factura electrónica',
@@ -1007,8 +1007,7 @@ test.describe('habilitación fiscal DIAN en CPE', () => {
             moneda: 'COP',
             estado: 'ACEPTADO',
             fechaCreacion: '2026-08-29T12:00:00-05:00',
-          }],
-        }),
+          }])) ,
       })
     })
     await page.route('**/api/compras/proveedores**', async (route) => {

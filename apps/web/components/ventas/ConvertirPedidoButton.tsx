@@ -18,7 +18,7 @@ export default function ConvertirPedidoButton({
   onSuccess,
   disabled = false,
 }: ConvertirPedidoButtonProps) {
-  const { post } = useApi();
+  const { get, post } = useApi({ showErrorToast: false });
   const [converting, setConverting] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
 
@@ -49,6 +49,22 @@ export default function ConvertirPedidoButton({
         );
       }
     } catch (error: any) {
+      // El writer puede haber confirmado el pedido aunque se pierda el ACK.
+      // Recuperar su vínculo mediante lectura evita una segunda conversión.
+      try {
+        const current = await get(`/api/ventas/cotizaciones/${cotizacionId}`);
+        const quote = current?.success ? current.data : null;
+        if (quote?.id === cotizacionId && quote.estado === "CONVERTIDA" && quote.pedido_id) {
+          if (onSuccess) {
+            onSuccess(quote.pedido_id, { pedido_id: quote.pedido_id, cotizacion: quote, recovered: true });
+          } else {
+            toast({ title: "Pedido existente recuperado", description: "La conversión quedó confirmada. Se conserva el pedido vinculado." });
+          }
+          return;
+        }
+      } catch {
+        // Una consulta indisponible no acredita que la conversión se completó.
+      }
       console.error("Error converting cotización:", error);
       toast({
         title: "Error",

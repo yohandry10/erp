@@ -1,3 +1,4 @@
+import { UuidParamPipe } from '../../../common/pipes/uuid-param.pipe';
 import {
   Controller,
   Get,
@@ -131,7 +132,7 @@ export class PedidosController {
     description: 'Obtiene las decisiones registradas para el pedido (aprobaciones/rechazos)',
   })
   @ApiResponse({ status: 200, description: 'Historial obtenido exitosamente' })
-  async obtenerHistorialAprobaciones(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+  async obtenerHistorialAprobaciones(@Param('id', UuidParamPipe) id: string, @CurrentTenant() tenantId: string) {
     return this.pedidosService.obtenerHistorialAprobaciones(id, tenantId);
   }
 
@@ -148,7 +149,7 @@ export class PedidosController {
   @ApiResponse({ status: 403, description: 'El creador no puede decidir su propio pedido' })
   @ApiResponse({ status: 409, description: 'El pedido ya no está pendiente de aprobación' })
   async decidirAprobacion(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Body() decidirAprobacionDto: DecidirAprobacionDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
@@ -177,7 +178,7 @@ export class PedidosController {
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 403, description: 'Sin permisos' })
   @ApiResponse({ status: 404, description: 'Pedido no encontrado' })
-  async findOne(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+  async findOne(@Param('id', UuidParamPipe) id: string, @CurrentTenant() tenantId: string) {
     const pedido = await this.pedidosService.findOne(id, tenantId);
     return {
       success: true,
@@ -201,7 +202,7 @@ export class PedidosController {
   @ApiResponse({ status: 403, description: 'Sin permisos' })
   @ApiResponse({ status: 404, description: 'Pedido no encontrado' })
   async update(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Body() updatePedidoDto: UpdatePedidoDto,
     @CurrentTenant() tenantId: string,
   ) {
@@ -228,7 +229,7 @@ export class PedidosController {
   @ApiResponse({ status: 403, description: 'Sin permisos' })
   @ApiResponse({ status: 404, description: 'Pedido no encontrado' })
   async confirmar(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
   ) {
@@ -255,7 +256,7 @@ export class PedidosController {
   @ApiResponse({ status: 403, description: 'Sin permisos' })
   @ApiResponse({ status: 404, description: 'Pedido no encontrado' })
   async cancelar(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Body() cancelarPedidoDto: CancelarPedidoDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @CurrentTenant() tenantId: string,
@@ -287,7 +288,7 @@ export class PedidosController {
   @ApiResponse({ status: 403, description: 'Sin permisos' })
   @ApiResponse({ status: 404, description: 'Pedido no encontrado' })
   async generarFactura(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
   ) {
@@ -308,7 +309,7 @@ export class PedidosController {
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 403, description: 'Sin permisos' })
   @ApiResponse({ status: 404, description: 'Pedido no encontrado' })
-  async getHistorial(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+  async getHistorial(@Param('id', UuidParamPipe) id: string, @CurrentTenant() tenantId: string) {
     return this.pedidosService.getHistorial(id, tenantId);
   }
 
@@ -321,7 +322,7 @@ export class PedidosController {
     summary: 'Listar GRE asociadas',
     description: 'Obtiene las guías de remisión vinculadas al pedido',
   })
-  async listarGresDelPedido(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+  async listarGresDelPedido(@Param('id', UuidParamPipe) id: string, @CurrentTenant() tenantId: string) {
     const data = await this.pedidosService.obtenerGreAsociadas(id, tenantId);
     return { success: true, data };
   }
@@ -366,7 +367,7 @@ export class PedidosController {
   @ApiResponse({ status: 403, description: 'Sin permisos' })
   @ApiResponse({ status: 404, description: 'Pedido no encontrado' })
   async generarDocumento(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Body('tipo_documento') tipoDocumento: '01' | '03',
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,

@@ -14,6 +14,7 @@ import {
   RegistrarAjusteFiscalDto,
   RegistrarAnticipoDto,
   RevertirAjusteFiscalCxcDto,
+  RevertirDetraccionProveedorDto,
 } from '../modules/retenciones/dto/retenciones-input.dto';
 
 @ApiTags('Finanzas - Ajustes fiscales y anticipos')
@@ -84,6 +85,14 @@ export class RetencionesController {
     @Body() dto: DepositarDetraccionDto,
   ) {
     return this.retencionesService.depositarDetraccion(tenantId, id, user?.id, dto);
+  }
+
+  @Post(':id/revertir-detraccion-proveedor')
+  @RequirePermission('finanzas.cxp.gestionar')
+  @ApiOperation({ summary: 'Revertir una detracción de proveedor que aún no fue depositada' })
+  revertirDetraccionProveedor(@Param('id') id: string, @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any, @Body() dto: RevertirDetraccionProveedorDto) {
+    return this.retencionesService.revertirDetraccionProveedor(tenantId, id, user?.id, dto);
   }
 
   @Post(':id/revertir-ajuste-cxc')

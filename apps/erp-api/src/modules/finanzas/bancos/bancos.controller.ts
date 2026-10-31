@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { UuidParamPipe } from '../../../common/pipes/uuid-param.pipe';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../../common/guards/permission.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
@@ -49,7 +50,7 @@ export class BancosController {
   @ApiResponse({ status: 404, description: 'Cuenta bancaria no encontrada' })
   @ApiResponse({ status: 400, description: 'Error al obtener la cuenta bancaria' })
   async obtenerCuentaBancariaPorId(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @CurrentTenant() tenantId: string,
   ) {
     return this.bancosService.obtenerCuentaBancariaPorId(tenantId, id);
@@ -82,7 +83,7 @@ export class BancosController {
   @ApiResponse({ status: 404, description: 'Cuenta bancaria no encontrada' })
   @ApiResponse({ status: 400, description: 'Datos inválidos o cuenta duplicada' })
   async actualizarCuentaBancaria(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Body() actualizarCuentaDto: ActualizarCuentaBancariaDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
@@ -101,7 +102,7 @@ export class BancosController {
   @ApiResponse({ status: 404, description: 'Cuenta bancaria no encontrada' })
   @ApiResponse({ status: 400, description: 'Error al obtener los movimientos bancarios' })
   async obtenerMovimientosBancarios(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Query() query: ListarMovimientosQueryDto,
     @CurrentTenant() tenantId: string,
   ) {
@@ -160,7 +161,7 @@ export class BancosController {
   @ApiResponse({ status: 404, description: 'Cuenta bancaria no encontrada' })
   @ApiResponse({ status: 400, description: 'Error al exportar los movimientos' })
   async exportarMovimientosBancarios(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Query() query: ListarMovimientosQueryDto,
     @CurrentTenant() tenantId: string,
   ) {

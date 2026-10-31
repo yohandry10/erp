@@ -36,7 +36,7 @@ export function CashClosingDialog({ isOpen, onClose, onSuccess, sesionId }: Cash
     // Este flujo necesita el mensaje autoritativo del backend (PIN, permiso,
     // sesión o configuración). El modo por defecto del hook convierte errores
     // en `null`, lo que antes reemplazaba todo por "Error al cerrar caja".
-    const { get, post } = useApi({ throwOnError: true });
+    const { get, post } = useApi({ throwOnError: true, requireLive: true });
     const [step, setStep] = useState<'VALIDATING' | 'COUNT' | 'REVIEW' | 'JUSTIFICATION' | 'CONFIRM'>('VALIDATING');
     const [validation, setValidation] = useState<PreCloseValidation | null>(null);
     const [denominaciones, setDenominaciones] = useState<Denominaciones>({ billetes: {}, monedas: {} });
@@ -324,7 +324,7 @@ export function CashClosingDialog({ isOpen, onClose, onSuccess, sesionId }: Cash
 
                                             <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
                                                 <div className="sm:col-span-1">
-                                                    <dt className="text-sm font-medium text-muted-foreground">Saldo Sistema</dt>
+                                                    <dt className="text-sm font-medium text-muted-foreground">Efectivo esperado</dt>
                                                     <dd className="mt-1 text-lg font-semibold text-foreground">
                                                         {currencySymbol} {montoEsperado.toFixed(2)}
                                                     </dd>
@@ -354,9 +354,9 @@ export function CashClosingDialog({ isOpen, onClose, onSuccess, sesionId }: Cash
                                             </dl>
                                         </div>
 
-                                        {preview?.redondeo_efectivo_legal ? (
+                                        {Number(preview?.redondeo_efectivo_documentado || 0) > 0 ? (
                                             <div className="rounded-md border border-sky-400/30 bg-sky-400/10 p-4 text-sm text-sky-200">
-                                                La diferencia corresponde al redondeo legal del pago en efectivo en Perú y coincide con {preview.redondeo_efectivo_cantidad} ajuste(s) documentado(s) por un total de S/ {Number(preview.redondeo_efectivo_documentado || 0).toFixed(2)}. Se conservará como redondeo, no como faltante, y no requiere supervisor.
+                                                El efectivo esperado ya descuenta {preview!.redondeo_efectivo_cantidad} ajuste(s) de redondeo documentado por {currencySymbol} {Number(preview!.redondeo_efectivo_documentado || 0).toFixed(2)}. La diferencia final corresponde al arqueo del cajero; el redondeo se conserva por separado.
                                             </div>
                                         ) : null}
 

@@ -24,6 +24,18 @@ export enum TipoDocumentoManual {
   CONTRATO = 'CONTRATO',
 }
 
+// El repositorio también contiene comprobantes emitidos por CPE/POS/GRE.
+// Ampliar la lectura no habilita su creación mediante el writer manual.
+export enum TipoDocumentoFiltro {
+  FACTURA = 'FACTURA',
+  BOLETA = 'BOLETA',
+  CONTRATO = 'CONTRATO',
+  NOTA_CREDITO = 'NOTA_CREDITO',
+  NOTA_DEBITO = 'NOTA_DEBITO',
+  GUIA_REMISION = 'GUIA_REMISION',
+  TICKET = 'TICKET',
+}
+
 export enum CondicionPagoDocumento {
   CONTADO = 'CONTADO',
   CREDITO = 'CREDITO',
@@ -195,8 +207,8 @@ export class ValidarRucDto {
 
 export class DocumentoFiltrosDto {
   @IsOptional()
-  @IsEnum(TipoDocumentoManual)
-  tipo_documento?: TipoDocumentoManual;
+  @IsEnum(TipoDocumentoFiltro)
+  tipo_documento?: TipoDocumentoFiltro;
 
   @IsOptional()
   @IsString()

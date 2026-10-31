@@ -28,7 +28,7 @@ interface BankOption {
 export function CashWithdrawalDialog({ isOpen, onClose, onSuccess, sesionId }: CashWithdrawalDialogProps) {
     const country = useCountryContext();
     const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$');
-    const { get, post } = useApi();
+    const { get, post } = useApi({ throwOnError: true, requireLive: true });
     const [monto, setMonto] = useState<string>('');
     const [motivo, setMotivo] = useState<string>('DEPOSITO_BANCARIO');
     const [detalle, setDetalle] = useState<string>('');

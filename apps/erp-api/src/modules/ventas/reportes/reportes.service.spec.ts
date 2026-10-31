@@ -64,6 +64,17 @@ describe('ReportesService', () => {
       expect(top.map(row => [row.moneda, row.total_facturacion, row.porcentaje_total])).toEqual([['PEN', 150, 100], ['USD', 20, 100]]);
     });
 
+    it('devuelve totales monetarios exactos en JSON al sumar centavos', async () => {
+      respuestas = { pedidos_venta: { count: 2, data: [pedido('PEN', 0.1), pedido('PEN', 0.2)] } };
+      const ventas: any[] = await service.getVentasPorCliente('tenant-a');
+      const estados: any[] = await service.getPedidosPorEstado('tenant-a');
+      const top = await service.getTopClientes('tenant-a');
+      expect(ventas[0].total).toBe(0.3);
+      expect(estados[0].total).toBe(0.3);
+      expect(top[0].total_facturacion).toBe(0.3);
+      expect(JSON.stringify([ventas, estados, top])).not.toContain('0.30000000000000004');
+    });
+
     it('incluye pedidos posteriores a la primera página de PostgREST', async () => {
       respuestas = { pedidos_venta: { count: 1001, data: Array.from({ length: 1001 }, () => pedido('PEN', 1)) } };
       const ventas: any[] = await service.getVentasPorCliente('tenant-a');

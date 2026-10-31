@@ -411,6 +411,14 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
             await this.handleAjusteCxpRegistrado(evento);
             break;
 
+          case 'cxp.ajuste.revertido':
+            await this.asientosGenerator.generarAsientoReversaDetraccionProveedor({
+              ...evento.event_data,
+              tenantId: this.ensureEventTenant(evento.event_data, evento.event_type),
+              eventId: evento.event_id,
+            });
+            break;
+
           case 'nota_credito.emitida':
             await this.handleNotaCreditoEmitida(evento);
             break;
@@ -444,6 +452,17 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
           case 'devolucion.proveedor.registrada':
           case 'DevolucionProveedorEmitida':
             await this.handleDevolucionProveedorRegistrada(evento);
+            break;
+
+          case 'nota_credito.proveedor.registrada':
+          case 'credito.proveedor.aplicado':
+          case 'credito.proveedor.reembolsado':
+            await this.asientosGenerator.generarAsientoCreditoProveedor({
+              ...evento.event_data,
+              tenantId: this.ensureEventTenant(evento.event_data, evento.event_type),
+              eventId: evento.event_id,
+              tipoEvento: evento.event_type,
+            });
             break;
 
           case 'cxc.creada':
@@ -1044,7 +1063,12 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
     if (!Number.isFinite(diferencia)) {
       throw new Error('Evento caja.cerrada con diferencia inválida');
     }
-    if (Math.abs(diferencia) <= 0.009) {
+    const cierreFisico = Number(eventData.schemaVersion ?? 0) >= 570;
+    const redondeoDocumentado = cierreFisico ? Number(eventData.redondeoEfectivoDocumentado ?? 0) : 0;
+    if (!Number.isFinite(redondeoDocumentado) || redondeoDocumentado < 0) {
+      throw new Error('Evento caja.cerrada con redondeo documentado inválido');
+    }
+    if (Math.abs(diferencia) <= 0.009 && redondeoDocumentado <= 0.009) {
       this.logger.log(
         `ℹ️ [ContabilidadEventsListener] Cierre ${eventData.sesionCajaId ?? evento.event_id} sin diferencia; no requiere asiento.`,
       );
@@ -1063,6 +1087,9 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
       caja_id: eventData.cajaId,
       tipo_diferencia: eventData.tipoDiferencia,
       redondeo_efectivo_legal: eventData.redondeoEfectivoLegal === true,
+      schema_version: eventData.schemaVersion,
+      diferencia_nominal: eventData.diferenciaNominal,
+      redondeo_efectivo_documentado: redondeoDocumentado,
     };
 
     const asientoCreado = await this.asientosGenerator.generarAsientoCierreCaja(cierreData);
@@ -1278,6 +1305,8 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
         montoContabilizado: eventData.montoContabilizado ?? eventData.monto_contabilizado,
         montoLiquidacion: eventData.montoLiquidacion ?? eventData.monto_liquidacion,
         diferenciaCambio: eventData.diferenciaCambio ?? eventData.diferencia_cambio,
+        // El ingreso va a la cuenta contable del banco elegido en el cobro.
+        cuenta_bancaria_id: eventData.cuentaBancariaId ?? eventData.cuenta_bancaria_id,
         centro_costo_id: eventData.centro_costo_id,
         referencia: eventData.numeroDocumento || eventData.referencia,
         event_id: evento.event_id || eventData.eventId
@@ -1321,6 +1350,7 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
         montoLiquidacion: eventData.montoLiquidacion ?? eventData.monto_liquidacion,
         diferenciaCambio: eventData.diferenciaCambio ?? eventData.diferencia_cambio,
         medio: eventData.medio ?? eventData.metodoPago ?? eventData.metodo_pago,
+        cuenta_bancaria_id: eventData.cuentaBancariaId ?? eventData.cuenta_bancaria_id,
         referencia: eventData.referencia ?? eventData.cobroId ?? eventData.cobro_id,
         event_id: evento.event_id || eventData.eventId,
       };
@@ -1562,6 +1592,7 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
       montoTesoreria: eventData.montoTesoreria ?? eventData.monto_tesoreria,
       diferenciaCambio: eventData.diferenciaCambio ?? eventData.diferencia_cambio,
       medio: eventData.medio,
+      cuenta_bancaria_id: eventData.cuentaBancariaId ?? eventData.cuenta_bancaria_id,
       referencia: eventData.referencia ?? eventData.saldoFavorId,
       event_id: evento.event_id || eventData.eventId,
     };
@@ -1590,6 +1621,7 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
       montoTesoreria: eventData.montoTesoreria ?? eventData.monto_tesoreria,
       diferenciaCambio: eventData.diferenciaCambio ?? eventData.diferencia_cambio,
       medio: eventData.medio,
+      cuenta_bancaria_id: eventData.cuentaBancariaId ?? eventData.cuenta_bancaria_id,
       referencia: eventData.referencia ?? eventData.saldoFavorId,
       event_id: evento.event_id || eventData.eventId,
     };
@@ -1819,6 +1851,10 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
         montoContabilizado: eventData.montoContabilizado,
         montoLiquidacion: eventData.montoLiquidacion,
         diferenciaCambio: eventData.diferenciaCambio,
+        // Conservar el medio: un egreso de caja no usa la cuenta de resumen10.
+        metodo_pago: eventData.metodoPago ?? eventData.metodo_pago,
+        // El egreso sale de la cuenta contable del banco elegido en el pago.
+        cuenta_bancaria_id: eventData.cuentaBancariaId ?? eventData.cuenta_bancaria_id,
         centro_costo_id: eventData.centro_costo_id,
         referencia: eventData.numeroDocumento || eventData.referencia,
         event_id: evento.event_id || eventData.eventId
@@ -1904,11 +1940,24 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
     try {
       const eventData = evento.event_data;
       const tenantId = this.ensureEventTenant(eventData, 'ajuste.inventario');
+      const rawValue = eventData.valor ?? eventData.valorDiferencia;
+      if (rawValue !== undefined && rawValue !== null && Number(rawValue) === 0) {
+        if (!Number.isInteger(Number(eventData.schemaVersion)) || Number(eventData.schemaVersion) < 570
+            || eventData.costoCeroConfirmado !== true
+            || eventData.costoUnitario === undefined || eventData.costoUnitario === null
+            || eventData.costoUnitario === '' || Number(eventData.costoUnitario) !== 0
+            || !Number.isFinite(Number(eventData.cantidad)) || !(Number(eventData.cantidad) > 0)
+            || !eventData.movimientoId || !eventData.operacionId) {
+          throw new Error('Ajuste de inventario sin valor requiere costo cero confirmado en su movimiento');
+        }
+        this.logger.log(`Ajuste ${eventData.operacionId} a costo cero confirmado: movimiento físico sin asiento monetario`);
+        return;
+      }
       
       const ajusteData = {
         tenant_id: tenantId,
         fecha: eventData.fecha || new Date().toISOString(),
-        valor: Math.abs(eventData.valor || eventData.valorDiferencia),
+        valor: Math.abs(rawValue),
         tipo: eventData.tipo || (eventData.diferencia > 0 ? 'SOBRANTE' : 'FALTANTE'),
         centro_costo_id: eventData.centro_costo_id,
         referencia: eventData.referencia || `Ajuste ${eventData.productoId}`,
@@ -1958,6 +2007,7 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
         neto: eventData.totalNeto || eventData.neto,
         centro_costo_id: eventData.centro_costo_id,
         planilla_id: eventData.planillaId,
+        pais_codigo: eventData.paisCodigo,
         referencia: eventData.planillaId ? `PLANILLA-${eventData.planillaId}` : eventData.periodo,
         source_event_id: evento.event_id || eventData.eventId || eventData.planillaId || evento.aggregate_id,
         event_id: evento.event_id || eventData.eventId

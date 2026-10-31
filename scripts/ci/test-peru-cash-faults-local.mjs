@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import {randomUUID} from 'node:crypto';import {execFileSync} from 'node:child_process';
+import {fetchWithLocalLoginRetry} from './peru-local-http.mjs';
 assert.equal(process.env.E2E_EPHEMERAL_LOCAL_DB,'1');assert.equal(process.env.PGHOST,'127.0.0.1');assert.equal(process.env.PGDATABASE,'erp_e2e');
 const output=process.env.LOCAL_INTEGRATED_OUTPUT_DIR,fixture=JSON.parse(fs.readFileSync(path.join(output,'cash-browser-fixture.json'))),first=JSON.parse(fs.readFileSync(path.join(output,'cash-first-fixture.json')));
 const api=process.env.LOCAL_API_URL;assert.equal(new URL(api).hostname,'127.0.0.1');assert.match(fixture.tenant,/^[0-9a-f-]{36}$/);assert.match(fixture.caja_id,/^[0-9a-f-]{36}$/);
 const sql=query=>execFileSync(process.env.PSQL_BIN,['-XqAt','-h','127.0.0.1','-p',process.env.PGPORT,'-U','postgres','-d','erp_e2e','-v','ON_ERROR_STOP=1'],{input:query,encoding:'utf8',windowsHide:true}).trim();
 const q=value=>{assert.match(value,/^[0-9a-f-]{36}$/);return "'"+value+"'::uuid";};
-let token,session;const scenarios=[],requests=[];
+let token,session,completed=false;const scenarios=[],requests=[];
 async function raw(endpoint,body,key=randomUUID()){
- const response=await fetch(api+'/api/'+endpoint,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json','idempotency-key':key,...(token?{authorization:'Bearer '+token}:{})},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(30000)});
+ const response=await fetchWithLocalLoginRetry(api+'/api/'+endpoint,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json','idempotency-key':key,...(token?{authorization:'Bearer '+token}:{})},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(30000)});
  const value=await response.json();requests.push({method:body===undefined?'GET':'POST',endpoint:endpoint.replace(/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}/gi,':id'),status:response.status});return {status:response.status,data:value.data??value};
 }
 const call=async(endpoint,body,status=body===undefined?200:201,key=randomUUID())=>{const result=await raw(endpoint,body,key);assert.equal(result.status,status,endpoint+': '+JSON.stringify(result.data));return result.data;};
@@ -49,11 +50,17 @@ try{
   try{await call('cajas/validar-cierre/'+session.id,body,503);}catch(failure){error=failure;}finally{sql('GRANT SELECT ON public.movimientos_caja TO service_role;');}
   const recovered=await call('cajas/validar-cierre/'+session.id,body);assert.equal(recovered.saldo_teorico,104.01);assert.equal(fingerprint(),before);if(error)throw error;
  });
- const reportSession=sql(`SELECT sesion_caja_id FROM cortes_caja WHERE id=${q(fixture.first_cut_id)};`);
+ const reportSession=sql(`SELECT sesion_caja_id FROM cortes_caja WHERE tenant_id=${q(fixture.tenant)} AND id=${q(fixture.first_cut_id)};`);
+ const reportCaja=sql(`SELECT caja_id FROM sesiones_caja WHERE tenant_id=${q(fixture.tenant)} AND id=${q(reportSession)};`);q(reportCaja);
+ await check('Caja: Corte Z consulta la caja vinculada y rechaza otra caja del mismo tenant sin efectos',async()=>{
+  const before=fingerprint();assert.notEqual(reportCaja,fixture.faults_caja_id);
+  await call('cajas/'+reportCaja+'/corte-z?sesionId='+reportSession);
+  await call('cajas/'+fixture.faults_caja_id+'/corte-z?sesionId='+reportSession,undefined,404);assert.equal(fingerprint(),before);
+ });
  for(const table of ['ventas_pos','ventas_pos_pagos'])await check('Caja: reporte fiscal/pagos indisponible responde 503 para '+table,async()=>{
   const before=fingerprint();let error;sql('REVOKE SELECT ON public.'+table+' FROM service_role;');
-  try{await call('cajas/'+fixture.caja_id+'/corte-z?sesionId='+reportSession,undefined,503);}catch(failure){error=failure;}finally{sql('GRANT SELECT ON public.'+table+' TO service_role;');}
-  await call('cajas/'+fixture.caja_id+'/corte-z?sesionId='+reportSession);assert.equal(fingerprint(),before);if(error)throw error;
+  try{await call('cajas/'+reportCaja+'/corte-z?sesionId='+reportSession,undefined,503);}catch(failure){error=failure;}finally{sql('GRANT SELECT ON public.'+table+' TO service_role;');}
+  await call('cajas/'+reportCaja+'/corte-z?sesionId='+reportSession);assert.equal(fingerprint(),before);if(error)throw error;
  });
  await check('Caja: CSV conserva comillas/salto de línea y neutraliza fórmula del nombre de caja',async()=>{
   const caja=sql(`SELECT caja_id FROM sesiones_caja WHERE id=${q(reportSession)};`),name='=SUM(1,2), "caja"\nlocal';
@@ -65,4 +72,5 @@ try{
   await call('cajas/sesiones/'+session.id+'/cierre-administrativo',{razon_cierre:'Fin del ensayo local de fallos de caja'});
   assert.equal(sql(`SELECT estado FROM sesiones_caja WHERE id=${q(session.id)};`),'CERRADA');
  });
-}finally{fs.writeFileSync(path.join(output,'cash-faults.json'),JSON.stringify({success:scenarios.every(s=>s.passed),scenarios,requests,remoteWrites:false,complete_acceptance:false},null,2));}
+ completed=true;
+}finally{const success=completed&&scenarios.length===13&&scenarios.every(s=>s.passed);fs.writeFileSync(path.join(output,'cash-faults.json'),JSON.stringify({success,completed,scenarios,requests,remoteWrites:false,complete_acceptance:false},null,2));if(!success)process.exitCode=1;}

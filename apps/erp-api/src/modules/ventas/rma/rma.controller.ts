@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { UuidParamPipe } from '../../../common/pipes/uuid-param.pipe';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../../common/guards/permission.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
@@ -78,21 +79,21 @@ export class RmaController {
   @Get('saldos-favor/:id/cxc-aplicables')
   @RequirePermission('ventas.rma.generar_nota_credito')
   @ApiOperation({ summary: 'Listar CxC futuras compatibles con un saldo a favor' })
-  async listarCxcAplicables(@CurrentTenant() tenantId: string, @Param('id') id: string) {
+  async listarCxcAplicables(@CurrentTenant() tenantId: string, @Param('id', UuidParamPipe) id: string) {
     return this.rmaService.listarCxcAplicables(tenantId, id);
   }
 
   @Get('saldos-favor/:id')
   @RequirePermission('ventas.rma.ver')
   @ApiOperation({ summary: 'Obtener un saldo a favor y sus movimientos' })
-  async obtenerSaldoFavor(@CurrentTenant() tenantId: string, @Param('id') id: string) {
+  async obtenerSaldoFavor(@CurrentTenant() tenantId: string, @Param('id', UuidParamPipe) id: string) {
     return this.rmaService.obtenerSaldoFavor(tenantId, id);
   }
 
   @Get(':id')
   @RequirePermission('ventas.rma.ver')
   @ApiOperation({ summary: 'Obtener detalle de una RMA' })
-  async obtener(@CurrentTenant() tenantId: string, @Param('id') id: string) {
+  async obtener(@CurrentTenant() tenantId: string, @Param('id', UuidParamPipe) id: string) {
     return this.rmaService.obtenerPorId(tenantId, id);
   }
 
@@ -114,7 +115,7 @@ export class RmaController {
   async aprobar(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Body() dto: AprobarRmaDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
@@ -127,7 +128,7 @@ export class RmaController {
   async recepcionar(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Body() dto: RecepcionarRmaDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
@@ -140,7 +141,7 @@ export class RmaController {
   async revertirRecepcion(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Body() dto: RevertirRecepcionRmaDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
@@ -153,7 +154,7 @@ export class RmaController {
   async generarNotaCredito(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Body() dto: GenerarNotaCreditoDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
@@ -166,7 +167,7 @@ export class RmaController {
   async aplicarSaldoFavor(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Body() dto: AplicarSaldoFavorDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
@@ -179,7 +180,7 @@ export class RmaController {
   async reembolsarSaldoFavor(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Body() dto: ReembolsarSaldoFavorDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
@@ -192,7 +193,7 @@ export class RmaController {
   async revertirReembolsoSaldoFavor(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Param('movimientoId') movimientoId: string,
     @Body() dto: RevertirReembolsoSaldoFavorDto,
     @Headers('idempotency-key') idempotencyKey?: string,

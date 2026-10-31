@@ -1,0 +1,12 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "scope": "UI real del catálogo de productos con API/PostgreSQL locales",
+  "checks": [
+    {
+      "operation": "Sin lectura de productos el catálogo avisa en vez de mostrarse vacío",
+      "passed": true
+    }
+  ]
+}

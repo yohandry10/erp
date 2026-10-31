@@ -1,8 +1,9 @@
+import { leerConsultaCompleta } from './consulta-completa';
 import Decimal from 'decimal.js';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EstadosFinancierosService } from './estados-financieros.service';
-import { AdvertenciaTributaria, normalizarRegimenPeru } from './tributos-mensuales.service';
+import { AdvertenciaTributaria, consolidarFuentesMensuales, normalizarRegimenPeru } from './tributos-mensuales.service';
 import { uitPeruPorEjercicio } from './uit-peru';
 import { mutarTributo, TributoIntent } from './tributos-intent';
 
@@ -19,6 +20,7 @@ export interface AjustesTributariosAnuales {
 
 export interface FuentesTributariasAnuales {
   ingresos_netos: number;
+  otros_ingresos_revisados?: number;
   resultado_contable: number;
   activos_netos: number;
   pagos_cuenta_renta: number;
@@ -44,7 +46,7 @@ export function calcularRentaAnualItanPeru(
 ) {
   const uit = uitPeruPorEjercicio(ejercicio);
   const warnings: AdvertenciaTributaria[] = [];
-  const ingresosNetos = roundMoney(fuentes.ingresos_netos);
+  const ingresosNetos = roundMoney(fuentes.ingresos_netos + Number(fuentes.otros_ingresos_revisados || 0));
   const resultadoContable = roundMoney(fuentes.resultado_contable, false);
   const adiciones = roundMoney(ajustes.adiciones_tributarias);
   const deducciones = roundMoney(ajustes.deducciones_tributarias);
@@ -104,6 +106,7 @@ export function calcularRentaAnualItanPeru(
     formulario,
     uit,
     ingresos_netos: ingresosNetos,
+    otros_ingresos_revisados: roundMoney(fuentes.otros_ingresos_revisados),
     resultado_contable: resultadoContable,
     adiciones_tributarias: adiciones,
     deducciones_tributarias: deducciones,
@@ -160,28 +163,35 @@ export class TributosAnualesService {
     const [estado, balance, ventasResult, pagosResult, periodoResult] = await Promise.all([
       this.estadosFinancieros.getEstadoResultados(tenantId, ejercicio, 12),
       this.estadosFinancieros.getBalanceGeneral(tenantId, ejercicio, 12),
-      client.from('cpe').select('id, total_gravadas, total_exoneradas, total_inafectas, total_exportacion')
+      leerConsultaCompleta(() => client.from('cpe').select('id, documento_id, tipo_documento, estado, moneda, documento:documentos!documento_id(tipo_cambio), total_gravadas, total_exoneradas, total_inafectas, total_exportacion')
         .eq('tenant_id', tenantId).gte('fecha_emision', desde).lt('fecha_emision', hasta)
-        .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA","RECHAZADO")'),
-      client.from('tributos_declaraciones_mensuales').select('pago_cuenta_renta')
+        .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA","RECHAZADO")').order('id')),
+      client.from('tributos_declaraciones_mensuales').select('periodo, estado, pago_cuenta_renta, source_snapshot')
         .eq('tenant_id', tenantId).gte('periodo', `${ejercicio}-01`).lte('periodo', `${ejercicio}-12`)
-        .eq('estado', 'PRESENTADA'),
+        .eq('vigente', true),
       client.from('periodos_contables').select('estado').eq('tenant_id', tenantId)
         .eq('anio', ejercicio).eq('mes', 12).maybeSingle(),
     ]);
     if (ventasResult.error) throw new Error(`No se pudieron consolidar ventas anuales: ${ventasResult.error.message}`);
     if (pagosResult.error) throw new Error(`No se pudieron consolidar pagos mensuales: ${pagosResult.error.message}`);
     if (periodoResult.error) throw new Error(`No se pudo verificar el cierre anual: ${periodoResult.error.message}`);
-    const ventas = ventasResult.data || [];
-    const ingresosNetos = ventas.reduce((total, row: any) => total
-      + Number(row.total_gravadas || 0) + Number(row.total_exoneradas || 0)
-      + Number(row.total_inafectas || 0) + Number(row.total_exportacion || 0), 0);
-    const pagosCuenta = (pagosResult.data || []).reduce((total: number, row: any) => total + Number(row.pago_cuenta_renta || 0), 0);
+    // El anual usa la misma fuente documental que el mensual: una nota de
+    // crédito reduce los ingresos y un ticket interno no forma parte de ellos.
+    const { fuentes: ingresos, ventasMes: ventas } = consolidarFuentesMensuales(
+      ventasResult.data || [], ventasResult.data || [], [],
+    );
+    const ingresosNetos = ingresos.ingresos_netos_acumulados;
+    const declaraciones = pagosResult.data || [];
+    const pagosCuenta = declaraciones.filter((row: any) => row.estado === 'PRESENTADA')
+      .reduce((total: number, row: any) => total + Number(row.pago_cuenta_renta || 0), 0);
+    const otrosIngresosRevisados = declaraciones.reduce((total: number, row: any) =>
+      total + Number(row.source_snapshot?.ajustes_renta?.otros_ingresos_renta_mes || 0), 0);
     const advertenciaBalance = (balance as any).advertencia_balance;
     const corte = new Date().toISOString();
     return {
       fuentes: {
         ingresos_netos: ingresosNetos,
+        otros_ingresos_revisados: otrosIngresosRevisados,
         resultado_contable: Number(estado.utilidad_neta || 0),
         activos_netos: Number(balance.activos.total_activos || 0),
         pagos_cuenta_renta: pagosCuenta,
@@ -193,9 +203,14 @@ export class TributosAnualesService {
         corte,
         ejercicio,
         ventas_origen: 'cpe',
+        moneda_calculo: 'PEN',
+        conversion: 'tipo_cambio_documental_congelado',
         cantidad_ventas: ventas.length,
+        ingresos_fuera_cpe_origen: 'ajustes_mensuales_vigentes_revisados',
+        otros_ingresos_revisados: otrosIngresosRevisados,
         resultado_origen: 'estado_resultados_diciembre',
         activos_origen: 'balance_general_diciembre',
+        itan_ejercicio: ejercicio + 1,
         pagos_cuenta_origen: 'declaraciones_mensuales_presentadas',
         ejercicio_cerrado: periodoResult.data?.estado === 'CERRADO',
       },
@@ -208,11 +223,20 @@ export class TributosAnualesService {
       this.configuracion(tenantId),
       this.fuentes(tenantId, ejercicio),
     ]);
-    const calculo = calcularRentaAnualItanPeru(ejercicio, regimen, fuentes, ajustes);
     const { data: declaracion, error } = await this.supabase.getClient()
       .from('tributos_declaraciones_anuales').select('*')
       .eq('tenant_id', tenantId).eq('ejercicio', ejercicio).eq('vigente', true).maybeSingle();
     if (error) throw new Error(`No se pudo leer el borrador anual: ${error.message}`);
+    const ajustesVigentes: AjustesTributariosAnuales = {
+      adiciones_tributarias: ajustes.adiciones_tributarias ?? declaracion?.adiciones_tributarias,
+      deducciones_tributarias: ajustes.deducciones_tributarias ?? declaracion?.deducciones_tributarias,
+      perdidas_compensables: ajustes.perdidas_compensables ?? declaracion?.perdidas_compensables,
+      pagos_cuenta_renta: ajustes.pagos_cuenta_renta ?? declaracion?.pagos_cuenta_renta,
+      credito_itan_renta: ajustes.credito_itan_renta ?? declaracion?.credito_itan_renta,
+      otros_creditos_renta: ajustes.otros_creditos_renta ?? declaracion?.otros_creditos_renta,
+      deducciones_itan: ajustes.deducciones_itan ?? declaracion?.deducciones_itan,
+    };
+    const calculo = calcularRentaAnualItanPeru(ejercicio, regimen, fuentes, ajustesVigentes);
     return { ...calculo, source_snapshot: snapshot, declaracion_vigente: declaracion || null };
   }
 

@@ -575,6 +575,8 @@ export class ContabilidadLibrosController {
       return {
         success: true,
         data: consignaciones,
+        complete: true,
+        total: consignaciones.length,
         message: "Registro de consignaciones obtenido exitosamente",
       };
     } catch (error) {
@@ -584,6 +586,14 @@ export class ContabilidadLibrosController {
       );
       throw error;
     }
+  }
+
+  @Get("registro-consignaciones/productos")
+  @RequirePermission("inventario.productos.read")
+  @ApiOperation({ summary: "Catálogo completo de productos para consignaciones" })
+  async getProductosConsignacion() {
+    const productos = await this.accountingService.getProductosConsignacion();
+    return { success: true, complete: true, total: productos.length, data: productos };
   }
 
   @Post("registro-consignaciones")

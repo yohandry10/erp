@@ -1,37 +1,15 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
+import { useAuth } from '@/contexts/AuthContext'
+import { readOrderReceipts, type OrderReceipt as Recepcion } from '@/lib/compras/purchase-order-history-contract'
 import { Package, Calendar, User, CheckCircle, XCircle, AlertCircle, Eye } from 'lucide-react'
 import { parseDateLocal } from '@/lib/date-utils'
 
-interface RecepcionItem {
-  id: string
-  producto_id: string
-  cantidad_recibida: number
-  calidad: string
-  lote?: string
-  serie?: string
-  almacen_id?: string
-  fecha_expiracion?: string
-  observaciones?: string
-}
-
-interface Recepcion {
-  id: string
-  numero: string
-  orden_id: string
-  fecha_recepcion: string
-  almacen_id: string
-  estado: string
-  observaciones?: string
-  recibido_por?: string
-  created_at: string
-  recepcion_items?: RecepcionItem[]
-}
-
 interface RecepcionesPanelProps {
   ordenId: string
+  hasReceivedItems?: boolean
 }
 
 const ESTADOS_CONFIG: Record<string, {
@@ -78,34 +56,42 @@ const CALIDAD_CONFIG: Record<string, {
   }
 }
 
-export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
-  const { get } = useApi()
+export default function RecepcionesPanel({ ordenId, hasReceivedItems = false }: RecepcionesPanelProps) {
+  const { get } = useApi({ requireLive: true, throwOnError: true, showErrorToast: false, retries: 0 })
+  const { session } = useAuth()
+  const tenantId = session?.user?.tenant_id || ''
+  const actorId = session?.user?.id || ''
+  const latestRead = useRef(0)
+  const activeScope = useRef('')
+  activeScope.current = `${tenantId}:${actorId}:${ordenId}`
   const [recepciones, setRecepciones] = useState<Recepcion[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedRecepcion, setExpandedRecepcion] = useState<string | null>(null)
 
   const loadRecepciones = useCallback(async () => {
+    if (!tenantId || !actorId) return
+    const request = ++latestRead.current
+    const scope = `${tenantId}:${actorId}:${ordenId}`
     try {
       setLoading(true)
       setError(null)
+      setRecepciones([])
+      setExpandedRecepcion(null)
       const response = await get(`/api/compras/ordenes/${ordenId}/recepciones`)
-
-      if (response?.success && response.data) {
-        setRecepciones(response.data)
-      } else {
-        setError('No se pudieron cargar las recepciones')
-      }
+      const rows = readOrderReceipts(response, { orderId: ordenId, tenantId, actorId }, hasReceivedItems)
+      if (request === latestRead.current && scope === activeScope.current) setRecepciones(rows)
     } catch (err: any) {
       console.error('Error loading recepciones:', err)
-      setError(err.message || 'Error al cargar las recepciones')
+      if (request === latestRead.current && scope === activeScope.current) setError(err.message || 'Error al cargar las recepciones')
     } finally {
-      setLoading(false)
+      if (request === latestRead.current && scope === activeScope.current) setLoading(false)
     }
-  }, [get, ordenId])
+  }, [get, ordenId, tenantId, actorId, hasReceivedItems])
 
   useEffect(() => {
     loadRecepciones()
+    return () => { latestRead.current++ }
   }, [loadRecepciones])
 
   const formatDate = (dateString: string) => {
@@ -178,6 +164,7 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
         <div className="text-center p-8 text-red-500">
           <AlertCircle size={32} />
           <p>{error}</p>
+          <button type="button" onClick={() => void loadRecepciones()} className="mt-3 rounded-lg border border-border px-4 py-2">Reintentar recepciones</button>
         </div>
       </div>
     )

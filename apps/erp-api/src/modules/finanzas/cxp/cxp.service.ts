@@ -1,3 +1,5 @@
+import { requireTenantRecord } from '../../../shared/utils/require-tenant-record';
+import { readCompleteCatalog } from '../../../shared/utils/complete-catalog-read';
 import { Injectable, BadRequestException, ConflictException, NotFoundException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
@@ -8,10 +10,12 @@ import { OutboxEventBuilder } from '../../../shared/outbox/outbox-event.interfac
 import Decimal from 'decimal.js';
 import { DevolucionProveedorEmitidaEvent } from '../../../shared/events/event-bus.service';
 import { TesoreriaService } from '../tesoreria/tesoreria.service';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { fechaHoyDelTenant } from '../../../shared/utils/fecha-tenant.util';
 import { appendIntegrationLog } from '../../../shared/utils/integration-log';
 import { errorWriterFinanciero, lecturaFinancieraFallida } from '../finanzas-errors';
+import { UsarCreditoProveedorDto } from './dto/usar-credito-proveedor.dto';
+import { readCxpPaymentHistory } from './cxp-payment-history-read';
 
 @Injectable()
 export class CxpService {
@@ -338,6 +342,50 @@ export class CxpService {
       throw new BadRequestException('La nota de crédito requiere los datos completos del comprobante modificado');
     }
 
+    if (tipoDocumento === 'NOTA_CREDITO') {
+      if (!userId) throw new BadRequestException('Se requiere un usuario autenticado');
+      if (!dto.devolucion_proveedor_id && (!dto.factura_proveedor_id || !dto.cuenta_ajuste_id || !dto.motivo_nota_credito)) {
+        throw new BadRequestException('Vincule la nota de crédito con una devolución emitida o seleccione el comprobante original, el motivo y la contrapartida contable.');
+      }
+      if ([dto.retencion, dto.percepcion, dto.detraccion, dto.anticipo].some((value) => Number(value ?? 0) !== 0)) {
+        throw new BadRequestException('La nota de crédito de devolución no admite nuevos pagos, retenciones ni anticipos');
+      }
+      const key = `cxp:nc:${createHash('sha256').update(`${tenantId}:${dto.proveedor_id}:${dto.numero_documento.trim().toUpperCase()}`).digest('hex')}`;
+      const { data, error } = await client.rpc(dto.devolucion_proveedor_id
+        ? 'registrar_nota_credito_proveedor_devolucion_tx' : 'registrar_nota_credito_proveedor_tx', {
+        p_tenant_id: tenantId, p_actor_id: userId,
+        ...(dto.devolucion_proveedor_id ? { p_devolucion_id: dto.devolucion_proveedor_id } : { p_factura_id: dto.factura_proveedor_id }),
+        p_payload: { ...dto, tipo_documento: tipoDocumento, moneda },
+        p_idempotency_key: key,
+      });
+      if (error) {
+        const messages: Record<string, string> = {
+          SUPPLIER_RETURN_NC_NOT_FOUND: 'No se encontró una devolución de esta empresa para registrar la nota.',
+          SUPPLIER_RETURN_NC_RETURN_NOT_APPLIED: 'Emita la devolución antes de registrar la nota de crédito.',
+          SUPPLIER_RETURN_NC_ADJUSTMENT_MISSING: 'La devolución no tiene un ajuste de proveedor verificable.',
+          SUPPLIER_RETURN_NC_AMOUNTS_MISMATCH: 'El proveedor, la moneda y los importes de la nota deben coincidir con la devolución aplicada.',
+          SUPPLIER_RETURN_NC_REFERENCE_MISMATCH: 'La referencia debe identificar el comprobante original de la devolución.',
+          SUPPLIER_RETURN_NC_ALREADY_REGISTERED: 'Esta devolución ya tiene una nota de crédito registrada.',
+          SUPPLIER_RETURN_NC_DOCUMENT_ALREADY_REGISTERED: 'El número de nota de crédito ya está registrado para este proveedor.',
+          SUPPLIER_RETURN_NC_IDEMPOTENCY_CONFLICT: 'Esta nota ya se registró con otros datos. Revise el documento existente.',
+          SUPPLIER_RETURN_NC_INVALID_PAYLOAD: 'Complete los datos del documento y de la devolución vinculada.',
+          SUPPLIER_CREDIT_PAYLOAD_INVALID: 'Complete el motivo, los importes y la contrapartida de la nota.',
+          SUPPLIER_CREDIT_INVOICE_NOT_FOUND: 'No se encontró el comprobante original en esta empresa.',
+          SUPPLIER_CREDIT_INVOICE_AMOUNTS_INVALID: 'La nota debe coincidir con el proveedor y la moneda, y no puede superar los importes pendientes de ajuste del comprobante.',
+          SUPPLIER_CREDIT_REFERENCE_INVALID: 'La referencia debe identificar el comprobante original seleccionado.',
+          SUPPLIER_CREDIT_CANCELLATION_REQUIRES_FULL_AMOUNT: 'La anulación requiere el importe completo pendiente de ajuste del comprobante.',
+          SUPPLIER_CREDIT_DOCUMENT_ALREADY_REGISTERED: 'Esta nota de crédito ya está registrada para el proveedor.',
+          SUPPLIER_CREDIT_IDEMPOTENCY_CONFLICT: 'Este número de nota ya se registró con otros datos.',
+          SUPPLIER_CREDIT_COUNTER_ACCOUNT_INVALID: 'Seleccione una contrapartida distinta de proveedores, crédito o IGV.',
+          SUPPLIER_CREDIT_PENDING_DETRACTION_REQUIRES_REVERSAL: 'Revierta primero la detracción aún no depositada en Finanzas → Ajustes fiscales. Registre luego la nota y, si corresponde, la detracción del importe corregido.',
+        };
+        throw errorWriterFinanciero({ ...error, message: messages[error.message] ?? error.message }, 'No se pudo registrar la nota de crédito del proveedor');
+      }
+      const note = Array.isArray(data) ? data[0] : data;
+      if (!note?.id) throw new ServiceUnavailableException('No se pudo confirmar el registro de la nota de crédito; reintente');
+      return { success: true, data: note };
+    }
+
     // Validar que el proveedor existe
     const { data: proveedor, error: proveedorError } = await client
       .from('proveedores')
@@ -537,6 +585,41 @@ export class CxpService {
     };
   }
 
+  async usarCreditoProveedor(tenantId: string, id: string, dto: UsarCreditoProveedorDto, userId?: string) {
+    if (!userId) throw new BadRequestException('Se requiere un usuario autenticado');
+    if (dto.accion === 'APLICACION' && !dto.factura_id) throw new BadRequestException('Seleccione la factura que recibirá el crédito');
+    if (dto.accion === 'REEMBOLSO' && !dto.cuenta_bancaria_id) throw new BadRequestException('Seleccione la cuenta bancaria que recibió el reembolso');
+    const { data, error } = await this.supabase.getClient().rpc('aplicar_credito_proveedor_tx', {
+      p_tenant_id: tenantId, p_actor_id: userId, p_nota_credito_id: id,
+      p_payload: dto, p_idempotency_key: dto.idempotency_key,
+    });
+    if (error) {
+      const messages: Record<string, string> = {
+        SUPPLIER_CREDIT_ACTION_INVALID: 'Complete los datos de aplicación o reembolso.',
+        SUPPLIER_CREDIT_NOTE_NOT_FOUND: 'La nota no pertenece a esta empresa.',
+        SUPPLIER_CREDIT_AVAILABLE_BALANCE_EXCEEDED: 'El importe supera el crédito disponible o la fecha es anterior a la nota.',
+        SUPPLIER_CREDIT_TARGET_NOT_FOUND: 'No se encontró la factura de esta empresa.',
+        SUPPLIER_CREDIT_TARGET_INVALID: 'Seleccione una factura pendiente del mismo proveedor y moneda, sin superar su saldo.',
+        SUPPLIER_CREDIT_REFUND_BANK_INVALID: 'Seleccione una cuenta bancaria activa de la misma moneda.',
+        SUPPLIER_CREDIT_REFUND_RATE_REQUIRED: 'Ingrese el tipo de cambio del reembolso.',
+        SUPPLIER_CREDIT_IDEMPOTENCY_CONFLICT: 'Este reintento cambió los datos de una operación ya registrada.',
+      };
+      throw errorWriterFinanciero({ ...error, message: messages[error.message] ?? error.message }, 'No se pudo utilizar el crédito del proveedor');
+    }
+    if (!data?.nota?.id) throw new ServiceUnavailableException('No se pudo confirmar el uso del crédito; reintente');
+    return { success: true, data };
+  }
+
+  async obtenerMovimientosCreditoProveedor(tenantId: string, id: string) {
+    const client = this.supabase.getClient();
+    await requireTenantRecord(client, 'cuentas_por_pagar', tenantId, id, 'Cuenta por pagar');
+    const data = await readCompleteCatalog(client, 'cxp_credito_proveedor_movimientos', '*',
+      query => query.eq('tenant_id', tenantId).eq('nota_credito_id', id),
+      row => row.tenant_id === tenantId && row.nota_credito_id === id,
+      [['created_at', false], ['id', false]]);
+    return { success: true, data };
+  }
+
   async obtenerCuentaPorPagar(
     tenantId: string,
     id: string,
@@ -585,6 +668,30 @@ export class CxpService {
       success: true,
       data: cxp,
     };
+  }
+
+  async listarDevolucionesParaNotaCredito(tenantId: string, proveedorId?: string) {
+    const client = this.supabase.getClient();
+    let query = client.from('devoluciones_proveedor')
+      .select('id,numero,proveedor_id,subtotal,igv,total,moneda,cuenta_por_pagar_id,fecha_devolucion')
+      .eq('tenant_id', tenantId).eq('estado', 'EMITIDA')
+      .not('cuenta_por_pagar_id', 'is', null).order('created_at', { ascending: false });
+    if (proveedorId) query = query.eq('proveedor_id', proveedorId);
+    const { data: returns, error } = await query;
+    if (error) throw lecturaFinancieraFallida('las devoluciones para nota de crédito');
+    if (!returns?.length) return { success: true, data: [] };
+    const [invoices, notes] = await Promise.all([
+      client.from('cuentas_por_pagar').select('id,numero_documento,tipo_documento,fecha_emision,fiscal_metadata')
+        .eq('tenant_id', tenantId).in('id', [...new Set(returns.map((row) => row.cuenta_por_pagar_id))]),
+      client.from('cuentas_por_pagar').select('metadata').eq('tenant_id', tenantId)
+        .eq('tipo_documento', 'NOTA_CREDITO').contains('metadata', { registro_fiscal_sin_obligacion: true }),
+    ]);
+    if (invoices.error || notes.error) throw lecturaFinancieraFallida('los comprobantes vinculados a devoluciones');
+    const assigned = new Set((notes.data ?? []).map((note) => note.metadata?.devolucion_proveedor_id));
+    const invoiceById = new Map((invoices.data ?? []).map((invoice) => [invoice.id, invoice]));
+    return { success: true, data: returns.filter((row) => !assigned.has(row.id)).map((row) => ({
+      ...row, factura: invoiceById.get(row.cuenta_por_pagar_id) ?? null,
+    })).filter((row) => row.factura) };
   }
 
   async listarCuentasPorPagar(
@@ -663,9 +770,7 @@ export class CxpService {
     idempotencyKey?: string,
   ): Promise<{ success: boolean; data: any }> {
     if (!userId) throw new BadRequestException('Se requiere un usuario autenticado');
-    const key = idempotencyKey?.trim() || `cxp-update:${createHash('sha256')
-      .update(JSON.stringify({ tenantId, id, dto, userId }))
-      .digest('hex')}`;
+    const key = idempotencyKey?.trim() || `cxp-update:${randomUUID()}`;
     const { data: rpcData, error: rpcError } = await this.supabase.getClient().rpc('gestionar_cxp_tx', {
       p_tenant_id: tenantId, p_cxp_id: id, p_actor_id: userId, p_action: 'UPDATE_TERMS',
       p_payload: dto, p_idempotency_key: key,
@@ -1000,8 +1105,9 @@ export class CxpService {
     }
 
     // Fecha actual para calcular días vencidos
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
+    // «Hoy» del contribuyente y no del servidor: en Render (UTC), desde las 19:00
+    // de Lima toda la antigüedad sumaba un día de mora.
+    const hoy = this.parseFechaLocal(await fechaHoyDelTenant(client, tenantId));
 
     // Inicializar contadores
     const resumen = {
@@ -1157,12 +1263,14 @@ export class CxpService {
     // Días por defecto: 30
     const dias = filtros.dias ?? 30;
 
-    // Calcular fecha límite (hoy + días)
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-
+    // Calcular fecha límite (hoy + días). «Hoy» es el del contribuyente: con el
+    // servidor en UTC, desde las 19:00 de Lima la deuda que vence hoy salía de la
+    // alerta porque la consulta empezaba en el día siguiente.
+    const hoyLocal = await fechaHoyDelTenant(client, tenantId);
+    const hoy = this.parseFechaLocal(hoyLocal);
     const fechaLimite = new Date(hoy);
     fechaLimite.setDate(fechaLimite.getDate() + dias);
+    const fechaLimiteLocal = `${fechaLimite.getFullYear()}-${String(fechaLimite.getMonth() + 1).padStart(2, '0')}-${String(fechaLimite.getDate()).padStart(2, '0')}`;
 
     // Construir query base - solo CxP pendientes o parciales
     let query = client
@@ -1195,9 +1303,9 @@ export class CxpService {
         )
       `)
       .eq('tenant_id', tenantId)
-      .in('estado', ['PENDIENTE', 'PARCIAL'])
-      .gte('fecha_vencimiento', hoy.toISOString().split('T')[0])
-      .lte('fecha_vencimiento', fechaLimite.toISOString().split('T')[0])
+      .in('estado', ['PENDIENTE', 'PARCIAL', 'VENCIDA'])
+      .gte('fecha_vencimiento', hoyLocal)
+      .lte('fecha_vencimiento', fechaLimiteLocal)
       .order('fecha_vencimiento', { ascending: true });
 
     // Filtrar por proveedor si se especifica
@@ -1216,9 +1324,9 @@ export class CxpService {
       return {
         success: true,
         data: {
-          fecha_consulta: hoy.toISOString().split('T')[0],
+          fecha_consulta: hoyLocal,
           dias_adelante: dias,
-          fecha_limite: fechaLimite.toISOString().split('T')[0],
+          fecha_limite: fechaLimiteLocal,
           resumen: {
             cantidad_total: 0,
             monto_total: 0,
@@ -1287,9 +1395,9 @@ export class CxpService {
     return {
       success: true,
       data: {
-        fecha_consulta: hoy.toISOString().split('T')[0],
+        fecha_consulta: hoyLocal,
         dias_adelante: dias,
-        fecha_limite: fechaLimite.toISOString().split('T')[0],
+        fecha_limite: fechaLimiteLocal,
         resumen: {
           cantidad_total: cantidadTotal,
           monto_total: this.round2(montoTotal),
@@ -1404,61 +1512,8 @@ export class CxpService {
    * @param cxpId - ID de la cuenta por pagar
    * @returns Historial de pagos ordenado por fecha descendente
    */
-  async obtenerHistorialPagos(
-    tenantId: string,
-    cxpId: string,
-  ): Promise<{ success: boolean; data: any[] }> {
-    const client = this.supabase.getClient();
-
-    // Verificar que la CxP existe
-    const { data: cxp, error: errorCxp } = await client
-      .from('cuentas_por_pagar')
-      .select('id, numero_documento')
-      .eq('tenant_id', tenantId)
-      .eq('id', cxpId)
-      .maybeSingle();
-
-    if (errorCxp || !cxp) {
-      throw new NotFoundException('Cuenta por pagar no encontrada');
-    }
-
-    // Obtener los movimientos bancarios relacionados con esta CxP
-    const { data: pagos, error: errorPagos } = await client
-      .from('movimientos_bancarios')
-      .select(`
-        id,
-        fecha,
-        monto,
-        tipo,
-        descripcion,
-        referencia,
-        metodo_pago,
-        conciliado,
-        cuenta_bancaria_id,
-        created_at,
-        cuenta_bancaria:cuentas_bancarias!movimientos_bancarios_cuenta_bancaria_id_fkey(
-          id,
-          banco,
-          numero_cuenta,
-          tipo_cuenta,
-          moneda
-        )
-      `)
-      .eq('tenant_id', tenantId)
-      .eq('cxp_id', cxpId)
-      .eq('tipo', 'CARGO') // Los pagos a proveedores son CARGO
-      .order('fecha', { ascending: false })
-      .order('created_at', { ascending: false });
-
-    if (errorPagos) {
-      console.error('Error obteniendo historial de pagos:', errorPagos);
-      throw lecturaFinancieraFallida('el historial de pagos');
-    }
-
-    return {
-      success: true,
-      data: pagos || [],
-    };
+  async obtenerHistorialPagos(tenantId: string, cxpId: string) {
+    return readCxpPaymentHistory(this.supabase.getClient(), tenantId, cxpId);
   }
 
   /**

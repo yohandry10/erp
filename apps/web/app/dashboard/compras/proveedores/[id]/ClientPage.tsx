@@ -1,5 +1,6 @@
 'use client'
 
+import { requestConfirmation } from '@/lib/confirm-action'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Edit, Trash2, Building2, Mail, Phone, MapPin, User, CreditCard, Calendar } from 'lucide-react'
@@ -75,7 +76,7 @@ export default function ProveedorDetailPage() {
   }, [loadProveedor])
 
   const handleDelete = async () => {
-    if (!confirm('¿Está seguro de desactivar este proveedor?')) {
+    if (!(await requestConfirmation('¿Está seguro de desactivar este proveedor?'))) {
       return
     }
 

@@ -16,6 +16,7 @@ interface ApiResponse<T> {
 }
 
 interface UseApiOptions {
+  requireLive?: boolean
   showErrorToast?: boolean
   showSuccessToast?: boolean
   throwOnError?: boolean
@@ -70,6 +71,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
   const { toast } = useToast()
   const { loading: authLoading, session } = useAuth()
   const {
+    requireLive = false,
     showErrorToast = true,
     showSuccessToast = false,
     throwOnError = false,
@@ -194,19 +196,24 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
           })
           clearTimeout(timer)
 
+          if (requireLive && (isOfflineCachedResponse(response) || isOfflineQueuedResponse(response))) {
+            throw new Error('Se necesita una respuesta en vivo para confirmar o mostrar datos actuales')
+          }
+
           // Handle 401 Unauthorized. Some module endpoints can return 401 for
           // permission gaps; only close the whole session if auth/profile also fails.
           if (response.status === 401) {
             const { data } = await customAuth.getSession()
             if (data.session) {
-              throw new Error('No autorizado para consultar este recurso')
+              const errorData = await response.json().catch(() => ({}))
+              throw Object.assign(new Error(getApiErrorMessage(errorData, 'No autorizado para consultar este recurso')), { status: 401, data: errorData })
             }
 
             if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
               await customAuth.signOut()
               window.location.href = '/login'
             }
-            throw new Error('Unauthorized - Session expired')
+            throw Object.assign(new Error('Unauthorized - Session expired'), { status: 401 })
           }
 
           // Handle 403 Forbidden - show permission error
@@ -216,11 +223,10 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
             // renovación/conversión en vez de dejar el dashboard en bucle de 403s.
             if (errorData.error === 'DEMO_EXPIRED') {
               await handleDemoExpired()
-              throw new Error('Tu demo ha expirado. Crea una nueva demo o convierte tu cuenta.')
+              throw Object.assign(new Error('Tu demo ha expirado. Crea una nueva demo o convierte tu cuenta.'), { status: 403, data: errorData })
             }
             const errorMessage = errorData.message || 'You do not have permission to perform this action'
-            const permissionError = Object.assign(new Error(errorMessage), { status: 403, data: errorData })
-            throw permissionError
+            throw Object.assign(new Error(errorMessage), { status: 403, data: errorData })
           }
 
           if (!response.ok) {
@@ -317,7 +323,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
     } finally {
       setLoading(false)
     }
-  }, [toast, authLoading, session?.access_token, session?.user?.tenant_id, showErrorToast, showSuccessToast, retries, timeoutMs, throwOnError])
+  }, [toast, authLoading, session?.access_token, session?.user?.tenant_id, requireLive, showErrorToast, showSuccessToast, retries, timeoutMs, throwOnError])
 
   // Métodos helper
   const get = useCallback((endpoint: string, reqOptions?: ApiRequestOptions) => {

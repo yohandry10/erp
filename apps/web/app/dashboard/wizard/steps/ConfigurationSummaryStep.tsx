@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 import { useWizardContext } from '../WizardContext'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { fetchApi } from '@/lib/api-fetch'
+import { isOfflineCachedResponse } from '@/lib/offline-store'
+import { readWizardCompany } from '../read-contract'
 
 interface EmpresaConfig {
   ruc?: string
@@ -75,11 +77,16 @@ export function ConfigurationSummaryStep() {
   const country = useCountryContext()
   const [empresaConfig, setEmpresaConfig] = useState<EmpresaConfig | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [revision, setRevision] = useState(0)
 
   useEffect(() => {
+    let active = true
     const loadConfig = async () => {
       try {
         setLoading(true)
+        setEmpresaConfig(null)
+        setError(null)
         const response = await fetchApi('/api/configuration/empresa', {
           credentials: 'include',
           headers: {
@@ -87,20 +94,18 @@ export function ConfigurationSummaryStep() {
           }
         })
 
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success && data.data) {
-            setEmpresaConfig(data.data)
-          }
-        }
+        if (!response.ok || isOfflineCachedResponse(response)) throw new Error('No se pudo consultar la configuración de empresa.')
+        const config = readWizardCompany<EmpresaConfig>(await response.json())
+        if (active) setEmpresaConfig(config)
       } catch (error) {
-        console.error('Error loading config:', error)
+        if (active) setError(error instanceof Error ? error.message : 'No se pudo consultar la configuración de empresa.')
       } finally {
-        setLoading(false)
+        if (active) setLoading(false)
       }
     }
     loadConfig()
-  }, [])
+    return () => { active = false }
+  }, [revision])
 
   const handleGoToDashboard = () => {
     router.push('/dashboard')
@@ -131,6 +136,13 @@ export function ConfigurationSummaryStep() {
         <p>Cargando configuración...</p>
       </div>
     )
+  }
+
+  if (error || !empresaConfig) {
+    return <div role="alert" className="space-y-3 p-6">
+      <p>{error || 'No se pudo consultar la configuración de empresa.'}</p>
+      <button type="button" onClick={() => setRevision(value => value + 1)} className="rounded border px-4 py-2">Reintentar</button>
+    </div>
   }
 
   return (

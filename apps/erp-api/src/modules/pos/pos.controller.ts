@@ -90,6 +90,8 @@ export class PosController {
         return HttpStatus.CONFLICT;
       case 'DATABASE_ERROR':
         if (resultado.error.codigo === '23505') return HttpStatus.CONFLICT;
+        // Falta de existencias en el almacén de la caja: regla de negocio, no caída.
+        if (String(resultado.error.mensaje ?? '').startsWith('INVENTORY_')) return HttpStatus.CONFLICT;
         if (['22023','22P02','23503','23514','23502'].includes(resultado.error.codigo)) return HttpStatus.BAD_REQUEST;
         return HttpStatus.SERVICE_UNAVAILABLE;
       default:

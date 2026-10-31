@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { HelpCircle, X } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import { fetchApi } from '@/lib/api-fetch'
@@ -19,6 +19,8 @@ export function CentroAyuda() {
   const [abierto, setAbierto] = useState(false)
   const [temas, setTemas] = useState<TemaAyuda[]>([])
   const [temasCargando, setTemasCargando] = useState(false)
+  const [temasError, setTemasError] = useState(false)
+  const temasRequest = useRef(0)
 
   const pathname = usePathname()
   const country = useCountryContext()
@@ -30,9 +32,11 @@ export function CentroAyuda() {
   const { startTour } = useOnboarding()
 
   const cargarTemas = useCallback(async () => {
+    const request = ++temasRequest.current
+    setTemasError(false)
     // La base histórica de temas frecuentes es peruana. Hasta disponer de un
     // catálogo AR verificado, Argentina usa sólo las fichas locales específicas.
-    if (country.paisCodigo !== 'PE') {
+    if (country.paisCodigo !== 'PE' || !user?.tenant_id || !user?.id) {
       setTemas([])
       setTemasCargando(false)
       return
@@ -43,27 +47,34 @@ export function CentroAyuda() {
       if (rol) params.append('rol', rol)
       params.append('limite', '6')
       const res = await fetchApi(`/api/help/sugerencias?${params}`)
-      if (res.ok) {
-        const data = await res.json()
-        setTemas(
-          (data.sugerencias || []).map((s: any) => ({
-            id: String(s.id),
-            pregunta: s.pregunta,
-            categoria: s.categoria,
-          })),
-        )
-      }
+      if (!res.ok) throw new Error('Catálogo no disponible')
+      const data = await res.json()
+      if (!Array.isArray(data.sugerencias)) throw new Error('Catálogo inválido')
+      if (request !== temasRequest.current) return
+      setTemas(
+        data.sugerencias.map((s: any) => ({
+          id: String(s.id),
+          pregunta: s.pregunta,
+          categoria: s.categoria,
+        })),
+      )
     } catch {
+      if (request !== temasRequest.current) return
       // Sin temas del servidor el panel sigue sirviendo: la ficha y el tour son locales.
       setTemas([])
+      setTemasError(true)
     } finally {
-      setTemasCargando(false)
+      if (request === temasRequest.current) setTemasCargando(false)
     }
-  }, [country.paisCodigo, rol])
+  }, [country.paisCodigo, rol, user?.id, user?.tenant_id])
 
   useEffect(() => {
+    const requestState = temasRequest
+    ++requestState.current
     setTemas([])
-  }, [country.paisCodigo])
+    setTemasError(false)
+    return () => { ++requestState.current }
+  }, [country.paisCodigo, rol, user?.id, user?.tenant_id])
 
   useEffect(() => {
     if (abierto && temas.length === 0) cargarTemas()
@@ -77,14 +88,14 @@ export function CentroAyuda() {
         const params = new URLSearchParams({ q: tema.pregunta })
         if (rol) params.append('rol', rol)
         const res = await fetchApi(`/api/help/search?${params}`)
-        if (!res.ok) return null
+        if (!res.ok) throw new Error('Respuesta no disponible')
         const data = await res.json()
         const r = data.resultado
         if (!r) return null
         const pasos = Array.isArray(r.pasos) && r.pasos.length > 0 ? '\n\n' + r.pasos.map((p: any) => `${p.paso}. ${p.texto}`).join('\n') : ''
         return `${r.respuesta}${pasos}`
       } catch {
-        return null
+        throw new Error('No se pudo cargar este tema. Intenta nuevamente.')
       }
     },
     [rol],
@@ -109,11 +120,14 @@ export function CentroAyuda() {
       </button>
 
       <AyudaPanel
+        key={`${country.paisCodigo}:${user?.tenant_id}:${user?.id}:${rol}`}
         abierto={abierto}
         onCerrar={() => setAbierto(false)}
         guia={guia}
         temas={temas}
         temasCargando={temasCargando}
+        temasError={temasError}
+        onReintentarTemas={cargarTemas}
         onAbrirTema={abrirTema}
         tourNombre={tour ? tour.nombre : null}
         onIniciarTour={iniciarTour}

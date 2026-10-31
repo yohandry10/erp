@@ -35,6 +35,8 @@ interface CuentaPorPagar {
 }
 
 interface SeleccionarCxpLoteProps {
+  initialSelectedIds?: string[];
+  initialMontos?: Record<string, number>;
   cxps: CuentaPorPagar[];
   onSelectionChange: (selectedIds: string[], montosParciales: Record<string, number>) => void;
   monedaFiltro?: string;
@@ -44,9 +46,11 @@ export function SeleccionarCxpLote({
   cxps,
   onSelectionChange,
   monedaFiltro,
+  initialSelectedIds = [],
+  initialMontos = {},
 }: SeleccionarCxpLoteProps) {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [montosParciales, setMontosParciales] = useState<Record<string, number>>({});
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(initialSelectedIds));
+  const [montosParciales, setMontosParciales] = useState<Record<string, number>>(initialMontos);
   const [filtroProveedor, setFiltroProveedor] = useState<string>('');
   const [filtroEstado, setFiltroEstado] = useState<string>('TODOS');
   const [filtroUrgencia, setFiltroUrgencia] = useState<string>('TODAS');
@@ -109,7 +113,7 @@ export function SeleccionarCxpLote({
   // Manejar cambio de monto parcial
   const handleMontoChange = (cxpId: string, monto: string) => {
     const montoNumerico = parseFloat(monto);
-    if (!isNaN(montoNumerico) && montoNumerico > 0) {
+    if (monto !== '') {
       setMontosParciales({
         ...montosParciales,
         [cxpId]: montoNumerico,
@@ -273,6 +277,7 @@ export function SeleccionarCxpLote({
                   {/* Checkbox */}
                   <div className="pt-1">
                     <Checkbox
+                      aria-label={`Seleccionar ${cxp.numero_documento}`}
                       checked={isSelected}
                       onCheckedChange={() => handleToggleSelection(cxp.id)}
                     />

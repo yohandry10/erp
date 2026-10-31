@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { HelpController } from './help.controller';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 
@@ -48,5 +48,17 @@ describe('HelpController', () => {
       p_categoria: 'ventas',
       p_limite: 20,
     });
+  });
+  it.each(['search', 'suggestions'] as const)('reports unavailable %s without exposing database diagnostics', async (operation) => {
+    rpc.mockResolvedValue({ data: null, error: { message: 'permission denied for private_catalog' } });
+    try {
+      if (operation === 'search') await controller.search('tenant-1', 'ventas');
+      else await controller.suggestions('admin');
+      throw new Error('Expected dependency failure');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ServiceUnavailableException);
+      expect((error as ServiceUnavailableException).getStatus()).toBe(503);
+      expect((error as Error).message).not.toContain('private_catalog');
+    }
   });
 });

@@ -15,6 +15,16 @@ const fuenteBase = (): FuentePlanillaPeru => ({
 });
 
 describe('Planilla electrónica Perú', () => {
+  it('bloquea EPS sin entidadTabla14 y exporta código declarado en períodoTRegistro', () => {
+    const fuente = fuenteBase();
+    fuente.fichas[0].regimen_salud_codigo = '01';
+    expect(construirPaquetePlanillaElectronicaPeru(fuente).bloqueos.map(b => b.codigo)).toContain('EPS_TABLA_14_FALTANTE');
+    fuente.fichas[0].eps_servicios_propios_codigo = '3';
+    expect(construirPaquetePlanillaElectronicaPeru(fuente).trabajadores[0].ficha.eps_servicios_propios_codigo).toBe('3');
+    const paquete = construirPaquetePlanillaElectronicaPeru(fuente);
+    expect(paquete.bloqueos).toHaveLength(0);
+    expect(paquete.archivos.find(a => a.nombre.endsWith('.per'))!.contenido).toContain('|01|3|');
+  });
   it('genera fuentes PVS con nombres y palote final oficiales', () => {
     const paquete = construirPaquetePlanillaElectronicaPeru(fuenteBase());
     expect(paquete.bloqueos).toHaveLength(0);

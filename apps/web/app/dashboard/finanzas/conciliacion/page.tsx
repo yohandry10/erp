@@ -557,7 +557,15 @@ function NewConciliacionForm({
             type="month"
             value={formData.periodo}
             onChange={(e) => {
-              setFormData({ ...formData, periodo: e.target.value });
+              // La conciliación es mensual: el rango se deriva del período.
+              const [anio, mes] = e.target.value.split("-").map(Number);
+              const ultimo = anio && mes ? new Date(anio, mes, 0).getDate() : 0;
+              setFormData({
+                ...formData,
+                periodo: e.target.value,
+                fecha_desde: ultimo ? `${e.target.value}-01` : "",
+                fecha_hasta: ultimo ? `${e.target.value}-${String(ultimo).padStart(2, "0")}` : "",
+              });
               setIdempotencyKey(`recon-create:${crypto.randomUUID()}`);
             }}
             placeholder="AAAA-MM"
@@ -571,10 +579,7 @@ function NewConciliacionForm({
             id="nueva-conciliacion-desde"
             type="date"
             value={formData.fecha_desde}
-            onChange={(e) => {
-              setFormData({ ...formData, fecha_desde: e.target.value });
-              setIdempotencyKey(`recon-create:${crypto.randomUUID()}`);
-            }}
+            readOnly
             required
           />
         </div>
@@ -585,10 +590,7 @@ function NewConciliacionForm({
             id="nueva-conciliacion-hasta"
             type="date"
             value={formData.fecha_hasta}
-            onChange={(e) => {
-              setFormData({ ...formData, fecha_hasta: e.target.value });
-              setIdempotencyKey(`recon-create:${crypto.randomUUID()}`);
-            }}
+            readOnly
             required
           />
         </div>

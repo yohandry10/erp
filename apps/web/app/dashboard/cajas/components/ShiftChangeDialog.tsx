@@ -3,6 +3,7 @@ import { useApi } from '@/hooks/use-api';
 import { DenominationForm, Denominaciones } from './DenominationForm';
 import { CashDialogFrame } from './CashDialogFrame';
 import { useCountryContext } from '@/hooks/use-country-context';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ShiftChangeDialogProps {
     isOpen: boolean;
@@ -27,8 +28,12 @@ interface AccountingOption {
 export function ShiftChangeDialog({ isOpen, onClose, onSuccess, sesionId }: ShiftChangeDialogProps) {
     const country = useCountryContext();
     const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$');
-    const { get, post } = useApi();
-    const [step, setStep] = useState<'USER_SELECT' | 'COUNT' | 'SIGNATURES' | 'CONFIRM'>('USER_SELECT');
+    const { get, post } = useApi({ throwOnError: true, requireLive: true });
+    const { user } = useAuth();
+    // La saliente inicia y entrega; la entrante (o un supervisor) cuenta y
+    // completa con su propia sesión. WAITING es la caja congelada entre ambos.
+    const [step, setStep] = useState<'USER_SELECT' | 'WAITING' | 'COUNT' | 'SIGNATURES' | 'CONFIRM'>('USER_SELECT');
+    const [entranteNombre, setEntranteNombre] = useState('');
     const [users, setUsers] = useState<User[]>([]);
     const [selectedUserId, setSelectedUserId] = useState<string>('');
     const [cambioId, setCambioId] = useState<string>('');
@@ -58,7 +63,7 @@ export function ShiftChangeDialog({ isOpen, onClose, onSuccess, sesionId }: Shif
         try {
             setLoading(true);
             const [usersResponse, accountingResponse] = await Promise.all([
-                get('/usuarios?rol=CAJERO'),
+                get(`/cajas/sesiones/${sesionId}/candidatos-turno`),
                 get('/cajas/opciones-contables'),
             ]);
             if (!usersResponse?.success || !accountingResponse?.success) {
@@ -66,6 +71,14 @@ export function ShiftChangeDialog({ isOpen, onClose, onSuccess, sesionId }: Shif
             }
             setUsers(usersResponse.data || []);
             setCuentas(accountingResponse.data?.cuentas || []);
+            const cambiosResponse = await get(`/cajas/sesiones/${sesionId}/cambios-turno`);
+            const pendiente = (Array.isArray(cambiosResponse?.data) ? cambiosResponse.data : [])
+                .find((cambio: any) => String(cambio.estado).toUpperCase() === 'EN_PROCESO');
+            if (pendiente) {
+                setCambioId(pendiente.id);
+                setSaldoSistema(Number(pendiente.saldo_sistema ?? 0));
+                setStep(pendiente.usuario_entrante_id === user?.id ? 'COUNT' : 'WAITING');
+            }
         } catch (err: any) {
             console.error('Error cargando usuarios:', err);
             setUsers([]);
@@ -74,7 +87,7 @@ export function ShiftChangeDialog({ isOpen, onClose, onSuccess, sesionId }: Shif
         } finally {
             setLoading(false);
         }
-    }, [get]);
+    }, [get, sesionId, user?.id]);
 
     useEffect(() => {
         if (isOpen) {
@@ -111,7 +124,8 @@ export function ShiftChangeDialog({ isOpen, onClose, onSuccess, sesionId }: Shif
             if (response?.success) {
                 setCambioId(response.data.id);
                 setSaldoSistema(response.data.saldo_sistema);
-                setStep('COUNT');
+                setEntranteNombre(users.find((u) => u.id === selectedUserId)?.nombres ?? '');
+                setStep('WAITING');
                 setError(null);
             } else {
                 throw new Error(response?.message || 'Error iniciando cambio de turno');
@@ -179,8 +193,10 @@ export function ShiftChangeDialog({ isOpen, onClose, onSuccess, sesionId }: Shif
         }
     };
 
-    const handleClose = async () => {
-        if (!cambioId) {
+    const handleClose = async (cancelWaiting = false) => {
+        // Cerrar mientras se espera a la entrante no cancela: la caja sigue
+        // congelada hasta que ella complete o alguien cancele explícitamente.
+        if (!cambioId || (step === 'WAITING' && !cancelWaiting)) {
             onClose();
             return;
         }
@@ -248,6 +264,32 @@ export function ShiftChangeDialog({ isOpen, onClose, onSuccess, sesionId }: Shif
                                         className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
                                     >
                                         {loading ? 'Iniciando...' : 'Continuar'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {step === 'WAITING' && (
+                            <div className="space-y-4">
+                                <div className="rounded-md bg-primary/10 p-3 text-sm text-primary">
+                                    Cambio de turno iniciado. La caja queda congelada hasta que
+                                    {entranteNombre ? ` ${entranteNombre}` : ' la persona entrante'} ingrese con su usuario,
+                                    abra esta caja y complete el arqueo en «Cambio de Turno». Un supervisor también puede completarlo.
+                                </div>
+                                <div className="flex flex-wrap justify-end gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setStep('COUNT')}
+                                        className="px-4 py-2 border rounded-md"
+                                    >
+                                        Completar como supervisor
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={onClose}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                                    >
+                                        Entendido
                                     </button>
                                 </div>
                             </div>
@@ -408,7 +450,7 @@ export function ShiftChangeDialog({ isOpen, onClose, onSuccess, sesionId }: Shif
                             <div className="mt-6 border-t border-border pt-4 text-left">
                                 <button
                                     type="button"
-                                    onClick={() => { void handleClose(); }}
+                                    onClick={() => { void handleClose(true); }}
                                     disabled={loading}
                                     className="text-sm font-medium text-destructive hover:underline disabled:opacity-50"
                                 >

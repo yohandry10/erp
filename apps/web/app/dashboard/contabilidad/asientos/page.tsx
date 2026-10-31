@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
+import { useTenant } from '@/contexts/TenantContext'
+import { loadJournalCatalog, readJournalPage } from '@/lib/journal-catalog'
 import { useRouter } from 'next/navigation'
-import { useApi } from '@/hooks/use-api'
 import {
   AlertCircle,
   Calendar,
@@ -23,6 +25,7 @@ import { useCountryContext } from '@/hooks/use-country-context'
 import { parseDateLocal } from '@/lib/date-utils'
 
 interface AsientoContable {
+  tenant_id: string
   id: string
   numero_asiento: string
   fecha: string
@@ -49,12 +52,21 @@ const inputClass =
 
 export default function AsientosPage() {
   const router = useRouter()
-  const { get } = useApi()
+  const { session, loading: authLoading } = useAuth()
+  const { tenant, user: tenantUser, loading: tenantLoading } = useTenant()
   const country = useCountryContext()
 
-  const [asientos, setAsientos] = useState<AsientoContable[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const scopeKey = JSON.stringify([authLoading, tenantLoading, session?.user?.id, session?.user?.tenant_id,
+    tenant?.id, tenantUser?.id, session?.user?.roles, session?.access_token])
+  const scope = useRef({ key: scopeKey, revision: 0 })
+  if (scope.current.key !== scopeKey) scope.current = { key: scopeKey, revision: scope.current.revision + 1 }
+  const revision = scope.current.revision
+  const requestGeneration = useRef(0)
+  const ready = !authLoading && !tenantLoading && !!tenant?.id && !!session?.user
+    && session.user.tenant_id === tenant.id && session.user.id === tenantUser?.id
+  const [state, setState] = useState<{ revision: number; data: AsientoContable[]; loading: boolean; error: string | null }>({ revision: -1, data: [], loading: true, error: null })
+  const { data: asientos, loading, error } = state.revision === revision
+    ? state : { data: [], loading: true, error: null }
 
   const [searchTerm, setSearchTerm] = useState('')
   const [numeroAsientoSearch, setNumeroAsientoSearch] = useState('')
@@ -64,27 +76,22 @@ export default function AsientosPage() {
   const [fechaHasta, setFechaHasta] = useState('')
 
   const loadAsientos = useCallback(async () => {
+    if (revision !== scope.current.revision) return
+    const generation = ++requestGeneration.current
+    const isCurrent = () => generation === requestGeneration.current && revision === scope.current.revision
+    setState({ revision, data: [], loading: true, error: null })
+    if (!ready || !tenant?.id) return
     try {
-      setLoading(true)
-      setError(null)
-
-      const response = await get('/api/contabilidad/asientos')
-
-      if (response?.success && response.data) {
-        setAsientos(response.data)
-      } else {
-        setError('No se pudieron cargar los asientos contables')
-      }
+      const data = await loadJournalCatalog<AsientoContable>(readJournalPage, tenant.id, isCurrent)
+      if (data && isCurrent()) setState({ revision, data, loading: false, error: null })
     } catch (err: any) {
-      console.error('Error loading asientos:', err)
-      setError(err.message || 'Error al cargar los asientos contables')
-    } finally {
-      setLoading(false)
+      if (isCurrent()) setState({ revision, data: [], loading: false, error: err.message || 'No se pudieron cargar los asientos contables' })
     }
-  }, [get])
+  }, [ready, tenant?.id, revision])
 
   useEffect(() => {
-    loadAsientos()
+    void loadAsientos()
+    return () => { requestGeneration.current += 1 }
   }, [loadAsientos])
 
   const formatCurrency = (amount: number) =>

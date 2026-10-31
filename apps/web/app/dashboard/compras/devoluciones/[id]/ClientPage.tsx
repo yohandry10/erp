@@ -91,7 +91,8 @@ const tableCellClass = 'px-4 py-3 text-sm text-foreground/90'
 export default function DevolucionDetallePage() {
   const router = useRouter()
   const params = useParams()
-  const { get, post } = useApi()
+  const { get } = useApi()
+  const { post } = useApi({ requireLive: true, throwOnError: true })
   const { formatCurrency: formatLocalizedCurrency, locale, taxIdLabel } = useLocalizedMoney()
   const { tasaIgv, nombreImpuesto } = useTaxConfig()
 
@@ -138,8 +139,8 @@ export default function DevolucionDetallePage() {
       const devolucionEmitida = response?.data ?? response
 
       if (devolucionEmitida?.id || response?.success) {
-        setPageMessage({ type: 'success', text: 'Devolución emitida correctamente.' })
         await loadDevolucion()
+        setPageMessage({ type: 'success', text: 'Devolución emitida correctamente.' })
       } else {
         setPageMessage({ type: 'error', text: response?.message || 'No se pudo emitir la devolución.' })
       }
@@ -159,11 +160,15 @@ export default function DevolucionDetallePage() {
     try {
       setAnulando(true)
       setPageMessage(null)
-      await post(`/api/compras/devoluciones/${devolucion.id}/anular`, {
+      const response = await post(`/api/compras/devoluciones/${devolucion.id}/anular`, {
         motivo: 'Borrador descartado por el usuario',
       })
-      setPageMessage({ type: 'success', text: 'Devolución pendiente anulada.' })
+      const receipt = response?.data ?? response
+      if (response?.queued === true || response?.offline === true || receipt?.id !== devolucion.id || receipt?.estado !== 'ANULADA') {
+        throw new Error('No se pudo confirmar la anulación de la devolución.')
+      }
       await loadDevolucion()
+      setPageMessage({ type: 'success', text: 'Devolución pendiente anulada.' })
     } catch (error) {
       setPageMessage({
         type: 'error',

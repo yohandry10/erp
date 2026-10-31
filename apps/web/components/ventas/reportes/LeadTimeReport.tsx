@@ -1,7 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { useApi } from '@/hooks/use-api'
+import { useSalesReport, ReportReadError } from './use-sales-report'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { DollarSign, Clock, TrendingDown, TrendingUp } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
@@ -33,35 +32,8 @@ interface Props {
 }
 
 export default function LeadTimeReport({ filters }: Props) {
-  const { get } = useApi()
-  const [data, setData] = useState<LeadTimeData | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true)
-      const response = await get('/ventas/reportes/lead-time', {
-        params: filters
-      })
-
-      if (response?.success) {
-        setData(response.data)
-      }
-    } catch (error) {
-      console.error('Error loading report:', error)
-      toast({
-        title: 'Error',
-        description: 'No se pudo cargar el reporte',
-        variant: 'destructive'
-      })
-    } finally {
-      setLoading(false)
-    }
-  }, [filters, get])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
+  const { data: reportData, loading, error, retry } = useSalesReport<LeadTimeData>('/ventas/reportes/lead-time', filters, 'object')
+  const data = reportData
 
   const getTendenciaIcon = () => {
     if (!data || data.tendencia.length < 2) return null
@@ -91,6 +63,8 @@ export default function LeadTimeReport({ filters }: Props) {
     }
     return 'Sin cambios'
   }
+
+  if (error) return <ReportReadError error={error} retry={retry} />
 
   return (
     <Card>

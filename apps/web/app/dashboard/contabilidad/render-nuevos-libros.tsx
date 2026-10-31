@@ -32,21 +32,28 @@ export const renderRegistroCompras = (registroCompras: any, loading: boolean, fo
     return <div className={emptyClass}>No hay compras registradas en el periodo seleccionado.</div>
   }
 
+  const moneda = registroCompras.resumen.moneda
   const metrics = [
     ['Total comprobantes', registroCompras.resumen.cantidadComprobantes],
-    ['Base imponible', formatearMoneda(registroCompras.resumen.baseImponible)],
-    ['IGV', formatearMoneda(registroCompras.resumen.igv)],
-    ['Total', formatearMoneda(registroCompras.resumen.total)],
+    ['Base imponible', moneda ? formatearMoneda(registroCompras.resumen.baseImponible, moneda) : 'Ver totales por moneda'],
+    ['IGV', moneda ? formatearMoneda(registroCompras.resumen.igv, moneda) : 'Ver totales por moneda'],
+    ['Total', moneda ? formatearMoneda(registroCompras.resumen.total, moneda) : 'Ver totales por moneda'],
   ]
 
   return (
     <div className={panelClass}>
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-xl font-black text-white">Registro de Compras</h2>
+        <h2 className="text-xl font-black text-foreground">Registro de Compras</h2>
         <button type="button" onClick={() => exportarExcel('registro-compras')} className={exportButtonClass}>
           Exportar Excel
         </button>
       </div>
+
+      {!moneda && (registroCompras.resumenPorMoneda || []).map((resumen: any) => (
+        <p key={resumen.moneda} className="mb-3 text-sm text-foreground">
+          {resumen.moneda}: base {formatearMoneda(resumen.baseImponible, resumen.moneda)}, IGV {formatearMoneda(resumen.igv, resumen.moneda)}, total {formatearMoneda(resumen.total, resumen.moneda)}
+        </p>
+      ))}
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {metrics.map(([label, value]) => (
@@ -61,7 +68,7 @@ export const renderRegistroCompras = (registroCompras: any, loading: boolean, fo
         <table className={tableClass}>
           <thead>
             <tr>
-              {['Fecha', 'Tipo', 'Serie-Numero', 'Proveedor', 'RUC', 'Base Imponible', 'IGV', 'Total', 'Origen'].map((head) => (
+              {['Fecha', 'Tipo', 'Comprobante', 'Proveedor', 'Documento proveedor', 'Moneda', 'Base Imponible', 'IGV', 'Total', 'Documento modificado'].map((head) => (
                 <th key={head} className={`${thClass} ${['Base Imponible', 'IGV', 'Total'].includes(head) ? 'text-right' : head === 'Origen' ? 'text-center' : ''}`}>{head}</th>
               ))}
             </tr>
@@ -69,19 +76,18 @@ export const renderRegistroCompras = (registroCompras: any, loading: boolean, fo
           <tbody className="divide-y divide-cyan-400/10">
             {registroCompras.compras.map((compra: any, index: number) => (
               <tr key={index} className="!bg-card/50 transition hover:!bg-card/80">
-                <td className={tdClass}>{formatearFecha(compra.fechaEmision)}</td>
+                <td className={tdClass}>{formatearFecha(compra.fecha)}</td>
                 <td className={tdClass}>
-                  <StatusPill active={compra.tipoComprobante === '01'}>{compra.tipoComprobante === '01' ? 'FACTURA' : 'OTROS'}</StatusPill>
+                  <StatusPill active={compra.tipoDocumento === 'FACTURA'}>{String(compra.tipoDocumento).replace(/_/g, ' ')}</StatusPill>
                 </td>
-                <td className={`${tdClass} font-mono`}>{compra.serieNumero}</td>
+                <td className={`${tdClass} font-mono`}>{compra.numeroDocumento}</td>
                 <td className={tdClass}>{compra.razonSocialProveedor}</td>
-                <td className={`${tdClass} font-mono`}>{compra.numeroDocumentoProveedor}</td>
-                <td className={`${tdClass} text-right font-mono`}>{formatearMoneda(compra.baseImponibleOperacionGravada)}</td>
-                <td className={`${tdClass} text-right font-mono`}>{formatearMoneda(compra.igv)}</td>
-                <td className={`${tdClass} text-right font-mono font-bold text-primary`}>{formatearMoneda(compra.importeTotal)}</td>
-                <td className={`${tdClass} text-center`}>
-                  <StatusPill active={compra.origen === 'ORDEN_COMPRA'}>{compra.origen === 'ORDEN_COMPRA' ? 'COMPRA' : 'GASTO'}</StatusPill>
-                </td>
+                <td className={`${tdClass} font-mono`}>{compra.rucProveedor}</td>
+                <td className={tdClass}>{compra.moneda}</td>
+                <td className={`${tdClass} text-right font-mono`}>{formatearMoneda(compra.baseImponible, compra.moneda)}</td>
+                <td className={`${tdClass} text-right font-mono`}>{formatearMoneda(compra.igv, compra.moneda)}</td>
+                <td className={`${tdClass} text-right font-mono font-bold text-primary`}>{formatearMoneda(compra.importeTotal, compra.moneda)}</td>
+                <td className={`${tdClass} font-mono`}>{compra.documentoModificado || '—'}</td>
               </tr>
             ))}
           </tbody>

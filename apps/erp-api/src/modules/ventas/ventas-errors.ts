@@ -29,6 +29,9 @@ export function writerFailure(error: DbError, fallback: string): HttpException {
   }
   const code = String(error?.code ?? '');
   const message = String(error?.message ?? '').trim();
+  if (message.includes('COMMERCIAL_PRICE_STALE')) {
+    return new ConflictException('Los precios cambiaron desde la revisión. Revisa el total vigente y vuelve a confirmar.');
+  }
   if (code === '23505') return new ConflictException(message || fallback);
   if (code === '42501') {
     return /permission denied/i.test(message)

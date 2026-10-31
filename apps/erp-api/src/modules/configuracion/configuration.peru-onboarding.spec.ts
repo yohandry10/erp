@@ -1,6 +1,7 @@
 import * as forge from 'node-forge';
 import { ConfigurationService } from './configuration.service';
 import { ConfigurationController } from './configuration.controller';
+import { decryptText } from '../../shared/utils/secure-config.utils';
 
 describe('Alta Perú: certificado del cliente y RUC en edición', () => {
   const tenantId = '11111111-1111-4111-8111-111111111111';
@@ -85,7 +86,9 @@ describe('Alta Perú: certificado del cliente y RUC en edición', () => {
   it('completar vuelve a validar y entrega únicamente el PFX y contraseña cifrados al writer', async () => {
     const { service, rpc } = setup();
     const config = { pais: 'PE', pais_id: 1, ruc: clientRuc, razonSocial: 'Cliente local', direccion: 'Dirección local',
-      certificateBase64, certificatePassword: password, sunat_environment: 'homologacion' };
+      certificateBase64, certificatePassword: password, sunat_environment: 'homologacion',
+      sunat_username: 'ERPCLIENT', sunat_password: 'Clave<&SOL\"2026',
+      sunat_gre_client_id: 'cliente-api-local', sunat_gre_client_secret: 'secreto-api-local' };
     await service.completeWizard(tenantId, config, '22222222-2222-4222-8222-222222222222', 'alta-local');
     expect(rpc).toHaveBeenCalledWith('completar_wizard_config_tx', expect.objectContaining({
       p_tenant_id: tenantId, p_patch: expect.objectContaining({ ruc: clientRuc, configuracion_completa: true }),
@@ -93,6 +96,13 @@ describe('Alta Perú: certificado del cliente y RUC en edición', () => {
     const serialized = JSON.stringify(rpc.mock.calls);
     expect(serialized).not.toContain(certificateBase64);
     expect(serialized).not.toContain(password);
+    expect(serialized).not.toContain(config.sunat_password);
+    expect(serialized).not.toContain(config.sunat_gre_client_secret);
+    const patch = rpc.mock.calls[0][1].p_patch;
+    const serverConfig = { get: (key: string) => key === 'CERT_ENCRYPTION_KEY' ? 'clave-cifrado-local-onboarding-32-bytes' : undefined } as any;
+    expect(patch.sunat_username).toBe('ERPCLIENT');
+    expect(decryptText(serverConfig, patch.sunat_password)).toBe(config.sunat_password);
+    expect(decryptText(serverConfig, patch.sunat_gre_client_secret)).toBe(config.sunat_gre_client_secret);
 
     rpc.mockClear();
     await expect(service.completeWizard(tenantId, { ...config, ruc: previousRuc },

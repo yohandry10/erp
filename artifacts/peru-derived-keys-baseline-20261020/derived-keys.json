@@ -1,0 +1,89 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Ediciones sin Idempotency-Key API/DB local; sin aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Claves: tipo de cambio 3.75, 3.80 y otra vez 3.75 el mismo día queda en 3.75",
+      "passed": false,
+      "message": "Venta registrada tras cada alta: [3.75,3.8,3.8]\n+ actual - expected\n\n  [\n    3.75,\n    3.8,\n+   3.8\n-   3.75\n  ]\n"
+    },
+    {
+      "scenario": "Claves: renombrar un centro de costo B→C→B deja B",
+      "passed": false,
+      "message": "Nombre tras cada edición: [\"Centro B\",\"Centro C\",\"Centro C\"]\n+ actual - expected\n\n  [\n    'Centro B',\n    'Centro C',\n+   'Centro C'\n-   'Centro B'\n  ]\n"
+    },
+    {
+      "scenario": "Claves: cambiar el vencimiento de una CxP A→B→A deja A",
+      "passed": false,
+      "message": "Vencimiento tras cada edición: [\"2026-12-04\",\"2026-12-19\",\"2026-12-19\"]\n+ actual - expected\n\n  [\n    '2026-12-04',\n    '2026-12-19',\n+   '2026-12-19'\n-   '2026-12-04'\n  ]\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/tipos-cambio",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/tipos-cambio",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/tipos-cambio",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/centros-costo",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "contabilidad/centros-costo/:id",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "contabilidad/centros-costo/:id",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "contabilidad/centros-costo/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "compras/proveedores",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "finanzas/cxp",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "finanzas/cxp/:id",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "finanzas/cxp/:id",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "finanzas/cxp/:id",
+      "status": 200
+    }
+  ]
+}

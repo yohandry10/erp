@@ -111,6 +111,7 @@ export default function PresupuestoEjecucionPorCentroChart({ centros }: Presupue
           <Tooltip content={<CustomTooltip />} />
           <Legend
             wrapperStyle={{ paddingTop: '20px' }}
+            formatter={(value)=><span className="text-foreground">{value}</span>}
             iconType="rect"
           />
           <Bar
@@ -121,6 +122,7 @@ export default function PresupuestoEjecucionPorCentroChart({ centros }: Presupue
           />
           <Bar
             dataKey="ejecutado"
+            fill="#f97316"
             name="Ejecutado"
             radius={[4, 4, 0, 0]}
           >

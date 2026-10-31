@@ -1,3 +1,4 @@
+import { UuidParamPipe } from '../../../common/pipes/uuid-param.pipe';
 import {
   Controller,
   Get,
@@ -21,6 +22,7 @@ import {
   UpdatePresupuestoDto,
   PresupuestoResponseDto,
 } from "@erp-suite/dtos";
+import { BudgetDeleteDto } from "../dto/budget-delete.dto";
 import { PresupuestosService } from "../services/presupuestos.service";
 
 @ApiTags("contabilidad")
@@ -276,6 +278,18 @@ export class ContabilidadPresupuestosController {
     }
   }
 
+  @Get("presupuestos/vista-ejecucion")
+  @RequirePermission("contabilidad.presupuestos.read")
+  async listarVistaEjecucion(@CurrentTenant() tenantId: string) {
+    return { success: true, data: await this.presupuestosService.listarVistaEjecucion(tenantId) };
+  }
+
+  @Get("presupuestos/:id/vista-ejecucion")
+  @RequirePermission("contabilidad.presupuestos.read")
+  async obtenerVistaEjecucion(@CurrentTenant() tenantId: string, @Param("id", UuidParamPipe) id: string) {
+    return { success: true, data: await this.presupuestosService.obtenerVistaEjecucion(tenantId, id) };
+  }
+
   @Get("presupuestos/:id")
   @RequirePermission("contabilidad.presupuestos.read") // HARDENING: permisos granulares.
   @ApiOperation({ summary: "Obtener un presupuesto específico por ID" })
@@ -290,7 +304,7 @@ export class ContabilidadPresupuestosController {
   })
   async obtenerPresupuestoPorId(
     @CurrentTenant() tenantId: string,
-    @Param("id") presupuestoId: string,
+    @Param("id", UuidParamPipe) presupuestoId: string,
   ): Promise<{
     success: boolean;
     data: PresupuestoResponseDto;
@@ -337,7 +351,7 @@ export class ContabilidadPresupuestosController {
   async actualizarPresupuesto(
     @CurrentTenant() tenantId: string,
     @CurrentUser("id") userId: string,
-    @Param("id") presupuestoId: string,
+    @Param("id", UuidParamPipe) presupuestoId: string,
     @Body() updatePresupuestoDto: UpdatePresupuestoDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<{
@@ -369,6 +383,20 @@ export class ContabilidadPresupuestosController {
     }
   }
 
+  @Post("presupuestos/:id/resolver-edicion")
+  @RequirePermission("contabilidad.presupuestos.actualizar")
+  @ApiOperation({summary:"Confirmar una edición previa o bloquear definitivamente su clave sin modificar el presupuesto"})
+  async resolverEdicionPresupuesto(
+    @CurrentTenant() tenantId:string,
+    @CurrentUser("id") userId:string,
+    @Param("id", UuidParamPipe) presupuestoId:string,
+    @Body() payload:UpdatePresupuestoDto,
+    @Headers('idempotency-key') key:string,
+  ) {
+    const data=await this.presupuestosService.resolverEdicionPresupuesto(tenantId,presupuestoId,payload,userId,key);
+    return {success:true,data};
+  }
+
   @Delete("presupuestos/:id")
   @RequirePermission("contabilidad.presupuestos.eliminar") // HARDENING: permisos granulares.
   @ApiOperation({ summary: "Eliminar un presupuesto existente" })
@@ -388,7 +416,8 @@ export class ContabilidadPresupuestosController {
   async eliminarPresupuesto(
     @CurrentTenant() tenantId: string,
     @CurrentUser("id") userId: string,
-    @Param("id") presupuestoId: string,
+    @Param("id", UuidParamPipe) presupuestoId: string,
+    @Body() deletePresupuestoDto: BudgetDeleteDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<{
     success: boolean;
@@ -405,6 +434,7 @@ export class ContabilidadPresupuestosController {
         presupuestoId,
         userId,
         idempotencyKey,
+        deletePresupuestoDto,
       );
 
       return {
@@ -754,7 +784,7 @@ export class ContabilidadPresupuestosController {
   })
   async actualizarEjecucionPresupuestal(
     @CurrentTenant() tenantId: string,
-    @Param("id") presupuestoId: string,
+    @Param("id", UuidParamPipe) presupuestoId: string,
   ): Promise<{
     success: boolean;
     data: PresupuestoResponseDto;

@@ -8,9 +8,11 @@ async function submitLocalLogin(page: Page) {
   // Todos los usuarios del ensayo comparten la IP local. Conservar el límite
   // real de autenticación y respetar Retry-After cuando se agota su ventana.
   for (let attempt = 0; attempt < 2; attempt++) {
-    const [response] = await Promise.all([
+    const [{ response, auth }] = await Promise.all([
       page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith('/api/auth/login')
-        && response.request().method() === 'POST'),
+        && response.request().method() === 'POST').then(async response => ({
+          response, auth: response.status() === 201 ? await response.json() : null,
+        })),
       page.getByRole('button', { name: 'Iniciar Sesión', exact: true }).click(),
     ])
     if (response.status() === 429 && attempt === 0) {
@@ -21,7 +23,10 @@ async function submitLocalLogin(page: Page) {
       continue
     }
     expect(response.status(), 'El login real debe responder 201').toBe(201)
-    return
+    expect(auth).toBeTruthy()
+    await expect(page).toHaveURL(/\/(?:superadmin\/)?dashboard\//, { timeout: 25000 })
+    await page.waitForLoadState('domcontentloaded')
+    return auth
   }
 }
 
@@ -296,7 +301,7 @@ test('Perú: primer administrador edita banco, descarga CSV filtrado y consulta 
     const filename = path.join(output, 'bank-filtered-ui.csv')
     await download.saveAs(filename)
     const csv = await fs.readFile(filename, 'utf8')
-    const date = readLocalSql(`SELECT app.hoy_tenant(${tenant});`).split('-').reverse().join('/')
+    const date = readLocalSql(`SELECT (date_trunc('month',app.hoy_tenant(${tenant}))-interval '1 month'+interval '14 days')::date;`).split('-').reverse().join('/')
     expect(csv).toContain('"' + date + '"')
     expect(csv).toContain('"\'=1+1"')
     for (const reference of ['FUND-LOCAL', 'FEE-LOCAL', 'TRANSFER-LOCAL', 'PAY-PARTIAL', 'PAY-FINAL', 'ADJUST-LOCAL']) expect(csv).toContain(reference)
@@ -356,11 +361,7 @@ test('Perú: CxC cobrada se busca, muestra dos pagos y se exporta desde la inter
   await page.goto('/login/')
   await page.locator('#email').fill('peru-integrated-1@example.test')
   await page.locator('#password').fill('Local-Peru-2026-Only!')
-  const [login] = await Promise.all([
-    page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith('/api/auth/login') && response.status() === 201),
-    submitLocalLogin(page),
-  ])
-  const auth = await login.json()
+  const auth = await submitLocalLogin(page)
   const token = auth.access_token ?? auth.data?.access_token
   expect(token).toBeTruthy()
   const detailResponse = await page.request.get(`${process.env.LOCAL_API_URL}/api/finanzas/cxc/${collection.cxc_id}`, {
@@ -389,7 +390,7 @@ test('Perú: CxC cobrada se busca, muestra dos pagos y se exporta desde la inter
   const cxcListRoute = /\/finanzas\/cxc\/?(?:\?.*)?$/
   await context.route(cxcListRoute, route => route.fulfill({ status: 503, json: { message: 'Fallo temporal local' } }))
   await page.getByRole('button', { name: 'Actualizar' }).click()
-  await expect(page.getByRole('alert').filter({ hasText: 'No se pudieron cargar las cuentas por cobrar' })).toBeVisible()
+  await expect(page.getByRole('alert').filter({ hasText: 'No se pudo consultar la información completa de la cuenta por cobrar.' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Exportar' })).toBeDisabled()
   await context.unroute(cxcListRoute)
   await page.getByRole('button', { name: 'Reintentar consulta' }).click()
@@ -408,11 +409,7 @@ test('Perú: primer administrador importa, edita y desactiva maestros con recupe
   await page.goto('/login/')
   await page.locator('#email').fill(onboarding.client_email)
   await page.locator('#password').fill('Cliente-Local-2026-Only!')
-  const [login] = await Promise.all([
-    page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith('/api/auth/login') && response.status() === 201),
-    submitLocalLogin(page),
-  ])
-  const auth = await login.json()
+  const auth = await submitLocalLogin(page)
   const token = auth.access_token ?? auth.data?.access_token
   expect(token).toBeTruthy()
   const headers = { Authorization: `Bearer ${token}` }
@@ -595,11 +592,7 @@ test('Perú: primer administrador reintenta cobro CxC con respuesta perdida sin 
   await page.goto('/login/')
   await page.locator('#email').fill(onboarding.client_email)
   await page.locator('#password').fill('Cliente-Local-2026-Only!')
-  const [login] = await Promise.all([
-    page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith('/api/auth/login') && response.status() === 201),
-    submitLocalLogin(page),
-  ])
-  const auth = await login.json()
+  const auth = await submitLocalLogin(page)
   const token = auth.access_token ?? auth.data?.access_token
   expect(token).toBeTruthy()
   const headers = { Authorization: `Bearer ${token}` }
@@ -619,8 +612,12 @@ test('Perú: primer administrador reintenta cobro CxC con respuesta perdida sin 
   await page.getByPlaceholder('Serie, numero, cliente, moneda').fill(String(detail.numero))
   const row = page.getByRole('row').filter({ hasText: String(detail.numero) })
   await expect(row).toBeVisible()
+  await page.getByRole('combobox', { name: 'Estado', exact: true }).selectOption('VENCIDO')
+  await expect(row).toBeVisible()
+  await page.getByRole('combobox', { name: 'Estado', exact: true }).selectOption('')
+  await expect(row).toBeVisible()
   await row.getByRole('button', { name: 'Cobro' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Registrar cobro' })
+  const dialog = page.getByRole('dialog', { name: /^(Registrar cobro|Confirmar cobro pendiente)$/ })
   await expect(dialog).toBeVisible()
   await dialog.locator('#metodo_pago').selectOption('EFECTIVO')
   await dialog.locator('#referencia').fill(`COBRO-UI-LOCAL-${randomUUID().slice(0, 8)}`)
@@ -645,6 +642,7 @@ test('Perú: primer administrador reintenta cobro CxC con respuesta perdida sin 
   expect(firstIntent).toMatch(/^cxc-cobro:/)
   expect(committedPayment.data?.pago?.id).toBeTruthy()
   expect(committedPayment.data?.movimiento_caja?.id).toBeTruthy()
+  await expect(page.getByRole('dialog', { name: 'Confirmar cobro pendiente', exact: true })).toBeVisible()
   await expect(dialog.getByRole('alert')).toContainText('Respuesta de cobro interrumpida')
   await expect(dialog).toBeVisible()
   await expect(dialog.locator('#monto')).toHaveValue(String(due))
@@ -655,7 +653,7 @@ test('Perú: primer administrador reintenta cobro CxC con respuesta perdida sin 
   const [paymentResponse] = await Promise.all([
     page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith(`/api/finanzas/cxc/${opening.cuenta_id}/pagos`)
       && response.request().method() === 'POST'),
-    dialog.getByRole('button', { name: 'Registrar cobro' }).click(),
+    dialog.getByRole('button', { name: 'Reintentar mismo cobro', exact: true }).click(),
   ])
   expect(paymentResponse.status(), await paymentResponse.text()).toBe(201)
   const payment = await paymentResponse.json()
@@ -679,6 +677,17 @@ test('Perú: primer administrador reintenta cobro CxC con respuesta perdida sin 
       notas: 'Arqueo local tras cobro visual de CxC inicial' },
   })
   expect(closeResponse.status(), await closeResponse.text()).toBe(201)
+  expect(firstIntent).toMatch(/^cxc-cobro:[0-9a-f-]{36}:[0-9a-f-]{36}$/i)
+  await consumeLocalAccounting('browser-imported-cxc-collection')
+  const collectionJournals = JSON.parse(readLocalSql(`SELECT COALESCE(json_agg(row_to_json(j)), '[]'::json)::text FROM (
+    SELECT a.id, a.estado, a.total_debe, a.total_haber FROM asientos_contables a
+    JOIN outbox_events e ON e.event_id=a.source_event_id
+    WHERE e.tenant_id='${auth.user.tenant_id}'::uuid AND e.idempotency_key='${firstIntent}'
+  ) j;`))
+  expect(collectionJournals).toHaveLength(1)
+  expect(collectionJournals[0].estado).toBe('CONFIRMADO')
+  expect(Number(collectionJournals[0].total_debe)).toBeCloseTo(due, 2)
+  expect(Number(collectionJournals[0].total_haber)).toBeCloseTo(due, 2)
   await fs.writeFile(path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'browser-cxc-collection.json'), JSON.stringify({
     scenario: 'primer ADMIN no demo cobra saldo inicial, pierde respuesta y reintenta sin duplicar',
     first_response_status: 503, committed_payment_id: committedPayment.data.pago.id,
@@ -686,7 +695,75 @@ test('Perú: primer administrador reintenta cobro CxC con respuesta perdida sin 
     payment_id: payment.data.pago.id, cash_movement_id: payment.data.movimiento_caja.id,
     payment_count: (paidRaw.data ?? paidRaw).pagos.length, final_balance: Number((paidRaw.data ?? paidRaw).saldo),
     cash_balance: Number(balance.data.saldo), expected_cash_balance: 100 + due, close_status: closeResponse.status(),
+    collection_journals: collectionJournals,
     external_browser_requests_blocked: true, local_only: true,
+  }, null, 2))
+})
+
+test('Perú: CPE histórico importado conserva estado no fiscal y sólo lectura', async ({ page, context }) => {
+  test.setTimeout(180000)
+  if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1' || process.env.LOCAL_API_URL !== 'http://127.0.0.1:3126') throw new Error('Requiere API/base locales efímeras')
+  const output = process.env.LOCAL_INTEGRATED_OUTPUT_DIR!
+  const evidence = JSON.parse(await fs.readFile(path.join(output, 'http.json'), 'utf8'))
+  const owner = evidence.results.find((row: { scenario: string }) => row.scenario.startsWith('alta no demo y primer administrador'))
+  expect(owner?.client_email).toBeTruthy()
+  const writers: string[] = [], errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  page.on('request', request => {
+    const pathname = new URL(request.url()).pathname
+    if (pathname.includes('/api/') && !['GET', 'HEAD', 'OPTIONS'].includes(request.method()) && !pathname.includes('/auth/')) writers.push(request.method() + ' ' + pathname)
+  })
+  await context.route('**/*', route => ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort())
+  await page.goto('/login/')
+  await page.locator('#email').fill(owner.client_email)
+  await page.locator('#password').fill('Cliente-Local-2026-Only!')
+  const auth = await submitLocalLogin(page)
+  const token = auth.access_token ?? auth.data?.access_token
+  const tenant = auth.user?.tenant_id ?? auth.data?.user?.tenant_id
+  expect(tenant).toMatch(/^[0-9a-f-]{36}$/i)
+  const response = await page.request.get(`${process.env.LOCAL_API_URL}/api/cpe/comprobantes?page=1&pageSize=50`, { headers: { Authorization: `Bearer ${token}` } })
+  expect(response.status(), await response.text()).toBe(200)
+  const list = await response.json()
+  const historical = list.data.find((row: { estado: string }) => row.estado === 'MIGRADO')
+  expect(historical).toMatchObject({ isHistoricalImport: true, estadoSunat: 'NO_VERIFICADO', isDemoRepresentation: false, requiereVincularCobro: false, total: 118 })
+  expect(historical.fechaEmision).toBe('2025-01-01')
+  expect(historical.id).toMatch(/^[0-9a-f-]{36}$/i)
+  const SQL = JSON.parse(readLocalSql(`SELECT json_build_object('estado', estado, 'total',total_venta,'activo',activo,'origen',metadata->>'origen','no_sunat',metadata->'no_sunat','solo_lectura',metadata->'solo_lectura')::text FROM cpe WHERE tenant_id='${tenant}'::uuid AND id='${historical.id}'::uuid;`))
+  expect(SQL).toEqual({ estado: 'MIGRADO', total: 118, activo: false, origen: 'migracion_historica', no_sunat: true, solo_lectura: true })
+  await page.goto('/dashboard/cpe/')
+  // La tabla PE expone el consecutivo numérico, no el formato de ocho dígitos
+  // del XML/PDF. Vincular ambas celdas exactas evita depender del número aleatorio.
+  const row = page.getByRole('row')
+    .filter({ has: page.getByRole('cell', { name: String(historical.serie), exact: true }) })
+    .filter({ has: page.getByRole('cell', { name: String(historical.numero), exact: true }) })
+  await expect(row).toContainText('Historia migrada')
+  await expect(row).toContainText('Sólo lectura; sin constancia fiscal')
+  await expect(row.getByRole('button')).toHaveCount(0)
+  await expect(row.getByRole('link')).toHaveCount(0)
+  await page.getByRole('combobox', { name: 'Estado', exact: true }).selectOption('MIGRADO')
+  await expect(row).toBeVisible()
+  const downloadPromise = page.waitForEvent('download', { timeout: 30000 })
+  await page.getByRole('button', { name: 'Exportar CSV', exact: true }).click()
+  const download = await downloadPromise
+  const exported = path.join(output, 'browser-historical-cpe.csv')
+  await download.saveAs(exported)
+  const csv = await fs.readFile(exported, 'utf8')
+  expect(csv).toContain('MIGRADO')
+  expect(csv).toContain(String(historical.numero))
+  await page.getByRole('combobox', { name: 'Estado', exact: true }).selectOption('FIRMADO')
+  await expect(row).toHaveCount(0)
+  await page.getByRole('combobox', { name: 'Estado', exact: true }).selectOption('')
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(row).toContainText('Historia migrada')
+  await expect(row.getByRole('button')).toHaveCount(0)
+  expect(writers).toEqual([])
+  expect(errors).toEqual([])
+  await fs.writeFile(path.join(output, 'browser-historical-cpe.json'), JSON.stringify({
+    scope: 'LOCAL_UI_REAL_IMPORTED_CPE_HISTORY_READ_FILTER_EXPORT_WITHOUT_FISCAL_ACTIONS', complete: true, remoteWrites: false, businessWrites: 0,
+    steps: [{ name: 'actual_imported_cpe_state_and_SQL_provenance_remain_historical', result: 'PASS' },
+      { name: 'history_filter_CSV_export_and_reload_without_false_fiscal_status', result: 'PASS' },
+      { name: 'historical_row_never_offers_fiscal_writers_preview_or_download', result: 'PASS' }],
+    cpeId: historical.id, SQL, stateSunat: historical.estadoSunat, writers, errors,
   }, null, 2))
 })
 
@@ -702,11 +779,7 @@ test('Perú: ajuste con respuesta perdida, transferencia y kardex conservan exis
   await page.goto('/login/')
   await page.locator('#email').fill(owner.client_email)
   await page.locator('#password').fill('Cliente-Local-2026-Only!')
-  const [login] = await Promise.all([
-    page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith('/api/auth/login') && response.status() === 201),
-    submitLocalLogin(page),
-  ])
-  const auth = await login.json()
+  const auth = await submitLocalLogin(page)
   const token = auth.access_token ?? auth.data?.access_token
   expect(token).toBeTruthy()
   const headers = { Authorization: `Bearer ${token}` }
@@ -726,23 +799,32 @@ test('Perú: ajuste con respuesta perdida, transferencia y kardex conservan exis
   await page.getByLabel('Motivo del ajuste', { exact: true }).fill('Conteo desde navegador local')
   const adjustmentRoute = /\/api\/inventario\/movimientos\/?$/
   let originalIntent: { idempotency_key: string } | undefined
+  let adjustmentReplyLost = false
   await page.route(adjustmentRoute, async route => {
+    if (route.request().method() !== 'POST' || adjustmentReplyLost) return route.fallback()
+    adjustmentReplyLost = true
     originalIntent = route.request().postDataJSON()
     const committed = await route.fetch()
     expect(committed.status()).toBe(201)
     await route.fulfill({ status: 503, json: { message: 'Respuesta de ajuste perdida después del commit local' } })
-  }, { times: 1 })
-  await page.getByRole('button', { name: 'Registrar ajuste y asiento', exact: true }).click()
-  await expect(page.getByRole('alert').filter({ hasText: 'Respuesta de ajuste perdida' })).toBeVisible()
+  })
+  const [lostAdjustment] = await Promise.all([
+    page.waitForResponse(response => adjustmentRoute.test(new URL(response.url()).pathname) && response.request().method() === 'POST'),
+    page.getByRole('button', { name: 'Registrar ajuste y asiento', exact: true }).click(),
+  ])
+  expect(lostAdjustment.status()).toBe(503)
+  await expect(page.getByRole('alert').filter({ hasText: 'No se pudo confirmar el resultado original completo.' })).toBeVisible()
   await expect(page.getByRole('status').filter({ hasText: 'registrado' })).toHaveCount(0)
   await expect(page.getByLabel('Diferencia del ajuste', { exact: true })).toHaveValue('1.5')
   expect(Number((await getReal(`productos/${inventory.producto_id}`)).data.stock_actual)).toBe(stockBefore + 1.5)
   const [retried] = await Promise.all([
     page.waitForResponse(response => adjustmentRoute.test(new URL(response.url()).pathname) && response.request().method() === 'POST' && response.status() === 201),
-    page.getByRole('button', { name: 'Registrar ajuste y asiento', exact: true }).click(),
+    page.getByRole('button', { name: 'Reintentar ajuste', exact: true }).click(),
   ])
   expect(retried.request().postDataJSON().idempotency_key).toBe(originalIntent!.idempotency_key)
-  await expect(page.getByRole('status').filter({ hasText: 'registrado' })).toBeVisible()
+  expect(retried.request().postDataJSON()).toEqual(originalIntent)
+  expect((await retried.json()).data.idempotent).toBe(true)
+  await expect(page.getByRole('status').filter({ hasText: 'recuperado' })).toBeVisible()
   expect(Number((await getReal(`productos/${inventory.producto_id}`)).data.stock_actual)).toBe(stockBefore + 1.5)
   expect((await getReal('movimientos?limit=500')).data.filter((row: { producto_id: string }) => row.producto_id === inventory.producto_id)).toHaveLength(movementsBefore.length + 1)
   await page.getByRole('tab', { name: 'Transferencia entre almacenes' }).click()
@@ -807,11 +889,7 @@ test('Perú: reembolso RMA recupera catálogos, respuesta perdida y asiento sin 
   await page.goto('/login/')
   await page.locator('#email').fill('peru-integrated-1@example.test')
   await page.locator('#password').fill('Local-Peru-2026-Only!')
-  const [login] = await Promise.all([
-    page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith('/api/auth/login') && response.status() === 201),
-    submitLocalLogin(page),
-  ])
-  const auth = await login.json()
+  const auth = await submitLocalLogin(page)
   const headers = { Authorization: `Bearer ${auth.access_token ?? auth.data?.access_token}` }
   const getReal = async (endpoint: string) => {
     const response = await page.request.get(`${process.env.LOCAL_API_URL}/api/${endpoint}`, { headers })
@@ -922,11 +1000,7 @@ test('Perú: primer administrador recupera asiento manual perdido, edita, confir
   await page.goto('/login/')
   await page.locator('#email').fill(onboarding.client_email)
   await page.locator('#password').fill('Cliente-Local-2026-Only!')
-  const [login] = await Promise.all([
-    page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith('/api/auth/login') && response.status() === 201),
-    submitLocalLogin(page),
-  ])
-  const auth = await login.json()
+  const auth = await submitLocalLogin(page)
   const headers = { Authorization: `Bearer ${auth.access_token ?? auth.data?.access_token}` }
   const api = process.env.LOCAL_API_URL!
   const accountsResponse = await page.request.get(`${api}/api/contabilidad/plan-cuentas`, { headers })
@@ -1121,10 +1195,7 @@ test('Perú: candidato conserva perfil y vacante después de crear, editar y rec
   await page.goto('/login/')
   await page.locator('#email').fill('peru-integrated-2@example.test')
   await page.locator('#password').fill('Local-Peru-2026-Only!')
-  const [login] = await Promise.all([
-    page.waitForResponse(r => r.url().includes('/auth/login') && r.status() === 201), submitLocalLogin(page),
-  ])
-  const auth = await login.json()
+  const auth = await submitLocalLogin(page)
   const token = auth.access_token ?? auth.data?.access_token
   expect(token).toBeTruthy()
   // Preparación local por API. El recorrido de candidato sí se hace desde UI.
@@ -1175,7 +1246,7 @@ test('Perú: candidato conserva perfil y vacante después de crear, editar y rec
   const candidateList = /\/api\/rrhh\/candidatos\/?$/
   await context.route(candidateList, route => route.fulfill({ status: 503, json: { message: 'Fallo local de prueba' } }))
   await page.reload()
-  await expect(page.getByRole('alert').filter({ hasText: 'información puede estar incompleta' })).toBeVisible()
+  await expect(page.getByRole('alert').filter({ hasText: 'No se pudo completar la carga de candidatos y vacantes.' })).toBeVisible()
   await context.unroute(candidateList)
   await page.getByRole('button', { name: 'Reintentar carga', exact: true }).click()
   await expect(row).toBeVisible()
@@ -1219,7 +1290,10 @@ test('Perú: superadministrador cambia de empresa y conserva la sesión al recar
   await expect(page.getByText('Cargando tenants...', { exact: true })).toHaveCount(0)
   await expect(page.getByText('...', { exact: true })).toHaveCount(0)
   await expect(page.getByText('Integración local Perú 1', { exact: true }).first()).toBeVisible()
-  await expect(page.getByText('En prueba', { exact: true }).filter({ visible: true })).toHaveCount(2)
+  for (const name of ['Integración local Perú 1', 'Integración local Perú 2']) {
+    const company = page.locator('div.grid').filter({ has: page.getByText(name, { exact: true }) }).filter({ has: page.getByRole('button', { name: 'Administrar demo', exact: true }) }).last()
+    await expect(company.getByText('En prueba', { exact: true })).toBeVisible()
+  }
   const output = path.resolve(process.env.LOCAL_INTEGRATED_OUTPUT_DIR || '../../artifacts/peru-integrated-local')
   await page.screenshot({ path: path.join(output, 'auth-tenant-switch.png'), fullPage: true })
   expect(failures).toEqual([])
@@ -1242,7 +1316,9 @@ test('Perú: consulta y filtra la auditoría de recepciones con la API real', as
   await page.locator('#password').fill('Local-Peru-2026-Only!')
   await submitLocalLogin(page)
   await page.waitForURL('**/dashboard/**')
-  await page.goto('/dashboard/audit-logs/')
+  // El contrato de disponibilidad es el encabezado real y la API siguientes;
+  // no el evento load de recursos secundarios durante la compilación local.
+  await page.goto('/dashboard/audit-logs/', { waitUntil: 'domcontentloaded' })
   await expect(page.getByRole('heading', { name: 'Logs de Auditoría', exact: true })).toBeVisible({ timeout: 30000 })
   const [loaded] = await Promise.all([
     page.waitForResponse(response => response.url().includes('/api/audit-logs') && response.url().includes('table_name=recepciones')),
@@ -1457,9 +1533,8 @@ test('Perú: retoma preparación logística tras fallo de packing y recarga', as
   await page.goto('/login/')
   await page.locator('#email').fill('peru-integrated-2@example.test')
   await page.locator('#password').fill('Local-Peru-2026-Only!')
-  const authResponse = page.waitForResponse(r => r.url().includes('/api/auth/login') && r.status() === 201)
-  await submitLocalLogin(page)
-  const token = (await (await authResponse).json()).access_token
+  const auth = await submitLocalLogin(page)
+  const token = auth.access_token ?? auth.data?.access_token
   await page.waitForURL('**/dashboard/**')
   const headers = { authorization: `Bearer ${token}` }
   const api = async (endpoint: string, body?: unknown) => {

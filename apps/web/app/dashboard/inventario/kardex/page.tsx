@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 import { useApi } from '@/hooks/use-api'
@@ -135,7 +135,7 @@ const formatCurrency = (value?: number | null, currency?: string | null) => {
 
 const formatNumber = (value?: number | null) => value === null || value === undefined
   ? 'Pendiente'
-  : value.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  : value.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 6 })
 
 const nullableNumber = (value: unknown): number | null => {
   if (value === null || value === undefined || value === '') return null
@@ -178,6 +178,9 @@ export default function KardexPage() {
   const [pendingFilters, setPendingFilters] = useState<FilterState>(initialFilters)
   const [almacenes, setAlmacenes] = useState<any[]>([])
   const [productos, setProductos] = useState<any[]>([])
+  const [catalogError, setCatalogError] = useState(false)
+  const catalogSequence = useRef(0)
+  const kardexSequence = useRef(0)
 
   const buildQuery = useCallback((source: FilterState) => {
     const params = new URLSearchParams()
@@ -191,6 +194,10 @@ export default function KardexPage() {
   }, [])
 
   const loadCatalogs = useCallback(async () => {
+    const sequence = ++catalogSequence.current
+    setAlmacenes([])
+    setProductos([])
+    setCatalogError(false)
     try {
       setCatalogLoading(true)
       const [almacenesResp, productosResp] = await Promise.all([
@@ -198,27 +205,45 @@ export default function KardexPage() {
         get('/inventario/productos'),
       ])
 
-      if (almacenesResp?.success) {
-        setAlmacenes(Array.isArray(almacenesResp.data) ? almacenesResp.data : [])
-      }
-
-      if (productosResp?.success) {
-        setProductos(Array.isArray(productosResp.data) ? productosResp.data : [])
-      }
+      const validCatalog = (response: any) => response?.success === true && Array.isArray(response.data) &&
+        response.data.every((row: any) => row && typeof row.id === 'string' && row.id.trim() && typeof row.nombre === 'string')
+      if (!validCatalog(almacenesResp) || !validCatalog(productosResp)) throw new Error('Catálogos incompletos de inventario')
+      if (sequence !== catalogSequence.current) return
+      setAlmacenes(almacenesResp.data)
+      setProductos(productosResp.data)
     } catch (err) {
+      if (sequence !== catalogSequence.current) return
+      setCatalogError(true)
       console.error('Error cargando catálogos de inventario', err)
     } finally {
-      setCatalogLoading(false)
+      if (sequence === catalogSequence.current) setCatalogLoading(false)
     }
   }, [get])
 
   const loadKardex = useCallback(async () => {
+    const sequence = ++kardexSequence.current
+    setMovimientos([])
+    setResumen(DEFAULT_RESUMEN)
     try {
       setLoading(true)
       setError(null)
       const response = await get(`/inventario/kardex${buildQuery(filters)}`)
+      const summary = response?.resumen
+      const finiteOrNull = (value: unknown) => value === null || typeof value === 'number' && Number.isFinite(value)
+      const validSummary = summary && typeof summary === 'object' && !Array.isArray(summary) &&
+        Object.entries(DEFAULT_RESUMEN).every(([key, value]) => {
+          if (!(key in summary)) return false
+          if (typeof value === 'boolean') return typeof summary[key] === 'boolean'
+          if (typeof value === 'number') return finiteOrNull(summary[key])
+          if (key === 'monedaBase') return summary[key] === null || typeof summary[key] === 'string'
+          return summary[key] === null || typeof summary[key] === 'object' && !Array.isArray(summary[key]) && Object.values(summary[key]).every(amount => typeof amount === 'number' && Number.isFinite(amount))
+        }) && typeof summary.totalMovimientos === 'number' && Number.isInteger(summary.totalMovimientos) && summary.totalMovimientos >= 0
+      if (response?.success !== true || !Array.isArray(response.data) || !validSummary || response.data.some((row: any) =>
+        !row || typeof row.id !== 'string' || !row.id.trim() || typeof row.producto?.id !== 'string' || typeof row.producto?.nombre !== 'string' || typeof row.cantidad !== 'number' || !Number.isFinite(row.cantidad)
+      )) throw new Error('Respuesta incompleta del kardex valorizado')
+      if (sequence !== kardexSequence.current) return
 
-      if (response?.success) {
+      if (response.success) {
         setMovimientos(
           (Array.isArray(response.data) ? response.data : []).map((item: any) => ({
             id: item.id ?? item.recepcionItemId ?? crypto.randomUUID(),
@@ -285,29 +310,41 @@ export default function KardexPage() {
         setResumen(DEFAULT_RESUMEN)
       }
     } catch (err) {
+      if (sequence !== kardexSequence.current) return
       console.error('Error cargando kardex valorizado', err)
       setError('No se pudo cargar el kardex valorizado.')
       setMovimientos([])
       setResumen(DEFAULT_RESUMEN)
     } finally {
-      setLoading(false)
+      if (sequence === kardexSequence.current) setLoading(false)
     }
   }, [buildQuery, filters, get])
 
   useEffect(() => {
     loadCatalogs()
+    return () => { catalogSequence.current += 1 }
   }, [loadCatalogs])
 
   useEffect(() => {
     loadKardex()
+    return () => { kardexSequence.current += 1 }
   }, [loadKardex])
 
   const applyFilters = (event: FormEvent) => {
     event.preventDefault()
+    if (catalogLoading || catalogError) return
+    kardexSequence.current += 1
+    setLoading(true)
+    setMovimientos([])
+    setResumen(DEFAULT_RESUMEN)
     setFilters({ ...pendingFilters })
   }
 
   const resetFilters = () => {
+    kardexSequence.current += 1
+    setLoading(true)
+    setMovimientos([])
+    setResumen(DEFAULT_RESUMEN)
     setPendingFilters(initialFilters)
     setFilters(initialFilters)
   }
@@ -392,7 +429,7 @@ export default function KardexPage() {
               <select id="kardex-producto"
                 value={pendingFilters.productoId}
                 onChange={(event) => setPendingFilters((prev) => ({ ...prev, productoId: event.target.value }))}
-                disabled={catalogLoading} className="w-[100%] py-[0.7rem] px-4 rounded-[0.625rem] border text-[0.875rem] bg-card"
+                disabled={catalogLoading || catalogError} className="w-[100%] py-[0.7rem] px-4 rounded-[0.625rem] border text-[0.875rem] bg-card"
               >
                 <option value="">Todos los productos</option>
                 {productos.map((producto) => (
@@ -410,7 +447,7 @@ export default function KardexPage() {
               <select id="kardex-almacen"
                 value={pendingFilters.almacenId}
                 onChange={(event) => setPendingFilters((prev) => ({ ...prev, almacenId: event.target.value }))}
-                disabled={catalogLoading} className="w-[100%] py-[0.7rem] px-4 rounded-[0.625rem] border text-[0.875rem] bg-card"
+                disabled={catalogLoading || catalogError} className="w-[100%] py-[0.7rem] px-4 rounded-[0.625rem] border text-[0.875rem] bg-card"
               >
                 <option value="">Todos los almacenes</option>
                 {almacenes.map((almacen) => (
@@ -445,7 +482,7 @@ export default function KardexPage() {
 
             <div className="flex gap-3 items-center">
               <button
-                type='submit' className="py-[0.7rem] px-6 rounded-[0.625rem] border-0 bg-blue-700 text-white font-semibold cursor-pointer"
+                type='submit' disabled={catalogLoading || catalogError} className="py-[0.7rem] px-6 rounded-[0.625rem] border-0 bg-blue-700 text-white font-semibold cursor-pointer disabled:opacity-50"
               >
                 Aplicar filtros
               </button>
@@ -458,10 +495,20 @@ export default function KardexPage() {
             </div>
           </form>
 
-          {loading ? (
+          {catalogError ? (
+            <div role="alert" className="rounded-xl border border-destructive p-5 text-destructive">
+              <p>No se pudieron cargar los catálogos del kardex.</p>
+              <button type="button" onClick={loadCatalogs} className="mt-3 rounded-lg border px-4 py-2">Reintentar catálogos</button>
+            </div>
+          ) : loading ? (
             <div className="flex justify-center items-center py-12 px-0 text-primary font-semibold"
             >
               Cargando kardex…
+            </div>
+          ) : error ? (
+            <div role="alert" className="rounded-xl border border-destructive p-5 text-destructive">
+              <p>{error}</p>
+              <button type="button" onClick={loadKardex} className="mt-3 rounded-lg border px-4 py-2">Reintentar kardex</button>
             </div>
           ) : (
             <>

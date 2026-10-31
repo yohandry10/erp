@@ -7,6 +7,14 @@ jest.mock('qrcode', () => ({
 }));
 
 describe('sunat-qr.util', () => {
+  it('conserva pasaporte en QR de exportación y exige RUC cuando la misma factura es interna', () => {
+    const exportInvoice = { ruc_emisor: '20616053575', tipo_documento: '01', serie: 'F001', numero: 44,
+      total_igv: 0, total_venta: 20, fecha_emision: '2026-10-08',
+      tipo_documento_receptor: '7', documento_receptor: 'AB570123', metadata: { sunat_tipo_operacion: '0200' } };
+    expect(buildSunatQrContent(exportInvoice)).toBe('20616053575|01|F001|44|0.00|20.00|2026-10-08|7|AB570123|');
+    expect(() => buildSunatQrContent({ ...exportInvoice, metadata: {} })).toThrow('serie F requiere RUC');
+    expect(() => buildSunatQrContent({ ...exportInvoice, documento_receptor: 'AB|570123' })).toThrow('serie F requiere RUC');
+  });
   it('construye el contenido QR SUNAT en el orden oficial', () => {
     const content = buildSunatQrContent({
       ruc_emisor: '20616053575',

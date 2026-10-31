@@ -1,4 +1,4 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { AsientosService } from './asientos.service';
 import {
@@ -13,8 +13,9 @@ import {
   AsientoResponseDto
 } from '@erp-suite/dtos';
 import { buildDeterministicUuid } from '../../../common/util/deterministic-uuid.util';
-
+
 import { fechaHoyDelTenant } from '../../../shared/utils/fecha-tenant.util';
+import { lecturaContableFallida } from '../contabilidad-errors';
 @Injectable()
 export class PlantillasAsientosService {
   private readonly logger = new Logger(PlantillasAsientosService.name);
@@ -86,7 +87,7 @@ export class PlantillasAsientosService {
     const { data, error } = await query.order('nombre', { ascending: true });
 
     if (error) {
-      throw new Error(`Error listando plantillas: ${error.message}`);
+      throw lecturaContableFallida(error, 'las plantillas de asientos');
     }
 
     return (data || []) as PlantillaAsientoResponseDto[];
@@ -101,7 +102,10 @@ export class PlantillasAsientosService {
       .eq('id', plantillaId)
       .single();
 
-    if (error || !data) {
+    if (error && !['PGRST116', '22P02'].includes(error.code)) {
+      throw new ServiceUnavailableException('No se pudo consultar la plantilla contable; reintente');
+    }
+    if (!data) {
       throw new NotFoundException(`Plantilla ${plantillaId} no encontrada`);
     }
 
@@ -345,7 +349,7 @@ export class PlantillasAsientosService {
       .limit(200);
 
     if (error) {
-      throw new Error(`Error obteniendo plantillas vencidas: ${error.message}`);
+      throw lecturaContableFallida(error, 'las plantillas vencidas');
     }
 
     return (data || []) as Array<{ id: string; tenant_id: string; proxima_ejecucion: string }>;
@@ -401,7 +405,7 @@ export class PlantillasAsientosService {
       .order('orden', { ascending: true });
 
     if (error) {
-      throw new Error(`Error obteniendo detalles de la plantilla: ${error.message}`);
+      throw lecturaContableFallida(error, 'el detalle de la plantilla');
     }
 
     return (data || []).map((fila: any) => ({

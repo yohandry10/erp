@@ -1,44 +1,88 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Calendar, ArrowLeft, Save, AlertCircle } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
+import { useAuth } from '@/contexts/AuthContext'
+import { usePermission } from '@/hooks/use-permission'
+import { confirmPeriodCreated, newPeriodCreateIntent, periodCreateIntentKey, readPeriodCreateIntent, type PeriodCreateIntent } from '@/lib/accounting-period-create'
 
 export default function NuevoPeriodoPage() {
+  const { session } = useAuth()
+  return <NuevoPeriodoWorkspace key={`${session?.user?.tenant_id || ''}:${session?.user?.id || ''}`} />
+}
+
+function NuevoPeriodoWorkspace() {
   const router = useRouter()
+  const { session, loading: authLoading } = useAuth()
+  const permission = usePermission('contabilidad', 'crear', 'periodos')
+  const tenantId = session?.user?.tenant_id || '', actorId = session?.user?.id || ''
+  const scopeIdentity = `${tenantId}:${actorId}`
+  const canCreate = !authLoading && !!tenantId && !!actorId && !permission.loading && permission.hasPermission
+  const activeScope = useRef(scopeIdentity); activeScope.current = scopeIdentity
+  const currentPermission = useRef(canCreate); currentPermission.current = canCreate
+  const epoch = useRef(0), inflight = useRef(false)
+  const [ready, setReady] = useState(false)
+  const [pendingIntent, setPendingIntent] = useState<PeriodCreateIntent | null>(null)
+  const [recoveryError, setRecoveryError] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [formData, setFormData] = useState({
-    anio: new Date().getFullYear(),
-    mes: new Date().getMonth() + 1
-  })
-  const { apiCall } = useApi<any>({ retries: 2, timeoutMs: 12000, showErrorToast: false })
+  const [formData, setFormData] = useState({ anio: new Date().getFullYear(), mes: new Date().getMonth() + 1 })
+  const { apiCall } = useApi<unknown>({ requireLive: true, retries: 0, timeoutMs: 30000, showErrorToast: false, throwOnError: true })
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-
+  useEffect(() => {
+    epoch.current++; inflight.current = false
+    setReady(false); setLoading(false); setError(null); setPendingIntent(null); setRecoveryError('')
+    if (authLoading || !tenantId || !actorId) return
     try {
-      const response = await apiCall('/contabilidad/periodos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      })
+      const scope = { tenantId, actorId }
+      const intent = readPeriodCreateIntent(localStorage.getItem(periodCreateIntentKey(scope)), scope)
+      setPendingIntent(intent)
+      if (intent) setFormData({ ...intent.payload })
+    } catch {
+      setRecoveryError('No se pudo recuperar la creación pendiente. Sus datos se conservan; revisa el resultado antes de continuar.')
+    }
+    setReady(true)
+    return () => { epoch.current++ }
+  }, [authLoading, tenantId, actorId])
 
-      if (response?.success === false) {
-        throw new Error(response.message || 'Error al crear el período')
+  const submit = async () => {
+    if (!ready || !canCreate || recoveryError || inflight.current) return
+    inflight.current = true; setLoading(true); setError(null)
+    const requestedEpoch = epoch.current, requestedScope = scopeIdentity
+    const current = () => requestedEpoch === epoch.current && activeScope.current === requestedScope && currentPermission.current
+    try {
+      const scope = { tenantId, actorId }, key = periodCreateIntentKey(scope)
+      const existing = localStorage.getItem(key)
+      const recovered = readPeriodCreateIntent(existing, scope)
+      if ((pendingIntent && existing !== JSON.stringify(pendingIntent)) || (!pendingIntent && recovered)) {
+        throw new Error('La creación pendiente cambió. Sus datos se conservan; recarga para revisarlos.')
       }
-
+      const intent = recovered || newPeriodCreateIntent(formData, scope), raw = JSON.stringify(intent)
+      if (!existing) localStorage.setItem(key, raw)
+      if (localStorage.getItem(key) !== raw) throw new Error('No se pudo guardar la creación pendiente. Reintenta sin cambiar sus datos.')
+      if (!current()) return
+      setPendingIntent(intent)
+      const response = await apiCall('/contabilidad/periodos', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'idempotency-key': intent.idempotencyKey },
+        body: JSON.stringify(intent.payload)
+      })
+      if (!current()) return
+      confirmPeriodCreated(response, intent, scope)
+      if (localStorage.getItem(key) !== raw) throw new Error('La creación pendiente cambió durante la confirmación. Sus datos se conservan; recarga para revisarlos.')
+      localStorage.removeItem(key)
+      if (localStorage.getItem(key) !== null) throw new Error('El período está confirmado, pero no se pudo retirar la creación pendiente. Reintenta con los mismos datos.')
+      setPendingIntent(null)
       router.push('/dashboard/contabilidad/periodos')
-    } catch (err: any) {
-      console.error('Error creating período:', err)
-      setError(err.message || 'Error al crear el período contable')
+    } catch (err: unknown) {
+      if (current()) setError(err instanceof Error ? err.message : 'No se pudo confirmar la creación del período. Reintenta con conexión.')
     } finally {
-      setLoading(false)
+      if (requestedEpoch === epoch.current && activeScope.current === requestedScope) { inflight.current = false; setLoading(false) }
     }
   }
+
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); void submit() }
 
   const meses = [
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -46,7 +90,7 @@ export default function NuevoPeriodoPage() {
   ]
 
   const currentYear = new Date().getFullYear()
-  const years = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i)
+  const years = Array.from(new Set([...Array.from({ length: 10 }, (_, i) => currentYear - 5 + i), formData.anio])).sort((a, b) => a - b)
 
   return (
     <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
@@ -72,10 +116,18 @@ export default function NuevoPeriodoPage() {
         </div>
       </div>
 
+      {(!ready || permission.loading) && <p role="status">Cargando permisos y creación pendiente...</p>}
+      {ready && !permission.loading && !canCreate && <p role="alert">No tienes permiso para crear períodos contables.</p>}
+      {canCreate && ready && recoveryError && <p role="alert">{recoveryError}</p>}
+      {canCreate && ready && !recoveryError && <>
+      {pendingIntent && <div data-testid="period-create-pending" className="mb-6 rounded-xl border border-border bg-card p-6">
+        <h2 className="font-semibold">Creación de período pendiente de confirmar</h2>
+        <p>{pendingIntent.payload.anio}-{String(pendingIntent.payload.mes).padStart(2, '0')}. Se conservan sus datos para reintentar con conexión.</p>
+      </div>}
       {/* Form */}
       <div className="bg-card rounded-xl shadow p-8 max-w-[600px]">
         {error && (
-          <div className="p-4 bg-[#fee2e2] border rounded-lg mb-6 flex items-start gap-3">
+          <div role="alert" className="p-4 bg-[#fee2e2] border rounded-lg mb-6 flex items-start gap-3">
             <AlertCircle size={20} className="text-destructive shrink-0 mt-0.5" />
             <p className="m-0 text-destructive text-[0.875rem]">
               {error}
@@ -96,7 +148,7 @@ export default function NuevoPeriodoPage() {
               value={formData.anio}
               onChange={(e) => setFormData({ ...formData, anio: parseInt(e.target.value) })}
               required
-              disabled={loading} className="w-[100%] p-3 border rounded-lg text-[0.875rem] text-foreground transition"
+              disabled={loading || !!pendingIntent} className="w-[100%] p-3 border rounded-lg text-[0.875rem] text-foreground transition"
             >
               {years.map((year) => (
                 <option key={year} value={year}>
@@ -118,7 +170,7 @@ export default function NuevoPeriodoPage() {
               value={formData.mes}
               onChange={(e) => setFormData({ ...formData, mes: parseInt(e.target.value) })}
               required
-              disabled={loading} className="w-[100%] p-3 border rounded-lg text-[0.875rem] text-foreground transition"
+              disabled={loading || !!pendingIntent} className="w-[100%] p-3 border rounded-lg text-[0.875rem] text-foreground transition"
             >
               {meses.map((mes, index) => (
                 <option key={index + 1} value={index + 1}>
@@ -180,13 +232,14 @@ export default function NuevoPeriodoPage() {
               ) : (
                 <>
                   <Save size={16} />
-                  Crear Período
+                  {pendingIntent ? 'Reintentar creación' : 'Crear Período'}
                 </>
               )}
             </button>
           </div>
         </form>
       </div>
+      </>}
     </div>
   )
 }

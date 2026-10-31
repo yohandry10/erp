@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 
 export default function NuevoPedidoPage() {
   const router = useRouter()
-  const { post } = useApi()
+  const { post } = useApi({ throwOnError: true, showErrorToast: false })
   // Una misma intención conserva su clave: reenviar tras una respuesta perdida
   // recupera el pedido ya creado en vez de duplicarlo.
   const intentKeys = useRef<Record<string, string>>({})

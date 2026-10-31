@@ -1,7 +1,9 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
-import { useApi } from '@/hooks/use-api'
+import { useAccountingStatement, previousAccountingPeriod } from '@/hooks/use-accounting-statement'
+import { readStatementResults } from '@/lib/contabilidad/statement-read-contract'
+import FinanceReportStatus from '@/components/finanzas/FinanceReportStatus'
+
 import { Download, AlertCircle, TrendingUp, TrendingDown, FileText } from 'lucide-react'
 import { IngresosVsGastosChart } from './IngresosVsGastosChart'
 import { exportToExcel, formatCurrencyForExcel, formatPercentageForExcel } from '@/lib/excel-export'
@@ -12,25 +14,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import { useCountryContext } from '@/hooks/use-country-context'
 
-interface EstadoResultadosData {
-  ingresos: {
-    ventas: number
-    otros_ingresos: number
-    total_ingresos: number
-  }
-  costos: {
-    costo_ventas: number
-    utilidad_bruta: number
-  }
-  gastos: {
-    gastos_administrativos: number
-    gastos_ventas: number
-    gastos_financieros: number
-    total_gastos: number
-  }
-  utilidad_neta: number
-}
-
 interface EstadoResultadosProps {
   anio: number
   mes: number
@@ -40,56 +23,11 @@ interface EstadoResultadosProps {
 export function EstadoResultados({ anio, mes, showComparison = false }: EstadoResultadosProps) {
   const country = useCountryContext()
   const { formatCurrency } = useLocalizedMoney()
-  const { get } = useApi()
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [data, setData] = useState<EstadoResultadosData | null>(null)
-  const [previousData, setPreviousData] = useState<EstadoResultadosData | null>(null)
-
-  const getPreviousPeriod = useCallback(() => {
-    if (mes === 1) {
-      return { anio: anio - 1, mes: 12 }
-    }
-    return { anio, mes: mes - 1 }
-  }, [anio, mes])
-
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      const response = await get(`/api/contabilidad/estados/estado-resultados?anio=${anio}&mes=${mes}`)
-
-      if (response?.success && response.data) {
-        setData(response.data)
-      } else {
-        setError('No se pudieron cargar los datos')
-      }
-
-      // Cargar datos del período anterior si showComparison está activado
-      if (showComparison) {
-        const { anio: prevAnio, mes: prevMes } = getPreviousPeriod()
-        const prevResponse = await get(`/api/contabilidad/estados/estado-resultados?anio=${prevAnio}&mes=${prevMes}`)
-
-        if (prevResponse?.success && prevResponse.data) {
-          setPreviousData(prevResponse.data)
-        } else {
-          setPreviousData(null)
-        }
-      } else {
-        setPreviousData(null)
-      }
-    } catch (err: any) {
-      console.error('Error loading estado resultados:', err)
-      setError(err.message || 'Error al cargar el estado de resultados')
-    } finally {
-      setLoading(false)
-    }
-  }, [anio, get, getPreviousPeriod, mes, showComparison])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
+  const report = useAccountingStatement('/api/contabilidad/estados/estado-resultados', anio, mes, readStatementResults, showComparison)
+  const { loading, error, reload } = report
+  const data = report.data
+  const previousData = report.previousData
+  const getPreviousPeriod = () => previousAccountingPeriod(anio, mes)
 
   const formatPercentage = (value: number, total: number) => {
     if (total === 0) return '0.00%'
@@ -183,15 +121,7 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
     )
   }
 
-  if (!data) {
-    return (
-      <Card className="border-cyan-400/20 bg-card/70 text-foreground">
-        <CardContent className="flex min-h-[160px] items-center justify-center p-6 text-center text-sm text-muted-foreground">
-          No hay datos disponibles para el período seleccionado
-        </CardContent>
-      </Card>
-    )
-  }
+  if (error || !data) return <FinanceReportStatus loading={loading} retry={reload} />
 
   const margenBruto = data.ingresos.total_ingresos > 0
     ? (data.costos.utilidad_bruta / data.ingresos.total_ingresos) * 100

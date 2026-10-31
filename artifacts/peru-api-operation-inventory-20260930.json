@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-10-19T20:47:30.097Z",
-  "commit": "334d6cb412378233b27748b1d177e2cf84fcfc3f",
+  "generated_at": "2026-10-19T22:26:18.221Z",
+  "commit": "edcb326d86e5cce6e67c31a187f9793f9fc9e95c",
   "excluded": [
     "Analytics"
   ],
@@ -15624,7 +15624,7 @@
       "endpoint": "/api/ventas/pedidos/:id",
       "summary": "Obtener pedido",
       "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts",
-      "line": 169,
+      "line": 170,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.pedidos.ver')"
@@ -15647,7 +15647,7 @@
       "endpoint": "/api/ventas/pedidos/:id",
       "summary": "Actualizar pedido",
       "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts",
-      "line": 191,
+      "line": 192,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.pedidos.editar')"
@@ -15670,7 +15670,7 @@
       "endpoint": "/api/ventas/pedidos/:id/confirmar",
       "summary": "Confirmar pedido",
       "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts",
-      "line": 214,
+      "line": 215,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.pedidos.confirmar')"
@@ -15693,7 +15693,7 @@
       "endpoint": "/api/ventas/pedidos/:id/cancelar",
       "summary": "Cancelar pedido",
       "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts",
-      "line": 245,
+      "line": 246,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.pedidos.cancelar')"
@@ -15716,7 +15716,7 @@
       "endpoint": "/api/ventas/pedidos/:id/generar-factura",
       "summary": "Generar factura",
       "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts",
-      "line": 277,
+      "line": 278,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.pedidos.generar_factura')"
@@ -15739,7 +15739,7 @@
       "endpoint": "/api/ventas/pedidos/:id/historial",
       "summary": "Obtener historial del pedido",
       "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts",
-      "line": 300,
+      "line": 301,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.pedidos.ver_historial')"
@@ -15762,7 +15762,7 @@
       "endpoint": "/api/ventas/pedidos/:id/gres",
       "summary": "Listar GRE asociadas",
       "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts",
-      "line": 317,
+      "line": 318,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.pedidos.ver_gre')"
@@ -15785,7 +15785,7 @@
       "endpoint": "/api/ventas/pedidos/:id/generar-documento",
       "summary": "Generar documento fiscal desde pedido",
       "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts",
-      "line": 331,
+      "line": 332,
       "access_declarations": [
         "UseGuards(JwtAuthGuard, PermissionGuard)",
         "RequirePermission('ventas.pedidos.generar_factura')"

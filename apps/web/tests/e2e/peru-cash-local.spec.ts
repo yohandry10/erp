@@ -31,7 +31,7 @@ test('Caja Perú: apertura, ingreso perdido tras commit, cierre, descargas, cont
   });
   const matchMovement=(r:any)=>r.request().method()==='POST'&&new URL(r.url()).pathname.replace(/\/$/,'').endsWith('/cajas/movimientos/manual/'+sessionId);
   const [lostResponse]=await Promise.all([page.waitForResponse(matchMovement),movementDialog.getByRole('button',{name:'Registrar',exact:true}).click()]);expect(lostResponse.status()).toBe(503);
-  await expect(movementDialog.getByText('Error registrando movimiento',{exact:true})).toBeVisible();await expect(movementDialog.getByRole('spinbutton',{name:'Monto',exact:true})).toHaveValue('10');await expect(movementDialog.getByRole('combobox',{name:'Contrapartida contable del movimiento',exact:true})).toHaveValue(fixture.income_account_id);await expect(movementDialog.getByLabel('Motivo',{exact:true})).toHaveValue('Ingreso confirmado desde navegador local');
+  await expect(movementDialog.getByText('Confirmación local perdida tras el commit',{exact:true})).toBeVisible();await expect(movementDialog.getByRole('spinbutton',{name:'Monto',exact:true})).toHaveValue('10');await expect(movementDialog.getByRole('combobox',{name:'Contrapartida contable del movimiento',exact:true})).toHaveValue(fixture.income_account_id);await expect(movementDialog.getByLabel('Motivo',{exact:true})).toHaveValue('Ingreso confirmado desde navegador local');
   expect(Number(sql(`SELECT saldo_nuevo FROM movimientos_caja WHERE sesion_caja_id='${sessionId}'::uuid ORDER BY secuencia DESC LIMIT 1;`))).toBe(110);
   const [created]=await Promise.all([page.waitForResponse(matchMovement),movementDialog.getByRole('button',{name:'Registrar',exact:true}).click()]);expect(created.status()).toBe(201);expect((await created.json()).data.id).toBe(createdId);expect(replayed).toBe(true);await expect(movementDialog).toHaveCount(0);await page.unroute(pattern);
   expect(Number(sql(`SELECT count(*) FROM movimientos_caja WHERE sesion_caja_id='${sessionId}'::uuid AND tipo_movimiento='INGRESO';`))).toBe(1);checks.push({operation:'Lost acknowledgement after real commit keeps form and replays same intent once',passed:true});
@@ -70,9 +70,9 @@ test('Caja Perú: apertura, ingreso perdido tras commit, cierre, descargas, cont
    await page.screenshot({path:path.join(output,'cash-recovery-'+table+'.png'),fullPage:true});
    checks.push({operation:'Retry after real '+table+' SELECT outage clears error and shows durable data',endpoint,retry_http_status:restored.status(),error_cleared:cleared,data_visible:shown,passed:cleared&&shown});save();
   };
-  await outage({table:'sesiones_caja',endpoint:'/cajas/sesiones',message:/Error cargando sesiones/,ready:()=>page.getByText(fixture.caja_name,{exact:true}).first()});
-  await page.reload();await page.waitForLoadState('networkidle');
-  await outage({table:'cortes_caja',endpoint:'/cajas/cortes',message:/No se pudieron cargar los cortes/,ready:()=>page.getByRole('button',{name:'CSV',exact:true}).first()});
+  await outage({table:'sesiones_caja',endpoint:'/cajas/sesiones',message:/^Error: No se pudo consultar la información completa de caja\./,ready:()=>page.getByText(fixture.caja_name,{exact:true}).first()});
+  await page.reload({waitUntil:'domcontentloaded'});await expect(page.getByRole('button',{name:'CSV',exact:true}).first()).toBeVisible();
+  await outage({table:'cortes_caja',endpoint:'/cajas/cortes',message:/^No se pudo consultar la información completa de caja\./,ready:()=>page.getByRole('button',{name:'CSV',exact:true}).first()});
   const failed=checks.filter(c=>c.passed===false);expect(failed,JSON.stringify(failed)).toEqual([]);
   proof.success=true;
  }finally{save();}

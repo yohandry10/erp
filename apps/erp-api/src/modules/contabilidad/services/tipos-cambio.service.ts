@@ -1,4 +1,5 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { lecturaContableFallida } from '../contabilidad-errors';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import {
   CreateTipoCambioDto,
@@ -7,7 +8,7 @@ import {
   LadoTipoCambio
 } from '@erp-suite/dtos';
 import { getActiveCountryByCode, ACTIVE_COUNTRY_PROFILES } from '../../paises/initial-country';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 
 @Injectable()
 export class TiposCambioService {
@@ -23,12 +24,13 @@ export class TiposCambioService {
    * a que ambos se contradigan.
    */
   async obtenerMonedaLocal(tenantId: string): Promise<string> {
-    const { data } = await this.supabaseService
+    const { data, error } = await this.supabaseService
       .getClient()
       .from('empresa_config')
       .select('pais')
       .eq('tenant_id', tenantId)
       .maybeSingle();
+    if (error) throw new ServiceUnavailableException('No se pudo consultar el país para resolver la moneda local.');
 
     const perfil = getActiveCountryByCode(data?.pais);
     return perfil?.moneda ?? ACTIVE_COUNTRY_PROFILES.PE.moneda;
@@ -46,7 +48,8 @@ export class TiposCambioService {
       .getClient()
       .from('tipos_cambio')
       .select('*', { count: 'exact' })
-      .eq('tenant_id', tenantId);
+      .eq('tenant_id', tenantId)
+      .or('activo.is.null,activo.eq.true');
 
     if (filtros.moneda_origen) {
       query = query.eq('moneda_origen', filtros.moneda_origen.toUpperCase());
@@ -66,7 +69,7 @@ export class TiposCambioService {
       .range(offset, offset + limit - 1);
 
     if (error) {
-      throw new Error(`Error listando tipos de cambio: ${error.message}`);
+      throw lecturaContableFallida(error, 'los tipos de cambio');
     }
 
     return {
@@ -94,7 +97,11 @@ export class TiposCambioService {
     const monedaDestinoValidada=dto.moneda_destino.toUpperCase();
     if(monedaOrigenValidada===monedaDestinoValidada) throw new BadRequestException('La moneda de origen y la de destino no pueden ser la misma.');
     if(dto.compra===undefined&&dto.venta===undefined) throw new BadRequestException('Debe informar al menos una cotización: compra o venta.');
-    const key=idempotencyKey?.trim()||`fx-upsert:${createHash('sha256').update(JSON.stringify({tenantId,userId,dto})).digest('hex')}`;
+    if ([dto.compra, dto.venta].some(value => value !== undefined &&
+      (!Number.isFinite(value) || value <= 0 || value !== Number(value.toFixed(6))))) {
+      throw new BadRequestException('Las cotizaciones deben ser positivas y admitir como máximo 6 decimales.');
+    }
+    const key=idempotencyKey?.trim()||`fx-upsert:${randomUUID()}`;
     const {data:rpcData,error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_maestro_contable_tx',{
       p_tenant_id:tenantId,p_actor_id:userId,p_entity:'FX',p_action:'CREATE',p_record_id:null,p_payload:dto,p_idempotency_key:key,
     });
@@ -108,6 +115,7 @@ export class TiposCambioService {
     const {error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_maestro_contable_tx',{
       p_tenant_id:tenantId,p_actor_id:userId,p_entity:'FX',p_action:'DEACTIVATE',p_record_id:id,p_payload:{},p_idempotency_key:key,
     });
+    if(rpcError&&/NOT_FOUND/.test(String(rpcError.message))) throw new NotFoundException('Tipo de cambio no encontrado');
     if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo desactivar el tipo de cambio'); return;
   }
 
@@ -135,6 +143,7 @@ export class TiposCambioService {
       .eq('tenant_id', tenantId)
       .eq('moneda_origen', origen)
       .eq('moneda_destino', destino)
+      .or('activo.is.null,activo.eq.true')
       .lte('fecha', fecha)
       .order('fecha', { ascending: false })
       .limit(1);

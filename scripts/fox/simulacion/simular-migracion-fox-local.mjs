@@ -203,7 +203,7 @@ try {
     const cadena = await ejecutar('cadena', process.execPath, ['scripts/ci/verify-database-contracts.mjs']);
     const ok = /OK PostgreSQL 16: (\d+) migraciones hasta (\d+), (\d+) verificadores/.exec(cadena);
     assert.ok(ok, 'La cadena de migraciones no terminó en verde');
-    assert.equal(ok[2], '582');
+    assert.equal(ok[2], '590');
     const usuarios = JSON.parse(sql(fs.readFileSync(path.join(root, 'scripts/fox/simulacion/fixture-simulacion.sql'), 'utf8')).split('\n').at(-1));
     const pgHost = redCreada ? pg : docker(['inspect', '-f', '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}', contenedores[0]]);
     contenedores.push(docker(['run', '--rm', '--detach', '--name', `${red}-rest`, ...enRed, '--publish', `127.0.0.1:${REST}:3000`,

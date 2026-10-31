@@ -121,6 +121,7 @@ DECLARE
   v_pos_retry jsonb;
   v_quote jsonb;
   v_quote_id uuid;
+  v_quote_count integer;
   v_order jsonb;
   v_order_id uuid;
   v_direct_order jsonb;
@@ -326,12 +327,30 @@ BEGIN
     RAISE EXCEPTION 'VERIFY_469_FISCAL_POS_DID_NOT_ACCEPT_VERIFIED_LIST_PRICE:%',v_pos_sale;
   END IF;
 
+  IF EXISTS(SELECT 1 FROM supabase_migrations.schema_migrations
+    WHERE version ~ '^[0-9]+$' AND version::integer>=570) THEN
+    SELECT count(*) INTO v_quote_count FROM public.cotizaciones WHERE tenant_id=v_tenant;
+    v_failed:=false;
+    BEGIN
+      PERFORM public.crear_cotizacion_comercial_tx(
+        v_tenant,v_actor,v_cliente,v_hoy+7,'Precio obsoleto','Vendedor469','PEN',
+        1998,359.64,2357.64,
+        jsonb_build_array(jsonb_build_object('producto_id',v_producto,'descripcion','Producto cotizado',
+          'cantidad',2,'precio_unitario',999,'orden',1)));
+    EXCEPTION WHEN serialization_failure THEN
+      v_failed:=SQLERRM='COMMERCIAL_PRICE_STALE';
+    END;
+    IF NOT v_failed OR (SELECT count(*) FROM public.cotizaciones WHERE tenant_id=v_tenant)<>v_quote_count THEN
+      RAISE EXCEPTION 'VERIFY469_STALE_REVIEWED_PRICE_NOT_REJECTED_ATOMICALLY';
+    END IF;
+  END IF;
+
   v_quote := public.crear_cotizacion_comercial_tx(
     v_tenant,v_actor,v_cliente,v_hoy+7,'Precio congelado','Vendedor 469','PEN',
-    1998,359.64,2357.64,
+    140,25.2,165.2,
     jsonb_build_array(jsonb_build_object(
       'producto_id',v_producto,'descripcion','Producto cotizado','cantidad',2,
-      'precio_unitario',999,'orden',1
+      'precio_unitario',70,'orden',1
     ))
   );
   v_quote_id := (v_quote#>>'{cotizacion,id}')::uuid;
@@ -413,7 +432,7 @@ BEGIN
       'moneda','PEN','observaciones','Pedido directo 469'
     ),
     jsonb_build_array(jsonb_build_object(
-      'producto_id',v_producto,'descripcion','Producto directo','cantidad',1,'precio_unitario',999
+      'producto_id',v_producto,'descripcion','Producto directo','cantidad',1,'precio_unitario',90
     ))
   );
   v_direct_order_id := (v_direct_order->>'pedido_id')::uuid;

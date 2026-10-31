@@ -7,6 +7,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatFiscalDocumentNumber } from '@/lib/fiscal-document-number'
+import { cpeA4Metadata } from '@/lib/cpe-read-contract'
+import { isOfflineCachedResponse } from '@/lib/offline-store'
+import { customAuth } from '@/lib/auth-service'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface CpePreviewMetadata {
   id?: string
@@ -110,6 +114,8 @@ interface CpePreviewItem {
   precio_unitario?: number | string
   precio_venta?: number | string
   valor_venta?: number | string
+  igv?: number | string
+  impuesto_igv?: number | string
   subtotal?: number | string
   total_item?: number | string
   total?: number | string
@@ -407,9 +413,16 @@ function CpeA4Sheet({
           <tbody>
             {visibleItems.length > 0 ? visibleItems.map((item, index) => {
               const quantity = firstFiniteNumber(item.cantidad, 1) || 1
+              // Igual que el PDF: precio_venta es unitario en pedidos y CPE, y
+              // total de línea en documentos; base + IGV es inequívoco.
+              const igv = item.igv ?? item.impuesto_igv
+              const grossFromBase = item.valor_venta != null && igv != null
+                ? Math.round((firstFiniteNumber(item.valor_venta) + firstFiniteNumber(igv)) * 100) / 100
+                : undefined
               const lineTotal = firstFiniteNumber(
                 item.total_item,
                 item.total,
+                grossFromBase,
                 item.precio_venta,
                 item.valor_venta,
                 item.subtotal,
@@ -536,18 +549,27 @@ function CpeA4Sheet({
   )
 }
 
-export default function CpeA4PreviewModal({
+export default function CpeA4PreviewModal(props: CpeA4PreviewModalProps) {
+  const { session, loading } = useAuth()
+  const actor = `${session?.user?.tenant_id || ''}:${session?.user?.id || ''}`
+  return props.isOpen ? <CpeA4Preview key={`${actor}:${props.documentId}`} {...props} actor={actor} authLoading={loading} /> : null
+}
+
+function CpeA4Preview({
   isOpen,
   onClose,
   documentId,
   documentType,
   serie,
   numero,
-}: CpeA4PreviewModalProps) {
+  actor,
+  authLoading,
+}: CpeA4PreviewModalProps & { actor: string; authLoading: boolean }) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [metadata, setMetadata] = useState<CpePreviewMetadata | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [revision, setRevision] = useState(0)
   const resolvedType = metadata?.tipo_documento_fiscal || documentType || metadata?.tipo_documento || metadata?.tipoDocumento
   const resolvedCountry = metadata?.pais_codigo || metadata?.country_code || 'PE'
   const profile = fiscalPreviewProfile(resolvedCountry)
@@ -563,9 +585,14 @@ export default function CpeA4PreviewModal({
   const evidenceStatus = String(metadata?.fiscal_acceptance_status || 'LEGACY_UNVERIFIED').toUpperCase()
   const explicitDemo = evidenceStatus === 'SIMULATED' || metadata?.simulated_origin === true
   const legacyUnverified = !explicitDemo && evidenceStatus === 'LEGACY_UNVERIFIED'
+  const pendingFiscalAcceptance = metadata && !lacksFiscalAcceptance && evidenceStatus !== 'ACCEPTED'
+  const reload = () => {
+    setLoading(true); setError(null); setPdfUrl(null); setMetadata(null)
+    setRevision(current => current + 1)
+  }
 
   useEffect(() => {
-    if (!isOpen || !documentId) return
+    if (!isOpen || !documentId || authLoading || actor === ':') return
 
     const controller = new AbortController()
     let objectUrl: string | null = null
@@ -579,21 +606,18 @@ export default function CpeA4PreviewModal({
       method: 'GET',
       signal: controller.signal,
     }).then(async (response) => {
-      if (!response.ok) return null
+      if (!response.ok || isOfflineCachedResponse(response)) throw new Error('La consulta A4 requiere datos completos en vivo')
       const payload = await response.json().catch(() => null)
-      return (payload?.data ?? payload) as CpePreviewMetadata | null
-    }).catch(() => null)
+      return cpeA4Metadata(payload, documentId, serie, numero) as CpePreviewMetadata
+    })
 
     const loadPdf = fetchApi(`/api/cpe/comprobantes/${encodedId}/pdf`, {
       method: 'GET',
       signal: controller.signal,
     }).then(async (response) => {
-      if (!response.ok) {
-        const detail = await response.text().catch(() => '')
-        throw new Error(detail || `El servidor respondió ${response.status}`)
-      }
+      if (!response.ok || isOfflineCachedResponse(response)) throw new Error('La representación A4 requiere un PDF actual')
       const blob = await response.blob()
-      if (!blob.size || !String(blob.type || 'application/pdf').includes('pdf')) {
+      if (!blob.size || !String(response.headers.get('content-type') || '').toLowerCase().startsWith('application/pdf')) {
         throw new Error('La representación A4 recibida no es un PDF válido')
       }
       const [header, trailer] = await Promise.all([
@@ -612,17 +636,17 @@ export default function CpeA4PreviewModal({
     })
 
     void Promise.all([loadPdf, loadMetadata])
-      .then(([blob, cpeMetadata]) => {
-        if (!cpeMetadata) {
-          throw new Error('El comprobante no tiene datos disponibles para la vista A4')
-        }
+      .then(async ([blob, cpeMetadata]) => {
+        const current = (await customAuth.getRequestSession()).session?.user
+        if (controller.signal.aborted) return
+        if (!current || `${current.tenant_id}:${current.id}` !== actor) throw new Error('La sesión cambió durante la consulta A4')
         objectUrl = window.URL.createObjectURL(blob)
         setMetadata(cpeMetadata)
         setPdfUrl(objectUrl)
       })
-      .catch((loadError: unknown) => {
+      .catch(() => {
         if (controller.signal.aborted) return
-        console.error('No se pudo cargar la vista previa A4 del CPE:', loadError)
+        setMetadata(null); setPdfUrl(null)
         setError('No se pudo preparar la vista previa A4. Intenta nuevamente.')
       })
       .finally(() => {
@@ -633,7 +657,7 @@ export default function CpeA4PreviewModal({
       controller.abort()
       if (objectUrl) window.URL.revokeObjectURL(objectUrl)
     }
-  }, [documentId, isOpen])
+  }, [documentId, isOpen, actor, authLoading, serie, numero, revision])
 
   const downloadPdf = () => {
     if (!pdfUrl) return
@@ -685,6 +709,7 @@ export default function CpeA4PreviewModal({
                     : `Sin aceptación ${profile.authority}`}
                 </Badge>
               )}
+              {pendingFiscalAcceptance && <Badge className="border-amber-400/30 bg-amber-400/15 text-amber-700 dark:text-amber-200">Sin aceptación {profile.authority}</Badge>}
             </div>
             <h2 id="cpe-a4-preview-title" className="mt-2 text-xl font-bold text-foreground">
               {label} {numberLabel}
@@ -697,8 +722,10 @@ export default function CpeA4PreviewModal({
             <p className="mt-1 text-xs text-muted-foreground">
               Salida PDF A4 del ERP. Para conservar 210 × 297 mm, imprime en A4 con escala 100% y sin “ajustar a página”.
             </p>
+            {pendingFiscalAcceptance && <p className="mt-1 text-xs text-amber-700 dark:text-amber-200">No consta aceptación {profile.authority}. La firma y el PDF no acreditan un CDR aceptado.</p>}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" onClick={reload} disabled={loading}>Verificar vista A4</Button>
             <Button type="button" variant="outline" onClick={downloadPdf} disabled={!pdfUrl}>
               <Download className="mr-2 h-4 w-4" />
               Descargar A4
@@ -720,9 +747,10 @@ export default function CpeA4PreviewModal({
               <p>Cargando representación A4…</p>
             </div>
           ) : error ? (
-            <Alert className="mx-auto max-w-2xl border-red-400/30 bg-red-500/10 text-red-700 dark:text-red-200">
+            <Alert className="mx-auto max-w-2xl border-red-400/30 bg-red-500/10 text-red-700 dark:text-red-200" data-testid="cpe-a4-error">
               <FileText className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
+              <Button className="mt-3" variant="outline" onClick={reload}>Reintentar vista A4</Button>
             </Alert>
           ) : pdfUrl && metadata ? (
             <div

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 interface RolesSectionProps {
   roles: any[]
@@ -19,7 +19,7 @@ import { useCountryContext } from '@/hooks/use-country-context'
 import { useApi } from '@/hooks/use-api'
 import { useToast } from '@/components/ui/use-toast'
 import { Plus, ShieldCheck } from 'lucide-react'
-import { unwrapApiArray } from '@/lib/api-contract'
+import { unwrapApiData } from '@/lib/api-contract'
 
 const RESTRICTED_DEMO_PERMISSIONS = /^(security\.audit\.|tenants\.manage$|system\.debug$|documentos\.audit\.read$)/i
 const PERMISSIONS_PREVIEW_LIMIT = 6
@@ -31,6 +31,10 @@ export default function RolesSection({ roles, canManage = false, onRoleCreated }
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [permissions, setPermissions] = useState<any[]>([])
+  const [permissionsLoading, setPermissionsLoading] = useState(false)
+  const [permissionsError, setPermissionsError] = useState<string | null>(null)
+  const [permissionsReady, setPermissionsReady] = useState(false)
+  const permissionsRequest = useRef(0)
   const [nombre, setNombre] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [selected, setSelected] = useState<string[]>([])
@@ -47,25 +51,50 @@ export default function RolesSection({ roles, canManage = false, onRoleCreated }
       && (country.paisCodigo === 'PE' || !/^(gre|sire)\b/i.test(code))
   }), [permissions, country.paisCodigo])
 
+  const loadPermissions = useCallback(async () => {
+    const request = ++permissionsRequest.current
+    setPermissionsLoading(true)
+    setPermissionsReady(false)
+    setPermissionsError(null)
+    try {
+      const response = await get('/permissions')
+      const data = unwrapApiData<unknown>(response)
+      if (!Array.isArray(data)) throw new Error('Catálogo de permisos incompleto')
+      if (request !== permissionsRequest.current) return
+      setPermissions(data)
+      setPermissionsReady(true)
+    } catch {
+      if (request !== permissionsRequest.current) return
+      setPermissionsError('No se pudieron cargar los permisos disponibles.')
+    } finally {
+      if (request === permissionsRequest.current) setPermissionsLoading(false)
+    }
+  }, [get])
+
   useEffect(() => {
     if (!open) return
     setIdempotencyKey(crypto.randomUUID())
     setNombre('')
     setDescripcion('')
     setSelected([])
-    void get('/permissions').then((response) => setPermissions(unwrapApiArray(response)))
-  }, [open, get])
+    setPermissions([])
+    void loadPermissions()
+    const requestState = permissionsRequest
+    return () => { ++requestState.current }
+  }, [open, loadPermissions])
 
   const createRole = async () => {
-    if (!nombre.trim()) return
+    if (!nombre.trim() || !permissionsReady || permissionsLoading || permissionsError) return
     setLoading(true)
     try {
-      await post('/roles', {
+      const response = await post('/roles', {
         idempotency_key: idempotencyKey,
         nombre: nombre.trim(),
         descripcion: descripcion.trim() || undefined,
         permission_ids: selected,
       })
+      const created = unwrapApiData<{ id?: string }>(response)
+      if (!created?.id) throw new Error('No se pudo confirmar el rol creado. Reintenta conservando los datos.')
       toast({ title: 'Rol creado', description: `${nombre.trim()} ya está disponible para asignarlo a usuarios.` })
       setOpen(false)
       onRoleCreated?.()
@@ -154,29 +183,31 @@ export default function RolesSection({ roles, canManage = false, onRoleCreated }
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /> Crear rol personalizado</DialogTitle>
-            <DialogDescription>Define un rol para esta empresa demo. Los permisos globales y de auditoría sensible no se pueden delegar.</DialogDescription>
+            <DialogDescription>Define un rol para esta empresa. Los permisos globales y de auditoría sensible no se pueden delegar.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2"><Label htmlFor="role-name">Nombre</Label><Input id="role-name" value={nombre} maxLength={100} onChange={(event) => setNombre(event.target.value)} placeholder="Ej. Vendedor de prueba" /></div>
             <div className="space-y-2"><Label htmlFor="role-description">Descripción</Label><Input id="role-description" value={descripcion} maxLength={250} onChange={(event) => setDescripcion(event.target.value)} placeholder="Alcance operativo del rol" /></div>
             <div className="space-y-2">
               <Label>Permisos operativos</Label>
+              {permissionsError && <div role="alert" className="rounded-lg border border-destructive p-3 text-sm"><p>{permissionsError}</p><Button type="button" variant="outline" onClick={loadPermissions} disabled={permissionsLoading || loading}>Reintentar permisos</Button></div>}
               <div className="grid max-h-72 gap-2 overflow-y-auto rounded-xl border p-3 sm:grid-cols-2">
                 {assignablePermissions.map((permission) => {
                   const code = permissionCode(permission)
                   const checked = selected.includes(permission.id)
                   return <label key={permission.id} className="flex cursor-pointer items-start gap-3 rounded-lg p-2 hover:bg-muted/60">
-                    <Checkbox checked={checked} onCheckedChange={(value) => setSelected((current) => value ? [...current, permission.id] : current.filter((id) => id !== permission.id))} />
+                    <Checkbox disabled={!permissionsReady || loading} checked={checked} onCheckedChange={(value) => setSelected((current) => value ? [...current, permission.id] : current.filter((id) => id !== permission.id))} />
                     <span><span className="block text-sm font-medium">{permission.descripcion || code}</span><span className="block text-xs text-muted-foreground">{code}</span></span>
                   </label>
                 })}
-                {!assignablePermissions.length && <p className="text-sm text-muted-foreground">Cargando permisos disponibles…</p>}
+                {permissionsLoading && <p className="text-sm text-muted-foreground">Cargando permisos disponibles…</p>}
+                {permissionsReady && !assignablePermissions.length && <p className="text-sm text-muted-foreground">No hay permisos operativos disponibles para este rol.</p>}
               </div>
             </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={loading}>Cancelar</Button>
-            <Button type="button" onClick={createRole} disabled={loading || !nombre.trim()}>{loading ? 'Creando…' : 'Crear rol'}</Button>
+            <Button type="button" onClick={createRole} disabled={loading || !nombre.trim() || !permissionsReady || permissionsLoading || !!permissionsError}>{loading ? 'Creando…' : 'Crear rol'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

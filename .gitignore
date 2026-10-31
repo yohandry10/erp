@@ -66,6 +66,8 @@ artifacts/db-backups/*.dump
 # Archivos de Storage y exportaciones por empresa: datos del cliente.
 artifacts/storage-backups/
 artifacts/exportaciones/
+artifacts/**/*.local.json
+artifacts/peru-uat-before-*.patch
 backups/*.dump
 
 # Cobertura y accesos directos locales generados.

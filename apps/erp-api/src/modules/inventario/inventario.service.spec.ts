@@ -64,6 +64,32 @@ describe('InventarioService', () => {
         jest.clearAllMocks();
     });
 
+    describe.each(['registrarAjusteAtomico', 'transferirStockAtomico'] as const)('recuperación de %s', (method) => {
+        it.each([
+            ['23514', 'INVENTORY_STOCK_INSUFFICIENT', true],
+            ['P0002', 'INVENTORY_PRODUCT_NOT_FOUND_OR_INACTIVE', true],
+            ['PGRST303', 'JWT expired', false],
+            ['23505', 'INVENTORY_IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD', false],
+            ['40001', 'INVENTORY_ADJUSTMENT_INCOMPLETE_RETRY', false],
+            [undefined, 'Failed to fetch', false],
+        ])('distingue %s de un recibo ambiguo', async (code, message, notApplied) => {
+            mockSupabaseClient.rpc.mockResolvedValue({ data: null, error: { code, message } });
+            try {
+                await service[method]('70000000-0000-4000-8000-000000000001', '70000000-0000-4000-8000-000000000002', {
+                    idempotency_key: 'original-key', producto_id: '70000000-0000-4000-8000-000000000003', motivo: 'Original inventory test',
+                    ...(method === 'registrarAjusteAtomico' ? { almacen_id: '70000000-0000-4000-8000-000000000004', delta: 1 }
+                        : { almacen_origen_id: '70000000-0000-4000-8000-000000000004', almacen_destino_id: '70000000-0000-4000-8000-000000000005', cantidad: 1 }),
+                } as any);
+                throw new Error('Se esperaba un rechazo');
+            } catch (error) {
+                expect(error).toBeInstanceOf(BadRequestException);
+                const response = (error as BadRequestException).getResponse() as { error: string };
+                expect(response.error === 'INVENTORY_NOT_APPLIED').toBe(notApplied);
+            }
+            expect(mockSupabaseClient.rpc).toHaveBeenCalledTimes(1);
+        });
+    });
+
     describe('getStockDisponible', () => {
         it('debe calcular el stock disponible correctamente', async () => {
             const mockProducto = {

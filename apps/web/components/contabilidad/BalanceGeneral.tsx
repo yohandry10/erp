@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useAccountingStatement, previousAccountingPeriod } from '@/hooks/use-accounting-statement'
+import { readStatementGeneral } from '@/lib/contabilidad/statement-read-contract'
+import FinanceReportStatus from '@/components/finanzas/FinanceReportStatus'
+
 import { AlertCircle, Building2, Download, FileText, Landmark, Scale } from 'lucide-react'
-import { useApi } from '@/hooks/use-api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ActivosVsPasivosChart } from './ActivosVsPasivosChart'
@@ -10,47 +12,6 @@ import { exportToExcel, formatCurrencyForExcel } from '@/lib/excel-export'
 import { exportBalanceGeneralToPDF } from '@/lib/pdf-export'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import { useCountryContext } from '@/hooks/use-country-context'
-
-interface BalanceGeneralData {
-  activos: {
-    corrientes: {
-      efectivo: number
-      cuentas_por_cobrar: number
-      inventarios: number
-      otros_activos: number
-      total_corrientes: number
-    }
-    no_corrientes: {
-      activos_fijos: number
-      depreciacion_acumulada: number
-      activos_fijos_neto: number
-      otros_activos: number
-      total_no_corrientes: number
-    }
-    total_activos: number
-  }
-  pasivos: {
-    corrientes: {
-      cuentas_por_pagar: number
-      tributos_por_pagar: number
-      remuneraciones_por_pagar: number
-      otros_pasivos: number
-      total_corrientes: number
-    }
-    no_corrientes: {
-      deudas_largo_plazo: number
-      otros_pasivos: number
-      total_no_corrientes: number
-    }
-    total_pasivos: number
-  }
-  patrimonio: {
-    capital: number
-    resultados_acumulados: number
-    resultado_ejercicio: number
-    total_patrimonio: number
-  }
-}
 
 interface BalanceGeneralProps {
   anio: number
@@ -68,48 +29,11 @@ type LineItem = {
 export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGeneralProps) {
   const country = useCountryContext()
   const { formatCurrency } = useLocalizedMoney()
-  const { get } = useApi()
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [data, setData] = useState<BalanceGeneralData | null>(null)
-  const [previousData, setPreviousData] = useState<BalanceGeneralData | null>(null)
-
-  const getPreviousPeriod = useCallback(() => {
-    if (mes === 1) return { anio: anio - 1, mes: 12 }
-    return { anio, mes: mes - 1 }
-  }, [anio, mes])
-
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      const response = await get(`/api/contabilidad/estados/balance-general?anio=${anio}&mes=${mes}`)
-
-      if (response?.success && response.data) {
-        setData(response.data)
-      } else {
-        setError('No se pudieron cargar los datos')
-      }
-
-      if (showComparison) {
-        const { anio: prevAnio, mes: prevMes } = getPreviousPeriod()
-        const prevResponse = await get(`/api/contabilidad/estados/balance-general?anio=${prevAnio}&mes=${prevMes}`)
-        setPreviousData(prevResponse?.success && prevResponse.data ? prevResponse.data : null)
-      } else {
-        setPreviousData(null)
-      }
-    } catch (err: any) {
-      console.error('Error loading balance general:', err)
-      setError(err.message || 'Error al cargar el balance general')
-    } finally {
-      setLoading(false)
-    }
-  }, [anio, get, getPreviousPeriod, mes, showComparison])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
+  const report = useAccountingStatement('/api/contabilidad/estados/balance-general', anio, mes, readStatementGeneral, showComparison)
+  const { loading, error, reload } = report
+  const data = report.data
+  const previousData = report.previousData
+  const getPreviousPeriod = () => previousAccountingPeriod(anio, mes)
 
   const calculateVariation = (current: number, previous: number) => {
     if (previous === 0) return { absolute: current, percentage: current > 0 ? 100 : 0 }
@@ -261,15 +185,7 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
     )
   }
 
-  if (!data) {
-    return (
-      <Card className="border-cyan-400/20 bg-card/65 text-foreground">
-        <CardContent className="flex min-h-[220px] items-center justify-center p-8 text-center text-muted-foreground">
-          No hay datos disponibles para el período seleccionado
-        </CardContent>
-      </Card>
-    )
-  }
+  if (error || !data) return <FinanceReportStatus loading={loading} retry={reload} />
 
   const isBalanced = Math.abs(data.activos.total_activos - (data.pasivos.total_pasivos + data.patrimonio.total_patrimonio)) < 0.01
   const { anio: prevAnio, mes: prevMes } = getPreviousPeriod()

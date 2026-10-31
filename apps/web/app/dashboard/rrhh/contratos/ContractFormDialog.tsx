@@ -64,18 +64,18 @@ const createInitialForm = (countryCode: string) => ({
 });
 
 export function ContractFormDialog({ isOpen, onClose, onSuccess, empleados }: ContractFormDialogProps) {
-  const { get, post } = useApi();
+  const { get, post } = useApi({ throwOnError: true });
   const { toast } = useToast();
   const country = useCountryContext();
   const isArgentina = country.paisCodigo === 'AR';
   const isColombia = country.paisCodigo === 'CO';
   const [form, setForm] = useState(() => createInitialForm('PE'));
   const [loading, setLoading] = useState(false);
-  const createIntent = useRef('');
+  const createIntents = useRef(new Map<string, string>());
 
   useEffect(() => {
     if (!isOpen) return;
-    createIntent.current = `rrhh-contract-create:${crypto.randomUUID()}`;
+    createIntents.current.clear();
     const initial = createInitialForm(country.paisCodigo);
     setForm(initial);
     if (!isArgentina && !isColombia) return;
@@ -111,7 +111,7 @@ export function ContractFormDialog({ isOpen, onClose, onSuccess, empleados }: Co
 
     setLoading(true);
     try {
-      const response = await post('/rrhh/contratos', {
+      const payload = {
         ...form,
         fecha_fin: form.tipo_contrato === 'indefinido' ? null : form.fecha_fin || null,
         salario: Number(form.salario),
@@ -125,10 +125,18 @@ export function ContractFormDialog({ isOpen, onClose, onSuccess, empleados }: Co
         tasa_seguro_afp: Number(form.tasa_seguro_afp) || 0,
         estado: 'vigente',
         activo: true,
-      }, {
-        headers: { 'Idempotency-Key': createIntent.current },
+      };
+      const fingerprint = JSON.stringify(payload);
+      let intent = createIntents.current.get(fingerprint);
+      if (!intent) {
+        intent = `rrhh-contract-create:${crypto.randomUUID()}`;
+        createIntents.current.set(fingerprint, intent);
+      }
+      const response = await post('/rrhh/contratos', payload, {
+        headers: { 'Idempotency-Key': intent },
       });
       if (response?.success === false) throw new Error(response.message || 'No se pudo crear el contrato');
+      createIntents.current.delete(fingerprint);
       toast({ title: 'Contrato creado', description: 'El contrato laboral se registró correctamente.' });
       onSuccess();
       onClose();

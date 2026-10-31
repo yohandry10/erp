@@ -41,18 +41,19 @@ function usarMoneda(moneda?: string | null, locale?: string) {
  * el número solo: es preferible a etiquetarlo con una divisa que no es la suya.
  */
 export function formatCurrency(amount: number): string {
-  if (!monedaDelDocumento) {
-    return new Intl.NumberFormat(localeDelDocumento, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount)
-  }
-  return new Intl.NumberFormat(localeDelDocumento, {
+  const formatter = new Intl.NumberFormat(localeDelDocumento, monedaDelDocumento ? {
     style: 'currency',
     currency: monedaDelDocumento,
     currencyDisplay: 'code',
     minimumFractionDigits: 2,
-  }).format(amount)
+  } : {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+  })
+  const formatted = formatter.format(amount)
+  // Suprime el signo sólo cuando el importe ya se representa como cero;
+  // conserva el valor contable y los negativos visibles en cada moneda/locale.
+  return formatted === formatter.format(-0) ? formatter.format(0) : formatted
 }
 
 /**
@@ -88,17 +89,26 @@ export function exportBalanceComprobacionToPDF(
   ])
   
   // Add totals row
-  tableData.push([
+  const totalsRow = [
     '',
     'TOTALES',
     formatCurrency(totales.saldo_inicial),
     formatCurrency(totales.debe),
     formatCurrency(totales.haber),
     formatCurrency(totales.saldo_final)
-  ])
+  ]
   
   autoTable(doc, {
     startY: 35,
+    margin: { top: 35, bottom: 18, left: 14, right: 14 },
+    showFoot: 'lastPage',
+    foot: [totalsRow],
+    willDrawPage: () => {
+      doc.setFontSize(18)
+      doc.text('Balance de Comprobación', 14, 20)
+      doc.setFontSize(12)
+      doc.text(`Período: ${anio} - ${String(mes).padStart(2, '0')}`, 14, 28)
+    },
     head: [['Cuenta', 'Nombre', 'Saldo Inicial', 'Debe', 'Haber', 'Saldo Final']],
     body: tableData,
     theme: 'grid',
@@ -110,7 +120,7 @@ export function exportBalanceComprobacionToPDF(
     },
     columnStyles: {
       0: { cellWidth: 25, halign: 'left' },
-      1: { cellWidth: 80, halign: 'left' },
+      1: { cellWidth: doc.internal.pageSize.getWidth() - 28 - 25 - 4 * 35, halign: 'left' },
       2: { cellWidth: 35, halign: 'right' },
       3: { cellWidth: 35, halign: 'right' },
       4: { cellWidth: 35, halign: 'right' },

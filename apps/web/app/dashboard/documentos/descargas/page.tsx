@@ -1,34 +1,22 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { parseDateLocal } from '@/lib/date-utils'
 import { Download, Filter, FileText, RefreshCcw } from 'lucide-react'
-import { useApi } from '@/hooks/use-api'
-import { fetchApi } from '@/lib/api-fetch'
+import { useFinanceReport } from '@/hooks/use-finance-report'
+import { readDocumentList } from '@/lib/operational-read-contract'
+import { formatFiscalDocumentNumber } from '@/lib/fiscal-document-number'
+import { downloadOperationalDocument } from '@/lib/documentos/download'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useCountryContext } from '@/hooks/use-country-context'
 
-interface Documento {
-  id: string
-  fecha_emision?: string
-  tipo_documento?: string
-  serie?: string
-  correlativo?: string
-  numero_documento?: string
-  receptor_nombre?: string
-  receptor_numero_doc?: string
-  estado?: string
-  total?: number
-}
-
 export default function DescargasPage() {
-  const { get } = useApi()
   const country = useCountryContext()
-  const formatMoney = (value: number) =>
+  const formatMoney = (value: number, moneda: string) =>
     new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: country.moneda || 'PEN',
+      currency: moneda,
     }).format(value)
   const [filtros, setFiltros] = useState({
     fecha_desde: format(new Date(new Date().setMonth(new Date().getMonth() - 1)), 'yyyy-MM-dd'),
@@ -36,30 +24,22 @@ export default function DescargasPage() {
     tipo_documento: '',
     serie: ''
   })
-  const [documentos, setDocumentos] = useState<Documento[]>([])
-  const [loading, setLoading] = useState(false)
+  const [submittedFilters, setSubmittedFilters] = useState(filtros)
+  const endpoint = useMemo(() => {
+    const params = new URLSearchParams()
+    Object.entries(submittedFilters).forEach(([key, value]) => { if (value) params.set(key, value) })
+    return `/documentos/lista?${params}`
+  }, [submittedFilters])
+  const { data, loading, error, reload } = useFinanceReport(endpoint, readDocumentList)
+  const filtersMatch = JSON.stringify(filtros) === JSON.stringify(submittedFilters)
+  const documentos = filtersMatch ? data ?? [] : []
   const [descargandoId, setDescargandoId] = useState<string | null>(null)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
 
-  const cargar = async () => {
-    setLoading(true)
-    try {
-      const params = new URLSearchParams()
-      Object.entries(filtros).forEach(([k, v]) => {
-        if (v) params.set(k, v)
-      })
-      const resp = await get(`/documentos/lista?${params.toString()}`)
-      setDocumentos(resp?.data?.data || resp?.data || [])
-    } catch (e) {
-      console.error('Error cargando documentos', e)
-    } finally {
-      setLoading(false)
-    }
+  const cargar = () => {
+    if (filtersMatch) void reload()
+    else setSubmittedFilters(filtros)
   }
-
-  useEffect(() => {
-    cargar()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   const handleFiltro = (key: string, value: string) => {
     setFiltros(prev => ({ ...prev, [key]: value }))
@@ -67,25 +47,11 @@ export default function DescargasPage() {
 
   const descargar = async (id: string, tipo: 'pdf' | 'xml') => {
     setDescargandoId(`${id}-${tipo}`)
+    setDownloadError(null)
     try {
-      const response = await fetchApi(`/api/documentos/${id}/descargar-${tipo}`)
-      if (!response.ok) {
-        const message = await response.text().catch(() => '')
-        throw new Error(message || `No se pudo descargar ${tipo.toUpperCase()}`)
-      }
-
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `documento-${id}.${tipo}`
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(url)
+      await downloadOperationalDocument(id, tipo, `documento-${id}.${tipo}`)
     } catch (error) {
-      console.error('Error descargando documento', error)
-      alert(error instanceof Error ? error.message : 'No se pudo descargar el documento')
+      setDownloadError(error instanceof Error ? error.message : 'No se pudo descargar el documento')
     } finally {
       setDescargandoId(null)
     }
@@ -94,17 +60,17 @@ export default function DescargasPage() {
   const formatos = useMemo(
     () => [
       { value: '', label: 'Todos' },
-      { value: '01', label: 'Factura' },
+      { value: 'FACTURA', label: 'Factura' },
       {
-        value: '03',
+        value: 'BOLETA',
         label: country.paisCodigo === 'AR'
           ? 'Factura B'
           : country.paisCodigo === 'CO'
             ? 'Documento equivalente'
             : 'Boleta',
       },
-      { value: '07', label: 'Nota de Crédito' },
-      { value: '08', label: 'Nota de Débito' }
+      { value: 'NOTA_CREDITO', label: 'Nota de Crédito' },
+      { value: 'NOTA_DEBITO', label: 'Nota de Débito' }
     ],
     [country.paisCodigo]
   )
@@ -124,6 +90,7 @@ export default function DescargasPage() {
       </div>
 
       <div className="relative rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl">
+        {downloadError && filtersMatch && data && !loading && !error && <p role="alert" className="mb-4 text-destructive">{downloadError}</p>}
         <div className="mb-4 flex items-center justify-between gap-4">
           <h2 className="m-0 text-lg font-bold text-foreground">
             <Filter className="mr-2 h-[18px] w-[18px]" /> Filtros
@@ -210,7 +177,16 @@ export default function DescargasPage() {
                     <td colSpan={6} className="px-4 py-4 text-center text-sm text-muted-foreground">Cargando...</td>
                   </tr>
                 )}
-                {!loading && documentos.length === 0 && (
+                {!loading && !filtersMatch && (
+                  <tr><td colSpan={6} className="px-4 py-4 text-center">Pulse Buscar para consultar los filtros seleccionados.</td></tr>
+                )}
+                {!loading && filtersMatch && error && (
+                  <tr><td colSpan={6} className="px-4 py-4 text-center">
+                    <div role="alert">No se pudieron consultar los documentos. Reintente para recuperar la lista actual.</div>
+                    <button type="button" onClick={cargar} className="mt-3 rounded-lg border px-4 py-2">Reintentar</button>
+                  </td></tr>
+                )}
+                {!loading && filtersMatch && data && !error && documentos.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-4 py-4 text-center text-sm text-muted-foreground">Sin resultados</td>
                   </tr>
@@ -222,14 +198,14 @@ export default function DescargasPage() {
                     </td>
                     <td className="px-4 py-2 text-sm text-foreground/85">
                       <div className="font-semibold">{doc.tipo_documento || '-'}</div>
-                      <div className="text-xs text-muted-foreground">{doc.serie}{doc.correlativo ? `-${doc.correlativo}` : ''}</div>
+                      <div className="text-xs text-muted-foreground">{formatFiscalDocumentNumber(country.paisCodigo, doc.serie, doc.numero)}</div>
                     </td>
                     <td className="px-4 py-2 text-sm text-foreground/85">
-                      <div className="font-medium">{doc.receptor_nombre || 'Sin nombre'}</div>
+                      <div className="font-medium">{doc.receptor_razon_social}</div>
                       <div className="text-xs text-muted-foreground">{doc.receptor_numero_doc || ''}</div>
                     </td>
                     <td className="px-4 py-2 text-sm text-right text-foreground/85">
-                      {formatMoney(Number(doc.total || 0))}
+                      {formatMoney(doc.total, doc.moneda)}
                     </td>
                     <td className="px-4 py-2 text-sm text-foreground/85">{doc.estado || '-'}</td>
                     <td className="px-4 py-2 text-sm text-foreground/85">

@@ -142,6 +142,7 @@ export default function CuentaBancariaDetallePage() {
 
       const queryParams = new URLSearchParams({
         page: page.toString(),
+        es_extracto: 'false',
         limit: pagination.limit.toString(),
         ...(filters.fecha_desde && { fecha_desde: filters.fecha_desde }),
         ...(filters.fecha_hasta && { fecha_hasta: filters.fecha_hasta }),
@@ -215,6 +216,7 @@ export default function CuentaBancariaDetallePage() {
 
     try {
       const queryParams = new URLSearchParams({
+        es_extracto: 'false',
         ...(filters.fecha_desde && { fecha_desde: filters.fecha_desde }),
         ...(filters.fecha_hasta && { fecha_hasta: filters.fecha_hasta }),
         ...(filters.tipo && { tipo: filters.tipo }),

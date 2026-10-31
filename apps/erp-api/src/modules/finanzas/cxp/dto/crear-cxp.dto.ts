@@ -61,6 +61,22 @@ export class CrearCxpDto {
   @IsUUID('4', { message: 'El ID de la recepción debe ser un UUID válido' })
   recepcion_id?: string;
 
+  @IsOptional()
+  @IsUUID('4', { message: 'La devolución vinculada debe ser un UUID válido' })
+  devolucion_proveedor_id?: string;
+
+  @IsOptional()
+  @IsUUID('4', { message: 'El comprobante original debe ser un UUID válido' })
+  factura_proveedor_id?: string;
+
+  @IsOptional()
+  @IsIn(['DESCUENTO', 'ANULACION'], { message: 'Motivo de nota de crédito inválido' })
+  motivo_nota_credito?: 'DESCUENTO' | 'ANULACION';
+
+  @IsOptional()
+  @IsUUID('4', { message: 'La contrapartida contable debe ser un UUID válido' })
+  cuenta_ajuste_id?: string;
+
   @IsString({ message: 'El número de documento es requerido' })
   numero_documento!: string;
 

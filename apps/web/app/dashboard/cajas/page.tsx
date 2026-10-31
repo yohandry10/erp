@@ -9,6 +9,7 @@ import { CortesList } from './components/CortesList';
 import { useToast } from '@/components/ui/use-toast';
 import { usePermission } from '@/hooks/use-permission';
 import { SupervisorPinDialog } from './components/SupervisorPinDialog';
+import { CashRegistersManager } from './components/CashRegistersManager';
 
 export default function CashManagementPage() {
     const { toast } = useToast();
@@ -88,6 +89,8 @@ export default function CashManagementPage() {
                         onSelect={handleSessionSelect}
                         onOpen={() => setShowOpenDialog(true)}
                     />
+
+                    <CashRegistersManager onChanged={() => setRefreshKey(prev => prev + 1)} />
 
                     <CortesList id="cortes" />
 

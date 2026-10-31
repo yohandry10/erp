@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CrearCuentaBancariaDto, ActualizarCuentaBancariaDto, ListarMovimientosQueryDto, CrearMovimientoBancarioDto, TransferirCuentasBancariasDto } from './dto';
 import { errorWriterFinanciero, lecturaFinancieraFallida } from '../finanzas-errors';
+import { readCompleteCatalog } from '../../../shared/utils/complete-catalog-read';
 
 @Injectable()
 export class BancosService {
@@ -144,23 +145,18 @@ export class BancosService {
 
   async obtenerCuentasBancarias(
     tenantId: string,
-  ): Promise<{ success: boolean; data: any[] }> {
+  ): Promise<{ success: boolean; data: any[]; complete: true; total: number; count: number }> {
     const client = this.supabase.getClient();
-
-    const { data: cuentas, error } = await client
-      .from('cuentas_bancarias')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error obteniendo cuentas bancarias:', error);
-      throw lecturaFinancieraFallida('las cuentas bancarias');
-    }
+    const cuentas = await readCompleteCatalog(client, 'cuentas_bancarias', '*',
+      query => query.eq('tenant_id', tenantId), row => row.tenant_id === tenantId,
+      [['created_at', false], ['id', false]]);
 
     return {
       success: true,
-      data: cuentas || [],
+      data: cuentas,
+      complete: true,
+      total: cuentas.length,
+      count: cuentas.length,
     };
   }
 

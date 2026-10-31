@@ -21,6 +21,7 @@ import { PermissionGuard } from "../../../common/guards/permission.guard";
 import { RequirePermission } from "../../../common/decorators/require-permission.decorator";
 import { CurrentTenant } from "../../../common/decorators/current-tenant.decorator";
 import { CurrentUser } from "../../auth/current-user.decorator";
+import { UuidParamPipe } from "../../../common/pipes/uuid-param.pipe";
 
 @ApiTags("compras/proveedores")
 @Controller("compras/proveedores")
@@ -181,7 +182,7 @@ export class ProveedoresController {
   @ApiOperation({ summary: "Obtener proveedor por ID" })
   @ApiResponse({ status: 200, description: "Proveedor encontrado" })
   @ApiResponse({ status: 404, description: "Proveedor no encontrado" })
-  async findOne(@Param("id") id: string, @CurrentTenant() tenantId: string) {
+  async findOne(@Param("id", UuidParamPipe) id: string, @CurrentTenant() tenantId: string) {
     const proveedor = await this.proveedoresService.findById(id, tenantId);
     return {
       success: true,

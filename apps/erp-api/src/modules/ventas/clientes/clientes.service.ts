@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
+import { readUnavailable } from '../ventas-errors';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CreateClienteDto, UpdateClienteDto, ValidarRucDto } from './dto';
 import { Cliente } from './entities/cliente.entity';
@@ -161,7 +162,7 @@ export class ClientesService {
 
     if (error) {
       console.error('❌ [ClientesService] Error fetching clientes:', error);
-      throw new BadRequestException('Error al obtener clientes');
+      throw readUnavailable('los clientes');
     }
 
     console.log(`✅ [ClientesService] Clientes encontrados: ${data?.length || 0} de ${count || 0} total`);
@@ -210,7 +211,10 @@ export class ClientesService {
    * Actualizar un cliente
    * Requirements: 1.8
    */
-  async update(id: string, updateClienteDto: UpdateClienteDto, tenantId: string, userId?: string): Promise<Cliente> {
+  async update(id: string, updateClienteDto: UpdateClienteDto, tenantId: string, userId?: string, idempotencyKey?: string): Promise<Cliente> {
+    if (idempotencyKey !== undefined && !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,199}$/.test(idempotencyKey)) {
+      throw new BadRequestException('La clave de la edición debe tener entre 8 y 200 caracteres válidos');
+    }
     const client = this.supabase.getClient();
     const previousCliente = await this.findOne(id, tenantId);
     if (!userId) {
@@ -226,11 +230,12 @@ export class ClientesService {
     if (!validacionDocumento.valido) {
       throw new BadRequestException(validacionDocumento.error);
     }
-    const { data, error } = await client.rpc('actualizar_cliente_maestro_tx', {
+    const { data, error } = await client.rpc(idempotencyKey ? 'actualizar_cliente_idempotente_tx_571' : 'actualizar_cliente_maestro_tx', {
       p_cliente_id: id,
       p_tenant_id: tenantId,
       p_actor_id: userId,
       p_cambios: updateClienteDto,
+      ...(idempotencyKey ? { p_idempotency_key: idempotencyKey } : {}),
     });
     if (error) {
       this.throwMasterError(error, 'cliente');
@@ -260,6 +265,9 @@ export class ClientesService {
 
   private throwMasterError(error: any, entity: 'cliente'): never {
     const message = String(error?.message || '');
+    if (message.includes('CUSTOMER_UPDATE_IDEMPOTENCY_CONFLICT')) {
+      throw new ConflictException('La clave de edición ya pertenece a otra solicitud');
+    }
     if (error?.code === '23505' || message.includes('IDENTITY_CONFLICT')) {
       throw new ConflictException('Ya existe otro cliente con esa identidad');
     }

@@ -2,7 +2,7 @@ export type EstadoBalanceAsiento = "PENDIENTE" | "DESCUADRADO" | "BALANCEADO";
 
 /**
  * Un asiento sin importes no está balanceado: todavía está pendiente de captura.
- * La tolerancia de un céntimo sólo aplica cuando ambos lados tienen movimiento.
+ * Los totales deben coincidir al céntimo, como exige el writer contable.
  */
 export function obtenerEstadoBalanceAsiento(
   totalDebe: number,
@@ -13,5 +13,6 @@ export function obtenerEstadoBalanceAsiento(
   if (totalDebe === 0 && totalHaber === 0) return "PENDIENTE";
   if (totalDebe <= 0 || totalHaber <= 0) return "DESCUADRADO";
 
-  return Math.abs(totalDebe - totalHaber) < 0.01 ? "BALANCEADO" : "DESCUADRADO";
+  return Math.round(totalDebe * 100) === Math.round(totalHaber * 100)
+    ? "BALANCEADO" : "DESCUADRADO";
 }

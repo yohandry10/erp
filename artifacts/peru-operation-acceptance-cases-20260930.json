@@ -5033,6 +5033,379 @@
       "pending_checks": [
         "Límite de crédito configurado y cuentas en moneda extranjera"
       ]
+    },
+    {
+      "id": "sales-order-invoice-emission",
+      "source": "scripts/ci/test-peru-sales-invoice-local.mjs",
+      "required_scenario_prefixes": [
+        "Facturar pedido: confirmado se factura",
+        "Facturar pedido: cliente con DNI recibe boleta"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/generar-factura"
+        }
+      ],
+      "verified_checks": [
+        "Pedido listo se factura una vez con CPE, salida de stock y FACTURADO; cliente con DNI recibe boleta"
+      ],
+      "pending_checks": [
+        "Flujo con logística activa (LISTO_FACTURAR tras despacho) y SUNAT real"
+      ]
+    },
+    {
+      "id": "sales-order-invoice-retry-and-states",
+      "source": "scripts/ci/test-peru-sales-invoice-local.mjs",
+      "required_scenario_prefixes": [
+        "Facturar pedido: repetir tras perder la respuesta",
+        "Facturar pedido: sin confirmar o cancelado",
+        "Facturar pedido: ajeno o inexistente"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/generar-factura"
+        }
+      ],
+      "verified_checks": [
+        "Reintento tras respuesta perdida devuelve la misma factura sin otro CPE ni salida; sin confirmar/cancelado 409; ajeno/inexistente 404"
+      ],
+      "pending_checks": []
+    },
+    {
+      "id": "sales-order-invoice-preconditions-outages",
+      "source": "scripts/ci/test-peru-sales-invoice-local.mjs",
+      "required_scenario_prefixes": [
+        "Facturar pedido: sin certificado configurado",
+        "Facturar pedido: sin lectura de configuración"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/ventas/pedidos/:id/generar-factura"
+        }
+      ],
+      "verified_checks": [
+        "Sin certificado 409 legible; configuración ilegible o writer caído 503 sin efectos y luego se recupera"
+      ],
+      "pending_checks": []
+    },
+    {
+      "id": "tenant-create-superadmin",
+      "source": "scripts/ci/test-peru-tenant-create-local.mjs",
+      "required_scenario_prefixes": [
+        "Alta de empresa: crea empresa y administrador",
+        "Alta de empresa: RUC ya registrado"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/tenants"
+        }
+      ],
+      "verified_checks": [
+        "Alta con administrador que entra con su contraseña; RUC repetido 409 con motivo legible"
+      ],
+      "pending_checks": []
+    },
+    {
+      "id": "tenant-create-unconfirmed-retry",
+      "source": "scripts/ci/test-peru-tenant-create-local.mjs",
+      "required_scenario_prefixes": [
+        "Alta de empresa: sin confirmación de la base"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/tenants"
+        }
+      ],
+      "verified_checks": [
+        "RPC retenido más allá del timeout: 503 legible y el reintento con la misma clave confirma sin duplicar"
+      ],
+      "pending_checks": []
+    },
+    {
+      "id": "dashboard-home-metrics",
+      "source": "scripts/ci/test-peru-dashboard-local.mjs",
+      "required_scenario_prefixes": [
+        "Dashboard: cotizaciones pendientes y conversión",
+        "Dashboard: ventas de hoy y del mes",
+        "Dashboard: otra empresa no ve"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/dashboard/stats"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/dashboard/activities"
+        }
+      ],
+      "verified_checks": [
+        "Cotizaciones pendientes/conversión con estados reales; ventas de hoy y mes en el día de Lima sin anulados (API en TZ=UTC); aislamiento por empresa"
+      ],
+      "pending_checks": [
+        "Notas de crédito reales (exigen CDR) y comprobantes en moneda extranjera"
+      ]
+    },
+    {
+      "id": "dashboard-home-outages",
+      "source": "scripts/ci/test-peru-dashboard-local.mjs",
+      "required_scenario_prefixes": [
+        "Dashboard: sin lectura de comprobantes",
+        "Dashboard: actividades muestran lo emitido"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/dashboard/stats"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/dashboard/activities"
+        }
+      ],
+      "verified_checks": [
+        "Sin lectura de comprobantes stats y actividades 503 en vez de ceros o lista parcial"
+      ],
+      "pending_checks": []
+    },
+    {
+      "id": "payables-dates-lima-day",
+      "source": "scripts/ci/test-peru-payables-dates-local.mjs",
+      "required_scenario_prefixes": [
+        "Fechas CxP: la deuda que vence hoy",
+        "Fechas tesorería: la programación",
+        "Fechas CxP: la antigüedad",
+        "Fechas tesorería: el flujo de caja"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxp/vencimientos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/tesoreria/programacion"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxp/aging"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/tesoreria/flujo-caja"
+        }
+      ],
+      "verified_checks": [
+        "Con el API en TZ=UTC y Lima pasadas las 19:00: vencimientos, programación, antigüedad y flujo de caja usan el día de Lima"
+      ],
+      "pending_checks": []
+    },
+    {
+      "id": "daily-list-read-faults",
+      "source": "scripts/ci/test-peru-read-faults-local.mjs",
+      "required_scenario_prefixes": [
+        "Lecturas: sin lectura de almacenes GET /api/inventario/almacenes",
+        "Lecturas: sin lectura de categorias_producto GET /api/inventario/categorias",
+        "Lecturas: sin lectura de productos GET /api/inventario/productos",
+        "Lecturas: sin lectura de recepciones GET /api/inventario/recepciones",
+        "Lecturas: sin lectura de clientes GET /api/ventas/clientes",
+        "Lecturas: sin lectura de rma_solicitudes GET /api/ventas/rma",
+        "Lecturas: sin lectura de proveedores GET /api/compras/proveedores",
+        "Lecturas: sin lectura de ordenes_compra GET /api/compras/ordenes",
+        "Lecturas: sin lectura de cuentas_por_pagar GET /api/finanzas/cxp",
+        "Lecturas: sin lectura de cuentas_por_cobrar GET /api/finanzas/cxc",
+        "Lecturas: sin lectura de cuentas_bancarias GET /api/finanzas/bancos/cuentas",
+        "Lecturas: sin lectura de cajas GET /api/cajas",
+        "Lecturas: sin lectura de empleados GET /api/rrhh/empleados",
+        "Lecturas: sin lectura de departamentos GET /api/rrhh/departamentos",
+        "Lecturas: sin lectura de planillas GET /api/rrhh/planillas",
+        "Lecturas: sin lectura de plan_cuentas GET /api/contabilidad/plan-cuentas",
+        "Lecturas: sin lectura de asientos_contables GET /api/contabilidad/asientos",
+        "Lecturas: sin lectura de centros_costo GET /api/contabilidad/centros-costo",
+        "Lecturas: sin lectura de gre_guias GET /api/gre/guias",
+        "Lecturas: sin lectura de sucursales GET /api/sucursales",
+        "Lecturas: sin lectura de audit_log GET /api/audit-logs"
+      ],
+      "operations": [
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/almacenes"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/categorias"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/productos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/inventario/recepciones"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/clientes"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/ventas/rma"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/proveedores"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/compras/ordenes"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxp"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/cxc"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/finanzas/bancos/cuentas"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/cajas"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/empleados"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/departamentos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/rrhh/planillas"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/plan-cuentas"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/asientos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/centros-costo"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/gre/guias"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/sucursales"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/audit-logs"
+        }
+      ],
+      "verified_checks": [
+        "Sin SELECT sobre su tabla, 21 listados de uso diario responden 503 legible (no 200 vacío, 400 ni texto de PostgreSQL)"
+      ],
+      "pending_checks": [
+        "El resto de pantallas aún muestran su estado vacío ante un 503 (sólo el catálogo de productos avisa)"
+      ]
+    },
+    {
+      "id": "accounting-budgets-lifecycle",
+      "source": "scripts/ci/test-peru-budgets-local.mjs",
+      "required_scenario_prefixes": [
+        "Presupuestos: editar el monto",
+        "Presupuestos: borrar y volver a crear",
+        "Presupuestos: duplicado",
+        "Presupuestos: inexistente o ajeno",
+        "Presupuestos: sin lectura"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/presupuestos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/presupuestos"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/contabilidad/presupuestos/:id"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/contabilidad/presupuestos/:id"
+        },
+        {
+          "method": "DELETE",
+          "endpoint": "/api/contabilidad/presupuestos/:id"
+        }
+      ],
+      "verified_checks": [
+        "Sin Idempotency-Key cada edición se aplica (A→B→A), recrear tras borrar crea, duplicado 409, ajeno 404 y lectura caída 503"
+      ],
+      "pending_checks": []
+    },
+    {
+      "id": "edits-without-idempotency-key",
+      "source": "scripts/ci/test-peru-derived-keys-local.mjs",
+      "required_scenario_prefixes": [
+        "Claves: tipo de cambio",
+        "Claves: renombrar un centro de costo",
+        "Claves: cambiar el vencimiento"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/tipos-cambio"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/contabilidad/centros-costo/:id"
+        },
+        {
+          "method": "PUT",
+          "endpoint": "/api/finanzas/cxp/:id"
+        }
+      ],
+      "verified_checks": [
+        "Volver a un valor ya usado sin Idempotency-Key se aplica en tipos de cambio, centros de costo y CxP"
+      ],
+      "pending_checks": [
+        "Activos fijos y consolidación (mismo cambio, sin escenario propio)"
+      ]
+    },
+    {
+      "id": "statements-refresh-contract",
+      "source": "scripts/ci/test-peru-statements-refresh-local.mjs",
+      "required_scenario_prefixes": [
+        "Estados: refrescar con el periodo en el cuerpo"
+      ],
+      "operations": [
+        {
+          "method": "POST",
+          "endpoint": "/api/contabilidad/estados/refrescar"
+        }
+      ],
+      "verified_checks": [
+        "Refrescar estados con el periodo en el cuerpo responde 2xx"
+      ],
+      "pending_checks": []
     }
   ]
 }

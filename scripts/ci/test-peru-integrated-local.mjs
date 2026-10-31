@@ -80,6 +80,13 @@ async function main() {
   assert.ok(token);
   assert.equal(auth.user.tenant_id, sql("SELECT tenant_id FROM usuarios_sistema WHERE email='peru-integrated-1@example.test';"));
   results.push({ scenario: 'login real con sesión persistida', passed: true, tenant_id: auth.user.tenant_id });
+  const dashboard = await request('dashboard/stats');
+  const dashboardStats = dashboard.data ?? dashboard;
+  const expectedSales = Number(sql(`SELECT round(coalesce((SELECT sum(CASE WHEN tipo_documento IN('07','NOTA_CREDITO') THEN -1 ELSE 1 END*coalesce(total_venta,total)) FROM cpe WHERE tenant_id=${uuid(auth.user.tenant_id)} AND created_at>=date_trunc('month',CURRENT_TIMESTAMP) AND created_at<date_trunc('month',CURRENT_TIMESTAMP)+interval '1 month' AND lower(estado) NOT IN('borrador','anulado','cancelado','rechazado','error') AND moneda='PEN'),0)+coalesce((SELECT sum(total) FROM ventas_pos WHERE tenant_id=${uuid(auth.user.tenant_id)} AND created_at>=date_trunc('month',CURRENT_TIMESTAMP) AND created_at<date_trunc('month',CURRENT_TIMESTAMP)+interval '1 month' AND estado<>'ANULADA' AND cpe_id IS NULL AND moneda='PEN'),0),2);`));
+  assert.equal(dashboardStats.ventasMes,expectedSales);
+  const activities = await request('dashboard/activities');
+  assert.ok(Array.isArray(activities.data ?? activities));
+  results.push({ scenario:'dashboard real acepta tipos persistidos y concuerda con ventas SQL sin duplicar POS',passed:true,ventas_mes:expectedSales });
   if (process.env.LOCAL_INTEGRATED_FOCUS === 'onboarding') {
     await testPeruOnboarding({ request, sql, uuid, results, setToken: value => { token = value; }, primaryToken: token, processAccounting });
     return;

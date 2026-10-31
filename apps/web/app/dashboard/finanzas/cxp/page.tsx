@@ -1,9 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, BarChart3, CheckCircle, Clock, DollarSign, Download, Eye, FileText, List, Plus, RefreshCw, XCircle, type LucideIcon } from 'lucide-react'
-import { useApi } from '@/hooks/use-api'
+import { useFinanceReport } from '@/hooks/use-finance-report'
+import { loadCxpPage, readCxpPage, sumReportMoney } from '@/lib/finanzas/report-read-contract'
 import { getDaysUntilDue, getVencimientoText, parseDateLocal } from '@/lib/date-utils'
 import AgingCxpChart from '@/components/finanzas/AgingCxpChart'
 import VencimientosAlert from '@/components/finanzas/VencimientosAlert'
@@ -25,6 +26,7 @@ interface CuentaPorPagar {
   moneda: string
   tipo_documento: string
   observaciones?: string
+  metadata?: { registro_fiscal_sin_obligacion?: boolean }
   proveedores?: {
     razon_social: string
     ruc: string
@@ -49,61 +51,25 @@ const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-prima
 export default function CuentasPorPagarPage() {
   const { currency, locale, formatCurrency: formatLocalizedCurrency, taxIdLabel } = useLocalizedMoney()
   const router = useRouter()
-  const { get } = useApi()
   const { hasPermission: canReadRecepciones } = usePermission('compras', 'ver', 'recepciones')
+  const { hasPermission: canGestionarCxp } = usePermission('finanzas', 'gestionar', 'cxp')
 
-  const [cuentas, setCuentas] = useState<CuentaPorPagar[]>([])
-  const [proveedores, setProveedores] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<'list' | 'aging'>('list')
   const [estadoFilter, setEstadoFilter] = useState<string>('')
   const [proveedorFilter, setProveedorFilter] = useState<string>('')
   const [vencimientoDesde, setVencimientoDesde] = useState<string>('')
   const [vencimientoHasta, setVencimientoHasta] = useState<string>('')
 
-  const loadCuentas = useCallback(async () => {
-    try {
-      setLoading(true)
-      const params = new URLSearchParams()
-
-      if (estadoFilter) params.append('estado', estadoFilter)
-      if (proveedorFilter) params.append('proveedor_id', proveedorFilter)
-      if (vencimientoDesde) params.append('vencimiento_desde', vencimientoDesde)
-      if (vencimientoHasta) params.append('vencimiento_hasta', vencimientoHasta)
-
-      const queryString = params.toString()
-      const response = await get(`/api/finanzas/cxp${queryString ? `?${queryString}` : ''}`)
-      // El API expone el join como `proveedor` (singular); se normaliza al shape que usa la tabla.
-      if (response?.success) {
-        setCuentas((response.data || []).map((cuenta: any) => ({
-          ...cuenta,
-          proveedores: cuenta.proveedores || cuenta.proveedor,
-        })))
-      }
-    } catch (error) {
-      console.error('Error loading cuentas por pagar:', error)
-      alert('Error: No se pudieron cargar las cuentas por pagar')
-    } finally {
-      setLoading(false)
-    }
-  }, [estadoFilter, proveedorFilter, vencimientoDesde, vencimientoHasta, get])
-
-  const loadProveedores = useCallback(async () => {
-    try {
-      const response = await get('/api/compras/proveedores?activo=true')
-      if (response?.success) setProveedores(response.data || [])
-    } catch (error) {
-      console.error('Error loading proveedores:', error)
-    }
-  }, [get])
-
-  useEffect(() => {
-    loadProveedores()
-  }, [loadProveedores])
-
-  useEffect(() => {
-    loadCuentas()
-  }, [loadCuentas])
+  const params = new URLSearchParams()
+  if (estadoFilter) params.append('estado', estadoFilter)
+  if (proveedorFilter) params.append('proveedor_id', proveedorFilter)
+  if (vencimientoDesde) params.append('vencimiento_desde', vencimientoDesde)
+  if (vencimientoHasta) params.append('vencimiento_hasta', vencimientoHasta)
+  const { data, loading, error, reload: loadCuentas } = useFinanceReport(
+    `/api/finanzas/cxp?${params.toString()}`, readCxpPage, undefined, loadCxpPage)
+  const cuentas: CuentaPorPagar[] = data?.rows ?? []
+  const proveedores = data?.providers ?? []
+  const ready = !loading && !error && data !== null
 
   const handleClearFilters = () => {
     setEstadoFilter('')
@@ -113,6 +79,7 @@ export default function CuentasPorPagarPage() {
   }
 
   const handleExport = () => {
+    if (!ready) return
     downloadCsv(
       `cuentas-por-pagar-${new Date().toISOString().slice(0, 10)}.csv`,
       ['Documento', 'Tipo', 'Proveedor', taxIdLabel, 'Emisión', 'Vencimiento', 'Moneda', 'Total', 'Saldo', 'Estado'],
@@ -126,14 +93,13 @@ export default function CuentasPorPagarPage() {
         cuenta.moneda,
         Number(cuenta.total || 0).toFixed(2),
         Number(cuenta.saldo || 0).toFixed(2),
-        cuenta.estado,
+        cuenta.metadata?.registro_fiscal_sin_obligacion ? 'NC recibida' : cuenta.estado,
       ]),
     )
   }
 
   const formatCurrency = (amount: number | undefined, moneda: string = currency) => {
-    if (!amount) return '-'
-    return formatLocalizedCurrency(amount, moneda)
+    return formatLocalizedCurrency(amount ?? 0, moneda)
   }
 
   const formatDate = (dateString: string) => {
@@ -146,8 +112,10 @@ export default function CuentasPorPagarPage() {
 
   const isFilterActive = estadoFilter || proveedorFilter || vencimientoDesde || vencimientoHasta
 
-  const getEstadoBadge = (estado: string) => {
-    const config = ESTADOS_CONFIG[estado as EstadoCxp]
+  const getEstadoBadge = (cuenta: CuentaPorPagar) => {
+    const config = cuenta.metadata?.registro_fiscal_sin_obligacion
+      ? { ...ESTADOS_CONFIG.PAGADA, label: 'NC recibida', icon: FileText }
+      : ESTADOS_CONFIG[cuenta.estado as EstadoCxp]
     if (!config) return null
     const Icon = config.icon
 
@@ -159,17 +127,19 @@ export default function CuentasPorPagarPage() {
     )
   }
 
-  const totalPendiente = cuentas
-    .filter((cuenta) => cuenta.estado === 'PENDIENTE' || cuenta.estado === 'PARCIAL' || cuenta.estado === 'VENCIDA')
-    .reduce((sum, cuenta) => sum + cuenta.saldo, 0)
-
-  const totalVencido = cuentas.filter((cuenta) => cuenta.estado === 'VENCIDA').reduce((sum, cuenta) => sum + cuenta.saldo, 0)
+  const balanceText = (rows: CuentaPorPagar[], empty: string) => {
+    if (!ready) return '—'
+    const codes = [...new Set(rows.filter(row => row.saldo > 0).map(row => row.moneda))]
+    return codes.length ? codes.map(code => formatCurrency(sumReportMoney(rows.filter(row => row.moneda === code).map(row => row.saldo)), code)).join(' · ') : empty
+  }
+  const totalPendiente = balanceText(cuentas.filter(cuenta => ['PENDIENTE','PARCIAL','VENCIDA'].includes(cuenta.estado)), 'Sin saldo pendiente')
+  const totalVencido = balanceText(cuentas.filter(cuenta => cuenta.estado === 'VENCIDA'), 'Sin saldo vencido')
 
   const statCards = [
-    { label: 'Total', value: cuentas.length, description: 'Cuentas', icon: FileText },
-    { label: 'Pendientes', value: cuentas.filter((cuenta) => cuenta.estado === 'PENDIENTE').length, description: 'Por pagar', icon: Clock },
-    { label: 'Vencidas', value: cuentas.filter((cuenta) => cuenta.estado === 'VENCIDA').length, description: formatCurrency(totalVencido), icon: XCircle },
-    { label: 'Saldo total', value: formatCurrency(totalPendiente), description: 'Por pagar', icon: DollarSign },
+    { label: 'Total', value: ready ? cuentas.length : '—', description: 'Cuentas', icon: FileText },
+    { label: 'Pendientes', value: ready ? cuentas.filter((cuenta) => cuenta.estado === 'PENDIENTE').length : '—', description: 'Por pagar', icon: Clock },
+    { label: 'Vencidas', value: ready ? cuentas.filter((cuenta) => cuenta.estado === 'VENCIDA').length : '—', description: totalVencido, icon: XCircle },
+    { label: 'Saldo total', value: totalPendiente, description: 'Por pagar', icon: DollarSign },
   ]
 
   return (
@@ -195,13 +165,17 @@ export default function CuentasPorPagarPage() {
                   Aging
                 </Button>
               </div>
-              <Button type="button" onClick={loadCuentas} variant="outline" className="gap-2 border-cyan-400/20 bg-muted/30 text-primary hover:bg-muted/50 hover:text-foreground">
+              <Button type="button" disabled={loading} onClick={loadCuentas} variant="outline" className="gap-2 border-cyan-400/20 bg-muted/30 text-primary hover:bg-muted/50 hover:text-foreground">
                 <RefreshCw className="h-4 w-4" />
                 Actualizar
               </Button>
               {canReadRecepciones && <Button type="button" onClick={() => router.push('/dashboard/compras/recepciones')} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
                 <Plus className="h-4 w-4" />
                 Ir a recepciones
+              </Button>}
+              {canGestionarCxp && <Button type="button" onClick={() => router.push('/dashboard/finanzas/cxp/nueva')} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+                <FileText className="h-4 w-4" />
+                Registrar factura
               </Button>}
             </div>
           </div>
@@ -224,7 +198,7 @@ export default function CuentasPorPagarPage() {
           ))}
         </section>
 
-        <VencimientosAlert diasAdelante={7} proveedorId={proveedorFilter || undefined} onCuentaClick={(cuentaId) => router.push(`/dashboard/finanzas/cxp/${cuentaId}`)} />
+        <VencimientosAlert diasAdelante={7} proveedorId={proveedorFilter || undefined} data={data?.due ?? null} loading={loading} error={!loading && (error !== null || data?.due === null)} retry={loadCuentas} onCuentaClick={(cuentaId) => router.push(`/dashboard/finanzas/cxp/${cuentaId}`)} />
 
         <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardContent className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3 xl:items-end">
@@ -241,7 +215,7 @@ export default function CuentasPorPagarPage() {
             </label>
             <label className="space-y-2">
               <span className={labelClass}>Proveedor</span>
-              <select className={inputClass} value={proveedorFilter} onChange={(event) => setProveedorFilter(event.target.value)}>
+              <select disabled={loading || !data?.providers} className={inputClass} value={proveedorFilter} onChange={(event) => setProveedorFilter(event.target.value)}>
                 <option value="">Todos los proveedores</option>
                 {proveedores.map((proveedor) => (
                   <option key={proveedor.id} value={proveedor.id}>
@@ -249,6 +223,10 @@ export default function CuentasPorPagarPage() {
                   </option>
                 ))}
               </select>
+              {!loading && (error || data?.providers === null) && <div role="alert" className="text-sm text-muted-foreground">
+                No se pudo consultar el catálogo de proveedores.
+                <Button type="button" onClick={loadCuentas} variant="outline" className="mt-2">Reintentar proveedores</Button>
+              </div>}
             </label>
             <label className="space-y-2">
               <span className={labelClass}>Desde</span>
@@ -264,7 +242,7 @@ export default function CuentasPorPagarPage() {
                 Limpiar
               </Button>
             )}
-            <Button type="button" onClick={handleExport} variant="outline" className="gap-2 border-cyan-400/20 bg-muted/30 text-primary hover:bg-muted/50 hover:text-foreground">
+            <Button type="button" disabled={!ready} onClick={handleExport} variant="outline" className="gap-2 border-cyan-400/20 bg-muted/30 text-primary hover:bg-muted/50 hover:text-foreground">
               <Download className="h-4 w-4" />
               Exportar
             </Button>
@@ -282,6 +260,11 @@ export default function CuentasPorPagarPage() {
                 <div className="flex min-h-[360px] flex-col items-center justify-center gap-3 text-muted-foreground">
                   <RefreshCw className="h-8 w-8 animate-spin text-primary" />
                   <p>Cargando cuentas por pagar...</p>
+                </div>
+              ) : error ? (
+                <div className="p-6">
+                  <p role="alert">No se pudieron consultar las cuentas por pagar. Reintente para recuperar los datos actuales.</p>
+                  <Button type="button" onClick={loadCuentas} className="mt-3">Reintentar cuentas</Button>
                 </div>
               ) : cuentas.length === 0 ? (
                 <div className="flex min-h-[340px] flex-col items-center justify-center p-8 text-center">
@@ -333,7 +316,7 @@ export default function CuentasPorPagarPage() {
                             </td>
                             <td className="px-4 py-3 text-right font-bold text-primary">{formatCurrency(cuenta.total, cuenta.moneda)}</td>
                             <td className="px-4 py-3 text-right font-bold text-primary">{formatCurrency(cuenta.saldo, cuenta.moneda)}</td>
-                            <td className="px-4 py-3 text-center">{getEstadoBadge(cuenta.estado)}</td>
+                            <td className="px-4 py-3 text-center">{getEstadoBadge(cuenta)}</td>
                             <td className="px-4 py-3 text-right">
                               <Button type="button" size="sm" onClick={() => router.push(`/dashboard/finanzas/cxp/${cuenta.id}`)} className="h-9 gap-1 bg-blue-600 px-3 text-xs text-white hover:bg-blue-500">
                                 <Eye className="h-3.5 w-3.5" />

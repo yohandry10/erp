@@ -1,13 +1,17 @@
-import { BadRequestException, Controller, Get, Post, Put, Body, Param, Query, UseGuards, Delete, Headers, InternalServerErrorException, Logger, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Post, Put, Body, Param, Query, Header, UseGuards, Delete, Headers, InternalServerErrorException, NotFoundException, Logger, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiConsumes } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentTenant, CurrentUser } from '../../common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { AlmacenesService } from './almacenes/almacenes.service';
+import { readCompleteCatalog } from '../../shared/utils/complete-catalog-read';
+import { readProductSucursalSources } from './product-sucursal-read';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { UuidParamPipe } from '../../common/pipes/uuid-param.pipe';
 import { InventarioService } from './inventario.service';
+import { readOriginalInventoryResolutionRequest, ResolverAjusteOriginalDto, ResolverTransferenciaOriginalDto } from './dto/resolver-operacion-inventario.dto';
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard';
 import { RequireFeatureFlag } from '../../common/decorators/feature-flag.decorator';
 import { TaxCalculatorService } from '../../shared/utils/tax-calculator';
@@ -26,7 +30,7 @@ import {
 } from './dto/maestro-inventario.dto';
 import { MAX_PRODUCT_IMAGE_BYTES, ProductImagesService, ProductImageUpload } from './product-images.service';
 import { rangoDelDiaDelTenant } from '../../shared/utils/fecha-tenant.util';
-import { calcularMetricasInventario } from './inventario-metrics.util';
+import { calcularMetricasInventario, obtenerPaisMetricasInventario } from './inventario-metrics.util';
 import { lecturaInventarioFallida } from './inventario-errors';
 
 /**
@@ -84,15 +88,13 @@ export class InventarioController {
       
       return {
         success: true,
+        complete:true,tenant_id:tenantId,total:almacenes.length,
         data: almacenes
       };
     } catch (error) {
       this.logger.error('❌ Error obteniendo almacenes', error as Error); // HARDENING: utiliza Logger Nest para errores.
-      return {
-        success: false,
-        message: 'Error al obtener almacenes: ' + (error as Error).message,
-        data: []
-      };
+      // Antes 200 con lista vacía: la pantalla decía que no había almacenes.
+      throw lecturaInventarioFallida(error, 'los almacenes');
     }
   }
 
@@ -324,7 +326,7 @@ export class InventarioController {
 
       const { data: productos, error: productosError } = await client
         .from('productos')
-        .select('precio_compra, costo, stock_actual, stock_minimo')
+        .select('precio_compra, costo, costo_promedio_base, stock_actual, stock_minimo, es_servicio, controla_stock')
         .eq('tenant_id', tenantId)
         .eq('activo', true);
 
@@ -334,7 +336,7 @@ export class InventarioController {
         totalProductos,
         valorInventario,
         productosStockBajo,
-      } = calcularMetricasInventario(productos);
+      } = calcularMetricasInventario(productos, await obtenerPaisMetricasInventario(client, tenantId));
 
       // `created_at` es timestamptz: comparar contra un literal sin zona hacía que
       // «los movimientos de hoy» abarcaran desde las 19:00 de ayer para un tenant
@@ -375,54 +377,26 @@ export class InventarioController {
       this.logger.log(`📦 [Tenant: ${tenantId}] Obteniendo productos del inventario...`); // HARDENING: añade trazabilidad a listados sensibles.
       
       const client = this.supabase.getClient();
-      let supaQuery = client.from('productos').select('*').eq('tenant_id', tenantId);
-      
-      if (query.categoria) {
-        supaQuery = supaQuery.eq('categoria', query.categoria);
-      }
-      
-      if (query.estado) {
-        supaQuery = supaQuery.eq('activo', query.estado === 'ACTIVO');
-      } else {
-        supaQuery = supaQuery.eq('activo', true);
-      }
-
-      const { data, error } = await supaQuery.order('created_at', { ascending: false });
-
-      if (error) {
-        throw error;
-      }
-
-      let enriched = data || [];
+      const active=query.estado?query.estado==='ACTIVO':true;
+      const data=await readCompleteCatalog(client,'productos','*',q=>{
+        q=q.eq('tenant_id',tenantId).eq('activo',active);return query.categoria?q.eq('categoria',query.categoria):q;
+      },r=>r.tenant_id===tenantId&&r.activo===active&&typeof r.nombre==='string'&&!!r.nombre.trim()&&typeof r.es_servicio==='boolean'&&typeof r.controla_stock==='boolean', [['created_at',false],['id',true]]);
       const includeSucursal = `${query.includeSucursal ?? 'false'}`.toLowerCase() === 'true';
-      if (includeSucursal && enriched.length > 0) {
-        const ids = enriched.map((p: any) => p.id);
-        const [preciosResp, stockResp] = await Promise.all([
-          client.from('producto_precios_sucursal').select('*').in('producto_id', ids),
-          client.from('producto_stock_sucursal').select('*').in('producto_id', ids),
-        ]);
-        const precios = preciosResp.data || [];
-        const stocks = stockResp.data || [];
-        enriched = enriched.map((p: any) => ({
-          ...p,
-          precios_sucursal: precios.filter((x: any) => x.producto_id === p.id),
-          stock_sucursal: stocks.filter((x: any) => x.producto_id === p.id),
-        }));
-      }
+      const sucursales = includeSucursal ? await readProductSucursalSources(client, tenantId, data) : null;
+      const enriched = sucursales?.data ?? data;
 
       this.logger.log(`✅ ${enriched?.length || 0} productos obtenidos`); // HARDENING: confirma operación para auditoría.
       
       return { 
         success: true, 
+        complete:true,tenant_id:tenantId,total:enriched.length,include_sucursal:includeSucursal,
+        ...(sucursales ? { fuentes_sucursal: sucursales.sources } : {}),
         data: enriched 
       };
     } catch (error) {
       this.logger.error('❌ Error obteniendo productos', error as Error);
-      return { 
-        success: false, 
-        message: 'Error al obtener productos: ' + (error as Error).message,
-        data: [] 
-      };
+      // Antes 200 con lista vacía y el texto de PostgreSQL: «no hay productos».
+      throw lecturaInventarioFallida(error, 'los productos');
     }
   }
 
@@ -536,6 +510,64 @@ export class InventarioController {
     }
   }
 
+  @Post('movimientos/resolver')
+  @Header('Cache-Control', 'no-store')
+  @RequirePermission('inventario.movimientos.create')
+  @ApiOperation({ summary: 'Resolver ajuste original confirmado o abandonarlo de forma segura' })
+  async resolverAjusteOriginal(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Body() request: ResolverAjusteOriginalDto,
+  ) {
+    if (!actorId) throw new BadRequestException('Se requiere un usuario autenticado para resolver el ajuste original');
+    const original = readOriginalInventoryResolutionRequest(request, tenantId, actorId);
+    const data = await this.inventarioService.resolverOperacionInventario(tenantId, actorId, 'AJUSTE', original);
+    return { success: true, data };
+  }
+
+  @Post('transferencias/resolver')
+  @Header('Cache-Control', 'no-store')
+  @RequirePermission('inventario.movimientos.create')
+  @ApiOperation({ summary: 'Resolver transferencia original confirmada o abandonarla de forma segura' })
+  async resolverTransferenciaOriginal(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Body() request: ResolverTransferenciaOriginalDto,
+  ) {
+    if (!actorId) throw new BadRequestException('Se requiere un usuario autenticado para resolver la transferencia original');
+    const original = readOriginalInventoryResolutionRequest(request, tenantId, actorId);
+    const data = await this.inventarioService.resolverOperacionInventario(tenantId, actorId, 'TRANSFERENCIA', original);
+    return { success: true, data };
+  }
+
+  @Get('movimientos/recibo')
+  @Header('Cache-Control', 'no-store')
+  @RequirePermission('inventario.movimientos.create')
+  @ApiOperation({ summary: 'Consultar recibo original de ajuste sin ejecutar movimientos' })
+  async recuperarReciboAjuste(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Query() original: RegistrarAjusteInventarioDto,
+  ) {
+    if (!actorId) throw new BadRequestException('Se requiere un usuario autenticado para recuperar el ajuste original');
+    const data = await this.inventarioService.recuperarReciboInventario(tenantId, actorId, 'AJUSTE', original);
+    return { success: true, data };
+  }
+
+  @Get('transferencias/recibo')
+  @Header('Cache-Control', 'no-store')
+  @RequirePermission('inventario.movimientos.create')
+  @ApiOperation({ summary: 'Consultar recibo original de transferencia sin ejecutar movimientos' })
+  async recuperarReciboTransferencia(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Query() original: TransferirInventarioDto,
+  ) {
+    if (!actorId) throw new BadRequestException('Se requiere un usuario autenticado para recuperar el traslado original');
+    const data = await this.inventarioService.recuperarReciboInventario(tenantId, actorId, 'TRANSFERENCIA', original);
+    return { success: true, data };
+  }
+
   /** Ajuste manual: ledger, saldo y outbox contable en una sola RPC. */
   @Post('movimientos')
   @RequirePermission('inventario.movimientos.create') // HARDENING: creación de movimientos limitada.
@@ -586,7 +618,7 @@ export class InventarioController {
   @ApiResponse({ status: 200, description: 'Producto obtenido exitosamente' })
   async getProducto(
     @CurrentTenant() tenantId: string,
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Query() query: any
   ) {
     try {
@@ -597,32 +629,26 @@ export class InventarioController {
         .select('*')
         .eq('tenant_id', tenantId)
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
       if (error) {
         throw error;
       }
 
+      // Antes 200 con success:false: la pantalla de edición no distinguía «no existe».
       if (!data) {
-        return {
-          success: false,
-          message: 'Producto no encontrado'
-        };
+        throw new NotFoundException('Producto no encontrado');
       }
 
       const includeSucursal = `${query?.includeSucursal ?? 'false'}`.toLowerCase() === 'true';
       if (includeSucursal && data?.id) {
-        const [preciosResp, stockResp] = await Promise.all([
-          this.supabase.getClient().from('producto_precios_sucursal').select('*').eq('producto_id', data.id),
-          this.supabase.getClient().from('producto_stock_sucursal').select('*').eq('producto_id', data.id),
-        ]);
+        if (data.id !== id || data.tenant_id !== tenantId) throw lecturaInventarioFallida(null, 'el alcance del producto');
+        const sucursales = await readProductSucursalSources(this.supabase.getClient(), tenantId, [data]);
         return {
           success: true,
-          data: {
-            ...data,
-            precios_sucursal: preciosResp.data || [],
-            stock_sucursal: stockResp.data || [],
-          }
+          complete: true, tenant_id: tenantId, include_sucursal: true,
+          fuentes_sucursal: sucursales.sources,
+          data: sucursales.data[0],
         };
       }
 
@@ -632,10 +658,7 @@ export class InventarioController {
       };
     } catch (error) {
       this.logger.error('Error obteniendo producto', error as Error);
-      return {
-        success: false,
-        message: 'Error al obtener el producto'
-      };
+      throw lecturaInventarioFallida(error, 'el producto');
     }
   }
 
@@ -764,7 +787,7 @@ export class InventarioController {
       return { success: true, data: data || [] };
     } catch (error) {
       this.logger.error('❌ Error obteniendo categorías', error as Error);
-      throw new InternalServerErrorException('No se pudieron cargar las categorías de producto');
+      throw lecturaInventarioFallida(error, 'las categorías de producto');
     }
   }
 

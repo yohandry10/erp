@@ -267,6 +267,7 @@ export class ContabilidadAsientosController {
     @CurrentTenant() tenantId: string,
   ): Promise<{
     success: boolean;
+    complete: boolean; tenant_id: string; total: number;
     data: { tipo: string; cantidad: number }[];
     message: string;
   }> {
@@ -276,6 +277,7 @@ export class ContabilidadAsientosController {
     return {
       success: true,
       data: estadisticas,
+      complete: true, tenant_id: tenantId, total: estadisticas.length,
       message: `Estadísticas de ${estadisticas.length} tipo(s) de asientos obtenidas`,
     };
   }
