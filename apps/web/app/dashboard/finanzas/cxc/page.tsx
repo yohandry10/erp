@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertCircle, CheckCircle, Clock, DollarSign, Download, FileText, History, RefreshCw, XCircle } from 'lucide-react'
-import { useApi } from '@/hooks/use-api'
+import { useAuth } from '@/contexts/AuthContext'
+import { useCxcRead } from '@/hooks/use-cxc-read'
+import { cxcPendingBalances, loadCxcCustomers, loadCxcList, readCxcHistory } from '@/lib/finanzas/cxc-read-contract'
+import type { CxcReadScope } from '@/lib/finanzas/cxc-read-contract'
 import { parseDateLocal } from '@/lib/date-utils'
 import { usePermission } from '@/hooks/use-permission'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
@@ -12,6 +15,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { downloadCsv } from '@/lib/csv-export'
 import { formatFiscalDocumentNumber } from '@/lib/fiscal-document-number'
+import { cxcCollectionAccount, cxcCollectionPendingPrefix, readCxcCollectionIntent } from '@/lib/finanzas/cxc-collection-operation'
+import type { CxcCollectionAccount, CxcCollectionIntent } from '@/lib/finanzas/cxc-collection-operation'
+import { cxcAdjustmentPendingKey, cxcAdjustmentPendingPrefix, readCxcAdjustmentIntent } from '@/lib/finanzas/cxc-adjustment-operation'
+import type { CxcAdjustmentIntent, CxcAdjustmentKind, CxcAdjustmentSnapshot } from '@/lib/finanzas/cxc-adjustment-operation'
 
 type EstadoCxc = 'PENDIENTE' | 'PARCIAL' | 'CANCELADO' | 'VENCIDO'
 
@@ -20,6 +27,7 @@ type CuentaPorCobrar = {
   serie: string | null
   numero: string | null
   cliente_id: string
+  documento_id?: string | null
   fecha_emision: string | null
   fecha_vencimiento: string | null
   estado: string | null
@@ -83,65 +91,116 @@ const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-prima
 
 export default function CuentasPorCobrarPage() {
   const country = useCountryContext()
-  const { get } = useApi({ showErrorToast: false })
+  const { session, loading: authLoading } = useAuth()
+  const { hasPermission: canCollect, loading: collectionPermissionLoading } = usePermission('finanzas', 'write', 'cxc.cobros')
   const { hasPermission: canReadClientes, loading: clientesPermissionLoading } = usePermission('ventas', 'ver', 'clientes')
 
-  const [cuentas, setCuentas] = useState<CuentaPorCobrar[]>([])
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [clientes, setClientes] = useState<ClienteLigero[]>([])
   const [filters, setFilters] = useState(initialFilters)
-  const [loading, setLoading] = useState(true)
-  const [selectedCuenta, setSelectedCuenta] = useState<CuentaPorCobrar | null>(null)
+  useEffect(() => {
+    const documento = new URLSearchParams(window.location.search).get('documento')?.trim()
+    if (documento) setFilters(current => ({ ...current, search: documento.slice(0, 80) }))
+  }, [])
+  const params = new URLSearchParams()
+  if (filters.estado) params.set('estado', filters.estado)
+  if (filters.clienteId) params.set('cliente_id', filters.clienteId)
+  if (filters.vencimientoDesde) params.set('desde', filters.vencimientoDesde)
+  if (filters.vencimientoHasta) params.set('hasta', filters.vencimientoHasta)
+  if (filters.search) params.set('search', filters.search.trim())
+  const endpoint = `/api/finanzas/cxc?${params.toString()}`
+  const list = useCxcRead<CuentaPorCobrar[]>(endpoint, loadCxcList)
+  const cuentas = useMemo(() => list.data || [], [list.data])
+  const loading = list.loading, loadError = list.error, fetchCuentas = list.reload
+  const customers = useCxcRead<ClienteLigero[]>('/api/ventas/clientes?limit=1000', loadCxcCustomers, canReadClientes && !clientesPermissionLoading)
+  const clientes = useMemo(() => customers.data || [], [customers.data])
+  const scopeKey = `${session?.user?.tenant_id || ''}:${session?.user?.id || ''}:${endpoint}`
+  const [selection, setSelection] = useState<{ scope: string; cuenta: CuentaPorCobrar } | null>(null)
+  const selectedCuenta = list.data && selection?.scope === scopeKey ? selection.cuenta : null
+  const setSelectedCuenta = (cuenta: CuentaPorCobrar | null) => setSelection(cuenta ? { scope: scopeKey, cuenta } : null)
   const [showCobro, setShowCobro] = useState(false)
-  const [showNotaCredito, setShowNotaCredito] = useState(false)
-  const [showReprogramar, setShowReprogramar] = useState(false)
   const [showHistorial, setShowHistorial] = useState(false)
-  const [detalleHistorial, setDetalleHistorial] = useState<any | null>(null)
-  const [loadingHistorial, setLoadingHistorial] = useState(false)
-
-  const fetchCuentas = useCallback(async () => {
+  const collectionScope = `${session?.user?.tenant_id || ''}:${session?.user?.id || ''}`
+  const [collectionTarget, setCollectionTarget] = useState<{ scope: string; cuenta: CxcCollectionAccount; source: CuentaPorCobrar[] | null; recovery: boolean } | null>(null)
+  const [pendingCollections, setPendingCollections] = useState<{ scope: string; rows: CxcCollectionIntent[]; error: string | null }>({ scope: '', rows: [], error: null })
+  const currentPending = pendingCollections.scope === collectionScope ? pendingCollections.rows : []
+  const pendingError = pendingCollections.scope === collectionScope ? pendingCollections.error : null
+  const [adjustmentTarget, setAdjustmentTarget] = useState<{ scope: string; kind: CxcAdjustmentKind; cuenta: CuentaPorCobrar | CxcAdjustmentSnapshot; source: CuentaPorCobrar[] | null; recovery: boolean } | null>(null)
+  const activeAdjustment = adjustmentTarget?.scope === collectionScope && !authLoading && canCollect && !collectionPermissionLoading
+    && (adjustmentTarget.recovery || adjustmentTarget.source === list.data) ? adjustmentTarget : null
+  const [pendingAdjustments, setPendingAdjustments] = useState<{ scope: string; rows: CxcAdjustmentIntent[]; error: string | null }>({ scope: '', rows: [], error: null })
+  const currentAdjustments = pendingAdjustments.scope === collectionScope ? pendingAdjustments.rows : []
+  const adjustmentError = pendingAdjustments.scope === collectionScope ? pendingAdjustments.error : null
+  const refreshPendingAdjustments = useCallback(() => {
+    if (!session?.user?.tenant_id || !session.user.id || authLoading || collectionPermissionLoading || !canCollect) {
+      setPendingAdjustments({ scope: collectionScope, rows: [], error: null }); return
+    }
+    const scope = { tenantId: session.user.tenant_id, actorId: session.user.id }, rows: CxcAdjustmentIntent[] = []
+    let error: string | null = null
     try {
-      setLoading(true)
-      setLoadError(null)
-      const params = new URLSearchParams()
-      if (filters.estado) params.append('estado', filters.estado)
-      if (filters.clienteId) params.append('cliente_id', filters.clienteId)
-      if (filters.vencimientoDesde) params.append('desde', filters.vencimientoDesde)
-      if (filters.vencimientoHasta) params.append('hasta', filters.vencimientoHasta)
-      if (filters.search) params.append('search', filters.search.trim())
-
-      const endpoint = params.toString() ? `/finanzas/cxc?${params.toString()}` : '/finanzas/cxc'
-      const response = await get(endpoint)
-      if (!response?.success || !Array.isArray(response.data)) {
-        throw new Error('La respuesta de cuentas por cobrar no es válida')
+      const prefix = cxcAdjustmentPendingPrefix(scope)
+      for (const key of Object.keys(localStorage).filter(key => key.startsWith(prefix)).sort()) {
+        try {
+          const intent = readCxcAdjustmentIntent(localStorage.getItem(key), scope)
+          if (!intent || key !== cxcAdjustmentPendingKey(scope, intent.cuenta.id, intent.kind)) throw new Error('Identidad del pendiente inválida')
+          rows.push(intent)
+        } catch { error = 'No se pudieron verificar todos los ajustes pendientes. Se conservan sin reemplazarlos ni preparar otra solicitud.' }
       }
-      setCuentas(response.data as CuentaPorCobrar[])
-    } catch (error) {
-      console.error('Error cargando cuentas por cobrar', error)
-      setCuentas([])
-      setLoadError('No se pudieron cargar las cuentas por cobrar. Reintenta la consulta.')
-    } finally {
-      setLoading(false)
+    } catch { error = 'No se pudo consultar el almacenamiento de ajustes pendientes. Reintenta su lectura antes de preparar otro ajuste.' }
+    setPendingAdjustments({ scope: collectionScope, rows, error })
+  }, [session?.user?.tenant_id, session?.user?.id, collectionScope, authLoading, collectionPermissionLoading, canCollect])
+  useEffect(() => {
+    refreshPendingAdjustments()
+    window.addEventListener('storage', refreshPendingAdjustments)
+    window.addEventListener('erp:cxc-adjustment-pending', refreshPendingAdjustments)
+    return () => {
+      window.removeEventListener('storage', refreshPendingAdjustments)
+      window.removeEventListener('erp:cxc-adjustment-pending', refreshPendingAdjustments)
     }
-  }, [filters, get])
-
-  const fetchClientes = useCallback(async () => {
-    if (clientesPermissionLoading) return
-
-    if (!canReadClientes) {
-      setClientes([])
-      return
+  }, [refreshPendingAdjustments])
+  useEffect(() => {
+    if (adjustmentTarget && (adjustmentTarget.scope !== collectionScope || authLoading || !canCollect || collectionPermissionLoading
+      || !adjustmentTarget.recovery && adjustmentTarget.source !== list.data)) setAdjustmentTarget(null)
+  }, [adjustmentTarget, collectionScope, authLoading, canCollect, collectionPermissionLoading, list.data])
+  const refreshPendingCollections = useCallback(() => {
+    if (!session?.user?.tenant_id || !session.user.id || collectionPermissionLoading || !canCollect) {
+      setPendingCollections({ scope: collectionScope, rows: [], error: null }); return
     }
-
+    const scope = { tenantId: session.user.tenant_id, actorId: session.user.id }
+    const rows: CxcCollectionIntent[] = []
+    let error: string | null = null
     try {
-      const response = await get('/ventas/clientes?limit=1000')
-      const data = Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : []
-      setClientes(data as ClienteLigero[])
-    } catch (error) {
-      console.error('Error cargando clientes', error)
-      setClientes([])
+      const prefix = cxcCollectionPendingPrefix(scope)
+      for (const key of Object.keys(localStorage).filter(key => key.startsWith(prefix)).sort()) {
+        try {
+          const intent = readCxcCollectionIntent(localStorage.getItem(key), scope, key.slice(prefix.length))
+          if (!intent) throw new Error('Pendiente ausente')
+          rows.push(intent)
+        } catch { error = 'No se pudieron verificar todos los cobros pendientes. Se conservan; no se puede preparar otro cobro.' }
+      }
+    } catch { error = 'No se pudo consultar el almacenamiento de cobros pendientes. Reintenta su lectura antes de preparar otro cobro.' }
+    setPendingCollections({ scope: collectionScope, rows, error })
+  }, [session?.user?.tenant_id, session?.user?.id, collectionScope, collectionPermissionLoading, canCollect])
+  useEffect(() => {
+    refreshPendingCollections()
+    window.addEventListener('storage', refreshPendingCollections)
+    window.addEventListener('erp:cxc-collection-pending', refreshPendingCollections)
+    return () => {
+      window.removeEventListener('storage', refreshPendingCollections)
+      window.removeEventListener('erp:cxc-collection-pending', refreshPendingCollections)
     }
-  }, [canReadClientes, clientesPermissionLoading, get])
+  }, [refreshPendingCollections])
+  useEffect(() => {
+    setSelection(null); setShowHistorial(false)
+  }, [list.data, scopeKey])
+  useEffect(() => {
+    if (collectionTarget && (collectionTarget.scope !== collectionScope || !canCollect || collectionPermissionLoading)) {
+      setCollectionTarget(null); setShowCobro(false)
+    }
+  }, [collectionScope, canCollect, collectionPermissionLoading, collectionTarget])
+  const historyId = showHistorial ? selectedCuenta?.id || '' : ''
+  const loadHistory = useCallback(async (get: (endpoint: string) => Promise<any>, path: string, scope: CxcReadScope) =>
+    readCxcHistory(await get(path), historyId, scope), [historyId])
+  const history = useCxcRead(`/api/finanzas/cxc/${historyId}`, loadHistory, Boolean(historyId))
+  const loadingHistorial = Boolean(historyId) && history.loading
 
   const exportarCuentas = () => {
     downloadCsv(
@@ -162,41 +221,13 @@ export default function CuentasPorCobrarPage() {
     )
   }
 
-  const fetchHistorial = useCallback(
-    async (cxcId: string) => {
-      try {
-        setLoadingHistorial(true)
-        const response = await get(`/finanzas/cxc/${cxcId}`)
-        setDetalleHistorial(response?.success ? response.data ?? response : response ?? null)
-      } catch (error) {
-        console.error('Error cargando historial de CxC', error)
-        setDetalleHistorial(null)
-      } finally {
-        setLoadingHistorial(false)
-      }
-    },
-    [get],
-  )
-
-  useEffect(() => {
-    fetchClientes()
-  }, [fetchClientes])
-
-  useEffect(() => {
-    fetchCuentas()
-  }, [fetchCuentas])
-
   const resetFilters = () => setFilters(initialFilters)
 
   const stats = useMemo(() => {
     const total = cuentas.length
     const pendientes = cuentas.filter((cuenta) => normalizeEstadoCxc(cuenta.estado) === 'PENDIENTE').length
     const vencidas = cuentas.filter((cuenta) => normalizeEstadoCxc(cuenta.estado) === 'VENCIDO').length
-    const saldoPendiente = cuentas
-      .filter((cuenta) => normalizeEstadoCxc(cuenta.estado) !== 'CANCELADO')
-      .reduce((sum, cuenta) => sum + Number(cuenta.saldo ?? 0), 0)
-
-    return { total, pendientes, vencidas, saldoPendiente }
+    return { total, pendientes, vencidas, saldos: cxcPendingBalances(cuentas) }
   }, [cuentas])
 
   const isFiltersActive = useMemo(
@@ -263,30 +294,28 @@ export default function CuentasPorCobrarPage() {
   }
 
   const openCobro = (cuenta: CuentaPorCobrar) => {
-    setSelectedCuenta(cuenta)
+    if (!canCollect || collectionPermissionLoading || pendingError || !list.data) return
+    setCollectionTarget({ scope: collectionScope, cuenta, source: list.data, recovery: false })
     setShowCobro(true)
   }
 
   const openNotaCredito = (cuenta: CuentaPorCobrar) => {
-    setSelectedCuenta(cuenta)
-    setShowNotaCredito(true)
+    if (!list.data || authLoading || !canCollect || collectionPermissionLoading || adjustmentError) return
+    setAdjustmentTarget({ scope: collectionScope, kind: 'notas-credito', cuenta, source: list.data, recovery: false })
   }
 
   const openReprogramar = (cuenta: CuentaPorCobrar) => {
-    setSelectedCuenta(cuenta)
-    setShowReprogramar(true)
+    if (!list.data || authLoading || !canCollect || collectionPermissionLoading || adjustmentError) return
+    setAdjustmentTarget({ scope: collectionScope, kind: 'reprogramar', cuenta, source: list.data, recovery: false })
   }
 
-  const openHistorial = async (cuenta: CuentaPorCobrar) => {
+  const openHistorial = (cuenta: CuentaPorCobrar) => {
     setSelectedCuenta(cuenta)
     setShowHistorial(true)
-    setDetalleHistorial(null)
-    await fetchHistorial(cuenta.id)
   }
 
   const closeHistorial = () => {
     setShowHistorial(false)
-    setDetalleHistorial(null)
     setSelectedCuenta(null)
   }
 
@@ -319,12 +348,32 @@ export default function CuentasPorCobrarPage() {
           </div>
         </section>
 
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {canCollect && !collectionPermissionLoading && (currentPending.length > 0 || pendingError) && <section data-testid="cxc-pending-collections" className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4">
+          <h2 className="font-semibold">Cobros pendientes de confirmar</h2>
+          <p className="mt-1 text-sm">Se conservan las solicitudes originales. Consulta el resultado del mismo cobro antes de preparar otro.</p>
+          {pendingError && <p role="alert" className="mt-2 text-sm text-destructive">{pendingError}</p>}
+          <div className="mt-3 flex flex-wrap gap-2">{currentPending.map(intent => <Button key={intent.cuenta.id} type="button" variant="outline" data-testid={'cxc-recover-' + intent.cuenta.id} onClick={() => {
+            setCollectionTarget({ scope: collectionScope, cuenta: cxcCollectionAccount(intent), source: null, recovery: true }); setShowCobro(true)
+          }}>Recuperar cobro {formatFiscalDocumentNumber(country.paisCodigo, intent.cuenta.serie, intent.cuenta.numero) || intent.cuenta.id}</Button>)}
+            <Button type="button" variant="outline" onClick={refreshPendingCollections}>Releer cobros pendientes</Button></div>
+        </section>}
+
+        {canCollect && !authLoading && !collectionPermissionLoading && (currentAdjustments.length > 0 || adjustmentError) && <section data-testid="cxc-pending-adjustments" className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4">
+          <h2 className="font-semibold">Ajustes pendientes de confirmar</h2>
+          <p className="mt-1 text-sm">Recupera la solicitud original para confirmar su resultado. No se envía automáticamente al volver.</p>
+          {adjustmentError && <p role="alert" className="mt-2 text-sm text-destructive">{adjustmentError}</p>}
+          <div className="mt-3 flex flex-wrap gap-2">{currentAdjustments.map(intent => <Button key={intent.cuenta.id + ':' + intent.kind} type="button" variant="outline" data-testid={'cxc-recover-adjustment-' + intent.kind + '-' + intent.cuenta.id} onClick={() => {
+            setAdjustmentTarget({ scope: collectionScope, kind: intent.kind, cuenta: intent.cuenta, source: null, recovery: true })
+          }}>Recuperar {intent.kind === 'reprogramar' ? 'reprogramación' : 'nota'} {formatFiscalDocumentNumber(intent.country, intent.cuenta.serie, intent.cuenta.numero) || intent.cuenta.id}</Button>)}
+            <Button type="button" variant="outline" onClick={refreshPendingAdjustments}>Releer ajustes pendientes</Button></div>
+        </section>}
+
+        {!loading && !loadError && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[
             { label: 'Total', value: stats.total.toLocaleString('es-PE'), description: 'Cuentas registradas', icon: FileText },
             { label: 'Pendientes', value: stats.pendientes.toLocaleString('es-PE'), description: 'Por cobrar', icon: Clock },
             { label: 'Vencidas', value: stats.vencidas.toLocaleString('es-PE'), description: 'Atrasadas', icon: XCircle },
-            { label: 'Saldo total', value: formatCurrency(stats.saldoPendiente), description: 'Pendiente por cobrar', icon: DollarSign },
+            { label: 'Saldo total', value: Object.entries(stats.saldos).map(([currency, amount]) => formatCurrency(amount, currency)).join(' · ') || formatCurrency(0), description: 'Pendiente por cobrar por moneda', icon: DollarSign },
           ].map(({ label, value, description, icon: Icon }) => (
             <Card key={label} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
               <CardContent className="flex items-start justify-between gap-3 p-4">
@@ -339,7 +388,7 @@ export default function CuentasPorCobrarPage() {
               </CardContent>
             </Card>
           ))}
-        </section>
+        </section>}
 
         <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
@@ -450,19 +499,19 @@ export default function CuentasPorCobrarPage() {
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap justify-end gap-2">
                               <ProtectedComponent modulo="finanzas" recurso="cxc.cobros" accion="write" fallback={null}>
-                                <Button type="button" size="sm" onClick={() => openCobro(cuenta)} disabled={!puedeGestionar} className="h-9 gap-1 bg-blue-600 px-3 text-xs text-white hover:bg-blue-500">
+                                <Button type="button" size="sm" onClick={() => openCobro(cuenta)} disabled={!puedeGestionar || Boolean(pendingError)} className="h-9 gap-1 bg-blue-600 px-3 text-xs text-white hover:bg-blue-500">
                                   <DollarSign className="h-3.5 w-3.5" />
                                   Cobro
                                 </Button>
                               </ProtectedComponent>
                               <ProtectedComponent modulo="finanzas" recurso="cxc.cobros" accion="write" fallback={null}>
-                                <Button type="button" size="sm" onClick={() => openNotaCredito(cuenta)} disabled={!puedeGestionar} variant="outline" className={actionButtonClass}>
+                                <Button type="button" size="sm" onClick={() => openNotaCredito(cuenta)} disabled={!puedeGestionar || Boolean(adjustmentError) || authLoading} variant="outline" className={actionButtonClass}>
                                   <FileText className="h-3.5 w-3.5" />
                                   Nota
                                 </Button>
                               </ProtectedComponent>
                               <ProtectedComponent modulo="finanzas" recurso="cxc.cobros" accion="write" fallback={null}>
-                                <Button type="button" size="sm" onClick={() => openReprogramar(cuenta)} disabled={estadoNormalizado === 'CANCELADO'} variant="outline" className={actionButtonClass}>
+                                <Button type="button" size="sm" onClick={() => openReprogramar(cuenta)} disabled={estadoNormalizado === 'CANCELADO' || Boolean(adjustmentError) || authLoading} variant="outline" className={actionButtonClass}>
                                   <Clock className="h-3.5 w-3.5" />
                                   Reprogramar
                                 </Button>
@@ -493,33 +542,28 @@ export default function CuentasPorCobrarPage() {
       </div>
 
       <CobroModal
-        isOpen={showCobro}
-        cuenta={selectedCuenta}
+        isOpen={showCobro && collectionTarget?.scope === collectionScope && canCollect && !collectionPermissionLoading && (collectionTarget.recovery || Boolean(list.data && collectionTarget.source === list.data) || currentPending.some(intent => intent.cuenta.id === collectionTarget.cuenta.id))}
+        cuenta={collectionTarget?.scope === collectionScope ? collectionTarget.cuenta : null}
         onClose={() => {
           setShowCobro(false)
-          setSelectedCuenta(null)
+          setCollectionTarget(null)
         }}
         onSuccess={fetchCuentas}
       />
       <NotaCreditoModal
-        isOpen={showNotaCredito}
-        cuenta={selectedCuenta}
-        onClose={() => {
-          setShowNotaCredito(false)
-          setSelectedCuenta(null)
-        }}
+        isOpen={activeAdjustment?.kind === 'notas-credito'}
+        cuenta={activeAdjustment?.kind === 'notas-credito' ? activeAdjustment.cuenta : null}
+        onClose={() => setAdjustmentTarget(null)}
         onSuccess={fetchCuentas}
       />
       <ReprogramarModal
-        isOpen={showReprogramar}
-        cuenta={selectedCuenta}
-        onClose={() => {
-          setShowReprogramar(false)
-          setSelectedCuenta(null)
-        }}
+        isOpen={activeAdjustment?.kind === 'reprogramar'}
+        cuenta={activeAdjustment?.kind === 'reprogramar' ? activeAdjustment.cuenta : null}
+        onClose={() => setAdjustmentTarget(null)}
         onSuccess={fetchCuentas}
       />
-      <HistorialDrawer isOpen={showHistorial} onClose={closeHistorial} detalle={loadingHistorial ? null : detalleHistorial} />
+      <HistorialDrawer isOpen={showHistorial && Boolean(selectedCuenta)} onClose={closeHistorial} detalle={history.data}
+        loading={loadingHistorial} error={history.error} onRetry={history.reload} />
     </div>
   )
 }

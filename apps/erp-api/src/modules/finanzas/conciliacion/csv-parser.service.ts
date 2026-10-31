@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
+import { parseCsvRecords } from '../../../shared/utils/csv-records.util';
 import { 
   obtenerPlantillaBanco, 
   PlantillaCsvBanco, 
@@ -71,14 +72,19 @@ export class CsvParserService {
     contenidoCsv: string,
     banco: string,
   ): ResultadoParseoCsv {
-    const lineas = contenidoCsv.split('\n').filter(l => l.trim());
+    const plantilla = obtenerPlantillaBanco(banco);
+    let lineas: string[][];
+    try {
+      lineas = parseCsvRecords(contenidoCsv, plantilla.separador);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : 'CSV inválido');
+    }
     
     if (lineas.length === 0) {
       throw new BadRequestException('El archivo CSV está vacío');
     }
 
     // Obtener plantilla del banco (configurable)
-    const plantilla = obtenerPlantillaBanco(banco);
     
     // Parsear y normalizar usando la plantilla
     return this.parsearConPlantilla(lineas, plantilla);
@@ -88,7 +94,7 @@ export class CsvParserService {
    * Parsea CSV usando una plantilla configurable
    */
   private parsearConPlantilla(
-    lineas: string[],
+    lineas: string[][],
     plantilla: PlantillaCsvBanco,
   ): ResultadoParseoCsv {
     const movimientos: MovimientoExtracto[] = [];
@@ -100,8 +106,7 @@ export class CsvParserService {
     const inicioLinea = plantilla.tieneEncabezado ? 1 : 0;
 
     for (let i = inicioLinea; i < lineas.length; i++) {
-      const linea = lineas[i].trim();
-      if (!linea) continue;
+      const linea = lineas[i];
 
       try {
         const movimientosLinea = this.parsearLineaConPlantilla(
@@ -140,12 +145,11 @@ export class CsvParserService {
    * Parsea una línea usando la plantilla del banco
    */
   private parsearLineaConPlantilla(
-    linea: string,
+    campos: string[],
     plantilla: PlantillaCsvBanco,
     numeroLinea: number,
   ): MovimientoExtracto[] {
     // Parsear campos según el separador de la plantilla
-    const campos = this.parsearLineaCsv(linea, plantilla.separador);
 
     // Extraer valores según el mapeo de columnas
     const valores: Record<TipoColumna, string> = {} as any;
@@ -276,31 +280,6 @@ export class CsvParserService {
 
 
   /**
-   * Parsea una línea CSV respetando comillas y usando separador configurable
-   */
-  private parsearLineaCsv(linea: string, separador: string = ','): string[] {
-    const campos: string[] = [];
-    let campoActual = '';
-    let dentroComillas = false;
-
-    for (let i = 0; i < linea.length; i++) {
-      const char = linea[i];
-
-      if (char === '"') {
-        dentroComillas = !dentroComillas;
-      } else if (char === separador && !dentroComillas) {
-        campos.push(campoActual.trim());
-        campoActual = '';
-      } else {
-        campoActual += char;
-      }
-    }
-
-    campos.push(campoActual.trim());
-    return campos;
-  }
-
-  /**
    * Normaliza fecha a formato estándar ISO (YYYY-MM-DD)
    * Convierte diferentes formatos de fecha (DD/MM/YYYY, MM/DD/YYYY, etc.) a ISO
    * 
@@ -319,22 +298,20 @@ export class CsvParserService {
   ): string {
     fecha = fecha.trim();
 
-    // Si ya está en formato ISO estándar, retornar directamente
-    if (/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
-      return fecha;
-    }
-
     const { formato, separador } = formatoFecha;
     const partes = fecha.split(separador);
-
-    if (partes.length !== 3) {
-      throw new Error(`Formato de fecha inválido: ${fecha}`);
-    }
-
     let dia: string, mes: string, anio: string;
+    const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fecha);
+    const local = /^(\d{2})([/-])(\d{2})\2(\d{4})$/.exec(fecha);
 
-    // Determinar el orden según el formato del banco
-    if (formato === 'DD/MM/YYYY' || formato === 'DD-MM-YYYY') {
+    // Mismos formatos públicos que la vista previa, conservando plantillas MM/DD.
+    if (iso) {
+      [, anio, mes, dia] = iso;
+    } else if (local && !formato.startsWith('MM')) {
+      dia = local[1]; mes = local[3]; anio = local[4];
+    } else if (partes.length !== 3) {
+      throw new Error(`Formato de fecha inválido: ${fecha}`);
+    } else if (formato === 'DD/MM/YYYY' || formato === 'DD-MM-YYYY') {
       [dia, mes, anio] = partes;
     } else if (formato === 'MM/DD/YYYY' || formato === 'MM-DD-YYYY') {
       [mes, dia, anio] = partes;
@@ -345,20 +322,21 @@ export class CsvParserService {
     }
 
     // Validar que sean números válidos
-    const diaNum = parseInt(dia, 10);
-    const mesNum = parseInt(mes, 10);
-    const anioNum = parseInt(anio, 10);
-
-    if (isNaN(diaNum) || isNaN(mesNum) || isNaN(anioNum)) {
+    if (!/^\d{1,2}$/.test(dia) || !/^\d{1,2}$/.test(mes) || !/^\d{4}$/.test(anio)) {
       throw new Error(`Fecha inválida: ${fecha}`);
     }
+    const diaNum = Number(dia);
+    const mesNum = Number(mes);
+    const anioNum = Number(anio);
+    const calendar = new Date(0);
+    calendar.setUTCFullYear(anioNum, mesNum - 1, diaNum);
 
-    if (diaNum < 1 || diaNum > 31 || mesNum < 1 || mesNum > 12) {
+    if (anioNum < 1 || calendar.getUTCFullYear() !== anioNum || calendar.getUTCMonth() !== mesNum - 1 || calendar.getUTCDate() !== diaNum) {
       throw new Error(`Fecha fuera de rango: ${fecha}`);
     }
 
     // Formatear a ISO estándar (YYYY-MM-DD)
-    return `${anioNum}-${mesNum.toString().padStart(2, '0')}-${diaNum.toString().padStart(2, '0')}`;
+    return `${anioNum.toString().padStart(4, '0')}-${mesNum.toString().padStart(2, '0')}-${diaNum.toString().padStart(2, '0')}`;
   }
 
   /**

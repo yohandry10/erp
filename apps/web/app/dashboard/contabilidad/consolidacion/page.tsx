@@ -1,8 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Building2, Calculator, Check, Loader2, Plus, RefreshCw, Send, Trash2, X } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
+import { useAuth } from '@/contexts/AuthContext'
+import { usePermission } from '@/hooks/use-permission'
+import { readConsolidationGroups, readConsolidationReports } from '@/lib/contabilidad/consolidation-read-contract'
+import { readConsolidationFinancialResult } from '@/lib/contabilidad/consolidation-financial-read-contract'
+import { useCountryContext } from '@/hooks/use-country-context'
+import { fiscalDateForCountry } from '@/lib/fiscal-date'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -17,6 +23,8 @@ type Miembro = {
 
 type Grupo = {
   id: string
+  tenant_id: string
+  activo: boolean
   codigo: string
   nombre: string
   moneda_presentacion: string
@@ -30,80 +38,118 @@ type LineaEditor = {
   tipo: 'CUENTAS' | 'FORMULA'
   definicion: string
   naturaleza: 'SALDO' | 'DEBE' | 'HABER'
+  signo: 1 | -1
   alcance_fecha: 'PERIODO' | 'HASTA_FECHA'
   tipo_tasa: 'CIERRE' | 'PROMEDIO' | 'HISTORICA'
 }
 
 type Reporte = { id: string; codigo: string; nombre: string; lineas: any[] }
 
-const hoy = new Date().toISOString().slice(0, 10)
-const inicioAnio = `${new Date().getFullYear()}-01-01`
 const campo = 'min-w-0 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground'
 
 const lineasIniciales: LineaEditor[] = [
   {
     codigo: 'INGRESOS', nombre: 'Ingresos', tipo: 'CUENTAS', definicion: '7',
-    naturaleza: 'HABER', alcance_fecha: 'PERIODO', tipo_tasa: 'PROMEDIO',
+    naturaleza: 'SALDO', signo: -1, alcance_fecha: 'PERIODO', tipo_tasa: 'PROMEDIO',
   },
   {
     codigo: 'GASTOS', nombre: 'Gastos', tipo: 'CUENTAS', definicion: '6',
-    naturaleza: 'DEBE', alcance_fecha: 'PERIODO', tipo_tasa: 'PROMEDIO',
+    naturaleza: 'SALDO', signo: 1, alcance_fecha: 'PERIODO', tipo_tasa: 'PROMEDIO',
   },
   {
     codigo: 'RESULTADO', nombre: 'Resultado del período', tipo: 'FORMULA',
-    definicion: 'INGRESOS:1,GASTOS:-1', naturaleza: 'SALDO',
+    definicion: 'INGRESOS:1,GASTOS:-1', naturaleza: 'SALDO', signo: 1,
     alcance_fecha: 'PERIODO', tipo_tasa: 'CIERRE',
   },
 ]
 
 export default function ConsolidacionPage() {
-  const { get, post } = useApi({ throwOnError: true })
+  const {session}=useAuth()
+  return <ConsolidationWorkspace key={`${session?.user?.tenant_id || ''}:${session?.user?.id || ''}`} />
+}
+function ConsolidationWorkspace() {
+  const {session}=useAuth()
+  const tenantId=session?.user?.tenant_id || ''
+  const actorId=session?.user?.id || ''
+  const country=useCountryContext()
+  const hoy=!country.loading&&!country.error&&['PE','CO','AR'].includes(country.paisCodigo)?fiscalDateForCountry(country.paisCodigo):''
+  const inicioAnio=hoy?`${hoy.slice(0,4)}-01-01`:''
+  const permission=usePermission('contabilidad','actualizar','reportes')
+  const canUpdate=!permission.loading && permission.hasPermission
+  const readPermission=usePermission('contabilidad','read','reportes')
+  const canRead=!readPermission.loading && readPermission.hasPermission
+  const [readReady,setReadReady]=useState(false)
+  const { get, post } = useApi({ throwOnError: true, requireLive: true, retries: 0, showErrorToast: false })
   const [grupos, setGrupos] = useState<Grupo[]>([])
   const [reportes, setReportes] = useState<Reporte[]>([])
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [readError, setReadError] = useState<string | null>(null)
+  const latestRead = useRef(0)
+  const latestGeneration = useRef(0)
+  const pendingMutations = useRef<Record<string, { signature: string; key: string }>>({})
   const [grupoId, setGrupoId] = useState('')
   const [reporteId, setReporteId] = useState('')
   const [resultado, setResultado] = useState<any>(null)
-  const [fechaDesde, setFechaDesde] = useState(inicioAnio)
-  const [fechaHasta, setFechaHasta] = useState(hoy)
+  const [fechaDesde, setFechaDesde] = useState('')
+  const [fechaHasta, setFechaHasta] = useState('')
+  const generationScope = useRef('')
+  generationScope.current = JSON.stringify({ grupoId, reporteId, fechaDesde, fechaHasta })
+  useEffect(()=>{latestGeneration.current+=1;setResultado(null)},[country.moneda,country.error,country.loading])
+
+  useEffect(() => {
+    latestGeneration.current += 1
+    setResultado(null)
+    setError(null)
+    return () => { latestGeneration.current += 1 }
+  }, [grupoId, reporteId, fechaDesde, fechaHasta])
 
   const [nuevoGrupo, setNuevoGrupo] = useState({ codigo: '', nombre: '', moneda_presentacion: 'PEN' })
   const [invitacion, setInvitacion] = useState({ ruc: '', participacion: '100' })
   const [tasa, setTasa] = useState({ tenant_miembro_id: '', fecha: hoy, tipo: 'CIERRE', factor_conversion: '' })
   const [mapeo, setMapeo] = useState({ tenant_miembro_id: '', cuenta_codigo_origen: '', cuenta_codigo_destino: '' })
   const [ajuste, setAjuste] = useState({ fecha: hoy, tipo: 'ELIMINACION', cuenta_codigo: '', descripcion: '', debe: '', haber: '' })
+  useEffect(()=>{if(hoy){setFechaDesde(v=>v||inicioAnio);setFechaHasta(v=>v||hoy);setTasa(v=>({...v,fecha:v.fecha||hoy}));setAjuste(v=>({...v,fecha:v.fecha||hoy}))}},[hoy,inicioAnio])
   const [reporteForm, setReporteForm] = useState({ codigo: 'ER-GESTION', nombre: 'Estado de resultados de gestión' })
   const [lineas, setLineas] = useState<LineaEditor[]>(lineasIniciales)
 
   const cargar = useCallback(async () => {
+    if (!tenantId || !actorId) return
+    const request = ++latestRead.current
+    latestGeneration.current += 1
+    setResultado(null)
     setLoading(true)
     setError(null)
+    setReadError(null)
+    setReadReady(false); setGrupos([]); setReportes([])
     try {
       const [gruposResponse, reportesResponse] = await Promise.all([
         get('/api/contabilidad/consolidacion/grupos'),
         get('/api/contabilidad/reportes-configurables'),
       ])
-      const nuevosGrupos = gruposResponse?.data || []
-      const nuevosReportes = reportesResponse?.data || []
+      const nuevosGrupos=readConsolidationGroups(gruposResponse,tenantId)
+      const nuevosReportes=readConsolidationReports(reportesResponse,tenantId)
+      if (request !== latestRead.current) return
       setGrupos(nuevosGrupos)
       setReportes(nuevosReportes)
-      setGrupoId((actual) => actual || nuevosGrupos[0]?.id || '')
-      setReporteId((actual) => actual || nuevosReportes[0]?.id || '')
+      setGrupoId((actual) => nuevosGrupos.some(g=>g.id===actual) ? actual : nuevosGrupos[0]?.id || '')
+      setReporteId((actual) => nuevosReportes.some(r=>r.id===actual) ? actual : nuevosReportes[0]?.id || '')
+      setReadReady(true)
     } catch (e: any) {
-      setError(e?.message || 'No se pudo cargar consolidación y reportes.')
+      if (request === latestRead.current) {setReadReady(false);setGrupos([]);setReportes([]);setResultado(null);setReadError(e?.message || 'No se pudo cargar consolidación y reportes.')}
     } finally {
-      setLoading(false)
+      if (request === latestRead.current) setLoading(false)
     }
-  }, [get])
+  }, [get,tenantId,actorId])
 
-  useEffect(() => { void cargar() }, [cargar])
+  useEffect(() => { void cargar();return ()=>{latestRead.current+=1;latestGeneration.current+=1} }, [cargar])
 
   const grupo = useMemo(() => grupos.find((item) => item.id === grupoId), [grupos, grupoId])
-  const invitacionPendiente = grupo?.miembros.find((m) => !m.es_controladora && m.estado === 'PENDIENTE')
+  const invitacionPendiente = grupo?.miembros.find((m) => m.tenant_id===tenantId && !m.es_controladora && m.estado === 'PENDIENTE')
 
-  const ejecutar = async (accion: () => Promise<void>) => {
+  const ejecutar = async (accion: () => Promise<void>,writer=true) => {
+    if (!readReady || loading || readError || working || (writer ? !canUpdate : !canRead)) return
     setWorking(true)
     setError(null)
     try { await accion() } catch (e: any) { setError(e?.message || 'La operación no pudo completarse.') } finally { setWorking(false) }
@@ -116,7 +162,7 @@ export default function ConsolidacionPage() {
   })
 
   const invitar = () => ejecutar(async () => {
-    if (!grupo) return
+    if (!grupo?.activo || !grupo.es_controladora) return
     await post(`/api/contabilidad/consolidacion/grupos/${grupo.id}/invitaciones`, {
       ruc: invitacion.ruc,
       participacion: Number(invitacion.participacion),
@@ -126,32 +172,59 @@ export default function ConsolidacionPage() {
   })
 
   const responder = (aceptar: boolean) => ejecutar(async () => {
-    if (!grupo) return
+    if (!grupo?.activo || !invitacionPendiente) return
     await post(`/api/contabilidad/consolidacion/grupos/${grupo.id}/respuesta`, { aceptar })
     await cargar()
   })
 
+  const guardarCambioConsolidado = async (operacion: string, payload: object) => {
+    if (!grupo?.activo || !grupo.es_controladora) throw new Error('Se necesita un grupo activo de la empresa controladora.')
+    const endpoint = `/api/contabilidad/consolidacion/grupos/${grupo.id}/${operacion}`
+    const signature = JSON.stringify({ endpoint, payload })
+    let intent = pendingMutations.current[operacion]
+    if (intent?.signature !== signature) {
+      intent = { signature, key: crypto.randomUUID() }
+      pendingMutations.current[operacion] = intent
+    }
+    latestGeneration.current += 1
+    setResultado(null)
+    const response = await post(endpoint, payload, { headers: { 'Idempotency-Key': intent.key } })
+    if (response?.success !== true || !response.data?.id || response.data.grupo_id !== grupo.id) {
+      throw new Error('No se pudo confirmar el cambio del consolidado. Reintente la misma operación.')
+    }
+    delete pendingMutations.current[operacion]
+  }
+
   const registrarTasa = () => ejecutar(async () => {
     if (!grupo) return
-    await post(`/api/contabilidad/consolidacion/grupos/${grupo.id}/tasas`, {
+    const factor = Number(tasa.factor_conversion)
+    if (!Number.isFinite(factor) || factor <= 0 || factor >= 10000000000 || factor !== Number(factor.toFixed(10))) {
+      throw new Error('La tasa debe ser positiva y admitir como máximo 10 decimales.')
+    }
+    await guardarCambioConsolidado('tasas', {
       ...tasa,
-      factor_conversion: Number(tasa.factor_conversion),
+      factor_conversion: factor,
     })
     setTasa({ tenant_miembro_id: '', fecha: hoy, tipo: 'CIERRE', factor_conversion: '' })
   })
 
   const registrarMapeo = () => ejecutar(async () => {
     if (!grupo) return
-    await post(`/api/contabilidad/consolidacion/grupos/${grupo.id}/mapeos-cuentas`, mapeo)
+    await guardarCambioConsolidado('mapeos-cuentas', mapeo)
     setMapeo({ tenant_miembro_id: '', cuenta_codigo_origen: '', cuenta_codigo_destino: '' })
   })
 
   const registrarAjuste = () => ejecutar(async () => {
     if (!grupo) return
-    await post(`/api/contabilidad/consolidacion/grupos/${grupo.id}/ajustes`, {
+    const debe = Number(ajuste.debe || 0)
+    const haber = Number(ajuste.haber || 0)
+    if ([debe, haber].some((value) => !Number.isFinite(value) || value < 0 || value !== Number(value.toFixed(2))) || (debe > 0) === (haber > 0)) {
+      throw new Error('Los ajustes admiten importes positivos con un máximo de 2 decimales.')
+    }
+    await guardarCambioConsolidado('ajustes', {
       ...ajuste,
-      debe: Number(ajuste.debe || 0),
-      haber: Number(ajuste.haber || 0),
+      debe,
+      haber,
     })
     setAjuste({ fecha: hoy, tipo: 'ELIMINACION', cuenta_codigo: '', descripcion: '', debe: '', haber: '' })
   })
@@ -176,7 +249,7 @@ export default function ConsolidacionPage() {
         naturaleza: linea.naturaleza,
         alcance_fecha: linea.alcance_fecha,
         tipo_tasa: linea.tipo_tasa,
-        signo: 1,
+        signo: linea.signo,
       })),
     }
     const response = await post('/api/contabilidad/reportes-configurables', payload)
@@ -185,12 +258,20 @@ export default function ConsolidacionPage() {
   })
 
   const generar = () => ejecutar(async () => {
-    if (!reporteId) return
+    if (country.loading || country.error || !country.moneda || !fechaDesde||!fechaHasta||!reporteId || (grupoId && (!grupo?.activo || !grupo.es_controladora))) return
+    const request = ++latestGeneration.current
+    const scope = generationScope.current
+    setResultado(null)
     const params = new URLSearchParams({ fecha_desde: fechaDesde, fecha_hasta: fechaHasta })
     if (grupoId) params.set('grupo_id', grupoId)
-    const response = await get(`/api/contabilidad/reportes-configurables/${reporteId}/generar?${params}`)
-    setResultado(response?.data)
-  })
+    let response: any
+    try {response = await get(`/api/contabilidad/reportes-configurables/${reporteId}/generar?${params}`)}
+    catch(e) {if(request !== latestGeneration.current || scope !== generationScope.current)return;throw e}
+    if (request !== latestGeneration.current || scope !== generationScope.current) return
+    const definition=reportes.find(r=>r.id===reporteId)
+    const current=readConsolidationFinancialResult(response,tenantId,definition,grupoId?grupo:null,fechaDesde,fechaHasta,grupoId?grupo?.moneda_presentacion || '':country.moneda)
+    setResultado(current)
+  },false)
 
   const modificarLinea = (indice: number, cambios: Partial<LineaEditor>) => {
     setLineas((actuales) => actuales.map((linea, i) => i === indice ? { ...linea, ...cambios } : linea))
@@ -214,11 +295,11 @@ export default function ConsolidacionPage() {
           </div>
         </section>
 
-        {error && <div className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</div>}
+        {(error || readError) && <div role="alert" className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error || readError}</div>}
         {loading ? (
           <div className="flex min-h-[260px] items-center justify-center gap-3"><Loader2 className="h-6 w-6 animate-spin text-primary" /> Cargando...</div>
         ) : (
-          <>
+          <fieldset disabled={working || !!readError || !readReady} className="min-w-0 space-y-4 border-0 p-0">
             <div className="grid gap-4 xl:grid-cols-2">
               <Card className="min-w-0 border-cyan-400/20 bg-card/70">
                 <CardHeader><CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /> Grupos empresariales</CardTitle></CardHeader>
@@ -228,7 +309,7 @@ export default function ConsolidacionPage() {
                     <Input aria-label="Nombre del grupo" className="md:col-span-2" placeholder="Nombre del grupo" value={nuevoGrupo.nombre} onChange={(e) => setNuevoGrupo({ ...nuevoGrupo, nombre: e.target.value })} />
                     <div className="flex gap-2">
                       <Input aria-label="Moneda de presentación" maxLength={3} value={nuevoGrupo.moneda_presentacion} onChange={(e) => setNuevoGrupo({ ...nuevoGrupo, moneda_presentacion: e.target.value.toUpperCase() })} />
-                      <Button onClick={crearGrupo} disabled={working || !nuevoGrupo.codigo || !nuevoGrupo.nombre}><Plus className="h-4 w-4" /></Button>
+                      <Button aria-label="Crear grupo" onClick={crearGrupo} disabled={!canUpdate || !readReady || working || !nuevoGrupo.codigo || !nuevoGrupo.nombre}><Plus className="h-4 w-4" /></Button>
                     </div>
                   </div>
 
@@ -252,12 +333,12 @@ export default function ConsolidacionPage() {
                         <div className="grid gap-2 md:grid-cols-[1fr_120px_auto]">
                           <Input aria-label="RUC exacto de la empresa" placeholder="RUC exacto de la empresa" value={invitacion.ruc} onChange={(e) => setInvitacion({ ...invitacion, ruc: e.target.value })} />
                           <Input aria-label="Participación" type="number" min="0.01" max="100" value={invitacion.participacion} onChange={(e) => setInvitacion({ ...invitacion, participacion: e.target.value })} />
-                          <Button onClick={invitar} disabled={working || !invitacion.ruc} className="gap-2"><Send className="h-4 w-4" /> Invitar</Button>
+                          <Button onClick={invitar} disabled={!canUpdate || !readReady || working || !grupo.activo || !invitacion.ruc} className="gap-2"><Send className="h-4 w-4" /> Invitar</Button>
                         </div>
                       ) : invitacionPendiente ? (
                         <div className="flex gap-2">
-                          <Button onClick={() => responder(true)} className="gap-2"><Check className="h-4 w-4" /> Aceptar</Button>
-                          <Button variant="outline" onClick={() => responder(false)} className="gap-2"><X className="h-4 w-4" /> Rechazar</Button>
+                          <Button disabled={!canUpdate || !readReady || working || !grupo.activo} onClick={() => responder(true)} className="gap-2"><Check className="h-4 w-4" /> Aceptar</Button>
+                          <Button variant="outline" disabled={!canUpdate || !readReady || working || !grupo.activo} onClick={() => responder(false)} className="gap-2"><X className="h-4 w-4" /> Rechazar</Button>
                         </div>
                       ) : null}
                     </div>
@@ -277,7 +358,7 @@ export default function ConsolidacionPage() {
                       </select>
                       <Input aria-label="Cuenta origen" placeholder="Cuenta origen" value={mapeo.cuenta_codigo_origen} onChange={(e) => setMapeo({ ...mapeo, cuenta_codigo_origen: e.target.value })} />
                       <Input aria-label="Cuenta destino" placeholder="Cuenta destino" value={mapeo.cuenta_codigo_destino} onChange={(e) => setMapeo({ ...mapeo, cuenta_codigo_destino: e.target.value })} />
-                      <Button onClick={registrarMapeo} disabled={working || !grupo?.es_controladora || !mapeo.tenant_miembro_id || !mapeo.cuenta_codigo_origen || !mapeo.cuenta_codigo_destino}><Plus className="h-4 w-4" /></Button>
+                      <Button aria-label="Registrar mapeo" onClick={registrarMapeo} disabled={!canUpdate || !readReady || working || !grupo?.activo || !grupo.es_controladora || !mapeo.tenant_miembro_id || !mapeo.cuenta_codigo_origen || !mapeo.cuenta_codigo_destino}><Plus className="h-4 w-4" /></Button>
                     </div>
                   </div>
                   <div>
@@ -289,8 +370,8 @@ export default function ConsolidacionPage() {
                       </select>
                       <Input aria-label="Fecha" type="date" value={tasa.fecha} onChange={(e) => setTasa({ ...tasa, fecha: e.target.value })} />
                       <select aria-label="Tipo" className={campo} value={tasa.tipo} onChange={(e) => setTasa({ ...tasa, tipo: e.target.value })}><option>CIERRE</option><option>PROMEDIO</option><option>HISTORICA</option></select>
-                      <Input aria-label="Factor" type="number" step="0.000001" placeholder="Factor" value={tasa.factor_conversion} onChange={(e) => setTasa({ ...tasa, factor_conversion: e.target.value })} />
-                      <Button onClick={registrarTasa} disabled={working || !grupo?.es_controladora || !tasa.tenant_miembro_id || !tasa.factor_conversion}><Plus className="h-4 w-4" /></Button>
+                      <Input aria-label="Factor" type="number" min="0.0000000001" step="0.0000000001" placeholder="Factor" value={tasa.factor_conversion} onChange={(e) => setTasa({ ...tasa, factor_conversion: e.target.value })} />
+                      <Button aria-label="Registrar tasa" onClick={registrarTasa} disabled={!canUpdate || !readReady || working || !grupo?.activo || !grupo.es_controladora || !tasa.tenant_miembro_id || !tasa.factor_conversion}><Plus className="h-4 w-4" /></Button>
                     </div>
                   </div>
                   <div>
@@ -302,7 +383,7 @@ export default function ConsolidacionPage() {
                       <Input aria-label="Descripción" placeholder="Descripción" value={ajuste.descripcion} onChange={(e) => setAjuste({ ...ajuste, descripcion: e.target.value })} />
                       <Input aria-label="Debe" type="number" step="0.01" placeholder="Debe" value={ajuste.debe} onChange={(e) => setAjuste({ ...ajuste, debe: e.target.value, haber: '' })} />
                       <Input aria-label="Haber" type="number" step="0.01" placeholder="Haber" value={ajuste.haber} onChange={(e) => setAjuste({ ...ajuste, haber: e.target.value, debe: '' })} />
-                      <Button className="md:col-span-2" onClick={registrarAjuste} disabled={working || !grupo?.es_controladora || !ajuste.cuenta_codigo || (!ajuste.debe && !ajuste.haber)}>Registrar sin tocar libros</Button>
+                      <Button className="md:col-span-2" onClick={registrarAjuste} disabled={!canUpdate || !readReady || working || !grupo?.activo || !grupo.es_controladora || !ajuste.cuenta_codigo || (!ajuste.debe && !ajuste.haber)}>Registrar sin tocar libros</Button>
                     </div>
                   </div>
                 </CardContent>
@@ -318,7 +399,7 @@ export default function ConsolidacionPage() {
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[1100px] text-sm">
-                    <thead><tr className="border-b border-border text-left text-xs uppercase text-muted-foreground"><th className="p-2">Código</th><th className="p-2">Nombre</th><th className="p-2">Tipo</th><th className="p-2">Prefijos o fórmula</th><th className="p-2">Naturaleza</th><th className="p-2">Fechas</th><th className="p-2">Tasa</th><th /></tr></thead>
+                    <thead><tr className="border-b border-border text-left text-xs uppercase text-muted-foreground"><th className="p-2">Código</th><th className="p-2">Nombre</th><th className="p-2">Tipo</th><th className="p-2">Prefijos o fórmula</th><th className="p-2">Naturaleza</th><th className="p-2">Signo</th><th className="p-2">Fechas</th><th className="p-2">Tasa</th><th /></tr></thead>
                     <tbody>{lineas.map((linea, indice) => (
                       <tr key={indice} className="border-b border-border/50">
                         <td className="p-1"><Input aria-label="Código" value={linea.codigo} onChange={(e) => modificarLinea(indice, { codigo: e.target.value })} /></td>
@@ -326,6 +407,7 @@ export default function ConsolidacionPage() {
                         <td className="p-1"><select aria-label="Tipo" className={campo} value={linea.tipo} onChange={(e) => modificarLinea(indice, { tipo: e.target.value as any })}><option>CUENTAS</option><option>FORMULA</option></select></td>
                         <td className="p-1"><Input aria-label="Definición" value={linea.definicion} placeholder={linea.tipo === 'CUENTAS' ? '10,11,12' : 'A:1,B:-1'} onChange={(e) => modificarLinea(indice, { definicion: e.target.value })} /></td>
                         <td className="p-1"><select aria-label="Naturaleza" className={campo} value={linea.naturaleza} disabled={linea.tipo === 'FORMULA'} onChange={(e) => modificarLinea(indice, { naturaleza: e.target.value as any })}><option>SALDO</option><option>DEBE</option><option>HABER</option></select></td>
+                        <td className="p-1"><select aria-label="Signo de la línea" className={campo} value={linea.signo} disabled={linea.tipo === 'FORMULA'} onChange={e => modificarLinea(indice, { signo: Number(e.target.value) as 1 | -1 })}><option value={1}>+1</option><option value={-1}>−1</option></select></td>
                         <td className="p-1"><select aria-label="Alcance fecha" className={campo} value={linea.alcance_fecha} disabled={linea.tipo === 'FORMULA'} onChange={(e) => modificarLinea(indice, { alcance_fecha: e.target.value as any })}><option>PERIODO</option><option>HASTA_FECHA</option></select></td>
                         <td className="p-1"><select aria-label="Tipo tasa" className={campo} value={linea.tipo_tasa} disabled={linea.tipo === 'FORMULA'} onChange={(e) => modificarLinea(indice, { tipo_tasa: e.target.value as any })}><option>CIERRE</option><option>PROMEDIO</option><option>HISTORICA</option></select></td>
                         <td className="p-1"><Button variant="ghost" onClick={() => setLineas((actuales) => actuales.filter((_, i) => i !== indice))}><Trash2 className="h-4 w-4" /></Button></td>
@@ -335,7 +417,7 @@ export default function ConsolidacionPage() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" onClick={() => setLineas((actuales) => [...actuales, { ...lineasIniciales[0], codigo: '', nombre: '', definicion: '' }])}><Plus className="mr-2 h-4 w-4" /> Línea</Button>
-                  <Button onClick={guardarReporte} disabled={working || !reporteForm.codigo || !reporteForm.nombre || lineas.length === 0}>Guardar definición atómica</Button>
+                  <Button onClick={guardarReporte} disabled={!canUpdate || !readReady || working || !reporteForm.codigo || !reporteForm.nombre || lineas.length === 0}>Guardar definición atómica</Button>
                 </div>
               </CardContent>
             </Card>
@@ -347,9 +429,9 @@ export default function ConsolidacionPage() {
                   <select aria-label="Reporte" className={`${campo} md:col-span-2`} value={reporteId} onChange={(e) => setReporteId(e.target.value)}><option value="">Seleccione reporte</option>{reportes.map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}</select>
                   <Input aria-label="Fecha desde" type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} />
                   <Input aria-label="Fecha hasta" type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} />
-                  <Button onClick={generar} disabled={working || !reporteId}>{working ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Generar'}</Button>
+                  <Button onClick={generar} disabled={!canRead || !readReady || country.loading || !!country.error || !country.moneda || !fechaDesde||!fechaHasta||working || !reporteId || (!!grupoId && (!grupo?.activo || !grupo.es_controladora))}>{working ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Generar'}</Button>
                 </div>
-                {resultado && (
+                {resultado && !readError && (
                   <div className="overflow-x-auto rounded-xl border border-border">
                     <div className="flex flex-wrap justify-between gap-2 border-b border-border bg-muted/30 px-4 py-3 text-sm"><strong>{resultado.reporte?.nombre}</strong><span>{resultado.alcance} · {resultado.empresas_incluidas} empresa(s) · {resultado.moneda_presentacion}</span></div>
                     <table className="w-full min-w-[600px] text-sm"><tbody>{resultado.lineas?.map((linea: any) => <tr key={linea.codigo} className="border-b border-border/60"><td className="px-4 py-3 font-mono text-xs">{linea.codigo}</td><td className="px-4 py-3">{linea.nombre}</td><td className="px-4 py-3 text-right font-semibold">{Number(linea.valor).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>)}</tbody></table>
@@ -358,7 +440,7 @@ export default function ConsolidacionPage() {
                 )}
               </CardContent>
             </Card>
-          </>
+          </fieldset>
         )}
       </div>
     </div>

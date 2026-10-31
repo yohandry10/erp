@@ -15,9 +15,10 @@ interface Props {
   }
   onChange: (next: Props['filters']) => void
   onExport: (filters: Props['filters']) => void
+  disabledExport?: boolean
 }
 
-export function ComprobantesFilters({ filters, onChange, onExport }: Props) {
+export function ComprobantesFilters({ filters, onChange, onExport, disabledExport }: Props) {
   const country = useCountryContext()
   const isArgentina = country.paisCodigo === 'AR'
   const isColombia = country.paisCodigo === 'CO'
@@ -67,6 +68,10 @@ export function ComprobantesFilters({ filters, onChange, onExport }: Props) {
         <option value="ENVIADO">Enviado</option>
         <option value="RECHAZADO">Rechazado</option>
         <option value="BORRADOR">Borrador</option>
+        <option value="FIRMADO">Firmado</option>
+        <option value="ERROR">Error</option>
+        <option value="ANULADO">Anulado</option>
+        {!isArgentina && !isColombia && <option value="MIGRADO">Historia migrada</option>}
       </select>
       <input aria-label="Fecha desde"
         type="date"
@@ -84,6 +89,7 @@ export function ComprobantesFilters({ filters, onChange, onExport }: Props) {
         <button
           className="w-full rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-primary transition hover:bg-cyan-400/15"
           onClick={() => onExport(local)}
+          disabled={disabledExport}
         >
           Exportar CSV
         </button>

@@ -127,6 +127,14 @@ export default function VentaExitosaModal({
     ventaData?.canjeable || ventaData?.tipo_emision === 'TICKET' || ventaData?.tipo_comprobante === 'TICKET',
   )
 
+  // El modal sigue montado entre ventas: al cerrarse no puede conservar el CPE
+  // de la venta anterior, o la siguiente (un ticket) muestra su número fiscal.
+  useEffect(() => {
+    if (isOpen) return
+    setCurrentCpeId(null)
+    setCpePrintData(null)
+  }, [isOpen])
+
   useEffect(() => {
     if (!isOpen || !ventaData) return
 
@@ -139,11 +147,8 @@ export default function VentaExitosaModal({
   const loadCpePrintData = useCallback(async (cpeId: string): Promise<CpePrintData | null> => {
     const result = await get(`/api/cpe/comprobantes/${encodeURIComponent(cpeId)}`)
     const data = result?.data || result
-    if (data?.id || data?.numero != null) {
-      setCpePrintData(data)
-      return data
-    }
-    return null
+    // Quien llama decide si la respuesta sigue vigente antes de mostrarla.
+    return data?.id || data?.numero != null ? data : null
   }, [get])
 
   useEffect(() => {
@@ -271,7 +276,8 @@ export default function VentaExitosaModal({
    */
   const handleImprimirTicket = async () => {
     if (currentCpeId && !cpePrintData) {
-      await loadCpePrintData(currentCpeId).catch(() => null)
+      const impreso = await loadCpePrintData(currentCpeId).catch(() => null)
+      if (impreso) setCpePrintData(impreso)
     }
     setVistaPreviaAbierta(true)
   }
@@ -293,7 +299,8 @@ export default function VentaExitosaModal({
       if (data?.success && data?.cpe_id) {
         setCurrentCpeId(data.cpe_id)
         setFacturacionPendiente(false)
-        await loadCpePrintData(data.cpe_id).catch(() => null)
+        const impreso = await loadCpePrintData(data.cpe_id).catch(() => null)
+        if (impreso) setCpePrintData(impreso)
       } else {
         setFacturacionPendiente(true)
         setFacturacionError(data?.message || 'No se pudo emitir el CPE en este intento.')

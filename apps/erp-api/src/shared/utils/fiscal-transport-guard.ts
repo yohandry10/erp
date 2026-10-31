@@ -37,6 +37,7 @@ export async function assertExternalFiscalTransportAllowed(
     throw new BadRequestException({
       message: 'La demo puede generar y firmar documentos, pero no transmite ni consulta servicios fiscales externos.',
       code: DEMO_EXTERNAL_TRANSPORT_BLOCKED,
+      error: DEMO_EXTERNAL_TRANSPORT_BLOCKED,
       is_demo_restriction: true,
     });
   }

@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { PresupuestosService } from './presupuestos.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CreatePresupuestoDto, UpdatePresupuestoDto, EstadoPresupuesto } from '@erp-suite/dtos';
@@ -47,11 +47,11 @@ describe('PresupuestosService', () => {
 
   describe('crearPresupuesto', () => {
     const tenantId = '55555555-5555-5555-5555-555555555555';
-    const userId = 'user-123';
+    const userId = '66666666-6666-4666-8666-666666666666';
     const createDto: CreatePresupuestoDto = {
-      centro_costo_id: 'centro-123',
-      cuenta_id: 'cuenta-123',
-      periodo_contable_id: 'periodo-123',
+      centro_costo_id: '11111111-1111-4111-8111-111111111111',
+      cuenta_id: '22222222-2222-4222-8222-222222222222',
+      periodo_contable_id: '33333333-3333-4333-8333-333333333333',
       monto_presupuestado: 10000,
       notas: 'Test presupuesto',
       estado: EstadoPresupuesto.ACTIVO,
@@ -69,16 +69,16 @@ describe('PresupuestosService', () => {
     });
 
     it('debe rechazar presupuesto duplicado (mismo centro + cuenta + período)', async () => {
-      mockSupabaseClient.rpc.mockResolvedValue({ data: null, error: { message: 'duplicate key value violates unique constraint' } });
+      mockSupabaseClient.rpc.mockResolvedValue({ data: null, error: { code:'23505',message: 'duplicate key value violates private_constraint' } });
 
       await expect(service.crearPresupuesto(tenantId, createDto, userId)).rejects.toThrow(
-        BadRequestException
+        ConflictException
       );
       await expect(service.crearPresupuesto(tenantId, createDto, userId)).rejects.toThrow(
-        'duplicate key value'
+        'Ya existe un presupuesto para ese centro de costo, cuenta y período'
       );
-      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('gestionar_presupuesto_tx', expect.objectContaining({
-        p_action: 'CREATE', p_actor_id: userId,
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('crear_presupuesto_tx_570', expect.objectContaining({
+        p_actor_id: userId,
       }));
       expect(mockSupabaseClient.from).not.toHaveBeenCalled();
     });
@@ -105,7 +105,7 @@ describe('PresupuestosService', () => {
 
   describe('obtenerAlertasSobregiro', () => {
     const tenantId = '55555555-5555-5555-5555-555555555555';
-    const periodoId = 'periodo-123';
+    const periodoId = '33333333-3333-4333-8333-333333333333';
 
     it('debe retornar alertas de sobregiro para presupuestos excedidos (>100%)', async () => {
       // Mock: obtener presupuestos activos
@@ -130,6 +130,7 @@ describe('PresupuestosService', () => {
         from: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
+        maybeSingle: jest.fn().mockResolvedValue({data:{id:periodoId,tenant_id:tenantId,anio:2025,mes:10,estado:'ABIERTO'},error:null}),
         order: jest.fn().mockResolvedValue({ data: mockPresupuestos, error: null }),
       };
 
@@ -169,6 +170,7 @@ describe('PresupuestosService', () => {
         from: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
+        maybeSingle: jest.fn().mockResolvedValue({data:{id:periodoId,tenant_id:tenantId,anio:2025,mes:10,estado:'ABIERTO'},error:null}),
         order: jest.fn().mockResolvedValue({ data: mockPresupuestos, error: null }),
       };
 
@@ -208,6 +210,7 @@ describe('PresupuestosService', () => {
         from: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
+        maybeSingle: jest.fn().mockResolvedValue({data:{id:periodoId,tenant_id:tenantId,anio:2025,mes:10,estado:'ABIERTO'},error:null}),
         order: jest.fn().mockResolvedValue({ data: mockPresupuestos, error: null }),
       };
 
@@ -255,6 +258,7 @@ describe('PresupuestosService', () => {
         from: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
+        maybeSingle: jest.fn().mockResolvedValue({data:{id:periodoId,tenant_id:tenantId,anio:2025,mes:10,estado:'ABIERTO'},error:null}),
         order: jest.fn().mockResolvedValue({ data: mockPresupuestos, error: null }),
       };
 
@@ -333,7 +337,7 @@ describe('PresupuestosService', () => {
         },
       ];
 
-      jest.spyOn(service, 'obtenerAlertasSobregiro').mockResolvedValue(mockAlertas as any);
+      jest.spyOn(service as any, 'leerAlertasConAlcance').mockResolvedValue({alertas:mockAlertas,consulta:{periodo:null}});
 
       const resumen = await service.obtenerResumenAlertas(tenantId, periodoId);
 
@@ -346,7 +350,7 @@ describe('PresupuestosService', () => {
     });
 
     it('debe retornar resumen vacío si no hay alertas', async () => {
-      jest.spyOn(service, 'obtenerAlertasSobregiro').mockResolvedValue([]);
+      jest.spyOn(service as any, 'leerAlertasConAlcance').mockResolvedValue({alertas:[],consulta:{periodo:null}});
 
       const resumen = await service.obtenerResumenAlertas(tenantId, periodoId);
 

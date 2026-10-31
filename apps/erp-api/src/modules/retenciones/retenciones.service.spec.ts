@@ -104,6 +104,27 @@ describe('RetencionesService 465', () => {
     });
   });
 
+  it('revierte una detracción proveedor aún pendiente con identidad, fecha y motivo explícitos', async () => {
+    rpc.mockResolvedValue({ data: { operacion_id: 'ajuste-1', estado: 'ANULADO' }, error: null });
+    await service.revertirDetraccionProveedor('tenant-1', 'ajuste-1', 'actor-1', {
+      fecha: '2026-10-07', motivo: ' Corrección por NC recibida ', idempotency_key: 'reverse-detraction-570',
+    });
+    expect(rpc).toHaveBeenCalledWith('revertir_detraccion_proveedor_pendiente_tx', {
+      p_tenant_id: 'tenant-1', p_actor_id: 'actor-1', p_operacion_id: 'ajuste-1',
+      p_payload: { fecha: '2026-10-07', motivo: 'Corrección por NC recibida' },
+      p_idempotency_key: 'reverse-detraction-570',
+    });
+  });
+
+  it('explica que no se puede revertir un depósito ya efectuado', async () => {
+    rpc.mockResolvedValue({ data: null, error: {
+      code: '23514', message: 'SUPPLIER_DETRACTION_ALREADY_SETTLED_OR_REVERSED',
+    } });
+    await expect(service.revertirDetraccionProveedor('tenant-1', 'ajuste-1', 'actor-1', {
+      fecha: '2026-10-07', motivo: 'Corrección por NC recibida', idempotency_key: 'reverse-settled-570',
+    })).rejects.toThrow('depositada');
+  });
+
   it('exige un único tercero correspondiente al origen del anticipo', async () => {
     await expect(service.registrarAnticipo('tenant-1', 'actor-1', {
       origen: OrigenAjusteFiscal.CLIENTE,

@@ -79,7 +79,8 @@ test('Notificaciones: la campana del vendedor lista, marca todas y no finge un b
       ? route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ statusCode: 503, message: 'Notificaciones no disponibles' }) })
       : route.continue())
     await page.getByRole('button', { name: 'Eliminar notificación', exact: true }).first().click()
-    await expect(page.getByText('No se pudo eliminar la notificación. Inténtalo de nuevo.')).toBeVisible()
+    await expect(page.getByRole('alert').filter({hasText:'No se pudo actualizar la notificación.'})).toBeVisible()
+    expect(sql(`SELECT count(*) FROM notificaciones WHERE tenant_id='${fixture.tenant}'::uuid AND titulo='Aviso del administrador';`)).toBe('1')
     await expect(item).toBeVisible()
     checks.push({ operation: 'Un borrado rechazado por el servidor no desaparece de la lista', passed: true })
     proof.success = true

@@ -1,3 +1,4 @@
+import { UuidParamPipe } from '../../common/pipes/uuid-param.pipe';
 import { Controller, Get, Post, Put, Delete, UseGuards, Query, Param, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -57,7 +58,7 @@ export class UserManagementController {
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
   async getUserById(
     @CurrentTenant() tenantId: string,
-    @Param('id') userId: string,
+    @Param('id', UuidParamPipe) userId: string,
   ) {
     return this.userManagementService.getUserById(tenantId, userId);
   }
@@ -96,7 +97,7 @@ export class UserManagementController {
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
   async updateUser(
     @CurrentTenant() tenantId: string,
-    @Param('id') userId: string,
+    @Param('id', UuidParamPipe) userId: string,
     @Body() updateUserDto: UpdateUserDto,
     @CurrentUser('id') updatedByUserId?: string,
   ) {
@@ -117,7 +118,7 @@ export class UserManagementController {
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
   async deleteUser(
     @CurrentTenant() tenantId: string,
-    @Param('id') userId: string,
+    @Param('id', UuidParamPipe) userId: string,
     @CurrentUser('id') actorId?: string,
   ) {
     await this.userManagementService.deleteUser(tenantId, userId, actorId);
@@ -136,7 +137,7 @@ export class UserManagementController {
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
   async activateUser(
     @CurrentTenant() tenantId: string,
-    @Param('id') userId: string,
+    @Param('id', UuidParamPipe) userId: string,
     @CurrentUser('id') actorId?: string,
   ) {
     return this.userManagementService.activateUser(tenantId, userId, actorId);
@@ -154,7 +155,7 @@ export class UserManagementController {
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
   async deactivateUser(
     @CurrentTenant() tenantId: string,
-    @Param('id') userId: string,
+    @Param('id', UuidParamPipe) userId: string,
     @CurrentUser('id') actorId?: string,
   ) {
     return this.userManagementService.deactivateUser(tenantId, userId, actorId);
@@ -173,7 +174,7 @@ export class UserManagementController {
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
   async resetPassword(
     @CurrentTenant() tenantId: string,
-    @Param('id') userId: string,
+    @Param('id', UuidParamPipe) userId: string,
     @CurrentUser('id') currentUserId?: string,
   ) {
     return this.userManagementService.resetPassword(tenantId, userId, currentUserId);
@@ -191,7 +192,7 @@ export class UserManagementController {
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
   async getUserRoles(
     @CurrentTenant() tenantId: string,
-    @Param('id') userId: string,
+    @Param('id', UuidParamPipe) userId: string,
   ) {
     const user = await this.userManagementService.getUserById(tenantId, userId);
     return user.user_roles || [];
@@ -211,7 +212,7 @@ export class UserManagementController {
   @ApiResponse({ status: 404, description: 'Usuario o rol no encontrado' })
   async assignRoles(
     @CurrentTenant() tenantId: string,
-    @Param('id') userId: string,
+    @Param('id', UuidParamPipe) userId: string,
     @Body() assignRolesDto: AssignRolesDto,
     @CurrentUser('id') actorId?: string,
   ) {
@@ -232,7 +233,7 @@ export class UserManagementController {
   @ApiResponse({ status: 404, description: 'Usuario o rol no encontrado' })
   async removeRole(
     @CurrentTenant() tenantId: string,
-    @Param('id') userId: string,
+    @Param('id', UuidParamPipe) userId: string,
     @Param('roleId') roleId: string,
     @CurrentUser('id') actorId?: string,
   ) {
@@ -252,8 +253,9 @@ export class UserManagementController {
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
   async getUserPermissions(
     @CurrentTenant() tenantId: string,
-    @Param('id') userId: string,
+    @Param('id', UuidParamPipe) userId: string,
   ): Promise<Permission[]> {
+    await this.userManagementService.assertUserExists(tenantId, userId);
     return this.permissionService.getUserPermissions(userId, tenantId);
   }
 
@@ -269,8 +271,9 @@ export class UserManagementController {
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
   async getUserAuditLogs(
     @CurrentTenant() tenantId: string,
-    @Param('id') userId: string,
+    @Param('id', UuidParamPipe) userId: string,
   ) {
+    await this.userManagementService.assertUserExists(tenantId, userId);
     return this.auditService.getUserAuditLogs(tenantId, userId);
   }
 }

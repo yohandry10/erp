@@ -1,8 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
+import { useAuth } from '@/contexts/AuthContext'
+import { readPurchaseOrder } from '@/lib/compras/purchase-order-read-contract'
+import { confirmPurchaseOrderAction, type PurchaseOrderAction } from '@/lib/compras/purchase-order-action-contract'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 import { parseDateLocal } from '@/lib/date-utils'
 import {
@@ -28,6 +31,7 @@ import RecepcionesPanel from '@/components/compras/RecepcionesPanel'
 import toast from 'react-hot-toast'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
+import CompraEditarDetallesModal from '@/components/compras/CompraEditarDetallesModal'
 
 interface OrdenCompraDetalle {
   id: string
@@ -55,6 +59,8 @@ interface OrdenCompra {
   total: number
   moneda: string
   observaciones?: string
+  aprobado_by?: string | null
+  aprobado_at?: string | null
   proveedor?: {
     razon_social: string
     ruc: string
@@ -73,6 +79,7 @@ type EstadoOrden =
   | 'APROBADA'
   | 'PARCIAL'
   | 'RECIBIDA'
+  | 'CERRADA'
   | 'ENTREGADO'
   | 'ENTREGADA'
   | 'RECHAZADA'
@@ -85,6 +92,7 @@ const ESTADOS_CONFIG: Record<EstadoOrden, { label: string; icon: any; className:
   APROBADA: { label: 'Aprobada', icon: CheckCircle, className: 'bg-blue-500/25 text-primary dark:text-blue-200 ring-blue-300/40' },
   PARCIAL: { label: 'Parcial', icon: Package, className: 'bg-cyan-500/20 text-primary ring-cyan-300/40' },
   RECIBIDA: { label: 'Recibida', icon: CheckCircle, className: 'bg-cyan-500/25 text-primary ring-cyan-300/40' },
+  CERRADA: { label: 'Cerrada', icon: CheckCircle, className: 'bg-cyan-500/25 text-primary ring-cyan-300/40' },
   ENTREGADO: { label: 'Entregada', icon: CheckCircle, className: 'bg-cyan-500/25 text-primary ring-cyan-300/40' },
   ENTREGADA: { label: 'Entregada', icon: CheckCircle, className: 'bg-cyan-500/25 text-primary ring-cyan-300/40' },
   RECHAZADA: { label: 'Rechazada', icon: XCircle, className: 'bg-muted text-foreground ring-slate-500/40' },
@@ -105,10 +113,11 @@ const tableCellClass = 'px-4 py-3 text-sm text-foreground/90'
 
 export default function OrdenCompraDetallePage() {
   const { formatCurrency: formatLocalizedCurrency, currency, locale, taxIdLabel } = useLocalizedMoney()
-  const { tasaIgv, nombreImpuesto } = useTaxConfig()
+  const { nombreImpuesto } = useTaxConfig()
   const router = useRouter()
   const params = useParams()
-  const { get, post } = useApi()
+  const { get, post } = useApi({ requireLive: true, throwOnError: true, showErrorToast: false })
+  const { session } = useAuth()
 
   const [orden, setOrden] = useState<OrdenCompra | null>(null)
   const [loading, setLoading] = useState(true)
@@ -116,37 +125,50 @@ export default function OrdenCompraDetallePage() {
   const [showAprobarModal, setShowAprobarModal] = useState(false)
   const [showRechazarModal, setShowRechazarModal] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
+  const [editandoProductos, setEditandoProductos] = useState(false)
 
   const ordenId = params.id as string | undefined
+  const tenantId = session?.user?.tenant_id || ''
+  const actorId = session?.user?.id || ''
+  const latestRead = useRef(0)
+  const activeScope = useRef('')
+  activeScope.current = `${tenantId}:${actorId}:${ordenId}`
 
   const loadOrden = useCallback(async () => {
-    if (!ordenId) return
+    if (!ordenId || !tenantId || !actorId) return
+    const request = ++latestRead.current
+    const scope = `${tenantId}:${actorId}:${ordenId}`
 
     try {
       setLoading(true)
       setError(null)
       const response = await get(`/api/compras/ordenes/${ordenId}`)
 
-      if (response?.success && response.data) {
-        setOrden(response.data)
-      } else {
-        setError('No se pudo cargar la orden de compra')
-      }
+      const data = readPurchaseOrder(response, ordenId, tenantId, actorId)
+      if (request === latestRead.current && scope === activeScope.current) setOrden(data)
     } catch (err: any) {
-      console.error('Error loading orden:', err)
-      setError(err.message || 'Error al cargar la orden de compra')
+      if (request === latestRead.current && scope === activeScope.current) {
+        setOrden(null)
+        setError(err.message || 'Error al cargar la orden de compra')
+      }
     } finally {
-      setLoading(false)
+      if (request === latestRead.current && scope === activeScope.current) setLoading(false)
     }
-  }, [get, ordenId])
+  }, [get, ordenId, tenantId, actorId])
 
   useEffect(() => {
+    setOrden(null)
+    setLoading(true)
+    setShowAprobarModal(false)
+    setShowRechazarModal(false)
+    setEditandoProductos(false)
     loadOrden()
+    return () => { latestRead.current++ }
   }, [loadOrden])
 
   const formatCurrency = (amount: number | undefined) => {
-    if (!amount) return '-'
-    return formatLocalizedCurrency(amount)
+    if (amount == null) return '-'
+    return formatLocalizedCurrency(amount, orden?.moneda || currency)
   }
 
   const formatDate = (dateString: string) => {
@@ -191,18 +213,24 @@ export default function OrdenCompraDetallePage() {
     return totalCantidad > 0 ? (totalRecibido / totalCantidad) * 100 : 0
   }
 
+  const confirmAction = async (response: any, action: PurchaseOrderAction, previous: OrdenCompra,
+    scope: string, reason?: string) => {
+    if (!ordenId || scope !== activeScope.current) throw new Error('El usuario o la empresa cambió. Recarga la orden.')
+    confirmPurchaseOrderAction(response, { id: ordenId, tenantId, actorId }, previous, action, reason)
+    await loadOrden()
+    if (scope !== activeScope.current) throw new Error('El usuario o la empresa cambió. Recarga la orden.')
+  }
+
   const handleAprobar = async (comentarios?: string) => {
     try {
+      if (!orden) throw new Error('Recarga la orden antes de aprobarla')
+      const previous = orden
+      const scope = activeScope.current
       const response = await post(`/api/compras/ordenes/${params.id}/aprobar`, {
         comentarios
       })
-
-      if (response?.success) {
-        await loadOrden()
-        toast.success('✅ Orden de compra aprobada exitosamente')
-      } else {
-        throw new Error(response?.message || 'Error al aprobar la orden')
-      }
+      await confirmAction(response, 'APROBAR', previous, scope)
+      toast.success('✅ Orden de compra aprobada exitosamente')
     } catch (err: any) {
       console.error('Error al aprobar orden:', err)
       toast.error(`❌ Error: ${err.message || 'No se pudo aprobar la orden'}`)
@@ -212,16 +240,14 @@ export default function OrdenCompraDetallePage() {
 
   const handleRechazar = async (motivoRechazo: string) => {
     try {
+      if (!orden) throw new Error('Recarga la orden antes de rechazarla')
+      const previous = orden
+      const scope = activeScope.current
       const response = await post(`/api/compras/ordenes/${params.id}/rechazar`, {
         motivo_rechazo: motivoRechazo
       })
-
-      if (response?.success) {
-        await loadOrden()
-        toast.success('✅ Orden de compra rechazada exitosamente')
-      } else {
-        throw new Error(response?.message || 'Error al rechazar la orden')
-      }
+      await confirmAction(response, 'RECHAZAR', previous, scope, motivoRechazo)
+      toast.success('✅ Orden de compra rechazada exitosamente')
     } catch (err: any) {
       console.error('Error al rechazar orden:', err)
       toast.error(`❌ Error: ${err.message || 'No se pudo rechazar la orden'}`)
@@ -233,14 +259,14 @@ export default function OrdenCompraDetallePage() {
     const motivo = prompt('Ingrese el motivo de la cancelación:')?.trim()
     if (!motivo) return
     try {
+      if (!orden) throw new Error('Recarga la orden antes de cancelarla')
+      const previous = orden
+      const scope = activeScope.current
       setActionLoading(true)
       const response = await post(`/api/compras/ordenes/${params.id}/cancelar`, {
         motivo_cancelacion: motivo,
       })
-      if (!response?.success) {
-        throw new Error(response?.message || 'No se pudo cancelar la orden')
-      }
-      await loadOrden()
+      await confirmAction(response, 'CANCELAR', previous, scope, motivo)
       toast.success('Orden de compra cancelada')
     } catch (err: any) {
       toast.error(`Error: ${err.message || 'No se pudo cancelar la orden'}`)
@@ -267,6 +293,10 @@ export default function OrdenCompraDetallePage() {
             <AlertCircle className="mx-auto mb-4 size-12 text-muted-foreground" />
             <h3 className="mb-2 text-lg font-semibold text-foreground">Error al cargar la orden</h3>
             <p className="mb-6 text-sm text-muted-foreground">{error || 'Orden no encontrada'}</p>
+            <button onClick={loadOrden} className={`${actionClass} mr-3`}>
+              <RefreshCw size={16} />
+              Reintentar
+            </button>
             <button onClick={() => router.push('/dashboard/compras/ordenes')} className={secondaryActionClass}>
               <ArrowLeft size={16} />
               Volver a Órdenes
@@ -278,7 +308,8 @@ export default function OrdenCompraDetallePage() {
   }
 
   return (
-    <div data-print-page className={pageClass}>
+    <div data-print-page="purchase-order" className={pageClass}>
+      <CompraEditarDetallesModal tipo="orden" documento={orden} open={editandoProductos} onClose={() => setEditandoProductos(false)} onSuccess={loadOrden} />
       <div className="mb-6 rounded-3xl border border-blue-400/20 bg-card/80 p-6 shadow-2xl shadow-blue-950/30">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div>
@@ -294,6 +325,7 @@ export default function OrdenCompraDetallePage() {
           </div>
 
           <div className="flex flex-wrap gap-3">
+            {orden.estado === 'BORRADOR' && <ProtectedComponent modulo="compras" accion="editar" recurso="ordenes" fallback={null}><button className={secondaryActionClass} disabled={actionLoading} onClick={() => setEditandoProductos(true)}>Editar productos</button></ProtectedComponent>}
             <button onClick={loadOrden} className={secondaryActionClass}>
               <RefreshCw size={16} />
               Actualizar
@@ -318,7 +350,7 @@ export default function OrdenCompraDetallePage() {
         </div>
       </div>
 
-      <div className="mb-6 grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+      <div data-order-main className="mb-6 grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
         <div className="grid min-w-0 grid-cols-1 content-start gap-6">
           <div className={panelClass}>
             <div className={panelHeaderClass}>
@@ -326,7 +358,7 @@ export default function OrdenCompraDetallePage() {
               <h2 className="m-0 text-lg font-bold text-foreground">Información del Proveedor</h2>
             </div>
 
-            <div className="grid gap-5 md:grid-cols-2">
+            <div data-order-supplier-fields className="grid gap-5 md:grid-cols-2">
               <div>
                 <label className={labelClass}>Razón Social</label>
                 <p className={valueClass}>{orden.proveedor?.razon_social || 'N/A'}</p>
@@ -409,7 +441,7 @@ export default function OrdenCompraDetallePage() {
                 <span className="font-semibold text-foreground">{formatCurrency(orden.subtotal)}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">{nombreImpuesto} ({Math.round(tasaIgv * 100)}%)</span>
+                <span className="text-muted-foreground">{nombreImpuesto}</span>
                 <span className="font-semibold text-foreground">{formatCurrency(orden.igv)}</span>
               </div>
               <div className="flex items-center justify-between border-t border-blue-400/20 pt-4">
@@ -479,7 +511,7 @@ export default function OrdenCompraDetallePage() {
           )}
 
           {(orden.estado === 'APROBACION' || orden.estado === 'BORRADOR' || orden.estado === 'PENDIENTE') && (
-            <div className={panelClass}>
+            <div data-order-operational className={panelClass}>
               <div className={panelHeaderClass}>
                 <h2 className="m-0 text-lg font-bold text-foreground">Aprobación</h2>
               </div>
@@ -502,21 +534,23 @@ export default function OrdenCompraDetallePage() {
             </div>
           )}
 
-          {(orden.estado === 'APROBACION' || orden.estado === 'APROBADA' || orden.estado === 'ANULADA') && (
-            <AprobacionesPanel ordenId={orden.id} estadoOrden={orden.estado} />
+          {(orden.estado === 'APROBACION' || orden.estado === 'APROBADA' || orden.estado === 'PARCIAL' || orden.estado === 'RECIBIDA' || orden.estado === 'ANULADA') && (
+            <div data-order-operational><AprobacionesPanel ordenId={orden.id} estadoOrden={orden.estado} approvedActor={orden.aprobado_by} approvedAt={orden.aprobado_at} /></div>
           )}
 
-          {orden.estado === 'APROBADA' && (
-            <div className={panelClass}>
-              <div className={panelHeaderClass}>
-                <h2 className="m-0 text-lg font-bold text-foreground">Acciones</h2>
-              </div>
+          {['APROBADA', 'PARCIAL'].includes(orden.estado) && orden.detalles?.some(detalle => cantidadPendiente(detalle) > 0) && (
+            <ProtectedComponent modulo="compras" accion="crear" recurso="recepciones" fallback={null}>
+              <div data-order-operational className={panelClass}>
+                <div className={panelHeaderClass}>
+                  <h2 className="m-0 text-lg font-bold text-foreground">Acciones</h2>
+                </div>
 
-              <button onClick={() => router.push(`/dashboard/compras/recepciones/nueva?orden_id=${orden.id}`)} className={`${primaryActionClass} w-full`}>
-                <Package size={16} />
-                Crear Recepción
-              </button>
-            </div>
+                <button onClick={() => router.push(`/dashboard/compras/recepciones/nueva?orden_id=${orden.id}`)} className={`${primaryActionClass} w-full`}>
+                  <Package size={16} />
+                  Crear Recepción
+                </button>
+              </div>
+            </ProtectedComponent>
           )}
         </div>
       </div>
@@ -532,7 +566,7 @@ export default function OrdenCompraDetallePage() {
       )}
 
       {(orden.estado === 'PARCIAL' || orden.estado === 'RECIBIDA' || orden.estado === 'CERRADA') && (
-        <RecepcionesPanel ordenId={orden.id} />
+        <div data-order-operational><RecepcionesPanel ordenId={orden.id} hasReceivedItems={Boolean(orden.detalles?.some(d => d.cantidad_recibida > 0))} /></div>
       )}
 
       <AprobarOrdenModal

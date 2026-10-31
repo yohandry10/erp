@@ -136,7 +136,7 @@ test("Perú: sucursales recupera alta, edición, baja y asignación perdidas y r
     const save = page.getByRole("button", { name: "Guardar", exact: true });
     await save.click();
     await expect(
-      page.getByText("No se pudo guardar el establecimiento.", { exact: true }),
+      page.getByRole("alert").filter({ hasText: "No se pudo guardar el establecimiento." }),
     ).toBeVisible();
     await expect(name).toHaveValue("Anexo UI perdido");
     expect(
@@ -158,7 +158,7 @@ test("Perú: sucursales recupera alta, edición, baja y asignación perdidas y r
     await page.getByLabel("Teléfono", { exact: true }).fill("555-LOCAL");
     await save.click();
     await expect(
-      page.getByText("No se pudo guardar el establecimiento.", { exact: true }),
+      page.getByRole("alert").filter({ hasText: "No se pudo guardar el establecimiento." }),
     ).toBeVisible();
     await expect(name).toHaveValue("Anexo UI editado");
     expect(
@@ -176,9 +176,7 @@ test("Perú: sucursales recupera alta, edición, baja y asignación perdidas y r
     });
     await deactivate.click();
     await expect(
-      page.getByText("No se pudo cambiar el estado del establecimiento.", {
-        exact: true,
-      }),
+      page.getByRole("alert").filter({ hasText: "No se pudo cambiar el estado del establecimiento." }),
     ).toBeVisible();
     expect(
       readLocalSql(

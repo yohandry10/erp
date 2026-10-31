@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { Calendar, ArrowLeft } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import PresupuestoVsRealChart from '@/components/contabilidad/PresupuestoVsRealChart'
 import { useApi } from '@/hooks/use-api'
+import { useAuth } from '@/contexts/AuthContext'
+import { readPeriodCatalog } from '@/lib/accounting-period-read'
 
 interface Periodo {
   id: string
@@ -14,50 +16,32 @@ interface Periodo {
 }
 
 export default function ComparacionPresupuestoPage() {
+ const {session}=useAuth()
+ return <BudgetComparisonWorkspace key={`${session?.user?.tenant_id || ''}:${session?.user?.id || ''}`} />
+}
+function BudgetComparisonWorkspace() {
+ const {session,loading:authLoading}=useAuth(),tenantId=session?.user?.tenant_id || ''
+ const readEpoch=useRef(0)
   const router = useRouter()
+  const [error,setError]=useState<string|null>(null)
   const [periodos, setPeriodos] = useState<Periodo[]>([])
   const [selectedPeriodoId, setSelectedPeriodoId] = useState<string>('')
   const [centroIdFilter, setCentroIdFilter] = useState<string | undefined>(undefined)
   const [loading, setLoading] = useState(true)
-  const { apiCall } = useApi<any>({ retries: 2, timeoutMs: 12000, showErrorToast: false })
+  const { apiCall } = useApi<unknown>({requireLive:true,retries:0,timeoutMs:30000,throwOnError:true,showErrorToast:false})
 
-  const fetchPeriodos = useCallback(async () => {
-    try {
-      setLoading(true)
-      const result = await apiCall('/contabilidad/periodos')
-      const periodosData = result?.data || []
-      setPeriodos(periodosData)
-
-      // Seleccionar el período más reciente por defecto
-      if (periodosData.length > 0) {
-        // Ordenar por año y mes descendente
-        const sorted = [...periodosData].sort((a, b) => {
-          if (a.anio !== b.anio) return b.anio - a.anio
-          return b.mes - a.mes
-        })
-        setSelectedPeriodoId(sorted[0].id)
-      }
-    } catch (err) {
-      console.error('Error fetching períodos:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [apiCall])
-
-  useEffect(() => {
-    fetchPeriodos()
-
-    const params = new URLSearchParams(window.location.search)
-    const periodoIdParam = params.get('periodoId')
-    const centroIdParam = params.get('centroId')
-
-    if (periodoIdParam) {
-      setSelectedPeriodoId(periodoIdParam)
-    }
-    if (centroIdParam) {
-      setCentroIdFilter(centroIdParam)
-    }
-  }, [fetchPeriodos])
+  const fetchPeriodos=useCallback(async()=>{
+    const run=++readEpoch.current;setLoading(true);setPeriodos([]);setSelectedPeriodoId('');setError(null)
+    if(authLoading||!tenantId)return
+    try{const result=await apiCall('/contabilidad/periodos');const rows=readPeriodCatalog(result,tenantId)
+      const params=new URLSearchParams(window.location.search),requested=params.get('periodoId'),center=params.get('centroId')
+      if(requested&&!rows.some(row=>row.id===requested))throw new Error('El período solicitado no está disponible en esta empresa.')
+      if(run!==readEpoch.current)return
+      setPeriodos(rows);setSelectedPeriodoId(requested||rows[0]?.id||'');setCentroIdFilter(center||undefined)
+    }catch(cause){if(run===readEpoch.current)setError(cause instanceof Error?cause.message:'No se pudieron consultar los períodos completos.')}
+    finally{if(run===readEpoch.current)setLoading(false)}
+  },[apiCall,tenantId,authLoading])
+  useEffect(()=>{void fetchPeriodos();return()=>{readEpoch.current++}},[fetchPeriodos])
 
   const formatPeriodo = (anio: number, mes: number) => {
     const meses = [
@@ -114,7 +98,7 @@ export default function ComparacionPresupuestoPage() {
             Cargando períodos...
           </span>
         </div>
-      ) : periodos.length === 0 ? (
+      ) : error ? (<div className="p-6"><p role="alert">{error}</p><button onClick={()=>void fetchPeriodos()}>Reintentar</button></div>) : periodos.length === 0 ? (
         <div className="p-12 bg-card rounded-xl shadow text-center">
           <p className="m-0 text-base text-muted-foreground">
             No hay períodos contables disponibles
@@ -124,7 +108,7 @@ export default function ComparacionPresupuestoPage() {
           </p>
         </div>
       ) : selectedPeriodoId ? (
-        <PresupuestoVsRealChart periodoId={selectedPeriodoId} centroId={centroIdFilter} />
+        <PresupuestoVsRealChart key={selectedPeriodoId} periodoId={selectedPeriodoId} centroId={centroIdFilter} />
       ) : null}
     </div>
   )

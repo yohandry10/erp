@@ -22,8 +22,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { parseDateLocal } from '@/lib/date-utils'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { CrearDepartamentoButton } from '@/components/rrhh/CrearDepartamentoButton'
 
 const commonRrhhModules = [
+  { href: '/dashboard/rrhh/solicitudes', title: 'Vacaciones y licencias', description: 'Solicitudes, aprobación y descansos del personal', icon: CalendarClock },
   { href: '/dashboard/rrhh/asistencia', title: 'Asistencia', description: 'Control de horarios y marcaciones', icon: CalendarClock },
   { href: '/dashboard/rrhh/contratos', title: 'Contratos', description: 'Gestión de contratos laborales', icon: FileText },
   { href: '/dashboard/rrhh/candidatos', title: 'Candidatos', description: 'Reclutamiento y selección', icon: Users },
@@ -109,6 +111,11 @@ export default function RrhhPage() {
       icon: FileCheck2,
     },
     ...(country.paisCodigo === 'PE' ? [{
+      href: '/dashboard/rrhh/fichas-sunat',
+      title: 'Ficha SUNAT del trabajador',
+      description: 'Datos registrales y régimen de salud antes de la planilla',
+      icon: FileCheck2,
+    }, {
       href: '/dashboard/rrhh/planilla-electronica',
       title: 'PLAME / T-Registro',
       description: 'Fuentes PVS, ticket y CIR de SUNAT',
@@ -200,7 +207,7 @@ export default function RrhhPage() {
     <PageShell
       title="Recursos Humanos"
       description="Operación diaria de empleados, contratos, asistencia, pagos y planillas."
-      actions={<Button className="gap-2" onClick={openCreateEmpleado}><UserPlus className="h-4 w-4" /> Agregar empleado</Button>}
+      actions={<div className="flex flex-wrap gap-2"><CrearDepartamentoButton onCreated={loadData}/><Button className="gap-2" onClick={openCreateEmpleado}><UserPlus className="h-4 w-4" /> Agregar empleado</Button></div>}
     >
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard title="Total empleados" value={stats.total} description="Personal registrado" icon={Users} tone="info" />

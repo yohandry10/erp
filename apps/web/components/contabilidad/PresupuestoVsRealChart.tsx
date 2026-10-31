@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import {
   TrendingUp,
   TrendingDown,
@@ -13,6 +13,8 @@ import { exportToExcel, formatCurrencyForExcel, formatPercentageForExcel } from 
 import PresupuestoEjecucionIndicator, { getEjecucionColor } from './PresupuestoEjecucionIndicator'
 import PresupuestoEjecucionPorCentroChart from './PresupuestoEjecucionPorCentroChart'
 import { useApi } from '@/hooks/use-api'
+import { useAuth } from '@/contexts/AuthContext'
+import { readBudgetComparison } from '@/lib/accounting-budget-read'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface PresupuestoVsRealChartProps {
@@ -88,94 +90,24 @@ const toNumber = (value: unknown) => {
   return Number.isFinite(numeric) ? numeric : 0
 }
 
-const normalizeComparacionData = (raw: any): ComparacionData => ({
-  periodo: {
-    id: raw?.periodo?.id || '',
-    anio: toNumber(raw?.periodo?.anio) || new Date().getFullYear(),
-    mes: toNumber(raw?.periodo?.mes) || new Date().getMonth() + 1,
-    estado: raw?.periodo?.estado || 'N/A',
-    descripcion: raw?.periodo?.descripcion || 'Periodo no disponible',
-  },
-  centros_costo: Array.isArray(raw?.centros_costo)
-    ? raw.centros_costo.map((centro: any, index: number) => ({
-        centro_costo: {
-          id: centro?.centro_costo?.id || `centro-${index}`,
-          codigo: centro?.centro_costo?.codigo || 'N/A',
-          nombre: centro?.centro_costo?.nombre || 'Centro de costo',
-          descripcion: centro?.centro_costo?.descripcion || '',
-        },
-        cuentas: Array.isArray(centro?.cuentas)
-          ? centro.cuentas.map((cuenta: any) => ({
-              cuenta: {
-                id: cuenta?.cuenta?.id || '',
-                codigo: cuenta?.cuenta?.codigo || 'N/A',
-                nombre: cuenta?.cuenta?.nombre || 'Cuenta',
-              },
-              monto_presupuestado: toNumber(cuenta?.monto_presupuestado),
-              monto_ejecutado: toNumber(cuenta?.monto_ejecutado),
-              monto_comprometido: toNumber(cuenta?.monto_comprometido),
-              monto_disponible: toNumber(cuenta?.monto_disponible),
-              porcentaje_ejecutado: toNumber(cuenta?.porcentaje_ejecutado),
-              variacion: toNumber(cuenta?.variacion),
-              variacion_porcentaje: toNumber(cuenta?.variacion_porcentaje),
-              alerta: cuenta?.alerta || 'NORMAL',
-            }))
-          : [],
-        totales: {
-          presupuestado: toNumber(centro?.totales?.presupuestado),
-          ejecutado: toNumber(centro?.totales?.ejecutado),
-          comprometido: toNumber(centro?.totales?.comprometido),
-          disponible: toNumber(centro?.totales?.disponible),
-          variacion: toNumber(centro?.totales?.variacion),
-          porcentaje_ejecucion: toNumber(centro?.totales?.porcentaje_ejecucion),
-          variacion_porcentaje: toNumber(centro?.totales?.variacion_porcentaje),
-          alerta: centro?.totales?.alerta || 'NORMAL',
-        },
-      }))
-    : [],
-  resumen_global: {
-    total_presupuestado: toNumber(raw?.resumen_global?.total_presupuestado),
-    total_ejecutado: toNumber(raw?.resumen_global?.total_ejecutado),
-    total_comprometido: toNumber(raw?.resumen_global?.total_comprometido),
-    total_disponible: toNumber(raw?.resumen_global?.total_disponible),
-    total_variacion: toNumber(raw?.resumen_global?.total_variacion),
-    porcentaje_ejecucion: toNumber(raw?.resumen_global?.porcentaje_ejecucion),
-    variacion_porcentaje: toNumber(raw?.resumen_global?.variacion_porcentaje),
-    total_centros: toNumber(raw?.resumen_global?.total_centros),
-    total_cuentas: toNumber(raw?.resumen_global?.total_cuentas),
-    alertas: {
-      sobregiros: toNumber(raw?.resumen_global?.alertas?.sobregiros),
-      advertencias: toNumber(raw?.resumen_global?.alertas?.advertencias),
-      normales: toNumber(raw?.resumen_global?.alertas?.normales),
-    },
-  },
-})
-
 export default function PresupuestoVsRealChart({ periodoId, centroId }: PresupuestoVsRealChartProps) {
   const { formatCurrency: formatLocalizedCurrency } = useLocalizedMoney()
+  const {session,loading:authLoading}=useAuth(),tenantId=session?.user?.tenant_id || ''
+  const readEpoch=useRef(0)
   const [data, setData] = useState<ComparacionData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedCentros, setExpandedCentros] = useState<Set<string>>(new Set())
-  const { apiCall } = useApi<any>({ retries: 2, timeoutMs: 12000, showErrorToast: false, throwOnError: true })
+  const { apiCall } = useApi<unknown>({requireLive:true,retries:0,timeoutMs:30000,throwOnError:true,showErrorToast:false})
 
-  const fetchComparacion = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      const result = await apiCall(`/contabilidad/presupuestos/comparacion/${periodoId}`)
-      setData(normalizeComparacionData(result?.data))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido')
-    } finally {
-      setLoading(false)
-    }
-  }, [apiCall, periodoId])
-
-  useEffect(() => {
-    fetchComparacion()
-  }, [fetchComparacion])
+  const fetchComparacion=useCallback(async()=>{
+    const run=++readEpoch.current;setLoading(true);setData(null);setError(null)
+    if(authLoading||!tenantId)return
+    try{const result=await apiCall(`/contabilidad/presupuestos/comparacion/${periodoId}`);const report=readBudgetComparison(result,tenantId,periodoId);if(run===readEpoch.current)setData(report)}
+    catch(cause){if(run===readEpoch.current)setError(cause instanceof Error?cause.message:'No se pudo consultar la comparación completa.')}
+    finally{if(run===readEpoch.current)setLoading(false)}
+  },[apiCall,periodoId,tenantId,authLoading])
+  useEffect(()=>{void fetchComparacion();return()=>{readEpoch.current++}},[fetchComparacion])
 
   useEffect(() => {
     if (centroId && data) {
@@ -350,7 +282,7 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
     return (
       <div className="p-8 bg-[#fef2f2] border rounded-xl text-destructive">
         <p className="m-0 font-semibold">Error al cargar la comparación</p>
-        <p className="mt-2 mr-0 mb-0 ml-0 text-[0.875rem]">{error}</p>
+        <p role="alert" className="mt-2 mr-0 mb-0 ml-0 text-[0.875rem]">{error}</p><button onClick={()=>void fetchComparacion()}>Reintentar</button>
       </div>
     )
   }

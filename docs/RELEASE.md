@@ -316,10 +316,14 @@ Reglas:
 
 ## Puesta en marcha ALKHOFAR
 
-1. Promoción DB-first de 570..582 con el procedimiento de esta guía: ensayo
-   sobre el respaldo PROD restaurado, preflight, respaldo de base y de Storage,
-   lote transaccional y readiness 582. El API y la web se despliegan después;
-   `render.yaml` ya exige 582. Esta promoción va antes de fusionar a `main`:
+1. Promoción DB-first de 570..590 con el procedimiento de esta guía: respaldo
+   nuevo de base y de Storage, ensayo sobre ese respaldo con
+   `node scripts/rehearse-promotion-local.mjs --dump <respaldo> --desde 570 --hasta 590`,
+   preflight, lote transaccional y readiness 590. El ensayo corre sin red, fuerza
+   un rollback, compara cada tabla y ejecuta los verificadores sobre esos datos; es
+   lo único que emula los privilegios por defecto de Supabase, que CI no tiene.
+   El API y la web se despliegan después; `render.yaml` ya exige 590. Esta
+   promoción va antes de fusionar a `main`:
    Render despliega `main` en cuanto pasan los checks (`autoDeployTrigger:
    checksPass`), y ese API no arranca sano contra un esquema anterior.
 2. Parametrización acordada con ALKHOFAR: base de facturación de cada contrato,

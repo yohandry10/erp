@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   AlertCircle,
@@ -25,7 +25,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useApi } from '@/hooks/use-api'
+import { useFinanceReport } from '@/hooks/use-finance-report'
+import { readCashflowReport } from '@/lib/finanzas/report-read-contract'
+import FinanceReportStatus from '@/components/finanzas/FinanceReportStatus'
 import { cn } from '@/lib/utils'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import { parseDateLocal } from '@/lib/date-utils'
@@ -92,80 +94,16 @@ const toNumber = (value: unknown) => {
   return Number.isFinite(numeric) ? numeric : 0
 }
 
-const normalizeFlujoCajaData = (raw: any): FlujoCajaData => ({
-  periodo: {
-    fecha_desde: raw?.periodo?.fecha_desde || '',
-    fecha_hasta: raw?.periodo?.fecha_hasta || '',
-    dias: toNumber(raw?.periodo?.dias),
-  },
-  cuentas_bancarias: Array.isArray(raw?.cuentas_bancarias) ? raw.cuentas_bancarias : [],
-  resumen: Array.isArray(raw?.resumen)
-    ? raw.resumen.map((resumen: any) => ({
-        moneda: resumen?.moneda || 'PEN',
-        saldo_actual: toNumber(resumen?.saldo_actual),
-        total_ingresos: toNumber(resumen?.total_ingresos),
-        total_egresos: toNumber(resumen?.total_egresos),
-        flujo_neto: toNumber(resumen?.flujo_neto),
-        saldo_proyectado: toNumber(resumen?.saldo_proyectado),
-        alerta: resumen?.alerta ?? null,
-      }))
-    : [],
-  proyeccion: Array.isArray(raw?.proyeccion)
-    ? raw.proyeccion.map((dia: any) => ({
-        fecha: dia?.fecha || '',
-        moneda: dia?.moneda || 'PEN',
-        saldo_inicial: toNumber(dia?.saldo_inicial),
-        ingresos: toNumber(dia?.ingresos),
-        egresos: toNumber(dia?.egresos),
-        flujo_neto: toNumber(dia?.flujo_neto),
-        saldo_final: toNumber(dia?.saldo_final),
-        items: Array.isArray(dia?.items)
-          ? dia.items.map((item: any) => ({
-              tipo: item?.tipo === 'EGRESO' ? 'EGRESO' : 'INGRESO',
-              concepto: item?.concepto || 'Movimiento',
-              descripcion: item?.descripcion || '',
-              monto: toNumber(item?.monto),
-              referencia_id: item?.referencia_id || '',
-            }))
-          : [],
-      }))
-    : [],
-  estadisticas: {
-    total_cxp_pendientes: toNumber(raw?.estadisticas?.total_cxp_pendientes),
-    total_cxc_pendientes: toNumber(raw?.estadisticas?.total_cxc_pendientes),
-    total_movimientos: toNumber(raw?.estadisticas?.total_movimientos),
-  },
-})
-
 export default function FlujoCajaPage() {
   const router = useRouter()
-  const { get } = useApi()
   const { currency, locale, formatCurrency: formatLocalizedCurrency } = useLocalizedMoney()
 
-  const [flujoCajaData, setFlujoCajaData] = useState<FlujoCajaData | null>(null)
-  const [loading, setLoading] = useState(true)
   const [diasProyeccion, setDiasProyeccion] = useState(90)
   const [monedaFiltro, setMonedaFiltro] = useState('TODAS')
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set())
 
-  const loadFlujoCaja = useCallback(async () => {
-    try {
-      setLoading(true)
-      const response = await get(`/api/finanzas/tesoreria/flujo-caja?dias_proyeccion=${diasProyeccion}`)
-
-      if (response?.success) {
-        setFlujoCajaData(normalizeFlujoCajaData(response.data))
-      }
-    } catch (error) {
-      console.error('Error loading flujo de caja:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [get, diasProyeccion])
-
-  useEffect(() => {
-    loadFlujoCaja()
-  }, [loadFlujoCaja])
+  const { data: flujoCajaData, loading, error, reload: loadFlujoCaja } = useFinanceReport<FlujoCajaData>(
+    `/api/finanzas/tesoreria/flujo-caja?dias_proyeccion=${diasProyeccion}`, readCashflowReport)
 
   const formatCurrency = (amount: number, moneda: string = currency) => {
     return formatLocalizedCurrency(toNumber(amount), moneda)
@@ -242,20 +180,8 @@ export default function FlujoCajaPage() {
           </CardContent>
         </Card>
 
-        {!flujoCajaData ? (
-          <Card className="border-cyan-400/20 bg-card/70 group-data-[erp-theme=light]/dashboard:bg-card">
-            <CardContent className="flex min-h-80 flex-col items-center justify-center gap-4 p-8 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-amber-300/30 bg-amber-300/10 text-amber-400 dark:text-amber-200">
-                <AlertCircle className="h-7 w-7" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">Error al cargar datos</h2>
-                <p className="mt-1 text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
-                  No se pudo cargar la proyección de flujo de caja.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+        {!flujoCajaData || error ? (
+          <FinanceReportStatus loading={false} retry={loadFlujoCaja} />
         ) : (
           <>
             <Card className="border-cyan-400/20 bg-card/70 group-data-[erp-theme=light]/dashboard:bg-card">

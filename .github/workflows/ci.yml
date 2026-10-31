@@ -148,8 +148,52 @@ jobs:
         run: pnpm --filter @erp-suite/web test:tenant-catalog
       - name: Candidate profile contract
         run: pnpm --filter @erp-suite/web test:candidate-profile
+      - name: Receivables complete live read contract
+        run: pnpm --filter @erp-suite/web test:cxc-read
+      - name: Frozen SIRE download integrity
+        run: pnpm --filter @erp-suite/web test:sire-download
+      - name: Verified receivables collection receipts
+        run: pnpm --filter @erp-suite/web test:cxc-collection
+      - name: Durable original receivables collection requests
+        run: pnpm --filter @erp-suite/web test:cxc-collection-operation
+      - name: Verified receivables adjustment receipts
+        run: pnpm --filter @erp-suite/web test:cxc-adjustments
+      - name: Durable original receivables adjustment requests
+        run: pnpm --filter @erp-suite/web test:cxc-adjustment-operation
+      - name: Complete scoped payables payment history
+        run: pnpm --filter @erp-suite/web test:cxp-history
+      - name: Original durable depreciation batch
+        run: pnpm --filter @erp-suite/web test:depreciation-batch
+      - name: Original durable asset update and retirement
+        run: pnpm --filter @erp-suite/web test:asset-lifecycle
+      - name: Asset creation SQL code and original request
+        run: pnpm --filter @erp-suite/web test:asset-create-code
+      - name: Readonly imported CPE history and fiscal state
+        run: pnpm --filter @erp-suite/web test:cpe-historical-read
+
+      - name: Wizard optional series and logo payload contracts
+        working-directory: apps/web
+        run: node node_modules/@playwright/test/cli.js test tests/e2e/wizard-company-read-contract.spec.ts tests/e2e/wizard-logo-contract.spec.ts --workers=1 --retries=0 --reporter=line
+        env:
+          PLAYWRIGHT_SKIP_GLOBAL_AUTH: "1"
+          PLAYWRIGHT_SKIP_WEBSERVER: "1"
+          E2E_ISOLATED_BROWSER: "1"
+          npm_lifecycle_event: test:e2e:isolated
+          SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:3002
+          E2E_API_ORIGIN: http://127.0.0.1:3002
+          BASE_URL: http://127.0.0.1:3001
+
+      - name: Verify CPE RA RC live read contract
+        run: pnpm --filter @erp-suite/web test:cpe-baja-read
       - name: Worker PROD-only configuration
         run: pnpm --filter @erp-suite/worker test:runtime-config
+      - name: Payroll payment fiscal-day boundaries
+        run: pnpm --filter @erp-suite/web test:payroll-payment-fiscal-date
+
+      - name: Requirement evidence rejects false acceptance
+        run: python -m unittest discover -s scripts/ci -p test_uat_evidence.py
 
       - name: Publicar reporte de cobertura
         if: always()
@@ -190,7 +234,7 @@ jobs:
           --health-retries 20
     env:
       E2E_EPHEMERAL_LOCAL_DB: "1"
-      REQUIRED_DATABASE_SCHEMA_VERSION: "582"
+      REQUIRED_DATABASE_SCHEMA_VERSION: "590"
       PGPASSWORD: postgres
       PGHOST: 127.0.0.1
       PGPORT: 5442

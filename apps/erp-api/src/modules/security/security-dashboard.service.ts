@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 
 @Injectable()
@@ -7,56 +7,38 @@ export class SecurityDashboardService {
 
   async getDashboardStats(days: number = 7) {
     const client = this.supabase.getClient();
-
-    // Get total violations
-    const { count: totalViolations } = await client
-      .from('rls_audit_log')
-      .select('*', { count: 'exact', head: true })
-      .gte('timestamp', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
-
-    // Get critical violations
-    const { count: criticalViolations } = await client
-      .from('rls_audit_log')
-      .select('*', { count: 'exact', head: true })
-      .eq('severity', 'CRITICAL')
-      .gte('timestamp', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
-
-    // Get unique users
-    const { data: uniqueUsersData } = await client
-      .from('rls_audit_log')
-      .select('user_id')
-      .gte('timestamp', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
-
-    const uniqueUsers = new Set(uniqueUsersData?.map(v => v.user_id).filter(Boolean)).size;
-
-    // Get tables affected
-    const { data: tablesData } = await client
-      .from('rls_audit_log')
-      .select('table_name')
-      .gte('timestamp', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
-
-    const tablesAffected = new Set(tablesData?.map(v => v.table_name)).size;
-
-    // Get total alerts
-    const { count: totalAlerts } = await client
+    // SQL counts DISTINCT across the complete period, beyond PostgREST's row cap.
+    const report = await this.getSecurityReport(days);
+    const metric = (name: string): number => {
+      const value = report[name];
+      if (!/^\d+$/.test(value ?? '') || !Number.isSafeInteger(Number(value))) {
+        throw new ServiceUnavailableException('No se pudieron consultar las estadísticas de seguridad');
+      }
+      return Number(value);
+    };
+    const { count: totalAlerts, error: alertsError } = await client
       .from('rls_alert_history')
       .select('*', { count: 'exact', head: true })
       .gte('triggered_at', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
 
-    // Get unacknowledged alerts
-    const { count: unacknowledgedAlerts } = await client
+    const { count: unacknowledgedAlerts, error: pendingError } = await client
       .from('rls_alert_history')
       .select('*', { count: 'exact', head: true })
       .eq('acknowledged', false);
 
+    if (alertsError || pendingError || !Number.isSafeInteger(totalAlerts) || !Number.isSafeInteger(unacknowledgedAlerts)
+      || totalAlerts! < 0 || unacknowledgedAlerts! < 0) {
+      throw new ServiceUnavailableException('No se pudieron consultar las alertas de seguridad');
+    }
+
     return {
       period: `${days} días`,
-      totalViolations: totalViolations || 0,
-      criticalViolations: criticalViolations || 0,
-      uniqueUsers,
-      tablesAffected,
-      totalAlerts: totalAlerts || 0,
-      unacknowledgedAlerts: unacknowledgedAlerts || 0,
+      totalViolations: metric('total_violations'),
+      criticalViolations: metric('critical_violations'),
+      uniqueUsers: metric('unique_users'),
+      tablesAffected: metric('tables_affected'),
+      totalAlerts,
+      unacknowledgedAlerts,
     };
   }
 
@@ -68,8 +50,8 @@ export class SecurityDashboardService {
       .order('total_violations', { ascending: false })
       .limit(20);
 
-    if (error) throw error;
-    return data || [];
+    if (error || !Array.isArray(data)) throw new ServiceUnavailableException('No se pudieron consultar las violaciones de seguridad');
+    return data;
   }
 
   async getRecentViolations(limit: number = 50) {
@@ -80,8 +62,8 @@ export class SecurityDashboardService {
       .order('timestamp', { ascending: false })
       .limit(limit);
 
-    if (error) throw error;
-    return data || [];
+    if (error || !Array.isArray(data)) throw new ServiceUnavailableException('No se pudieron consultar las violaciones de seguridad');
+    return data;
   }
 
   async getViolationsByUser() {
@@ -92,8 +74,8 @@ export class SecurityDashboardService {
       .order('total_violations', { ascending: false })
       .limit(20);
 
-    if (error) throw error;
-    return data || [];
+    if (error || !Array.isArray(data)) throw new ServiceUnavailableException('No se pudieron consultar las violaciones de seguridad');
+    return data;
   }
 
   async getViolationsHourly() {
@@ -104,8 +86,8 @@ export class SecurityDashboardService {
       .order('hour', { ascending: false })
       .limit(168); // 7 days * 24 hours
 
-    if (error) throw error;
-    return data || [];
+    if (error || !Array.isArray(data)) throw new ServiceUnavailableException('No se pudieron consultar las violaciones de seguridad');
+    return data;
   }
 
   async getRecentAlerts() {
@@ -115,8 +97,8 @@ export class SecurityDashboardService {
       .select('*')
       .order('triggered_at', { ascending: false });
 
-    if (error) throw error;
-    return data || [];
+    if (error || !Array.isArray(data)) throw new ServiceUnavailableException('No se pudieron consultar las alertas de seguridad');
+    return data;
   }
 
   async getUnacknowledgedAlerts() {
@@ -126,8 +108,8 @@ export class SecurityDashboardService {
       .select('*')
       .order('triggered_at', { ascending: false });
 
-    if (error) throw error;
-    return data || [];
+    if (error || !Array.isArray(data)) throw new ServiceUnavailableException('No se pudieron consultar las alertas de seguridad');
+    return data;
   }
 
   async getSecurityReport(days: number = 7) {
@@ -135,15 +117,19 @@ export class SecurityDashboardService {
     const { data, error } = await client
       .rpc('generate_rls_security_report', { p_days: days });
 
-    if (error) throw error;
+    if (error || !Array.isArray(data)) throw new ServiceUnavailableException('No se pudo consultar el informe de seguridad');
     
-    // Convert array of {metric, value} to object
+    // Reject a partial or contradictory report before publishing any metric.
     const report: Record<string, string> = {};
-    if (data) {
-      data.forEach((row: { metric: string; value: string }) => {
-        report[row.metric] = row.value;
-      });
+    const names = new Set(['periodo', 'total_violations', 'critical_violations', 'unique_users', 'tables_affected']);
+    for (const row of data) {
+      if (!row || !names.has(row.metric) || Object.prototype.hasOwnProperty.call(report, row.metric)
+        || typeof row.value !== 'string' || !/^\d+$/.test(row.value) || !Number.isSafeInteger(Number(row.value))) {
+        throw new ServiceUnavailableException('El informe de seguridad está incompleto');
+      }
+      report[row.metric] = row.value;
     }
+    if (Object.keys(report).length !== names.size) throw new ServiceUnavailableException('El informe de seguridad está incompleto');
     
     return report;
   }

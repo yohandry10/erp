@@ -19,6 +19,29 @@ pnpm build
 Para pruebas con escritura se usa el runner aislado
 `node scripts/ci/run-peru-integrated-local.mjs --browser`, que crea y elimina
 únicamente su infraestructura efímera y no carga secretos productivos.
+El UAT570 conservado usa web3310/API3311 y
+`artifacts/peru-uat-stack-570.mjs resume|restart-api|restart-web`; no se resetea
+su contenedor con operaciones de aceptación. Las pruebas de escritorio usan
+identificadores y carpetas WebView2 separados para servidor local y paquete
+estático. `E2E_TAURI_STATIC=1` añade sólo `http://tauri.localhost` al CORS del
+harness, cuyo PostgreSQL/PostgREST y web siguen obligatoriamente en loopback.
+No modifica el CORS productivo. El build nativo con `NEXT_DIST_DIR` exporta en
+ese directorio; el override de prueba debe usarlo como `frontendDist`.
+La583 local incluye SELECT de `service_role` en `documento_archivos` para la
+relación consultada al descargar documentos, y en `cxc_cobro_reversas` para
+consultar la trazabilidad de anulación financiera CPE. También incluye SELECT
+del servidor en `producto_precios_sucursal` y `producto_stock_sucursal` para
+la consulta opcional histórica `includeSucursal`; el stock operativo sigue
+en `producto_existencias`/`stock_por_sucursal`. La lectura del reparto de una
+línea contable requiere además SELECT del servidor en `distribucion_analitica`;
+su alta y eliminación conservan las RPC transaccionales. No añadeDML ni cambiaRLS,
+owner o permisos de clientes. El gatefresh/restore y la aplicación local
+`document-files-read-local-ddl.json`, `cpe-cancellation-read-local-ddl.json`
+y `product-branch-read-local-ddl.json`
+contrastan preservación de todas las filas y demás ACL. Los permisos DML que
+ya existían en el respaldo restaurado se conservan; el verificador exige el
+SELECT nuevo sin delegación. Sigue sin promoción
+aPROD569. No ejecutar el grant por separado enPROD.
 El arranque operativo requiere primero el preflight PROD indicado más abajo;
 después se ejecuta el paquete compilado mediante `pnpm --filter @erp-suite/erp-api start`.
 

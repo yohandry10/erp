@@ -1,0 +1,10 @@
+{
+  "completedAt": "2026-10-20T08:11:41.892Z",
+  "success": true,
+  "withBrowser": true,
+  "block": "dashboard",
+  "scope": "dashboard_home_subset",
+  "database": "PostgreSQL 16 efímero (migraciones completas)",
+  "output": "artifacts\\peru-dashboard-local-20261020080915828-25208",
+  "remoteWrites": false
+}

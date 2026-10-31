@@ -1,5 +1,6 @@
 'use client'
 
+import { requestConfirmation } from '@/lib/confirm-action'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
@@ -98,8 +99,8 @@ export default function NuevoAsientoPage() {
     }
   }
 
-  const handleCancel = () => {
-    if (confirm('¿Esta seguro de cancelar? Se perderan los datos ingresados.')) {
+  const handleCancel = async () => {
+    if ((await requestConfirmation('¿Esta seguro de cancelar? Se perderan los datos ingresados.'))) {
       router.push('/dashboard/contabilidad/asientos')
     }
   }
@@ -186,7 +187,11 @@ export default function NuevoAsientoPage() {
         {error && (
           <div role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-foreground">
             <p className="font-semibold">No se pudo confirmar el guardado</p>
-            <p className="mt-1 text-sm">{error}</p>
+            <p className="mt-1 text-sm">
+              {error.includes('MANUAL_ACCOUNTING_PERIOD_NOT_OPEN')
+                ? 'El período contable de la fecha del asiento no está abierto: créelo o revise su estado en Contabilidad > Períodos.'
+                : error}
+            </p>
             <a href="/dashboard/contabilidad/periodos/" target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm text-primary underline">
               Revisar períodos contables en otra pestaña
             </a>

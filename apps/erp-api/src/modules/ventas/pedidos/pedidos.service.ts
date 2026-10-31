@@ -1,3 +1,5 @@
+import { readCompleteCatalog } from '../../../shared/utils/complete-catalog-read';
+import { requireTenantRecord } from '../../../shared/utils/require-tenant-record';
 import { Injectable, BadRequestException, ConflictException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { Decimal } from 'decimal.js';
@@ -1368,6 +1370,10 @@ export class PedidosService {
   }> {
     const client = this.supabase.getClient();
 
+    // El pedido va primero: uno ajeno o inexistente es 404 aunque la empresa que
+    // consulta no tenga su configuración fiscal completa.
+    let pedido = await this.findOne(id, tenantId);
+
     // 0. VALIDAR CONFIGURACIÓN COMPLETA ANTES DE CONTINUAR
     const { data: empresaConfig, error: configError } = await client
       .from('empresa_config')
@@ -1375,8 +1381,13 @@ export class PedidosService {
       .eq('tenant_id', tenantId)
       .single();
 
-    if (configError || !empresaConfig) {
-      throw new BadRequestException(
+    // Una lectura caída no es una configuración incompleta: pedir el wizard haría
+    // rehacer datos que sí existen.
+    if (configError && configError.code !== 'PGRST116') {
+      throw readUnavailable('la configuración de la empresa');
+    }
+    if (!empresaConfig) {
+      throw new ConflictException(
         'No se puede generar factura: La configuración de la empresa no está completa. Por favor, complete el wizard de configuración inicial.',
       );
     }
@@ -1399,27 +1410,14 @@ export class PedidosService {
     }
 
     if (camposFaltantes.length > 0) {
-      throw new BadRequestException(
+      throw new ConflictException(
         `No se puede generar factura: Faltan los siguientes datos de configuración: ${camposFaltantes.join(', ')}. Por favor, complete el wizard de configuración inicial.`,
       );
     }
 
-    // 1. Obtener pedido
-    let pedido = await this.findOne(id, tenantId);
-
-    // 2. Validar estado (considerando flujo simplificado)
-    const config = await this.obtenerConfiguracionEmpresa(tenantId);
-    const esFlujoSimplificado = !config.usar_flujo_logistica;
-    const puedeFacturar =
-      pedido.estado === EstadoPedido.LISTO_FACTURAR ||
-      (esFlujoSimplificado && pedido.estado === EstadoPedido.CONFIRMADO);
-
-    if (!puedeFacturar) {
-      throw new BadRequestException(
-        `No se puede generar factura para un pedido en estado ${pedido.estado}`,
-      );
-    }
-
+    // 1-2. Un pedido ya facturado devuelve su comprobante antes de mirar el
+    // estado: tras perder la respuesta el reintento llega con FACTURADO y antes
+    // respondía 400 aunque la factura existía.
     if (pedido.factura_id) {
       console.log(`ℹ️ [PedidosService] Pedido ${id} ya tiene factura ${pedido.factura_id}, retornando datos actuales`);
       const demoExistente = await this.obtenerRepresentacionDemoCpePersistida(
@@ -1443,6 +1441,18 @@ export class PedidosService {
       };
     }
 
+    const config = await this.obtenerConfiguracionEmpresa(tenantId);
+    const esFlujoSimplificado = !config.usar_flujo_logistica;
+    const puedeFacturar =
+      pedido.estado === EstadoPedido.LISTO_FACTURAR ||
+      (esFlujoSimplificado && pedido.estado === EstadoPedido.CONFIRMADO);
+
+    if (!puedeFacturar) {
+      throw new ConflictException(
+        `No se puede generar factura para un pedido en estado ${pedido.estado}`,
+      );
+    }
+
     // 3. Obtener configuración
     if (config.usar_flujo_logistica) {
       const pendientesDespacho = pedido.detalle.some((item) => {
@@ -1452,7 +1462,7 @@ export class PedidosService {
       });
 
       if (pendientesDespacho) {
-        throw new BadRequestException('No se puede generar la factura: existen ítems pendientes de despacho.');
+        throw new ConflictException('No se puede generar la factura: existen ítems pendientes de despacho.');
       }
     }
 
@@ -1611,11 +1621,9 @@ export class PedidosService {
    */
   async obtenerGreAsociadas(pedidoId: string, tenantId: string) {
     const client = this.supabase.getClient();
-
-    const { data, error } = await client
-      .from('pedido_gres')
-      .select(`
-        id,
+    await requireTenantRecord(client, 'pedidos_venta', tenantId, pedidoId, 'Pedido');
+    const data = await readCompleteCatalog(client, 'pedido_gres', `
+        id,tenant_id,pedido_id,
         estado,
         notas,
         creado_en,
@@ -1633,16 +1641,11 @@ export class PedidosService {
           placa_vehiculo,
           licencia_conducir
         )
-      `)
-      .eq('tenant_id', tenantId)
-      .eq('pedido_id', pedidoId)
-      .order('creado_en', { ascending: false });
-
-    if (error) {
-      throw new BadRequestException('Error al obtener las GRE asociadas al pedido');
-    }
-
-    return (data || []).map((item: any) => ({
+      `,
+      query => query.eq('tenant_id', tenantId).eq('pedido_id', pedidoId),
+      row => row.tenant_id === tenantId && row.pedido_id === pedidoId,
+      [['creado_en', false], ['id', false]]);
+    return data.map((item: any) => ({
       id: item.id,
       estado: item.estado,
       notas: item.notas ?? null,

@@ -67,8 +67,9 @@ export default function RecepcionesPage() {
 
       if (response?.success) {
         // El API expone las líneas como `items`; se normalizan al shape `detalles` que usa esta vista.
-        const ordenes = (response.data || []).map((orden: OrdenCompra) => ({
+        const ordenes = (response.data || []).map((orden: OrdenCompra & { proveedores?: OrdenCompra['proveedor'] }) => ({
           ...orden,
+          proveedor: orden.proveedor ?? orden.proveedores,
           detalles:
             orden.detalles && orden.detalles.length > 0
               ? orden.detalles

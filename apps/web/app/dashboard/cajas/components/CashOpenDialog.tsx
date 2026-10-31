@@ -1,5 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApi } from '@/hooks/use-api';
+import { useCashRead } from '@/hooks/use-cash-read';
+import { confirmCashOpening, readCashRegisters } from '@/lib/cash-read-contract';
 import { DenominationForm, Denominaciones } from './DenominationForm';
 import { CashDialogFrame } from './CashDialogFrame';
 import { useCountryContext } from '@/hooks/use-country-context';
@@ -20,50 +22,35 @@ interface Caja {
 export function CashOpenDialog({ isOpen, onClose, onSuccess }: CashOpenDialogProps) {
     const country = useCountryContext();
     const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$');
-    const { get, post } = useApi();
+    const { post } = useApi({ throwOnError: true, requireLive: true, showErrorToast: false });
     const [step, setStep] = useState<'SELECT_CAJA' | 'AMOUNT' | 'CONFIRM'>('SELECT_CAJA');
-    const [cajas, setCajas] = useState<Caja[]>([]);
+    const registers = useCashRead<Caja[]>('/cajas', readCashRegisters, isOpen);
+    const cajas = (registers.data || []).filter(c => c.estado === 'ACTIVO');
+    const generation = useRef(0);
     const [selectedCajaId, setSelectedCajaId] = useState<string>('');
     const [montoInicio, setMontoInicio] = useState<number>(0);
     const [denominaciones, setDenominaciones] = useState<Denominaciones>({ billetes: {}, monedas: {} });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const cargarCajas = useCallback(async () => {
-        try {
-            setLoading(true);
-            const response = await get('/cajas');
-            if (response?.success) {
-                // `estado` describe si la caja (registradora) está habilitada
-                // ('ACTIVO'/'INACTIVO'), no si hay una sesión abierta. Filtrar por
-                // 'CERRADA' dejaba el diálogo vacío en tenants nuevos, cuya caja
-                // se siembra como 'ACTIVO'. El backend rechaza abrir una sesión si
-                // ya hay una abierta, así que basta con excluir cajas deshabilitadas.
-                const cajasDisponibles = (response.data as Caja[]).filter(
-                    (c) => String(c.estado).toUpperCase() !== 'INACTIVO',
-                );
-                setCajas(cajasDisponibles);
-                if (cajasDisponibles.length === 1) {
-                    setSelectedCajaId(cajasDisponibles[0].id);
-                    setStep('AMOUNT');
-                }
-            }
-        } catch (err: any) {
-            setError('Error cargando cajas disponibles');
-        } finally {
-            setLoading(false);
-        }
-    }, [get]);
+    useEffect(() => {
+        generation.current += 1;
+        setLoading(false);
+        setStep('SELECT_CAJA');
+        setSelectedCajaId('');
+        setMontoInicio(0);
+        setDenominaciones({ billetes: {}, monedas: {} });
+        setError(null);
+        return () => { generation.current += 1; };
+    }, [isOpen, registers.key]);
 
     useEffect(() => {
-        if (isOpen) {
-            cargarCajas();
-            setStep('SELECT_CAJA');
-            setMontoInicio(0);
-            setDenominaciones({ billetes: {}, monedas: {} });
-            setError(null);
+        const available = registers.data?.filter(c => c.estado === 'ACTIVO');
+        if (isOpen && available?.length === 1) {
+            setSelectedCajaId(available[0].id);
+            setStep('AMOUNT');
         }
-    }, [cargarCajas, isOpen]);
+    }, [isOpen, registers.data]);
 
     const handleDenominationSubmit = (denom: Denominaciones, total: number) => {
         setDenominaciones(denom);
@@ -72,6 +59,8 @@ export function CashOpenDialog({ isOpen, onClose, onSuccess }: CashOpenDialogPro
     };
 
     const handleOpenSession = async () => {
+        if (registers.loading || registers.error || !cajas.some(c => c.id === selectedCajaId) || loading) return;
+        const current = generation.current;
         try {
             setLoading(true);
             setError(null);
@@ -87,17 +76,15 @@ export function CashOpenDialog({ isOpen, onClose, onSuccess }: CashOpenDialogPro
 
             const response = await post(`/cajas/${selectedCajaId}/apertura`, payload);
 
-            if (response?.success) {
-                onSuccess();
-                onClose();
-            } else {
-                throw new Error(response?.message || 'Error al abrir caja');
-            }
+            confirmCashOpening(response, selectedCajaId, montoInicio);
+            if (current !== generation.current) return;
+            onSuccess();
+            onClose();
         } catch (err: any) {
             console.error('Error abriendo caja:', err);
-            setError(err.message || 'Error desconocido al abrir caja');
+            if (current === generation.current) setError(err.message || 'Error desconocido al abrir caja');
         } finally {
-            setLoading(false);
+            if (current === generation.current) setLoading(false);
         }
     };
 
@@ -111,6 +98,8 @@ export function CashOpenDialog({ isOpen, onClose, onSuccess }: CashOpenDialogPro
             className="sm:max-w-3xl"
         >
             <div className="w-full text-left">
+                {registers.loading && <p>Cargando cajas disponibles...</p>}
+                {registers.error && <div role="alert">{registers.error}<button type="button" onClick={registers.reload}>Reintentar cajas</button></div>}
 
                                 {error && (
                                     <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 p-4">
@@ -127,12 +116,14 @@ export function CashOpenDialog({ isOpen, onClose, onSuccess }: CashOpenDialogPro
                                     </div>
                                 )}
 
-                                {step === 'SELECT_CAJA' && (
+                                {registers.data && step === 'SELECT_CAJA' && (
                                     <div className="space-y-4">
                                         <p className="text-sm text-muted-foreground">Seleccione la caja que desea abrir:</p>
                                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                             {cajas.map((caja) => (
-                                                <div
+                                                <button
+                                                    type="button"
+                                                    aria-label={`Abrir caja ${caja.nombre}`}
                                                     key={caja.id}
                                                     onClick={() => {
                                                         setSelectedCajaId(caja.id);
@@ -141,20 +132,19 @@ export function CashOpenDialog({ isOpen, onClose, onSuccess }: CashOpenDialogPro
                                                     className="relative rounded-lg border border-border bg-card px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-blue-500 hover:ring-1 hover:ring-blue-500 cursor-pointer"
                                                 >
                                                     <div className="flex-1 min-w-0">
-                                                        <span className="absolute inset-0" aria-hidden="true" />
                                                         <p className="text-sm font-medium text-foreground">{caja.nombre}</p>
                                                         <p className="text-sm text-muted-foreground truncate">{caja.codigo}</p>
                                                     </div>
-                                                </div>
+                                                </button>
                                             ))}
                                         </div>
                                         {cajas.length === 0 && !loading && (
-                                            <p className="text-center text-muted-foreground py-4">No hay cajas disponibles para abrir.</p>
+                                            <p className="text-center text-muted-foreground py-4">No hay cajas disponibles para abrir. Regístrela en «Cajas registradas» con el botón «Nueva caja».</p>
                                         )}
                                     </div>
                                 )}
 
-                                {step === 'AMOUNT' && (
+                                {registers.data && step === 'AMOUNT' && (
                                     <div>
                                         <p className="text-sm text-muted-foreground mb-4">Ingrese el detalle del efectivo inicial:</p>
                                         <DenominationForm onSubmit={handleDenominationSubmit} />
@@ -170,7 +160,7 @@ export function CashOpenDialog({ isOpen, onClose, onSuccess }: CashOpenDialogPro
                                     </div>
                                 )}
 
-                                {step === 'CONFIRM' && (
+                                {registers.data && step === 'CONFIRM' && (
                                     <div className="space-y-6">
                                         <div className="bg-primary/10 border border-primary/20 p-4 rounded-md">
                                             <h4 className="text-sm font-medium text-primary mb-2">Resumen de Apertura</h4>

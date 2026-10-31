@@ -1,5 +1,6 @@
 'use client'
 
+import { requestConfirmation } from '@/lib/confirm-action'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useApiCall } from '@/hooks/use-api'
@@ -92,7 +93,7 @@ export default function CrearTenants() {
   }
 
   const handleDeleteTenant = async (tenant: Tenant) => {
-    if (!confirm(`¿Estás seguro de que deseas eliminar la empresa "${tenant.razon_social}"?\n\nEsta acción no se puede deshacer.`)) {
+    if (!(await requestConfirmation(`¿Estás seguro de que deseas eliminar la empresa "${tenant.razon_social}"?\n\nEsta acción no se puede deshacer.`))) {
       return
     }
 

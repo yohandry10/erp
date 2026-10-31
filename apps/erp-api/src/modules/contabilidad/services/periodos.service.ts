@@ -1,4 +1,5 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { lecturaContableFallida } from '../contabilidad-errors';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { createHash } from 'crypto';
 import { periodoContableDelTenant } from '../../../shared/utils/fecha-tenant.util';
@@ -143,7 +144,7 @@ export class PeriodosService {
 
     if (error) {
       console.error('❌ [Periodos] Error obteniendo períodos:', error);
-      throw new Error(`Error obteniendo períodos contables: ${error.message}`);
+      throw lecturaContableFallida(error, 'los períodos contables');
     }
 
     return (data || []) as PeriodoContable[];
@@ -298,28 +299,41 @@ export class PeriodosService {
    * saberlo. 360 días es el umbral que no necesita otra prueba.
    */
   async provisionarCobranzaDudosa(
-    tenantId: string,
-    periodo: string,
-    usuarioId: string,
-    diasVencido = 360,
+    tenantId: string, periodo: string, usuarioId: string, diasVencido = 360,
+    idempotencyKey?: string,
   ): Promise<Record<string, unknown>> {
-    const { data, error } = await this.supabaseService.getClient().rpc(
-      'provisionar_cobranza_dudosa_tx',
-      {
-        p_tenant_id: tenantId,
-        p_periodo: periodo,
-        p_actor_id: usuarioId,
-        p_dias_vencido: diasVencido,
-      },
-    );
-
-    if (error) {
-      throw new BadRequestException(
-        error.message || `No se pudo provisionar la cobranza dudosa de ${periodo}`,
-      );
+    if (!/^(20[0-9]{2}|21[0-9]{2}|2200)-(0[1-9]|1[0-2])$/.test(periodo) ||
+        !Number.isInteger(diasVencido) || diasVencido < 1 || diasVencido > 2147483647) {
+      throw new BadRequestException('El período y la antigüedad de la estimación son inválidos.');
     }
-
+    const key = idempotencyKey === undefined
+      ? `period-provision:${createHash('sha256').update(JSON.stringify({ tenantId, usuarioId, periodo, diasVencido })).digest('hex')}`
+      : idempotencyKey.trim().toLowerCase();
+    if (key.length < 8 || key.length > 200) throw new BadRequestException('La clave de confirmación es inválida.');
+    const { data, error } = await this.supabaseService.getClient().rpc('provisionar_cobranza_dudosa_tx_570', {
+      p_tenant_id: tenantId, p_periodo: periodo, p_actor_id: usuarioId,
+      p_dias_vencido: diasVencido, p_idempotency_key: key,
+    });
+    if (error) {
+      if (['22023', '23514', '42501'].includes(error.code)) {
+        throw new BadRequestException('No se pudo confirmar la estimación. Revisa el período, permisos, moneda y criterio conservado.');
+      }
+      throw new ServiceUnavailableException('No se pudo confirmar la estimación. Reintenta con los mismos datos y conexión.');
+    }
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      throw new ServiceUnavailableException('La estimación no devolvió un resultado verificable.');
+    }
     return data as Record<string, unknown>;
+  }
+
+  async validarCierre(tenantId: string, periodoId: string, actorId: string) {
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'validar_cierre_periodo_contable_570',
+      { p_tenant_id: tenantId, p_periodo_id: periodoId, p_actor_id: actorId },
+    );
+    if (error) throw new ServiceUnavailableException('No se pudieron verificar las condiciones de cierre. Vuelva a intentar.');
+    if (!data) throw new NotFoundException('Período no encontrado');
+    return data;
   }
 
   async cerrarPeriodo(

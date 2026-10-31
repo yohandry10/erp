@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   AlertTriangle,
@@ -15,6 +15,9 @@ import {
   CheckCircle2
 } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
+import { useAuth } from '@/contexts/AuthContext'
+import { readScopedBudgetAlerts, type BudgetAlertScope } from '@/lib/accounting-budget-alert-scope'
+import { readPeriodCatalog, type PeriodSnapshot } from '@/lib/accounting-period-read'
 import { useCountryContext } from '@/hooks/use-country-context'
 
 interface Alerta {
@@ -48,6 +51,7 @@ interface Alerta {
 }
 
 interface ResumenAlertas {
+  consulta: BudgetAlertScope
   total_alertas: number
   sobregiros: {
     cantidad: number
@@ -67,50 +71,46 @@ const toNumber = (value: unknown) => {
   return Number.isFinite(numeric) ? numeric : 0
 }
 
-const toArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? value : [])
-
-const normalizeResumen = (raw: any): ResumenAlertas => ({
-  total_alertas: toNumber(raw?.total_alertas),
-  sobregiros: {
-    cantidad: toNumber(raw?.sobregiros?.cantidad),
-    total_excedente: toNumber(raw?.sobregiros?.total_excedente),
-    alertas: toArray<Alerta>(raw?.sobregiros?.alertas),
-  },
-  advertencias: {
-    cantidad: toNumber(raw?.advertencias?.cantidad),
-    total_en_riesgo: toNumber(raw?.advertencias?.total_en_riesgo),
-    alertas: toArray<Alerta>(raw?.advertencias?.alertas),
-  },
-  fecha_generacion: raw?.fecha_generacion || new Date().toISOString(),
-})
-
 export default function AlertasSobregirosPage() {
+ const {session}=useAuth()
+ return <BudgetAlertsWorkspace key={`${session?.user?.tenant_id || ''}:${session?.user?.id || ''}`} />
+}
+function BudgetAlertsWorkspace() {
+ const {session,loading:authLoading}=useAuth(),tenantId=session?.user?.tenant_id || ''
+ const readEpoch=useRef(0)
   const router = useRouter()
   const country = useCountryContext()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [resumen, setResumen] = useState<ResumenAlertas | null>(null)
+  const [selectedPeriodId,setSelectedPeriodId]=useState('')
+  const [periodos,setPeriodos]=useState<PeriodSnapshot[]>([])
   const [filtroNivel, setFiltroNivel] = useState<'TODOS' | 'SOBREGIRO' | 'ADVERTENCIA'>('TODOS')
   const [error, setError] = useState<string | null>(null)
-  const { apiCall } = useApi<any>({ retries: 2, timeoutMs: 12000, showErrorToast: false })
+  const { apiCall } = useApi<unknown>({requireLive:true,retries:0,timeoutMs:30000,throwOnError:true,showErrorToast:false})
 
-  const fetchAlertas = useCallback(async () => {
-    try {
-      setError(null)
-      const result = await apiCall('/contabilidad/presupuestos/alertas/resumen')
-      setResumen(normalizeResumen(result?.data))
-    } catch (err) {
-      console.error('Error fetching alertas:', err)
-      setError(err instanceof Error ? err.message : 'Error desconocido')
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
+  const fetchAlertas=useCallback(async()=>{
+    const run=++readEpoch.current;setLoading(true);setResumen(null);setError(null)
+    if(authLoading||!tenantId)return
+    try{
+      const [result,catalog]=await Promise.all([
+        apiCall('/contabilidad/presupuestos/alertas/resumen',{params:selectedPeriodId?{periodo_id:selectedPeriodId}:undefined}),
+        apiCall('/contabilidad/periodos')
+      ])
+      const periods=readPeriodCatalog(catalog,tenantId),report=readScopedBudgetAlerts(result,tenantId,selectedPeriodId||undefined)
+      if(selectedPeriodId&&!periods.some(p=>p.id===selectedPeriodId))throw new Error('El período seleccionado ya no está disponible en esta empresa.')
+      const actual=report.consulta.periodo
+      if(actual&&!periods.some(p=>p.id===actual.id&&p.anio===actual.anio&&p.mes===actual.mes&&p.estado===actual.estado))throw new Error('El período de las alertas cambió. Reintenta su consulta actual.')
+      if(!selectedPeriodId){
+        const latest=periods.find(p=>p.estado==='ABIERTO')
+        if((latest?.id||null)!==(actual?.id||null))throw new Error('El último período abierto cambió entre consultas. Reintenta sus alertas actuales.')
+      }
+      if(run===readEpoch.current){setPeriodos(periods);setResumen(report)}
     }
-  }, [apiCall])
-
-  useEffect(() => {
-    fetchAlertas()
-  }, [fetchAlertas])
+    catch(cause){if(run===readEpoch.current)setError(cause instanceof Error?cause.message:'No se pudieron consultar las alertas completas.')}
+    finally{if(run===readEpoch.current){setLoading(false);setRefreshing(false)}}
+  },[apiCall,tenantId,authLoading,selectedPeriodId])
+  useEffect(()=>{void fetchAlertas();return()=>{readEpoch.current++}},[fetchAlertas])
 
   const handleRefresh = () => {
     setRefreshing(true)
@@ -148,46 +148,6 @@ export default function AlertasSobregirosPage() {
     return nivel === 'SOBREGIRO' ? '#fecaca' : '#fde68a'
   }
 
-  if (loading) {
-    return (
-      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
-        <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8 mb-8">
-          <div>
-            <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Alertas de Sobregiro Presupuestal</h1>
-            <p className="mt-2 text-base text-muted-foreground">
-              Monitoreo de presupuestos con advertencias, sobregiros y límites de ejecución.
-            </p>
-          </div>
-        </div>
-        <div className="flex justify-center items-center min-h-[400px]">
-          <div className="text-center">
-            <RefreshCw size={48} className="text-blue-500" />
-            <p className="text-muted-foreground text-base">
-              Cargando alertas de sobregiro...
-            </p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
-        <div className="p-8 bg-[#fef2f2] border rounded-xl text-center">
-          <AlertCircle size={48} className="text-red-500" />
-          <h3 className="text-destructive mb-2">Error al cargar alertas</h3>
-          <p className="text-destructive mb-4">{error}</p>
-          <button
-            onClick={handleRefresh} className="py-3 px-6 bg-red-500 text-white border-0 rounded-lg cursor-pointer text-[0.875rem] font-semibold"
-          >
-            Reintentar
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   const alertasFiltradas = getAlertasFiltradas()
 
   return (
@@ -218,6 +178,20 @@ export default function AlertasSobregirosPage() {
           {refreshing ? 'Actualizando...' : 'Actualizar'}
         </button>
       </div>
+
+      <div className="mb-6 rounded-xl border border-border bg-card p-4">
+        <label htmlFor="budget-alert-period" className="mb-2 block font-semibold">Período consultado</label>
+        <select id="budget-alert-period" className="w-full rounded-lg border border-border bg-card p-3" value={selectedPeriodId} disabled={loading||authLoading||!!error} onChange={e=>{readEpoch.current++;setResumen(null);setError(null);setSelectedPeriodId(e.target.value)}}>
+          <option value="">Último período abierto</option>
+          {periodos.map(p=><option key={p.id} value={p.id}>{p.anio}-{String(p.mes).padStart(2,'0')} · {p.estado}</option>)}
+        </select>
+        {resumen&&<div data-testid="budget-alert-scope" className="mt-3 text-sm">
+          <p>{resumen.consulta.periodo?`Período ${resumen.consulta.periodo.anio}-${String(resumen.consulta.periodo.mes).padStart(2,'0')} · ${resumen.consulta.periodo.estado}`:'Sin períodos abiertos disponibles'}</p>
+          <p>Presupuestos activos evaluados: {resumen.consulta.presupuestos_evaluados}. Esta consulta no incluye otros períodos ni presupuestos bloqueados o cerrados.</p>
+        </div>}
+      </div>
+      {loading&&<p role="status">Consultando el período y sus alertas...</p>}
+      {error&&<section className="mb-6 rounded-xl border border-destructive p-4"><p role="alert">{error}</p><button onClick={handleRefresh}>Reintentar</button></section>}
 
       {/* Resumen Cards */}
       {resumen && (
@@ -282,7 +256,7 @@ export default function AlertasSobregirosPage() {
       )}
 
       {/* Filtros */}
-      <div className="flex gap-4 mb-6 flex-wrap">
+      {resumen&&<div className="flex gap-4 mb-6 flex-wrap">
         {(['TODOS', 'SOBREGIRO', 'ADVERTENCIA'] as const).map((nivel) => (
           <button
             key={nivel}
@@ -291,17 +265,17 @@ export default function AlertasSobregirosPage() {
             {nivel === 'TODOS' ? 'Todas' : nivel === 'SOBREGIRO' ? 'Sobregiros' : 'Advertencias'}
           </button>
         ))}
-      </div>
+      </div>}
 
       {/* Lista de Alertas */}
-      {alertasFiltradas.length === 0 ? (
+      {resumen && (alertasFiltradas.length === 0 ? (
         <div className="p-12 bg-card rounded-xl text-center">
           <CheckCircle2 size={64} className="text-[#10b981]" />
           <h3 className="text-foreground mb-2">
-            ¡No hay alertas activas!
+            {!resumen.consulta.periodo?'No hay períodos abiertos disponibles':resumen.consulta.presupuestos_evaluados===0?'No hay presupuestos activos en este período':filtroNivel==='SOBREGIRO'?'No hay sobregiros en este período':filtroNivel==='ADVERTENCIA'?'No hay advertencias en este período':'Sin advertencias ni sobregiros en este período'}
           </h3>
           <p className="text-muted-foreground m-0">
-            Todos los presupuestos están dentro de los límites normales
+            {!resumen.consulta.periodo?'Selecciona un período disponible para consultar sus presupuestos.':resumen.consulta.presupuestos_evaluados===0?'La ausencia de presupuestos activos no indica normalidad de otros períodos.':filtroNivel==='TODOS'?'No se detectaron alertas entre los presupuestos activos evaluados.':`El filtro no muestra otras categorías. Advertencias: ${resumen.advertencias.cantidad}; sobregiros: ${resumen.sobregiros.cantidad}.`}
           </p>
         </div>
       ) : (
@@ -408,7 +382,7 @@ export default function AlertasSobregirosPage() {
             </div>
           ))}
         </div>
-      )}
+      ))}
 
       {/* Info Footer */}
       {resumen && (

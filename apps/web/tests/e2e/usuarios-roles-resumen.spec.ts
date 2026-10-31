@@ -1,3 +1,4 @@
+import { fiscalCountryFixture } from './fixtures/fiscal-country'
 import { expect, test } from "@playwright/test";
 import { SignJWT } from "jose";
 import fs from "node:fs";
@@ -79,15 +80,14 @@ test("roles resume permisos y sólo expande el detalle bajo demanda", async ({
       });
 
     if (/\/api\/auth\/profile\/?$/.test(pathname)) return json(user);
+    if (pathname.replace(/\/$/, '') === '/api/tenants/me') return json({ data: { id: user.tenant_id, nombre: 'Empresa aislada', estado: 'ACTIVO' } });
     if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
-      return json({
-        data: {
+      return json(fiscalCountryFixture(user.tenant_id, {
           pais_id: 1,
           pais: "PE",
           paisCodigo: "PE",
           monedaDefecto: "PEN",
-        },
-      });
+        }));
     }
     if (/\/api\/demo\/status\/?$/.test(pathname))
       return json({ is_demo: true, is_expired: false });

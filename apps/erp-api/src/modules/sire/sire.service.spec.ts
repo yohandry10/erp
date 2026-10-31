@@ -14,6 +14,7 @@ class QueryMock {
 
   select() { return this; }
   order() { return this; }
+  range() { return this; }
   eq(column: string, value: unknown) { this.filters.push({ op: 'eq', column, value }); return this; }
   gte(column: string, value: unknown) { this.filters.push({ op: 'gte', column, value }); return this; }
   lt(column: string, value: unknown) { this.filters.push({ op: 'lt', column, value }); return this; }
@@ -52,6 +53,20 @@ function createService(options: {
 }
 
 describe('SireService contrato atómico 463', () => {
+  it('explica el bloqueo de un RCE legacy sin importar el saldo neto como factura original', async () => {
+    const { service } = createService({ rpc: jest.fn().mockResolvedValue({
+      data: null, error: { code: '23514', message: 'SIRE_RCE_ORIGINAL_AMOUNTS_REQUIRED' },
+    }) });
+    await expect(service.generarReporte({
+      tipoReporte: 'REGISTRO_COMPRAS', periodo: '2026-10',
+    }, tenantId, actorId, 'sire-legacy-missing-original')).rejects.toMatchObject({
+      response: {
+        code: 'SIRE_RCE_ORIGINAL_AMOUNTS_REQUIRED',
+        message: expect.stringContaining('importes originales'),
+      },
+    });
+  });
+
   it('registra el CPE y congela el reporte usando sólo las dos RPC del evento', async () => {
     const rpc = jest.fn()
       .mockResolvedValueOnce({ data: { report: { id: reportId } }, error: null })
@@ -141,7 +156,8 @@ describe('SireService contrato atómico 463', () => {
     const { service, queries } = createService({
       tableResults: {
         sire_files: {
-          data: [{ id: reportId, periodo: '2026-08', tipo: 'REG_COM', estado: 'ENVIADO' }],
+          data: [{ id: reportId, tenant_id: tenantId, periodo: '2026-08', tipo: 'REG_COM', estado: 'ENVIADO' }],
+          count: 1,
           error: null,
         },
       },

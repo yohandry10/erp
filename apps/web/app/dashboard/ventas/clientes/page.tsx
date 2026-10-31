@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { requestConfirmation } from '@/lib/confirm-action'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { Cliente, TipoCliente } from '@/types/ventas'
@@ -28,6 +29,9 @@ export default function ClientesPage() {
 
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const loadSequence = useRef(0)
+  const invalidatePendingReads = useCallback(() => { loadSequence.current++ }, [])
   const [searchTerm, setSearchTerm] = useState('')
   const [tipoFilter, setTipoFilter] = useState<string>('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -40,8 +44,10 @@ export default function ClientesPage() {
     String(cliente.ruc || cliente.codigo || cliente.documento_numero || cliente.numero_documento || '-')
 
   const loadClientes = useCallback(async () => {
+    const sequence = ++loadSequence.current
     try {
       setLoading(true)
+      setLoadError(null)
       const params = new URLSearchParams()
       if (searchTerm) params.append('search', searchTerm)
       if (tipoFilter) params.append('tipo', tipoFilter)
@@ -49,24 +55,29 @@ export default function ClientesPage() {
       params.append('limit', itemsPerPage.toString())
 
       const response = await get(`/api/ventas/clientes?${params.toString()}`)
+      if (sequence !== loadSequence.current) return
 
       // El backend devuelve { data: [], pagination: { total, page, limit, totalPages } }
-      if (response?.data) {
-        setClientes(response.data || [])
-        setTotalClientes(response.pagination?.total || 0)
-        setTotalPages(response.pagination?.totalPages || 1)
-      }
+      if (!Array.isArray(response?.data)) throw new Error('Respuesta de clientes incompleta')
+      setClientes(response.data)
+      setTotalClientes(response.pagination?.total || 0)
+      setTotalPages(response.pagination?.totalPages || 1)
     } catch (error) {
+      if (sequence !== loadSequence.current) return
       console.error('Error loading clientes:', error)
-      alert('Error: No se pudieron cargar los clientes')
+      setClientes([])
+      setTotalClientes(0)
+      setTotalPages(1)
+      setLoadError('No se pudieron cargar los clientes. Revisa tu acceso o conexión y vuelve a intentarlo.')
     } finally {
-      setLoading(false)
+      if (sequence === loadSequence.current) setLoading(false)
     }
   }, [searchTerm, tipoFilter, currentPage, get])
 
   useEffect(() => {
     loadClientes()
-  }, [loadClientes])
+    return invalidatePendingReads
+  }, [loadClientes, invalidatePendingReads])
 
   const handleSearch = (value: string) => {
     setSearchTerm(value)
@@ -79,7 +90,7 @@ export default function ClientesPage() {
   }
 
   const handleDelete = async (id: string, razonSocial: string) => {
-    if (!confirm(`¿Está seguro de desactivar el cliente "${razonSocial}"?`)) {
+    if (!(await requestConfirmation(`¿Está seguro de desactivar el cliente "${razonSocial}"?`))) {
       return
     }
 
@@ -131,7 +142,7 @@ export default function ClientesPage() {
               <Users />
             </span>
           </div>
-          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none">{totalClientes}</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none">{loading || loadError ? '—' : totalClientes}</div>
           <div className="mt-2 text-[0.8125rem] text-muted-foreground">Clientes registrados</div>
         </div>
       </div>
@@ -189,6 +200,13 @@ export default function ClientesPage() {
             <div className="flex min-h-48 items-center justify-center">
               <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
               <p>Cargando clientes...</p>
+            </div>
+          ) : loadError ? (
+            <div role="alert" className="space-y-4 p-8 text-center">
+              <p className="text-destructive">{loadError}</p>
+              <button type="button" onClick={loadClientes} className="rounded-lg border px-4 py-2 text-sm font-semibold">
+                Reintentar
+              </button>
             </div>
           ) : clientes.length === 0 ? (
             <div className="text-center p-12 text-muted-foreground">

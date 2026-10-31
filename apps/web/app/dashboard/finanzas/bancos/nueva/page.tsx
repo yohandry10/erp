@@ -8,7 +8,7 @@ import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 export default function NuevaCuentaBancariaPage() {
   const router = useRouter()
-  const { get, post } = useApi()
+  const { get, post } = useApi({ throwOnError: true })
   const { country, currency } = useLocalizedMoney()
   const isArgentina = country.paisCodigo === 'AR'
   const isColombia = country.paisCodigo === 'CO'
@@ -59,16 +59,18 @@ export default function NuevaCuentaBancariaPage() {
         if (!active) return
         const rows = Array.isArray(response?.data) ? response.data : []
         const bancarias = rows.filter((cuenta: any) =>
-          String(cuenta.codigo || '').startsWith('10') &&
+          String(cuenta.codigo || '').startsWith(isPeru ? '104' : '10') &&
           Boolean(cuenta.acepta_movimiento) &&
           String(cuenta.estado || 'ACTIVO').toUpperCase() === 'ACTIVO',
         )
         setCuentasContables(bancarias)
-        setCuentaContableId((current) => current || bancarias[0]?.id || '')
+        setCuentaContableId((current) => bancarias.some((cuenta: any) => cuenta.id === current)
+          ? current
+          : bancarias.find((cuenta: any) => cuenta.codigo === '1041')?.id || bancarias[0]?.id || '')
       })
-      .catch(() => setCuentasContables([]))
+      .catch(() => { setCuentasContables([]); setError('No se pudo cargar el plan de cuentas. Recarga para reintentar.'); })
     return () => { active = false }
-  }, [get])
+  }, [get, isPeru])
 
   const bankExamples = isColombia
     ? { account: 'Ej: Cuenta Operaciones Bancolombia', bank: 'Ej: Bancolombia', number: 'Ej: 12345678901' }
@@ -347,6 +349,7 @@ export default function NuevaCuentaBancariaPage() {
                   <input id="nueva-saldo-inicial"
                     type="text"
                     value={saldo}
+                    readOnly
                     onChange={(e) => handleSaldoChange(e.target.value)}
                     placeholder="0.00"
                     className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -359,7 +362,7 @@ export default function NuevaCuentaBancariaPage() {
                     </p>
                   )}
                   <p className="text-xs text-muted-foreground mt-1">
-                    Saldo actual de la cuenta bancaria
+                    La cuenta se crea con saldo cero. Después registra el aporte de capital en Nuevo movimiento bancario para conservar el saldo y su asiento contable.
                   </p>
                 </div>
               </div>

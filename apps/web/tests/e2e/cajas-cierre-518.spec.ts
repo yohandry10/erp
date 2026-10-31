@@ -1,3 +1,4 @@
+import { fiscalCountryFixture } from './fixtures/fiscal-country'
 import { expect, test, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import { SignJWT } from 'jose';
 
@@ -63,10 +64,9 @@ async function openCashClosing(
     });
 
     if (/\/api\/auth\/profile\/?$/.test(pathname)) return json(user);
+    if (pathname.replace(/\/$/, '') === '/api/tenants/me') return json({ data: { id: user.tenant_id, nombre: 'Empresa aislada', estado: 'ACTIVO' } });
     if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
-      return json({
-        data: { pais_id: 1, pais: 'PE', paisCodigo: 'PE', monedaDefecto: 'PEN' },
-      });
+      return json(fiscalCountryFixture(user.tenant_id, { pais_id: 1, pais: 'PE', paisCodigo: 'PE', monedaDefecto: 'PEN' }));
     }
     if (/\/api\/demo\/status\/?$/.test(pathname)) {
       return json({ is_demo: false, is_expired: false });
@@ -79,6 +79,7 @@ async function openCashClosing(
         success: true,
         data: [{
           id: 'sesion-cierre-518',
+          caja_id: 'caja-cierre-518',
           estado: 'ABIERTA',
           hora_apertura: '2026-08-25T13:00:00-05:00',
           monto_inicio: ['legal', 'unmatched'].includes(scenario.preview) ? 203.84 : 100,
@@ -237,7 +238,7 @@ test('S/ -0.04 muestra redondeo legal y cierra sin supervisor ni PIN', async ({ 
   await countLegalRounding(dialog);
   await dialog.getByRole('button', { name: 'Confirmar Arqueo' }).click();
 
-  await expect(dialog.getByText(/redondeo legal del pago en efectivo en Perú/i)).toBeVisible();
+  await expect(dialog.getByText(/El efectivo esperado ya descuenta 1 ajuste\(s\) de redondeo documentado por S\/ 0\.04/)).toBeVisible();
   await expect(dialog.getByLabel('Supervisor que autoriza')).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Confirmar Cierre' }).click();
   await expect(dialog).not.toBeVisible();
@@ -256,7 +257,7 @@ test('S/ -0.04 sin evidencia documentada exige supervisor', async ({ context, pa
   await countLegalRounding(dialog);
   await dialog.getByRole('button', { name: 'Confirmar Arqueo' }).click();
 
-  await expect(dialog.getByText(/redondeo legal del pago en efectivo en Perú/i)).toHaveCount(0);
+  await expect(dialog.getByText(/El efectivo esperado ya descuenta .*ajuste\(s\) de redondeo documentado/)).toHaveCount(0);
   await dialog.getByRole('textbox', { name: /Justificación \/ Notas/ }).fill(
     'Diferencia pequeña sin evidencia de venta',
   );
@@ -386,8 +387,9 @@ async function openPosCashClose(
     });
 
     if (/\/api\/auth\/profile\/?$/.test(pathname)) return json(user);
+    if (pathname.replace(/\/$/, '') === '/api/tenants/me') return json({ data: { id: user.tenant_id, nombre: 'Empresa aislada', estado: 'ACTIVO' } });
     if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
-      return json({ data: { pais_id: 1, pais: 'PE', paisCodigo: 'PE', monedaDefecto: 'PEN' } });
+      return json(fiscalCountryFixture(user.tenant_id, { pais_id: 1, pais: 'PE', paisCodigo: 'PE', monedaDefecto: 'PEN' }));
     }
     if (/\/api\/demo\/status\/?$/.test(pathname)) {
       return json({ is_demo: false, is_expired: false });

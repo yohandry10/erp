@@ -1,23 +1,26 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import Decimal from 'decimal.js';
+import { getActiveCountryByCode } from '../../paises/initial-country';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { PeriodosService } from './periodos.service';
-import { PlanCuentasService } from './plan-cuentas.service';
 import { TiposCambioService } from './tipos-cambio.service';
 import {
   LadoTipoCambio,
   PosicionRevaluacionDto,
-  RevaluacionResponseDto,
-  EstadoAsiento
+  RevaluacionResponseDto
 } from '@erp-suite/dtos';
 import { buildDeterministicUuid } from '../../../common/util/deterministic-uuid.util';
+import { confirmRevaluationRegistrationReceipt } from './revaluation-registration-receipt';
 
-/** Cuentas PCGE del resultado por diferencia de cambio. */
-const CUENTA_PERDIDA_CAMBIO = '676';
-const CUENTA_GANANCIA_CAMBIO = '776';
-const CUENTA_CXC = '12';
-const CUENTA_CXP = '42';
 
 const ESTADOS_NO_REVALUABLES = new Set(['ANULADA', 'ANULADO', 'PAGADA', 'PAGADO']);
+const civilDay=(v:unknown):v is string=>{
+  if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;
+  const [y,m,d]=v.split('-').map(Number),date=new Date(Date.UTC(y,m-1,d));
+  return date.getUTCFullYear()===y&&date.getUTCMonth()===m-1&&date.getUTCDate()===d;
+};
+const cents=(v:unknown)=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&Number.isSafeInteger(Math.round(v*100))&&Math.abs(v-Math.round(v*100)/100)<1e-9;
+const rate=(v:unknown)=>typeof v==='number'&&Number.isFinite(v)&&v>0&&v<1e10;
 
 interface PosicionCruda {
   tipo: 'CXC' | 'CXP';
@@ -31,17 +34,16 @@ interface PosicionCruda {
 
 @Injectable()
 export class RevaluacionService {
-  private readonly logger = new Logger(RevaluacionService.name);
-
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly periodosService: PeriodosService,
-    private readonly planCuentasService: PlanCuentasService,
     private readonly tiposCambioService: TiposCambioService
   ) {}
 
-  private round2(valor: number): number {
-    return Math.round((valor + Number.EPSILON) * 100) / 100;
+  private round2(valor: Decimal.Value): number {
+    const n=new Decimal(valor).toDecimalPlaces(2,Decimal.ROUND_HALF_UP).toNumber();
+    if(!Number.isFinite(n)||!Number.isSafeInteger(Math.round(n*100)))throw new ServiceUnavailableException('La valoración está fuera de rango.');
+    return n;
   }
 
   /**
@@ -54,15 +56,24 @@ export class RevaluacionService {
    * mientras los asientos históricos no lleven la moneda en la línea.
    */
   async simular(tenantId: string, fecha: string): Promise<RevaluacionResponseDto> {
-    const monedaLocal = await this.tiposCambioService.obtenerMonedaLocal(tenantId);
-    const crudas = await this.obtenerPosiciones(tenantId, monedaLocal);
+    return (await this.simularCompleta(tenantId,fecha)).data;
+  }
+
+  async simularCompleta(tenantId: string,fecha: string) {
+    if(!civilDay(fecha))throw new BadRequestException('El corte debe ser una fecha civil válida.');
+    const {data:config,error}=(await this.supabaseService.getClient().from('empresa_config').select('tenant_id,pais').eq('tenant_id',tenantId).maybeSingle())||{};
+    const profile=getActiveCountryByCode(config?.pais);
+    if(error||config?.tenant_id!==tenantId||!profile)throw new ServiceUnavailableException('No se pudo confirmar el país y la moneda de la empresa.');
+    const monedaLocal=profile.moneda;
+    const source=await this.obtenerPosiciones(tenantId,monedaLocal,fecha),crudas=source.posiciones;
 
     const posiciones: PosicionRevaluacionDto[] = [];
     const excluidas: Array<{ tipo: string; documento_id: string; motivo: string }> = [];
 
     // Una cotización por moneda: el mismo par se consulta una sola vez aunque
     // haya cientos de documentos.
-    const cotizaciones = new Map<string, { compra: number; venta: number } | null>();
+    const cotizaciones = new Map<string, { compra: number|null; venta: number|null } | null>();
+    let sinDiferencia=0;
 
     for (const cruda of crudas) {
       if (!cruda.tipo_cambio_origen || cruda.tipo_cambio_origen <= 0) {
@@ -77,15 +88,10 @@ export class RevaluacionService {
       }
 
       if (!cotizaciones.has(cruda.moneda)) {
-        const vigente = await this.tiposCambioService.obtenerVigente(
-          tenantId,
-          cruda.moneda,
-          monedaLocal,
-          fecha
-        );
+        const vigente = await this.cotizacionCompleta(tenantId,cruda.moneda,monedaLocal,fecha);
         cotizaciones.set(
           cruda.moneda,
-          vigente ? { compra: Number(vigente.compra), venta: Number(vigente.venta) } : null
+          vigente ? { compra: vigente.compra, venta: vigente.venta } : null
         );
       }
 
@@ -103,16 +109,18 @@ export class RevaluacionService {
       const lado = cruda.tipo === 'CXC' ? LadoTipoCambio.COMPRA : LadoTipoCambio.VENTA;
       const tipoCambioCierre =
         lado === LadoTipoCambio.COMPRA ? cotizacion.compra : cotizacion.venta;
+      if(tipoCambioCierre===null){excluidas.push({tipo:cruda.tipo,documento_id:cruda.documento_id,motivo:`No hay tipo de cambio ${cruda.moneda}/${monedaLocal} vigente al ${fecha}.`});continue;}
 
-      const valorContabilizado = this.round2(cruda.pendiente * cruda.tipo_cambio_origen);
-      const valorACierre = this.round2(cruda.pendiente * tipoCambioCierre);
-      const variacion = this.round2(valorACierre - valorContabilizado);
+      const valorContabilizado = this.round2(new Decimal(cruda.pendiente).times(cruda.tipo_cambio_origen));
+      const valorACierre = this.round2(new Decimal(cruda.pendiente).times(tipoCambioCierre));
+      const variacion = this.round2(new Decimal(valorACierre).minus(valorContabilizado));
 
       // En un activo, que valga más es ganancia. En un pasivo, que valga más es
       // pérdida: se debe más en moneda local por la misma deuda.
       const diferencia = cruda.tipo === 'CXC' ? variacion : this.round2(-variacion);
 
       if (diferencia === 0) {
+        sinDiferencia++;
         continue;
       }
 
@@ -131,122 +139,66 @@ export class RevaluacionService {
     }
 
     const totalGanancia = this.round2(
-      posiciones.filter(p => p.diferencia > 0).reduce((sum, p) => sum + p.diferencia, 0)
+      posiciones.filter(p => p.diferencia > 0).reduce((sum, p) => sum.plus(p.diferencia),new Decimal(0))
     );
     const totalPerdida = this.round2(
-      posiciones.filter(p => p.diferencia < 0).reduce((sum, p) => sum - p.diferencia, 0)
+      posiciones.filter(p => p.diferencia < 0).reduce((sum, p) => sum.minus(p.diferencia),new Decimal(0))
     );
 
-    return {
+    const data:RevaluacionResponseDto={
       fecha,
       moneda_local: monedaLocal,
       posiciones,
       total_ganancia: totalGanancia,
       total_perdida: totalPerdida,
-      diferencia_neta: this.round2(totalGanancia - totalPerdida),
+      diferencia_neta: this.round2(new Decimal(totalGanancia).minus(totalPerdida)),
       excluidas: excluidas.length > 0 ? excluidas : undefined
     };
+    return {data,fuentes:{...source.fuentes,completas:true,evaluadas_total:crudas.length,sin_diferencia_total:sinDiferencia},posiciones_total:posiciones.length,excluidas_total:excluidas.length};
   }
 
-  /**
-   * Genera el asiento de diferencia de cambio no realizada a la fecha de corte.
-   *
-   * Es idempotente por fecha: el `source_event_id` se deriva de la fecha de
-   * corte y el índice único de `asientos_contables` impide una segunda
-   * ejecución del mismo corte.
-   */
+  /** La RPC valida el snapshot, la intención y el libro en una transacción. */
   async ejecutar(
     tenantId: string,
     userId: string,
     fecha: string,
-    concepto?: string
+    concepto?: string,
+    simulacion?: RevaluacionResponseDto,
+    idempotencyKey?: string
   ): Promise<RevaluacionResponseDto> {
-    const resultado = await this.simular(tenantId, fecha);
-
-    if (resultado.posiciones.length === 0) {
-      throw new BadRequestException(
-        `No hay diferencia de cambio que registrar al ${fecha}. ` +
-          'Verifique que existan saldos en moneda extranjera y cotizaciones cargadas.'
-      );
+    const revisada = simulacion ?? await this.simular(tenantId, fecha);
+    if (revisada.fecha !== fecha || !Array.isArray(revisada.posiciones)) {
+      throw new BadRequestException('La simulación revisada no corresponde a la fecha de corte.');
     }
-
-    const fechaCorte = new Date(fecha);
-    await this.periodosService.validarPeriodoAbierto(tenantId, fechaCorte);
-
-    const sourceEventId = buildDeterministicUuid(`revaluacion:${tenantId}:${fecha}`);
-
-    const { data: existente } = await this.supabaseService
-      .getClient()
-      .from('asientos_contables')
-      .select('id, numero_asiento')
-      .eq('tenant_id', tenantId)
-      .eq('source_event_id', sourceEventId)
-      .maybeSingle();
-
-    if (existente?.id) {
-      throw new BadRequestException(
-        `Ya existe un asiento de revaluación para el ${fecha} ` +
-          `(asiento ${existente.numero_asiento ?? existente.id}). ` +
-          'Revérselo antes de volver a ejecutar el corte.'
-      );
+    if (revisada.posiciones.length === 0) {
+      throw new BadRequestException(`No hay diferencia de cambio que registrar al ${fecha}.`);
     }
+    if (!simulacion) await this.periodosService.validarPeriodoAbierto(tenantId, new Date(fecha));
+    const { data, error } = await this.supabaseService.getClient().rpc('registrar_revaluacion_tx_570', {
+      p_tenant_id: tenantId, p_actor_id: userId, p_fecha: fecha,
+      p_simulacion: revisada, p_concepto: concepto ?? null,
+      p_idempotency_key: idempotencyKey ?? buildDeterministicUuid(`revaluacion:${tenantId}:${fecha}`)
+    });
+    if (error) throw new BadRequestException(error.message || 'No se pudo registrar la revaluación.');
+    if (!data?.asiento_id || data.fecha !== fecha) throw new Error('Respuesta incompleta del registro de revaluación.');
+    return data as RevaluacionResponseDto;
+  }
 
-    const lineas = await this.construirLineas(tenantId, resultado);
-    const totalDebe = this.round2(lineas.reduce((sum, l) => sum + l.debe, 0));
-    const totalHaber = this.round2(lineas.reduce((sum, l) => sum + l.haber, 0));
-
-    if (Math.round(totalDebe * 100) !== Math.round(totalHaber * 100)) {
-      // No debería ocurrir: el cálculo es una identidad algebraica. Si ocurre,
-      // es preferible no escribir nada a dejar el libro descuadrado.
-      throw new Error(
-        `El asiento de revaluación no cuadra (debe=${totalDebe}, haber=${totalHaber}). ` +
-          'No se registró nada.'
-      );
+  /** Canonical receipt reads follow the existing atomic writer; unknown reads never confirm success. */
+  async ejecutarConRecibo(tenantId: string, userId: string, fecha: string, concepto?: string, simulacion?: RevaluacionResponseDto, idempotencyKey?: string) {
+    const revisada = simulacion ?? await this.simular(tenantId, fecha);
+    const key = idempotencyKey ?? buildDeterministicUuid(`revaluacion:${tenantId}:${fecha}`);
+    if (!simulacion) await this.periodosService.validarPeriodoAbierto(tenantId, new Date(fecha));
+    const result = await this.ejecutar(tenantId, userId, fecha, concepto, revisada, key);
+    try {
+      const client = this.supabaseService.getClient();
+      const ledger = await client.from('financial_master_operations').select('*', { count: 'exact' }).eq('tenant_id', tenantId).eq('operation_type', 'FX_REVALUATION').eq('idempotency_key', key).maybeSingle();
+      const journal = await client.from('asientos_contables').select('id,tenant_id,numero_asiento,fecha,estado,origen,tipo_asiento,created_by,confirmado_por,confirmado_en,concepto,metadata', { count: 'exact' }).eq('tenant_id', tenantId).eq('id', result.asiento_id).maybeSingle();
+      if (ledger.error || journal.error || ledger.count !== 1 || journal.count !== 1) throw new Error('Unknown canonical receipt sources');
+      return confirmRevaluationRegistrationReceipt({ tenant: tenantId, actor: userId, key, fecha, simulacion: revisada, concepto }, result, ledger.data, journal.data);
+    } catch {
+      throw new ServiceUnavailableException('No se pudo confirmar el recibo completo de revaluación. Conserve la intención y reintente con la misma clave.');
     }
-
-    const { data: asiento, error: asientoError } = await this.supabaseService
-      .getClient()
-      .rpc('crear_asiento_con_detalles_tx', {
-        p_tenant_id: tenantId,
-        p_asiento: {
-          fecha: fechaCorte.toISOString(),
-          concepto: concepto || `Diferencia de cambio no realizada al ${fecha}`,
-          referencia: `REVAL-${fecha}`,
-          tipo_asiento: 'AJUSTE',
-          origen: 'REVALUACION_MONEDA',
-          source_event_id: sourceEventId,
-          estado: EstadoAsiento.CONFIRMADO,
-          created_by: userId,
-          confirmado_por: userId,
-          confirmado_en: new Date().toISOString()
-        },
-        p_detalles: lineas.map(linea => ({
-          cuenta_id: linea.cuenta_id,
-          debe: linea.debe,
-          haber: linea.haber,
-          concepto: linea.concepto
-        }))
-      });
-
-    if (asientoError || !asiento) {
-      if (asientoError?.code === '23505') {
-        throw new BadRequestException(
-          `Ya existe un asiento de revaluación para el ${fecha}.`
-        );
-      }
-      throw new Error(`Error creando asiento de revaluación: ${asientoError?.message}`);
-    }
-
-    this.logger.log(
-      `💱 Revaluación al ${fecha} registrada para ${tenantId}: asiento ${asiento.id}, ` +
-        `neto ${resultado.diferencia_neta}`
-    );
-
-    return {
-      ...resultado,
-      asiento_id: asiento.id,
-      numero_asiento: asiento.numero_asiento
-    };
   }
 
   /**
@@ -274,142 +226,50 @@ export class RevaluacionService {
     return Math.round((diferencia + Number.EPSILON) * 100) / 100;
   }
 
-  /**
-   * Traduce el resultado de la simulación a líneas de asiento.
-   *
-   * El resultado se registra en bruto: la ganancia va a 776 y la pérdida a 676
-   * sin compensarse entre sí, porque compensarlas ocultaría la exposición real
-   * en el estado de resultados. Las cuentas patrimoniales sí van netas, que es
-   * como efectivamente varía su saldo.
-   */
-  private async construirLineas(
-    tenantId: string,
-    resultado: RevaluacionResponseDto
-  ): Promise<Array<{ cuenta_id: string; debe: number; haber: number; concepto: string }>> {
-    const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(tenantId, [
-      CUENTA_CXC,
-      CUENTA_CXP,
-      CUENTA_PERDIDA_CAMBIO,
-      CUENTA_GANANCIA_CAMBIO
-    ]);
-
-    // Variación del valor en moneda local de cada grupo patrimonial.
-    const variacionCxC = this.round2(
-      resultado.posiciones
-        .filter(p => p.tipo === 'CXC')
-        .reduce((sum, p) => sum + (p.valor_a_cierre - p.valor_contabilizado), 0)
-    );
-    const variacionCxP = this.round2(
-      resultado.posiciones
-        .filter(p => p.tipo === 'CXP')
-        .reduce((sum, p) => sum + (p.valor_a_cierre - p.valor_contabilizado), 0)
-    );
-
-    const lineas: Array<{ cuenta_id: string; debe: number; haber: number; concepto: string }> = [];
-
-    if (variacionCxC !== 0) {
-      lineas.push({
-        cuenta_id: cuentas.get(CUENTA_CXC)!.id,
-        debe: variacionCxC > 0 ? variacionCxC : 0,
-        haber: variacionCxC < 0 ? -variacionCxC : 0,
-        concepto: `Ajuste por diferencia de cambio en cuentas por cobrar al ${resultado.fecha}`
-      });
-    }
-
-    if (variacionCxP !== 0) {
-      // Si el pasivo vale más en moneda local, la cuenta se abona.
-      lineas.push({
-        cuenta_id: cuentas.get(CUENTA_CXP)!.id,
-        debe: variacionCxP < 0 ? -variacionCxP : 0,
-        haber: variacionCxP > 0 ? variacionCxP : 0,
-        concepto: `Ajuste por diferencia de cambio en cuentas por pagar al ${resultado.fecha}`
-      });
-    }
-
-    if (resultado.total_perdida > 0) {
-      lineas.push({
-        cuenta_id: cuentas.get(CUENTA_PERDIDA_CAMBIO)!.id,
-        debe: resultado.total_perdida,
-        haber: 0,
-        concepto: `Pérdida por diferencia de cambio al ${resultado.fecha}`
-      });
-    }
-
-    if (resultado.total_ganancia > 0) {
-      lineas.push({
-        cuenta_id: cuentas.get(CUENTA_GANANCIA_CAMBIO)!.id,
-        debe: 0,
-        haber: resultado.total_ganancia,
-        concepto: `Ganancia por diferencia de cambio al ${resultado.fecha}`
-      });
-    }
-
-    return lineas;
-  }
-
   /** Posiciones monetarias abiertas en moneda distinta a la local. */
   private async obtenerPosiciones(
     tenantId: string,
-    monedaLocal: string
-  ): Promise<PosicionCruda[]> {
-    const client = this.supabaseService.getClient();
-
-    const [cxcResult, cxpResult] = await Promise.all([
-      client
-        .from('cuentas_por_cobrar')
-        .select('id, moneda, estado, monto_pendiente, saldo_pendiente, saldo, tipo_cambio_origen, serie, numero')
-        .eq('tenant_id', tenantId)
-        .not('moneda', 'is', null)
-        .neq('moneda', monedaLocal),
-      client
-        .from('cuentas_por_pagar')
-        .select('id, moneda, estado, saldo, saldo_pendiente, tipo_cambio_origen, numero_documento')
-        .eq('tenant_id', tenantId)
-        .not('moneda', 'is', null)
-        .neq('moneda', monedaLocal)
+    monedaLocal: string,
+    fecha: string
+  ) {
+    const [cxc,cxp]=await Promise.all([
+      this.readRows('cuentas_por_cobrar','id,tenant_id,fecha_emision,moneda,estado,monto_pendiente,saldo_pendiente,saldo,tipo_cambio_origen,serie,numero',tenantId),
+      this.readRows('cuentas_por_pagar','id,tenant_id,fecha_emision,moneda,estado,saldo,saldo_pendiente,tipo_cambio_origen,numero_documento',tenantId),
     ]);
-
-    if (cxcResult.error) {
-      throw new Error(`Error obteniendo cuentas por cobrar: ${cxcResult.error.message}`);
+    const posiciones:PosicionCruda[]=[];
+    for(const [tipo,rows] of [['CXC',cxc],['CXP',cxp]] as const)for(const fila of rows){
+      if(typeof fila.estado!=='string'||!fila.estado||typeof fila.moneda!=='string'||!/^[A-Za-z]{3}$/.test(fila.moneda))throw new ServiceUnavailableException('Una posición no tiene estado o moneda confirmados.');
+      const moneda=fila.moneda.toUpperCase();
+      if(moneda===monedaLocal||ESTADOS_NO_REVALUABLES.has(fila.estado.toUpperCase()))continue;
+      const pendiente=tipo==='CXC'?fila.monto_pendiente??fila.saldo_pendiente??fila.saldo:fila.saldo??fila.saldo_pendiente;
+      if(!cents(pendiente))throw new ServiceUnavailableException('El saldo de una posición es desconocido o está fuera de rango.');
+      if(pendiente===0)continue;
+      if(!civilDay(fila.fecha_emision))throw new ServiceUnavailableException('La fecha de una posición abierta es desconocida.');
+      if(fila.fecha_emision>fecha)continue;
+      const origen=fila.tipo_cambio_origen;
+      if(origen!==null&&origen!==undefined&&(!rate(origen)))throw new ServiceUnavailableException('El tipo de cambio de origen es incoherente.');
+      posiciones.push({tipo,documento_id:fila.id,referencia:tipo==='CXC'?[fila.serie,fila.numero].filter(Boolean).join('-')||undefined:fila.numero_documento||undefined,moneda,pendiente,tipo_cambio_origen:origen??null,estado:fila.estado});
     }
-    if (cxpResult.error) {
-      throw new Error(`Error obteniendo cuentas por pagar: ${cxpResult.error.message}`);
+    return {posiciones,fuentes:{cxc_total:cxc.length,cxp_total:cxp.length}};
+  }
+
+  private async readRows(table:string,selection:string,tenantId:string) {
+    const rows:any[]=[];const ids=new Set<string>();let total:number|undefined;
+    for(let offset=0;;offset+=1000){
+      const query:any=this.supabaseService.getClient().from(table).select(selection,{count:'exact'}).eq('tenant_id',tenantId).order('id',{ascending:true}).range(offset,offset+999);
+      const {data,error,count}=(await query)||{};
+      if(error||!Array.isArray(data)||!Number.isSafeInteger(count)||count<0||(total!==undefined&&count!==total)||data.length!==Math.min(1000,Math.max(0,count-offset)))throw new ServiceUnavailableException('No se pudieron completar las posiciones monetarias.');
+      total=count;
+      for(const row of data){if(!row||typeof row.id!=='string'||!row.id||ids.has(row.id)||row.tenant_id!==tenantId)throw new ServiceUnavailableException('Las posiciones son incompletas, repetidas o ajenas.');ids.add(row.id);rows.push(row)}
+      if(rows.length===total)return rows;
     }
+  }
 
-    const posiciones: PosicionCruda[] = [];
-
-    for (const fila of cxcResult.data || []) {
-      const pendiente = Number(fila.monto_pendiente ?? fila.saldo_pendiente ?? fila.saldo ?? 0);
-      if (pendiente <= 0 || ESTADOS_NO_REVALUABLES.has(String(fila.estado || '').toUpperCase())) {
-        continue;
-      }
-      posiciones.push({
-        tipo: 'CXC',
-        documento_id: fila.id,
-        referencia: [fila.serie, fila.numero].filter(Boolean).join('-') || undefined,
-        moneda: String(fila.moneda).toUpperCase(),
-        pendiente,
-        tipo_cambio_origen: fila.tipo_cambio_origen ? Number(fila.tipo_cambio_origen) : null,
-        estado: fila.estado
-      });
-    }
-
-    for (const fila of cxpResult.data || []) {
-      const pendiente = Number(fila.saldo ?? fila.saldo_pendiente ?? 0);
-      if (pendiente <= 0 || ESTADOS_NO_REVALUABLES.has(String(fila.estado || '').toUpperCase())) {
-        continue;
-      }
-      posiciones.push({
-        tipo: 'CXP',
-        documento_id: fila.id,
-        referencia: fila.numero_documento ? String(fila.numero_documento) : undefined,
-        moneda: String(fila.moneda).toUpperCase(),
-        pendiente,
-        tipo_cambio_origen: fila.tipo_cambio_origen ? Number(fila.tipo_cambio_origen) : null,
-        estado: fila.estado
-      });
-    }
-
-    return posiciones;
+  private async cotizacionCompleta(tenantId:string,origen:string,destino:string,fecha:string){
+    const {data,error,count}=(await this.supabaseService.getClient().from('tipos_cambio').select('id,tenant_id,moneda_origen,moneda_destino,fecha,compra,venta,activo,estado',{count:'exact'}).eq('tenant_id',tenantId).eq('moneda_origen',origen).eq('moneda_destino',destino).eq('activo',true).eq('estado','ACTIVO').lte('fecha',fecha).order('fecha',{ascending:false}).order('id',{ascending:true}).range(0,0))||{};
+    if(error||!Array.isArray(data)||!Number.isSafeInteger(count)||count<0||data.length!==Math.min(1,count))throw new ServiceUnavailableException('No se pudo confirmar la cotización vigente.');
+    if(!data.length)return null;
+    const r=data[0];if(!r||typeof r.id!=='string'||!r.id||r.tenant_id!==tenantId||r.moneda_origen!==origen||r.moneda_destino!==destino||!civilDay(r.fecha)||r.fecha>fecha||r.activo!==true||r.estado!=='ACTIVO'||![r.compra,r.venta].every(v=>v===null||rate(v)))throw new ServiceUnavailableException('La cotización vigente es incompleta o ajena.');
+    return r;
   }
 }

@@ -353,6 +353,28 @@ runPsql([], "registro local del historial de migraciones", {
   `,
 });
 
+// Las migraciones dejan la frontera operativa cerrada por defecto. Los
+// verificadores con fixtures necesitan una identidad explícita de esta base
+// efímera; no se toma configuración del runtime ni de archivos operativos.
+// PGHOST local, erp_e2e y E2E_EPHEMERAL_LOCAL_DB se exigen antes de conectar.
+runPsql([], "identidad local para fixtures de los verificadores", {
+  capture: true,
+  input: `
+    UPDATE app.deployment_environment
+    SET environment='DEV', project_ref='localerpephemeralqax', allow_demo_data=true,
+        configured_at=now(), updated_at=now()
+    WHERE singleton AND environment='UNCONFIGURED';
+    DO $local_verifier_environment$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM app.deployment_environment
+        WHERE singleton AND environment='DEV' AND project_ref='localerpephemeralqax') THEN
+        RAISE EXCEPTION 'CI_LOCAL_VERIFIER_ENVIRONMENT_INVALID';
+      END IF;
+    END
+    $local_verifier_environment$;
+  `,
+});
+
 // El verificador 523 antes quedaba verde sin medir el bucket ni sus políticas:
 // los dos bloques eran condicionales y PostgreSQL puro no tenía schema storage.
 // Además de crear el catálogo efímero, demostramos que el guardián se ve rojo

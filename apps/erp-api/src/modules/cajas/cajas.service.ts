@@ -1,3 +1,4 @@
+import { requireTenantRecord } from '../../shared/utils/require-tenant-record';
 import { Injectable, BadRequestException, ServiceUnavailableException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
 import { rangoDelDiaDelTenant } from '../../shared/utils/fecha-tenant.util';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
@@ -46,6 +47,75 @@ export class CajasService {
       .order('created_at', { ascending: false });
     if (error) throw new ServiceUnavailableException('No se pudo consultar la información de caja; reintente');
     return data || [];
+  }
+
+  /**
+   * Usuarios activos que pueden abrir caja y ven el establecimiento de la
+   * sesión. Un usuario sin establecimientos asignados los ve todos.
+   */
+  async candidatosCambioTurno(tenantId: string, sesionId: string, actorId?: string) {
+    const client = this.supabase.getClient();
+    const fallo = () => new ServiceUnavailableException('No se pudo consultar quién puede recibir la caja; reintente');
+    const { data: sesion, error: sesionError } = await client
+      .from('sesiones_caja')
+      .select('id, sucursal_id')
+      .eq('tenant_id', tenantId)
+      .eq('id', sesionId)
+      .maybeSingle();
+    if (sesionError) throw fallo();
+    if (!sesion) throw new NotFoundException('Sesión de caja no encontrada');
+
+    const { data: permiso, error: permisoError } = await client
+      .from('permisos')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('codigo', 'cajas.apertura')
+      .maybeSingle();
+    if (permisoError) throw fallo();
+    if (!permiso) return [];
+    const { data: rolesConPermiso, error: rolesError } = await client
+      .from('rol_permisos')
+      .select('role_id')
+      .eq('permiso_id', (permiso as any).id)
+      .eq('concedido', true);
+    if (rolesError) throw fallo();
+    const roleIds = (rolesConPermiso ?? []).map((r: any) => r.role_id);
+    if (roleIds.length === 0) return [];
+
+    const { data: asignaciones, error: asignError } = await client
+      .from('user_roles')
+      .select('usuario_sistema_id')
+      .in('role_id', roleIds);
+    if (asignError) throw fallo();
+    const userIds = [...new Set((asignaciones ?? []).map((a: any) => a.usuario_sistema_id))]
+      .filter((id) => id && id !== actorId);
+    if (userIds.length === 0) return [];
+
+    const [{ data: usuarios, error: usuariosError }, { data: alcances, error: alcanceError }] = await Promise.all([
+      client.from('usuarios_sistema')
+        .select('id, nombre, email, activo, estado')
+        .eq('tenant_id', tenantId)
+        .in('id', userIds),
+      client.from('usuario_sucursales')
+        .select('usuario_sistema_id, sucursal_id')
+        .eq('tenant_id', tenantId)
+        .in('usuario_sistema_id', userIds),
+    ]);
+    if (usuariosError || alcanceError) throw fallo();
+    const alcancePorUsuario = new Map<string, string[]>();
+    for (const fila of alcances ?? []) {
+      const lista = alcancePorUsuario.get((fila as any).usuario_sistema_id) ?? [];
+      lista.push((fila as any).sucursal_id);
+      alcancePorUsuario.set((fila as any).usuario_sistema_id, lista);
+    }
+    return (usuarios ?? [])
+      .filter((u: any) => u.activo !== false && String(u.estado ?? 'ACTIVO').toUpperCase() === 'ACTIVO')
+      .filter((u: any) => {
+        const sucursales = alcancePorUsuario.get(u.id);
+        return !sucursales || sucursales.length === 0 || sucursales.includes((sesion as any).sucursal_id);
+      })
+      .map((u: any) => ({ id: u.id, nombres: u.nombre ?? u.email, apellidos: '', email: u.email }))
+      .sort((a: any, b: any) => String(a.nombres).localeCompare(String(b.nombres)));
   }
 
   async crearCaja(
@@ -627,12 +697,25 @@ export class CajasService {
     return data || [];
   }
 
+  // cortes_caja no lleva sucursal_id: el alcance por sucursal llega a través
+  // de las cajas, que sí lo llevan y que el cliente ya filtra.
+  private async cajasVisibles(tenantId: string): Promise<Map<string, string>> {
+    const { data, error } = await this.supabase.getClient()
+      .from('cajas')
+      .select('id, nombre')
+      .eq('tenant_id', tenantId);
+    if (error) throw new ServiceUnavailableException('No se pudo consultar la información de caja; reintente');
+    return new Map((data ?? []).map((c: any) => [c.id, c.nombre]));
+  }
+
   async listarCortes(tenantId: string, filtros: { fecha_desde?: string; fecha_hasta?: string; caja_id?: string }) {
     this.validateDateFilters(filtros);
+    const cajas = await this.cajasVisibles(tenantId);
     let query = this.supabase.getClient()
       .from('cortes_caja')
       .select('*')
-      .eq('tenant_id', tenantId);
+      .eq('tenant_id', tenantId)
+      .in('caja_id', Array.from(cajas.keys()));
 
     if (filtros.caja_id) query = query.eq('caja_id', filtros.caja_id);
     if (filtros.fecha_desde) query = query.gte('fecha_corte', (await rangoDelDiaDelTenant(this.supabase.getClient(), tenantId, new Date(filtros.fecha_desde+'T12:00:00Z'))).desde);
@@ -640,11 +723,15 @@ export class CajasService {
 
     const { data, error } = await query.order('fecha_corte', { ascending: false });
     if (error) throw new ServiceUnavailableException('No se pudo consultar la información de caja; reintente');
-    return data || [];
+    return (data || []).map((corte: any) => ({ ...corte, caja_nombre: cajas.get(corte.caja_id) ?? null }));
   }
 
   async obtenerCorte(tenantId: string, corteId: string) {
-    return this.cashReportsService.obtenerCortePersistido(tenantId, corteId);
+    const corte = await this.cashReportsService.obtenerCortePersistido(tenantId, corteId);
+    if (!(await this.cajasVisibles(tenantId)).has(corte.caja_id)) {
+      throw new NotFoundException('Corte no encontrado');
+    }
+    return corte;
   }
 
   async exportarCortePdf(tenantId: string, corteId: string) {
@@ -657,9 +744,20 @@ export class CajasService {
     return this.cashReportsService.generarCorteCSV(corte.sesion_caja_id, tenantId);
   }
 
-  async obtenerCorteZ(tenantId: string, sesionId: string) {
+  async obtenerCorteZ(tenantId: string, sesionId: string, cajaId?: string) {
     if (!sesionId) {
       throw new BadRequestException('Se requiere sesionId para generar el reporte');
+    }
+    if (cajaId) {
+      const client = this.supabase.getClient();
+      await requireTenantRecord(client, 'cajas', tenantId, cajaId, 'Caja');
+      const { data: sesion, error } = await client.from('sesiones_caja').select('id,caja_id,tenant_id')
+        .eq('tenant_id', tenantId).eq('id', sesionId).eq('caja_id', cajaId).maybeSingle();
+      if (error) throw new ServiceUnavailableException('No se pudo verificar la sesión de caja; reintente');
+      if (!sesion) throw new NotFoundException('Sesión no encontrada para la caja');
+      if (sesion.id !== sesionId || sesion.caja_id !== cajaId || sesion.tenant_id !== tenantId) {
+        throw new ServiceUnavailableException('No se pudo verificar la sesión de caja; reintente');
+      }
     }
     // Reutiliza el servicio de reportes de caja (ventas, métodos de pago, fiscal, movimientos)
     return this.cashReportsService.obtenerDatosReporteCierre(sesionId, tenantId);

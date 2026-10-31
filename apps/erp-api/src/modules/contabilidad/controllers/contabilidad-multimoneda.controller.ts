@@ -203,11 +203,13 @@ export class ContabilidadMultimonedaController {
     @CurrentTenant() tenantId: string,
     @Query() query: RevaluacionQueryDto,
   ) {
-    const resultado = await this.revaluacionService.simular(tenantId, query.fecha);
+    const resultado = await this.revaluacionService.simularCompleta(tenantId, query.fecha);
 
     return {
       success: true,
-      data: resultado,
+      complete: true, tenant_id: tenantId,
+      data: resultado.data, fuentes: resultado.fuentes,
+      posiciones_total:resultado.posiciones_total,excluidas_total:resultado.excluidas_total,
       message: `Simulación de revaluación al ${query.fecha}`,
     };
   }
@@ -217,7 +219,8 @@ export class ContabilidadMultimonedaController {
   @ApiOperation({
     summary: "Registrar el asiento de diferencia de cambio no realizada",
     description:
-      "Idempotente por fecha de corte: un segundo intento sobre la misma fecha se rechaza.",
+      "Confirma la simulación revisada. Una intención se recupera sin duplicar el asiento; " +
+      "otro corte exige reversar la revaluación vigente.",
   })
   @ApiResponse({ status: 201, type: RevaluacionResponseDto })
   @ApiResponse({
@@ -230,17 +233,19 @@ export class ContabilidadMultimonedaController {
     @CurrentUser("id") userId: string,
     @Body() dto: EjecutarRevaluacionDto,
   ) {
-    const resultado = await this.revaluacionService.ejecutar(
+    const resultado = await this.revaluacionService.ejecutarConRecibo(
       tenantId,
       userId,
       dto.fecha,
       dto.concepto,
+      dto.simulacion,
+      dto.idempotency_key,
     );
 
     return {
       success: true,
-      data: resultado,
-      message: `Revaluación al ${dto.fecha} registrada en el asiento ${resultado.numero_asiento ?? resultado.asiento_id}`,
+      ...resultado,
+      message: `Revaluación al ${dto.fecha} registrada en el asiento ${resultado.data.numero_asiento ?? resultado.data.asiento_id}`,
     };
   }
 }

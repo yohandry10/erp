@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useApi } from '@/hooks/use-api'
+import { useCallback, useEffect, useMemo } from 'react'
+import { useSalesReport, ReportReadError } from './use-sales-report'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/use-toast'
@@ -98,10 +98,9 @@ const CurrencyBreakdown = ({
 }
 
 export default function AgingCxcReport({ filters }: Props) {
-  const { get } = useApi()
+  const { data: reportData, loading, error, retry } = useSalesReport<AgingResponse>('/ventas/reportes/cxc-aging', { fechaCorte: filters.fechaHasta || undefined, cliente: filters.cliente || undefined }, 'object')
+  const data = reportData
   const country = useCountryContext()
-  const [data, setData] = useState<AgingResponse | null>(null)
-  const [loading, setLoading] = useState(true)
 
   const formatMoney = useCallback((value: number | null | undefined, currency: string | null) => {
     if (value === null || value === undefined) return 'Por valorizar'
@@ -116,37 +115,6 @@ export default function AgingCxcReport({ filters }: Props) {
       return `${currency} ${Number(value).toFixed(2)}`
     }
   }, [country.locale])
-
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true)
-      const response = await get('/ventas/reportes/cxc-aging', {
-        params: {
-          fechaCorte: filters.fechaHasta || undefined,
-          cliente: filters.cliente || undefined,
-        },
-      })
-
-      if (!response?.success || !Array.isArray(response.data?.detalle)) {
-        throw new Error('Respuesta inválida del servidor')
-      }
-      setData(response.data)
-    } catch (error) {
-      console.error('Error cargando aging CxC:', error)
-      setData(null)
-      toast({
-        title: 'Error al cargar CxC',
-        description: 'No fue posible obtener la cartera al corte solicitado.',
-        variant: 'destructive',
-      })
-    } finally {
-      setLoading(false)
-    }
-  }, [filters.cliente, filters.fechaHasta, get])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
 
   const exportCsv = () => {
     if (!data) return
@@ -166,6 +134,8 @@ export default function AgingCxcReport({ filters }: Props) {
     )
     toast({ title: 'Reporte exportado', description: 'Se descargó el aging CxC al corte en CSV.' })
   }
+
+  if (error) return <ReportReadError error={error} retry={retry} />
 
   if (loading) {
     return (

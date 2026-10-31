@@ -1,0 +1,16 @@
+{
+  "capturedAt": "2026-10-20T08:40:16.836Z",
+  "capture": "Before launch",
+  "source_hashes": {
+    "artifacts/peru-block-runner-20261019.mjs": "de40f83fab69ed72aae8906c9c681d3e5128f9927a5fe1cab9f3ae75432e1271",
+    "scripts/ci/test-peru-budgets-local.mjs": "7d5049448e9a1fcd0942a51e952b286a97c206e5c8c44e2bd2f0944f2d3d95a6",
+    "scripts/ci/peru-local-smtp-sink.mjs": "af601f15f5beb86aabc65046663fe33779b3b37c18c18365b514f84d056347ff",
+    "scripts/ci/prepare-peru-first-client-local.mjs": "ad6151649aec21cc2570f80414fb72260f1e7a8cf2f104888433d8038a61db00",
+    "apps/erp-api/tests/e2e/helpers/local-api-harness.ts": "b1c4d7c61c10a2b5b0c28c367c8790196d667dd8d03bdd65058bf982efc3e968",
+    "apps/erp-api/src/modules/contabilidad/services/presupuestos.service.ts": "5a468fcb8eaf3ff0d89f3569e7b6f26d031c8013b513633a52da385738cec1ec",
+    "apps/web/components/contabilidad/PresupuestoForm.tsx": "19678292e1d72d02efefc216292c94da1321b47975ab576dda56dbaf0b1f63fa",
+    "apps/web/tests/e2e/peru-budgets-local.spec.ts": "d58cd55c7e52d4c9008af8526550235a4b34cdf59b8b55b919791452fc7ac70d"
+  },
+  "complete_acceptance": false,
+  "remoteWrites": false
+}

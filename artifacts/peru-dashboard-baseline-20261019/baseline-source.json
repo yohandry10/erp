@@ -1,0 +1,7 @@
+{
+  "captured_at": "2026-10-19T23:03:03.426Z",
+  "product_source_commit": "edcb326d (dashboard sin cambios respecto de 49dce263)",
+  "note": "Capturada en el worktree principal antes de tocar el dashboard; el API corre con TZ=UTC como Render.",
+  "discarded_attempts": [],
+  "remoteWrites": false
+}

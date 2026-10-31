@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { parseDateLocal } from '@/lib/date-utils'
 import { useRouter } from "next/navigation";
 import { useApi } from "@/hooks/use-api";
@@ -9,7 +9,7 @@ import { PedidoVenta } from "@/types/ventas";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Truck, RefreshCw, Eye } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
+import { useTenant } from "@/contexts/TenantContext";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ConfirmarDespachoButton } from "@/components/ventas/ConfirmarDespachoButton";
@@ -18,38 +18,50 @@ import { useCountryContext } from "@/hooks/use-country-context";
 
 export default function ListoDespachoPage() {
   const router = useRouter();
-  const { get } = useApi();
+  const { get } = useApi({ throwOnError: true, showErrorToast: false, retries: 0 });
+  const { user } = useTenant();
+  const scope = `${user?.tenant_id ?? ""}:${user?.id ?? ""}`;
+  const scopeRef = useRef(scope);
+  scopeRef.current = scope;
+  const requestRef = useRef(0);
   const { loading: configLoading, isFlujologistica } = useEmpresaConfig();
   const country = useCountryContext();
 
   const [ordenes, setOrdenes] = useState<PedidoVenta[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [loadedScope, setLoadedScope] = useState<string | null>(null);
 
   const loadOrdenes = useCallback(async () => {
-    if (!isFlujologistica) return;
-
+    if (!isFlujologistica || !user?.tenant_id || !user.id) return;
+    const request = ++requestRef.current;
     try {
       setLoading(true);
+      setOrdenes([]);
+      setError(null);
+      setLoadedScope(null);
       const response = await get("/inventario/logistica/listo-despacho");
-      if (response?.success) {
-        setOrdenes(response.data || []);
-      } else if (Array.isArray(response)) {
-        setOrdenes(response);
+      if (request !== requestRef.current || scopeRef.current !== scope) return;
+      const data = response?.success === true ? response.data : response;
+      if (!Array.isArray(data) || data.some(orden => !orden?.id || !Array.isArray(orden.detalle)
+        || orden.detalle.some((line: any) => !line.id || typeof line.despachable !== "boolean"
+          || !Number.isFinite(Number(line.cantidad)) || !Number.isFinite(Number(line.cantidad_despachada))))) {
+        throw new Error("La respuesta de las órdenes está incompleta. Reintenta la consulta.");
       }
-    } catch (error) {
-      console.error("Error loading ordenes:", error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar las órdenes listas para despacho",
-        variant: "destructive",
-      });
+      setOrdenes(data);
+      setLoadedScope(scope);
+    } catch (cause) {
+      if (request !== requestRef.current || scopeRef.current !== scope) return;
+      setOrdenes([]);
+      setError(cause instanceof Error ? cause.message : "No se pudieron cargar las órdenes listas para despacho.");
     } finally {
-      setLoading(false);
+      if (request === requestRef.current && scopeRef.current === scope) setLoading(false);
     }
-  }, [get, isFlujologistica]);
+  }, [get, isFlujologistica, scope, user?.tenant_id, user?.id]);
 
   useEffect(() => {
     loadOrdenes();
+    return () => { requestRef.current++; };
   }, [loadOrdenes]);
 
   const handleVerDetalle = (pedidoId: string) => {
@@ -101,14 +113,19 @@ export default function ListoDespachoPage() {
             Confirma el despacho de pedidos preparados
           </p>
         </div>
-        <Button onClick={loadOrdenes} variant="outline">
+        <Button onClick={loadOrdenes} variant="outline" disabled={loading}>
           <RefreshCw />
           Actualizar
         </Button>
       </div>
 
       <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
-        {loading ? (
+        {error ? (
+          <div role="alert" className="space-y-3 p-6 text-center">
+            <p className="text-destructive">{error}</p>
+            <Button type="button" onClick={loadOrdenes} disabled={loading}>Reintentar</Button>
+          </div>
+        ) : loading || loadedScope !== scope ? (
           <div className="flex min-h-48 items-center justify-center">
             <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
             <p>Cargando órdenes...</p>
@@ -137,7 +154,7 @@ export default function ListoDespachoPage() {
                   <td>
                     <div>
                       <strong>{orden.numero}</strong>
-                      <Badge className="inline-flex items-center rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-400 dark:text-emerald-300">Listo Despacho</Badge>
+                      <Badge className="inline-flex items-center rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-400 dark:text-emerald-300">{orden.estado === "DESPACHO_PARCIAL" ? "Despacho parcial" : "Listo Despacho"}</Badge>
                     </div>
                   </td>
                   <td>
@@ -167,7 +184,9 @@ export default function ListoDespachoPage() {
                       <ConfirmarDespachoButton
                         pedidoId={orden.id}
                         pedidoNumero={orden.numero}
+                        detalle={orden.detalle}
                         onSuccess={loadOrdenes}
+                        onRejected={loadOrdenes}
                       />
                     </div>
                   </td>
@@ -178,7 +197,7 @@ export default function ListoDespachoPage() {
         )}
       </div>
 
-      {!loading && ordenes.length > 0 && (
+      {!loading && !error && loadedScope === scope && ordenes.length > 0 && (
         <div className="mt-2 text-[0.8125rem] text-muted-foreground">
           {ordenes.length}{" "}
           {ordenes.length === 1 ? "orden lista" : "órdenes listas"} para

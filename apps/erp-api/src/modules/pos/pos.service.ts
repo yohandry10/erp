@@ -367,6 +367,58 @@ export class PosService {
     });
   }
 
+  private async sucursalDeSesionCaja(tenantId: string, sesionCajaId: string): Promise<string | null> {
+    const { data, error } = await this.supabase.getClient()
+      .from('sesiones_caja')
+      .select('sucursal_id')
+      .eq('tenant_id', tenantId)
+      .eq('id', sesionCajaId)
+      .maybeSingle();
+    if (error) throw error;
+    return (data as any)?.sucursal_id ?? null;
+  }
+
+  /**
+   * Serie fiscal activa del establecimiento anexo. Devuelve null en la casa
+   * matriz, que usa las series de empresa_config; un anexo sin serie propia se
+   * rechaza en vez de emitir con la numeración de otro establecimiento.
+   */
+  private async serieDelEstablecimiento(
+    tenantId: string,
+    sucursalId: string | null,
+    tipoComprobante: string,
+  ): Promise<string | null> {
+    if (!sucursalId) return null;
+    const client = this.supabase.getClient();
+    const { data: sucursal, error } = await client
+      .from('sucursales')
+      .select('es_principal, codigo_establecimiento, nombre')
+      .eq('tenant_id', tenantId)
+      .eq('id', sucursalId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!sucursal || (sucursal as any).es_principal) return null;
+    const factura = tipoComprobante === '01';
+    const { data: series, error: seriesError } = await client
+      .from('documento_series')
+      .select('serie')
+      .eq('tenant_id', tenantId)
+      .eq('sucursal_id', sucursalId)
+      .eq('tipo_documento', factura ? 'FACTURA' : 'BOLETA')
+      .eq('activo', true)
+      .order('serie');
+    if (seriesError) throw seriesError;
+    const serie = (series ?? [])
+      .map((row: any) => String(row.serie || '').toUpperCase())
+      .find((value) => /^[A-Z0-9]{4}$/.test(value) && value.startsWith(factura ? 'F' : 'B'));
+    if (!serie) {
+      throw new Error(
+        `El establecimiento ${(sucursal as any).codigo_establecimiento} (${(sucursal as any).nombre}) no tiene serie de ${factura ? 'factura' : 'boleta'}; regístrela en Configuración → Establecimientos`,
+      );
+    }
+    return serie;
+  }
+
   /**
    * Reserva el siguiente correlativo de la serie fiscal en documento_series, que
    * es la secuencia compartida por POS, Documentos y facturación de pedidos.
@@ -578,12 +630,53 @@ export class PosService {
 
         return {
           success: true,
-          data: data || [],
+          data: await this.conStockDelAlmacenDeCaja(user, data || []),
         };
       } catch (error) {
         this.logger.error('Error obteniendo productos POS:', error);
         throw error;
       }
+    });
+  }
+
+  /**
+   * La venta descuenta del almacén de la caja abierta: el catálogo debe mostrar
+   * ese stock y no el total de la empresa, o el cajero ofrece productos que el
+   * almacén de su local no tiene. Sin caja abierta se conserva el total.
+   */
+  private async conStockDelAlmacenDeCaja(user: any, productos: any[]): Promise<any[]> {
+    const sesion = await this.getSesionCajaActual(user);
+    const cajaId = sesion?.success ? (sesion.data as any)?.caja_id : null;
+    if (!cajaId || productos.length === 0) return productos;
+    const client = this.supabase.getClient();
+    const { data: caja, error: cajaError } = await client
+      .from('cajas')
+      .select('almacen_id')
+      .eq('tenant_id', user.tenant_id)
+      .eq('id', cajaId)
+      .maybeSingle();
+    if (cajaError) throw cajaError;
+    const almacenId = (caja as any)?.almacen_id;
+    if (!almacenId) return productos;
+    const { data: existencias, error } = await client
+      .from('producto_existencias')
+      .select('producto_id, stock_actual, stock_reservado')
+      .eq('tenant_id', user.tenant_id)
+      .eq('almacen_id', almacenId);
+    if (error) throw error;
+    const porProducto = new Map((existencias ?? []).map((e: any) => [e.producto_id, e]));
+    return productos.map((producto) => {
+      if (producto.es_servicio === true || producto.controla_stock === false) return producto;
+      const existencia: any = porProducto.get(producto.id);
+      const actual = Number(existencia?.stock_actual ?? 0);
+      const reservado = Number(existencia?.stock_reservado ?? 0);
+      return {
+        ...producto,
+        almacen_id: almacenId,
+        stock_actual: actual,
+        stock_reservado: reservado,
+        stock_disponible: Math.max(actual - reservado, 0),
+      };
     });
   }
 
@@ -777,6 +870,21 @@ export class PosService {
     return this.runWithTenantContext(user, async () => {
       try {
         const idempotencyKey = String(payload?.idempotency_key || '').trim();
+        let serieCanje = payload.serie?.trim().toUpperCase() || null;
+        if (!serieCanje) {
+          const { data: venta, error: ventaError } = await this.supabase.getClient()
+            .from('ventas_pos')
+            .select('sucursal_id')
+            .eq('tenant_id', user.tenant_id)
+            .eq('id', ventaId)
+            .maybeSingle();
+          if (ventaError) throw ventaError;
+          serieCanje = await this.serieDelEstablecimiento(
+            user.tenant_id,
+            (venta as any)?.sucursal_id ?? null,
+            payload.tipo_documento,
+          );
+        }
         const { data, error } = await this.supabase.getClient()
           .rpc('pos_canjear_ticket_tx', {
             p_tenant_id: user.tenant_id,
@@ -785,7 +893,7 @@ export class PosService {
             p_idempotency_key: idempotencyKey,
             p_payload: {
               tipo_documento: payload.tipo_documento,
-              serie: payload.serie?.trim().toUpperCase() || null,
+              serie: serieCanje,
               cliente_id: payload.cliente_id || null,
               cliente_tipo_documento: payload.cliente_tipo_documento.trim().toUpperCase(),
               cliente_documento: payload.cliente_documento.trim(),
@@ -1064,7 +1172,7 @@ export class PosService {
       if (emitirCpe && empresaCfg?.pais === 'PE' && tipoComprobanteSolicitado === '03' && totalCalculado > 700) {
         const documentoCliente = String(ventaData?.cliente_documento ?? '').trim();
         const nombreCliente = String(ventaData?.cliente_nombre ?? '').trim();
-        if (!documentoCliente || /^9+$/.test(documentoCliente) || !nombreCliente) {
+        if (!documentoCliente || /^(9+|0+)$/.test(documentoCliente) || !nombreCliente) {
           throw new BadRequestException(
             'Las boletas mayores a S/ 700 requieren los datos del cliente (nombre y número de documento). ' +
               'Solicítalos antes de cobrar o emite una factura.',
@@ -1301,7 +1409,7 @@ export class PosService {
         (countryCode === 'CO' || !serieFiscal.startsWith('T')) &&
         (empresaCfg?.pais !== 'PE' || serieFiscal.startsWith(prefijoFiscal));
       const arcaPointOfSale = Number(empresaCfg?.arca_punto_venta);
-      const serieCpe = countryCode === 'AR'
+      let serieCpe = countryCode === 'AR'
         ? (Number.isInteger(arcaPointOfSale) && arcaPointOfSale >= 1 && arcaPointOfSale <= 99998
           ? String(arcaPointOfSale).padStart(5, '0')
           : (() => { throw new Error('Punto de venta ARCA inválido o no configurado'); })())
@@ -1310,6 +1418,16 @@ export class PosService {
           : esSerieFiscalValida(serieConfigurada)
             ? serieConfigurada
             : `${prefijoFiscal}001`;
+      // Fuera de la casa matriz, el comprobante lleva la serie del establecimiento
+      // de la caja: la serie decide el establecimiento del CPE (504).
+      const serieEstablecimiento = emitirCpe && countryCode === 'PE'
+        ? await this.serieDelEstablecimiento(
+          user.tenant_id,
+          await this.sucursalDeSesionCaja(user.tenant_id, sesionCajaId),
+          tipoComprobante,
+        )
+        : null;
+      if (serieEstablecimiento) serieCpe = serieEstablecimiento;
       const docReceptorRaw = String(ventaData.cliente_documento || '').trim();
       const tipoDocReceptor = this.inferirTipoDocumento(
         docReceptorRaw,
@@ -1530,9 +1648,12 @@ export class PosService {
 
     } catch (error) {
       this.logger.error('❌ Error procesando venta:', error);
+      const sinExistencia = String(error?.message ?? '').startsWith('INVENTORY_EXISTENCE_REQUIRED');
       return {
         success: false,
-        message: error.message || 'Error procesando venta',
+        message: sinExistencia
+          ? 'Uno de los productos no tiene stock en el almacén de esta caja. Retírelo de la venta o registre un traslado.'
+          : error.message || 'Error procesando venta',
         error: {
           tipo: 'DATABASE_ERROR',
           mensaje: error.message,

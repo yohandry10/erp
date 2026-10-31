@@ -1,0 +1,10 @@
+{
+  "completedAt": "2026-10-20T08:31:45.833Z",
+  "success": true,
+  "withBrowser": true,
+  "block": "read_faults",
+  "scope": "read_faults_subset",
+  "database": "PostgreSQL 16 efímero (migraciones completas)",
+  "output": "artifacts\\peru-read_faults-local-20261020082856230-26464",
+  "remoteWrites": false
+}

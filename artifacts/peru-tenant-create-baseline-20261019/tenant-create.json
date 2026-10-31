@@ -1,0 +1,48 @@
+{
+  "success": false,
+  "remoteWrites": false,
+  "scope": "Alta de empresa por superadministrador API/DB local; sin aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Alta de empresa: crea empresa y administrador que entra con la contraseña temporal",
+      "passed": true
+    },
+    {
+      "scenario": "Alta de empresa: RUC ya registrado responde 409 con un motivo legible",
+      "passed": false,
+      "message": "Código interno al usuario: TENANT_CREATE_ID_TAX_OR_EMAIL_CONFLICT"
+    },
+    {
+      "scenario": "Alta de empresa: sin confirmación de la base responde 503 legible y el reintento con la misma clave no duplica",
+      "passed": false,
+      "message": "Sin confirmación respondió 400 {\"statusCode\":400,\"message\":\"No se pudo crear el tenant: AbortError: This operation was aborted\",\"error\":\"Bad Request\",\"timestamp\":\"2026-10-19T23:39:32.278Z\",\"path\":\"/api/tenants\"}\n\n400 !== 503\n"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "tenants",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "tenants",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "endpoint": "tenants",
+      "status": 400
+    }
+  ]
+}

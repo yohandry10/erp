@@ -21,12 +21,15 @@ function showToast(message: string) {
 }
 
 interface SireReportModalProps {
+  canGenerate: boolean
+  tenantId: string
+  actorId: string
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
 }
 
-export default function SireReportModal({ isOpen, onClose, onSuccess }: SireReportModalProps) {
+export default function SireReportModal({ isOpen, onClose, onSuccess, canGenerate, tenantId, actorId }: SireReportModalProps) {
   const [formData, setFormData] = useState({
     tipoReporte: 'REGISTRO_VENTAS',
     periodo: getCurrentPeriod(),
@@ -34,11 +37,12 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
     incluirAnulados: false
   })
 
-  const api = useApiCall()
+  const api = useApiCall({requireLive:true,retries:0,showErrorToast:false})
   const requestRef = useRef<{ fingerprint: string; key: string } | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!canGenerate || !tenantId || !actorId) return
 
     const fingerprint = JSON.stringify(formData)
     if (!requestRef.current || requestRef.current.fingerprint !== fingerprint) {
@@ -169,7 +173,7 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
             </button>
             <button
               type="submit"
-              disabled={api.loading} className="py-3 px-6 border-0 rounded-[6px] text-white font-semibold"
+              disabled={api.loading || !canGenerate} className="py-3 px-6 border-0 rounded-[6px] text-white font-semibold"
             >
               {api.loading ? 'Generando...' : 'Generar Reporte'}
             </button>

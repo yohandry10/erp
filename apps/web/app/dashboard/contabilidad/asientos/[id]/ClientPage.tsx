@@ -1,5 +1,6 @@
 'use client'
 
+import { requestConfirmation } from '@/lib/confirm-action'
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
@@ -185,7 +186,7 @@ export default function AsientoDetallePage() {
 
   const eliminarBorrador = async () => {
     if (!asientoId) return
-    if (!confirm('¿Eliminar definitivamente este borrador? No quedará rastro del asiento.')) return
+    if (!(await requestConfirmation('¿Eliminar definitivamente este borrador? No quedará rastro del asiento.'))) return
     try {
       setAccionEnCurso('eliminar')
       setAccionError(null)

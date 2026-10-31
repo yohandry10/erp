@@ -4,3 +4,4 @@ export * from './actualizar-cxp.dto';
 export * from './aplicar-pago-cxp.dto';
 export * from './anular-cxp.dto';
 export * from './vencimientos-cxp.dto';
+export * from './usar-credito-proveedor.dto';

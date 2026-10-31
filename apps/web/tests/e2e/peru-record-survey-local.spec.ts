@@ -71,8 +71,9 @@ test('Perú: carga las pantallas con identificador usando registros de la empres
     await page.locator('#password').fill('Local-Peru-2026-Only!')
     let token: string | undefined
     for (let attempt = 0; attempt < 2; attempt++) {
-      const [login] = await Promise.all([
-        page.waitForResponse(r => new URL(r.url()).pathname.replace(/\/$/, '').endsWith('/auth/login') && r.request().method() === 'POST'),
+      const [{ login, auth }] = await Promise.all([
+        page.waitForResponse(r => new URL(r.url()).pathname.replace(/\/$/, '').endsWith('/auth/login') && r.request().method() === 'POST')
+          .then(async login => ({ login, auth: login.status() === 201 ? await login.json() : null })),
         page.getByRole('button', { name: 'Iniciar Sesión', exact: true }).click(),
       ])
       if (login.status() === 429 && attempt === 0) {
@@ -82,7 +83,7 @@ test('Perú: carga las pantallas con identificador usando registros de la empres
         continue
       }
       expect(login.status()).toBe(201)
-      const auth = await login.json()
+      expect(auth).toBeTruthy()
       token = auth.access_token ?? auth.data?.access_token
       break
     }
@@ -101,6 +102,9 @@ test('Perú: carga las pantallas con identificador usando registros de la empres
         scriptErrors = []
         let status: number | null = null
         try {
+          // Ritmo de navegación compatible con el bootstrap fiscal compartido.
+          // Los errores HTTP siguen siendo fallos, incluido cualquier 429.
+          await page.waitForTimeout(2500)
           status = (await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 45000 }))?.status() ?? null
           await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {})
         } catch (error) { errors.push(String(error).split('\n')[0]) }

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, UseGuards, InternalServerErrorException } from '@nestjs/common';
+import { Controller, Get, Post, UseGuards, HttpException, InternalServerErrorException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
@@ -29,6 +29,8 @@ export class DashboardController {
       };
     } catch (error) {
       console.error('❌ [Dashboard Controller] Error obteniendo estadísticas:', error);
+      // Una lectura caída ya llega como 503; sólo lo inesperado queda en 500.
+      if (error instanceof HttpException) throw error;
       throw new InternalServerErrorException('No se pudieron calcular las estadísticas del dashboard');
     }
   }
@@ -47,11 +49,9 @@ export class DashboardController {
       };
     } catch (error) {
       console.error('❌ [Dashboard Controller] Error obteniendo actividades:', error);
-      return {
-        success: false,
-        data: [],
-        message: 'Error al obtener actividades recientes'
-      };
+      // Antes respondía 200 con lista vacía: la pantalla mostraba «sin actividad».
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('No se pudieron cargar las actividades recientes');
     }
   }
 

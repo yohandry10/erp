@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useApi } from '@/hooks/use-api'
+import { useSalesReport, ReportReadError } from './use-sales-report'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { TrendingUp, Eye } from 'lucide-react'
@@ -32,36 +32,9 @@ interface Props {
 
 export default function TopClientesReport({ filters }: Props) {
   const router = useRouter()
-  const { get } = useApi()
-  const [data, setData] = useState<TopCliente[]>([])
-  const [loading, setLoading] = useState(true)
   const [topN, setTopN] = useState(10)
-
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true)
-      const response = await get('/ventas/reportes/top-clientes', {
-        params: { ...filters, limit: topN }
-      })
-
-      if (response?.success) {
-        setData(response.data || [])
-      }
-    } catch (error) {
-      console.error('Error loading report:', error)
-      toast({
-        title: 'Error',
-        description: 'No se pudo cargar el reporte',
-        variant: 'destructive'
-      })
-    } finally {
-      setLoading(false)
-    }
-  }, [filters, get, topN])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
+  const { data: reportData, loading, error, retry } = useSalesReport<TopCliente[]>('/ventas/reportes/top-clientes', { ...filters, limit: topN }, 'array')
+  const data = reportData || []
 
   const handleVerCliente = (clienteId: string) => {
     router.push(`/dashboard/ventas/clientes/${clienteId}`)
@@ -69,6 +42,8 @@ export default function TopClientesReport({ filters }: Props) {
 
   const totales = reportTotals(data, row => row.total_facturacion)
   const maxFacturacion = (moneda: string) => Math.max(...data.filter(row => row.moneda === moneda).map(row => row.total_facturacion), 1)
+
+  if (error) return <ReportReadError error={error} retry={retry} />
 
   return (
     <Card>

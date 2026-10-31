@@ -1,4 +1,4 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { PeriodosService } from './periodos.service';
 import {
@@ -12,6 +12,7 @@ import {
 } from '@erp-suite/dtos';
 import { buildDeterministicUuid } from '../../../common/util/deterministic-uuid.util';
 import { createHash } from 'crypto';
+import { lecturaContableFallida } from '../contabilidad-errors';
 
 @Injectable()
 export class DiferidosService {
@@ -120,7 +121,7 @@ export class DiferidosService {
     const { data, error } = await query.order('fecha_inicio', { ascending: false });
 
     if (error) {
-      throw new Error(`Error listando diferidos: ${error.message}`);
+      throw lecturaContableFallida(error, 'los diferidos');
     }
 
     return (data || []).map((fila: any) => this.aRespuesta(fila));
@@ -173,6 +174,8 @@ export class DiferidosService {
     const {data:rpcData,error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_activo_diferido_tx',{
       p_tenant_id:tenantId,p_actor_id:userId,p_entity:'DEFERRED',p_action:'CANCEL',p_record_id:diferidoId,p_payload:{},p_idempotency_key:key,
     });
+    // Un diferido inexistente es 404, no 400 con el código interno.
+    if(rpcError&&/NOT_FOUND/.test(String(rpcError.message))) throw new NotFoundException('Diferido no encontrado');
     if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo cancelar el diferido');
     const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData;
     return this.aRespuesta(result.record);
@@ -212,7 +215,7 @@ export class DiferidosService {
       .eq('estado', EstadoDiferido.VIGENTE);
 
     if (error) {
-      throw new Error(`Error obteniendo los diferidos vigentes: ${error.message}`);
+      throw lecturaContableFallida(error, 'los diferidos vigentes');
     }
 
     const omitidos: Array<{ diferido_id: string; nombre?: string; motivo: string }> = [];
@@ -339,6 +342,11 @@ export class DiferidosService {
       });
 
     if (errorDevengo) {
+      if (/DIFERIDO_NO_VIGENTE|DIFERIDO_CAMBIO_CONCURRENTEMENTE/.test(errorDevengo.message ?? '')) {
+        throw new ConflictException(
+          'El registro de diferidos cambió durante el devengo. Actualiza la lista y revisa el período antes de reintentar.'
+        );
+      }
       if (
         errorDevengo.code === '23505' ||
         /YA_DEVENGADO|source_event_id/i.test(errorDevengo.message ?? '')

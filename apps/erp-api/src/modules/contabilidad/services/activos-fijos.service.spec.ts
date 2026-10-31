@@ -1,5 +1,6 @@
+import { batchTestKey, batchTestId, batchTestReceipt } from './asset-depreciation-batch.fixture';
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { ActivosFijosService } from './activos-fijos.service';
 import { PeriodosService } from './periodos.service';
 import { PlanCuentasService } from './plan-cuentas.service';
@@ -30,7 +31,8 @@ describe('ActivosFijosService', () => {
     const filtros: string[] = [];
     const resultado = () => {
       const valor = tablas[tabla];
-      return typeof valor === 'function' ? valor(filtros) : valor ?? { data: null, error: null };
+      const result = typeof valor === 'function' ? valor(filtros) : valor ?? { data: null, error: null };
+      return Array.isArray(result.data) ? { ...result, count: result.data.length } : result;
     };
     const query: any = {
       select: jest.fn(() => query),
@@ -50,6 +52,7 @@ describe('ActivosFijosService', () => {
       gte: jest.fn(() => query),
       lte: jest.fn(() => query),
       order: jest.fn(() => query),
+      range: jest.fn(() => query),
       single: jest.fn(async () => resultado()),
       maybeSingle: jest.fn(async () => resultado()),
       then: (onFulfilled: any) => Promise.resolve(resultado()).then(onFulfilled)
@@ -97,6 +100,7 @@ describe('ActivosFijosService', () => {
               from: jest.fn((tabla: string) => construirQuery(tabla)),
               rpc: jest.fn(async (funcion: string, parametros: any) => {
                 rpcs.push({ funcion, parametros });
+                if(funcion==='registrar_lote_depreciacion_tx_570'&&!resultadosRpc[funcion])return {data:batchTestReceipt(parametros),error:null};
                 return resultadosRpc[funcion] ?? { data: null, error: null };
               })
             }))
@@ -114,6 +118,116 @@ describe('ActivosFijosService', () => {
   });
 
   afterEach(() => jest.clearAllMocks());
+
+  describe('estimación prospectiva572', () => {
+    const revision = { version: 572, periodo_inicio: '2026-02', meses_restantes: 23, base_centimos: 1100000, cuota_centimos: 47826, acumulada_anterior_centimos: 100000, adquisicion_centimos: 1200000, residual_centimos: 0 };
+    const activo = { id: 'af-570', codigo: 'AF-570', valor_adquisicion: 12000, valor_residual: 0, vida_util_meses: 24, depreciacion_acumulada: 1000, fecha_inicio_depreciacion: '2026-01-01', situacion: 'ACTIVO', metadata: { depreciacion_revision_572: revision } };
+
+    it('reparte el pendiente entre los meses restantes y absorbe los céntimos al final', () => {
+      const actual = { ...activo };
+      const cuotas = [];
+      for (let indice = 0; indice < 23; indice++) {
+        const fecha = new Date(Date.UTC(2026, 1 + indice, 1));
+        const cuota = ActivosFijosService.cuotaDelPeriodo(actual, fecha.getUTCFullYear(), fecha.getUTCMonth() + 1);
+        cuotas.push(cuota);
+        actual.depreciacion_acumulada = Math.round((actual.depreciacion_acumulada + cuota) * 100) / 100;
+      }
+      expect(cuotas.slice(0, 22)).toEqual(Array(22).fill(478.26));
+      expect(cuotas[22]).toBe(478.28);
+      expect(actual.depreciacion_acumulada).toBe(12000);
+      expect(ActivosFijosService.cuotaDelPeriodo(actual, 2028, 1)).toBe(0);
+      expect(ActivosFijosService.cuotaDelPeriodo(activo, 2026, 1)).toBe(0);
+    });
+
+    it('el residual revisado se descuenta del pendiente, sin volver a dividir la adquisición', () => {
+      const actual = { ...activo, vida_util_meses: 12, valor_residual: 1000, metadata: { depreciacion_revision_572: { ...revision, meses_restantes: 11, base_centimos: 1000000, cuota_centimos: 90909, residual_centimos: 100000 } } };
+      expect(ActivosFijosService.cuotaDelPeriodo(actual, 2026, 2)).toBe(909.09);
+    });
+
+    it('cronograma conserva la cuota real y su acumulada histórica', async () => {
+      tablas.activos_fijos = { data: activo, error: null };
+      tablas.depreciaciones = { data: [{ id: 'history-jan', tenant_id: TENANT, activo_id: activo.id, periodo: '2026-01', monto_depreciacion: 1000, depreciacion_acumulada: 1000, valor_neto: 11000, estado: 'PENDIENTE', activo: true }], error: null };
+      const rows = await service.obtenerCronograma(TENANT, activo.id);
+      expect(rows).toHaveLength(24);
+      expect(rows[0]).toEqual({ periodo: '2026-01', cuota: 1000, acumulada: 1000, valor_neto: 11000, registrada: true });
+      expect(rows[1].cuota).toBe(478.26);
+      expect(rows.at(-1)).toMatchObject({ cuota: 478.28, acumulada: 12000, valor_neto: 0 });
+    });
+
+    it('una cuota futura ya registrada permanece exacta al recargar el cronograma', async () => {
+      tablas.activos_fijos = { data: { ...activo, depreciacion_acumulada: 1478.26 }, error: null };
+      tablas.depreciaciones = { data: [
+        { id: 'history-jan', tenant_id: TENANT, activo_id: activo.id, periodo: '2026-01', monto_depreciacion: 1000, depreciacion_acumulada: 1000, valor_neto: 11000, estado: 'PROCESADA' },
+        { id: 'history-feb', tenant_id: TENANT, activo_id: activo.id, periodo: '2026-02', monto_depreciacion: 478.26, depreciacion_acumulada: 1478.26, valor_neto: 10521.74, estado: 'PENDIENTE' },
+      ], error: null };
+      const rows = await service.obtenerCronograma(TENANT, activo.id);
+      expect(rows).toHaveLength(24);
+      expect(rows[1]).toMatchObject({ cuota: 478.26, acumulada: 1478.26, valor_neto: 10521.74 });
+      expect(rows[2].cuota).toBe(478.26);
+      expect(rows.at(-1)).toMatchObject({ cuota: 478.28, valor_neto: 0 });
+    });
+
+    it('el historial indisponible no se sustituye por una proyección inventada', async () => {
+      tablas.activos_fijos = { data: activo, error: null };
+      tablas.depreciaciones = { data: null, error: { code: '42501', message: 'permission denied' } };
+      await expect(service.obtenerCronograma(TENANT, activo.id)).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
+
+    it('un activo retirado sólo muestra cuotas registradas', async () => {
+      tablas.activos_fijos = { data: { ...activo, situacion: 'BAJA' }, error: null };
+      tablas.depreciaciones = { data: [{ id: 'history-jan', tenant_id: TENANT, activo_id: activo.id, periodo: '2026-01', monto_depreciacion: 1000, depreciacion_acumulada: 1000, valor_neto: 11000, estado: 'PENDIENTE' }], error: null };
+      expect(await service.obtenerCronograma(TENANT, activo.id)).toHaveLength(1);
+    });
+
+    it('una revisión corrupta falla cerrado sin producirNaN o una cuota cero falsa', () => {
+      expect(() => ActivosFijosService.cuotaDelPeriodo({ ...activo, metadata: { depreciacion_revision_572: { ...revision, cuota_centimos: '47826' } } }, 2026, 2)).toThrow(ServiceUnavailableException);
+    });
+  });
+
+  describe('errores observados en UAT', () => {
+    const dto = { codigo: 'AF-UAT', nombre: 'Equipo', fecha_adquisicion: '2026-01-01', valor_adquisicion: 12000, vida_util_meses: 12 };
+
+    it.each(['obtener', 'obtenerCronograma'] as const)('%s distingue lectura caída de ausencia', async metodo => {
+      tablas.activos_fijos = { data: null, error: { code: '42501', message: 'permission denied for table activos_fijos' } };
+      await expect(service[metodo](TENANT, 'af-1')).rejects.toBeInstanceOf(ServiceUnavailableException);
+      tablas.activos_fijos = { data: null, error: { code: 'PGRST116', message: 'no rows' } };
+      await expect(service[metodo](TENANT, 'af-1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it.each([
+      [{ code: '23505', message: 'duplicate key' }, ConflictException],
+      [{ code: 'P0001', message: 'ACCOUNTING_MASTER_IDEMPOTENCY_CONFLICT' }, ConflictException],
+      [{ code: '42501', message: 'permission denied for function gestionar_activo_diferido_tx' }, ServiceUnavailableException],
+    ])('clasifica errores de alta sin exponer el mensaje SQL: %j', async (error, tipo) => {
+      resultadosRpc.gestionar_activo_diferido_tx = { data: null, error };
+      await expect(service.crear(TENANT, USER, dto)).rejects.toBeInstanceOf(tipo);
+      await expect(service.crear(TENANT, USER, dto)).rejects.not.toThrow(error.message);
+    });
+
+    it('una edición ajena es404 y una edición indisponible es503', async () => {
+      resultadosRpc.gestionar_activo_diferido_tx = { data: null, error: { message: 'ASSET_NOT_FOUND' } };
+      await expect(service.actualizar(TENANT, 'af-1', { nombre: 'Cambio' }, USER)).rejects.toBeInstanceOf(NotFoundException);
+      resultadosRpc.gestionar_activo_diferido_tx = { data: null, error: { code: '42501', message: 'permission denied' } };
+      await expect(service.actualizar(TENANT, 'af-1', { nombre: 'Cambio' }, USER)).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
+
+    it('una respuesta vacía del writer no acredita el alta ni la edición', async () => {
+      resultadosRpc.gestionar_activo_diferido_tx = { data: null, error: null };
+      await expect(service.crear(TENANT, USER, dto)).rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expect(service.actualizar(TENANT, 'af-1', { nombre: 'Cambio' }, USER)).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
+
+    it('la lectura caída al depreciar responde503', async () => {
+      tablas.activos_fijos = { data: null, error: { code: '42501', message: 'permission denied' } };
+      await expect(service.depreciarPeriodo(TENANT, USER, 2026, 1, batchTestKey)).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
+
+    it('la caída del writer de depreciación no se devuelve como éxito con omitidos', async () => {
+      tablas.activos_fijos = { data: [{ id: batchTestId(1), tenant_id: TENANT, situacion: 'ACTIVO', codigo: 'AF-1', valor_adquisicion: 12000, valor_residual: 0, vida_util_meses: 12, depreciacion_acumulada: 0, fecha_inicio_depreciacion: '2026-01-01' }], error: null };
+      resultadosRpc.registrar_lote_depreciacion_tx_570 = { data: null, error: { code: '08006', message: 'connection lost at registrar_lote_depreciacion_tx_570' } };
+      await expect(service.depreciarPeriodo(TENANT, USER, 2026, 1, batchTestKey)).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
+  });
 
   describe('calcularCronograma', () => {
     const calc = ActivosFijosService.calcularCronograma;
@@ -241,6 +355,56 @@ describe('ActivosFijosService', () => {
     });
   });
 
+  describe('cronograma con cuotas registradas', () => {
+    beforeEach(() => {
+      tablas.activos_fijos = { data: { valor_adquisicion: 120, valor_residual: 18,
+        vida_util_meses: 6, fecha_inicio_depreciacion: '2026-05-01', depreciacion_acumulada: 9,
+        situacion: 'ACTIVO' }, error: null };
+      tablas.depreciaciones = { data: [{ id: 'registered-1', tenant_id: TENANT, activo_id: 'af-1', periodo: '2026-05', monto_depreciacion: 9,
+        depreciacion_acumulada: 9, valor_neto: 111, estado: 'PROCESADA' }], error: null };
+    });
+
+    it('preserva la cuota anterior a un cambio de estimación y ajusta sólo la proyección', async () => {
+      const cuotas = await service.obtenerCronograma(TENANT, 'af-1');
+      expect(cuotas).toHaveLength(6);
+      expect(cuotas[0]).toEqual({ periodo: '2026-05', cuota: 9, acumulada: 9, valor_neto: 111, registrada: true });
+      expect(cuotas[1]).toMatchObject({ periodo: '2026-06', cuota: 17, acumulada: 26, valor_neto: 94, registrada: false });
+      expect(cuotas[5]).toMatchObject({ periodo: '2026-10', cuota: 25, acumulada: 102, valor_neto: 18, registrada: false });
+      expect(rpcs).toHaveLength(0);
+    });
+
+    it.each(['BAJA', 'VENDIDO', 'DEPRECIADO'])('no proyecta cuotas después de retirar o agotar un activo %s', async situacion => {
+      tablas.activos_fijos.data.situacion = situacion;
+      expect(await service.obtenerCronograma(TENANT, 'af-1')).toEqual([
+        { periodo: '2026-05', cuota: 9, acumulada: 9, valor_neto: 111, registrada: true },
+      ]);
+    });
+
+    it('no convierte meses omitidos en depreciación registrada o proyectada del pasado', async () => {
+      tablas.depreciaciones.data[0].periodo = '2026-07';
+      const cuotas = await service.obtenerCronograma(TENANT, 'af-1');
+      expect(cuotas.map(c => c.periodo)).toEqual(['2026-07', '2026-08', '2026-09', '2026-10']);
+      expect(cuotas[3]).toMatchObject({ cuota: 59, acumulada: 102, valor_neto: 18 });
+    });
+
+    it('rechaza una lectura fallida del historial en lugar de recalcularlo como vacío', async () => {
+      tablas.depreciaciones = { data: null, error: { message: 'unavailable' } };
+      await expect(service.obtenerCronograma(TENANT, 'af-1')).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
+
+    it('rechaza una lectura del activo que no coincide con su historial', async () => {
+      tablas.activos_fijos.data.depreciacion_acumulada = 17;
+      await expect(service.obtenerCronograma(TENANT, 'af-1')).rejects.toThrow(/no coincide/);
+    });
+
+    it('proyecta desde cero para un activo sin cuotas registradas', async () => {
+      tablas.activos_fijos.data.depreciacion_acumulada = 0; tablas.depreciaciones.data = [];
+      const cuotas = await service.obtenerCronograma(TENANT, 'af-1');
+      expect(cuotas).toHaveLength(6); expect(cuotas.every(c => !c.registrada)).toBe(true);
+      expect(cuotas[5]).toMatchObject({ cuota: 17, acumulada: 102, valor_neto: 18 });
+    });
+  });
+
   describe('alta', () => {
     it('rechaza un valor residual mayor que el de adquisición', async () => {
       await expect(
@@ -279,7 +443,8 @@ describe('ActivosFijosService', () => {
       tablas['activos_fijos'] = {
         data: [
           {
-            id: 'af-1',
+            id: batchTestId(1),
+            tenant_id: TENANT, situacion: 'ACTIVO',
             codigo: 'AF-1',
             valor_adquisicion: 12000,
             valor_residual: 0,
@@ -292,20 +457,19 @@ describe('ActivosFijosService', () => {
       };
       tablas['depreciaciones'] = { data: null, error: null };
 
-      const resultado = await service.depreciarPeriodo(TENANT, USER, 2026, 1);
+      const resultado = await service.depreciarPeriodo(TENANT, USER, 2026, 1, batchTestKey);
 
-      expect(resultado).toMatchObject({
+      expect(resultado.data).toMatchObject({
         periodo: '2026-01',
         activos_depreciados: 1,
         total_depreciado: 1000
       });
-      const registro = rpcs.find(r => r.funcion === 'registrar_depreciacion_tx');
-      expect(registro!.parametros).toMatchObject({
-        p_activo_id: 'af-1',
-        p_periodo: '2026-01',
-        p_monto: 1000,
-        p_acumulado: 1000,
-        p_valor_neto: 11000
+      const registro = rpcs.find(r => r.funcion === 'registrar_lote_depreciacion_tx_570');
+      expect(registro!.parametros.p_plan[0]).toMatchObject({
+        source:{id:batchTestId(1)},
+        cuota: 1000,
+        acumulada: 1000,
+        valor_neto: 11000
       });
     });
 
@@ -313,7 +477,8 @@ describe('ActivosFijosService', () => {
       tablas['activos_fijos'] = {
         data: [
           {
-            id: 'af-1',
+            id: batchTestId(1),
+            tenant_id: TENANT, situacion: 'ACTIVO',
             codigo: 'AF-1',
             valor_adquisicion: 12000,
             valor_residual: 0,
@@ -326,18 +491,19 @@ describe('ActivosFijosService', () => {
       };
       tablas['depreciaciones'] = { data: null, error: null };
 
-      await service.depreciarPeriodo(TENANT, USER, 2026, 12);
+      await service.depreciarPeriodo(TENANT, USER, 2026, 12, batchTestKey);
 
-      const registro = rpcs.find(r => r.funcion === 'registrar_depreciacion_tx');
-      expect(registro!.parametros.p_acumulado).toBe(12000);
-      expect(registro!.parametros.p_valor_neto).toBe(0);
+      const registro = rpcs.find(r => r.funcion === 'registrar_lote_depreciacion_tx_570');
+      expect(registro!.parametros.p_plan[0].acumulada).toBe(12000);
+      expect(registro!.parametros.p_plan[0].valor_neto).toBe(0);
     });
 
-    it('traduce el choque contra el índice único a un motivo entendible', async () => {
+    it('un fallo de escritura del lote se propaga y nunca se confirma como omitido', async () => {
       tablas['activos_fijos'] = {
         data: [
           {
-            id: 'af-1',
+            id: batchTestId(1),
+            tenant_id: TENANT, situacion: 'ACTIVO',
             codigo: 'AF-1',
             valor_adquisicion: 12000,
             valor_residual: 0,
@@ -348,15 +514,12 @@ describe('ActivosFijosService', () => {
         ],
         error: null
       };
-      resultadosRpc.registrar_depreciacion_tx = {
+      resultadosRpc.registrar_lote_depreciacion_tx_570 = {
         data: null,
         error: { code: '23505', message: 'duplicate' }
       };
 
-      const resultado = await service.depreciarPeriodo(TENANT, USER, 2026, 1);
-
-      expect(resultado.activos_depreciados).toBe(0);
-      expect(resultado.omitidos![0].motivo).toMatch(/ya tiene registrada su depreciación/);
+      await expect(service.depreciarPeriodo(TENANT,USER,2026,1,batchTestKey)).rejects.toThrow(/Conserve la solicitud/);
     });
 
     it('respeta el período contable cerrado', async () => {
@@ -364,13 +527,13 @@ describe('ActivosFijosService', () => {
         new BadRequestException('El período contable 2026-01 está CERRADO.')
       );
 
-      await expect(service.depreciarPeriodo(TENANT, USER, 2026, 1)).rejects.toThrow(/CERRADO/);
+      await expect(service.depreciarPeriodo(TENANT, USER, 2026, 1, batchTestKey)).rejects.toThrow(/CERRADO/);
       expect(inserciones).toHaveLength(0);
-      expect(rpcs).toHaveLength(0);
+      expect(rpcs.filter(r=>r.funcion==='registrar_lote_depreciacion_tx_570')).toHaveLength(0);
     });
 
     it('rechaza un mes inválido', async () => {
-      await expect(service.depreciarPeriodo(TENANT, USER, 2026, 13)).rejects.toBeInstanceOf(
+      await expect(service.depreciarPeriodo(TENANT, USER, 2026, 13, batchTestKey)).rejects.toBeInstanceOf(
         BadRequestException
       );
     });

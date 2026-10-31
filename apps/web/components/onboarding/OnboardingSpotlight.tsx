@@ -40,16 +40,30 @@ export function OnboardingSpotlight({
     }
   }, [selector, isVisible])
 
-  if (!isVisible || !rect) return null
+  if (!isVisible || !rect || !rect.width || !rect.height ||
+      rect.bottom <= 0 || rect.right <= 0 ||
+      rect.top >= window.innerHeight || rect.left >= window.innerWidth) return null
+
+  const spotlightStyle = {
+    top: rect.top - padding,
+    left: rect.left - padding,
+    width: rect.width + padding * 2,
+    height: rect.height + padding * 2,
+    pointerEvents: 'none' as const,
+  }
 
   return (
     <>
       {/* Spotlight hole */}
-      <div className="fixed z-[9999] rounded-lg shadow transition"
+      <div data-testid="tour-spotlight-hole"
+        className="fixed z-[9999] rounded-lg border-2 border-primary transition"
+        style={{ ...spotlightStyle, boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.5)' }}
       />
 
       {/* Pulse animation */}
-      <div className="fixed z-[9998] rounded-lg"
+      <div data-testid="tour-spotlight-pulse"
+        className="fixed z-[9998] rounded-lg border-2 border-primary/50 animate-pulse"
+        style={spotlightStyle}
       />
     </>
   )

@@ -43,7 +43,7 @@ for (const f of readdirSync(toursDir).filter((n) => n.endsWith('-tour.ts'))) {
 
 // 2. Anclas literales en el resto del código
 const disponibles = new Set()
-for (const f of archivosFuente(web)) {
+for (const f of ['app', 'components', 'contexts', 'hooks', 'lib'].flatMap((dir) => archivosFuente(join(web, dir)))) {
   const src = readFileSync(f, 'utf8')
   for (const m of src.matchAll(/data-tour="([^"{]+)"/g)) disponibles.add(m[1])
 }

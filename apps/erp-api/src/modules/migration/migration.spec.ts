@@ -596,7 +596,7 @@ describe('migration/473 canonical writer coverage', () => {
     },
   );
 
-  it('writers contables usan crear_asiento_con_detalles_tx', () => {
+  it('writers contables conservan la transacción canónica del asiento', () => {
     // `shared/integration/accounting-entries.service.ts` se retiró: no estaba
     // inyectado en ningún módulo y arrastraba un IGV 1.18 cableado y fechas UTC.
     const revaluation = readRepoFile(
@@ -604,11 +604,12 @@ describe('migration/473 canonical writer coverage', () => {
     );
     const entries = readRepoFile('apps/erp-api/src/modules/contabilidad/services/asientos.service.ts');
 
-    for (const source of [revaluation]) {
-      expect(source).toContain("rpc('crear_asiento_con_detalles_tx'");
-      expect(source).not.toContain("from('detalle_asientos').insert(");
-      expect(source).not.toContain("from('asientos_contables').insert(");
-    }
+    expect(revaluation).toContain("rpc('registrar_revaluacion_tx_570'");
+    const migration = readRepoFile('supabase/migrations/583__peru_establishment_structure_from_ui.sql');
+    const atomicRevaluation = migration.slice(migration.indexOf('CREATE OR REPLACE FUNCTION public.registrar_revaluacion_tx_570'));
+    expect(atomicRevaluation).toContain('public.crear_asiento_con_detalles_tx(');
+    expect(revaluation).not.toContain("from('detalle_asientos').insert(");
+    expect(revaluation).not.toContain("from('asientos_contables').insert(");
     expect(entries).not.toContain('private async insertarDetalles');
   });
 });

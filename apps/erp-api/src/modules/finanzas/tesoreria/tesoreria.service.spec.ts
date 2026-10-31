@@ -5,6 +5,11 @@ import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { TiposCambioService } from '../../contabilidad/services/tipos-cambio.service';
 
+// El día del contribuyente se resuelve fuera de las colas de `from()` simuladas.
+jest.mock('../../../shared/utils/fecha-tenant.util', () => ({
+  fechaHoyDelTenant: jest.fn(async () => '2026-10-20'),
+}));
+
 describe('TesoreriaService', () => {
   let service: TesoreriaService;
   let supabaseService: jest.Mocked<SupabaseService>;
@@ -569,8 +574,21 @@ describe('TesoreriaService', () => {
   describe('obtenerProgramacionPagos', () => {
     const tenantId = 'tenant-123';
 
+    it.each([
+      { data: null, error: null, count: 0 },
+      { data: {}, error: null, count: 0 },
+      { data: [], error: null, count: null },
+      { data: [], error: null, count: -1 },
+    ])('rejects an unavailable source or count as 503: %p', async result => {
+      const chain: any = {};
+      for (const name of ['select','eq','in','gt','order']) chain[name] = jest.fn().mockReturnValue(chain);
+      chain.range = jest.fn().mockResolvedValue(result);
+      mockSupabaseClient.from.mockReturnValue(chain);
+      await expect(service.obtenerProgramacionPagos(tenantId, {})).rejects.toMatchObject({status: 503});
+    });
+
     it('should return programacion with urgencia classification', async () => {
-      const hoy = new Date();
+      const hoy = new Date('2026-10-20T12:00:00Z');
       const manana = new Date(hoy);
       manana.setDate(manana.getDate() + 1);
 
@@ -611,7 +629,7 @@ describe('TesoreriaService', () => {
     });
 
     it('should classify urgencia as VENCIDA for past dates', async () => {
-      const ayer = new Date();
+      const ayer = new Date('2026-10-20T12:00:00Z');
       ayer.setDate(ayer.getDate() - 1);
 
       const mockCxp = [
@@ -650,7 +668,7 @@ describe('TesoreriaService', () => {
     });
 
     it('should classify urgencia as HOY for today', async () => {
-      const hoy = new Date();
+      const hoy = new Date('2026-10-20T12:00:00Z');
 
       const mockCxp = [
         {
@@ -815,6 +833,31 @@ describe('TesoreriaService', () => {
 
   describe('obtenerFlujoCaja', () => {
     const tenantId = 'tenant-123';
+
+    it.each(['db-error', 'transport-error', 'missing-data'])(
+      'rejects an incomplete projection when CxC cannot be read: %s', async (failure) => {
+        const accounts = {
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          then: (resolve: any) => resolve({ data: [{ id: 'bank', moneda: 'PEN', saldo: 100 }], error: null }),
+        };
+        const source = (result: any, reject = false) => ({
+          select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(),
+          in: jest.fn().mockReturnThis(), gt: jest.fn().mockReturnThis(),
+          gte: jest.fn().mockReturnThis(), lte: jest.fn().mockReturnThis(),
+          order: reject ? jest.fn().mockRejectedValue(result) : jest.fn().mockResolvedValue(result),
+        });
+        const cxc = failure === 'transport-error'
+          ? source(new Error('read transport unavailable'), true)
+          : source({ data: null, error: failure === 'db-error' ? { code: 'PGRST503', message: 'read unavailable' } : null });
+        mockSupabaseClient.from.mockReturnValueOnce(accounts)
+          .mockReturnValueOnce(source({ data: [], error: null })).mockReturnValueOnce(cxc);
+
+        await expect(service.obtenerFlujoCaja(tenantId, {})).rejects.toMatchObject({
+          status: 503, message: 'No se pudo consultar las cuentas por cobrar; reintente',
+        });
+      },
+    );
 
     it('should return flujo de caja projection', async () => {
       const mockCuentas = [

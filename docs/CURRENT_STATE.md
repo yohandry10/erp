@@ -1,25 +1,44 @@
 # Estado actual del ERP
 
-Actualizado: 2026-10-28.
+Actualizado: 2026-10-30.
 
-Suministro ALKHOFAR F01–F10 (rama `claude/alkhofar-supply-20261027`, commit
-local sin push): contratos, OC y cronogramas (570–573), lotes y vencimientos
-(574), entregas y conformidad (575), facturación contra conformidad y estado de
-cuenta (576), alertas (577), penalidades (578), tablero, cortes, Excel y Power BI
-(579), migración FOX por saldos abiertos (580), perfiles y segregación (581) y
-migración integral desde FOX (582: archivo íntegro, maestros y saldos abiertos
-que faltaban, ensayo y conciliación de toda la migración), más respaldo y
-restauración de Storage, exportación integral por empresa y capacitación por
-función en Ayuda. Sólo se verificó en infraestructura local efímera: la cadena
-PostgreSQL 16 fresca aplicó 578 migraciones hasta 582 con 91 verificadores y
-67 históricos; Storage y exportación se ensayaron en contenedores y base
-efímeros; la pantalla usa dobles en Playwright. La simulación FOX corrió contra
-el API Nest real, PostgREST y PostgreSQL efímeros con un ERP FOX sintético de
-27 tablas y 88438 filas: archivó 88443 filas, importó 9469 filas de 16 plantillas y
-concilió sin diferencias (`artifacts/alkhofar-fox-simulacion/evidence.json`).
-Nada se aplicó en PROD; `render.yaml` y CI exigen 582, así que el API no debe
-desplegarse antes de promover 570–582 DB-first con preflight y respaldo. El piloto, la aceptación y los anexos comerciales son de
-ALKHOFAR (`RELEASE.md`).
+Candidato integrado en la rama `claude/alkhofar-supply-20261027` (PR #149). Reúne
+el suministro ALKHOFAR y la migración FOX (570–582) con las correcciones Perú del
+UAT de Codex (583–590) y los PR #147 y #148. PROD sigue en 569: nada se aplicó ni
+se desplegó, y `render.yaml` y CI exigen 590, así que hay que promover 570–590
+DB-first antes de fusionar a `main` (`RELEASE.md`).
+
+Numeración: el candidato de Codex usaba 570–577 para migraciones distintas de las
+de ALKHOFAR. Al integrarlo pasaron a 583 (estructura de establecimientos y
+operaciones), 584 (edición de clientes), 585 (estimaciones de activos), 586
+(lectura auxiliar de RRHH), 587 (fecha civil de CxC y CxP), 588 (panel de
+seguridad), 589 (recepción a costo cero) y 590 (movimiento bancario activo por
+defecto). Sus identificadores internos con sufijo `_570` o `_572` y el
+`schemaVersion` 570 de los eventos se conservan: son nombres, no su posición.
+
+Aceptación del UAT Perú: su matriz de 988 requisitos y 19.598 criterios se cerró
+sobre el candidato anterior a esta integración, con 153 requisitos repetidos y el
+resto por evidencia conservada. No se repitió. Lo que acredita esta integración:
+
+- Cadena PostgreSQL 16 desde cero hasta 590: 99 verificadores y 67 históricos.
+- Ensayo de promoción con `scripts/rehearse-promotion-local.mjs` sobre el respaldo
+  PROD del 16-oct-2026 (esquema 569) en un contenedor sin red: rollback forzado sin
+  rastro, lote aplicado en una transacción, 21 de 21 verificadores en verde sobre
+  esos datos, sin perder tablas ni columnas. Evidencia en
+  `artifacts/promocion-ensayo-570-590-*`.
+- Cambios sobre filas existentes en ese ensayo: 242 productos con costo nulo o cero
+  toman el costo promedio del kardex (ningún costo previo se altera), un activo fijo
+  recibe metadatos, y se añaden permisos, el rol SUMINISTRO y cuentas contables POS.
+- El ensayo emula los privilegios por defecto de Supabase, que la base de CI no tiene,
+  y mostró que 585, 586 y 588 no cumplían sus propios verificadores en un entorno así.
+  Corregido en esas migraciones.
+
+Sigue sin acreditarse: SUNAT, SOL y SIRE reales (van con el onboarding de cada
+contribuyente), extracto FOX real, piloto y firma de ALKHOFAR, binario Windows
+firmado, RTO de PROD y objetos de Storage. Antes de promover hay que repetir el
+ensayo sobre un respaldo nuevo. Queda como mejora: 143 tablas conservan permiso de
+escritura para `anon`; RLS forzado las frena y no es explotable hoy.
+
 
 Corte vigente POS/CPE: #135 se integró como `8d717bcf` (fuente `c7e28691`) tras
 28 checks; sus dos CI (37150593171/37150595858) pasaron 342 escenarios HTTP y
@@ -221,8 +240,11 @@ con la venta contabilizada la nota sobre factura sin CDR se bloquea
 (`REFERENCED_NOTE_SOURCE_NOT_FISCALLY_ACCEPTED`). Tras corregir, 12/12 API, 2/2
 navegador y restore (`artifacts/peru-cxc-fixed-local-20261019`); la fase entra
 al CI. En producción los 5xx siguen sin detalles internos pero en español.
-Sus 17 checks aprobaron y se integró como `d6386bea`; main, E2E y seguridad de
-ese commit y la verificación del runtime quedan pendientes en este corte.
+Sus 17 checks aprobaron y se integró como `d6386bea`; main 39328687047 (484
+HTTP, 35 UI), E2E y seguridad aprobaron y el runtime `d6386bea`/569 pasó al
+tercer intento tras dos timeouts de arranque
+(`artifacts/peru-production-verification-after-145-20261019.json`); en PROD el
+503 ya llega en español (`artifacts/peru-production-error-language-after-145-20261019.json`).
 Aprobaciones de pedidos PE (#146, sin migración): la bandeja y la decisión
 reprodujeron siete defectos (`artifacts/peru-sales-approvals-baseline-20261019`,
 2/8 API y 1/5 navegador): sobre un pedido ya resuelto toda decisión respondía
@@ -239,9 +261,68 @@ al CI. La segregación del creador y el bloqueo por crédito ya eran correctos;
 confirmar con mora responde 400 «Crédito bloqueado» sin pasar a la bandeja
 (observación: es regla de negocio y no 409). Localmente el historial exige
 emular el SELECT por defecto que Supabase concede a `service_role`.
-La matriz registra 717 contratos, 479 observados (main 39313892124), 328 con
-casos funcionales, 179 casos y 142 defectos; los ocho casos de CxC y
-aprobaciones esperan CI; no hay aceptación integral del lanzamiento.
+Facturar desde el pedido (#147, sin migración): el botón de la pantalla usa
+`/generar-factura`, que ningún caso ejecutaba; la línea base
+(`artifacts/peru-sales-invoice-baseline-20261019`, 2/7) mostró que reintentar
+tras perder la respuesta respondía 400 «pedido en estado FACTURADO» aunque la
+factura existía (el RPC 446 sí es idempotente; el control de estado del API
+corría antes), estado y configuración incompletos eran 400, un pedido ajeno con
+la empresa sin certificado daba 400 en vez de 404 y las caídas devolvían 400 con
+texto de PostgreSQL. Tras corregir, 7/7 (`artifacts/peru-sales-invoice-fixed-local-20261019`).
+Alta de empresa (#147): el RPC tarda más que el plazo general de 8 s del cliente
+Supabase (25-30 s en local cargado) y respondía 400 «AbortError» aunque la base
+terminaba el alta; el conflicto mostraba el código interno y, con un fallo de
+red, la cola offline encolaba el alta y el modal se cerraba como si hubiera
+terminado (`artifacts/peru-tenant-create-baseline-20261019`, 1/3 y navegador
+rojo). Ahora el RPC tiene 60 s propios (una señal del llamador fija el plazo en
+`SupabaseService`), el modal espera 70 s, sin confirmación responde 503 legible
+y la misma clave confirma, el alta nunca se encola y el reintento muestra las
+credenciales (`artifacts/peru-tenant-create-fixed-local-20261019`). En PROD el
+primer alta del cliente es justo esta operación.
+Inicio del dashboard (#147): con el API en TZ=UTC como Render, «ventas de hoy»
+sumaba la venta de las 22:00 de ayer en Lima y la factura anulada (S/ 1 357 en
+vez de 118); cotizaciones pendientes y conversión eran siempre 0 (estados
+inexistentes); y una lectura caída daba 200 con ventas 0 y actividades sin
+comprobantes (`artifacts/peru-dashboard-baseline-20261019`, 1/5). Ahora usa el
+día y el mes del contribuyente, excluye anulados/rechazados, resta notas de
+crédito y responde 503; la pantalla avisa (`artifacts/peru-dashboard-fixed-local-20261019`).
+Fechas de CxP y tesorería (#147): con el servidor en otra zona, la alerta de
+próximos vencimientos omitía la deuda que vence hoy, la programación la marcaba
+VENCIDA, la antigüedad sumaba un día y el flujo de caja empezaba mañana; en UTC
+ocurre cada noche entre las 19:00 y la medianoche de Lima
+(`artifacts/peru-payables-dates-baseline-20261019`, 0/4 en UTC y en Honolulu).
+Corregido 4/4 con el servidor en Honolulu
+(`artifacts/peru-payables-dates-fixed-local-20261019`); en CI lo prueba
+`fechas-contribuyente.spec.ts` con reloj fijo en UTC (el original falla 4/4);
+falta repetir la sonda con UTC en esa franja. Observaciones sin caso: `PUT /finanzas/cxp/:id` deriva la clave
+del contenido sin `Idempotency-Key` (la UI no lo usa) y el cliente Supabase
+reintenta escrituras tras un timeout.
+Barrido de lecturas (#148): sin SELECT sobre su tabla, 12 de 21 listados de
+uso diario fallaban mal (`artifacts/peru-read-faults-baseline-20261020`):
+productos y almacenes respondían 200 con lista vacía y el catálogo decía «No se
+encontraron productos»; categorías, recepciones, clientes, RMA, CxC, empleados,
+departamentos, centros de costo, GRE y sucursales daban 400/500, varios con el
+texto de PostgreSQL. Ahora 21/21 responden 503 legible y el catálogo avisa
+(`artifacts/peru-read-faults-fixed-local-20261020`); las demás pantallas siguen
+mostrando su estado vacío ante un 503 (con el aviso del hook).
+Claves derivadas del contenido (#148): sin `Idempotency-Key` (ninguna de estas
+pantallas la envía) la tercera de A→B→A reproducía la primera: el tipo de
+cambio registrado otra vez en 3.75 quedaba en 3.80, el vencimiento de una CxP y
+el nombre de un centro de costo no volvían, un presupuesto editado
+2000→3000→2000 quedaba en 3000 y recrearlo tras borrarlo devolvía el borrado
+(`artifacts/peru-derived-keys-baseline-20261020`, 0/3;
+`artifacts/peru-budgets-baseline-20261020`, 0/5 y navegador rojo). Ediciones y
+altas-upsert usan ahora una intención por petición (como CxC en #145); las altas
+conservan la clave derivada contra el doble clic salvo presupuestos. Presupuestos
+responde además 409/404/503 legibles (`artifacts/peru-budgets-fixed-local-20261020`,
+5/5 y navegador; `artifacts/peru-derived-keys-fixed-local-20261020`, 3/3).
+Estados financieros (#148): «Refrescar vistas» enviaba el periodo en la URL y
+cada clic terminaba en 400 de validación; ahora va en el cuerpo
+(`artifacts/peru-statements-refresh-fixed-local-20261020`).
+La matriz registra 717 contratos, 481 observados (main 39328687047), 330 con
+casos funcionales, 191 casos y 158 defectos; los casos de aprobaciones,
+facturación, alta, dashboard, fechas, lecturas, presupuestos, claves y estados
+esperan CI; no hay aceptación integral del lanzamiento.
 
 Corte técnico 131/132: el cierre 131 promovió 562 una sola vez con preflight,
 respaldo 560, rollback local y preservación de 29 tablas/funciones/seguridad

@@ -37,8 +37,9 @@ test('Perú: inspección de carga de todas las pantallas estáticas con API y ba
   await page.locator('#password').fill('Cliente-Local-2026-Only!')
   let auth: any
   for (let attempt = 0; attempt < 2; attempt++) {
-    const [response] = await Promise.all([
-      page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith('/auth/login') && response.request().method() === 'POST'),
+    const [{ response, receivedAuth }] = await Promise.all([
+      page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith('/auth/login') && response.request().method() === 'POST')
+        .then(async response => ({ response, receivedAuth: response.status() === 201 ? await response.json() : null })),
       page.getByRole('button', { name: 'Iniciar Sesión', exact: true }).click(),
     ])
     if (response.status() === 429 && attempt === 0) {
@@ -49,7 +50,7 @@ test('Perú: inspección de carga de todas las pantallas estáticas con API y ba
       continue
     }
     expect(response.status()).toBe(201)
-    auth = await response.json()
+    auth = receivedAuth
     break
   }
   await page.waitForURL('**/dashboard/**')
@@ -109,6 +110,10 @@ test('Perú: inspección de carga de todas las pantallas estáticas con API y ba
     const webLog = path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'web.log')
     const logBefore = (await fs.readFile(webLog, 'utf8')).length
     try {
+      // Cada navegación completa vuelve a consultar el bootstrap fiscal. El
+      // barrido respeta el límite real de 100 lecturas/minuto por identidad;
+      // conserva cualquier 429 como fallo y no lo reintenta ni intercepta.
+      await page.waitForTimeout(2500)
       const response = await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 120000 })
       status = response?.status() ?? null
       await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {})

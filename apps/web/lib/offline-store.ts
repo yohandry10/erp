@@ -91,6 +91,7 @@ interface ApiCacheEntry {
   url: string
   endpoint: string
   tenant_id?: string | null
+  user_id?: string | null
   status: number
   statusText: string
   headers: HeaderPair[]
@@ -100,17 +101,20 @@ interface ApiCacheEntry {
 
 const OUTBOX_KEY = 'erp.desktop.offline.outbox'
 const CACHE_KEY = 'erp.desktop.offline.cache'
+const cacheAuthorizationRevisions = new Map<string, number>()
+function cacheAuthorizationRevision(userId?: string | null) {
+  return userId ? cacheAuthorizationRevisions.get(userId) ?? 0 : 0
+}
 const SENSITIVE_OFFLINE_ERROR = 'Esta configuracion sensible requiere conexion en vivo y nunca se guarda en la cola offline.'
 const FISCAL_OFFLINE_ERROR = 'La emision fiscal requiere conexion en vivo. No se guarda en la cola offline ni se considera emitida.'
+const PAYROLL_PAYMENT_OFFLINE_ERROR = 'El pago laboral requiere confirmacion en vivo. No se guarda en la cola offline; conserve la referencia y reintente para confirmar la misma operacion.'
 const CACHE_LIMIT = 120
 const CACHE_ENTRY_BODY_LIMIT = 512 * 1024
 const BINARY_CACHE_BODY_LIMIT = 8 * 1024 * 1024
 const OFFLINE_MODE_CACHE_TTL = 5000
 export const DEFAULT_LOCAL_FIRST_SNAPSHOT_ENDPOINTS = [
-  '/api/dashboard/metrics',
   '/api/dashboard/stats',
   '/api/dashboard/activities',
-  '/api/dashboard/recent-activity',
   '/api/pos/productos',
   '/api/pos/clientes',
   '/api/pos/metodos-pago',
@@ -118,11 +122,9 @@ export const DEFAULT_LOCAL_FIRST_SNAPSHOT_ENDPOINTS = [
   '/api/pos/configuration-status',
   '/api/pos/sesion-caja',
   '/api/pos/ventas-recientes',
-  '/api/pos/detalles-venta',
   '/api/configuration/gre-thresholds',
   '/api/configuration/context/country',
   '/api/configuracion-fiscal',
-  '/api/validations/certificate',
   '/api/inventario/productos',
   '/api/inventario/almacenes',
   '/api/inventario/recepciones',
@@ -158,13 +160,9 @@ export const DEFAULT_LOCAL_FIRST_SNAPSHOT_ENDPOINTS = [
   '/api/rrhh/contratos',
   '/api/rrhh/candidatos',
   '/api/rrhh/asistencia',
-  '/api/rrhh/asistencias',
-  '/api/finanzas/cuentas-bancarias',
   '/api/finanzas/cxc',
   '/api/finanzas/cxp',
-  '/api/finanzas/tesoreria',
   '/api/finanzas/tesoreria/pagos',
-  '/api/finanzas/bancos',
   '/api/finanzas/bancos/cuentas',
   '/api/finanzas/conciliacion/pendientes',
   '/api/finanzas/tesoreria/programacion',
@@ -181,25 +179,15 @@ export const DEFAULT_LOCAL_FIRST_SNAPSHOT_ENDPOINTS = [
   '/api/contabilidad/periodos',
   '/api/contabilidad/plan-cuentas',
   '/api/cpe/comprobantes',
-  '/api/cotizaciones/lista',
-  '/api/cotizaciones/stats',
   '/api/gre/guias',
   '/api/gre/reporte',
-  '/api/sire/files',
-  '/api/documentos',
-  '/api/documentos/descargas',
   '/api/paises',
-  '/api/paises/usuario/configuracion',
   '/api/notifications',
   '/api/notifications/unread',
   '/api/usuarios-sistema/me/permissions',
-  '/api/tenants',
+  '/api/tenants/me',
   '/api/cajas/sesiones',
   '/api/cajas/cortes',
-  '/api/cajas/movimientos',
-  '/api/cajas/retiros',
-  '/api/cajas/saldo-esperado',
-  '/api/cajas/cambios-turno',
   '/api/cajas',
 ]
 const LOCAL_FIRST_EXCLUDED_PREFIXES = [
@@ -234,7 +222,7 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
 }
 
 export function isDesktopRuntime() {
-  return typeof window !== 'undefined' && Boolean(window.__TAURI__)
+  return typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || Boolean(window.__TAURI__))
 }
 
 function now() {
@@ -294,7 +282,7 @@ function localFirstEndpoint(endpoint: string) {
 }
 
 function offlineEndpointPath(endpoint: string) {
-  const withoutQuery = endpoint.split('?')[0]?.trim() || ''
+  const withoutQuery = endpoint.split(/[?#]/)[0]?.trim() || ''
   const schemeIndex = withoutQuery.indexOf('://')
   if (schemeIndex < 0) return withoutQuery.replace(/\/+$/, '').toLowerCase()
 
@@ -364,12 +352,206 @@ function isSensitiveNonQueueableEndpoint(endpoint: string, method: string) {
     // Una migración se ensaya e importa en línea, con su lote y conciliación.
     || /\/(?:api\/)?migration(?:\/|$)/.test(normalized)
     || /\/demo\/convert-to-real(?:\/|$)/.test(normalized)
+    // El alta y la edición de empresas son de plataforma: encoladas, el modal se
+    // cerraba como si hubieran terminado, sin credenciales, y el envío real quedaba
+    // para cuando la cola se sincronizara.
+    || new RegExp(`${absolutePrefix}/api/tenants(?:/|$)`).test(normalized)
+    || new RegExp(`${absolutePrefix}/tenants(?:/|$)`).test(normalized)
     || hasSensitiveSegment
 }
 
 function isSensitiveOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
   return isSensitiveNonQueueableEndpoint(input.endpoint, input.method)
     || isSensitiveNonQueueableEndpoint(input.url, input.method)
+}
+
+function isPayrollPaymentOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(input.method.trim().toUpperCase())) return false
+  const isPayment = (endpoint: string) => /^\/(?:api\/)?rrhh\/(?:planillas\/[^/]+\/pagar(?:-empleados)?|liquidaciones\/[^/]+\/(?:pagar|pago\/revertir)|cts\/depositos\/[^/]+\/depositar)$/.test(offlineEndpointPath(endpoint))
+  return isPayment(offlineEndpointPath(input.endpoint).replace(/^\/backend(?=\/)/, '')) || isPayment(offlineEndpointPath(input.url).replace(/^\/backend(?=\/)/, ''))
+}
+
+function isPayrollCreationOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  const method=input.method.trim().toUpperCase()
+  if (['GET','HEAD','OPTIONS'].includes(method)) return false
+  return [input.endpoint,input.url].some(endpoint=>{
+    const path=offlineEndpointPath(endpoint).replace(/^\/backend(?=\/)/,'')
+    return /^\/(?:api\/)?rrhh\/planillas\/crear-con-calculo(?:\/resolver)?$/.test(path)
+      || method==='POST' && /^\/(?:api\/)?rrhh\/planillas$/.test(path)
+  })
+}
+
+function isPayrollCalculationOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  if (['GET','HEAD','OPTIONS'].includes(input.method.trim().toUpperCase())) return false
+  return [input.endpoint,input.url].some(endpoint => /^\/(?:api\/)?rrhh\/planillas\/[^/]+\/calcular(?:-personalizada)?(?:\/resolver)?$/.test(offlineEndpointPath(endpoint).replace(/^\/backend(?=\/)/,'')))
+}
+
+function isPayrollApprovalOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url' | 'body'>) {
+  const method = input.method.trim().toUpperCase()
+  if (['GET', 'HEAD', 'OPTIONS'].includes(method)) return false
+  let legacyApproval = false
+  try { legacyApproval = method === 'PUT' && String(JSON.parse(input.body || '{}')?.estado || '').trim().toLowerCase() === 'aprobada' } catch { /* DTO inválido: no se declara una aprobación. */ }
+  return [input.endpoint, input.url].some(endpoint => {
+    const path = offlineEndpointPath(endpoint).replace(/^\/backend(?=\/)/, '')
+    return /^\/(?:api\/)?rrhh\/planillas\/[^/]+\/aprobar$/.test(path)
+      || legacyApproval && /^\/(?:api\/)?rrhh\/planillas\/[^/]+$/.test(path)
+  })
+}
+
+function isTreasuryBatchOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(input.method.trim().toUpperCase())) return false
+  return [input.endpoint, input.url].some(endpoint => /^\/(?:api\/)?finanzas\/tesoreria\/lote$/.test(offlineEndpointPath(endpoint)))
+}
+
+function isCxpPaymentOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(input.method.trim().toUpperCase())) return false
+  return [input.endpoint, input.url].some(endpoint => /^\/(?:api\/)?finanzas\/cxp\/[^/]+\/aplicar-pago$/.test(offlineEndpointPath(endpoint)))
+}
+
+function isCxcManualConfirmationRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(input.method.trim().toUpperCase())) return false
+  return [input.endpoint, input.url].some(endpoint => /^\/(?:backend\/)?(?:api\/)?finanzas\/cxc\/[^/]+\/(?:pagos|reprogramar|notas-credito)$/.test(offlineEndpointPath(endpoint)))
+}
+
+function isSupplierInvoiceOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  if (input.method.trim().toUpperCase() !== 'POST') return false
+  return [input.endpoint, input.url].some(endpoint => /^\/(?:backend\/)?(?:api\/)?finanzas\/cxp$/.test(offlineEndpointPath(endpoint)))
+}
+
+function isEmployeeRequestOfflineOperation(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  const method = input.method.trim().toUpperCase()
+  return [input.endpoint, input.url].some(endpoint => {
+    const path = offlineEndpointPath(endpoint).replace(/^\/backend(?=\/)/, '')
+    return method === 'POST' && /^\/(?:api\/)?rrhh\/solicitudes$/.test(path)
+      || method === 'PUT' && /^\/(?:api\/)?rrhh\/solicitudes\/[^/]+\/(?:aprobar|rechazar)$/.test(path)
+  })
+}
+
+function isPurchaseOrderCreateOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  return input.method.trim().toUpperCase() === 'POST' && [input.endpoint,input.url].some(endpoint =>
+    /^\/(?:backend\/)?(?:api\/)?compras\/ordenes$/.test(offlineEndpointPath(endpoint)))
+}
+
+function isPurchaseReceiptOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  return input.method.trim().toUpperCase() === 'POST' && [input.endpoint,input.url].some(endpoint =>
+    /^\/(?:backend\/)?(?:api\/)?compras\/recepciones\/(?:ordenes\/[^/]+|[^/]+\/cerrar)$/.test(offlineEndpointPath(endpoint)))
+}
+
+function isProductCreateOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  const method = input.method.trim().toUpperCase()
+  return [input.endpoint,input.url].some(endpoint => {
+    const path = offlineEndpointPath(endpoint).replace(/^\/backend(?=\/)/,'').replace(/^\/api(?=\/)/,'')
+    return method === 'POST' && /^\/inventario\/productos(?:\/[^/]+\/imagen)?$/.test(path)
+      || method === 'PUT' && /^\/inventario\/productos\/[^/]+$/.test(path)
+      || method === 'DELETE' && /^\/inventario\/productos\/[^/]+(?:\/imagen)?$/.test(path)
+  })
+}
+
+function isDeferredAccrueOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  return input.method.trim().toUpperCase() === 'POST' && [input.endpoint, input.url].some(endpoint =>
+    /^\/(?:backend\/)?(?:api\/)?contabilidad\/diferidos\/devengar$/.test(offlineEndpointPath(endpoint)))
+}
+
+function isDeferredCancelOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  return input.method.trim().toUpperCase() === 'DELETE' && [input.endpoint, input.url].some(endpoint =>
+    /^\/(?:backend\/)?(?:api\/)?contabilidad\/diferidos\/(?!devengar$)[^/]+$/.test(offlineEndpointPath(endpoint)))
+}
+
+function isAssetLifecycleManualRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+ const method=input.method.trim().toUpperCase()
+ return [input.endpoint,input.url].some(value=>{
+  const p=offlineEndpointPath(value).replace(/^\/backend(?=\/)/,'').replace(/^\/api(?=\/)/,'')
+  return method==='PUT'&&p!=='/contabilidad/activos-fijos/depreciar'&&/^\/contabilidad\/activos-fijos\/[^/]+$/.test(p)||method==='POST'&&/^\/contabilidad\/activos-fijos\/[^/]+\/baja$/.test(p)
+ })
+}
+
+function isDepreciationBatchOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+ return input.method.trim().toUpperCase()==='POST'&&[input.endpoint,input.url].some(endpoint=>/^\/(?:backend\/)?(?:api\/)?contabilidad\/activos-fijos\/depreciar$/.test(offlineEndpointPath(endpoint)))
+}
+
+function isAssetCreateOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  return input.method.trim().toUpperCase() === 'POST' && [input.endpoint,input.url].some(endpoint=>
+    /^\/(?:backend\/)?(?:api\/)?contabilidad\/activos-fijos$/.test(offlineEndpointPath(endpoint)))
+}
+
+function isRevaluationRegistrationOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  return input.method.trim().toUpperCase() === 'POST' && [input.endpoint,input.url].some(endpoint=>
+    /^\/(?:backend\/)?(?:api\/)?contabilidad\/revaluacion$/.test(offlineEndpointPath(endpoint)))
+}
+
+function isDeferredCreateOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  return input.method.trim().toUpperCase() === 'POST' && [input.endpoint, input.url].some(endpoint =>
+    /^\/(?:backend\/)?(?:api\/)?contabilidad\/diferidos$/.test(offlineEndpointPath(endpoint)))
+}
+
+function isSalesDeliveryOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  return input.method.trim().toUpperCase() === 'POST' && [input.endpoint, input.url].some(endpoint =>
+    /^\/(?:backend\/)?(?:api\/)?inventario\/logistica\/[^/]+\/registrar-entrega$/.test(offlineEndpointPath(endpoint)))
+}
+
+function isInvoiceGenerationOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  return input.method.trim().toUpperCase() === 'POST' && [input.endpoint, input.url].some(endpoint =>
+    /^\/(?:backend\/)?(?:api\/)?ventas\/pedidos\/[^/]+\/generar-factura$/.test(offlineEndpointPath(endpoint)))
+}
+
+function isAccountingPeriodProvisionOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  return input.method.trim().toUpperCase() === 'POST' && [input.endpoint, input.url].some(endpoint =>
+    /^\/(?:backend\/)?(?:api\/)?contabilidad\/periodos\/[^/]+\/provision-cobranza-dudosa$/.test(offlineEndpointPath(endpoint)))
+}
+
+function isAccountingPeriodTransitionOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  return input.method.trim().toUpperCase() === 'POST' && [input.endpoint, input.url].some(endpoint =>
+    /^\/(?:backend\/)?(?:api\/)?contabilidad\/periodos\/[^/]+\/(?:cerrar|reabrir)$/.test(offlineEndpointPath(endpoint)))
+}
+
+function isBudgetDeleteOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  return input.method.trim().toUpperCase() === 'DELETE' && [input.endpoint, input.url].some(endpoint =>
+    /^\/(?:backend\/)?(?:api\/)?contabilidad\/presupuestos\/[^/]+$/.test(offlineEndpointPath(endpoint)))
+}
+
+function isBudgetUpdateOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  const method=input.method.trim().toUpperCase()
+  return [input.endpoint,input.url].some(endpoint=>
+    (method==='PUT' && /^\/(?:backend\/)?(?:api\/)?contabilidad\/presupuestos\/[^/]+$/.test(offlineEndpointPath(endpoint)))
+    || (method==='POST' && /^\/(?:backend\/)?(?:api\/)?contabilidad\/presupuestos\/[^/]+\/resolver-edicion$/.test(offlineEndpointPath(endpoint))))
+}
+
+function isBudgetCreateOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  return input.method.trim().toUpperCase() === 'POST' && [input.endpoint, input.url].some(endpoint =>
+    /^\/(?:backend\/)?(?:api\/)?contabilidad\/presupuestos$/.test(offlineEndpointPath(endpoint)))
+}
+
+function isAccountingPeriodCreateOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  return input.method.trim().toUpperCase() === 'POST' && [input.endpoint, input.url].some(endpoint =>
+    /^\/(?:backend\/)?(?:api\/)?contabilidad\/periodos$/.test(offlineEndpointPath(endpoint)))
+}
+
+// A closure preview is a server read, never an external validation to replay.
+function isAccountingPeriodPreviewOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  if (!['GET', 'HEAD'].includes(input.method.trim().toUpperCase())) return false
+  return [input.endpoint, input.url].some(endpoint => /^\/(?:backend\/)?(?:api\/)?contabilidad\/periodos\/[^/]+\/validar-cierre$/.test(offlineEndpointPath(endpoint)))
+}
+
+function isCashOperationOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(input.method.trim().toUpperCase())) return false
+  const cashOperation = /^\/(?:api\/)?cajas\/(?:[^/]+\/(?:apertura|cierre)|validar-cierre\/[^/]+|cerrar\/[^/]+|retiros\/[^/]+(?:\/conciliar)?|cambio-turno\/(?:iniciar|completar|cancelar)\/[^/]+|movimientos\/manual\/[^/]+|sesiones\/[^/]+\/cierre-administrativo)$/
+  return [input.endpoint, input.url].some(endpoint => cashOperation.test(offlineEndpointPath(endpoint)))
+}
+
+function isInventoryOperationOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(input.method.trim().toUpperCase())) return false
+  return [input.endpoint, input.url].some(endpoint => /^\/(?:api\/)?inventario\/(?:movimientos|transferencias)(?:\/resolver)?$/.test(offlineEndpointPath(endpoint).replace(/^\/backend(?=\/|$)/, '')))
+}
+
+function isGreOperationOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(input.method.trim().toUpperCase())) return false
+  return [input.endpoint, input.url].some(endpoint => /^\/(?:api\/)?gre(?:\/|$)/.test(offlineEndpointPath(endpoint)))
+}
+
+function isDocumentFiscalManualRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  if (input.method.trim().toUpperCase() !== 'POST') return false
+  return [input.endpoint, input.url].some(value =>
+    /^\/(?:backend\/)?(?:api\/)?documentos\/[^/]+\/(?:generar-xml|enviar-sunat)$/.test(offlineEndpointPath(value)))
 }
 
 function isFiscalEmissionEndpoint(endpoint: string, method: string) {
@@ -432,6 +614,41 @@ async function nonQueueableOfflineError(
   body: BodyInit | null | undefined,
 ) {
   if (isSensitiveOfflineRequest({ endpoint, url, method })) return sensitiveOfflineError()
+  if (isDocumentFiscalManualRequest({ endpoint, url, method })) return fiscalOfflineError()
+  if (isPayrollPaymentOfflineRequest({ endpoint, url, method })) return new Error(PAYROLL_PAYMENT_OFFLINE_ERROR)
+  if (isPayrollCreationOfflineRequest({ endpoint, url, method })) return new Error('El alta de planilla y su conciliación requieren confirmación del servidor. La solicitud original de alta y cálculo se conserva para continuar o conciliar con conexión.')
+  if (isPayrollCalculationOfflineRequest({ endpoint, url, method })) return new Error('El cálculo y su conciliación requieren confirmación del servidor. La solicitud original se conserva para un reintento manual con conexión.')
+  const approvalBody = method.trim().toUpperCase() === 'PUT' && [endpoint, url].some(value =>
+    /^\/(?:backend\/)?(?:api\/)?rrhh\/planillas\/[^/]+$/.test(offlineEndpointPath(value)))
+    ? typeof body === 'string' ? body : await offlineBodyToString(body) : null
+  if (isPayrollApprovalOfflineRequest({ endpoint, url, method, body: approvalBody })) return new Error('La aprobación de planilla requiere confirmación del servidor. Reintenta la aprobación pendiente con conexión.')
+  if (isTreasuryBatchOfflineRequest({ endpoint, url, method })) return new Error('El pago masivo requiere confirmación del servidor. Conserva el formulario y reintenta con conexión.')
+  if (isCxpPaymentOfflineRequest({ endpoint, url, method })) return new Error('El pago requiere confirmación del servidor. Reintenta el pago pendiente con conexión.')
+  if (isCxcManualConfirmationRequest({ endpoint, url, method })) return new Error('El cobro o ajuste CxC requiere confirmación del servidor. Conserva la solicitud original para reintentar con conexión.')
+  if (isSupplierInvoiceOfflineRequest({ endpoint, url, method })) return new Error('El documento requiere confirmación del servidor. Reintenta el registro pendiente con conexión.')
+  if (isEmployeeRequestOfflineOperation({ endpoint, url, method })) return new Error('La solicitud requiere confirmación del servidor. Reintenta la operación pendiente con conexión.')
+  if (isPurchaseOrderCreateOfflineRequest({ endpoint, url, method })) return new Error('La orden requiere confirmación del servidor. Reintenta la orden pendiente con conexión.')
+  if (isPurchaseReceiptOfflineRequest({ endpoint, url, method })) return new Error('La recepción requiere confirmación del servidor. Reintenta la recepción pendiente con conexión.')
+  if (isProductCreateOfflineRequest({ endpoint, url, method })) return new Error('El producto requiere confirmación del servidor. Reintenta el producto pendiente con conexión.')
+  if (isDeferredAccrueOfflineRequest({ endpoint, url, method })) return new Error('El devengo requiere verificar el asiento y el período pendiente con conexión.')
+  if (isDeferredCancelOfflineRequest({ endpoint, url, method })) return new Error('La cancelación del diferido requiere confirmación del servidor. Reintenta la cancelación pendiente con conexión.')
+  if (isRevaluationRegistrationOfflineRequest({ endpoint, url, method })) return new Error('El registro de revaluación requiere confirmación del servidor. Reintenta la misma intención pendiente con conexión.')
+  if(isAssetLifecycleManualRequest({endpoint,url,method}))return new Error('La edición o baja del activo requiere confirmación del servidor. Se conserva su solicitud original para un reintento manual con conexión.')
+  if (isDepreciationBatchOfflineRequest({ endpoint, url, method })) return new Error('La depreciación requiere confirmación del servidor. Reintenta el lote original con conexión.')
+  if (isAssetCreateOfflineRequest({ endpoint, url, method })) return new Error('El alta de activo requiere confirmación del servidor. Reintenta la misma solicitud pendiente con conexión.')
+  if (isDeferredCreateOfflineRequest({ endpoint, url, method })) return new Error('El alta del diferido requiere confirmación del servidor. Reintenta el alta pendiente con conexión.')
+  if (isSalesDeliveryOfflineRequest({ endpoint, url, method })) return new Error('La entrega requiere confirmación del servidor. Reintenta la entrega pendiente con conexión.')
+  if (isInvoiceGenerationOfflineRequest({ endpoint, url, method })) return new Error('La generación del comprobante requiere confirmación del servidor. Verifica la generación pendiente con conexión.')
+  if (isAccountingPeriodProvisionOfflineRequest({ endpoint, url, method })) return new Error('La estimación requiere confirmación del servidor. Verifica el resultado con conexión antes de reintentar.')
+  if (isAccountingPeriodTransitionOfflineRequest({ endpoint, url, method })) return new Error('La transición del período requiere confirmación del servidor. Verifica la transición pendiente con conexión.')
+  if (isBudgetDeleteOfflineRequest({ endpoint, url, method })) return new Error('La baja del presupuesto requiere confirmación del servidor. Reintenta la baja pendiente con conexión.')
+  if (isBudgetUpdateOfflineRequest({ endpoint, url, method })) return new Error('La edición del presupuesto requiere confirmación del servidor. Reintenta la edición pendiente con conexión.')
+  if (isBudgetCreateOfflineRequest({ endpoint, url, method })) return new Error('El alta del presupuesto requiere confirmación del servidor. Reintenta el alta pendiente con conexión.')
+  if (isAccountingPeriodCreateOfflineRequest({ endpoint, url, method })) return new Error('La creación del período requiere confirmación del servidor. Reintenta la creación pendiente con conexión.')
+  if (isAccountingPeriodPreviewOfflineRequest({ endpoint, url, method })) return new Error('La validación de cierre requiere una lectura en vivo. Reintenta la consulta con conexión.')
+  if (isCashOperationOfflineRequest({ endpoint, url, method })) return new Error('La operación de caja requiere confirmación del servidor. Conserva el formulario y reintenta con conexión.')
+  if (isInventoryOperationOfflineRequest({ endpoint, url, method })) return new Error('La operación de inventario requiere confirmación del servidor. Conserva el intento y reintenta con conexión.')
+  if (isGreOperationOfflineRequest({ endpoint, url, method })) return new Error('La acción de GRE requiere confirmación del servidor. Conserva el intento y reintenta con conexión.')
 
   const serializedBody = offlineEndpointPath(endpoint) === '/api/pos/venta'
     || offlineEndpointPath(url) === '/api/pos/venta'
@@ -610,14 +827,42 @@ function responseFromBinaryLocal(local: BinaryLocalResponse) {
   })
 }
 
-async function readLocalFirstResponse(endpoint: string, url: string, tenantId?: string | null) {
-  if (!isDesktopRuntime() || !isLocalFirstGetEndpoint(endpoint)) return null
+function nativeActorScope(tenantId?: string | null) {
+  const snapshot = readJson<{ user?: { id?: string; tenant_id?: string } }>('erp.auth.session.snapshot', {})
+  const user = snapshot?.user
+  if (!user?.id || !user.tenant_id || tenantId && tenantId !== user.tenant_id) return null
+  return { tenantId: user.tenant_id, userId: user.id }
+}
+
+function requiredNativeActorScope() {
+  const scope = nativeActorScope()
+  if (!scope) throw new Error('No hay empresa o usuario activos para la cola local')
+  return scope
+}
+
+type QueueActorScope = NonNullable<ReturnType<typeof nativeActorScope>>
+
+function isQueueOwner(item: OfflineQueueItem, scope: QueueActorScope) {
+  return item.tenant_id === scope.tenantId && item.user_id === scope.userId
+}
+
+function nativeReadAuthorization(tenantId?: string | null, userId?: string | null) {
+  if (!isDesktopRuntime() || !tenantId || !userId) return null
+  const key = `erp.native.read-authorization.${tenantId}.${userId}`
+  let value = readJson<string | null>(key, null)
+  if (!value) { value = localId(); if (!writeJson(key, value)) return null }
+  return { tenantId, userId, authorization: value }
+}
+
+async function readLocalFirstResponse(endpoint: string, url: string, tenantId?: string | null, userId?: string | null) {
+  const scope = nativeReadAuthorization(tenantId, userId)
+  if (!isDesktopRuntime() || !scope || !isLocalFirstGetEndpoint(endpoint)) return null
   const normalizedEndpoint = localFirstEndpoint(endpoint)
   try {
     const local = await invoke<LocalFirstResponse | null>('get_local_first_response', {
       endpoint: normalizedEndpoint,
       url,
-      tenantId: tenantId ?? null,
+      ...scope,
     })
     return local ? responseFromLocalFirst(local) : null
   } catch (error) {
@@ -626,13 +871,14 @@ async function readLocalFirstResponse(endpoint: string, url: string, tenantId?: 
   }
 }
 
-async function readBinaryResponse(endpoint: string, url: string, tenantId?: string | null) {
-  if (!isDesktopRuntime()) return null
+async function readBinaryResponse(endpoint: string, url: string, tenantId?: string | null, userId?: string | null) {
+  const scope = nativeReadAuthorization(tenantId, userId)
+  if (!isDesktopRuntime() || !scope) return null
   try {
     const local = await invoke<BinaryLocalResponse | null>('get_binary_response', {
       endpoint: localFirstEndpoint(endpoint),
       url,
-      tenantId: tenantId ?? null,
+      ...scope,
     })
     return local ? responseFromBinaryLocal(local) : null
   } catch (error) {
@@ -641,8 +887,8 @@ async function readBinaryResponse(endpoint: string, url: string, tenantId?: stri
   }
 }
 
-async function hydrateLocalFirstResponse(url: string, endpoint: string, response: Response, tenantId?: string | null) {
-  if (!isDesktopRuntime() || !isLocalFirstGetEndpoint(endpoint)) return
+async function hydrateLocalFirstResponse(url: string, endpoint: string, response: Response, scope: ReturnType<typeof nativeReadAuthorization>) {
+  if (!isDesktopRuntime() || !scope || !isLocalFirstGetEndpoint(endpoint)) return
   if (!response.ok || response.status === 204) return
 
   const contentType = response.headers.get('Content-Type') || ''
@@ -658,15 +904,15 @@ async function hydrateLocalFirstResponse(url: string, endpoint: string, response
       status: response.status,
       headers: headersToPairs(response.headers),
       body,
-      tenantId: tenantId ?? null,
+      ...scope,
     })
   } catch (error) {
     console.warn('[offline-store] No se pudo hidratar SQLite local-first:', error)
   }
 }
 
-async function hydrateBinaryResponse(url: string, endpoint: string, response: Response, tenantId?: string | null) {
-  if (!isDesktopRuntime()) return
+async function hydrateBinaryResponse(url: string, endpoint: string, response: Response, scope: ReturnType<typeof nativeReadAuthorization>) {
+  if (!isDesktopRuntime() || !scope) return
   if (!response.ok || response.status === 204) return
 
   const contentType = response.headers.get('Content-Type') || ''
@@ -682,7 +928,7 @@ async function hydrateBinaryResponse(url: string, endpoint: string, response: Re
       status: response.status,
       headers: headersToPairs(response.headers),
       bodyBase64: arrayBufferToBase64(buffer),
-      tenantId: tenantId ?? null,
+      ...scope,
     })
   } catch (error) {
     console.warn('[offline-store] No se pudo hidratar binario local:', error)
@@ -714,8 +960,40 @@ async function processLocalFirstWrite(
 }
 
 export async function enqueueOfflineRequest(input: OfflineRequestInput): Promise<OfflineQueueItem> {
+  if (isAccountingPeriodProvisionOfflineRequest(input)) throw new Error('La estimación requiere confirmación del servidor. Verifica el resultado con conexión antes de reintentar.')
+  if (isAccountingPeriodTransitionOfflineRequest(input)) throw new Error('La transición del período requiere confirmación del servidor. Verifica la transición pendiente con conexión.')
+  if (isBudgetDeleteOfflineRequest(input)) throw new Error('La baja del presupuesto requiere confirmación del servidor. Reintenta la baja pendiente con conexión.')
+  if (isBudgetUpdateOfflineRequest(input)) throw new Error('La edición del presupuesto requiere confirmación del servidor. Reintenta la edición pendiente con conexión.')
+  if (isBudgetCreateOfflineRequest(input)) throw new Error('El alta del presupuesto requiere confirmación del servidor. Reintenta el alta pendiente con conexión.')
+  if (isAccountingPeriodCreateOfflineRequest(input)) throw new Error('La creación del período requiere confirmación del servidor. Reintenta la creación pendiente con conexión.')
+  if (isAccountingPeriodPreviewOfflineRequest(input)) throw new Error('La validación de cierre requiere una lectura en vivo. Reintenta la consulta con conexión.')
   if (isSensitiveOfflineRequest(input)) throw sensitiveOfflineError()
+  if (isDocumentFiscalManualRequest(input)) throw fiscalOfflineError()
   if (isFiscalOfflineRequest(input)) throw fiscalOfflineError()
+  if (isPayrollPaymentOfflineRequest(input)) throw new Error(PAYROLL_PAYMENT_OFFLINE_ERROR)
+  if (isPayrollApprovalOfflineRequest(input)) throw new Error('La aprobación de planilla requiere confirmación del servidor. Reintenta la aprobación pendiente con conexión.')
+  if (isPayrollCreationOfflineRequest(input)) throw new Error('El alta de planilla y su conciliación requieren confirmación del servidor. La solicitud original de alta y cálculo se conserva para continuar o conciliar con conexión.')
+  if (isPayrollCalculationOfflineRequest(input)) throw new Error('El cálculo y su conciliación requieren confirmación del servidor. La solicitud original se conserva para un reintento manual con conexión.')
+  if (isTreasuryBatchOfflineRequest(input)) throw new Error('El pago masivo requiere confirmación del servidor.')
+  if (isCxpPaymentOfflineRequest(input)) throw new Error('El pago requiere confirmación del servidor. Reintenta el pago pendiente con conexión.')
+  if (isCxcManualConfirmationRequest(input)) throw new Error('El cobro o ajuste CxC requiere confirmación del servidor. Conserva la solicitud original para reintentar con conexión.')
+  if (isSupplierInvoiceOfflineRequest(input)) throw new Error('El documento requiere confirmación del servidor. Reintenta el registro pendiente con conexión.')
+  if (isEmployeeRequestOfflineOperation(input)) throw new Error('La solicitud requiere confirmación del servidor. Reintenta la operación pendiente con conexión.')
+  if (isPurchaseOrderCreateOfflineRequest(input)) throw new Error('La orden requiere confirmación del servidor. Reintenta la orden pendiente con conexión.')
+  if (isPurchaseReceiptOfflineRequest(input)) throw new Error('La recepción requiere confirmación del servidor. Reintenta la recepción pendiente con conexión.')
+  if (isProductCreateOfflineRequest(input)) throw new Error('El producto requiere confirmación del servidor. Reintenta el producto pendiente con conexión.')
+  if (isDeferredAccrueOfflineRequest(input)) throw new Error('El devengo requiere verificar el asiento y el período pendiente con conexión.')
+  if (isDeferredCancelOfflineRequest(input)) throw new Error('La cancelación del diferido requiere confirmación del servidor. Reintenta la cancelación pendiente con conexión.')
+  if (isRevaluationRegistrationOfflineRequest(input)) throw new Error('El registro de revaluación requiere confirmación del servidor. Reintenta la misma intención pendiente con conexión.')
+  if(isAssetLifecycleManualRequest(input))throw new Error('La edición o baja del activo requiere confirmación del servidor. Se conserva su solicitud original para un reintento manual con conexión.')
+  if (isDepreciationBatchOfflineRequest(input)) throw new Error('La depreciación requiere confirmación del servidor. Reintenta el lote original con conexión.')
+  if (isAssetCreateOfflineRequest(input)) throw new Error('El alta de activo requiere confirmación del servidor. Reintenta la misma solicitud pendiente con conexión.')
+  if (isDeferredCreateOfflineRequest(input)) throw new Error('El alta del diferido requiere confirmación del servidor. Reintenta el alta pendiente con conexión.')
+  if (isSalesDeliveryOfflineRequest(input)) throw new Error('La entrega requiere confirmación del servidor. Reintenta la entrega pendiente con conexión.')
+  if (isInvoiceGenerationOfflineRequest(input)) throw new Error('La generación del comprobante requiere confirmación del servidor.')
+  if (isCashOperationOfflineRequest(input)) throw new Error('La operación de caja requiere confirmación del servidor.')
+  if (isInventoryOperationOfflineRequest(input)) throw new Error('La operación de inventario requiere confirmación del servidor.')
+  if (isGreOperationOfflineRequest(input)) throw new Error('La acción de GRE requiere confirmación del servidor.')
 
   const safeInput = { ...input, headers: sanitizePersistedHeaders(input.headers || []) }
   if (isDesktopRuntime()) {
@@ -744,17 +1022,26 @@ export async function enqueueOfflineRequest(input: OfflineRequestInput): Promise
 }
 
 export async function listOfflineRequests(tenantId?: string | null): Promise<OfflineQueueItem[]> {
+  const scope = nativeActorScope(tenantId)
+  if (!scope) return []
+  const queue = await listActorOfflineRequests(scope)
+  const active = nativeActorScope(tenantId)
+  return active?.userId === scope.userId && active.tenantId === scope.tenantId ? queue : []
+}
+
+async function listActorOfflineRequests(scope: QueueActorScope): Promise<OfflineQueueItem[]> {
   let queue: OfflineQueueItem[]
   if (isDesktopRuntime()) {
-    queue = await invoke<OfflineQueueItem[]>('list_offline_requests')
+    queue = await invoke<OfflineQueueItem[]>('list_offline_requests', scope)
   } else {
     queue = readJson<OfflineQueueItem[]>(OUTBOX_KEY, [])
   }
-  const sensitiveItems = queue.filter(isNonQueueableOfflineRequest)
+  const owned = queue.filter((item) => isQueueOwner(item, scope))
+  const sensitiveItems = owned.filter(isNonQueueableOfflineRequest)
   if (isDesktopRuntime()) {
     for (const item of sensitiveItems) {
       try {
-        await invoke('delete_offline_request', { id: item.id })
+        await invoke('delete_offline_request', { id: item.id, ...scope })
       } catch (error) {
         console.warn('[offline-store] No se pudo purgar una configuracion sensible legacy:', error)
       }
@@ -762,18 +1049,31 @@ export async function listOfflineRequests(tenantId?: string | null): Promise<Off
   }
 
   let changed = sensitiveItems.length > 0
-  const sanitized = queue.filter((item) => !isNonQueueableOfflineRequest(item)).map((item) => {
+  const sanitized = owned.filter((item) => !isNonQueueableOfflineRequest(item)).map((item) => {
     const headers = sanitizePersistedHeaders(item.headers || [])
     changed ||= headers.length !== (item.headers || []).length
     return { ...item, headers }
   })
-  if (changed && !isDesktopRuntime()) writeJson(OUTBOX_KEY, sanitized)
-  return tenantId ? sanitized.filter((item) => item.tenant_id === tenantId) : sanitized
+  if (changed && !isDesktopRuntime()) {
+    const byId = new Map(sanitized.map((item) => [item.id, item]))
+    writeJson(OUTBOX_KEY, queue.flatMap((item) => (
+      !isQueueOwner(item, scope) ? [item] : byId.has(item.id) ? [byId.get(item.id)!] : []
+    )))
+  }
+  return sanitized
 }
 
 export async function listLocalIdMappings(): Promise<LocalIdMapping[]> {
+  const scope = nativeActorScope()
+  if (!scope) return []
+  const mappings = await listActorLocalIdMappings(scope)
+  const active = nativeActorScope()
+  return active?.userId === scope.userId && active.tenantId === scope.tenantId ? mappings : []
+}
+
+async function listActorLocalIdMappings(scope: QueueActorScope): Promise<LocalIdMapping[]> {
   if (isDesktopRuntime()) {
-    return invoke<LocalIdMapping[]>('list_local_id_mappings')
+    return invoke<LocalIdMapping[]>('list_local_id_mappings', scope)
   }
   return []
 }
@@ -783,8 +1083,15 @@ export async function markOfflineRequestSynced(
   responseStatus: number,
   responseBody?: string | null,
 ) {
+  return markActorOfflineRequestSynced(requiredNativeActorScope(), id, responseStatus, responseBody)
+}
+
+async function markActorOfflineRequestSynced(
+  scope: QueueActorScope, id: string, responseStatus: number, responseBody?: string | null,
+) {
   if (isDesktopRuntime()) {
     await invoke('mark_offline_request_synced', {
+      ...scope,
       id,
       responseStatus,
       responseBody: responseBody ?? null,
@@ -793,8 +1100,9 @@ export async function markOfflineRequestSynced(
   }
 
   const queue = readJson<OfflineQueueItem[]>(OUTBOX_KEY, [])
+  if (!queue.some((item) => item.id === id && isQueueOwner(item, scope))) throw new Error('No existe la operación offline para este usuario')
   if (!writeJson(OUTBOX_KEY, queue.map((item) => (
-    item.id === id
+    item.id === id && isQueueOwner(item, scope)
       ? {
           ...item,
           status: 'synced' as const,
@@ -810,14 +1118,19 @@ export async function markOfflineRequestSynced(
 }
 
 export async function markOfflineRequestFailed(id: string, error: string, responseStatus?: number | null) {
+  return markActorOfflineRequestFailed(requiredNativeActorScope(), id, error, responseStatus)
+}
+
+async function markActorOfflineRequestFailed(scope: QueueActorScope, id: string, error: string, responseStatus?: number | null) {
   if (isDesktopRuntime()) {
-    await invoke('mark_offline_request_failed', { id, error, responseStatus: responseStatus ?? null })
+    await invoke('mark_offline_request_failed', { id, error, responseStatus: responseStatus ?? null, ...scope })
     return
   }
 
   const queue = readJson<OfflineQueueItem[]>(OUTBOX_KEY, [])
+  if (!queue.some((item) => item.id === id && isQueueOwner(item, scope))) throw new Error('No existe la operación offline para este usuario')
   if (!writeJson(OUTBOX_KEY, queue.map((item) => (
-    item.id === id
+    item.id === id && isQueueOwner(item, scope)
       ? {
           ...item,
           status: 'failed' as const,
@@ -833,20 +1146,22 @@ export async function markOfflineRequestFailed(id: string, error: string, respon
 }
 
 export async function deleteOfflineRequest(id: string) {
+  const scope = requiredNativeActorScope()
   if (isDesktopRuntime()) {
-    await invoke('delete_offline_request', { id })
+    await invoke('delete_offline_request', { id, ...scope })
     return
   }
 
-  if (!writeJson(OUTBOX_KEY, readJson<OfflineQueueItem[]>(OUTBOX_KEY, []).filter((item) => item.id !== id))) {
+  const queue = readJson<OfflineQueueItem[]>(OUTBOX_KEY, [])
+  if (!queue.some((item) => item.id === id && isQueueOwner(item, scope))) throw new Error('No existe la operación offline para este usuario')
+  if (!writeJson(OUTBOX_KEY, queue.filter((item) => item.id !== id || !isQueueOwner(item, scope)))) {
     throw new Error('No se pudo eliminar la operacion offline')
   }
 }
 
 export async function getOfflineStatus(tenantId?: string | null): Promise<OfflineStatus> {
   if (isDesktopRuntime()) {
-    const rawStatus = await invoke<OfflineStatus>('get_offline_status')
-    if (!tenantId) return rawStatus
+    const rawStatus = await invoke<OfflineStatus>('get_offline_status', nativeActorScope(tenantId) ?? { tenantId: null, userId: null })
     const queue = await listOfflineRequests(tenantId)
     return {
       offline_mode: rawStatus.offline_mode,
@@ -872,7 +1187,10 @@ export async function cacheApiResponse(
   endpoint: string,
   response: Response,
   tenantId?: string | null,
+  userId?: string | null,
+  authorizationRevision = cacheAuthorizationRevision(userId),
 ) {
+  if (!tenantId || !userId) return
   if (response.status === 204) return
   const contentType = response.headers.get('Content-Type') || ''
   if (!/application\/json|text\//i.test(contentType)) return
@@ -880,12 +1198,14 @@ export async function cacheApiResponse(
   const body = await response.text().catch(() => '')
   if (!body) return
   if (body.length > CACHE_ENTRY_BODY_LIMIT) return
+  if (authorizationRevision !== cacheAuthorizationRevision(userId)) return
 
   const cache = readJson<ApiCacheEntry[]>(CACHE_KEY, [])
   const entry: ApiCacheEntry = {
     url,
     endpoint,
     tenant_id: tenantId ?? null,
+    user_id: userId,
     status: response.status,
     statusText: response.statusText,
     headers: headersToPairs(response.headers),
@@ -895,18 +1215,33 @@ export async function cacheApiResponse(
 
   const next = [
     entry,
-    ...cache.filter((item) => item.url !== url || item.tenant_id !== entry.tenant_id),
+    ...cache.filter((item) => item.url !== url || item.tenant_id !== entry.tenant_id || item.user_id !== entry.user_id),
   ].slice(0, CACHE_LIMIT)
   writeJson(CACHE_KEY, next)
+}
+
+export async function clearCachedApiResponses(userId?: string | null, tenantId?: string | null) {
+  if (!userId) return
+  cacheAuthorizationRevisions.set(userId, cacheAuthorizationRevision(userId) + 1)
+  const entries = readJson<ApiCacheEntry[]>(CACHE_KEY, [])
+  writeJson(CACHE_KEY, Array.isArray(entries)
+    ? entries.filter((entry) => entry?.user_id && entry.user_id !== userId)
+    : [])
+  if (isDesktopRuntime() && tenantId) {
+    const scope = { tenantId, userId, authorization: localId() }
+    if (!writeJson(`erp.native.read-authorization.${tenantId}.${userId}`, scope.authorization)) throw new Error('No se pudo invalidar la autorización local')
+    await invoke('invalidate_local_read_cache', scope)
+  }
 }
 
 export async function readCachedApiResponse(
   url: string,
   tenantId?: string | null,
+  userId?: string | null,
 ): Promise<Response | null> {
-  const normalizedTenantId = tenantId ?? null
+  if (!tenantId || !userId) return null
   const entry = readJson<ApiCacheEntry[]>(CACHE_KEY, []).find(
-    (item) => item.url === url && (item.tenant_id ?? null) === normalizedTenantId,
+    (item) => item.url === url && item.tenant_id === tenantId && item.user_id === userId,
   )
   if (!entry) return null
 
@@ -1077,6 +1412,15 @@ export async function fetchWithOfflineSupport(
   meta: { endpoint: string; userId?: string | null; tenantId?: string | null },
 ) {
   const method = (init.method || 'GET').toUpperCase()
+  // La misma clave viaja en el primer envío y en la cola si se pierde el ACK.
+  // Generarla durante el replay no protegería un COMMIT anterior ya confirmado.
+  if (isCustomerUpdateRequest(meta.endpoint, method)) {
+    const headers = new Headers(init.headers)
+    if (!headers.has('Idempotency-Key')) headers.set('Idempotency-Key', localId())
+    init = { ...init, headers }
+  }
+  const authorizationRevision = cacheAuthorizationRevision(meta.userId)
+  const nativeScope = nativeReadAuthorization(meta.tenantId, meta.userId)
   const forceOffline = await isOfflineModeEnabled()
 
   if (forceOffline) {
@@ -1094,13 +1438,13 @@ export async function fetchWithOfflineSupport(
     }
 
     if (method === 'GET') {
-      const localFirst = await readLocalFirstResponse(meta.endpoint, url, meta.tenantId)
+      const localFirst = await readLocalFirstResponse(meta.endpoint, url, meta.tenantId, meta.userId)
       if (localFirst) return localFirst
 
-      const binary = await readBinaryResponse(meta.endpoint, url, meta.tenantId)
+      const binary = await readBinaryResponse(meta.endpoint, url, meta.tenantId, meta.userId)
       if (binary) return binary
 
-      const cached = await readCachedApiResponse(url, meta.tenantId)
+      const cached = await readCachedApiResponse(url, meta.tenantId, meta.userId)
       if (cached) return cached
     }
 
@@ -1126,10 +1470,21 @@ export async function fetchWithOfflineSupport(
 
   try {
     const response = await fetch(url, init)
+    if (response.status === 401 || response.status === 403) {
+      await clearCachedApiResponses(meta.userId, meta.tenantId)
+    }
     if (method === 'GET' && response.ok) {
-      await hydrateLocalFirstResponse(url, meta.endpoint, response.clone(), meta.tenantId)
-      await hydrateBinaryResponse(url, meta.endpoint, response.clone(), meta.tenantId)
-      await cacheApiResponse(url, meta.endpoint, response.clone(), meta.tenantId)
+      if (authorizationRevision === cacheAuthorizationRevision(meta.userId)) {
+        await hydrateLocalFirstResponse(url, meta.endpoint, response.clone(), nativeScope)
+        await hydrateBinaryResponse(url, meta.endpoint, response.clone(), nativeScope)
+        await cacheApiResponse(url, meta.endpoint, response.clone(), meta.tenantId, meta.userId, authorizationRevision)
+      }
+      if (authorizationRevision !== cacheAuthorizationRevision(meta.userId)) {
+        return new Response(JSON.stringify({ success: false, message: 'El acceso cambió durante la consulta. Vuelve a consultar los datos.' }), {
+          status: 409,
+          headers: { 'Content-Type': 'application/json', 'x-erp-authorization-changed': 'true' },
+        })
+      }
     }
     return response
   } catch (error) {
@@ -1159,13 +1514,13 @@ export async function fetchWithOfflineSupport(
     }
 
     if (method === 'GET') {
-      const localFirst = await readLocalFirstResponse(meta.endpoint, url, meta.tenantId)
+      const localFirst = await readLocalFirstResponse(meta.endpoint, url, meta.tenantId, meta.userId)
       if (localFirst) return localFirst
 
-      const binary = await readBinaryResponse(meta.endpoint, url, meta.tenantId)
+      const binary = await readBinaryResponse(meta.endpoint, url, meta.tenantId, meta.userId)
       if (binary) return binary
 
-      const cached = await readCachedApiResponse(url, meta.tenantId)
+      const cached = await readCachedApiResponse(url, meta.tenantId, meta.userId)
       if (cached) return cached
     }
 
@@ -1194,21 +1549,37 @@ export async function syncOfflineQueue(
   accessToken: string | null = null,
   tenantId?: string | null,
 ) {
-  const queue = await listOfflineRequests(tenantId)
+  const scope = nativeActorScope(tenantId)
+  if (!scope) return []
+  const authorizationRevision = cacheAuthorizationRevision(scope.userId)
+  const queue = await listActorOfflineRequests(scope)
   const candidates = queue.filter((item) => item.status === 'pending' || item.status === 'failed')
   const results: Array<{ id: string; ok: boolean; status?: number; error?: string }> = []
-  let idReplacements = buildLocalIdReplacementMap(await listLocalIdMappings())
+  let idReplacements = buildLocalIdReplacementMap(await listActorLocalIdMappings(scope))
 
   for (const item of candidates) {
+    const active = nativeActorScope()
+    if (!active || active.tenantId !== scope.tenantId || active.userId !== scope.userId
+      || authorizationRevision !== cacheAuthorizationRevision(scope.userId)) break
     try {
       const rewrittenEndpoint = item.endpoint
         ? rewriteLocalIdsInEndpoint(item.endpoint, idReplacements)
         : item.endpoint
       const rewrittenUrl = rewriteLocalIdsInEndpoint(item.url, idReplacements)
-      const rewrittenBody = rewriteLocalIdsInBody(item.body, idReplacements)
+      const rewrittenBody = backendQueueBody(item, rewriteLocalIdsInBody(item.body, idReplacements))
+      if (isDocumentFiscalManualRequest({ ...item, endpoint: rewrittenEndpoint, url: rewrittenUrl })) throw new Error('La firma o el envío fiscal requiere confirmación manual en vivo. Se conserva la solicitud original sin reenviarla automáticamente.')
+      if (isCxcManualConfirmationRequest({ ...item, endpoint: rewrittenEndpoint, url: rewrittenUrl })) throw new Error('El cobro o ajuste CxC requiere confirmación manual del servidor. Se conserva la solicitud original sin reenviarla automáticamente.')
+      if(isAssetLifecycleManualRequest({...item,endpoint:rewrittenEndpoint,url:rewrittenUrl}))throw new Error('La edición o baja del activo requiere confirmación manual. Se conserva la solicitud original sin reenviarla automáticamente.')
+      if (isDepreciationBatchOfflineRequest({ ...item, endpoint: rewrittenEndpoint, url: rewrittenUrl })) throw new Error('La depreciación requiere confirmación manual del servidor. Se conserva la solicitud original sin reenviarla automáticamente.')
+      if (isPayrollApprovalOfflineRequest({ ...item, endpoint: rewrittenEndpoint, url: rewrittenUrl, body: rewrittenBody })) throw new Error('La aprobación de planilla requiere confirmación manual del servidor. Se conserva el pendiente para conciliación.')
+      if (isPayrollCreationOfflineRequest({ ...item, endpoint: rewrittenEndpoint, url: rewrittenUrl })) throw new Error('El alta de planilla y su conciliación requieren confirmación del servidor. La solicitud original de alta y cálculo se conserva para continuar o conciliar con conexión.')
+      if (isPayrollCalculationOfflineRequest({ ...item, endpoint: rewrittenEndpoint, url: rewrittenUrl })) throw new Error('El cálculo y su conciliación requieren confirmación manual del servidor. Se conserva el pendiente para conciliación.')
       const targetUrl = rewrittenEndpoint ? buildApiUrl(rewrittenEndpoint) : rewrittenUrl
       const formDataBody = rewrittenBody ? serializedFormDataToBody(rewrittenBody) : null
       const headers = pairsToHeaders(item.headers)
+      if (isCustomerUpdateRequest(item.endpoint, item.method) && !headers.has('Idempotency-Key')) {
+        throw new Error('La edición antigua no tiene clave de operación. Concilia el resultado con el servidor antes de reenviarla; se conserva la solicitud original.')
+      }
       if (accessToken?.trim()) {
         headers.set('Authorization', `Bearer ${accessToken.trim()}`)
       }
@@ -1228,17 +1599,19 @@ export async function syncOfflineQueue(
       const logicalError = response.ok ? responseBodyFailureMessage(responseBody) : null
 
       if (response.ok && !logicalError) {
-        await markOfflineRequestSynced(item.id, response.status, responseBody)
-        idReplacements = buildLocalIdReplacementMap(await listLocalIdMappings())
+        // El ACK pertenece a la solicitud que salió. Un cambio de sesión no
+        // puede moverlo a la cola del nuevo actor ni provocar otro envío.
+        await markActorOfflineRequestSynced(scope, item.id, response.status, responseBody)
+        idReplacements = buildLocalIdReplacementMap(await listActorLocalIdMappings(scope))
         results.push({ id: item.id, ok: true, status: response.status })
       } else {
         const error = logicalError || responseBody || `HTTP ${response.status}`
-        await markOfflineRequestFailed(item.id, error, response.status)
+        await markActorOfflineRequestFailed(scope, item.id, error, response.status)
         results.push({ id: item.id, ok: false, status: response.status, error })
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error de sincronizacion offline'
-      await markOfflineRequestFailed(item.id, message)
+      await markActorOfflineRequestFailed(scope, item.id, message)
       results.push({ id: item.id, ok: false, error: message })
     }
   }
@@ -1246,13 +1619,40 @@ export async function syncOfflineQueue(
   return results
 }
 
+function isCustomerUpdateRequest(endpoint: string, method: string) {
+  return method.toUpperCase() === 'PUT' && /(?:^|\/)api\/ventas\/clientes\/[^/]+$/.test(offlineEndpointPath(endpoint))
+}
+
+function backendQueueBody(item: OfflineQueueItem, body: string | null | undefined) {
+  const nativeCustomer = item.headers.some(header => header.name.toLowerCase() === 'x-erp-local-entity-type' && header.value === 'customer')
+  const customer = nativeCustomer && /^\/api\/ventas\/clientes(?:\/|$)/.test(localFirstEndpoint(item.endpoint))
+  const payrollPayment = isPayrollPaymentOfflineRequest(item) || isTreasuryBatchOfflineRequest(item)
+  if ((!customer && !payrollPayment) || !body) return body
+  try {
+    const payload = JSON.parse(body)
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return body
+    // Compatibilidad con pendientes creados por versiones anteriores: conservar
+    // la intención durable y enviar sólo el contrato admitido por el DTO.
+    for (const field of ['local_id', 'external_id', 'offline_entity_type']) delete payload[field]
+    // Una intención de pago antigua se confirma con su misma clave; quitarla
+    // convertiría la recuperación explícita en otra operación.
+    if (customer) delete payload.idempotency_key
+    return JSON.stringify(payload)
+  } catch { return body }
+}
+
 export async function refreshLocalFirstSnapshots(
   endpoints: string[] = DEFAULT_LOCAL_FIRST_SNAPSHOT_ENDPOINTS,
   headers?: HeadersInit,
+  tenantId?: string | null,
+  userId?: string | null,
 ) {
   const results: Array<{ endpoint: string; ok: boolean; status?: number; error?: string }> = []
-  const snapshotHeaders = new Headers(headers)
-  const tenantId = snapshotHeaders.get('x-tenant-id') || snapshotHeaders.get('X-Tenant-Id')
+  // Scope local obtenido de la sesión; el servidor sigue resolviendo el tenant
+  // desde el JWT. Nunca almacenar snapshots de sesión bajo un scope anónimo.
+  if (!tenantId || !userId) {
+    return endpoints.map((endpoint) => ({ endpoint, ok: false, error: 'No hay empresa o usuario activos' }))
+  }
   if (await isOfflineModeEnabled()) {
     return endpoints.map((endpoint) => ({
       endpoint,
@@ -1263,6 +1663,8 @@ export async function refreshLocalFirstSnapshots(
 
   for (const endpoint of endpoints) {
     try {
+      const authorizationRevision = cacheAuthorizationRevision(userId)
+      const nativeScope = nativeReadAuthorization(tenantId, userId)
       const url = buildApiUrl(endpoint)
       const response = await fetch(url, {
         method: 'GET',
@@ -1271,12 +1673,15 @@ export async function refreshLocalFirstSnapshots(
         mode: 'cors',
         cache: 'no-store',
       })
+      if (response.status === 401 || response.status === 403) await clearCachedApiResponses(userId, tenantId)
       if (response.ok) {
-        await hydrateLocalFirstResponse(url, endpoint, response.clone(), tenantId)
-        await hydrateBinaryResponse(url, endpoint, response.clone(), tenantId)
-        await cacheApiResponse(url, endpoint, response.clone(), tenantId)
+        await hydrateLocalFirstResponse(url, endpoint, response.clone(), nativeScope)
+        await hydrateBinaryResponse(url, endpoint, response.clone(), nativeScope)
+        await cacheApiResponse(url, endpoint, response.clone(), tenantId, userId, authorizationRevision)
       }
-      results.push({ endpoint, ok: response.ok, status: response.status })
+      results.push(authorizationRevision !== cacheAuthorizationRevision(userId) && response.ok
+        ? { endpoint, ok: false, error: 'El acceso cambió durante la consulta. Vuelve a consultar los datos.' }
+        : { endpoint, ok: response.ok, status: response.status })
     } catch (error) {
       results.push({
         endpoint,

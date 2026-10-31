@@ -12,6 +12,7 @@ import ClienteSelector from './ClienteSelector'
 import { Plus, Trash2, Package } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
 import { multiplicarMoneda, redondearMoneda } from '@/lib/format-utils'
+import { reviewCommercialPrices } from '@/lib/ventas/commercial-prices'
 
 interface Producto {
   id: string
@@ -60,6 +61,7 @@ export default function PedidoForm({
   disabled = false
 }: PedidoFormProps) {
   const { get } = useApi()
+  const { post: resolvePrices } = useApi({ throwOnError: true, showErrorToast: false })
   const { tasaIgv, nombreImpuesto } = useTaxConfig()
   const country = useCountryContext()
   const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$')
@@ -115,7 +117,7 @@ const hasStockShortage = stockAlerts.length > 0
           id: p.id,
           codigo: p.codigo,
           nombre: p.nombre,
-          precio: Number(p.precio ?? p.precio_venta ?? 0),
+          precio: Number(p.precio_venta ?? p.precio ?? 0),
           stock: Number(p.stock ?? p.stock_actual ?? 0),
           stock_reservado: Number(p.stock_reservado ?? 0),
           es_servicio: Boolean(p.es_servicio),
@@ -248,6 +250,20 @@ const hasStockShortage = stockAlerts.length > 0
 
     try {
       setSubmitting(true)
+
+      if (country.paisCodigo === 'PE') {
+        const prices = await resolvePrices('/api/ventas/comercial/precios/resolver', {
+          cliente_id: clienteId, vendedor_id: (pedido as any)?.created_by || undefined,
+          moneda: (pedido as any)?.moneda || country.moneda,
+          detalle: detalle.map(({ producto_id, cantidad, precio_unitario }) => ({ producto_id, cantidad, precio_unitario })),
+        })
+        const review = reviewCommercialPrices(detalle, prices)
+        if (review.changed) {
+          setDetalle(review.lines)
+          toast({ title: 'Precios vigentes actualizados', description: 'Revisa el total y vuelve a confirmar el guardado.' })
+          return
+        }
+      }
 
       const formData: PedidoFormData = {
         cliente_id: clienteId,

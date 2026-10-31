@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useApi } from '@/hooks/use-api'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
@@ -92,6 +92,9 @@ export default function InventarioPage() {
   const { get } = useApi()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [statsError, setStatsError] = useState(false)
+  const [productsError, setProductsError] = useState(false)
+  const loadSequence = useRef(0)
   const [stats, setStats] = useState<InventoryStats>(DEFAULT_STATS)
   const [productos, setProductos] = useState<Producto[]>([])
   const [filters, setFilters] = useState<Filters>({
@@ -101,21 +104,31 @@ export default function InventarioPage() {
     soloCriticos: false,
   })
 
-  useEffect(() => {
-    loadDashboard()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const loadDashboard = async () => {
+  const loadDashboard = useCallback(async () => {
+    const sequence = ++loadSequence.current
     setLoading(true)
     setError(null)
+    setStats(DEFAULT_STATS)
+    setProductos([])
+    setStatsError(false)
+    setProductsError(false)
     try {
-      const [statsResp, productosResp] = await Promise.all([
-        get('/inventario/stats'),
-        get('/inventario/productos'),
-      ])
+      // Una denegación invalida las lecturas en curso del actor. Consultar el
+      // catálogo después permite conservar su acceso aunque stats esté denegado.
+      const statsResp = await get('/inventario/stats')
+      if (sequence !== loadSequence.current) return
+      const productosResp = await get('/inventario/productos')
 
-      if (statsResp?.success && statsResp.data) {
+      if (sequence !== loadSequence.current) return
+      const statsValid = statsResp?.success === true && statsResp.data &&
+        ['totalProductos','valorInventario','productosStockBajo','movimientosHoy'].every(field =>
+          typeof statsResp.data[field] === 'number' && Number.isFinite(statsResp.data[field]))
+      const productsValid = productosResp?.success === true && Array.isArray(productosResp.data) &&
+        productosResp.data.every((row: any) => row && typeof row.id === 'string' && row.id.trim() && typeof row.nombre === 'string' && typeof row.activo === 'boolean')
+      setStatsError(!statsValid)
+      setProductsError(!productsValid)
+      if (!statsValid || !productsValid) setError('No se pudo completar la lectura de inventario. Los datos no disponibles se mantienen sin evaluar. Reintente la consulta.')
+      if (statsValid) {
         setStats({
           totalProductos: Number(statsResp.data.totalProductos ?? 0),
           valorInventario: Number(statsResp.data.valorInventario ?? 0),
@@ -126,7 +139,7 @@ export default function InventarioPage() {
         setStats(DEFAULT_STATS)
       }
 
-      if (productosResp?.success && Array.isArray(productosResp.data)) {
+      if (productsValid) {
         setProductos(
           productosResp.data.map((item: any) => ({
             id: item.id,
@@ -143,14 +156,22 @@ export default function InventarioPage() {
         setProductos([])
       }
     } catch (err) {
+      if (sequence !== loadSequence.current) return
       console.error('Error cargando dashboard de inventario', err)
       setError('No se pudo cargar el dashboard de inventario. Intenta nuevamente.')
       setStats(DEFAULT_STATS)
       setProductos([])
+      setStatsError(true)
+      setProductsError(true)
     } finally {
-      setLoading(false)
+      if (sequence === loadSequence.current) setLoading(false)
     }
-  }
+  }, [get])
+
+  useEffect(() => {
+    loadDashboard()
+    return () => { loadSequence.current += 1 }
+  }, [loadDashboard])
 
   const categorias = useMemo(() => {
     const set = new Set<string>()
@@ -205,7 +226,7 @@ export default function InventarioPage() {
         </>
       }
     >
-      {error && <div className="rounded-2xl border border-amber-300/25 bg-amber-300/10 p-4 text-sm font-semibold text-amber-700 dark:text-amber-200 group-data-[erp-theme=light]/dashboard:border-amber-200 group-data-[erp-theme=light]/dashboard:bg-amber-50 group-data-[erp-theme=light]/dashboard:text-amber-800">{error}</div>}
+      {error && <div role="alert" className="rounded-2xl border border-amber-300/25 bg-amber-300/10 p-4 text-sm font-semibold text-amber-700 dark:text-amber-200 group-data-[erp-theme=light]/dashboard:border-amber-200 group-data-[erp-theme=light]/dashboard:bg-amber-50 group-data-[erp-theme=light]/dashboard:text-amber-800">{error}</div>}
 
       {loading ? (
         <div className="grid min-h-[320px] place-items-center rounded-3xl border border-cyan-400/20 bg-card/60 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground/85">
@@ -224,9 +245,9 @@ export default function InventarioPage() {
             fallback={<StatsFallback />}
           >
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <MetricCard title="Productos" value={stats.totalProductos.toLocaleString('es-PE')} description="Activos registrados" icon={Package} tone="info" />
-              <MetricCard title="Valor inventario" value={formatCurrency(stats.valorInventario, country.moneda || 'PEN')} description="Inventario valorizado" icon={Boxes} tone="success" />
-              <MetricCard title="Stock crítico" value={stats.productosStockBajo.toLocaleString('es-PE')} description="Por debajo del mínimo" icon={AlertTriangle} tone="warning" />
+              <MetricCard title="Productos" value={statsError ? '—' : stats.totalProductos.toLocaleString('es-PE')} description="Activos registrados" icon={Package} tone="info" />
+              <MetricCard title="Valor inventario" value={statsError ? '—' : formatCurrency(stats.valorInventario, country.moneda || 'PEN')} description="Inventario valorizado" icon={Boxes} tone="success" />
+              <MetricCard title="Stock crítico" value={statsError ? '—' : stats.productosStockBajo.toLocaleString('es-PE')} description="Por debajo del mínimo" icon={AlertTriangle} tone="warning" />
             </div>
           </ProtectedComponent>
 
@@ -237,7 +258,7 @@ export default function InventarioPage() {
             accion="read"
             fallback={<ProductsFallback />}
           >
-            <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
+            {productsError ? <div role="alert" className="rounded-xl border border-destructive p-4">Catálogo de productos no disponible. Use Actualizar para reintentar.</div> : <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-white group-data-[erp-theme=light]/dashboard:text-foreground"><ClipboardList className="h-5 w-5 text-primary group-data-[erp-theme=light]/dashboard:text-blue-600" /> Productos</CardTitle>
                 <p className="text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
@@ -342,7 +363,7 @@ export default function InventarioPage() {
                 </div>
               )}
               </CardContent>
-            </Card>
+            </Card>}
           </ProtectedComponent>
 
         </>

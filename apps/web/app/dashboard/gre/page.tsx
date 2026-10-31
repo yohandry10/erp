@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
-import { fetchApi } from '@/lib/api-fetch'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { parseDateLocal } from '@/lib/date-utils'
 import { Download, Eye, FileText, Plus, RefreshCw, ShieldCheck, Truck } from 'lucide-react'
 
@@ -9,33 +8,11 @@ import GreModal from '@/components/modals/GreModal'
 import GreViewModal from '@/components/modals/GreViewModal'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useApiCall } from '@/hooks/use-api'
 import { useCountryContext } from '@/hooks/use-country-context'
-import { apiSucceeded, unwrapApiArray, unwrapApiObject } from '@/lib/api-contract'
-
-interface GreDocument {
-  id: string
-  numero: string
-  destinatario: string
-  direccionDestino: string
-  fechaTraslado: string
-  fechaCreacion: string
-  modalidad: 'TRANSPORTE_PUBLICO' | 'TRANSPORTE_PRIVADO'
-  motivo: string
-  pesoTotal: number
-  estado: 'BORRADOR' | 'FIRMADO' | 'ENVIADO' | 'ACEPTADO' | 'RECHAZADO' | 'ANULADO' | 'ERROR'
-  observaciones?: string
-  transportista?: string
-  placaVehiculo?: string
-  licenciaConducir?: string
-}
-
-interface GreStats {
-  greEmitidas: number
-  totalGre: number
-  enTransito: number
-  completados: number
-}
+import { useAuth } from '@/contexts/AuthContext'
+import { useGreRead } from '@/hooks/use-gre-read'
+import { GreDocument, greList, greStats } from '@/lib/gre-read-contract'
+import { liveGreFile, saveGreFile } from '@/lib/gre-download'
 
 const inputClass =
   'rounded-xl border border-cyan-400/20 bg-card/75 px-3 py-3 text-sm text-foreground outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
@@ -62,8 +39,6 @@ export default function GREPage() {
   const country = useCountryContext()
   const isPeru = (country.paisCodigo || 'PE').toUpperCase() === 'PE'
   const [mounted, setMounted] = useState(false)
-  const [documents, setDocuments] = useState<GreDocument[]>([])
-  const [stats, setStats] = useState<GreStats | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [selectedDocumentId, setSelectedDocumentId] = useState<string>('')
@@ -74,92 +49,48 @@ export default function GREPage() {
     fechaHasta: ''
   })
 
-  const { get, loading } = useApiCall<GreDocument[]>({ timeoutMs: 6000, retries: 1 })
-  const { get: getStats } = useApiCall<GreStats>({ timeoutMs: 6000, retries: 1 })
+  const { session } = useAuth()
+  const scope = `${session?.user?.tenant_id || ''}:${session?.user?.id || ''}:${JSON.stringify(filters)}`
+  const scopeRef = useRef(scope); scopeRef.current = scope
+  const [downloadError, setDownloadError] = useState<string | null>(null)
+  const [downloading, setDownloading] = useState(false)
+  useEffect(() => { setDownloadError(null); setDownloading(false); setIsViewModalOpen(false); setIsModalOpen(false); setSelectedDocumentId('') }, [scope])
+  const queryParams = new URLSearchParams()
+  if (filters.modalidad) queryParams.append('modalidad', filters.modalidad)
+  if (filters.estado) queryParams.append('estado', filters.estado)
+  if (filters.fechaDesde) queryParams.append('desde', filters.fechaDesde)
+  if (filters.fechaHasta) queryParams.append('hasta', filters.fechaHasta)
+  const enabled = mounted && !country.loading && isPeru
+  const documentsRead = useGreRead(`/api/gre/guias?${queryParams}`, greList, enabled)
+  const statsRead = useGreRead('/api/gre/stats', greStats, enabled)
+  const documents = documentsRead.data || []; const stats = statsRead.data
+  const loading = documentsRead.loading
 
   useEffect(() => setMounted(true), [])
 
-  const loadDocuments = useCallback(async () => {
-    const queryParams = new URLSearchParams()
-    if (filters.modalidad) queryParams.append('modalidad', filters.modalidad)
-    if (filters.estado) queryParams.append('estado', filters.estado)
-    if (filters.fechaDesde) queryParams.append('desde', filters.fechaDesde)
-    if (filters.fechaHasta) queryParams.append('hasta', filters.fechaHasta)
-
-    const response = await get(`/api/gre/guias?${queryParams}`)
-    const documents = unwrapApiArray<GreDocument>(response)
-    if (apiSucceeded(response)) {
-      console.log('GRE Data recibida:', documents)
-      setDocuments(documents)
-    } else {
-      console.log('No hay datos de GRE o respuesta incorrecta:', response)
-      setDocuments([])
-    }
-  }, [get, filters])
-
-  const loadStats = useCallback(async () => {
-    const response = await getStats('/api/gre/stats')
-    if (apiSucceeded(response)) {
-      const stats = unwrapApiObject<GreStats>(response, {
-        greEmitidas: 0,
-        totalGre: 0,
-        enTransito: 0,
-        completados: 0
-      })
-      console.log('GRE Stats recibidas:', stats)
-      setStats(stats)
-    } else {
-      console.log('No hay estadisticas de GRE o respuesta incorrecta:', response)
-      setStats({
-        greEmitidas: 0,
-        totalGre: 0,
-        enTransito: 0,
-        completados: 0
-      })
-    }
-  }, [getStats])
-
   const loadData = useCallback(async () => {
-    await Promise.all([
-      loadDocuments(),
-      loadStats()
-    ])
-  }, [loadDocuments, loadStats])
-
-  useEffect(() => {
-    if (!country.loading && isPeru) loadData()
-  }, [country.loading, isPeru, loadData])
+    await Promise.all([documentsRead.reload(), statsRead.reload()])
+  }, [documentsRead.reload, statsRead.reload])
 
   const generateReport = async () => {
-    const data = await get('/api/gre/reporte')
-    if (data) {
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `reporte-gre-${new Date().toISOString().split('T')[0]}.json`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-    }
+    if (downloading || loading || documentsRead.error) return
+    const current = scope; setDownloadError(null); setDownloading(true)
+    try {
+      const blob = await liveGreFile('/api/gre/reporte', 'csv')
+      if (current === scopeRef.current) saveGreFile(blob, `reporte-gre-${new Date().toISOString().split('T')[0]}.csv`)
+    } catch (error) { if (current === scopeRef.current) setDownloadError(error instanceof Error ? error.message : 'No se pudo descargar el reporte GRE.') }
+    finally { if (current === scopeRef.current) setDownloading(false) }
   }
 
   const downloadPdf = async (document: GreDocument) => {
+    if (downloading || loading || documentsRead.error) return
+    const current = scope; setDownloadError(null); setDownloading(true)
     try {
-      const response = await fetchApi(`/api/gre/guias/${document.id}/pdf/`, { method: 'GET' })
-      if (!response.ok || !response.headers.get('content-type')?.startsWith('application/pdf')) throw new Error('No se pudo descargar el PDF de la guía.')
-      const url = window.URL.createObjectURL(await response.blob())
-      const link = window.document.createElement('a')
-      link.href = url
-      link.download = `GRE-${document.numero}.pdf`
-      window.document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(url)
+      const blob = await liveGreFile(`/api/gre/guias/${document.id}/pdf/`, 'pdf')
+      if (current === scopeRef.current) saveGreFile(blob, `GRE-${document.numero}.pdf`)
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'No se pudo descargar la guía.')
-    }
+      if (current === scopeRef.current) setDownloadError(error instanceof Error ? error.message : 'No se pudo descargar la guía.')
+    } finally { if (current === scopeRef.current) setDownloading(false) }
   }
 
   const getStatusText = (estado: string) => {
@@ -219,17 +150,6 @@ export default function GREPage() {
     )
   }
 
-  if (loading && documents.length === 0) {
-    return (
-      <div className="min-h-screen bg-background p-5 text-foreground">
-        <div className="mx-auto flex min-h-[420px] max-w-[1600px] flex-col items-center justify-center gap-3 rounded-3xl border border-cyan-400/20 bg-card/75 shadow-2xl shadow-blue-950/30">
-          <RefreshCw className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Cargando guias de remision...</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-background px-4 py-5 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
@@ -243,11 +163,11 @@ export default function GREPage() {
               <p className="mt-2 max-w-3xl text-sm text-muted-foreground">Gestion de transporte, trazabilidad GRE y documentos logisticos.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" onClick={generateReport} variant="outline" className="gap-2 border-cyan-400/20 bg-cyan-400/10 text-primary hover:bg-cyan-400/15 hover:text-foreground">
+              <Button type="button" disabled={downloading || loading || !!documentsRead.error} onClick={generateReport} title="Reporte de todas las guías, independiente de los filtros del listado" variant="outline" className="gap-2 border-cyan-400/20 bg-cyan-400/10 text-primary hover:bg-cyan-400/15 hover:text-foreground">
                 <Download className="h-4 w-4" />
-                Generar reporte
+                Descargar reporte CSV
               </Button>
-              <Button type="button" onClick={() => setIsModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+              <Button type="button" disabled={loading || !!documentsRead.error} onClick={() => setIsModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
                 <Plus className="h-4 w-4" />
                 Nueva GRE
               </Button>
@@ -255,12 +175,15 @@ export default function GREPage() {
           </div>
         </section>
 
+        {downloadError && <div role="alert" className="rounded-xl border border-destructive p-4 text-destructive">{downloadError}</div>}
+        {statsRead.error && <div role="alert" className="rounded-xl border border-destructive p-4 text-destructive">{statsRead.error} <Button variant="outline" onClick={statsRead.reload}>Reintentar indicadores</Button></div>}
+
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            ['GRE emitidas hoy', stats?.greEmitidas || 0, 'Guias hoy'],
-            ['Total GRE', stats?.totalGre || 0, 'Guias del mes'],
-            ['En transito', stats?.enTransito || 0, 'Transportes activos'],
-            ['Completados', stats?.completados || 0, 'Entregas exitosas'],
+            ['GRE emitidas hoy', stats?.greEmitidas ?? '—', 'Guías creadas hoy'],
+            ['Total GRE', stats?.totalGre ?? '—', 'Todas las guías'],
+            ['En transito', stats?.enTransito ?? '—', 'Firmadas o enviadas'],
+            ['Completados', stats?.completados ?? '—', 'Aceptación fiscal confirmada'],
           ].map(([label, value, description]) => (
             <Card key={label} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
               <CardContent className="flex items-start justify-between gap-3 p-4">
@@ -329,14 +252,16 @@ export default function GREPage() {
             <CardTitle className="text-base text-foreground">Lista de guías de remisión</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            {Array.isArray(documents) && documents.length === 0 && !loading ? (
+            {documentsRead.error ? <div role="alert" className="p-8 text-destructive">{documentsRead.error} <Button variant="outline" onClick={documentsRead.reload}>Reintentar guías</Button></div>
+            : loading ? <p className="p-8 text-muted-foreground">Consultando guías actuales…</p>
+            : documents.length === 0 ? (
               <div className="flex min-h-[320px] flex-col items-center justify-center p-8 text-center">
                 <Truck className="mb-3 h-12 w-12 text-cyan-200/50" />
-                <h3 className="text-lg font-bold text-foreground">No hay guías de remisión</h3>
-                <p className="mt-2 text-sm text-muted-foreground">Comienza creando tu primera guia electronica.</p>
+                <h3 className="text-lg font-bold text-foreground">{Object.values(filters).some(Boolean) ? 'Sin guías para estos filtros' : 'No hay guías de remisión'}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{Object.values(filters).some(Boolean) ? 'Modifica los filtros para consultar otras guías.' : 'Comienza creando tu primera guía electrónica.'}</p>
                 <Button type="button" onClick={() => setIsModalOpen(true)} className="mt-4 gap-2 bg-blue-600 text-white hover:bg-blue-500">
                   <Plus className="h-4 w-4" />
-                  Crear primera GRE
+                  {Object.values(filters).some(Boolean) ? 'Nueva GRE' : 'Crear primera GRE'}
                 </Button>
               </div>
             ) : (
@@ -381,6 +306,7 @@ export default function GREPage() {
                           <div className="flex flex-wrap justify-end gap-1.5">
                             <Button
                               type="button"
+                              disabled={downloading}
                               size="sm"
                               onClick={() => viewDocument(doc.id)}
                               variant="outline"
@@ -393,6 +319,7 @@ export default function GREPage() {
                               type="button"
                               size="sm"
                               onClick={() => downloadPdf(doc)}
+                              disabled={downloading}
                               title="Descargar PDF GRE"
                               aria-label="Descargar PDF GRE"
                               variant="outline"

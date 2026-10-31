@@ -1,31 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { AlertCircle, ArrowDownRight, ArrowUpRight, Landmark, Loader2 } from 'lucide-react'
-import { useApi } from '@/hooks/use-api'
+import { useAccountingStatement } from '@/hooks/use-accounting-statement'
+import { readStatementCashflow } from '@/lib/contabilidad/statement-read-contract'
+import FinanceReportStatus from '@/components/finanzas/FinanceReportStatus'
+
+import { ArrowDownRight, ArrowUpRight, Landmark } from 'lucide-react'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-
-type FlujoEfectivoData = {
-  operativo: number
-  inversion: number
-  financiamiento: number
-  neto: number
-  detalle: {
-    utilidadNeta: number
-    /** Depreciación, amortización y deterioro del mes (PCGE 68). */
-    gastosNoDesembolsables: number
-    variacionCxc: number
-    variacionInventario: number
-    variacionCxp: number
-    variacionInversiones: number
-    variacionFinanciamiento: number
-    /** Variación real de caja y bancos (PCGE 10) en el mes. */
-    variacionCaja: number
-    /** `neto` menos la variación real de caja. Un estado correcto cierra en cero. */
-    descuadre: number
-  }
-}
 
 type FlujoEfectivoProps = {
   anio: number
@@ -33,45 +14,9 @@ type FlujoEfectivoProps = {
 }
 
 export function FlujoEfectivo({ anio, mes }: FlujoEfectivoProps) {
-  const { get } = useApi()
+  const { data, loading, error, reload } = useAccountingStatement('/api/contabilidad/flujo-efectivo', anio, mes, readStatementCashflow)
   const { formatCurrency } = useLocalizedMoney()
-  const [data, setData] = useState<FlujoEfectivoData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const response = await get(`/api/contabilidad/flujo-efectivo?anio=${anio}&mes=${mes}`)
-      if (!response?.success || !response.data) throw new Error(response?.message || 'No se pudo calcular el flujo de efectivo')
-      setData(response.data)
-    } catch (err: any) {
-      setData(null)
-      setError(err?.message || 'Error al cargar el flujo de efectivo')
-    } finally {
-      setLoading(false)
-    }
-  }, [anio, get, mes])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
-
-  if (loading) {
-    return <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-  }
-
-  if (error || !data) {
-    return (
-      <Card className="border-destructive/30 bg-destructive/5">
-        <CardContent className="flex gap-3 p-6 text-sm text-destructive">
-          <AlertCircle className="h-5 w-5 shrink-0" />
-          <div><p className="font-semibold">No se pudo presentar el flujo de efectivo</p><p className="mt-1 opacity-80">{error}</p></div>
-        </CardContent>
-      </Card>
-    )
-  }
+  if (loading || error || !data) return <FinanceReportStatus loading={loading} retry={reload} />
 
   const sections = [
     { label: 'Actividades operativas', value: data.operativo },
@@ -79,13 +24,14 @@ export function FlujoEfectivo({ anio, mes }: FlujoEfectivoProps) {
     { label: 'Actividades de financiamiento', value: data.financiamiento },
   ]
   const details = [
-    ['Utilidad neta', data.detalle.utilidadNeta],
+    ['Utilidad neta del mes', data.detalle.utilidadNeta],
     // El método indirecto devuelve a la utilidad lo que no movió dinero. Sin
     // esta línea el estado no cuadra con la caja y no se ve por qué.
-    ['Depreciación y provisiones del mes', data.detalle.gastosNoDesembolsables],
+    ['Depreciación y amortización del mes', data.detalle.gastosNoDesembolsables],
     ['Variación de cuentas por cobrar', data.detalle.variacionCxc],
     ['Variación de inventarios', data.detalle.variacionInventario],
     ['Variación de cuentas por pagar', data.detalle.variacionCxp],
+    ['Tributos, anticipos y otras partidas operativas (efecto en caja)', data.detalle.otrosOperativos],
     ['Variación de inversiones', data.detalle.variacionInversiones],
     ['Variación de financiamiento', data.detalle.variacionFinanciamiento],
     ['Variación real de caja y bancos', data.detalle.variacionCaja],

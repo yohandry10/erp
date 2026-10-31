@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import {
   ListarAsientosQueryDto,
@@ -633,101 +633,21 @@ export class AsientosService {
    * @param tenantId - ID del tenant
    * @returns Estadísticas de asientos por tipo de evento
    */
-  async obtenerEstadisticasAsientosPorTipo(tenantId: string): Promise<{
-    tipo: string;
-    cantidad: number;
-  }[]> {
-    try {
-      this.logger.log(`📊 Obteniendo estadísticas de asientos por tipo para tenant ${tenantId}`);
-
-      // Query SQL para obtener conteo de asientos por tipo de evento
-      const { data, error } = await this.supabaseService
-        .getClient()
-        .rpc('get_asientos_por_tipo', { p_tenant_id: tenantId });
-
-      if (error) {
-        this.logger.error(`❌ Error obteniendo estadísticas por tipo: ${error.message}`);
-        // Si la función no existe, usar query alternativa
-        return await this.obtenerEstadisticasAsientosPorTipoFallback(tenantId);
-      }
-
-      this.logger.log(`✅ Estadísticas de asientos por tipo obtenidas: ${data?.length || 0} tipos`);
-      return data || [];
-    } catch (error) {
-      this.logger.error(`❌ Error obteniendo estadísticas por tipo: ${error.message}`);
-      // Fallback a query alternativa
-      return await this.obtenerEstadisticasAsientosPorTipoFallback(tenantId);
+  async obtenerEstadisticasAsientosPorTipo(tenantId: string): Promise<{ tipo: string; cantidad: number }[]> {
+    const { data, error } = await this.supabaseService.getClient().rpc('get_asientos_por_tipo', { p_tenant_id: tenantId });
+    if (error || !Array.isArray(data)) {
+      throw new ServiceUnavailableException('No se pudo completar la distribución de asientos. Reintente la consulta');
     }
-  }
-
-  /**
-   * Método fallback para obtener estadísticas cuando la función RPC no existe
-   * @param tenantId - ID del tenant
-   * @returns Estadísticas de asientos por tipo
-   */
-  private async obtenerEstadisticasAsientosPorTipoFallback(tenantId: string): Promise<{
-    tipo: string;
-    cantidad: number;
-  }[]> {
-    try {
-      // Obtener asientos con source_event_id
-      const { data: asientos, error: asientosError } = await this.supabaseService
-        .getClient()
-        .from('asientos_contables')
-        .select('source_event_id')
-        .eq('tenant_id', tenantId)
-        .not('source_event_id', 'is', null);
-
-      if (asientosError) {
-        this.logger.error(`❌ Error en fallback: ${asientosError.message}`);
-        return [];
+    const types = new Set<string>();
+    let total = 0;
+    for (const row of data) {
+      if (!row || typeof row.tipo !== 'string' || !row.tipo.trim() || types.has(row.tipo) || !Number.isSafeInteger(row.cantidad) || row.cantidad < 0) {
+        throw new ServiceUnavailableException('La distribución de asientos contiene datos incoherentes');
       }
-
-      if (!asientos || asientos.length === 0) {
-        return [];
-      }
-
-      // Obtener eventos correspondientes
-      const eventIds = asientos.map(a => a.source_event_id);
-      const { data: eventos, error: eventosError } = await this.supabaseService
-        .getClient()
-        .from('outbox_events')
-        .select('id, event_type')
-        .in('id', eventIds);
-
-      if (eventosError) {
-        this.logger.error(`❌ Error obteniendo eventos: ${eventosError.message}`);
-        return [];
-      }
-
-      // Contar por tipo
-      const conteo: Record<string, number> = {};
-      eventos?.forEach(evento => {
-        const tipo = evento.event_type || 'Manual';
-        conteo[tipo] = (conteo[tipo] || 0) + 1;
-      });
-
-      // Contar asientos manuales (sin source_event_id)
-      const { count: manualesCount } = await this.supabaseService
-        .getClient()
-        .from('asientos_contables')
-        .select('*', { count: 'exact', head: true })
-        .eq('tenant_id', tenantId)
-        .is('source_event_id', null);
-
-      if (manualesCount && manualesCount > 0) {
-        conteo['Manual'] = manualesCount;
-      }
-
-      // Convertir a array
-      return Object.entries(conteo).map(([tipo, cantidad]) => ({
-        tipo,
-        cantidad
-      }));
-    } catch (error) {
-      this.logger.error(`❌ Error en fallback: ${error.message}`);
-      return [];
+      types.add(row.tipo); total += row.cantidad;
     }
+    if (!Number.isSafeInteger(total)) throw new ServiceUnavailableException('La distribución de asientos está fuera de rango');
+    return data;
   }
 
   /**

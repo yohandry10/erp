@@ -21,6 +21,7 @@ import {
   ResumenPartidasDto,
 } from "@erp-suite/dtos";
 import { ConciliacionPartidasService } from "../services/conciliacion-partidas.service";
+import { UuidParamPipe } from "../../../common/pipes/uuid-param.pipe";
 
 @ApiTags("contabilidad")
 @Controller("contabilidad")
@@ -98,7 +99,7 @@ export class ContabilidadConciliacionController {
   })
   async desconciliar(
     @CurrentTenant() tenantId: string,
-    @Param("id") conciliacionId: string,
+    @Param("id", UuidParamPipe) conciliacionId: string,
   ) {
     await this.conciliacionService.desconciliar(tenantId, conciliacionId);
     return { success: true, message: "Conciliación deshecha" };

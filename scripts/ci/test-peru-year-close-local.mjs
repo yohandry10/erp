@@ -118,7 +118,7 @@ try {
   token = platformToken;
   const finalSnapshot = entrySnapshot();
   const rejected = await call(`contabilidad/periodos/${period.id}/reabrir`,{},400);
-  assert.match(String(rejected.message),/ACCOUNTING_PERIOD_HAS_LATER_CLOSED_PERIODS/);
+  assert.match(String(rejected.code ?? rejected.message),/ACCOUNTING_PERIOD_HAS_LATER_CLOSED_PERIODS/);
   assert.equal(entrySnapshot(),finalSnapshot);
   assert.equal((await call(`contabilidad/periodos/${period.id}`)).estado,'CERRADO');
   scenarios.push({ scenario:'Pérdida anual, resultado nuevo independiente y rechazo de reapertura con período posterior cerrado', passed:true });

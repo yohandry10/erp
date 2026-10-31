@@ -1,5 +1,6 @@
 "use client";
 
+import { requestConfirmation } from '@/lib/confirm-action'
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useApi } from "@/hooks/use-api";
@@ -11,6 +12,12 @@ import {
 } from "@/lib/afectacion-labels";
 import { ProductImageField } from "@/components/ProductImageField";
 import { deleteProductImage, uploadProductImage } from "@/lib/product-images";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePermission } from "@/hooks/use-permission";
+import { ProtectedComponent } from "@/components/auth/ProtectedComponent";
+import { preserveProductImage, recoveredProductImage } from "@/lib/product-create-operation";
+import { ProductUpdateIntent, ProductSnapshot, productUpdateIntentKey, readProductUpdateIntent,
+  confirmProductUpdateSource, confirmProductUpdated, confirmUpdatedProductImage } from "@/lib/product-update-operation";
 
 // Ni las etiquetas ni los campos tenian estilo propio: el navegador los pintaba
 // en linea y el texto de cada label quedaba pegado a su input.
@@ -20,12 +27,23 @@ const camposClass =
 export default function EditarProductoPage() {
   const router = useRouter();
   const params = useParams();
-  const { get, put, apiCall } = useApi();
+  const { get, put, apiCall } = useApi({ requireLive: true, throwOnError: true, showErrorToast: false, retries: 0 });
   const country = useCountryContext();
   const productoId = params.id as string | undefined;
-  const intentRef = useRef<{ fingerprint: string; key: string } | null>(null);
-  const imageIntentRef = useRef<{ fingerprint: string; key: string } | null>(null);
-  const deleteImageIntentRef = useRef<string | null>(null);
+  const { session, loading: authLoading } = useAuth();
+  const { hasPermission, loading: permissionLoading } = usePermission('inventario','update','productos');
+  const tenantId=session?.user?.tenant_id||'', actorId=session?.user?.id||'';
+  const scopeIdentity=`${tenantId}:${actorId}:${productoId||''}`;
+  const activeScope=useRef(scopeIdentity);activeScope.current=scopeIdentity;
+  const epoch=useRef(0),inflight=useRef(false);
+  const [intentReady,setIntentReady]=useState('');
+  const [pendingIntent,setPendingIntent]=useState<ProductUpdateIntent|null>(null);
+  const [original,setOriginal]=useState<ProductSnapshot|null>(null);
+  const [recoveryError,setRecoveryError]=useState('');
+  const [sourceError,setSourceError]=useState('');
+  const [operationError,setOperationError]=useState('');
+  const scopeReady=!authLoading&&intentReady===scopeIdentity&&!!tenantId&&!!actorId&&!!productoId;
+  const visibleIntent=scopeReady&&pendingIntent?.tenantId===tenantId&&pendingIntent?.actorId===actorId&&pendingIntent?.productId===productoId?pendingIntent:null;
   const [isLoading, setIsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [categorias, setCategorias] = useState<Array<{ id: string; nombre: string }>>([]);
@@ -45,6 +63,8 @@ export default function EditarProductoPage() {
     stockMinimo: "",
     codigoBarras: "",
     afectacionIgv: "10",
+    esServicio: false,
+    controlaStock: true,
   });
 
   const impuestoNombre = country.paisCodigo === "PE" ? "IGV" : "IVA";
@@ -55,15 +75,31 @@ export default function EditarProductoPage() {
       ? Math.round(country.impuestoRate * 10000) / 100
       : 0;
 
-  const loadProducto = useCallback(async () => {
-    if (!productoId) return;
+  useEffect(()=>{
+    epoch.current++;inflight.current=false;setIntentReady('');setPendingIntent(null);setOriginal(null);
+    setIsLoading(false);setLoading(true);setRecoveryError('');setSourceError('');setOperationError('');setCategorias([]);
+    setCurrentImageUrl(null);setOriginalUnit(null);setProductImage(null);setRemoveCurrentImage(false);
+    setFormData({codigo:'',nombre:'',marca:'',unidadMedida:'',descripcion:'',categoria:'',precioVenta:'',precioCompra:'',stockMinimo:'',codigoBarras:'',afectacionIgv:'10',esServicio:false,controlaStock:true});
+    if(authLoading||!tenantId||!actorId||!productoId)return;
+    try{const scope={tenantId,actorId,productId:productoId};setPendingIntent(readProductUpdateIntent(localStorage.getItem(productUpdateIntentKey(scope)),scope));setIntentReady(scopeIdentity)}
+    catch{setIntentReady(scopeIdentity);setRecoveryError('No se pudo recuperar el cambio pendiente. Sus datos se conservan para revisar el resultado.')}
+    return()=>{epoch.current++};
+  },[tenantId,actorId,productoId,scopeIdentity,authLoading]);
 
+  const loadProducto = useCallback(async () => {
+    if (!scopeReady || !productoId || pendingIntent || recoveryError) return;
+    const requestedScope=activeScope.current,requestedEpoch=++epoch.current;
+    const current=()=>activeScope.current===requestedScope&&epoch.current===requestedEpoch;
     setLoading(true);
+    setSourceError('');setOriginal(null);setCategorias([]);
     try {
       const [response, categoriasResponse] = await Promise.all([
         get(`/inventario/productos/${productoId}`),
         get("/inventario/categorias"),
       ]);
+      if(!current())return;
+      const p=confirmProductUpdateSource(response,{tenantId,actorId,productId:productoId});
+      if(categoriasResponse?.success!==true||categoriasResponse.offline||categoriasResponse.cached||categoriasResponse.queued||categoriasResponse.pending||!Array.isArray(categoriasResponse.data)||!categoriasResponse.data.every((c:any)=>c&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(c.id||'')&&c.tenant_id===tenantId&&typeof c.nombre==='string'&&!!c.nombre.trim()&&c.activo===true))throw new Error('Catálogos no confirmados');
       if (categoriasResponse?.success && Array.isArray(categoriasResponse.data)) {
         setCategorias(
           categoriasResponse.data.map((categoria: any) => ({
@@ -73,7 +109,7 @@ export default function EditarProductoPage() {
         );
       }
       if (response?.success && response.data) {
-        const p = response.data;
+        setOriginal(p);
         const loadedUnit = typeof p.unidad_medida === "string" && p.unidad_medida.trim()
           ? p.unidad_medida.trim().toUpperCase()
           : "";
@@ -91,15 +127,16 @@ export default function EditarProductoPage() {
           stockMinimo: p.stock_minimo?.toString() || "",
           codigoBarras: p.codigo_barras || "",
           afectacionIgv: String(p.afectacion_igv || "10"),
+          esServicio: p.es_servicio === true,
+          controlaStock: p.es_servicio !== true && p.controla_stock !== false,
         });
       }
     } catch (error) {
-      console.error("Error cargando producto:", error);
-      alert("Error al cargar el producto");
+      if(current()){setOriginal(null);setCategorias([]);setSourceError('No se pudo confirmar el producto y sus categorías. Reintenta la carga con conexión.')}
     } finally {
-      setLoading(false);
+      if(current())setLoading(false);
     }
-  }, [country.impuestoRate, get, productoId]);
+  }, [get, productoId, tenantId, actorId, scopeReady, pendingIntent, recoveryError]);
 
   useEffect(() => {
     loadProducto();
@@ -107,19 +144,21 @@ export default function EditarProductoPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if(inflight.current||!scopeReady||!productoId||recoveryError||!hasPermission||permissionLoading||(!pendingIntent&&(!original||sourceError||loading)))return;
+    setOperationError('');
 
-    if (!formData.codigo || !formData.nombre || !formData.categoria) {
-      alert("Por favor complete los campos obligatorios");
+    if (!pendingIntent && (!formData.codigo.trim() || !formData.nombre.trim() || !formData.categoria)) {
+      setOperationError('Por favor complete los campos obligatorios');
       return;
     }
 
-    if (!originalUnit && formData.unidadMedida) {
-      const confirmed = window.confirm(
-        `Este producto histórico no tiene unidad registrada. Asignar ${formData.unidadMedida} regularizará su Kardex de forma auditable y la unidad ya no podrá cambiar cuando existan movimientos. ¿Desea continuar?`,
-      );
+    if (!pendingIntent && !originalUnit && formData.unidadMedida) {
+      const confirmed = (await requestConfirmation(`Este producto histórico no tiene unidad registrada. Asignar ${formData.unidadMedida} regularizará su Kardex de forma auditable y la unidad ya no podrá cambiar cuando existan movimientos. ¿Desea continuar?`));
       if (!confirmed) return;
     }
 
+    inflight.current=true;const submittedScope=activeScope.current,submittedEpoch=++epoch.current;
+    const current=()=>activeScope.current===submittedScope&&epoch.current===submittedEpoch;
     setIsLoading(true);
     try {
       const payload = {
@@ -139,58 +178,42 @@ export default function EditarProductoPage() {
         codigo_barras: formData.codigoBarras.trim() || undefined,
         impuesto: tasaEfectiva,
         afectacion_igv: formData.afectacionIgv,
+        es_servicio: formData.esServicio,
+        controla_stock: !formData.esServicio && formData.controlaStock,
       };
-      const fingerprint = JSON.stringify(payload);
-      if (intentRef.current?.fingerprint !== fingerprint) {
-        intentRef.current = {
-          fingerprint,
-          key: `inventory-product-update:${productoId}:${crypto.randomUUID()}`,
-        };
+      const scope={tenantId,actorId,productId:productoId},key=productUpdateIntentKey(scope);
+      const previous=localStorage.getItem(key),stored=readProductUpdateIntent(previous,scope);
+      const candidate:ProductUpdateIntent=pendingIntent||{...scope,version:1,createdAt:new Date().toISOString(),stage:'UPDATE',
+        payload:JSON.parse(JSON.stringify({...payload,idempotency_key:`inventory-product-update:${productoId}:${crypto.randomUUID()}`})),
+        original:original!,removeImage:removeCurrentImage&&!!currentImageUrl,imageKey:`inventory-product-image-${productImage?'upload':'delete'}:${productoId}:${crypto.randomUUID()}`,
+        ...(productImage?{image:await preserveProductImage(productImage)}:{})};
+      if(!current())return;
+      let serialized=JSON.stringify(candidate),intent=readProductUpdateIntent(serialized,scope);
+      if(!intent||stored&&JSON.stringify(stored)!==serialized)throw new Error('Hay otro cambio pendiente del producto. Sus datos se conservan.');
+      const file=intent.image?await recoveredProductImage(intent):null;if(!current())return;
+      const persist=(value:ProductUpdateIntent,expected:string|null)=>{
+        if(localStorage.getItem(key)!==expected)throw new Error('El cambio pendiente del producto cambió. Sus datos se conservan.');
+        const raw=JSON.stringify(value);localStorage.setItem(key,raw);
+        if(localStorage.getItem(key)!==raw)throw new Error('No se pudo conservar el cambio antes del envío.');
+        setPendingIntent(value);return raw;
+      };
+      serialized=persist(intent,previous);
+      if(intent.stage==='UPDATE'){
+        const response=await put(`/inventario/productos/${productoId}`,intent.payload);if(!current())return;
+        const next=confirmProductUpdated(response,scope,intent);
+        if(next.stage!=='UPDATE'){serialized=persist(next,serialized);intent=next}
       }
-      const response = await put(
-        `/inventario/productos/${params.id}`,
-        { ...payload, idempotency_key: intentRef.current.key },
-      );
-
-      if (response?.success) {
-        if (productImage) {
-          const imageFingerprint = [
-            productImage.name,
-            productImage.type,
-            productImage.size,
-            productImage.lastModified,
-          ].join(":");
-          if (imageIntentRef.current?.fingerprint !== imageFingerprint) {
-            imageIntentRef.current = {
-              fingerprint: imageFingerprint,
-              key: `inventory-product-image-upload:${productoId}:${crypto.randomUUID()}`,
-            };
-          }
-          await uploadProductImage(
-            apiCall,
-            productoId!,
-            productImage,
-            imageIntentRef.current.key,
-          );
-        } else if (removeCurrentImage && currentImageUrl) {
-          deleteImageIntentRef.current ??=
-            `inventory-product-image-delete:${productoId}:${crypto.randomUUID()}`;
-          await deleteProductImage(
-            apiCall,
-            productoId!,
-            deleteImageIntentRef.current,
-          );
-        }
-        alert("✅ Producto actualizado exitosamente");
-        router.push("/dashboard/inventario/productos");
-      } else {
-        throw new Error(response?.message || "Error al actualizar producto");
+      if(intent.stage!=='UPDATE'){
+        const response=intent.stage==='IMAGE_UPLOAD'?await uploadProductImage(apiCall,productoId,file!,intent.imageKey):await deleteProductImage(apiCall,productoId,intent.imageKey);
+        if(!current())return;confirmUpdatedProductImage(response,scope,intent);
       }
+      if(localStorage.getItem(key)!==serialized)throw new Error('El cambio pendiente del producto cambió. Sus datos se conservan.');
+      localStorage.removeItem(key);if(localStorage.getItem(key)!==null)throw new Error('No se pudo retirar el cambio confirmado. Reintenta para confirmar su resultado.');
+      setPendingIntent(null);alert('✅ Producto actualizado exitosamente');router.push('/dashboard/inventario/productos');
     } catch (error: any) {
-      console.error("Error:", error);
-      alert(`❌ Error: ${error.message}`);
+      if(current())setOperationError(error.message||'No se pudo confirmar el cambio; sus datos se conservan.');
     } finally {
-      setIsLoading(false);
+      if(current()){setIsLoading(false);inflight.current=false}
     }
   };
 
@@ -199,14 +222,29 @@ export default function EditarProductoPage() {
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
     >,
   ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    const { name } = e.target;
+    const value = e.target instanceof HTMLInputElement && e.target.type === 'checkbox'
+      ? e.target.checked : e.target.value;
+    setFormData((prev) => {
+      const next = { ...prev, [name]: value };
+      if ((name === 'esServicio' && value === true) || (name === 'unidadMedida' && value === 'ZZ')) {
+        next.esServicio = true;
+        next.controlaStock = false;
+      }
+      return next;
+    });
   };
 
-  if (loading) {
+  const back=<button onClick={()=>router.push('/dashboard/inventario/productos')}>Volver a Productos</button>;
+  if(scopeReady&&recoveryError)return <div data-testid="product-update-recovery-error" role="alert" className="space-y-4 p-6">{recoveryError}{back}</div>;
+  if(visibleIntent)return <div data-testid="product-update-pending" className="space-y-4 p-6">
+    <h1>Cambio de producto pendiente de confirmación</h1><p>{visibleIntent.payload.codigo} — {visibleIntent.payload.nombre}</p><p>Marca: {visibleIntent.payload.marca||'Sin marca'}</p>
+    <p>{visibleIntent.stage==='UPDATE'?'Reintenta para confirmar el cambio con los datos conservados.':visibleIntent.stage==='IMAGE_UPLOAD'?'El cambio está confirmado; falta confirmar la nueva imagen.':'El cambio está confirmado; falta confirmar la retirada de la imagen.'}</p>
+    {visibleIntent.image&&<p>Imagen conservada: {visibleIntent.image.name} ({visibleIntent.image.size} bytes)</p>}{operationError&&<p role="alert">{operationError}</p>}
+    <ProtectedComponent modulo="inventario" accion="update" recurso="productos"><button onClick={handleSubmit} disabled={isLoading} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">{isLoading?'Procesando...':'Reintentar cambio pendiente'}</button></ProtectedComponent>{back}
+  </div>;
+  if(scopeReady&&sourceError)return <div data-testid="product-update-source-error" role="alert" className="space-y-4 p-6">{sourceError}<button onClick={loadProducto}>Reintentar producto y categorías</button>{back}</div>;
+  if (!scopeReady || loading) {
     return (
       <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
         <div className="flex min-h-48 items-center justify-center">
@@ -238,7 +276,9 @@ export default function EditarProductoPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className={camposClass}>
+      <ProtectedComponent modulo="inventario" accion="update" recurso="productos" fallback={<p>No tienes permiso para editar productos.</p>}>
+      <form onSubmit={handleSubmit} noValidate className={camposClass}>
+        {operationError&&<p role="alert">{operationError}</p>}
         <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl mb-8">
           <h2 className="m-0 text-lg font-bold text-foreground">Información Básica</h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -320,6 +360,18 @@ export default function EditarProductoPage() {
             </p>
           </div>
 
+          <div className="mt-4 space-y-3">
+            <label htmlFor="editar-es-servicio" className="flex items-center gap-2">
+              <input id="editar-es-servicio" name="esServicio" type="checkbox" checked={formData.esServicio} onChange={handleChange} />
+              Es un servicio
+            </label>
+            <label htmlFor="editar-controla-stock" className="flex items-center gap-2">
+              <input id="editar-controla-stock" name="controlaStock" type="checkbox" checked={formData.controlaStock} disabled={formData.esServicio} onChange={handleChange} />
+              Controlar stock
+            </label>
+            <p className="text-xs text-muted-foreground">Los servicios no controlan stock. El sistema rechaza desactivar su control si el producto conserva existencias o reservas.</p>
+          </div>
+
           <div className="mt-4">
             <label htmlFor="editar-descripcion">Descripción</label>
             <textarea id="editar-descripcion"
@@ -360,13 +412,10 @@ export default function EditarProductoPage() {
             onFileChange={(file) => {
               setProductImage(file);
               setRemoveCurrentImage(false);
-              imageIntentRef.current = null;
             }}
             onRemoveCurrent={() => {
               setProductImage(null);
               setRemoveCurrentImage(true);
-              imageIntentRef.current = null;
-              deleteImageIntentRef.current = null;
             }}
           />
         </div>
@@ -464,6 +513,7 @@ export default function EditarProductoPage() {
               <label htmlFor="editar-stock-minimo">Stock Mínimo</label>
               <input id="editar-stock-minimo"
                 type="number"
+                step="0.000001"
                 name="stockMinimo"
                 value={formData.stockMinimo}
                 onChange={handleChange}
@@ -502,6 +552,7 @@ export default function EditarProductoPage() {
           </button>
         </div>
       </form>
+      </ProtectedComponent>
     </div>
   );
 }

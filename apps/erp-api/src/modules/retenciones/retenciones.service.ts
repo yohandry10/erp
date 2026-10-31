@@ -16,6 +16,7 @@ import {
   RegistrarAjusteFiscalDto,
   RegistrarAnticipoDto,
   RevertirAjusteFiscalCxcDto,
+  RevertirDetraccionProveedorDto,
   TipoAjusteFiscal,
 } from './dto/retenciones-input.dto';
 
@@ -174,6 +175,26 @@ export class RetencionesService {
       },
     );
     if (error) this.throwDatabaseError(error, 'No se pudo depositar la detracción');
+    return { success: true, data };
+  }
+
+  async revertirDetraccionProveedor(tenantId: string, operacionId: string, actorId: string | undefined, dto: RevertirDetraccionProveedorDto) {
+    this.assertActor(actorId);
+    const { idempotency_key, ...payload } = dto;
+    const { data, error } = await this.supabase.getClient().rpc('revertir_detraccion_proveedor_pendiente_tx', {
+      p_tenant_id: tenantId, p_actor_id: actorId, p_operacion_id: operacionId,
+      p_payload: { ...payload, motivo: payload.motivo.trim() }, p_idempotency_key: idempotency_key.trim(),
+    });
+    if (error) {
+      const messages: Record<string, string> = {
+        SUPPLIER_DETRACTION_REVERSAL_PAYLOAD_INVALID: 'Complete la fecha y el motivo de la reversión.',
+        SUPPLIER_DETRACTION_REVERSAL_NOT_FOUND: 'No se encontró una detracción de proveedor en esta empresa.',
+        SUPPLIER_DETRACTION_ALREADY_SETTLED_OR_REVERSED: 'Sólo se revierte una detracción aún no depositada. La fecha no puede ser anterior al registro.',
+        SUPPLIER_DETRACTION_SOURCE_INVALID: 'La detracción no coincide con la deuda y el proveedor; revise el documento original.',
+        SUPPLIER_DETRACTION_REVERSAL_IDEMPOTENCY_CONFLICT: 'Esta reversión ya se registró con otros datos.',
+      };
+      this.throwDatabaseError({ ...error, message: messages[error.message] ?? error.message }, 'No se pudo revertir la detracción pendiente');
+    }
     return { success: true, data };
   }
 

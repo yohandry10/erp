@@ -12,6 +12,7 @@ import { Proveedor } from '@/types/compras'
 import { cn } from '@/lib/utils'
 import { parseDateLocal } from '@/lib/date-utils'
 import { multiplicarMoneda, redondearMoneda } from '@/lib/format-utils'
+import { isPurchaseQuantity, isPurchaseUnitPrice } from '@/lib/compras/quantity'
 
 const fieldLabelClass = 'mb-2 block text-sm font-medium text-foreground/85'
 const requiredMarkClass = 'text-muted-foreground'
@@ -60,10 +61,10 @@ export function CotizacionCompraWizard({
   const [proveedores, setProveedores] = useState<Proveedor[]>([])
   const [productos, setProductos] = useState<any[]>([])
   const [detalles, setDetalles] = useState<ProductoDetalle[]>([])
-  const [loadingProveedores, setLoadingProveedores] = useState(false)
-  const [loadingProductos, setLoadingProductos] = useState(false)
+  const [loadingCatalogos, setLoadingCatalogos] = useState(true)
+  const [catalogError, setCatalogError] = useState(false)
   const createIdempotencyKeyRef = useRef<string | null>(null)
-  const { get } = useApi()
+  const { get } = useApi({ throwOnError: true, showErrorToast: false })
 
   const {
     register,
@@ -84,40 +85,33 @@ export function CotizacionCompraWizard({
 
   const formData = watch()
 
-  const loadProveedores = useCallback(async () => {
+  const loadCatalogos = useCallback(async () => {
     try {
-      setLoadingProveedores(true)
-      const response = await get('/api/compras/proveedores?activo=true')
-      if (response?.success) {
-        setProveedores(response.data || [])
+      setLoadingCatalogos(true)
+      setCatalogError(false)
+      const [suppliers, products] = await Promise.all([
+        get('/api/compras/proveedores?activo=true'),
+        get('/api/inventario/productos'),
+      ])
+      if (!suppliers?.success || !Array.isArray(suppliers.data)
+        || !products?.success || !Array.isArray(products.data)) {
+        throw new Error('Catálogos de compras incompletos')
       }
+      setProveedores(suppliers.data)
+      setProductos(products.data)
     } catch (error) {
-      console.error('Error loading proveedores:', error)
+      setCatalogError(true)
     } finally {
-      setLoadingProveedores(false)
-    }
-  }, [get])
-
-  const loadProductos = useCallback(async () => {
-    try {
-      setLoadingProductos(true)
-      const response = await get('/api/inventario/productos')
-      if (response?.success) {
-        setProductos(response.data || [])
-      }
-    } catch (error) {
-      console.error('Error loading productos:', error)
-    } finally {
-      setLoadingProductos(false)
+      setLoadingCatalogos(false)
     }
   }, [get])
 
   useEffect(() => {
-    loadProveedores()
-    loadProductos()
-  }, [loadProductos, loadProveedores])
+    loadCatalogos()
+  }, [loadCatalogos])
 
   const handleNext = () => {
+    if (loadingCatalogos || catalogError || isLoading) return
     if (currentStep === 1) {
       handleSubmit(() => setCurrentStep(2))()
     } else if (currentStep === 2) {
@@ -165,6 +159,7 @@ export function CotizacionCompraWizard({
   }
 
   const handleFinalSubmit = async () => {
+    if (loadingCatalogos || catalogError || isLoading) return
     const { subtotal, igv, total } = calculateTotals()
 
     if (!createIdempotencyKeyRef.current) {
@@ -197,6 +192,14 @@ export function CotizacionCompraWizard({
 
   return (
     <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
+      {catalogError && (
+        <div role="alert" className="mb-4 rounded-lg border border-border p-4">
+          <p>No se pudieron cargar los catálogos. Reintenta para continuar.</p>
+          <button type="button" onClick={loadCatalogos} disabled={loadingCatalogos}>
+            Reintentar catálogos
+          </button>
+        </div>
+      )}
       {/* Wizard Header */}
       <div className="mb-8">
         <h2 className="mb-4 text-2xl font-semibold text-foreground">
@@ -265,7 +268,7 @@ export function CotizacionCompraWizard({
               <select id="cotizacioncomprawizard-proveedor"
                 {...register('proveedor_id')}
                 className={cn(fieldBaseClass, errors.proveedor_id ? fieldErrorClass : fieldNormalClass)}
-                disabled={loadingProveedores}
+                disabled={loadingCatalogos || catalogError}
               >
                 <option value="">Seleccione un proveedor</option>
                 {proveedores.map(p => (
@@ -335,7 +338,7 @@ export function CotizacionCompraWizard({
           detalles={detalles}
           onAddProducto={handleAddProducto}
           onRemoveProducto={handleRemoveProducto}
-          loadingProductos={loadingProductos}
+          loadingProductos={loadingCatalogos || catalogError}
         />
       )}
 
@@ -366,6 +369,7 @@ export function CotizacionCompraWizard({
           <button
             type="button"
             onClick={handleNext}
+            disabled={isLoading || loadingCatalogos || catalogError}
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 flex items-center gap-2 px-6 py-3"
           >
             Siguiente
@@ -375,7 +379,7 @@ export function CotizacionCompraWizard({
           <button
             type="button"
             onClick={handleFinalSubmit}
-            disabled={isLoading}
+            disabled={isLoading || loadingCatalogos || catalogError}
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 flex items-center gap-2 px-6 py-3 disabled:cursor-not-allowed disabled:opacity-70"
           >
             <Check size={16} />
@@ -399,18 +403,20 @@ function Step2AddProducts({
   const [selectedProducto, setSelectedProducto] = useState('')
   const [cantidad, setCantidad] = useState(1)
   const [precio, setPrecio] = useState(0)
+  const [lineError, setLineError] = useState('')
 
   const handleAdd = () => {
+    setLineError('')
     if (!selectedProducto) {
       alert('Seleccione un producto')
       return
     }
-    if (cantidad <= 0) {
-      alert('La cantidad debe ser mayor a 0')
+    if (!isPurchaseQuantity(cantidad)) {
+      setLineError('La cantidad debe ser positiva y tener como máximo dos decimales.')
       return
     }
-    if (precio < 0) {
-      alert('El precio no puede ser negativo')
+    if (!isPurchaseUnitPrice(precio)) {
+      setLineError('El precio debe ser no negativo y tener como máximo dos decimales.')
       return
     }
 
@@ -432,6 +438,7 @@ function Step2AddProducts({
 
   return (
     <div className="min-h-[400px]">
+      {lineError && <p role="alert">{lineError}</p>}
       <h3 className="mb-6 text-lg font-semibold text-foreground">
         Agregar Productos
       </h3>

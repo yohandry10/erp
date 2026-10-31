@@ -1,3 +1,4 @@
+import { fiscalCountryFixture } from './fixtures/fiscal-country'
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { SignJWT } from 'jose'
 import fs from 'node:fs'
@@ -139,16 +140,15 @@ test.describe('POS Argentina conserva identidad fiscal de cliente en UI → HTTP
           })
 
         if (/\/api\/auth\/profile\/?$/.test(pathname)) return json(user)
-        if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
-          return json({
-            data: {
+        if (pathname.replace(/\/$/, '') === '/api/tenants/me') return json({ data: { id: user.tenant_id, nombre: 'Empresa aislada', estado: 'ACTIVO' } });
+    if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
+          return json(fiscalCountryFixture(user.tenant_id, {
               pais_id: 5,
               pais: 'AR',
               paisCodigo: 'AR',
               monedaDefecto: 'ARS',
               igvPorcentaje: 21,
-            },
-          })
+            }))
         }
         if (/\/api\/demo\/status\/?$/.test(pathname)) {
           return json({ is_demo: true, is_expired: false, dias_restantes: 10 })

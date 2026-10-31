@@ -12,6 +12,7 @@ import ClienteSelector from './ClienteSelector'
 import { Plus, Trash2, Package } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
 import { multiplicarMoneda, redondearMoneda } from '@/lib/format-utils'
+import { reviewCommercialPrices } from '@/lib/ventas/commercial-prices'
 
 interface Producto {
   id: string
@@ -61,6 +62,7 @@ export default function CotizacionForm({
   disabled = false
 }: CotizacionFormProps) {
   const { get } = useApi()
+  const { post: resolvePrices } = useApi({ throwOnError: true, showErrorToast: false })
   const { tasaIgv, nombreImpuesto } = useTaxConfig()
   const country = useCountryContext()
   const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$')
@@ -248,6 +250,20 @@ export default function CotizacionForm({
 
     try {
       setSubmitting(true)
+
+      if (country.paisCodigo === 'PE') {
+        const prices = await resolvePrices('/api/ventas/comercial/precios/resolver', {
+          cliente_id: clienteId, vendedor_id: (cotizacion as any)?.created_by || undefined,
+          moneda: (cotizacion as any)?.moneda || country.moneda,
+          detalle: detalle.map(({ producto_id, cantidad, precio_unitario }) => ({ producto_id, cantidad, precio_unitario })),
+        })
+        const review = reviewCommercialPrices(detalle, prices)
+        if (review.changed) {
+          setDetalle(review.lines)
+          toast({ title: 'Precios vigentes actualizados', description: 'Revisa el total y vuelve a confirmar el guardado.' })
+          return
+        }
+      }
 
       const formData: CotizacionFormData = {
         cliente_id: clienteId,

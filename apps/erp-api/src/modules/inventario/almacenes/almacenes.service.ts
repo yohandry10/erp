@@ -1,5 +1,6 @@
 import { Injectable, InternalServerErrorException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { readCompleteCatalog } from '../../../shared/utils/complete-catalog-read';
 
 export interface Almacen {
   id: string;
@@ -31,21 +32,8 @@ export class AlmacenesService {
   constructor(private readonly supabase: SupabaseService) {}
 
   async listar(tenantId: string, includeInactive = false): Promise<Almacen[]> {
-    let query = this.supabase
-      .getClient()
-      .from('almacenes')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .order('es_principal', { ascending: false })
-      .order('nombre', { ascending: true });
-    if (!includeInactive) query = query.eq('activo', true);
-    const { data, error } = await query;
-
-    if (error) {
-      throw new InternalServerErrorException(`Error al listar almacenes: ${error.message}`);
-    }
-
-    return (data as Almacen[] | null) ?? [];
+    return readCompleteCatalog(this.supabase.getClient(),'almacenes','*',q=>includeInactive?q.eq('tenant_id',tenantId):q.eq('tenant_id',tenantId).eq('activo',true),
+      r=>r.tenant_id===tenantId&&typeof r.nombre==='string'&&!!r.nombre.trim()&&typeof r.activo==='boolean'&&(includeInactive||r.activo),[['es_principal',false],['nombre',true],['id',true]]);
   }
 
   async listarUbicaciones(

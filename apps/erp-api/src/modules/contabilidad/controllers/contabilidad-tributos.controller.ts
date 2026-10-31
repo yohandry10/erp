@@ -23,7 +23,10 @@ class CalcularTributoMensualDto implements AjustesTributariosMensuales {
   @IsOptional() @IsNumber() @Min(0) retenciones_igv?: number;
   @IsOptional() @IsNumber() @Min(0) percepciones_igv?: number;
   @IsOptional() @IsNumber() @Min(0) otros_creditos_igv?: number;
-  @IsOptional() @IsNumber() @Min(0) @Max(1) coeficiente_renta?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(1) coeficiente_renta?: number | null;
+  @IsOptional() @IsNumber() @Min(0) otros_ingresos_renta_mes?: number;
+  @IsOptional() @IsNumber() @Min(0) otros_ingresos_renta_acumulados?: number;
+  @IsOptional() @IsString() sustento_renta?: string;
   @IsOptional() @IsString() notas?: string;
 }
 

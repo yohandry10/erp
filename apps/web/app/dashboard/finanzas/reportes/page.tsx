@@ -19,6 +19,7 @@ type ReportType = 'aging-cxp' | 'flujo-caja' | 'movimientos' | 'conciliaciones' 
 
 export default function ReportesFinanzasPage() {
   const [selectedReport, setSelectedReport] = useState<ReportType>('aging-cxp')
+  const [reportReady, setReportReady] = useState(false)
   const [proveedorFilter, setProveedorFilter] = useState<string>('')
 
   const reports = [
@@ -65,11 +66,11 @@ export default function ReportesFinanzasPage() {
   ]
 
   const handleExport = () => {
-    window.print()
+    if (reportReady) window.print()
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+    <div data-print-page="financial-reports" className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
       {/* Header */}
       <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8 print:shadow-none">
         <div>
@@ -77,7 +78,7 @@ export default function ReportesFinanzasPage() {
           <p className="mt-2 text-base text-muted-foreground">Análisis y reportes del módulo de finanzas</p>
         </div>
         <button
-          onClick={handleExport} className="py-3 px-6 rounded-lg border bg-card cursor-pointer flex items-center gap-2 text-[0.875rem] font-semibold text-foreground/85 transition print:hidden"
+          disabled={!reportReady} onClick={handleExport} className="py-3 px-6 rounded-lg border bg-card cursor-pointer flex items-center gap-2 text-[0.875rem] font-semibold text-foreground/85 transition print:hidden disabled:cursor-not-allowed disabled:opacity-50"
           onMouseEnter={(e) => {
             e.currentTarget.style.background = '#f9fafb'
           }}
@@ -99,7 +100,7 @@ export default function ReportesFinanzasPage() {
           return (
             <button
               key={report.id}
-              onClick={() => report.available && setSelectedReport(report.id)}
+              onClick={() => { if (report.available && report.id !== selectedReport) { setReportReady(false); setSelectedReport(report.id) } }}
               disabled={!report.available} className="p-6 rounded-xl text-left transition relative"
               onMouseEnter={(e) => {
                 if (report.available && !isSelected) {
@@ -140,23 +141,23 @@ export default function ReportesFinanzasPage() {
       {/* Report Content */}
       <div>
         {selectedReport === 'aging-cxp' && (
-          <AgingCxpChart proveedorId={proveedorFilter || undefined} />
+          <AgingCxpChart proveedorId={proveedorFilter || undefined} onReadyChange={setReportReady} />
         )}
 
         {selectedReport === 'proveedores-deuda' && (
-          <ProveedoresMayorDeudaReport limite={20} />
+          <ProveedoresMayorDeudaReport limite={20} onReadyChange={setReportReady} />
         )}
 
         {selectedReport === 'movimientos' && (
-          <MovimientosBancariosReport />
+          <MovimientosBancariosReport onReadyChange={setReportReady} />
         )}
 
         {selectedReport === 'conciliaciones' && (
-          <ConciliacionesPendientesReport />
+          <ConciliacionesPendientesReport onReadyChange={setReportReady} />
         )}
 
         {selectedReport === 'flujo-caja' && (
-          <FlujoCajaChart diasProyeccion={90} />
+          <FlujoCajaChart diasProyeccion={90} onReadyChange={setReportReady} />
         )}
       </div>
     </div>

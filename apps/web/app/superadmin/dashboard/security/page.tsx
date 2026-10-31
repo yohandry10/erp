@@ -51,7 +51,10 @@ interface Alert {
   acknowledged: boolean
 }
 
-const toArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? value : [])
+const toArray = <T,>(value: unknown): T[] => {
+  if (!Array.isArray(value)) throw new Error('Respuesta de seguridad incompleta')
+  return value
+}
 
 const unwrapArrayResponse = <T,>(response: any): T[] => toArray<T>(Array.isArray(response?.data) ? response.data : response)
 
@@ -72,6 +75,8 @@ export default function SecurityDashboard() {
   const [unacknowledgedAlerts, setUnacknowledgedAlerts] = useState<Alert[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedPeriod, setSelectedPeriod] = useState(7)
+  const [loadError, setLoadError] = useState(false)
+  const [reload, setReload] = useState(0)
 
   useEffect(() => {
     if (!tenantLoading && !isSuperAdmin) {
@@ -80,10 +85,12 @@ export default function SecurityDashboard() {
   }, [isSuperAdmin, tenantLoading, router])
 
   useEffect(() => {
+    let current = true
     const fetchData = async () => {
       if (!isSuperAdmin) return
 
       setLoading(true)
+      setLoadError(false)
       try {
         const [statsRes, tablesRes, violationsRes, alertsRes] = await Promise.all([
           get(`/security/dashboard/stats?days=${selectedPeriod}`),
@@ -92,19 +99,34 @@ export default function SecurityDashboard() {
           get('/security/dashboard/alerts-unacknowledged'),
         ])
 
-        setStats(statsRes?.data || statsRes)
-        setViolationsByTable(unwrapArrayResponse<ViolationByTable>(tablesRes))
-        setRecentViolations(unwrapArrayResponse<RecentViolation>(violationsRes))
-        setUnacknowledgedAlerts(unwrapArrayResponse<Alert>(alertsRes))
+        const nextStats = statsRes?.data ?? statsRes
+        const metrics = ['totalViolations', 'criticalViolations', 'uniqueUsers', 'tablesAffected', 'totalAlerts', 'unacknowledgedAlerts']
+        if (!nextStats || typeof nextStats.period !== 'string' || metrics.some(key => !Number.isSafeInteger(nextStats[key]) || nextStats[key] < 0)) {
+          throw new Error('Estadísticas de seguridad incompletas')
+        }
+        const nextTables = unwrapArrayResponse<ViolationByTable>(tablesRes)
+        const nextViolations = unwrapArrayResponse<RecentViolation>(violationsRes)
+        const nextAlerts = unwrapArrayResponse<Alert>(alertsRes)
+        if (!current) return
+        setStats(nextStats)
+        setViolationsByTable(nextTables)
+        setRecentViolations(nextViolations)
+        setUnacknowledgedAlerts(nextAlerts)
       } catch (error) {
-        console.error('Error fetching security data:', error)
+        if (!current) return
+        setStats(null)
+        setViolationsByTable([])
+        setRecentViolations([])
+        setUnacknowledgedAlerts([])
+        setLoadError(true)
       } finally {
-        setLoading(false)
+        if (current) setLoading(false)
       }
     }
 
     fetchData()
-  }, [isSuperAdmin, get, selectedPeriod])
+    return () => { current = false }
+  }, [isSuperAdmin, get, selectedPeriod, reload])
 
   if (tenantLoading || !user) {
     return (
@@ -164,7 +186,7 @@ export default function SecurityDashboard() {
 
         {/* Period Selector */}
         <div>
-          <label htmlFor="security-periodo">Período</label>
+          <label htmlFor="security-periodo">Período de estadísticas</label>
           <select id="security-periodo" value={selectedPeriod} onChange={(e) => setSelectedPeriod(Number(e.target.value))}>
             <option value={1}>Últimas 24 horas</option>
             <option value={7}>Últimos 7 días</option>
@@ -178,6 +200,14 @@ export default function SecurityDashboard() {
         <div className="text-center py-12 px-0">
           <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
           <p className="text-[var(--primary-500)]">Cargando datos de seguridad...</p>
+        </div>
+      ) : loadError ? (
+        <div role="alert" className="rounded-xl border border-border bg-card p-6 text-foreground">
+          <p>No se pudieron cargar los datos de seguridad.</p>
+          <p className="mt-2 text-muted-foreground">Reintenta la consulta para ver las estadísticas y alertas actuales.</p>
+          <button type="button" onClick={() => setReload(value => value + 1)} className="mt-4 rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+            Reintentar consulta
+          </button>
         </div>
       ) : (
         <>
@@ -289,7 +319,7 @@ export default function SecurityDashboard() {
             <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
               {violationsByTable.length === 0 ? (
                 <div className="px-4 py-10 text-center text-muted-foreground">
-                  <h3>✅ No se detectaron violaciones en el período seleccionado</h3>
+                  <h3>✅ No hay violaciones registradas</h3>
                 </div>
               ) : (
                 <table>
