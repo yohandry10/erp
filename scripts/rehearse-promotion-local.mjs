@@ -2,7 +2,8 @@
 // restaurado en un contenedor sin red. La cadena desde cero no prueba esto: aquí
 // hay datos, así que se ven backfills, bloqueos y filas alteradas.
 //
-//   node scripts/rehearse-promotion-local.mjs --dump <respaldo.dump> --desde 570 --hasta 590 [--conservar]
+//   node scripts/rehearse-promotion-local.mjs --backup artifacts/peru-prod-backup-<id>.json --desde 570 --hasta 590 [--conservar]
+//   (o --dump <respaldo.dump> para un archivo suelto; la promoción exige --backup)
 //
 // Nunca conecta con PROD. El informe sólo lleva nombres de tabla, conteos y
 // huellas; ni filas ni datos de empresas.
@@ -11,6 +12,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import {
+  compararEstados, conRollbackForzado, construirLote, consultaCatalogo, consultaColumnas, consultaEsquema, consultaFunciones,
+  consultaHuellas, consultaSalud, leerHuellas, sha256,
+} from './ci/lote-promocion.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const opcion = (nombre) => {
@@ -18,7 +23,9 @@ const opcion = (nombre) => {
   assert.ok(i >= 0 && process.argv[i + 1], `Falta ${nombre}`);
   return process.argv[i + 1];
 };
-const dump = fs.realpathSync(opcion('--dump'));
+const manifiesto = process.argv.includes('--backup') ? JSON.parse(fs.readFileSync(path.resolve(root, opcion('--backup')), 'utf8')) : null;
+const dump = fs.realpathSync(manifiesto ? manifiesto.archive : opcion('--dump'));
+if (manifiesto) assert.equal(sha256(fs.readFileSync(dump)), manifiesto.sha256, 'El respaldo no coincide con su manifiesto');
 const desde = Number(opcion('--desde'));
 const hasta = Number(opcion('--hasta'));
 assert.ok(Number.isInteger(desde) && Number.isInteger(hasta) && desde <= hasta);
@@ -43,39 +50,15 @@ const migraciones = fs.readdirSync(dirMigraciones)
   .map((f) => ({ version: Number(f.split('__')[0]), archivo: f }))
   .sort((a, b) => a.version - b.version);
 const cuerpo = (archivo) => fs.readFileSync(path.join(dirMigraciones, archivo), 'utf8').replace(/^﻿/, '');
-// El lote corre en una sola transacción: cada migración pierde su BEGIN y COMMIT propios.
-const sinTransaccion = (archivo) => {
-  const t = cuerpo(archivo);
-  assert.equal((t.match(/^BEGIN;\s*$/gm) || []).length, 1, `${archivo}: se esperaba un BEGIN;`);
-  assert.equal((t.match(/^COMMIT;\s*$/gm) || []).length, 1, `${archivo}: se esperaba un COMMIT;`);
-  return t.replace(/^BEGIN;\s*$/m, '').replace(/^COMMIT;\s*$/m, '');
-};
 const sello = ({ version, archivo }) => `INSERT INTO supabase_migrations.schema_migrations(version,statements,name) VALUES('${version}',ARRAY['Ensayo de promoción de ${archivo}'],'${archivo.replace(/^\d+__/, '').replace(/\.sql$/, '')}');`;
 
-const ESQUEMAS = `('public','app','auth','storage')`;
-const columnasActuales = () => JSON.parse(sql(`SELECT coalesce(jsonb_object_agg(t,c),'{}') FROM (
-  SELECT table_schema||'.'||table_name t, jsonb_agg(column_name ORDER BY column_name) c
-  FROM information_schema.columns c JOIN pg_class k ON k.relname=c.table_name
-  JOIN pg_namespace n ON n.oid=k.relnamespace AND n.nspname=c.table_schema
-  WHERE table_schema IN ${ESQUEMAS} AND k.relkind='r' AND coalesce(c.is_generated,'NEVER')='NEVER'
-  GROUP BY 1) q;`));
+const columnasActuales = () => JSON.parse(sql(consultaColumnas));
 const comilla = (x) => `"${x.replaceAll('"', '""')}"`;
 const tablaSql = (t) => t.split('.').map(comilla).join('.');
-// Huella de cada tabla con las columnas que tenía antes: añadir una columna no
-// la altera; cambiar un valor existente, sí.
-const huellas = (columnas) => {
-  const script = Object.entries(columnas).map(([t, cols]) => `SELECT '${t}'||chr(9)||count(*)||chr(9)||md5(coalesce(string_agg(x,'' ORDER BY x),'')) FROM (SELECT md5(ROW(${cols.map(comilla).join(',')})::text) x FROM ${tablaSql(t)}) q;`).join('\n');
-  const r = {};
-  for (const l of sql(script).split('\n').filter(Boolean)) {
-    const [t, n, h] = l.split('\t');
-    r[t] = { filas: Number(n), huella: h };
-  }
-  return r;
-};
-const catalogo = () => sql(`SELECT count(*)||'/'||md5(string_agg(n.nspname||'.'||p.proname||md5(p.prosrc),'' ORDER BY n.nspname,p.proname,p.oid::regprocedure::text))
-  FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname IN ${ESQUEMAS};`);
+const huellas = (columnas) => leerHuellas(sql(consultaHuellas(columnas)));
+const catalogo = () => sql(consultaCatalogo);
 
-const informe = { exito: false, redDelContenedor: 'none', conexionesRemotas: 0, desde, hasta, limites: ['Sin objetos de Storage ni roles globales reales; el tiempo local no acredita el de PROD.'] };
+const informe = { archiveSha256: manifiesto?.sha256 ?? sha256(fs.readFileSync(dump)), exito: false, redDelContenedor: 'none', conexionesRemotas: 0, desde, hasta, limites: ['Sin objetos de Storage ni roles globales reales; el tiempo local no acredita el de PROD.'] };
 fs.mkdirSync(salida, { recursive: true });
 let paso = 'crear contenedor';
 try {
@@ -101,7 +84,7 @@ try {
   const lista = docker(['exec', contenedor, 'pg_restore', '--list', '/tmp/fuente.dump']).split('\n').filter((l) => !/^\d+; \d+ \d+ SCHEMA - public /.test(l));
   docker(['exec', '-i', contenedor, 'sh', '-c', 'cat > /tmp/restaurar.lista'], lista.join('\n'));
   docker(['exec', contenedor, 'pg_restore', '-U', 'postgres', '-d', 'erp_e2e', '--no-owner', '--exit-on-error', '--single-transaction', '--use-list=/tmp/restaurar.lista', '/tmp/fuente.dump']);
-  informe.esquemaDelRespaldo = Number(sql(`SELECT max(version::integer) FROM supabase_migrations.schema_migrations WHERE version ~ '^[0-9]+$';`));
+  informe.esquemaDelRespaldo = Number(sql(consultaEsquema));
   informe.entornoDelRespaldo = sql('SELECT environment FROM app.deployment_environment WHERE singleton;');
 
   paso = 'llevar el respaldo hasta la versión anterior al lote';
@@ -112,18 +95,19 @@ try {
   }
 
   paso = 'huella inicial';
-  const lote = migraciones.filter((m) => m.version >= desde && m.version <= hasta);
-  assert.equal(lote.at(-1).version, hasta);
+  const lote = construirLote(root, desde, hasta);
+  informe.loteSha256 = lote.sha256;
+  informe.migraciones = lote.migraciones;
   const columnas = columnasActuales();
   const antes = huellas(columnas);
   const catalogoAntes = catalogo();
   informe.tablas = Object.keys(antes).length;
   informe.filas = Object.values(antes).reduce((s, x) => s + x.filas, 0);
-  const script = (final) => `BEGIN;\n${lote.map((m) => `${sinTransaccion(m.archivo)}\n${sello(m)}`).join('\n')}\n${final}`;
+  const funcionesAntes = JSON.parse(sql(consultaFunciones));
 
   paso = 'rollback forzado';
   let t0 = Date.now();
-  const forzado = sqlCrudo(script(`DO $f$ BEGIN RAISE EXCEPTION 'ENSAYO_ROLLBACK_FORZADO'; END $f$;\nCOMMIT;`));
+  const forzado = sqlCrudo(conRollbackForzado(lote.sql));
   informe.rollbackMs = Date.now() - t0;
   assert.ok(forzado.status !== 0 && forzado.stderr.includes('ENSAYO_ROLLBACK_FORZADO'), `El lote falló antes del rollback forzado: ${forzado.stderr.slice(0, 1500)}`);
   assert.deepEqual(huellas(columnas), antes, 'El rollback dejó datos cambiados');
@@ -134,24 +118,22 @@ try {
 
   paso = 'aplicar el lote';
   t0 = Date.now();
-  sql(script('COMMIT;'));
+  sql(lote.sql);
   informe.aplicarMs = Date.now() - t0;
-  informe.esquemaFinal = Number(sql(`SELECT max(version::integer) FROM supabase_migrations.schema_migrations WHERE version ~ '^[0-9]+$';`));
+  informe.esquemaFinal = Number(sql(consultaEsquema));
   assert.equal(informe.esquemaFinal, hasta);
 
   paso = 'comparar datos';
   const columnasDespues = columnasActuales();
   informe.tablasNuevas = Object.keys(columnasDespues).filter((t) => !columnas[t]).sort();
-  const tablasPerdidas = Object.keys(columnas).filter((t) => !columnasDespues[t]);
-  const columnasPerdidas = Object.entries(columnas).flatMap(([t, cs]) => cs.filter((c) => !columnasDespues[t]?.includes(c)).map((c) => `${t}.${c}`));
+  const comparables = Object.fromEntries(Object.entries(columnas).filter(([t]) => columnasDespues[t]).map(([t, cs]) => [t, cs.filter((c) => columnasDespues[t].includes(c))]));
+  const { tablasPerdidas, columnasPerdidas, tablasConDatosCambiados } = compararEstados(columnas, columnasDespues, antes, huellas(comparables));
   informe.tablasPerdidas = tablasPerdidas;
   informe.columnasPerdidas = columnasPerdidas;
-  const comparables = Object.fromEntries(Object.entries(columnas).filter(([t]) => !tablasPerdidas.includes(t)).map(([t, cs]) => [t, cs.filter((c) => columnasDespues[t].includes(c))]));
-  const antesComparable = columnasPerdidas.length ? null : antes;
-  const despues = huellas(comparables);
-  informe.tablasConDatosCambiados = Object.entries(despues)
-    .filter(([t, v]) => antesComparable && (antes[t].filas !== v.filas || antes[t].huella !== v.huella))
-    .map(([t, v]) => ({ tabla: t, antes: antes[t].filas, despues: v.filas, mismasFilas: antes[t].filas === v.filas }));
+  informe.tablasConDatosCambiados = tablasConDatosCambiados;
+  // Una función retirada dejaría sin servicio al API anterior mientras se despliega el nuevo.
+  const funcionesDespues = new Set(JSON.parse(sql(consultaFunciones)));
+  informe.funcionesPublicasRetiradas = funcionesAntes.filter((x) => !funcionesDespues.has(x));
   // Sólo nombres de columna y conteos: qué filas que ya existían cambiaron de valor o desaparecieron.
   for (const fila of informe.tablasConDatosCambiados) {
     const cols = comparables[fila.tabla];
@@ -164,7 +146,7 @@ try {
   }
 
   paso = 'salud y datos bancarios';
-  informe.salud = JSON.parse(sql(`SELECT jsonb_build_object('ready',s->'ready','requerido_aplicado',s#>'{contract,required_schema_applied}','esquema',s#>'{contract,schema_version}','cola_muerta',s#>'{backlog,dead_letter}') FROM (SELECT public.outbox_runtime_health_492(p_required_schema_version=>${hasta}) s) q;`));
+  informe.salud = JSON.parse(sql(consultaSalud(hasta)));
   informe.movimientosBancarios = JSON.parse(sql(`SELECT jsonb_build_object('total',count(*),'inactivos',count(*) FILTER (WHERE activo IS FALSE),'nulos',count(*) FILTER (WHERE activo IS NULL)) FROM public.movimientos_bancarios;`));
   informe.defaultActivo = sql(`SELECT column_default FROM information_schema.columns WHERE table_schema='public' AND table_name='movimientos_bancarios' AND column_name='activo';`);
 
@@ -175,10 +157,11 @@ try {
     const r = sqlCrudo(fs.readFileSync(path.join(dirVerificadores, archivo), 'utf8'));
     return { version: m.version, ok: r.status === 0, error: r.status === 0 ? null : (r.stderr.split('\n').find((l) => /ERROR|FATAL/.test(l)) || r.stderr).slice(0, 300) };
   };
-  for (const m of lote) informe.verificadores.push(verificar(m));
+  const delLote = lote.migraciones.map((archivo) => ({ version: Number(archivo.split('__')[0]) }));
+  for (const m of delLote) informe.verificadores.push(verificar(m));
   // Algunos se niegan a correr si la base se identifica como PROD; esta copia es local.
   sql("UPDATE app.deployment_environment SET environment='DEV', project_ref='localerpephemeralqax', allow_demo_data=true WHERE singleton;");
-  informe.verificadores = informe.verificadores.map((v) => (/_LOCAL_ONLY/.test(v.error ?? '') ? { ...verificar(lote.find((m) => m.version === v.version)), identidadLocal: true } : v));
+  informe.verificadores = informe.verificadores.map((v) => (/_LOCAL_ONLY/.test(v.error ?? '') ? { ...verificar({ version: v.version }), identidadLocal: true } : v));
   informe.verificadoresFallidos = informe.verificadores.filter((v) => !v.ok).length;
   informe.exito = informe.verificadoresFallidos === 0 && !tablasPerdidas.length && !columnasPerdidas.length;
 } catch (e) {
