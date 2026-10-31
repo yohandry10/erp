@@ -58,7 +58,7 @@ const FUNCIONES: Funcion[] = [
     rol: 'ADMIN',
     pasos: [
       { texto: 'Asignar a cada persona su perfil', ruta: '/dashboard/usuarios', pantalla: 'Usuarios' },
-      { texto: 'Ensayar, importar y conciliar la migración desde FOX', ruta: '/dashboard/migracion-fox', pantalla: 'Migración FOX' },
+      { texto: 'Ensayar, importar y conciliar la migración desde otro sistema', ruta: '/dashboard/migracion', pantalla: 'Migración de datos' },
       { texto: 'Emitir y revocar credenciales de Power BI', ruta: '/dashboard/tablero-suministro', pantalla: 'Tablero' },
     ],
   },

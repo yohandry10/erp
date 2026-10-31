@@ -10,17 +10,17 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { MigrationService } from './migration.service';
-import { FoxArchivoService } from './fox-archivo.service';
+import { OrigenArchivoService } from './archivo-origen.service';
 import {
-  FoxArchivoCierreDto,
-  FoxArchivoConsultaDto,
-  FoxArchivoDescarteDto,
-  FoxArchivoFilasDto,
-  FoxArchivoLoteDto,
-  FoxConciliacionDto,
-  FoxEnsayoDto,
-  MIGRATION_FOX_MAESTRO_RUN_TYPES,
-  MigrationFoxMaestroRunType,
+  OrigenArchivoCierreDto,
+  OrigenArchivoConsultaDto,
+  OrigenArchivoDescarteDto,
+  OrigenArchivoFilasDto,
+  OrigenArchivoLoteDto,
+  OrigenConciliacionDto,
+  OrigenEnsayoDto,
+  MIGRATION_ORIGEN_MAESTRO_RUN_TYPES,
+  MigrationOrigenMaestroRunType,
   MigrationImportDto,
   MigrationPreviewDto,
   MigrationRunType,
@@ -37,7 +37,7 @@ import {
 export class MigrationController {
   constructor(
     private readonly service: MigrationService,
-    private readonly archivo: FoxArchivoService,
+    private readonly archivo: OrigenArchivoService,
   ) {}
 
   @Get('templates/:runType')
@@ -169,25 +169,25 @@ export class MigrationController {
     return this.service.import('cronograma_suministro', body, tenantId, userId);
   }
 
-  /** Maestros y saldos abiertos FOX: almacenes, plan de cuentas, productos, bancos, listas, OC y pedidos. */
-  @Post('fox/:runType/import')
-  @RequirePermission('migration.fox.import')
+  /** Maestros y saldos abiertos del sistema anterior: almacenes, plan de cuentas, productos, bancos, listas, OC y pedidos. */
+  @Post('origen/:runType/import')
+  @RequirePermission('migration.origen.import')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  async importMaestroFox(
+  async importMaestroOrigen(
     @Param('runType') runType: string,
     @Body() body: MigrationImportDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
   ) {
-    if (!MIGRATION_FOX_MAESTRO_RUN_TYPES.includes(runType as MigrationFoxMaestroRunType))
-      throw new BadRequestException(`Maestro FOX no soportado: ${runType}`);
-    return this.service.import(runType as MigrationFoxMaestroRunType, body, tenantId, userId);
+    if (!MIGRATION_ORIGEN_MAESTRO_RUN_TYPES.includes(runType as MigrationOrigenMaestroRunType))
+      throw new BadRequestException(`Maestro no soportado: ${runType}`);
+    return this.service.import(runType as MigrationOrigenMaestroRunType, body, tenantId, userId);
   }
 
-  @Post('fox/archivo/lotes')
+  @Post('origen/archivo/lotes')
   @RequirePermission('migration.archivo.import')
   async crearLoteArchivo(
-    @Body() body: FoxArchivoLoteDto,
+    @Body() body: OrigenArchivoLoteDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') key?: string,
@@ -196,23 +196,23 @@ export class MigrationController {
   }
 
   /** Tandas de hasta 2000 filas: un extracto grande llega en muchas llamadas. */
-  @Post('fox/archivo/lotes/:id/filas')
+  @Post('origen/archivo/lotes/:id/filas')
   @RequirePermission('migration.archivo.import')
   @Throttle({ default: { limit: 600, ttl: 60000 } })
   async archivarFilas(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: FoxArchivoFilasDto,
+    @Body() body: OrigenArchivoFilasDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
   ) {
     return this.archivo.archivarFilas(tenantId, userId, id, body);
   }
 
-  @Post('fox/archivo/lotes/:id/cerrar')
+  @Post('origen/archivo/lotes/:id/cerrar')
   @RequirePermission('migration.archivo.import')
   async cerrarLoteArchivo(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: FoxArchivoCierreDto,
+    @Body() body: OrigenArchivoCierreDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') key?: string,
@@ -220,11 +220,11 @@ export class MigrationController {
     return this.archivo.cerrarLote(tenantId, userId, id, body, key);
   }
 
-  @Post('fox/archivo/lotes/:id/descartar')
+  @Post('origen/archivo/lotes/:id/descartar')
   @RequirePermission('migration.archivo.import')
   async descartarLoteArchivo(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: FoxArchivoDescarteDto,
+    @Body() body: OrigenArchivoDescarteDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') key?: string,
@@ -232,36 +232,36 @@ export class MigrationController {
     return this.archivo.descartarLote(tenantId, userId, id, body, key);
   }
 
-  @Get('fox/archivo')
+  @Get('origen/archivo')
   @RequirePermission('migration.archivo.read')
   @Throttle({ default: { limit: 120, ttl: 60000 } })
   async consultarArchivo(
-    @Query() query: FoxArchivoConsultaDto,
+    @Query() query: OrigenArchivoConsultaDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
   ) {
     return this.archivo.consultar(tenantId, userId, query);
   }
 
-  @Post('fox/ensayo')
-  @RequirePermission('migration.fox.import')
+  @Post('origen/ensayo')
+  @RequirePermission('migration.origen.import')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  async ensayoFox(
-    @Body() body: FoxEnsayoDto,
+  async ensayoOrigen(
+    @Body() body: OrigenEnsayoDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
   ) {
-    return this.service.ensayoFox(body, tenantId, userId);
+    return this.service.ensayoOrigen(body, tenantId, userId);
   }
 
-  @Post('fox/conciliacion')
+  @Post('origen/conciliacion')
   @RequirePermission('migration.validar.read')
-  async conciliacionFox(
-    @Body() body: FoxConciliacionDto,
+  async conciliacionOrigen(
+    @Body() body: OrigenConciliacionDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
   ) {
-    return this.service.conciliarFox(body.control, tenantId, userId);
+    return this.service.conciliarOrigen(body.control, tenantId, userId, body.sistemaOrigen);
   }
 
   @Get('runs')

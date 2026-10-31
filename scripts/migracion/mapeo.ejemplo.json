@@ -1,5 +1,5 @@
 {
-  "descripcion": "Ejemplo de mapeo FOX -> ERP. Los nombres de tablas y campos son supuestos: reemplazarlos con los del perfil real (perfil-fox.md).",
+  "descripcion": "Ejemplo de mapeo de un sistema anterior al ERP. Los nombres de tablas y campos son supuestos: reemplazarlos con los del perfil real (perfil-extracto.md).",
   "fechaCorte": "2026-10-31",
   "codificacion": "cp850",
   "salidas": {

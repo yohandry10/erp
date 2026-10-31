@@ -251,25 +251,27 @@ conservan el fallo cerrado por falta de handler.
 - Integraciones externas usan adaptadores y fallan cerrado en operaciones
   fiscales o financieras.
 
-Migración desde FOX (580): sustitución con fecha de corte, no convivencia. FOX
-no expone una API transaccional y mantener ambos sistemas exigiría definir
+Migración desde otro sistema (580): sustitución con fecha de corte, no convivencia. Un
+sistema anterior no tiene por qué exponer una API transaccional y mantener ambos exigiría definir
 dueño por dato, dirección de intercambio y resolución de conflictos sobre
 saldos que cambian a diario. Se migran saldos abiertos por los writers vigentes
-(contratos 570 e inventario) y la historia queda consultable en FOX. Cada
+(contratos 570 e inventario) y la historia queda consultable en el sistema anterior. Cada
 registro de origen se enlaza a su par del ERP con la huella de su contenido;
 un reintento idéntico no duplica y un cambio en el origen se rechaza. El
 ensayo completo corre en la base y se revierte, de modo que puede repetirse
-sin escribir.
+sin escribir. El proceso no conoce ningún sistema en particular: el origen es un
+dato que acompaña a cada migración, los registros de dos orígenes no se pisan y lo
+propio de cada sistema queda en un mapeo fuera del código.
 
 La 582 completa la sustitución en dos capas:
 
 - Archivo íntegro: un lote inmutable por extracto, que cierra sólo si lo
-  cargado coincide con lo leído, para que nada del FOX se pierda aunque no
+  cargado coincide con lo leído, para que nada del sistema anterior se pierda aunque no
   tenga equivalente operativo. Es consulta pura y sin efectos; las credenciales
   se redactan antes de cargar porque el archivo lo leen auditoría y gerencia.
 - Migración operativa: entra sólo por los writers vigentes, y el ERP adopta lo
   que ya tiene antes de crear. Nunca adivina: un código ambiguo o dos registros
-  FOX sobre un mismo registro del ERP son errores del registro.
+  de origen sobre un mismo registro del ERP son errores del registro.
 
 Reglas de cada saldo migrado:
 
@@ -277,7 +279,7 @@ Reglas de cada saldo migrado:
   contabilidad llega en el balance de apertura. Lleva su valor en moneda local
   y se cruza por cuenta contable con ese asiento.
 - Pedidos de venta: se crean con el writer base y no con el comercial, para
-  conservar el precio pactado en FOX.
+  conservar el precio pactado en el sistema anterior.
 - OC de compra: llegan en borrador para respetar la segregación de
   aprobación.
 

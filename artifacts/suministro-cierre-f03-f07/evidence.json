@@ -1,5 +1,5 @@
 {
-  "alcance": "Suministro ALKHOFAR F01-F07: migraciones 570-579, API, web y pruebas",
+  "alcance": "Suministro suministro F01-F07: migraciones 570-579, API, web y pruebas",
   "fecha": "2026-10-28",
   "entorno": "Sólo infraestructura local efímera; nada se aplicó en PROD",
   "sql": {
@@ -28,7 +28,7 @@
         "supply-tablero-feature"
       ],
       "resultado": "23 aprobadas, sin reintentos",
-      "capturas": "artifacts/alkhofar-f0*/browser/*.png (escritorio claro y móvil oscuro)"
+      "capturas": "artifacts/suministro-f0*/browser/*.png (escritorio claro y móvil oscuro)"
     }
   },
   "documentos": "scripts/check-docs-contract.mjs: 6 archivos canónicos, sin subdirectorios",

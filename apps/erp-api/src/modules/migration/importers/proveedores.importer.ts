@@ -10,7 +10,7 @@ const REQUIRED = ['external_id', 'tipo', 'tipo_documento', 'numero_documento', '
 const TIPOS = new Set(['PERSONA', 'EMPRESA']);
 const TIPOS_DOC = new Set(['DNI', 'RUC', 'CE', 'CEX', 'PASAPORTE', 'PAS']);
 
-/** Payload de importar_proveedor_historico_tx; el ensayo FOX integral usa el mismo. */
+/** Payload de importar_proveedor_historico_tx; el ensayo integral usa el mismo. */
 export function payloadProveedor(row: Record<string, string>): Record<string, any> {
   const tipoDoc = String(row['tipo_documento']).toUpperCase().trim();
   const numDocTexto = String(row['numero_documento']).trim();

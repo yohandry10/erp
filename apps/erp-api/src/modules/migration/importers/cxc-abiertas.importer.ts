@@ -21,7 +21,7 @@ const REQUIRED = [
 const TIPOS_DOC = new Set(['FACTURA', 'BOLETA', 'NOTA_CREDITO', 'NOTA_DEBITO', 'NC', 'ND', 'RECIBO', 'OTRO']);
 const MONEDAS = new Set(['PEN', 'USD', 'EUR']);
 
-/** Documento abierto sin tercero ni corte; CxP y el ensayo FOX integral lo reutilizan. */
+/** Documento abierto sin tercero ni corte; CxP y el ensayo integral lo reutilizan. */
 export function payloadDocumentoApertura(row: Record<string, string>) {
   return {
     tipo_documento: String(row['tipo_documento']).toUpperCase().trim(),

@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-// Perfil del extracto FOX: versión, formato, volumen, campos, claves
+// Perfil del extracto: versión, formato, volumen, campos, claves
 // candidatas, calidad y rango de históricos por tabla. Sólo lee.
 //
-// Uso: node scripts/fox/perfilar-fox.mjs <carpeta-del-extracto> [--salida <carpeta>] [--codificacion cp850]
+// Uso: node scripts/migracion/perfilar.mjs <carpeta-del-extracto> [--salida <carpeta>] [--codificacion cp850]
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { leerTabla } from './fox-dbf.mjs';
-import { CAMPO_SENSIBLE } from './archivar-fox.mjs';
+import { archivosExtracto, leerTabla } from './leer-extracto.mjs';
+import { CAMPO_SENSIBLE } from './archivar.mjs';
 
 const MAX_DISTINTOS = 50000;
 
@@ -80,8 +80,8 @@ export function perfilarTabla(tabla) {
 }
 
 export function perfilarCarpeta(carpeta, opciones = {}) {
-  const archivos = fs.readdirSync(carpeta).filter((f) => /\.(dbf|csv)$/i.test(f)).sort();
-  if (!archivos.length) throw new Error(`${carpeta}: no hay archivos .dbf ni .csv`);
+  const archivos = archivosExtracto(carpeta);
+  if (!archivos.length) throw new Error(`${carpeta}: no hay archivos .dbf, .csv, .tsv, .json, .jsonl ni .xlsx`);
   return {
     generado_en: new Date().toISOString(),
     carpeta: path.resolve(carpeta),
@@ -96,7 +96,7 @@ export function perfilarCarpeta(carpeta, opciones = {}) {
 }
 
 export function perfilMarkdown(perfil) {
-  const l = [`# Perfil del extracto FOX`, '', `Generado: ${perfil.generado_en}`, `Carpeta: ${perfil.carpeta}`, '',
+  const l = [`# Perfil del extracto`, '', `Generado: ${perfil.generado_en}`, `Carpeta: ${perfil.carpeta}`, '',
     '| Tabla | Formato | Registros | Borrados | Claves candidatas | Histórico |', '| --- | --- | ---: | ---: | --- | --- |'];
   for (const t of perfil.tablas) {
     if (t.error) { l.push(`| ${t.archivo} | ERROR: ${t.error} | | | | |`); continue; }
@@ -115,14 +115,14 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const args = process.argv.slice(2);
   const carpeta = args.find((a) => !a.startsWith('--') && args[args.indexOf(a) - 1] !== '--salida' && args[args.indexOf(a) - 1] !== '--codificacion');
   if (!carpeta) {
-    console.error('Uso: node scripts/fox/perfilar-fox.mjs <carpeta-del-extracto> [--salida <carpeta>] [--codificacion cp850]');
+    console.error('Uso: node scripts/migracion/perfilar.mjs <carpeta-del-extracto> [--salida <carpeta>] [--codificacion cp850]');
     process.exit(2);
   }
   const salida = args.includes('--salida') ? args[args.indexOf('--salida') + 1] : carpeta;
   const codificacion = args.includes('--codificacion') ? args[args.indexOf('--codificacion') + 1] : undefined;
   const perfil = perfilarCarpeta(carpeta, { codificacion });
   fs.mkdirSync(salida, { recursive: true });
-  fs.writeFileSync(path.join(salida, 'perfil-fox.json'), JSON.stringify(perfil, null, 2));
-  fs.writeFileSync(path.join(salida, 'perfil-fox.md'), perfilMarkdown(perfil));
-  console.log(`Perfil de ${perfil.tablas.length} tablas en ${path.join(salida, 'perfil-fox.{json,md}')}`);
+  fs.writeFileSync(path.join(salida, 'perfil-extracto.json'), JSON.stringify(perfil, null, 2));
+  fs.writeFileSync(path.join(salida, 'perfil-extracto.md'), perfilMarkdown(perfil));
+  console.log(`Perfil de ${perfil.tablas.length} tablas en ${path.join(salida, 'perfil-extracto.{json,md}')}`);
 }

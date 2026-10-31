@@ -95,7 +95,7 @@ async function limpiar() {
   }
 }
 
-const evidencia = path.join(root, 'artifacts', 'alkhofar-f09-recuperacion');
+const evidencia = path.join(root, 'artifacts', 'suministro-f09-recuperacion');
 let ok = false;
 try {
   docker(['network', 'create', '--label', `com.erp.local-test=${runId}`, network]);

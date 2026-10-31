@@ -28,10 +28,10 @@ for (const mobile of [false, true])
     await expect(page.getByRole("tabpanel", { name: "Gerencia" })).toContainText("calculadas por otra persona");
 
     const fichas = page.getByTestId("module-guide-entry");
-    for (const titulo of ["Contratos de suministro", "Lotes y vencimientos", "Alertas de suministro", "Tablero de suministro", "Migración desde FOX"])
+    for (const titulo of ["Contratos de suministro", "Lotes y vencimientos", "Alertas de suministro", "Tablero de suministro", "Migración desde otro sistema"])
       await expect(fichas.filter({ hasText: titulo })).toHaveCount(1);
     await fichas.filter({ hasText: "Tablero de suministro" }).click();
     await expect(page.getByText("Excel y Power BI leen el mismo corte que la pantalla, por eso cuadran")).toBeVisible();
-    await page.screenshot({ path: `../../artifacts/alkhofar-f10-implantacion/browser/${mobile ? "movil" : "escritorio"}-capacitacion.png`, fullPage: true });
+    await page.screenshot({ path: `../../artifacts/suministro-f10-implantacion/browser/${mobile ? "movil" : "escritorio"}-capacitacion.png`, fullPage: true });
     expect(errors).toEqual([]);
   });

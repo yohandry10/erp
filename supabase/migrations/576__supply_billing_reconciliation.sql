@@ -1,6 +1,6 @@
 -- ============================================================================
 -- 576__supply_billing_reconciliation.sql
--- F04 ALKHOFAR: facturación y conciliación por contrato y OC.
+-- F04 suministro: facturación y conciliación por contrato y OC.
 --
 -- La facturación sigue siendo la de pedidos (446): cada pedido vinculado se
 -- factura una sola vez con su comprobante, su CxC y sus cobros (452) y notas

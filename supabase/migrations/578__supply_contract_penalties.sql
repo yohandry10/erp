@@ -1,6 +1,6 @@
 -- ============================================================================
 -- 578__supply_contract_penalties.sql
--- F06 ALKHOFAR: penalidades contractuales configurables.
+-- F06 suministro: penalidades contractuales configurables.
 --
 -- Reglas versionadas por contrato: editar crea una versión nueva y la anterior
 -- queda reemplazada. Cada cálculo es una instantánea inmutable: guarda la

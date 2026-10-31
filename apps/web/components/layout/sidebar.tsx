@@ -428,8 +428,8 @@ const menuItems: MenuItem[] = [
     }
   },
   {
-    title: 'Migración FOX',
-    href: '/dashboard/migracion-fox',
+    title: 'Migración de datos',
+    href: '/dashboard/migracion',
     icon: Download,
     // Quien migra (ADMIN) también lee el archivo; gerencia, contabilidad y auditoría sólo lo consultan.
     permission: { modulo: 'migration', accion: 'read', recurso: 'archivo' }

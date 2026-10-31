@@ -1,6 +1,6 @@
-// Extracto sintético de un ERP Visual FoxPro de distribución médica, para la
+// Extracto sintético de un ERP en tablas DBF de distribución médica, para la
 // simulación local de la migración (nunca datos reales). Trae lo que trae un
-// FOX de verdad: CP850, registros borrados, códigos con mayúsculas mezcladas,
+// extracto de verdad: CP850, registros borrados, códigos con mayúsculas mezcladas,
 // unidades sin homologar, documentos cerrados y anulados, lotes vencidos,
 // cuentas en dólares con sobregiro, históricos que no se migran y una tabla
 // de usuarios con claves. Determinista por semilla.
@@ -85,7 +85,7 @@ export function generarExtracto(dir, { semilla = 582, escala = 1, corregido = fa
   }
   if (!corregido) {
     clientes[6].EMAIL = 'compras@@hospital-error.pe';
-    plantados.push({ archivo: 'clientes', id: clientes[6].CODCLI, causa: 'email inválido en FOX' });
+    plantados.push({ archivo: 'clientes', id: clientes[6].CODCLI, causa: 'email inválido en el sistema anterior' });
   }
   const activos = clientes.filter((c) => c.ACTIVO);
   tabla('CLIENTES.DBF', [
@@ -107,7 +107,7 @@ export function generarExtracto(dir, { semilla = 582, escala = 1, corregido = fa
   }
   if (!corregido) {
     proveedores[2].EMAIL = '';
-    plantados.push({ archivo: 'proveedores', id: proveedores[2].CODPRO, causa: 'proveedor sin correo en FOX' });
+    plantados.push({ archivo: 'proveedores', id: proveedores[2].CODPRO, causa: 'proveedor sin correo en el sistema anterior' });
   }
   const provActivos = proveedores.filter((p) => p.ACTIVO);
   tabla('PROVEED.DBF', [
@@ -124,7 +124,7 @@ export function generarExtracto(dir, { semilla = 582, escala = 1, corregido = fa
 
   const plan = [['10', 'Efectivo y equivalentes de efectivo'], ['104', 'Cuentas corrientes en instituciones financieras'],
     ['1041', 'Cuentas corrientes operativas'], ['104101', 'BCP cuenta corriente soles'], ['104102', 'BCP cuenta corriente dólares'],
-    ['104103', 'Interbank cuenta corriente soles'], ['104104', 'BBVA cuenta corriente soles'], ['104199', 'Fondo fijo FOX (sin uso)'],
+    ['104103', 'Interbank cuenta corriente soles'], ['104104', 'BBVA cuenta corriente soles'], ['104199', 'Fondo fijo (sin uso)'],
     ['12', 'Cuentas por cobrar comerciales - terceros'], ['121', 'Facturas, boletas y otros comprobantes por cobrar'],
     ['1212', 'Emitidas en cartera'], ['20', 'Mercaderías'], ['201', 'Mercaderías manufacturadas'], ['2011', 'Mercaderías manufacturadas - costo'],
     ['42', 'Cuentas por pagar comerciales - terceros'], ['421', 'Facturas, boletas y otros comprobantes por pagar'], ['4212', 'Emitidas'],
@@ -133,7 +133,7 @@ export function generarExtracto(dir, { semilla = 582, escala = 1, corregido = fa
   tabla('PLANCTA.DBF', [{ nombre: 'CUENTA', tipo: 'C', largo: 12 }, { nombre: 'DESCRI', tipo: 'C', largo: 60 },
     { nombre: 'NIVEL', tipo: 'N', largo: 2 }, { nombre: 'MOVIM', tipo: 'L', largo: 1 }], plan);
 
-  // Artículos: un código en minúsculas duplica a otro (FOX no distingue) y una unidad sin homologar.
+  // Artículos: un código en minúsculas duplica a otro (el sistema anterior no distingue) y una unidad sin homologar.
   const articulos = [];
   for (let i = 1; i <= n(1500); i++) {
     const f = uno(FAMILIAS);
@@ -224,7 +224,7 @@ export function generarExtracto(dir, { semilla = 582, escala = 1, corregido = fa
       DESCRIP: `Suministro de ${uno(['medicamentos', 'insumos médicos', 'dispositivos', 'reactivos'])} para ${cliente.RAZON}`.slice(0, 60),
       MONEDA: 'S', FECINI: desde, FECFIN: hasta, ESTADO: cerrado ? 'C' : 'V', NOTAS: si(0.3) ? 'Adenda 1 firmada' : '', ALTA: `${desde}T09:00:00Z` });
     const agotado = c === 3 && !corregido;
-    if (agotado) plantados.push({ archivo: 'contratos', id: String(c), causa: 'contrato ejecutado al 100% pero vigente en FOX' });
+    if (agotado) plantados.push({ archivo: 'contratos', id: String(c), causa: 'contrato ejecutado al 100% pero vigente en el sistema anterior' });
     if (c === 3 && corregido) contratos.at(-1).ESTADO = 'C';
     const lineas = [];
     const usados = new Set();
@@ -256,7 +256,7 @@ export function generarExtracto(dir, { semilla = 582, escala = 1, corregido = fa
         ocDet.push({ IDOC: id, ITEM: ++item, ITEMCONT: l.ITEM, CANTIDAD: cantidad, CANTENT: entregada });
         if (anulada) continue;
         let pendiente = cantidad - entregada;
-        // Lo ya entregado en FOX queda como entrega histórica (E): no se migra.
+        // Lo ya entregado en el sistema anterior queda como entrega histórica (E): no se migra.
         if (entregada) cronog.push({ IDOC: id, ITEM: item, NROENT: 0, FECENT: dia(fecha, 5), CANTIDAD: entregada, CANTENT: entregada,
           LUGAR: 'Almacén del cliente; puerta 2', ESTADO: 'E' });
         for (let k = 1; pendiente > 0 && k <= 3; k++) {
@@ -333,7 +333,7 @@ export function generarExtracto(dir, { semilla = 582, escala = 1, corregido = fa
 
   // Stock por almacén: lotes con vencimiento (también vencidos), sin lote para el resto, y ceros que no se migran.
   const saldos = [];
-  // Un lote tiene un solo vencimiento aunque esté en varios almacenes (y en FOX se escriba con minúscula).
+  // Un lote tiene un solo vencimiento aunque esté en varios almacenes (y en el sistema anterior se escriba con minúscula).
   const vencimientos = new Map();
   for (const a of artActivos) {
     for (const alm of ['01', '02', '03'].slice(0, entre(1, 3))) {
@@ -348,7 +348,7 @@ export function generarExtracto(dir, { semilla = 582, escala = 1, corregido = fa
       }
     }
   }
-  const idStock = (s) => `stock:${s.CODART}:${s.LOTE ? `${s.LOTE.toUpperCase()}:` : ''}FOX-${s.CODALM}:${fechaCorte}`;
+  const idStock = (s) => `stock:${s.CODART}:${s.LOTE ? `${s.LOTE.toUpperCase()}:` : ''}ORI-${s.CODALM}:${fechaCorte}`;
   const sinLote = saldos.find((s) => s.LOTE && s.STOCK > 0);
   const repetido = saldos.find((s) => s.LOTE && s.STOCK > 0 && s !== sinLote);
   // El mismo lote en el almacén de cuarentena: en la primera entrega, con otro vencimiento.
@@ -356,14 +356,14 @@ export function generarExtracto(dir, { semilla = 582, escala = 1, corregido = fa
   if (corregido) Object.assign(sinLote, { LOTE: 'L-REG-01' });
   else {
     Object.assign(sinLote, { LOTE: '', FECVEN: null });
-    plantados.push({ archivo: 'stock', id: idStock(sinLote), causa: 'producto con control de lote sin lote ni vencimiento en FOX' });
+    plantados.push({ archivo: 'stock', id: idStock(sinLote), causa: 'producto con control de lote sin lote ni vencimiento en el sistema anterior' });
     plantados.push({ archivo: 'stock', id: idStock(saldos.at(-1)), causa: 'mismo lote con otro vencimiento en otro almacén' });
   }
   tabla('SALDOS.DBF', [{ nombre: 'CODART', tipo: 'C', largo: 15 }, { nombre: 'CODALM', tipo: 'C', largo: 2 },
     { nombre: 'STOCK', tipo: 'N', largo: 12, decimales: 2 }, { nombre: 'COSTO', tipo: 'N', largo: 12, decimales: 4 },
     { nombre: 'LOTE', tipo: 'C', largo: 15 }, { nombre: 'FECVEN', tipo: 'D', largo: 8 }], saldos);
 
-  // Balance al corte desde los propios libros de FOX: cuadra y coincide con bancos, cartera, stock y proveedores.
+  // Balance al corte desde los propios libros del sistema anterior: cuadra y coincide con bancos, cartera, stock y proveedores.
   const abiertoCxc = redondear(cxc.filter((d) => ['01', '03'].includes(d.TIPDOC)).reduce((s, d) => s + d.SALDO, 0));
   const abiertoCxp = redondear(cxp.filter((d) => ['01', '03'].includes(d.TIPDOC)).reduce((s, d) => s + d.SALDO, 0));
   const inventario = redondear(saldos.filter((s) => s.STOCK > 0).reduce((t, s) => t + redondear(s.STOCK * s.COSTO), 0));
@@ -407,7 +407,7 @@ export function generarExtracto(dir, { semilla = 582, escala = 1, corregido = fa
   tabla('USUARIOS.DBF', [{ nombre: 'USUARIO', tipo: 'C', largo: 10 }, { nombre: 'NOMBRE', tipo: 'C', largo: 40 }, { nombre: 'CLAVE', tipo: 'C', largo: 20 },
     { nombre: 'NIVEL', tipo: 'N', largo: 1 }],
   ['ADMIN', 'CONTA1', 'CAJA1', 'ALMACEN1', 'VENTAS1', 'VENTAS2', 'COMPRAS1', 'GERENTE'].map((u, k) => ({ USUARIO: u,
-    NOMBRE: `${uno(NOMBRES)} ${uno(APELLIDOS)}`, CLAVE: `fox${pad(entre(1000, 9999), 4)}!`, NIVEL: k ? 2 : 9 })));
+    NOMBRE: `${uno(NOMBRES)} ${uno(APELLIDOS)}`, CLAVE: `clave${pad(entre(1000, 9999), 4)}!`, NIVEL: k ? 2 : 9 })));
   tabla('PARAMETR.DBF', [{ nombre: 'PARAM', tipo: 'C', largo: 20 }, { nombre: 'VALOR', tipo: 'C', largo: 60 }],
     [['EMPRESA', 'Distribuidora Médica Sintética S.A.C.'], ['RUC', ruc('20', 55823011)], ['IGV', '18'], ['MONEDA', 'S'],
       ['CORTE', fechaCorte]].map(([PARAM, VALOR]) => ({ PARAM, VALOR })));

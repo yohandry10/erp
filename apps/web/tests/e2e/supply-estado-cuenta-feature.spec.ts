@@ -89,7 +89,7 @@ for (const mobile of [false, true])
     expect(api.intents[0].body).toEqual({ base_facturacion: "CONFORMIDAD", version: 2, motivo: "El cliente paga contra acta de conformidad" });
     await expect(region.getByText("contra conformidad del cliente", { exact: false })).toBeVisible();
     await region.scrollIntoViewIfNeeded();
-    await page.screenshot({ path: `../../artifacts/alkhofar-f04-facturacion/browser/${mobile ? "movil" : "escritorio"}-estado-cuenta.png`, fullPage: true });
+    await page.screenshot({ path: `../../artifacts/suministro-f04-facturacion/browser/${mobile ? "movil" : "escritorio"}-estado-cuenta.png`, fullPage: true });
     expect(errors).toEqual([]);
   });
 

@@ -20,11 +20,11 @@ const ETAPAS: Array<{ titulo: string; archivos: DefArchivo[] }> = [
     { clave: "proveedores", titulo: "Proveedores", runType: "proveedores", ruta: "proveedores" },
   ] },
   { titulo: "Maestros", archivos: [
-    { clave: "almacenes", titulo: "Almacenes", runType: "almacenes", ruta: "fox/almacenes" },
-    { clave: "plan_cuentas", titulo: "Plan de cuentas", runType: "plan_cuentas", ruta: "fox/plan_cuentas" },
-    { clave: "productos", titulo: "Productos", runType: "productos", ruta: "fox/productos" },
-    { clave: "cuentas_bancarias", titulo: "Cuentas bancarias", runType: "cuentas_bancarias", ruta: "fox/cuentas_bancarias" },
-    { clave: "listas_precios", titulo: "Listas de precios", runType: "listas_precios", ruta: "fox/listas_precios" },
+    { clave: "almacenes", titulo: "Almacenes", runType: "almacenes", ruta: "origen/almacenes" },
+    { clave: "plan_cuentas", titulo: "Plan de cuentas", runType: "plan_cuentas", ruta: "origen/plan_cuentas" },
+    { clave: "productos", titulo: "Productos", runType: "productos", ruta: "origen/productos" },
+    { clave: "cuentas_bancarias", titulo: "Cuentas bancarias", runType: "cuentas_bancarias", ruta: "origen/cuentas_bancarias" },
+    { clave: "listas_precios", titulo: "Listas de precios", runType: "listas_precios", ruta: "origen/listas_precios" },
   ] },
   { titulo: "Saldos y apertura", archivos: [
     { clave: "cxc", titulo: "Cuentas por cobrar abiertas", runType: "cxc_abiertas", ruta: "cxc", corte: true },
@@ -37,8 +37,8 @@ const ETAPAS: Array<{ titulo: string; archivos: DefArchivo[] }> = [
     { clave: "cronograma", titulo: "Cronograma de entregas", runType: "cronograma_suministro", ruta: "cronograma-suministro" },
   ] },
   { titulo: "Operación abierta", archivos: [
-    { clave: "oc_compra", titulo: "OC de compra abiertas", runType: "oc_compra", ruta: "fox/oc_compra" },
-    { clave: "pedidos_venta", titulo: "Pedidos de venta abiertos", runType: "pedidos_venta", ruta: "fox/pedidos_venta" },
+    { clave: "oc_compra", titulo: "OC de compra abiertas", runType: "oc_compra", ruta: "origen/oc_compra" },
+    { clave: "pedidos_venta", titulo: "Pedidos de venta abiertos", runType: "pedidos_venta", ruta: "origen/pedidos_venta" },
     { clave: "stock", titulo: "Stock inicial con lotes", runType: "stock_inicial", ruta: "stock-inicial", corte: true },
   ] },
 ];
@@ -62,11 +62,13 @@ type Importacion = {
   status: string;
   result: { totalRows: number; okRows: number; errorRows: number; skippedRows: number; created: number; updated?: number; errors: Array<{ rowIndex: number; externalId?: string; message: string }> };
 };
-type Lote = { id: string; descripcion: string; fecha_corte: string | null; estado: "CARGANDO" | "COMPLETO" | "DESCARTADO"; tablas: Record<string, number>; cerrado_en: string | null; motivo_descarte: string | null };
+type Lote = { id: string; origen: string; descripcion: string; fecha_corte: string | null; estado: "CARGANDO" | "COMPLETO" | "DESCARTADO"; tablas: Record<string, number>; cerrado_en: string | null; motivo_descarte: string | null };
 type ConsultaArchivo = {
   lotes: Lote[]; lote_id: string | null; tablas: Array<{ tabla: string; filas: number }>; total: number; pagina: number; limite: number;
   filas: Array<{ id: number; tabla: string; clave: string; fila: Record<string, unknown> }>;
 };
+
+const SISTEMA_ORIGEN = /^[A-Za-z0-9][A-Za-z0-9 ._-]{1,29}$/;
 
 const leerBase64 = (file: File) =>
   new Promise<string>((resolve, reject) => {
@@ -83,14 +85,16 @@ const leerControl = async (file: File) => {
   }
 };
 
-export default function MigracionFoxPage() {
-  const importar = usePermission("migration", "import", "fox");
+export default function MigracionPage() {
+  const importar = usePermission("migration", "import", "origen");
   const validar = usePermission("migration", "read", "validar");
   const leerArchivo = usePermission("migration", "read", "archivo");
   // Importar miles de filas o ensayar el extracto completo tarda minutos: el límite de 12 s por defecto lo abortaría.
   const { post, get } = useApi({ throwOnError: true, showErrorToast: false, timeoutMs: 15 * 60 * 1000 });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [sistemaOrigen, setSistemaOrigen] = useState("");
+  const origenValido = SISTEMA_ORIGEN.test(sistemaOrigen.trim());
 
   const correr = async (tarea: () => Promise<void>) => {
     setBusy(true);
@@ -113,14 +117,14 @@ export default function MigracionFoxPage() {
   if (!importar.hasPermission && !leerArchivo.hasPermission)
     return (
       <p role="alert" className="p-6">
-        No tiene permiso para migrar ni consultar el archivo de FOX.
+        No tiene permiso para migrar ni consultar el archivo del sistema anterior.
       </p>
     );
 
   return (
     <div className="mx-auto max-w-[1200px] space-y-8 p-4 md:p-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Migración desde FOX</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Migración desde otro sistema</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
           Dos capas con fecha de corte. El archivo íntegro guarda cada tabla del extracto tal cual, consultable y sin efectos. La
           migración operativa carga terceros, maestros y saldos abiertos por los mismos procesos del ERP: lo pendiente de cada
@@ -134,10 +138,26 @@ export default function MigracionFoxPage() {
       )}
       {importar.hasPermission && (
         <>
+          <section aria-label="Sistema de origen" className="max-w-md space-y-1">
+            <Campo label="Sistema de origen">
+              {/* etiqueta-por-composicion: Campo envuelve estos controles en <label> */}
+              <Input
+                value={sistemaOrigen}
+                maxLength={30}
+                onChange={(e) => setSistemaOrigen(e.target.value)}
+                placeholder="SAP B1, Odoo, sistema propio, Excel…"
+                aria-describedby="origen-ayuda"
+              />
+            </Campo>
+            <p id="origen-ayuda" className="text-xs text-muted-foreground">
+              El nombre del sistema del que vienen los datos: de 2 a 30 letras, números, espacios, punto o guion. Los registros de
+              cada sistema se siguen por separado.
+            </p>
+          </section>
           <Plantillas />
-          <EnsayoCompleto busy={busy} correr={correr} post={post} />
-          <ImportarArchivo busy={busy} correr={correr} post={post} />
-          {validar.hasPermission && <ConciliarMigracion busy={busy} correr={correr} post={post} />}
+          <EnsayoCompleto busy={busy} correr={correr} post={post} origen={origenValido ? sistemaOrigen.trim() : ""} />
+          <ImportarArchivo busy={busy} correr={correr} post={post} origen={origenValido ? sistemaOrigen.trim() : ""} />
+          {validar.hasPermission && <ConciliarMigracion busy={busy} correr={correr} post={post} origen={origenValido ? sistemaOrigen.trim() : ""} />}
         </>
       )}
       {leerArchivo.hasPermission && <ArchivoIntegro get={get} />}
@@ -149,6 +169,8 @@ type Acciones = {
   busy: boolean;
   correr: (tarea: () => Promise<void>) => Promise<void>;
   post: ReturnType<typeof useApi>["post"];
+  /** Vacío mientras no se indique un sistema de origen válido. */
+  origen: string;
 };
 
 function Plantillas() {
@@ -170,8 +192,8 @@ function Plantillas() {
     <section aria-label="Plantillas" className="space-y-3">
       <h2 className="text-lg font-semibold">1. Plantillas</h2>
       <p className="text-sm text-muted-foreground">
-        CSV UTF-8 con punto decimal y fechas AAAA-MM-DD. El transformador <span className="font-mono">scripts/fox</span> las genera desde
-        el extracto FOX junto con <span className="font-mono">control.json</span>.
+        CSV UTF-8 con punto decimal y fechas AAAA-MM-DD. El transformador <span className="font-mono">scripts/migracion</span> las genera desde
+        el extracto junto con <span className="font-mono">control.json</span>.
       </p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {ETAPAS.map((etapa) => (
@@ -193,14 +215,14 @@ function Plantillas() {
   );
 }
 
-function EnsayoCompleto({ busy, correr, post }: Acciones) {
+function EnsayoCompleto({ busy, correr, post, origen }: Acciones) {
   const [archivos, setArchivos] = useState<Partial<Record<Archivo, File>>>({});
   const [controlFile, setControlFile] = useState<File | null>(null);
   const [fechaCorte, setFechaCorte] = useState("");
   const [resultado, setResultado] = useState<Ensayo | null>(null);
   const elegidos = Object.keys(archivos).filter((k) => archivos[k as Archivo]);
   const exigeCorte = conCorte(elegidos);
-  const listo = elegidos.length > 0 && (!exigeCorte || fechaCorte);
+  const listo = Boolean(origen) && elegidos.length > 0 && (!exigeCorte || fechaCorte);
   return (
     <section aria-label="Ensayo completo" className="space-y-4 border-t border-border pt-6">
       <div>
@@ -217,11 +239,11 @@ function EnsayoCompleto({ busy, correr, post }: Acciones) {
           e.preventDefault();
           if (!listo) return;
           void correr(async () => {
-            const body: Record<string, unknown> = {};
+            const body: Record<string, unknown> = { sistemaOrigen: origen };
             for (const [clave, file] of Object.entries(archivos)) if (file) body[clave] = await leerBase64(file);
             if (fechaCorte) body.fechaCorte = fechaCorte;
             if (controlFile) body.control = await leerControl(controlFile);
-            const r = await post("/api/migration/fox/ensayo", body);
+            const r = await post("/api/migration/origen/ensayo", body);
             if (!Array.isArray(r?.data?.registros)) throw new Error("El ensayo no devolvió resultados.");
             setResultado(r.data);
           });
@@ -279,19 +301,20 @@ function EnsayoCompleto({ busy, correr, post }: Acciones) {
   );
 }
 
-function ImportarArchivo({ busy, correr, post }: Acciones) {
+function ImportarArchivo({ busy, correr, post, origen }: Acciones) {
   const [tipo, setTipo] = useState<Archivo>("clientes");
   const [file, setFile] = useState<File | null>(null);
   const [fechaCorte, setFechaCorte] = useState("");
   const [resultado, setResultado] = useState<(Importacion & { ensayo: boolean; titulo: string }) | null>(null);
   const def = ARCHIVOS.find((a) => a.clave === tipo)!;
-  const listo = Boolean(file) && (!def.corte || fechaCorte);
+  const listo = Boolean(origen) && Boolean(file) && (!def.corte || fechaCorte);
   const enviar = (dryRun: boolean) =>
     correr(async () => {
       const r = await post(`/api/migration/${def.ruta}/import`, {
         fileBase64: await leerBase64(file!),
         filename: file!.name,
         dryRun,
+        sistemaOrigen: origen,
         ...(def.corte ? { fechaCorte } : {}),
       });
       if (!r?.result) throw new Error("La importación no devolvió resultados.");
@@ -303,7 +326,7 @@ function ImportarArchivo({ busy, correr, post }: Acciones) {
         <h2 className="text-lg font-semibold">3. Importar</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Un archivo a la vez, en el orden de la lista. Repetir el mismo archivo no duplica: lo ya migrado se informa como omitido,
-          lo que ya existía en el ERP se enlaza, y un dato cambiado en FOX se rechaza.
+          lo que ya existía en el ERP se enlaza, y un dato cambiado en el sistema anterior se rechaza.
         </p>
       </div>
       <form className="grid gap-3 sm:grid-cols-3" aria-label="Archivo a importar" onSubmit={(e) => e.preventDefault()}>
@@ -364,7 +387,7 @@ function ImportarArchivo({ busy, correr, post }: Acciones) {
   );
 }
 
-function ConciliarMigracion({ busy, correr, post }: Acciones) {
+function ConciliarMigracion({ busy, correr, post, origen }: Acciones) {
   const [controlFile, setControlFile] = useState<File | null>(null);
   const [resultado, setResultado] = useState<Conciliacion | null>(null);
   return (
@@ -380,9 +403,9 @@ function ConciliarMigracion({ busy, correr, post }: Acciones) {
         aria-label="Conciliar migración"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!controlFile) return;
+          if (!controlFile || !origen) return;
           void correr(async () => {
-            const r = await post("/api/migration/fox/conciliacion", { control: await leerControl(controlFile) });
+            const r = await post("/api/migration/origen/conciliacion", { control: await leerControl(controlFile), sistemaOrigen: origen });
             if (!Array.isArray(r?.data?.entidades)) throw new Error("La conciliación no devolvió resultados.");
             setResultado(r.data);
           });
@@ -394,7 +417,7 @@ function ConciliarMigracion({ busy, correr, post }: Acciones) {
             <input type="file" accept=".json,application/json" className={control} onChange={(e) => setControlFile(e.target.files?.[0] ?? null)} />
           </Campo>
         </div>
-        <Button type="submit" disabled={busy || !controlFile}>
+        <Button type="submit" disabled={busy || !controlFile || !origen}>
           Conciliar
         </Button>
       </form>
@@ -415,12 +438,12 @@ function TablaConciliacion({ data }: { data: Conciliacion }) {
       </p>
       <div className="overflow-x-auto rounded-md border border-border">
         <table className="w-full min-w-[520px] text-sm tabular-nums">
-          <caption className="sr-only">Conciliación FOX frente al ERP</caption>
+          <caption className="sr-only">Conciliación del origen frente al ERP</caption>
           <thead>
             <tr className="border-b border-border text-left">
               <th scope="col" className="p-2">Entidad</th>
               <th scope="col" className="p-2">Medida</th>
-              <th scope="col" className="p-2 text-right">FOX</th>
+              <th scope="col" className="p-2 text-right">Origen</th>
               <th scope="col" className="p-2 text-right">ERP</th>
               <th scope="col" className="p-2 text-right">Diferencia</th>
             </tr>
@@ -492,7 +515,7 @@ function ArchivoIntegro({ get }: { get: ReturnType<typeof useApi>["get"] }) {
       if (f.loteId) q.set("loteId", f.loteId);
       if (f.tabla) q.set("tabla", f.tabla);
       if (f.texto) q.set("texto", f.texto);
-      const r = await get(`/api/migration/fox/archivo?${q.toString()}`);
+      const r = await get(`/api/migration/origen/archivo?${q.toString()}`);
       if (!Array.isArray(r?.data?.filas)) throw new Error("La consulta del archivo no devolvió resultados.");
       setDatos(r.data);
     } catch (e) {
@@ -511,10 +534,10 @@ function ArchivoIntegro({ get }: { get: ReturnType<typeof useApi>["get"] }) {
   return (
     <section aria-label="Archivo íntegro" className="space-y-4 border-t border-border pt-6">
       <div>
-        <h2 className="text-lg font-semibold">Archivo íntegro de FOX</h2>
+        <h2 className="text-lg font-semibold">Archivo íntegro del sistema anterior</h2>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Cada tabla del extracto tal cual, incluidas las filas borradas en FOX, para consultar la historia que no se migra. Las
-          credenciales se redactan al cargar. Se carga con <span className="font-mono">scripts/fox/archivar-fox.mjs</span> y es de
+          Cada tabla del extracto tal cual, incluidas las filas borradas en el sistema anterior, para consultar la historia que no se migra. Las
+          credenciales se redactan al cargar. Se carga con <span className="font-mono">scripts/migracion/archivar.mjs</span> y es de
           sólo lectura.
         </p>
       </div>
@@ -535,7 +558,7 @@ function ArchivoIntegro({ get }: { get: ReturnType<typeof useApi>["get"] }) {
               onChange={(e) => setFiltros({ loteId: e.target.value, tabla: "", texto: filtros.texto, pagina: 1 })}>
               {(datos?.lotes ?? []).map((l) => (
                 <option key={l.id} value={l.id}>
-                  {l.descripcion} · {ESTADO_LOTE[l.estado]}
+                  {l.origen} · {l.descripcion} · {ESTADO_LOTE[l.estado]}
                 </option>
               ))}
             </select>
@@ -605,7 +628,7 @@ function FilaArchivo({ fila }: { fila: ConsultaArchivo["filas"][number] }) {
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="font-mono text-xs font-medium">{fila.tabla}</span>
         <span className="font-mono text-xs text-muted-foreground">registro {fila.clave}</span>
-        {borrada && <span className="text-xs font-medium text-destructive">Borrado en FOX</span>}
+        {borrada && <span className="text-xs font-medium text-destructive">Borrado en origen</span>}
       </div>
       <dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
         {campos.slice(0, 9).map(([k, v]) => (

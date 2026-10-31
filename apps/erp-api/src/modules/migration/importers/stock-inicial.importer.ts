@@ -4,7 +4,7 @@ import { ImporterResult, ImporterRowError } from '../dto/import.dto';
 import { ParsedCsv, nonEmpty, toDateOrNull, toNumber, validateHeaders } from '../util/csv-parser.util';
 import { Importer, ImporterContext, emptyResult } from './importer.interface';
 import { MigrationRunsService } from '../migration-runs.service';
-import { mensajeFox } from './suministro-fox.importer';
+import { mensajeOrigen } from './suministro-origen.importer';
 
 const REQUIRED = [
   'external_id_producto',
@@ -13,7 +13,7 @@ const REQUIRED = [
   'cantidad',
   'costo_unitario',
 ];
-// Con almacen_codigo (FOX) no hacen falta los UUID: la sucursal es la del almacén o la principal.
+// Con almacen_codigo no hacen falta los UUID: la sucursal es la del almacén o la principal.
 const REQUIRED_POR_CODIGO = ['external_id_producto', 'almacen_codigo', 'cantidad', 'costo_unitario'];
 const UUID = /^[0-9a-f-]{36}$/i;
 
@@ -23,7 +23,7 @@ function externalIdStock(producto: string, almacenId: string, fechaCorte: string
 }
 const loteDe = (row: Record<string, string>) => nonEmpty(row['lote'])?.toUpperCase() ?? null;
 
-/** Filas del ensayo FOX: el producto se resuelve por código en la base. */
+/** Filas del ensayo de migración: el producto se resuelve por código en la base. */
 export function filasEnsayoStock(parsed: ParsedCsv, fechaCorte: string) {
   return parsed.rows.map((row, idx) => {
     const producto = nonEmpty(row['external_id_producto']) ?? '';
@@ -64,7 +64,7 @@ export class StockInicialImporter implements Importer {
     const sample = [
       ['PROD-00001', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000', '120', '8.50', 'Stock inicial laboratorio', '', '', ''],
       ['PROD-00002', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000', '50', '120.00', 'Stock inicial farmacia', 'L2405A', '2027-05-31', ''],
-      ['PROD-00003', '', '', '30', '4.20', 'Stock en almacén migrado de FOX', '', '', 'ALM-CALLAO'],
+      ['PROD-00003', '', '', '30', '4.20', 'Stock en almacén migrado del sistema anterior', '', '', 'ALM-CALLAO'],
     ];
     return {
       filename: 'plantilla_migracion_stock_inicial.csv',
@@ -329,7 +329,7 @@ export class StockInicialImporter implements Importer {
           });
         }
       } catch (err: any) {
-        const msg = mensajeFox(err?.message || String(err));
+        const msg = mensajeOrigen(err?.message || String(err));
         this.logger.warn(`Error stock fila ${rowIndex} (${externalProd}): ${msg}`);
         result.errorRows++;
         result.errors.push({ rowIndex, externalId: externalProd, message: msg });

@@ -152,7 +152,7 @@ for (const mobile of [false, true])
     await expect(region.getByText(/Recepción 1 · Pedido PV-2026-0040/)).toBeVisible();
     await expect(region.getByText(/rechazado 2: Embalaje dañado/)).toBeVisible();
     await expect(region.getByRole("button", { name: "Registrar recepción", exact: true })).toHaveCount(0);
-    await page.screenshot({ path: `../../artifacts/alkhofar-f03-entregas/browser/${mobile ? "movil" : "escritorio"}-recepcion.png`, fullPage: true });
+    await page.screenshot({ path: `../../artifacts/suministro-f03-entregas/browser/${mobile ? "movil" : "escritorio"}-recepcion.png`, fullPage: true });
 
     await region.getByRole("button", { name: "Anular", exact: true }).click();
     await page.getByLabel("Motivo de la anulación").fill("Registro equivocado");

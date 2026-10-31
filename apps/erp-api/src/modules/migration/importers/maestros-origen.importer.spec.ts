@@ -1,17 +1,17 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException, ValidationPipe } from '@nestjs/common';
 import { PERMISSION_KEY } from '../../../common/decorators/require-permission.decorator';
-import { FoxArchivoCierreDto, FoxArchivoFilasDto } from '../dto/import.dto';
-import { FoxArchivoService } from '../fox-archivo.service';
+import { OrigenArchivoCierreDto, OrigenArchivoFilasDto } from '../dto/import.dto';
+import { OrigenArchivoService } from '../archivo-origen.service';
 import { MigrationController } from '../migration.controller';
 import { MigrationService } from '../migration.service';
 import { parseCsv } from '../util/csv-parser.util';
 import { BalanceAperturaImporter } from './balance-apertura.importer';
 import { ClientesImporter } from './clientes.importer';
 import { CxcAbiertasImporter } from './cxc-abiertas.importer';
-import { MaestrosFoxImporters, SPECS_MAESTROS } from './maestros-fox.importer';
+import { MaestrosOrigenImporters, SPECS_MAESTROS } from './maestros-origen.importer';
 import { ProveedoresImporter } from './proveedores.importer';
 import { StockInicialImporter } from './stock-inicial.importer';
-import { construirLote, ContratosSuministroImporter, CronogramaSuministroImporter, OcSuministroImporter } from './suministro-fox.importer';
+import { construirLote, ContratosSuministroImporter, CronogramaSuministroImporter, OcSuministroImporter } from './suministro-origen.importer';
 import { Test } from '@nestjs/testing';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { MigrationRunsService } from '../migration-runs.service';
@@ -29,11 +29,11 @@ const csv = (spec: keyof typeof SPECS_MAESTROS, ...filas: string[]) => {
 function importadores(rpc: jest.Mock) {
   const recordRow = jest.fn().mockResolvedValue(undefined);
   const supabase = { getClient: () => ({ rpc }), getLongRunningClient: () => ({ rpc }) } as any;
-  const todos = new MaestrosFoxImporters(supabase, { recordRow } as any).todos;
+  const todos = new MaestrosOrigenImporters(supabase, { recordRow } as any).todos;
   return { porTipo: (t: string) => todos.find((i) => i.runType === t)!, recordRow, todos };
 }
 
-describe('Plantillas de maestros FOX', () => {
+describe('Plantillas de maestros de origen', () => {
   it('cada plantilla trae las columnas que su lote exige y un ejemplo válido', () => {
     const { todos } = importadores(jest.fn());
     expect(todos.map((i) => i.runType)).toEqual(['productos', 'almacenes', 'plan_cuentas', 'cuentas_bancarias', 'listas_precios', 'oc_compra', 'pedidos_venta']);
@@ -41,6 +41,13 @@ describe('Plantillas de maestros FOX', () => {
       const { content } = imp.getTemplate();
       expect(imp.validate(parseCsv(content))).toEqual([]);
     }
+  });
+
+  it('un pedido no acepta un precio con más decimales de los que guarda, para no alterarlo en silencio', () => {
+    const fila = (precio: string) => `PV-1,PED-1,CLI-1,PEN,MED-1,10,0,${precio}`;
+    expect(construirLote(SPECS_MAESTROS.PEDIDO_VENTA, csv('PEDIDO_VENTA', fila('12.50'))).errores).toEqual([]);
+    const mal = construirLote(SPECS_MAESTROS.PEDIDO_VENTA, csv('PEDIDO_VENTA', fila('12.345678')));
+    expect(mal.errores.map((e) => e.field)).toEqual(['precio_unitario']);
   });
 
   it('valida unidades homologadas, booleanos, monedas, saldos con fecha y cantidades', () => {
@@ -76,18 +83,18 @@ describe('Plantillas de maestros FOX', () => {
   });
 });
 
-describe('Importación de maestros FOX contra la base', () => {
+describe('Importación de maestros de origen contra la base', () => {
   it('usa la RPC 582 por registro y distingue creados, adoptados y reintentos', async () => {
     const rpc = jest.fn()
       .mockResolvedValueOnce({ data: { id: 'a-1', action: 'CREATED' }, error: null })
       .mockResolvedValueOnce({ data: { id: 'a-2', action: 'ADOPTED' }, error: null })
       .mockResolvedValueOnce({ data: { id: 'a-3', action: 'IDEMPOTENT' }, error: null })
-      .mockResolvedValueOnce({ data: null, error: { code: '23505', message: 'MIGRATION_FOX_AMBIGUOUS_CODE: almacenes ALM-4' } });
+      .mockResolvedValueOnce({ data: null, error: { code: '23505', message: 'MIGRATION_SOURCE_AMBIGUOUS_CODE: almacenes ALM-4' } });
     const { porTipo, recordRow } = importadores(rpc);
     const result = await porTipo('almacenes').run(csv('ALMACEN', 'A-1,ALM-1,Callao,,,', 'A-2,PRINCIPAL,Principal,,,SI', 'A-3,ALM-3,Lima,,,', 'A-4,ALM-4,Sur,,,'), {
       tenantId: TENANT, startedBy: ACTOR, dryRun: false, runCtx: { runId: RUN, tenantId: TENANT, runType: 'almacenes' },
     });
-    expect(rpc).toHaveBeenNthCalledWith(2, 'importar_maestro_fox_582', {
+    expect(rpc).toHaveBeenNthCalledWith(2, 'importar_maestro_origen_582', {
       p_tenant_id: TENANT, p_actor_id: ACTOR, p_run_id: RUN, p_entidad: 'ALMACEN', p_id_origen: 'A-2',
       p_payload: { codigo: 'PRINCIPAL', nombre: 'Principal', es_principal: true },
     });
@@ -100,13 +107,13 @@ describe('Importación de maestros FOX contra la base', () => {
 
   it('el ensayo de un archivo usa la base revertida 582 con su clave de lote', async () => {
     const rpc = jest.fn().mockResolvedValue({ data: { registros: [
-      { id_origen: '60111', ok: true }, { id_origen: '6011101', ok: false, error: 'MIGRATION_FOX_ACCOUNT_PARENT_NOT_FOUND: 6011101' },
+      { id_origen: '60111', ok: true }, { id_origen: '6011101', ok: false, error: 'MIGRATION_SOURCE_ACCOUNT_PARENT_NOT_FOUND: 6011101' },
     ] }, error: null });
     const { porTipo } = importadores(rpc);
     const result = await porTipo('plan_cuentas').run(csv('CUENTA_CONTABLE', '6011101,Lote,', '60111,Mercaderías,'), {
       tenantId: TENANT, startedBy: ACTOR, dryRun: true, fechaCorte: '2026-10-31',
     });
-    expect(rpc).toHaveBeenCalledWith('ensayar_migracion_fox_582', expect.objectContaining({
+    expect(rpc).toHaveBeenCalledWith('ensayar_migracion_origen_582', expect.objectContaining({
       p_control: null, p_fecha_corte: '2026-10-31',
       p_lote: { cuentas_contables: [expect.objectContaining({ id_origen: '60111' }), expect.objectContaining({ id_origen: '6011101' })] },
     }));
@@ -115,7 +122,7 @@ describe('Importación de maestros FOX contra la base', () => {
   });
 });
 
-describe('Stock inicial por código de almacén FOX', () => {
+describe('Stock inicial por código de almacén de origen', () => {
   const consulta = (data: unknown[]) => {
     const q: any = new Proxy({}, { get: (_, k) => (k === 'then' ? (ok: any) => ok({ data, error: null }) : () => q) });
     return q;
@@ -144,7 +151,7 @@ describe('Stock inicial por código de almacén FOX', () => {
   });
 });
 
-describe('Ensayo FOX integral en el servicio', () => {
+describe('Ensayo integral en el servicio', () => {
   function servicio(rpc: jest.Mock) {
     const supabase = { getClient: () => ({ rpc }), getLongRunningClient: () => ({ rpc }) } as any;
     const runs = {} as any;
@@ -152,7 +159,7 @@ describe('Ensayo FOX integral en el servicio', () => {
     return new MigrationService(supabase, runs, new ClientesImporter(supabase, runs), new ProveedoresImporter(supabase, runs),
       new CxcAbiertasImporter(supabase, runs), fake('cxp_abiertas'), new BalanceAperturaImporter(supabase, runs),
       new StockInicialImporter(supabase, runs), fake('comprobantes_historico'), fake('contratos_suministro'), fake('oc_suministro'),
-      fake('cronograma_suministro'), new MaestrosFoxImporters(supabase, runs));
+      fake('cronograma_suministro'), new MaestrosOrigenImporters(supabase, runs));
   }
   const CLIENTES = 'external_id,tipo,tipo_documento,numero_documento,razon_social\nCLI-1,EMPRESA,RUC,20100070970,Hospital Regional SAC\nCLI-2,EMPRESA,RUC,123,Mal';
   const CXC = 'external_id,external_id_cliente,tipo_documento,serie,numero,fecha_emision,fecha_vencimiento,moneda,monto_total,saldo_pendiente\n'
@@ -161,14 +168,14 @@ describe('Ensayo FOX integral en el servicio', () => {
 
   it('arma un solo lote en el orden real con el mismo payload de cada importador', async () => {
     const rpc = jest.fn().mockResolvedValue({ data: { registros: [{ entidad: 'CLIENTE', id_origen: 'CLI-1', ok: false,
-      error: 'MIGRATION_FOX_REFERENCE_NOT_FOUND: plan_cuentas 104999' }], conciliacion: null, ensayo: true, errores: 1 }, error: null });
-    const res = await servicio(rpc).ensayoFox({
+      error: 'MIGRATION_SOURCE_REFERENCE_NOT_FOUND: plan_cuentas 104999' }], conciliacion: null, ensayo: true, errores: 1 }, error: null });
+    const res = await servicio(rpc).ensayoOrigen({
       clientes: b64(CLIENTES), cxc: b64(CXC), balance: b64(BALANCE),
       productos: b64(SPECS_MAESTROS.PRODUCTO.requeridas.join(',') + '\nP-1,MED-1,Amoxicilina'),
       fechaCorte: '2026-10-31T00:00:00.000Z', control: { cxc: { registros: 1, saldo: 500 } },
     }, TENANT, ACTOR);
     const [nombre, args] = rpc.mock.calls[0];
-    expect(nombre).toBe('ensayar_migracion_fox_582');
+    expect(nombre).toBe('ensayar_migracion_origen_582');
     expect(args.p_fecha_corte).toBe('2026-10-31');
     expect(args.p_lote.clientes).toEqual([{ id_origen: 'CLI-1', fila: 2, payload: expect.objectContaining({
       tipo: 'EMPRESA', documento_tipo: 'RUC', documento_identidad: '20100070970', razon_social: 'Hospital Regional SAC' }) }]);
@@ -184,14 +191,14 @@ describe('Ensayo FOX integral en el servicio', () => {
 
   it('exige fecha de corte para saldos, balance y stock', async () => {
     const rpc = jest.fn();
-    await expect(servicio(rpc).ensayoFox({ cxc: b64(CXC) }, TENANT, ACTOR)).rejects.toThrow('fechaCorte es obligatoria');
-    await expect(servicio(rpc).ensayoFox({ balance: b64(BALANCE) }, TENANT, ACTOR)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(servicio(rpc).ensayoOrigen({ cxc: b64(CXC) }, TENANT, ACTOR)).rejects.toThrow('fechaCorte es obligatoria');
+    await expect(servicio(rpc).ensayoOrigen({ balance: b64(BALANCE) }, TENANT, ACTOR)).rejects.toBeInstanceOf(BadRequestException);
     expect(rpc).not.toHaveBeenCalled();
   });
 });
 
-describe('Archivo íntegro FOX', () => {
-  const svc = (rpc: jest.Mock) => new FoxArchivoService({ getClient: () => ({ rpc }), getLongRunningClient: () => ({ rpc }) } as any);
+describe('Archivo íntegro', () => {
+  const svc = (rpc: jest.Mock) => new OrigenArchivoService({ getClient: () => ({ rpc }), getLongRunningClient: () => ({ rpc }) } as any);
 
   it('exige Idempotency-Key en las operaciones del lote', async () => {
     const rpc = jest.fn();
@@ -203,13 +210,13 @@ describe('Archivo íntegro FOX', () => {
   it('opera el lote, archiva tandas y consulta con filtros', async () => {
     const rpc = jest.fn().mockResolvedValue({ data: { id: LOTE, estado: 'CARGANDO', filas: [] }, error: null });
     const s = svc(rpc);
-    await s.crearLote(TENANT, ACTOR, { descripcion: 'Extracto FOX', fechaCorte: '2026-10-31' }, 'lote-fox-2026-10');
-    expect(rpc).toHaveBeenLastCalledWith('operar_archivo_fox_582', { p_tenant_id: TENANT, p_actor_id: ACTOR, p_accion: 'CREAR_LOTE',
-      p_payload: { descripcion: 'Extracto FOX', fecha_corte: '2026-10-31' }, p_idempotency_key: 'lote-fox-2026-10' });
+    await s.crearLote(TENANT, ACTOR, { descripcion: 'Extracto', fechaCorte: '2026-10-31' }, 'lote-origen-2026-10');
+    expect(rpc).toHaveBeenLastCalledWith('operar_archivo_origen_582', { p_tenant_id: TENANT, p_actor_id: ACTOR, p_accion: 'CREAR_LOTE',
+      p_payload: { descripcion: 'Extracto', fecha_corte: '2026-10-31' }, p_idempotency_key: 'lote-origen-2026-10' });
     await s.archivarFilas(TENANT, ACTOR, LOTE, { tabla: 'CLIENTES', filas: [{ clave: 'C1', fila: { RAZON: 'X' } }] });
-    expect(rpc).toHaveBeenLastCalledWith('archivar_filas_fox_582', expect.objectContaining({ p_lote_id: LOTE, p_tabla: 'CLIENTES' }));
+    expect(rpc).toHaveBeenLastCalledWith('archivar_filas_origen_582', expect.objectContaining({ p_lote_id: LOTE, p_tabla: 'CLIENTES' }));
     await s.consultar(TENANT, ACTOR, { texto: 'andino', limite: 20 });
-    expect(rpc).toHaveBeenLastCalledWith('consultar_archivo_fox_582', expect.objectContaining({
+    expect(rpc).toHaveBeenLastCalledWith('consultar_archivo_origen_582', expect.objectContaining({
       p_filtros: { lote_id: null, tabla: null, texto: 'andino', pagina: 1, limite: 20 } }));
   });
 
@@ -229,7 +236,7 @@ describe('Archivo íntegro FOX', () => {
 
   it('cada ruta del archivo y de maestros exige su permiso', () => {
     const esperado: Record<string, string> = {
-      importMaestroFox: 'migration.fox.import',
+      importMaestroOrigen: 'migration.origen.import',
       crearLoteArchivo: 'migration.archivo.import',
       archivarFilas: 'migration.archivo.import',
       cerrarLoteArchivo: 'migration.archivo.import',
@@ -240,45 +247,45 @@ describe('Archivo íntegro FOX', () => {
       expect(Reflect.getMetadata(PERMISSION_KEY, (MigrationController.prototype as any)[method])?.raw).toBe(codigo);
   });
 
-  it('rechaza un maestro FOX desconocido sin tocar la base', async () => {
+  it('rechaza un maestro desconocido sin tocar la base', async () => {
     const service = { import: jest.fn() } as any;
     const ctl = new MigrationController(service, {} as any);
-    await expect(ctl.importMaestroFox('nomina', { fileBase64: 'eA==' }, TENANT, ACTOR)).rejects.toBeInstanceOf(BadRequestException);
-    await ctl.importMaestroFox('oc_compra', { fileBase64: 'eA==' }, TENANT, ACTOR);
+    await expect(ctl.importMaestroOrigen('nomina', { fileBase64: 'eA==' }, TENANT, ACTOR)).rejects.toBeInstanceOf(BadRequestException);
+    await ctl.importMaestroOrigen('oc_compra', { fileBase64: 'eA==' }, TENANT, ACTOR);
     expect(service.import).toHaveBeenCalledWith('oc_compra', { fileBase64: 'eA==' }, TENANT, ACTOR);
   });
 });
 
-describe('Contrato HTTP del archivo FOX', () => {
+describe('Contrato HTTP del archivo íntegro', () => {
   // Las mismas opciones del ValidationPipe global (main.ts).
   const pipe = new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true, transformOptions: { enableImplicitConversion: true } });
 
   it('la tanda llega a la base con cada fila intacta', async () => {
     const fila = { CODALM: '01', NOMBRE: 'Almacén', PRINCIPAL: true, FECHA: '2026-01-01', STOCK: 3, NOTAS: null, _borrado: true };
-    const dto = await pipe.transform({ tabla: 'ALMACEN', filas: [{ clave: '1', fila }] }, { type: 'body', metatype: FoxArchivoFilasDto });
+    const dto = await pipe.transform({ tabla: 'ALMACEN', filas: [{ clave: '1', fila }] }, { type: 'body', metatype: OrigenArchivoFilasDto });
     expect(JSON.parse(JSON.stringify(dto.filas))).toEqual([{ clave: '1', fila }]);
-    const cierre = await pipe.transform({ tablas: { ALMACEN: 4 } }, { type: 'body', metatype: FoxArchivoCierreDto });
+    const cierre = await pipe.transform({ tablas: { ALMACEN: 4 } }, { type: 'body', metatype: OrigenArchivoCierreDto });
     expect(cierre.tablas).toEqual({ ALMACEN: 4 });
   });
 
   it('rechaza claves vacías, filas que no son objeto y campos extra', async () => {
     for (const filas of [[{ clave: '', fila: {} }], [{ clave: '1', fila: [] }], [{ clave: '1', fila: {}, extra: 1 }], []])
-      await expect(pipe.transform({ tabla: 'A', filas }, { type: 'body', metatype: FoxArchivoFilasDto })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(pipe.transform({ tabla: 'A', filas }, { type: 'body', metatype: OrigenArchivoFilasDto })).rejects.toBeInstanceOf(BadRequestException);
   });
 });
 
-describe('Inyección de dependencias de los importadores FOX', () => {
+describe('Inyección de dependencias de los importadores del sistema anterior', () => {
   it('Nest entrega la base y el registro de filas a cada importador', async () => {
     const supabase = { getClient: jest.fn(), getLongRunningClient: jest.fn() };
     const runs = { recordRow: jest.fn() };
     const moduleRef = await Test.createTestingModule({
-      providers: [ContratosSuministroImporter, OcSuministroImporter, CronogramaSuministroImporter, MaestrosFoxImporters,
+      providers: [ContratosSuministroImporter, OcSuministroImporter, CronogramaSuministroImporter, MaestrosOrigenImporters,
         { provide: SupabaseService, useValue: supabase }, { provide: MigrationRunsService, useValue: runs }],
     }).compile();
     for (const tipo of [ContratosSuministroImporter, OcSuministroImporter, CronogramaSuministroImporter]) {
       const imp = moduleRef.get<any>(tipo);
       expect([imp.supabase, imp.runs]).toEqual([supabase, runs]);
     }
-    for (const imp of moduleRef.get(MaestrosFoxImporters).todos as any[]) expect([imp.supabase, imp.runs]).toEqual([supabase, runs]);
+    for (const imp of moduleRef.get(MaestrosOrigenImporters).todos as any[]) expect([imp.supabase, imp.runs]).toEqual([supabase, runs]);
   });
 });

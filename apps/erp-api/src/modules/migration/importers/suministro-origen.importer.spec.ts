@@ -5,12 +5,12 @@ import { MigrationService } from '../migration.service';
 import { parseCsv } from '../util/csv-parser.util';
 import { filasEnsayoStock, StockInicialImporter } from './stock-inicial.importer';
 import {
-  construirLoteFox,
+  construirLoteOrigen,
   ContratosSuministroImporter,
   CronogramaSuministroImporter,
   OcSuministroImporter,
-} from './suministro-fox.importer';
-import { MaestrosFoxImporters } from './maestros-fox.importer';
+} from './suministro-origen.importer';
+import { MaestrosOrigenImporters } from './maestros-origen.importer';
 
 const TENANT = '58000000-0000-4000-8000-000000000001';
 const ACTOR = '58000000-0000-4000-8000-000000000002';
@@ -31,9 +31,9 @@ function servicios(rpc: jest.Mock) {
   return { supabase, runs: { recordRow } as any, recordRow };
 }
 
-describe('construirLoteFox', () => {
+describe('construirLoteOrigen', () => {
   it('agrupa las líneas de cada contrato y arma el saldo abierto de origen', () => {
-    const { registros, errores } = construirLoteFox('CONTRATO', parseCsv(CONTRATOS));
+    const { registros, errores } = construirLoteOrigen('CONTRATO', parseCsv(CONTRATOS));
     expect(errores).toEqual([]);
     expect(registros.map((r) => [r.id_origen, r.fila, r.filas])).toEqual([['C-100', 2, [2, 3]], ['C-200', 4, [4]]]);
     expect(registros[0].payload).toEqual({
@@ -53,16 +53,16 @@ describe('construirLoteFox', () => {
     ['moneda desconocida', CONTRATOS.replace('Otro,PEN', 'Otro,BOB'), 'moneda inválida'],
     ['id con almohadilla', CONTRATOS.replace('C-200', 'C#200').replace('C-200', 'C#200'), 'sin "#"'],
   ])('rechaza %s en la fila correcta sin perder el resto', (_, csv, mensaje) => {
-    const { registros, errores } = construirLoteFox('CONTRATO', parseCsv(csv));
+    const { registros, errores } = construirLoteOrigen('CONTRATO', parseCsv(csv));
     expect(errores.some((e) => e.message.includes(mensaje))).toBe(true);
     // El contrato con error queda fuera completo; el otro sigue.
     expect(registros.length).toBe(1);
   });
 
   it('exige las columnas y no admite entregas repetidas', () => {
-    expect(construirLoteFox('OC', parseCsv('id_origen_oc,numero\nOC-1,X')).errores[0]).toMatchObject({ rowIndex: 1 });
+    expect(construirLoteOrigen('OC', parseCsv('id_origen_oc,numero\nOC-1,X')).errores[0]).toMatchObject({ rowIndex: 1 });
     const csv = 'id_origen_entrega,id_origen_oc,id_origen_linea_oc,fecha_programada,cantidad,destino\nE-1,OC-9,1,2026-11-10,120,Hospital\nE-1,OC-9,1,2026-11-12,10,Hospital';
-    const { registros, errores } = construirLoteFox('ENTREGA', parseCsv(csv));
+    const { registros, errores } = construirLoteOrigen('ENTREGA', parseCsv(csv));
     expect(errores).toEqual([expect.objectContaining({ rowIndex: 3, message: 'id_origen_entrega repetido' })]);
     expect(registros).toEqual([]);
   });
@@ -78,7 +78,7 @@ describe('construirLoteFox', () => {
   });
 });
 
-describe('Importadores FOX contra la base', () => {
+describe('Importadores del sistema anterior contra la base', () => {
   it('importa cada contrato una vez, registra sus filas y distingue el reintento', async () => {
     const rpc = jest.fn()
       .mockResolvedValueOnce({ data: { id: 'erp-1', action: 'CREATED' }, error: null })
@@ -87,7 +87,7 @@ describe('Importadores FOX contra la base', () => {
     const result = await new ContratosSuministroImporter(supabase, runs).run(parseCsv(CONTRATOS), {
       tenantId: TENANT, startedBy: ACTOR, dryRun: false, runCtx: { runId: RUN, tenantId: TENANT, runType: 'contratos_suministro' },
     });
-    expect(rpc).toHaveBeenNthCalledWith(1, 'importar_suministro_fox_580', expect.objectContaining({
+    expect(rpc).toHaveBeenNthCalledWith(1, 'importar_suministro_origen_580', expect.objectContaining({
       p_tenant_id: TENANT, p_actor_id: ACTOR, p_run_id: RUN, p_entidad: 'CONTRATO', p_id_origen: 'C-100',
     }));
     expect(result).toMatchObject({ okRows: 2, skippedRows: 1, errorRows: 0, created: 1 });
@@ -98,7 +98,7 @@ describe('Importadores FOX contra la base', () => {
 
   it('informa por registro el error de la base sin detener el lote', async () => {
     const rpc = jest.fn()
-      .mockResolvedValueOnce({ data: null, error: { code: '23503', message: 'MIGRATION_FOX_PRODUCT_NOT_FOUND: MED-001' } })
+      .mockResolvedValueOnce({ data: null, error: { code: '23503', message: 'MIGRATION_SOURCE_PRODUCT_NOT_FOUND: MED-001' } })
       .mockResolvedValueOnce({ data: { id: 'erp-2', action: 'CREATED' }, error: null });
     const { supabase, runs } = servicios(rpc);
     const result = await new ContratosSuministroImporter(supabase, runs).run(parseCsv(CONTRATOS), {
@@ -110,14 +110,14 @@ describe('Importadores FOX contra la base', () => {
 
   it('el ensayo usa la base revertida y no la importación', async () => {
     const rpc = jest.fn().mockResolvedValue({ data: { registros: [
-      { id_origen: 'C-100', ok: true }, { id_origen: 'C-200', ok: false, error: 'MIGRATION_FOX_CLIENT_NOT_FOUND: codigo=CLI-46' },
+      { id_origen: 'C-100', ok: true }, { id_origen: 'C-200', ok: false, error: 'MIGRATION_SOURCE_CLIENT_NOT_FOUND: codigo=CLI-46' },
     ] }, error: null });
     const { supabase, runs } = servicios(rpc);
     const result = await new ContratosSuministroImporter(supabase, runs).run(parseCsv(CONTRATOS), {
       tenantId: TENANT, startedBy: ACTOR, dryRun: true,
     });
     expect(rpc).toHaveBeenCalledTimes(1);
-    expect(rpc.mock.calls[0][0]).toBe('ensayar_migracion_fox_580');
+    expect(rpc.mock.calls[0][0]).toBe('ensayar_migracion_origen_580');
     expect(rpc.mock.calls[0][1].p_lote.contratos.map((r: any) => r.id_origen)).toEqual(['C-100', 'C-200']);
     expect(result).toMatchObject({ okRows: 2, errorRows: 1 });
     expect(result.errors[0]).toMatchObject({ rowIndex: 4, message: expect.stringContaining('importe antes los clientes') });
@@ -160,7 +160,7 @@ describe('Stock inicial con lote y vencimiento', () => {
   });
 });
 
-describe('Ensayo y conciliación FOX en el servicio', () => {
+describe('Ensayo y conciliación en el servicio', () => {
   const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
   function servicio(rpc: jest.Mock) {
     const fake = (runType: string) => ({ runType, requiredHeaders: [], getTemplate: jest.fn(), validate: jest.fn(() => []), run: jest.fn() }) as any;
@@ -168,20 +168,20 @@ describe('Ensayo y conciliación FOX en el servicio', () => {
     return new MigrationService(supabase, {} as any, fake('clientes'), fake('proveedores'), fake('cxc_abiertas'), fake('cxp_abiertas'),
       fake('balance_apertura'), new StockInicialImporter(supabase, {} as any), fake('comprobantes_historico'),
       new ContratosSuministroImporter(supabase, {} as any), new OcSuministroImporter(supabase, {} as any),
-      new CronogramaSuministroImporter(supabase, {} as any), new MaestrosFoxImporters(supabase, {} as any));
+      new CronogramaSuministroImporter(supabase, {} as any), new MaestrosOrigenImporters(supabase, {} as any));
   }
 
   it('ensaya todos los archivos juntos con su control y devuelve los errores de archivo', async () => {
     const rpc = jest.fn().mockResolvedValue({ data: { registros: [], conciliacion: { cuadra: true }, ensayo: true, errores: 0 }, error: null });
     const control = { contratos: { registros: 1, cantidad: 400 } };
-    const res = await servicio(rpc).ensayoFox({
+    const res = await servicio(rpc).ensayoOrigen({
       contratos: b64(CONTRATOS.replace('Otro,PEN', 'Otro,BOB')),
       stock: b64(`external_id_producto,sucursal_id,almacen_id,cantidad,costo_unitario,lote,fecha_vencimiento\nMED-1,${SUCURSAL},${ALMACEN},5,8,L1,2027-05-31`),
       fechaCorte: '2026-10-28',
       control,
     }, TENANT, ACTOR);
     const args = rpc.mock.calls[0][1];
-    expect(rpc.mock.calls[0][0]).toBe('ensayar_migracion_fox_582');
+    expect(rpc.mock.calls[0][0]).toBe('ensayar_migracion_origen_582');
     expect(args.p_lote.contratos.map((r: any) => r.id_origen)).toEqual(['C-100']);
     expect(args.p_lote.stock).toHaveLength(1);
     expect(args.p_control).toEqual(control);
@@ -191,29 +191,29 @@ describe('Ensayo y conciliación FOX en el servicio', () => {
 
   it('exige archivos y fecha de corte para el stock', async () => {
     const rpc = jest.fn();
-    await expect(servicio(rpc).ensayoFox({}, TENANT, ACTOR)).rejects.toBeInstanceOf(BadRequestException);
-    await expect(servicio(rpc).ensayoFox({ stock: b64('external_id_producto\nX') }, TENANT, ACTOR)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(servicio(rpc).ensayoOrigen({}, TENANT, ACTOR)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(servicio(rpc).ensayoOrigen({ stock: b64('external_id_producto\nX') }, TENANT, ACTOR)).rejects.toBeInstanceOf(BadRequestException);
     expect(rpc).not.toHaveBeenCalled();
   });
 
   it('concilia y traduce los rechazos de la base', async () => {
     const rpc = jest.fn().mockResolvedValueOnce({ data: { cuadra: false, entidades: [] }, error: null })
       .mockResolvedValueOnce({ data: null, error: { code: '42501', message: 'PERMISSION_DENIED' } })
-      .mockResolvedValueOnce({ data: null, error: { code: '22023', message: 'MIGRATION_FOX_CONTROL_INVALID' } });
+      .mockResolvedValueOnce({ data: null, error: { code: '22023', message: 'MIGRATION_SOURCE_CONTROL_INVALID' } });
     const s = servicio(rpc);
-    expect((await s.conciliarFox({ oc: {} }, TENANT, ACTOR)).data.cuadra).toBe(false);
-    await expect(s.conciliarFox({}, TENANT, ACTOR)).rejects.toBeInstanceOf(ForbiddenException);
-    await expect(s.conciliarFox({ nomina: {} }, TENANT, ACTOR)).rejects.toThrow('sólo admiten: clientes, proveedores');
-    expect(rpc.mock.calls[0][0]).toBe('conciliar_migracion_fox_582');
+    expect((await s.conciliarOrigen({ oc: {} }, TENANT, ACTOR)).data.cuadra).toBe(false);
+    await expect(s.conciliarOrigen({}, TENANT, ACTOR)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(s.conciliarOrigen({ nomina: {} }, TENANT, ACTOR)).rejects.toThrow('sólo admiten: clientes, proveedores');
+    expect(rpc.mock.calls[0][0]).toBe('conciliar_migracion_origen_582');
   });
 
-  it('cada ruta FOX exige su permiso', () => {
+  it('cada ruta de migración exige su permiso', () => {
     const esperado: Record<string, string> = {
       importContratosSuministro: 'migration.suministro.import',
       importOcSuministro: 'migration.suministro.import',
       importCronogramaSuministro: 'migration.suministro.import',
-      ensayoFox: 'migration.fox.import',
-      conciliacionFox: 'migration.validar.read',
+      ensayoOrigen: 'migration.origen.import',
+      conciliacionOrigen: 'migration.validar.read',
     };
     for (const [method, codigo] of Object.entries(esperado))
       expect(Reflect.getMetadata(PERMISSION_KEY, (MigrationController.prototype as any)[method])?.raw).toBe(codigo);

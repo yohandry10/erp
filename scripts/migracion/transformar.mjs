@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-// Convierte el extracto FOX en las plantillas de migración del ERP y calcula
+// Convierte el extracto en las plantillas de migración del ERP y calcula
 // los totales de control con las mismas reglas que la conciliación (582):
 // terceros, maestros, saldos abiertos (original - ejecutado > 0), balance,
 // suministro y stock.
 //
-// Uso: node scripts/fox/transformar-fox.mjs <mapeo.json> <carpeta-extracto> <carpeta-salida>
+// Uso: node scripts/migracion/transformar.mjs <mapeo.json> <carpeta-extracto> <carpeta-salida>
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { leerTabla } from './fox-dbf.mjs';
+import { archivosExtracto, leerTabla } from './leer-extracto.mjs';
 
 export const COLUMNAS = {
   clientes: ['external_id', 'tipo', 'tipo_documento', 'numero_documento', 'razon_social', 'direccion', 'email', 'telefono',
@@ -234,7 +234,7 @@ export function escribir(resultado, carpeta, mapeo) {
 
 export function cargarTablas(carpeta, opciones = {}) {
   const tablas = {};
-  for (const f of fs.readdirSync(carpeta).filter((x) => /\.(dbf|csv)$/i.test(x))) {
+  for (const f of archivosExtracto(carpeta)) {
     const t = leerTabla(path.join(carpeta, f), opciones);
     tablas[f.replace(/\.[^.]+$/, '').toUpperCase()] = t;
   }
@@ -244,7 +244,7 @@ export function cargarTablas(carpeta, opciones = {}) {
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const [mapeoPath, extracto, salida] = process.argv.slice(2);
   if (!mapeoPath || !extracto || !salida) {
-    console.error('Uso: node scripts/fox/transformar-fox.mjs <mapeo.json> <carpeta-extracto> <carpeta-salida>');
+    console.error('Uso: node scripts/migracion/transformar.mjs <mapeo.json> <carpeta-extracto> <carpeta-salida>');
     process.exit(2);
   }
   const mapeo = JSON.parse(fs.readFileSync(mapeoPath, 'utf8'));

@@ -1,6 +1,6 @@
 -- ============================================================================
 -- 577__supply_configurable_alerts.sql
--- F05 ALKHOFAR: alertas configurables de entregas, lotes y cobranza.
+-- F05 suministro: alertas configurables de entregas, lotes y cobranza.
 --
 -- Una regla por tipo y empresa define anticipación, destinatarios, escalamiento
 -- y correo. La evaluación es idempotente: una condición abierta tiene una sola

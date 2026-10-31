@@ -1,5 +1,5 @@
 {
-  "alcance": "Suministro ALKHOFAR F08-F10: migración FOX (580), perfiles y segregación (581), respaldo de Storage, exportación integral y capacitación por función",
+  "alcance": "Suministro suministro F08-F10: migración FOX (580), perfiles y segregación (581), respaldo de Storage, exportación integral y capacitación por función",
   "fecha": "2026-10-28",
   "entorno": "Sólo infraestructura local efímera; nada se aplicó en PROD",
   "sql": {
@@ -21,14 +21,14 @@
     "playwright": "28 aprobadas con dobles locales: lotes, contratos, expediente, entregas, estado de cuenta, alertas, penalidades, tablero, migración FOX y capacitación"
   },
   "fox": "node --test scripts/fox/fox.test.mjs: 4 aprobadas con tablas Visual FoxPro sintéticas (CP850, memo FPT, moneda, fecha-hora, borrados)",
-  "storage": "artifacts/alkhofar-f09-recuperacion/storage-restore-local.json: respaldo, respaldo alterado rechazado, restauración por empresa y completa verificadas por SHA-256, destino remoto rechazado (Docker efímero)",
-  "exportacion": "artifacts/alkhofar-f09-recuperacion/exportacion-tenant-local.json: 282 tablas de una empresa sin filas de otra, conteos de una instantánea, hashes y secretos vacíos",
+  "storage": "artifacts/suministro-f09-recuperacion/storage-restore-local.json: respaldo, respaldo alterado rechazado, restauración por empresa y completa verificadas por SHA-256, destino remoto rechazado (Docker efímero)",
+  "exportacion": "artifacts/suministro-f09-recuperacion/exportacion-tenant-local.json: 282 tablas de una empresa sin filas de otra, conteos de una instantánea, hashes y secretos vacíos",
   "documentos": "scripts/check-docs-contract.mjs: 6 archivos canónicos, sin subdirectorios",
   "no_verificado": [
     "Promoción de 570-581 a PROD",
     "Extracto FOX real (sólo tablas sintéticas)",
     "RTO de PROD y respaldo de Storage contra el proyecto real",
-    "Piloto y aceptación con usuarios de ALKHOFAR",
+    "Piloto y aceptación con usuarios de suministro",
     "Anexos comerciales: equipo, licencias, costos, exclusiones y SLA"
   ]
 }

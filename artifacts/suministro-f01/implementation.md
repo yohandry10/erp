@@ -1,4 +1,4 @@
-# Primera entrega de contratos de suministro para ALKHOFAR
+# Primera entrega de contratos de suministro para suministro
 
 Corte de desarrollo: 27 de octubre de 2026. Feature independiente de la matriz
 de aceptación existente. La migración 570 está propuesta en esta rama; no se
@@ -46,14 +46,14 @@ ha operado PROD ni se ha publicado esta entrega.
 ## Límites y siguiente trabajo
 
 Esta entrega es el núcleo de planificación de F01. No declara terminada toda
-la feature ni el alcance solicitado por ALKHOFAR. No crea reservas físicas,
+la feature ni el alcance solicitado por suministro. No crea reservas físicas,
 pedidos, despachos, documentos fiscales ni asientos.
 
 | Entrega | Estado | Trabajo siguiente |
 | --- | --- | --- |
 | F01 núcleo de planificación | Implementado y validado localmente | Promoción coordinada pendiente, conforme al contrato PROD-only |
-| F01 adendas y modificaciones | Implementado y validado localmente en el segundo incremento | Referencias, versiones, precios congelados y anulación de OC; ver `../alkhofar-f01-adendas/implementation.md`. Adjuntos incorporados en el tercer incremento |
-| F01 ejecución mediante pedidos y adjuntos | Implementado y validado localmente | Vínculo completo protegido y expediente privado; ver `../alkhofar-f01-expediente/implementation.md`. Promoción pendiente |
+| F01 adendas y modificaciones | Implementado y validado localmente en el segundo incremento | Referencias, versiones, precios congelados y anulación de OC; ver `../suministro-f01-adendas/implementation.md`. Adjuntos incorporados en el tercer incremento |
+| F01 ejecución mediante pedidos y adjuntos | Implementado y validado localmente | Vínculo completo protegido y expediente privado; ver `../suministro-f01-expediente/implementation.md`. Promoción pendiente |
 | F02 lotes y reservas | Pendiente | Saldos por lote/almacén/ubicación, vencimientos y adaptación de todos los escritores |
 | F03 entregas y PECOSAS | Pendiente | Cantidades recibidas/aceptadas/rechazadas, conformidades y adjuntos |
 | F04 facturación y conciliación | Pendiente | Facturación parcial y saldos por contrato/OC |

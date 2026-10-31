@@ -1,4 +1,4 @@
-# ALKHOFAR · F01, segundo incremento
+# suministro · F01, segundo incremento
 
 Trabajo local como feature, separado de la matriz de aceptación existente. No se
 han aplicado migraciones, publicado servicios ni escrito datos en PROD.
@@ -61,7 +61,7 @@ F01 aún requiere vincular pedidos operativos y adjuntos del expediente. Una
 referencia de adenda no acredita archivo, firma, aprobación legal ni aceptación
 del cliente. No se crean reservas físicas, entregas ejecutadas, facturas,
 conformidades, penalidades ni asientos. F02 lotes y las siguientes features
-continúan pendientes según el plan de `../alkhofar-f01/implementation.md`.
+continúan pendientes según el plan de `../suministro-f01/implementation.md`.
 
 La promoción de 570–571 y del runtime que exige 571 sigue pendiente. Antes de
 operar PROD: releer OPERATIONS, revisar rango vigente/prefijos, preflight,

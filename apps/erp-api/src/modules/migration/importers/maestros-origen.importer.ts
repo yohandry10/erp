@@ -3,9 +3,9 @@ import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { MigrationRunsService } from '../migration-runs.service';
 import { nonEmpty } from '../util/csv-parser.util';
 import { Importer } from './importer.interface';
-import { FoxImporterBase, SpecFox, esVerdadero } from './suministro-fox.importer';
+import { OrigenImporterBase, SpecOrigen, esVerdadero } from './suministro-origen.importer';
 
-/** Unidades que el maestro de productos admite (SUNAT); FOX se homologa a ellas. */
+/** Unidades que el maestro de productos admite (SUNAT); el origen se homologa a ellas. */
 export const UNIDADES_ERP = ['NIU', 'KGM', 'LTR', 'MTR', 'ZZ'];
 const MONEDAS = ['PEN', 'USD', 'EUR', 'COP', 'ARS'];
 const n = (v: string | undefined) => (nonEmpty(v) === null ? undefined : Number(v));
@@ -21,9 +21,9 @@ const noSupera = (original: string, ejecutado: string) => (row: Record<string, s
   if (Number(row[ejecutado]) > Number(row[original])) err(ejecutado, `${ejecutado} no puede superar ${original}`);
 };
 
-const base = { rpc: 'importar_maestro_fox_582' as const, opcionales: [] as string[], cabecera: [] as string[], numericas: [] as string[], fechas: [] as string[] };
+const base = { rpc: 'importar_maestro_origen_582' as const, opcionales: [] as string[], cabecera: [] as string[], numericas: [] as string[], fechas: [] as string[] };
 
-export const SPECS_MAESTROS: Record<string, SpecFox> = {
+export const SPECS_MAESTROS: Record<string, SpecOrigen> = {
   PRODUCTO: {
     ...base,
     runType: 'productos', entidad: 'PRODUCTO', tabla: 'productos', clave: 'id_origen_producto', claveLote: 'productos', unaFila: true,
@@ -34,7 +34,7 @@ export const SPECS_MAESTROS: Record<string, SpecFox> = {
     booleanas: ['controla_lote', 'requiere_vencimiento'],
     validarFila: (row, err) => {
       if (nonEmpty(row.unidad_medida) && !UNIDADES_ERP.includes(row.unidad_medida.trim().toUpperCase()))
-        err('unidad_medida', `unidad_medida debe ser ${UNIDADES_ERP.join(', ')} (homologue la unidad de FOX)`);
+        err('unidad_medida', `unidad_medida debe ser ${UNIDADES_ERP.join(', ')} (homologue la unidad del sistema anterior)`);
       if (nonEmpty(row.afectacion_igv) && !/^\d{2}$/.test(row.afectacion_igv.trim())) err('afectacion_igv', 'afectacion_igv es un código de 2 dígitos');
       if (nonEmpty(row.codigo) && row.codigo.trim().length > 60) err('codigo', 'codigo: hasta 60 caracteres');
     },
@@ -144,7 +144,13 @@ export const SPECS_MAESTROS: Record<string, SpecFox> = {
       'precio_unitario'],
     cabecera: ['numero', 'cliente_codigo', 'moneda'],
     numericas: ['cantidad_original', 'cantidad_despachada', 'precio_unitario'],
-    validarFila: (row, err) => { moneda(row, err); noSupera('cantidad_original', 'cantidad_despachada')(row, err); },
+    validarFila: (row, err) => {
+      moneda(row, err);
+      noSupera('cantidad_original', 'cantidad_despachada')(row, err);
+      const precio = Number(row.precio_unitario);
+      if (Number.isFinite(precio) && Math.round(precio * 100) / 100 !== precio)
+        err('precio_unitario', 'precio_unitario: un pedido guarda hasta 2 decimales; ajústelo en el origen para no alterar el precio pactado sin aviso');
+    },
     ejemplo: [['PV-31', 'PED-2026-0931', 'CLI-0045', 'PEN', 'MED-001', '120', '40', '12.50']],
     armar: (filas) => {
       const f = filas[0];
@@ -157,19 +163,19 @@ export const SPECS_MAESTROS: Record<string, SpecFox> = {
   },
 };
 
-class MaestroFoxImporter extends FoxImporterBase {
+class MaestroOrigenImporter extends OrigenImporterBase {
   readonly runType: Importer['runType'];
-  constructor(supabase: SupabaseService, runs: MigrationRunsService, protected readonly spec: SpecFox) {
+  constructor(supabase: SupabaseService, runs: MigrationRunsService, protected readonly spec: SpecOrigen) {
     super(supabase, runs);
     this.runType = spec.runType as Importer['runType'];
   }
 }
 
-/** Importadores de maestros y saldos abiertos FOX que faltaban (582). */
+/** Importadores de maestros y saldos abiertos del sistema anterior que faltaban (582). */
 @Injectable()
-export class MaestrosFoxImporters {
+export class MaestrosOrigenImporters {
   readonly todos: Importer[];
   constructor(supabase: SupabaseService, runs: MigrationRunsService) {
-    this.todos = Object.values(SPECS_MAESTROS).map((spec) => new MaestroFoxImporter(supabase, runs, spec));
+    this.todos = Object.values(SPECS_MAESTROS).map((spec) => new MaestroOrigenImporter(supabase, runs, spec));
   }
 }

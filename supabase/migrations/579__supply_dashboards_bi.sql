@@ -1,6 +1,6 @@
 -- ============================================================================
 -- 579__supply_dashboards_bi.sql
--- F07 ALKHOFAR: tablero de suministro, cortes conciliables y lectura para BI.
+-- F07 suministro: tablero de suministro, cortes conciliables y lectura para BI.
 --
 -- El tablero se calcula de los mismos datos que el expediente (entregas,
 -- recepciones, estado de cuenta 576, lotes 574 y penalidades 578). Un corte es

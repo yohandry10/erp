@@ -1,4 +1,4 @@
-# ALKHOFAR · F02: inventario por lote y vencimiento
+# suministro · F02: inventario por lote y vencimiento
 
 Feature local; la migración 574 no se promovió a PROD ni hubo escrituras remotas.
 

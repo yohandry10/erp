@@ -8,7 +8,7 @@ import {
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { MigrationRunsService } from './migration-runs.service';
 import {
-  FoxEnsayoDto,
+  OrigenEnsayoDto,
   ImporterResult,
   ImporterRowError,
   MigrationImportDto,
@@ -25,15 +25,15 @@ import { BalanceAperturaImporter } from './importers/balance-apertura.importer';
 import { filasEnsayoStock, StockInicialImporter } from './importers/stock-inicial.importer';
 import { ComprobantesHistoricoImporter } from './importers/comprobantes-historico.importer';
 import {
-  mensajeFox,
+  mensajeOrigen,
   ContratosSuministroImporter,
   CronogramaSuministroImporter,
   OcSuministroImporter,
   SPECS,
-  SpecFox,
+  SpecOrigen,
   construirLote,
-} from './importers/suministro-fox.importer';
-import { MaestrosFoxImporters, SPECS_MAESTROS } from './importers/maestros-fox.importer';
+} from './importers/suministro-origen.importer';
+import { MaestrosOrigenImporters, SPECS_MAESTROS } from './importers/maestros-origen.importer';
 
 @Injectable()
 export class MigrationService {
@@ -53,7 +53,7 @@ export class MigrationService {
     contratosImporter: ContratosSuministroImporter,
     ocImporter: OcSuministroImporter,
     cronogramaImporter: CronogramaSuministroImporter,
-    maestrosFox: MaestrosFoxImporters,
+    maestrosOrigen: MaestrosOrigenImporters,
   ) {
     this.importers = new Map<MigrationRunType, Importer>();
     [
@@ -67,7 +67,7 @@ export class MigrationService {
       contratosImporter,
       ocImporter,
       cronogramaImporter,
-      ...maestrosFox.todos,
+      ...maestrosOrigen.todos,
     ].forEach((imp) => this.importers.set(imp.runType, imp));
   }
 
@@ -121,6 +121,7 @@ export class MigrationService {
         tenantId,
         startedBy: userId ?? null,
         fechaCorte: body.fechaCorte ?? null,
+        sistemaOrigen: body.sistemaOrigen ?? null,
         totalDeclarado: body.totalDeclarado ?? null,
         dryRun: true,
       };
@@ -146,6 +147,7 @@ export class MigrationService {
         tenantId,
         startedBy: userId ?? null,
         fechaCorte: body.fechaCorte ?? null,
+        sistemaOrigen: body.sistemaOrigen ?? null,
         totalDeclarado: body.totalDeclarado ?? null,
         dryRun: false,
         runCtx,
@@ -194,15 +196,15 @@ export class MigrationService {
   }
 
   /**
-   * Ensayo FOX integral en la base y revertido: terceros, maestros, saldos
+   * Ensayo integral en la base y revertido: terceros, maestros, saldos
    * abiertos, balance, suministro y stock en el orden real, con las mismas
    * validaciones y payloads de cada importador, errores por registro y
    * conciliación contra el control.
    */
-  async ensayoFox(dto: FoxEnsayoDto, tenantId: string, userId: string) {
+  async ensayoOrigen(dto: OrigenEnsayoDto, tenantId: string, userId: string) {
     const lote: Record<string, unknown[]> = {};
     const errores: Array<ImporterRowError & { archivo: string }> = [];
-    const leer = (archivo: keyof FoxEnsayoDto) => this.parseCsvFile(this.decodeCsv(dto[archivo] as string));
+    const leer = (archivo: keyof OrigenEnsayoDto) => this.parseCsvFile(this.decodeCsv(dto[archivo] as string));
     const anotar = (archivo: string, e: ImporterRowError[]) => {
       errores.push(...e.map((x) => ({ ...x, archivo })));
       return new Set(e.map((x) => x.rowIndex));
@@ -239,13 +241,13 @@ export class MigrationService {
         centro_costo_codigo: nonEmpty(row.centro_costo_codigo), descripcion: nonEmpty(row.descripcion),
       } }));
     }
-    const fox: Array<[keyof FoxEnsayoDto, SpecFox]> = [
+    const especificos: Array<[keyof OrigenEnsayoDto, SpecOrigen]> = [
       ['almacenes', SPECS_MAESTROS.ALMACEN], ['plan_cuentas', SPECS_MAESTROS.CUENTA_CONTABLE], ['productos', SPECS_MAESTROS.PRODUCTO],
       ['cuentas_bancarias', SPECS_MAESTROS.CUENTA_BANCARIA], ['listas_precios', SPECS_MAESTROS.LISTA_PRECIOS],
       ['contratos', SPECS.CONTRATO], ['oc', SPECS.OC], ['cronograma', SPECS.ENTREGA],
       ['oc_compra', SPECS_MAESTROS.OC_COMPRA], ['pedidos_venta', SPECS_MAESTROS.PEDIDO_VENTA],
     ];
-    for (const [archivo, spec] of fox) {
+    for (const [archivo, spec] of especificos) {
       if (!dto[archivo]) continue;
       const { registros, errores: e } = construirLote(spec, leer(archivo));
       anotar(archivo, e);
@@ -259,26 +261,28 @@ export class MigrationService {
         : filasEnsayoStock(parsed, fechaCorte).filter((f) => !conError.has(f.fila));
     }
     if (!Object.keys(lote).length) throw new BadRequestException('Adjunte al menos un archivo para ensayar');
-    const { data, error } = await this.supabase.getLongRunningClient().rpc('ensayar_migracion_fox_582', {
+    const { data, error } = await this.supabase.getLongRunningClient().rpc('ensayar_migracion_origen_582', {
       p_tenant_id: tenantId,
       p_actor_id: userId,
       p_lote: lote,
       p_control: dto.control ?? null,
       p_fecha_corte: fechaCorte,
+      ...(dto.sistemaOrigen ? { p_origen: dto.sistemaOrigen } : {}),
     });
-    if (error) foxFailure(error);
+    if (error) origenFailure(error);
     if (!Array.isArray(data?.registros)) throw new ServiceUnavailableException('El ensayo no devolvió resultados. Reintente.');
-    const registros = data.registros.map((r: { error?: string }) => (r.error ? { ...r, error: mensajeFox(r.error) } : r));
+    const registros = data.registros.map((r: { error?: string }) => (r.error ? { ...r, error: mensajeOrigen(r.error) } : r));
     return { success: true, data: { ...data, registros, errores_archivo: errores } };
   }
 
-  async conciliarFox(control: Record<string, unknown>, tenantId: string, userId: string) {
-    const { data, error } = await this.supabase.getLongRunningClient().rpc('conciliar_migracion_fox_582', {
+  async conciliarOrigen(control: Record<string, unknown>, tenantId: string, userId: string, sistemaOrigen?: string) {
+    const { data, error } = await this.supabase.getLongRunningClient().rpc('conciliar_migracion_origen_582', {
       p_tenant_id: tenantId,
       p_actor_id: userId,
       p_control: control,
+      ...(sistemaOrigen ? { p_origen: sistemaOrigen } : {}),
     });
-    if (error) foxFailure(error);
+    if (error) origenFailure(error);
     if (!Array.isArray(data?.entidades)) throw new ServiceUnavailableException('La conciliación no devolvió resultados. Reintente.');
     return { success: true, data };
   }
@@ -324,15 +328,16 @@ export class MigrationService {
 }
 
 /** Entidades que la conciliación 582 compara contra el extracto. */
-export const CONTROL_FOX = ['clientes', 'proveedores', 'almacenes', 'cuentas_contables', 'productos', 'cuentas_bancarias',
+export const CONTROL_ORIGEN = ['clientes', 'proveedores', 'almacenes', 'cuentas_contables', 'productos', 'cuentas_bancarias',
   'listas_precios', 'cxc', 'cxp', 'balance', 'stock', 'contratos', 'oc', 'entregas', 'oc_compra', 'pedidos_venta'];
 
-function foxFailure(error: { code?: string; message?: string }): never {
-  if (error.code === '42501') throw new ForbiddenException('No tiene permiso para migrar o conciliar desde FOX.');
+function origenFailure(error: { code?: string; message?: string }): never {
+  if (error.code === '42501') throw new ForbiddenException('No tiene permiso para migrar o conciliar desde el sistema anterior.');
   if (error.code === '22023') {
     const codigo = (error.message || '').split(':')[0].trim();
-    throw new BadRequestException(codigo === 'MIGRATION_FOX_CONTROL_INVALID'
-      ? `Los totales de control sólo admiten: ${CONTROL_FOX.join(', ')}.`
+    if (codigo === 'MIGRATION_SOURCE_NAME_INVALID') throw new BadRequestException('El sistema de origen admite de 2 a 30 letras, números, espacios, punto, guion o guion bajo.');
+    throw new BadRequestException(codigo === 'MIGRATION_SOURCE_CONTROL_INVALID'
+      ? `Los totales de control sólo admiten: ${CONTROL_ORIGEN.join(', ')}.`
       : 'Revise el lote: entidades y archivos válidos.');
   }
   throw new ServiceUnavailableException('El servicio de migración no está disponible. Reintente.');

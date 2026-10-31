@@ -1,4 +1,4 @@
-# ALKHOFAR · F01, tercer incremento: pedidos y adjuntos
+# suministro · F01, tercer incremento: pedidos y adjuntos
 
 Feature local separada de la matriz de aceptación. Las migraciones 570–573 y
 el runtime que exige 573 siguen sin promoverse a PROD. No hubo escrituras remotas.

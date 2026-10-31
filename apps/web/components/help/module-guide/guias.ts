@@ -417,9 +417,9 @@ export const guias: Record<string, GuiaModulo> = {
     ],
   },
 
-  '/dashboard/migracion-fox': {
-    titulo: 'Migración desde FOX',
-    queEs: 'El paso desde el sistema anterior en dos capas: el archivo íntegro de cada tabla de FOX y la migración de terceros, maestros y saldos abiertos.',
+  '/dashboard/migracion': {
+    titulo: 'Migración desde otro sistema',
+    queEs: 'El paso desde el sistema anterior en dos capas: el archivo íntegro de cada tabla del sistema anterior y la migración de terceros, maestros y saldos abiertos.',
     quePuedesHacer: [
       'Descargar plantillas y ensayar toda la migración junta sin escribir',
       'Importar archivo por archivo en orden y repetir sin duplicar',
