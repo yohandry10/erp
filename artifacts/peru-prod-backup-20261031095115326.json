@@ -1,0 +1,19 @@
+{
+  "completedAt": "2026-10-31T09:57:12.672Z",
+  "project": "wypnbcptofqdmoynlonq",
+  "remoteWrites": false,
+  "archive": "C:\\Users\\PC\\Desktop\\erp\\.claude\\worktrees\\alkhofar-supply\\artifacts\\db-backups\\prod-pre-peru-552-20261031095115326.dump",
+  "schemas": [
+    "public",
+    "app",
+    "auth",
+    "storage",
+    "supabase_migrations"
+  ],
+  "bytes": 17911582,
+  "sha256": "6ac459c1bfbb9569dbd484d4533eab54e2e861cb0678cec155ba1409b2a773c6",
+  "catalogEntries": 7973,
+  "durationMs": 357396,
+  "restoreVerified": false,
+  "limits": "Respaldo lógico de esquemas de la aplicación. No incluye objetos externos de Storage ni roles globales."
+}
