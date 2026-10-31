@@ -1,5 +1,5 @@
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
-import { CrearDocumentoManualDto, CrearSerieDocumentoDto } from './documentos.dto';
+import { CrearDocumentoManualDto, CrearSerieDocumentoDto, DocumentoFiltrosDto } from './documentos.dto';
 
 describe('CrearDocumentoManualDto — frontera estricta', () => {
   const pipe = new ValidationPipe({
@@ -50,6 +50,25 @@ describe('CrearDocumentoManualDto — frontera estricta', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     },
   );
+
+  it.each(['NOTA_CREDITO', 'NOTA_DEBITO', 'GUIA_REMISION', 'TICKET'])(
+    'permite consultar %s sin ampliar el writer manual',
+    async (tipo) => {
+      await expect(pipe.transform({ tipo_documento: tipo }, {
+        type: 'query' as const, metatype: DocumentoFiltrosDto, data: '',
+      })).resolves.toMatchObject({ tipo_documento: tipo });
+      await expect(pipe.transform({ ...valid, tipo_documento: tipo }, metadata))
+        .rejects.toBeInstanceOf(BadRequestException);
+    },
+  );
+
+  it('rechaza códigos fiscales y tipos desconocidos en el filtro del repositorio', async () => {
+    for (const tipo of ['01', '03', 'NO_EXISTE']) {
+      await expect(pipe.transform({ tipo_documento: tipo }, {
+        type: 'query' as const, metatype: DocumentoFiltrosDto, data: '',
+      })).rejects.toBeInstanceOf(BadRequestException);
+    }
+  });
 
   it('exige clave idempotente y al menos una línea', async () => {
     await expect(

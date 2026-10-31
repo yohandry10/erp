@@ -43,7 +43,8 @@ try{
  const report=await call(reports,definition),url=reports+'/'+report.id+'/generar?fecha_desde=2026-09-01&fecha_hasta=2026-09-30';
  const total=r=>Number(r.lineas.find(l=>l.codigo==='TOTAL').valor);
  const individual=await call(url);assert.equal(total(individual),100);assert.equal(Number(individual.lineas.find(l=>l.codigo==='ACUMULADO').valor),130);pass('Reportes: período/acumulado y fórmula excluyen borradores, futuro y empresa ajena');
- let before=reportState();await call(reports,definition,409);assert.equal(reportState(),before);pass('Reportes: código duplicado no inserta otra definición');
+ let before=reportState();const same=await call(reports,definition);assert.equal(same.id,report.id);assert.equal(same.idempotent,true);assert.equal(reportState(),before);
+ await call(reports,{...definition,nombre:'Otra definición con el mismo código'},409);assert.equal(reportState(),before);pass('Reportes: repetición idéntica del mismo actor recupera el original; código con definición distinta rechaza sin insertar ni reemplazar');
  for(const [name,lineas] of [
   ['ciclo',[{codigo:'A',nombre:'A',orden:1,tipo:'FORMULA',formula:[{codigo:'B',coeficiente:1}]},{codigo:'B',nombre:'B',orden:2,tipo:'FORMULA',formula:[{codigo:'A',coeficiente:1}]}]],
   ['referencia ausente',[{codigo:'A',nombre:'A',orden:1,tipo:'FORMULA',formula:[{codigo:'NO_EXISTE',coeficiente:1}]}]],

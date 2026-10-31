@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { fiscalCountryFixture } from "./fixtures/fiscal-country";
 import { SignJWT } from "jose";
 import fs from "node:fs";
 import path from "node:path";
@@ -25,6 +26,7 @@ async function waitForThemeRouteReady(page: Page) {
 }
 
 function readJwtSecret(): string {
+  if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
   for (const envPath of [
     path.resolve(process.cwd(), ".env.local"),
     path.resolve(process.cwd(), "../../.env"),
@@ -221,17 +223,7 @@ test.describe("Contrato de tema del dashboard", () => {
         return route.fulfill({
           status: 200,
           contentType: "application/json",
-          body: JSON.stringify({
-            data: {
-              pais_id: 1,
-              pais: "PE",
-              monedaDefecto: "PEN",
-              tipo_empresa: "MICRO",
-              usar_flujo_logistica: false,
-              gre_obligatorio: false,
-              gre_automatico_habilitado: false,
-            },
-          }),
+          body: JSON.stringify(fiscalCountryFixture(apiUser.tenant_id, { pais_id: 1, pais: "PE", monedaDefecto: "PEN" })),
         });
       }
       if (/\/api\/demo\/status\/?$/.test(pathname)) {

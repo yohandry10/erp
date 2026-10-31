@@ -1,5 +1,6 @@
 'use client'
 
+import { requestConfirmation } from '@/lib/confirm-action'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
@@ -341,7 +342,7 @@ function CategoriasContent() {
   }
 
   const handleDelete = async (id: string, nombre: string) => {
-    if (!confirm(`¿Eliminar la categoría "${nombre}"? Los productos con esta categoría no se verán afectados.`))
+    if (!(await requestConfirmation(`¿Eliminar la categoría "${nombre}"? Los productos con esta categoría no se verán afectados.`)))
       return
     try {
       const resp = await del(`/inventario/categorias/${id}`, {

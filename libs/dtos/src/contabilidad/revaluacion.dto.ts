@@ -1,23 +1,11 @@
-import { IsString, IsNumber, IsOptional, IsDateString, IsUUID, IsIn } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsDateString, IsUUID, IsIn, IsObject, MinLength, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
 export class RevaluacionQueryDto {
   @ApiProperty({ description: 'Fecha de corte de la revaluación (YYYY-MM-DD)' })
   @IsDateString()
   fecha: string;
-}
-
-export class EjecutarRevaluacionDto {
-  @ApiProperty({ description: 'Fecha de corte de la revaluación (YYYY-MM-DD)' })
-  @IsDateString()
-  fecha: string;
-
-  @ApiPropertyOptional({
-    description: 'Concepto del asiento generado. Por omisión se describe la fecha de corte.'
-  })
-  @IsOptional()
-  @IsString()
-  concepto?: string;
 }
 
 /** Una posición monetaria en moneda extranjera pendiente de revaluar. */
@@ -104,4 +92,26 @@ export class RevaluacionResponseDto {
   @ApiPropertyOptional({ description: 'Número del asiento generado. Solo al ejecutar.' })
   @IsOptional()
   numero_asiento?: string | number;
+}
+
+export class EjecutarRevaluacionDto {
+  @ApiProperty({ description: 'Fecha de corte de la revaluación (YYYY-MM-DD)' })
+  @IsDateString()
+  fecha: string;
+
+  @ApiProperty({ type: RevaluacionResponseDto, description: 'Simulación que el usuario revisó antes de confirmar' })
+  @Type(() => Object)
+  @IsObject()
+  simulacion: RevaluacionResponseDto;
+
+  @ApiProperty({ description: 'Identifica esta intención y sus reintentos' })
+  @IsString()
+  @MinLength(8)
+  @MaxLength(200)
+  idempotency_key: string;
+
+  @ApiPropertyOptional({ description: 'Concepto del asiento generado. Por omisión se describe la fecha de corte.' })
+  @IsOptional()
+  @IsString()
+  concepto?: string;
 }

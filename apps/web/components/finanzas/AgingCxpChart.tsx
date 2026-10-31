@@ -1,7 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { useApi } from '@/hooks/use-api'
+import { useState } from 'react'
+import { useFinanceReport } from '@/hooks/use-finance-report'
+import FinanceReportStatus from './FinanceReportStatus'
+import { readAgingReport, sumReportMoney } from '@/lib/finanzas/report-read-contract'
 import { BarChart3, TrendingUp, AlertTriangle, RefreshCw } from 'lucide-react'
 import { useCountryContext } from '@/hooks/use-country-context'
 
@@ -40,6 +42,7 @@ interface AgingData {
 
 interface AgingCxpChartProps {
   proveedorId?: string
+  onReadyChange?: (ready: boolean) => void
 }
 
 const toNumber = (value: unknown) => {
@@ -49,76 +52,45 @@ const toNumber = (value: unknown) => {
 
 const emptyRange = { cantidad: 0, monto: 0 }
 
-const normalizeAgingData = (raw: any): AgingData => ({
-  fecha_reporte: raw?.fecha_reporte || new Date().toISOString(),
-  resumen: {
-    rango_0_30: {
-      cantidad: toNumber(raw?.resumen?.rango_0_30?.cantidad),
-      monto: toNumber(raw?.resumen?.rango_0_30?.monto),
-    },
-    rango_31_60: {
-      cantidad: toNumber(raw?.resumen?.rango_31_60?.cantidad),
-      monto: toNumber(raw?.resumen?.rango_31_60?.monto),
-    },
-    rango_61_90: {
-      cantidad: toNumber(raw?.resumen?.rango_61_90?.cantidad),
-      monto: toNumber(raw?.resumen?.rango_61_90?.monto),
-    },
-    rango_mas_90: {
-      cantidad: toNumber(raw?.resumen?.rango_mas_90?.cantidad),
-      monto: toNumber(raw?.resumen?.rango_mas_90?.monto),
-    },
-    total: {
-      cantidad: toNumber(raw?.resumen?.total?.cantidad),
-      monto: toNumber(raw?.resumen?.total?.monto),
-    },
-  },
-  por_proveedor: Array.isArray(raw?.por_proveedor) ? raw.por_proveedor : [],
-  detalle: Array.isArray(raw?.detalle) ? raw.detalle : [],
-})
+const normalizeAgingData = (raw: any, moneda: string): AgingData => {
+  const resumen: any = Object.fromEntries(['rango_0_30','rango_31_60','rango_61_90','rango_mas_90','total'].map(key => [key,{ cantidad:0,monto:0 }]))
+  const providers = new Map<string, any>()
+  const detalle = raw.detalle.filter((row: any) => row.moneda === moneda)
+  for (const row of detalle) {
+    if (row.dias_vencidos <= 0) continue
+    resumen[row.rango].cantidad += 1
+    resumen[row.rango].monto = sumReportMoney([resumen[row.rango].monto, row.saldo])
+    resumen.total.cantidad += 1
+    resumen.total.monto = sumReportMoney([resumen.total.monto, row.saldo])
+    const provider = providers.get(row.proveedor_id) ?? { proveedor_id:row.proveedor_id,
+      proveedor_razon_social:row.proveedor_razon_social,proveedor_ruc:row.proveedor_ruc,
+      rango_0_30:0,rango_31_60:0,rango_61_90:0,rango_mas_90:0,por_vencer:0,total:0,cantidad_cxp:0 }
+    provider[row.rango] = sumReportMoney([provider[row.rango],row.saldo])
+    provider.total = sumReportMoney([provider.total,row.saldo]); provider.cantidad_cxp += 1
+    providers.set(row.proveedor_id,provider)
+  }
+  return { fecha_reporte:raw.fecha_reporte,resumen,detalle,
+    por_proveedor:Array.from(providers.values()).sort((a,b) => b.total-a.total) }
+}
 
-export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
-  const { get } = useApi()
+export default function AgingCxpChart({ proveedorId, onReadyChange }: AgingCxpChartProps) {
   const country = useCountryContext()
   const taxIdLabel = country.paisCodigo === 'AR' ? 'CUIT' : country.paisCodigo === 'CO' ? 'NIT' : 'RUC'
-  const [agingData, setAgingData] = useState<AgingData | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  const loadAgingData = useCallback(async () => {
-    try {
-      setLoading(true)
-      const params = proveedorId ? `?proveedor_id=${proveedorId}` : ''
-      const response = await get(`/api/finanzas/cxp/aging${params}`)
-
-      if (response?.success) {
-        setAgingData(normalizeAgingData(response.data))
-      }
-    } catch (error) {
-      console.error('Error loading aging data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [get, proveedorId])
-
-  useEffect(() => {
-    loadAgingData()
-  }, [loadAgingData])
+  const [selectedMoneda, setSelectedMoneda] = useState(country.moneda || 'PEN')
+  const { data, loading, error, reload: loadAgingData } = useFinanceReport(
+    `/api/finanzas/cxp/aging${proveedorId ? `?proveedor_id=${proveedorId}` : ''}`, readAgingReport, onReadyChange)
+  const monedas = Array.from(new Set<string>((data?.detalle ?? []).map((row: any) => row.moneda))).sort()
+  const moneda = monedas.includes(selectedMoneda) ? selectedMoneda : monedas[0] || country.moneda || 'PEN'
+  const agingData = data ? normalizeAgingData(data, moneda) : null
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: country.moneda || 'PEN',
+      currency: moneda,
     }).format(toNumber(amount))
   }
 
-  if (loading) {
-    return (
-      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl p-8 text-center">
-        <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
-        <p className="text-muted-foreground">Cargando reporte de aging...</p>
-      </div>
-    )
-  }
+  if (loading || error) return <FinanceReportStatus loading={loading} retry={loadAgingData} />
 
   const resumen = agingData?.resumen ?? {
     rango_0_30: emptyRange,
@@ -137,8 +109,10 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
           No hay cuentas vencidas
         </h3>
         <p className="text-muted-foreground">
-          Todas las cuentas por pagar están al día
+          {monedas.length ? `Todas las cuentas por pagar en ${moneda} están al día` : 'No hay cuentas por pagar pendientes en el corte consultado'}
         </p>
+        {monedas.length > 1 && <select aria-label="Moneda Aging" value={moneda} onChange={event => setSelectedMoneda(event.target.value)}>{monedas.map(code => <option key={code} value={code}>{code}</option>)}</select>}
+        <button type="button" onClick={loadAgingData} className="mt-4 rounded border px-4 py-2">Actualizar</button>
       </div>
     )
   }
@@ -188,6 +162,7 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
 
   return (
     <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
+      <div className="mb-4"><label htmlFor="aging-cxp-moneda">Moneda</label><select id="aging-cxp-moneda" value={moneda} onChange={event => setSelectedMoneda(event.target.value)} className="ml-3 rounded border p-2">{monedas.map(code => <option key={code} value={code}>{code}</option>)}</select></div>
       {/* Header */}
       <div className="flex justify-between items-center mb-6 pb-4 border-b">
         <div className="flex items-center gap-3">
@@ -258,7 +233,7 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
                 </div>
               </div>
               <div className="w-[100%] h-8 rounded-[6px] overflow-hidden relative">
-                <div className="h-[100%] transition flex items-center justify-end pr-3">
+                <div className="h-[100%] transition flex items-center justify-end pr-3" style={{ width: `${range.percentage}%`, backgroundColor: range.color }}>
                   {range.percentage > 15 && (
                     <span className="text-xs font-semibold text-white">
                       {range.percentage.toFixed(0)}%

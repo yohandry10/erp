@@ -20,8 +20,8 @@ export default function PresupuestoEjecucionIndicator({
   
   // Determine status based on percentage
   const getStatus = () => {
-    if (porcentajeEjecutado >= 100) return 'sobregiro'
-    if (porcentajeEjecutado >= 90) return 'advertencia'
+    if (porcentajeEjecutado > 100) return 'sobregiro'
+    if (porcentajeEjecutado > 90) return 'advertencia'
     return 'normal'
   }
 
@@ -115,14 +115,14 @@ export default function PresupuestoEjecucionIndicator({
 
 // Export helper function to get color by percentage
 export function getEjecucionColor(porcentajeEjecutado: number): string {
-  if (porcentajeEjecutado >= 100) return '#ef4444' // red
-  if (porcentajeEjecutado >= 90) return '#f59e0b' // yellow
+  if (porcentajeEjecutado > 100) return '#ef4444' // red
+  if (porcentajeEjecutado > 90) return '#f59e0b' // yellow
   return '#10b981' // green
 }
 
 // Export helper function to get status
 export function getEjecucionStatus(porcentajeEjecutado: number): 'normal' | 'advertencia' | 'sobregiro' {
-  if (porcentajeEjecutado >= 100) return 'sobregiro'
-  if (porcentajeEjecutado >= 90) return 'advertencia'
+  if (porcentajeEjecutado > 100) return 'sobregiro'
+  if (porcentajeEjecutado > 90) return 'advertencia'
   return 'normal'
 }

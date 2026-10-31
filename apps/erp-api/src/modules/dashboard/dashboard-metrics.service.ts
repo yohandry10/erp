@@ -1,13 +1,25 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { CacheService } from '../../shared/cache/cache.service';
 import Decimal from 'decimal.js';
 import {
   calcularMetricasInventario,
   InventarioMetrics,
+  obtenerPaisMetricasInventario,
 } from '../inventario/inventario-metrics.util';
+import { paisDelTenant } from '../../shared/utils/fecha-tenant.util';
+import { fechaHoyEnPais, rangoDelDiaEnPais } from '../../shared/utils/fecha-peru.util';
+
+// Comprobantes que no son venta: anulados por baja, rechazados o fallidos.
+const CPE_SIN_VENTA = new Set(['ANULADO', 'RECHAZADO', 'ERROR']);
+// Una cotización espera decisión mientras es borrador o está enviada; la
+// conversión cuenta las aprobadas y las ya convertidas en pedido.
+const COTIZACION_PENDIENTE = ['BORRADOR', 'ENVIADA'];
+const COTIZACION_ACEPTADA = new Set(['APROBADA', 'CONVERTIDA']);
 
 export interface DashboardStats {
+  monedaBase: string;
+  importesPorMoneda: Array<{ moneda: string; ventasMes: number; ventasHoy: number; comprasMes: number }>;
   totalCpe: number;
   totalGre: number;
   totalSire: number;
@@ -36,7 +48,8 @@ export interface Activity {
   id: string;
   type: string;
   description: string;
-  amount: number;
+  amount?: number;
+  moneda?: string;
   date: string;
   status: 'success' | 'warning' | 'error' | 'pending';
 }
@@ -74,14 +87,14 @@ export class DashboardMetricsService implements OnModuleDestroy {
     const hoy = new Date();
     const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
     const periodoKey = periodo || `${inicioMes.getFullYear()}-${inicioMes.getMonth()}`;
-    return `dashboard:stats:${tenantId}:${periodoKey}`;
+    return `dashboard:stats:${tenantId}:${periodoKey}:v3`;
   }
 
   /**
    * Genera una clave de cache única para actividades
    */
   private getActivitiesCacheKey(tenantId: string): string {
-    return `dashboard:activities:${tenantId}`;
+    return `dashboard:activities:${tenantId}:v3`;
   }
 
   /**
@@ -173,24 +186,30 @@ export class DashboardMetricsService implements OnModuleDestroy {
     // omitida, y el botón Actualizar realmente refleja el mismo dato que
     // /inventario/stats.
     // La lectura viva y la del snapshot pueden resolverse en paralelo.
-    const [cached, inventario] = await Promise.all([
+    const [cached, inventario, monedaBase] = await Promise.all([
       this.getStatsFromCache(tenantId),
       this.getInventarioActual(client, tenantId),
+      this.getMonedaBase(client, tenantId),
     ]);
-    if (cached) {
+    if (cached && cached.monedaBase === monedaBase && Array.isArray(cached.importesPorMoneda)) {
       return this.aplicarInventario(cached, inventario);
     }
 
     this.logger.log(`📊 [DashboardMetricsService] Calculando estadísticas para tenant: ${tenantId}`);
 
-    // Obtener fechas para filtros
-    const hoy = new Date();
-    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    inicioMes.setHours(0, 0, 0, 0);
-    const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
-    finMes.setHours(23, 59, 59, 999);
-    const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
-    inicioHoy.setHours(0, 0, 0, 0);
+    // Día y mes del contribuyente, no del servidor: Render corre en UTC y a las
+    // 19:00 de Lima ya contaba «hoy» con las ventas de la noche anterior.
+    const pais = await paisDelTenant(client, tenantId);
+    const hoyLocal = fechaHoyEnPais(pais);
+    const [anio, mes] = hoyLocal.split('-').map(Number);
+    const primerDia = (y: number, m: number) =>
+      new Date(Date.UTC(y, m - 1, 1, 12));
+    const inicioHoy = new Date(rangoDelDiaEnPais(pais).desde);
+    const inicioMes = new Date(rangoDelDiaEnPais(pais, primerDia(anio, mes)).desde);
+    const inicioMesSiguiente = new Date(
+      rangoDelDiaEnPais(pais, primerDia(mes === 12 ? anio + 1 : anio, mes === 12 ? 1 : mes + 1)).desde,
+    );
+    const finMes = new Date(inicioMesSiguiente.getTime() - 1);
 
     // Consultas en paralelo para obtener datos reales
     const [
@@ -205,13 +224,13 @@ export class DashboardMetricsService implements OnModuleDestroy {
       ventasPosResult
     ] = await Promise.allSettled([
       client.from('cpe')
-        .select('total_venta, total, created_at, tenant_id')
+        .select('total_venta, total, moneda, tipo_documento, estado, created_at, tenant_id')
         .eq('tenant_id', tenantId)
         .gte('created_at', inicioMes.toISOString())
         .lte('created_at', finMes.toISOString())
         .order('created_at', { ascending: false }),
       client.from('cpe')
-        .select('total_venta, total')
+        .select('total_venta, total, moneda, tipo_documento, estado')
         .eq('tenant_id', tenantId)
         .gte('created_at', inicioHoy.toISOString()),
       client.from('gre_guias')
@@ -219,7 +238,7 @@ export class DashboardMetricsService implements OnModuleDestroy {
         .eq('tenant_id', tenantId)
         .gte('created_at', inicioMes.toISOString()),
       client.from('ordenes_compra')
-        .select('total, estado, fecha_orden, created_at')
+        .select('total, moneda, estado, fecha_orden, created_at')
         .eq('tenant_id', tenantId)
         .gte('created_at', inicioMes.toISOString())
         .lte('created_at', finMes.toISOString())
@@ -234,7 +253,7 @@ export class DashboardMetricsService implements OnModuleDestroy {
       client.from('cotizaciones')
         .select('id')
         .eq('tenant_id', tenantId)
-        .eq('estado', 'PENDIENTE'),
+        .in('estado', COTIZACION_PENDIENTE),
       client.from('sire_files')
         .select('id')
         .eq('tenant_id', tenantId)
@@ -243,14 +262,19 @@ export class DashboardMetricsService implements OnModuleDestroy {
       // no aparecen en la tabla `cpe`, así que sin esto el dashboard muestra
       // "Ventas: S/ 0" aunque el POS haya registrado ventas pagadas.
       client.from('ventas_pos')
-        .select('total, cpe_id, created_at')
+        .select('total, moneda, cpe_id, created_at')
         .eq('tenant_id', tenantId)
         .neq('estado', 'ANULADA')
         .gte('created_at', inicioMes.toISOString())
         .lte('created_at', finMes.toISOString())
     ]);
 
-    // Procesar resultados de forma segura
+    this.requireCompleteSources([
+      cpeResult, cpeHoyResult, greResult, comprasTodasResult, usuariosResult,
+      cotizacionesResult, cotizacionesPendientesResult, sireResult, ventasPosResult,
+    ]);
+
+    // Publicar/cachear sólo cuando todas las fuentes fueron consultadas.
     const cpeData = cpeResult.status === 'fulfilled' ? cpeResult.value.data : [];
     const cpeHoyData = cpeHoyResult.status === 'fulfilled' ? cpeHoyResult.value.data : [];
     const greData = greResult.status === 'fulfilled' ? greResult.value.data : [];
@@ -267,19 +291,25 @@ export class DashboardMetricsService implements OnModuleDestroy {
     const ventasPosSinCpeHoy = ventasPosSinCpe.filter(
       (v) => new Date(v.created_at) >= inicioHoy,
     );
-    const ingresosMes = this.sumarTotalesCpe(cpeData) + this.sumarTotales(ventasPosSinCpe);
-    const ingresosHoy = this.sumarTotalesCpe(cpeHoyData) + this.sumarTotales(ventasPosSinCpeHoy);
-    const inversionCompras = this.sumarTotales(comprasData);
+    // Sumar por moneda original: no existe una conversión implícita a moneda base.
+    // La nota de crédito resta; una orden anulada/rechazada no es inversión vigente.
+    const importesPorMoneda = this.agruparImportes(monedaBase, cpeData || [], cpeHoyData || [], ventasPosSinCpe, ventasPosSinCpeHoy, comprasData || []);
+    const base = importesPorMoneda.find(row => row.moneda === monedaBase)!;
+    const ingresosMes = base.ventasMes;
+    const ingresosHoy = base.ventasHoy;
+    const inversionCompras = base.comprasMes;
     const comprasPendientes = comprasData?.filter(c => this.estadoNormalizado(c.estado) === 'pendiente').length || 0;
 
     // Calcular tasa de conversión de cotizaciones
     const totalCotizaciones = cotizacionesData?.length || 0;
-    const cotizacionesAceptadas = cotizacionesData?.filter(c => this.estadoNormalizado(c.estado) === 'aceptada').length || 0;
+    const cotizacionesAceptadas = cotizacionesData?.filter(c => COTIZACION_ACEPTADA.has(String(c.estado ?? '').toUpperCase())).length || 0;
     const tasaConversion = totalCotizaciones > 0 ?
       ((cotizacionesAceptadas / totalCotizaciones) * 100) : 0;
 
     const estadisticas: DashboardStats = {
-      totalCpe: cpeData?.length || 0,
+      monedaBase,
+      importesPorMoneda,
+      totalCpe: cpeData?.filter(c => !CPE_SIN_VENTA.has(String(c.estado ?? '').toUpperCase())).length || 0,
       totalGre: greData?.length || 0,
       totalSire: sireData?.length || 0,
       totalUsers: usuariosData?.length || 0,
@@ -298,8 +328,8 @@ export class DashboardMetricsService implements OnModuleDestroy {
       crecimientoVentas: 0,
       ultimaActualizacion: new Date().toISOString(),
       periodoCalculado: {
-        inicio: this.formatDateOnly(inicioMes),
-        fin: this.formatDateOnly(finMes)
+        inicio: `${hoyLocal.slice(0, 7)}-01`,
+        fin: `${hoyLocal.slice(0, 7)}-${String(new Date(Date.UTC(anio, mes, 0)).getUTCDate()).padStart(2, '0')}`
       }
     };
 
@@ -332,7 +362,7 @@ export class DashboardMetricsService implements OnModuleDestroy {
       cotizacionesResult
     ] = await Promise.allSettled([
       client.from('cpe')
-        .select('id, tipo_documento, serie, numero, total_venta, estado, created_at')
+        .select('id, tipo_documento, serie, numero, total_venta, total, moneda, estado, created_at')
         .eq('tenant_id', tenantId)
         .gte('created_at', hace24h.toISOString())
         .order('created_at', { ascending: false })
@@ -344,19 +374,20 @@ export class DashboardMetricsService implements OnModuleDestroy {
         .order('created_at', { ascending: false })
         .limit(10),
       client.from('ordenes_compra')
-        .select('id, numero, total, fecha_orden, estado, created_at')
+        .select('id, numero, total, moneda, fecha_orden, estado, created_at')
         .eq('tenant_id', tenantId)
         .gte('created_at', hace24h.toISOString())
         .order('created_at', { ascending: false })
         .limit(10),
       client.from('cotizaciones')
-        .select('id, numero, total, fecha_cotizacion, estado, created_at')
+        .select('id, numero, total, moneda, fecha_cotizacion, estado, created_at')
         .eq('tenant_id', tenantId)
         .gte('created_at', hace24h.toISOString())
         .order('created_at', { ascending: false })
         .limit(10)
     ]);
 
+    this.requireCompleteSources([cpeResult, greResult, comprasResult, cotizacionesResult]);
     const actividades: Activity[] = [];
 
     // Procesar CPE
@@ -366,7 +397,8 @@ export class DashboardMetricsService implements OnModuleDestroy {
           id: `cpe-${cpe.id}`,
           type: 'CPE',
           description: `${this.getCpeDocumentLabel(cpe.tipo_documento)} ${cpe.serie}-${cpe.numero.toString().padStart(8, '0')}`,
-          amount: parseFloat(cpe.total_venta) || 0,
+          amount: this.importe(cpe.total_venta ?? cpe.total).times(this.cpeDocumentType(cpe.tipo_documento) === '07' ? -1 : 1).toNumber(),
+          moneda: this.moneda(cpe.moneda),
           date: cpe.created_at,
           status: this.mapearEstado(cpe.estado)
         });
@@ -380,7 +412,6 @@ export class DashboardMetricsService implements OnModuleDestroy {
           id: `gre-${gre.id}`,
           type: 'GRE',
           description: `Guía de Remisión ${gre.numero || gre.id}`,
-          amount: 0,
           date: gre.created_at || gre.fecha_traslado,
           status: this.mapearEstado(gre.estado)
         });
@@ -394,7 +425,8 @@ export class DashboardMetricsService implements OnModuleDestroy {
           id: `compra-${compra.id}`,
           type: 'COMPRA',
           description: `Orden de Compra ${compra.numero || compra.id}`,
-          amount: parseFloat(compra.total) || 0,
+          amount: this.importe(compra.total).toNumber(),
+          moneda: this.moneda(compra.moneda),
           date: compra.created_at || compra.fecha_orden,
           status: this.mapearEstado(compra.estado)
         });
@@ -408,7 +440,8 @@ export class DashboardMetricsService implements OnModuleDestroy {
           id: `cotizacion-${cotizacion.id}`,
           type: 'COTIZACION',
           description: `Cotización ${cotizacion.numero || cotizacion.id}`,
-          amount: parseFloat(cotizacion.total) || 0,
+          amount: this.importe(cotizacion.total).toNumber(),
+          moneda: this.moneda(cotizacion.moneda),
           date: cotizacion.created_at || cotizacion.fecha_cotizacion,
           status: this.mapearEstado(cotizacion.estado)
         });
@@ -426,28 +459,72 @@ export class DashboardMetricsService implements OnModuleDestroy {
     return actividadesOrdenadas;
   }
 
-  // Métodos de utilidad privados
-  // ✅ FIX: Usar Decimal.js para sumas financieras
-  private sumarTotales(data: any[]): number {
-    if (!Array.isArray(data)) return 0;
-    return data.reduce(
-      (sum, item) => sum.plus(item.total || 0),
-      new Decimal(0)
-    ).toDecimalPlaces(2).toNumber();
+  private requireCompleteSources(results: PromiseSettledResult<{ data: unknown; error?: unknown }>[]) {
+    if (results.some(result => result.status === 'rejected'
+      || result.value.error || !Array.isArray(result.value.data))) {
+      throw new ServiceUnavailableException('No se pudieron consultar todas las fuentes del dashboard; reintente');
+    }
   }
 
-  private sumarTotalesCpe(data: any[]): number {
-    if (!Array.isArray(data)) return 0;
-    return data.reduce(
-      (sum, item) => sum.plus(item.total_venta ?? item.total ?? 0),
-      new Decimal(0)
-    ).toDecimalPlaces(2).toNumber();
+  private moneda(value: unknown): string {
+    if (typeof value !== 'string' || !/^[A-Z]{3}$/.test(value)) {
+      throw new ServiceUnavailableException('Moneda del dashboard incompleta; reintente');
+    }
+    return value;
+  }
+
+  private importe(value: unknown): Decimal {
+    try {
+      if (value === null || value === undefined || value === '' || (typeof value !== 'number' && typeof value !== 'string')) throw new Error();
+      const amount = new Decimal(value);
+      if (!amount.isFinite() || amount.isNegative() || amount.decimalPlaces() > 2) throw new Error();
+      return amount;
+    } catch {
+      throw new ServiceUnavailableException('Importe del dashboard incompleto; reintente');
+    }
+  }
+
+  private async getMonedaBase(client: any, tenantId: string): Promise<string> {
+    const { data, error } = await client.from('empresa_config').select('moneda').eq('tenant_id', tenantId).maybeSingle();
+    if (error) throw new ServiceUnavailableException('No se pudo consultar la moneda base; reintente');
+    return this.moneda(data?.moneda);
+  }
+
+  private agruparImportes(monedaBase: string, cpe: any[], cpeHoy: any[], pos: any[], posHoy: any[], compras: any[]) {
+    const buckets = new Map<string, { moneda: string; ventasMes: Decimal; ventasHoy: Decimal; comprasMes: Decimal }>();
+    const bucket = (moneda: unknown) => {
+      const code = this.moneda(moneda);
+      if (!buckets.has(code)) buckets.set(code, { moneda: code, ventasMes: new Decimal(0), ventasHoy: new Decimal(0), comprasMes: new Decimal(0) });
+      return buckets.get(code)!;
+    };
+    bucket(monedaBase);
+    for (const [rows, field] of [[cpe, 'ventasMes'], [cpeHoy, 'ventasHoy']] as const) {
+      for (const row of rows) {
+        const dest = bucket(row.moneda);
+        const amount = this.importe(row.total_venta ?? row.total);
+        const estado = this.estadoNormalizado(row.estado);
+        const tipoDocumento = this.cpeDocumentType(row.tipo_documento);
+        if (!estado) throw new ServiceUnavailableException('Comprobante del dashboard incompleto; reintente');
+        if (!['borrador', 'anulado', 'cancelado', 'rechazado', 'error'].includes(estado)) {
+          dest[field] = dest[field].plus(amount.times(tipoDocumento === '07' ? -1 : 1));
+        }
+      }
+    }
+    for (const [rows, field] of [[pos, 'ventasMes'], [posHoy, 'ventasHoy']] as const) {
+      for (const row of rows) { const dest = bucket(row.moneda); dest[field] = dest[field].plus(this.importe(row.total)); }
+    }
+    for (const row of compras) {
+      const dest = bucket(row.moneda); const amount = this.importe(row.total); const estado = this.estadoNormalizado(row.estado);
+      if (!estado) throw new ServiceUnavailableException('Orden del dashboard incompleta; reintente');
+      if (!['anulada', 'cancelada', 'rechazada'].includes(estado)) dest.comprasMes = dest.comprasMes.plus(amount);
+    }
+    return [...buckets.values()].sort((a,b) => a.moneda.localeCompare(b.moneda)).map(row => ({ moneda:row.moneda, ventasMes:row.ventasMes.toDecimalPlaces(2).toNumber(), ventasHoy:row.ventasHoy.toDecimalPlaces(2).toNumber(), comprasMes:row.comprasMes.toDecimalPlaces(2).toNumber() }));
   }
 
   private async getInventarioActual(client: any, tenantId: string): Promise<InventarioMetrics> {
     const { data, error } = await client
       .from('productos')
-      .select('precio_compra, costo, stock_actual, stock_minimo')
+      .select('precio_compra, costo, costo_promedio_base, stock_actual, stock_minimo, es_servicio, controla_stock')
       .eq('tenant_id', tenantId)
       .eq('activo', true);
 
@@ -458,7 +535,7 @@ export class DashboardMetricsService implements OnModuleDestroy {
       throw error;
     }
 
-    return calcularMetricasInventario(data);
+    return calcularMetricasInventario(data, await obtenerPaisMetricasInventario(client, tenantId));
   }
 
   private aplicarInventario(
@@ -477,18 +554,17 @@ export class DashboardMetricsService implements OnModuleDestroy {
     return String(estado ?? '').trim().toLowerCase();
   }
 
-  private formatDateOnly(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-
   private mapearEstado(estado: string): 'success' | 'warning' | 'error' | 'pending' {
     if (!estado) return 'pending';
 
     const estadosMap = {
       'COMPLETADO': 'success',
+      'RECIBIDA': 'success',
+      'CONVERTIDA': 'success',
+      'ANULADA': 'error',
+      'ANULADO': 'error',
+      'RECHAZADO': 'error',
+      'CANCELADO': 'error',
       'PAGADA': 'success',
       'ENTREGADO': 'success',
       'ACEPTADA': 'success',
@@ -507,6 +583,16 @@ export class DashboardMetricsService implements OnModuleDestroy {
     return estadosMap[estado.toUpperCase()] || 'pending';
   }
 
+  private cpeDocumentType(value: unknown): string {
+    const types: Record<string, string> = {
+      '01': '01', '03': '03', '07': '07', '08': '08',
+      FACTURA: '01', BOLETA: '03', NOTA_CREDITO: '07', NOTA_DEBITO: '08',
+    };
+    const type = typeof value === 'string' && Object.prototype.hasOwnProperty.call(types, value) ? types[value] : null;
+    if (!type) throw new ServiceUnavailableException('Comprobante del dashboard incompleto; reintente');
+    return type;
+  }
+
   private getCpeDocumentLabel(tipoDocumento: unknown): string {
     const labels: Record<string, string> = {
       '01': 'Factura',
@@ -515,6 +601,6 @@ export class DashboardMetricsService implements OnModuleDestroy {
       '08': 'Nota de débito',
     };
 
-    return labels[String(tipoDocumento ?? '').trim()] ?? 'Comprobante';
+    return labels[this.cpeDocumentType(tipoDocumento)];
   }
 }

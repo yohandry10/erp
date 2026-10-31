@@ -1,0 +1,115 @@
+{
+  "commit": "9f5798a521b594d3381d1400b194ffc15a659754",
+  "pr": 149,
+  "proyecto": "wypnbcptofqdmoynlonq",
+  "desde": 570,
+  "hasta": 590,
+  "migraciones": [
+    "570__supply_contracts_customer_orders_schedules.sql",
+    "571__supply_contract_amendments.sql",
+    "572__supply_operational_orders.sql",
+    "573__supply_private_attachments.sql",
+    "574__inventory_lots_expiry_reservations.sql",
+    "575__supply_delivery_conformity.sql",
+    "576__supply_billing_reconciliation.sql",
+    "577__supply_configurable_alerts.sql",
+    "578__supply_contract_penalties.sql",
+    "579__supply_dashboards_bi.sql",
+    "580__migration_source_supply.sql",
+    "581__supply_access_profiles.sql",
+    "582__migration_source_full.sql",
+    "583__peru_establishment_structure_from_ui.sql",
+    "584__customer_update_durable_intents.sql",
+    "585__fixed_asset_prospective_estimates.sql",
+    "586__rrhh_auxiliary_read_permissions.sql",
+    "587__receivables_payables_tenant_civil_day.sql",
+    "588__security_dashboard_read_contract.sql",
+    "589__purchase_receipt_explicit_zero_inventory_cost.sql",
+    "590__bank_movement_default_active.sql"
+  ],
+  "respaldoSha256": "6ac459c1bfbb9569dbd484d4533eab54e2e861cb0678cec155ba1409b2a773c6",
+  "loteSha256": "ef3d7fc57682285f00342460a285edd50d755464b587484fda453f11d514b88e",
+  "exito": true,
+  "escriturasRemotas": true,
+  "antes": {
+    "esquema": 569,
+    "salud": {
+      "ready": true,
+      "esquema": 569,
+      "cola_muerta": 7,
+      "requerido_aplicado": true
+    },
+    "tablas": 295,
+    "filas": 207482
+  },
+  "aplicarMs": 121557,
+  "despues": {
+    "esquema": 590,
+    "salud": {
+      "ready": true,
+      "esquema": 590,
+      "cola_muerta": 7,
+      "requerido_aplicado": true
+    },
+    "tablasPerdidas": [],
+    "columnasPerdidas": [],
+    "tablasConDatosCambiados": [
+      {
+        "tabla": "public.roles",
+        "antes": 1024,
+        "despues": 1117,
+        "mismasFilas": false
+      },
+      {
+        "tabla": "public.permisos",
+        "antes": 24360,
+        "despues": 25941,
+        "mismasFilas": false
+      },
+      {
+        "tabla": "storage.buckets",
+        "antes": 2,
+        "despues": 3,
+        "mismasFilas": false
+      },
+      {
+        "tabla": "public.productos",
+        "antes": 545,
+        "despues": 545,
+        "mismasFilas": true
+      },
+      {
+        "tabla": "public.plan_cuentas",
+        "antes": 3591,
+        "despues": 3838,
+        "mismasFilas": false
+      },
+      {
+        "tabla": "public.rol_permisos",
+        "antes": 85678,
+        "despues": 92662,
+        "mismasFilas": false
+      },
+      {
+        "tabla": "public.activos_fijos",
+        "antes": 41,
+        "despues": 41,
+        "mismasFilas": true
+      },
+      {
+        "tabla": "public.producto_existencias",
+        "antes": 545,
+        "despues": 545,
+        "mismasFilas": true
+      },
+      {
+        "tabla": "public.movimientos_inventario",
+        "antes": 1021,
+        "despues": 1021,
+        "mismasFilas": true
+      }
+    ],
+    "cambiosNoVistosEnElEnsayo": []
+  },
+  "terminado": "2026-10-31T10:09:18.975Z"
+}

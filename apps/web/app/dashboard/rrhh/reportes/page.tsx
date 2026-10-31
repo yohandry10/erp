@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 
 type Empleado = {
@@ -21,10 +21,14 @@ export default function ReportesRrhhPage() {
   const [departamentos, setDepartamentos] = useState<Departamento[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { get } = useApi<any>({ showErrorToast: false })
+  const { get } = useApi<any>({ showErrorToast: false, throwOnError: true })
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED !== 'false'
+  const loadSequence = useRef(0)
 
   const loadData = useCallback(async () => {
+    const sequence = ++loadSequence.current
+    setEmpleados([])
+    setDepartamentos([])
     if (!rrhhEnabled) {
       setEmpleados([])
       setDepartamentos([])
@@ -41,21 +45,31 @@ export default function ReportesRrhhPage() {
         get('/rrhh/departamentos'),
       ])
 
-      const empleadosData = empleadosResponse?.data ?? empleadosResponse ?? []
-      const departamentosData = departamentosResponse?.data ?? departamentosResponse ?? []
-      setEmpleados(Array.isArray(empleadosData) ? empleadosData : [])
-      setDepartamentos(Array.isArray(departamentosData) ? departamentosData : [])
+      const asList = (response: any, fields: string[]) => {
+        const rows = Array.isArray(response) ? response : response?.data
+        if (response?.success === false || !Array.isArray(rows) || rows.some(row =>
+          !row || typeof row.id !== 'string' || !row.id.trim() || fields.some(field => typeof row[field] !== 'string')
+        )) throw new Error('Respuesta incompleta al cargar reportes de RRHH')
+        return rows
+      }
+      const nextEmpleados = asList(empleadosResponse, ['estado'])
+      const nextDepartamentos = asList(departamentosResponse, ['nombre'])
+      if (sequence !== loadSequence.current) return
+      setEmpleados(nextEmpleados)
+      setDepartamentos(nextDepartamentos)
     } catch {
+      if (sequence !== loadSequence.current) return
       setError('No fue posible cargar los reportes de RRHH.')
       setEmpleados([])
       setDepartamentos([])
     } finally {
-      setLoading(false)
+      if (sequence === loadSequence.current) setLoading(false)
     }
   }, [get, rrhhEnabled])
 
   useEffect(() => {
     loadData()
+    return () => { loadSequence.current += 1 }
   }, [loadData])
 
   const metrics = useMemo(() => {
@@ -127,7 +141,7 @@ export default function ReportesRrhhPage() {
       </div>
 
       {error && (
-        <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl text-[var(--red-700)]">
+        <div role="alert" className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl text-[var(--red-700)]">
           {error}
         </div>
       )}
@@ -138,7 +152,7 @@ export default function ReportesRrhhPage() {
             <h3>Total empleados</h3>
             <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">👥</div>
           </div>
-          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-primary">{metrics.total}</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-primary">{error?'—':metrics.total}</div>
           <div className="mt-2 text-[0.8125rem] text-muted-foreground">Personal registrado</div>
         </div>
 
@@ -147,7 +161,7 @@ export default function ReportesRrhhPage() {
             <h3>Activos</h3>
             <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">✅</div>
           </div>
-          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-emerald-400">{metrics.activos}</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-emerald-400">{error?'—':metrics.activos}</div>
           <div className="mt-2 text-[0.8125rem] text-muted-foreground">Personal habilitado</div>
         </div>
 
@@ -156,7 +170,7 @@ export default function ReportesRrhhPage() {
             <h3>Inactivos</h3>
             <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">⏸️</div>
           </div>
-          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-destructive">{metrics.inactivos}</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-destructive">{error?'—':metrics.inactivos}</div>
           <div className="mt-2 text-[0.8125rem] text-muted-foreground">Personal no activo</div>
         </div>
 
@@ -165,7 +179,7 @@ export default function ReportesRrhhPage() {
             <h3>Nuevos ingresos</h3>
             <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">📈</div>
           </div>
-          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-violet-400">{metrics.ingresos30Dias}</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-violet-400">{error?'—':metrics.ingresos30Dias}</div>
           <div className="mt-2 text-[0.8125rem] text-muted-foreground">Últimos 30 días</div>
         </div>
       </div>
@@ -173,7 +187,7 @@ export default function ReportesRrhhPage() {
       <div className="relative rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl">
         <h2 className="m-0 text-lg font-bold text-foreground">Distribución por departamento</h2>
         <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
-          {metrics.porDepartamento.length === 0 ? (
+          {error ? <p>Distribución no disponible. Reintente la consulta.</p> : metrics.porDepartamento.length === 0 ? (
             <div className="px-4 py-10 text-center text-muted-foreground">
               <h3>No hay departamentos registrados</h3>
               <p>Cuando existan áreas organizacionales se mostrará la distribución del personal.</p>

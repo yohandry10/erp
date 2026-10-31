@@ -73,7 +73,8 @@ export class OrdenesCompraRepository {
       .select(
         `
           *,
-          proveedores:proveedores(id, ruc, razon_social, nombre_comercial)
+          proveedores:proveedores(id, ruc, razon_social, nombre_comercial),
+          detalles:orden_compra_detalles!fk_orden_compra_detalles_orden_id(producto_id, descripcion, cantidad, cantidad_recibida)
         `,
         { count: 'exact' },
       )

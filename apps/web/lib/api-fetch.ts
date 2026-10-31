@@ -7,9 +7,9 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   const headers = new Headers(options.headers)
   const hasBody = options.body !== undefined && options.body !== null
   const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
-  // Lectura sincrónica del token/sesión cacheada: NO dispara /auth/profile por request.
-  // La validación/refresh de sesión vive en AuthContext.loadSession y use-api.
-  const { session, accessToken } = customAuth.getCachedSession()
+  // En desktop espera la restauración del token protegido tras una recarga.
+  // No dispara /auth/profile por request; AuthContext mantiene la validación.
+  const { session, accessToken } = await customAuth.getRequestSession()
   const token = accessToken ?? session?.access_token
 
   if (hasBody && !isFormData && !headers.has('Content-Type')) {

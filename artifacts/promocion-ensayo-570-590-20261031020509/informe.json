@@ -1,0 +1,291 @@
+{
+  "archiveSha256": "b2f589f73963f14446101b1cde34de60029cc1459a10b255b26544248d44f917",
+  "exito": true,
+  "redDelContenedor": "none",
+  "conexionesRemotas": 0,
+  "desde": 570,
+  "hasta": 590,
+  "limites": [
+    "Sin objetos de Storage ni roles globales reales; el tiempo local no acredita el de PROD."
+  ],
+  "esquemaDelRespaldo": 569,
+  "entornoDelRespaldo": "PROD",
+  "aplicadasAntesDelLote": [],
+  "loteSha256": "ef3d7fc57682285f00342460a285edd50d755464b587484fda453f11d514b88e",
+  "migraciones": [
+    "570__supply_contracts_customer_orders_schedules.sql",
+    "571__supply_contract_amendments.sql",
+    "572__supply_operational_orders.sql",
+    "573__supply_private_attachments.sql",
+    "574__inventory_lots_expiry_reservations.sql",
+    "575__supply_delivery_conformity.sql",
+    "576__supply_billing_reconciliation.sql",
+    "577__supply_configurable_alerts.sql",
+    "578__supply_contract_penalties.sql",
+    "579__supply_dashboards_bi.sql",
+    "580__migration_source_supply.sql",
+    "581__supply_access_profiles.sql",
+    "582__migration_source_full.sql",
+    "583__peru_establishment_structure_from_ui.sql",
+    "584__customer_update_durable_intents.sql",
+    "585__fixed_asset_prospective_estimates.sql",
+    "586__rrhh_auxiliary_read_permissions.sql",
+    "587__receivables_payables_tenant_civil_day.sql",
+    "588__security_dashboard_read_contract.sql",
+    "589__purchase_receipt_explicit_zero_inventory_cost.sql",
+    "590__bank_movement_default_active.sql"
+  ],
+  "tablas": 295,
+  "filas": 207482,
+  "rollbackMs": 11737,
+  "rollbackSinRastro": true,
+  "aplicarMs": 4401,
+  "esquemaFinal": 590,
+  "tablasNuevas": [
+    "app.asset_depreciation_batches_570",
+    "app.asset_lifecycle_operations_570",
+    "app.inventory_operation_abandonments_570",
+    "app.rrhh_calculation_operations_570",
+    "app.rrhh_payroll_creation_operations_570",
+    "public.alertas_destinatarios",
+    "public.alertas_ejecuciones",
+    "public.alertas_eventos",
+    "public.alertas_reglas",
+    "public.bi_accesos",
+    "public.bi_credenciales",
+    "public.customer_update_intents",
+    "public.cxp_credito_proveedor_movimientos",
+    "public.inventario_lote_operaciones",
+    "public.inventario_lote_politicas",
+    "public.inventario_lote_saldos",
+    "public.inventario_lotes",
+    "public.migracion_archivo",
+    "public.migracion_archivo_lotes",
+    "public.migracion_correspondencias",
+    "public.movimientos_inventario_lotes",
+    "public.penalidad_calculos",
+    "public.penalidad_excepciones",
+    "public.penalidad_reglas",
+    "public.penalidad_revisiones",
+    "public.suministro_adjuntos",
+    "public.suministro_contrato_lineas",
+    "public.suministro_contratos",
+    "public.suministro_entregas_programadas",
+    "public.suministro_historial",
+    "public.suministro_operaciones",
+    "public.suministro_orden_lineas",
+    "public.suministro_ordenes_cliente",
+    "public.suministro_pedido_lineas",
+    "public.suministro_pedidos",
+    "public.suministro_recepcion_lineas",
+    "public.suministro_recepciones",
+    "public.tablero_cortes"
+  ],
+  "tablasPerdidas": [],
+  "columnasPerdidas": [],
+  "tablasConDatosCambiados": [
+    {
+      "tabla": "public.roles",
+      "antes": 1024,
+      "despues": 1117,
+      "mismasFilas": false,
+      "columnasCambiadas": {},
+      "filasBorradas": 0
+    },
+    {
+      "tabla": "public.permisos",
+      "antes": 24360,
+      "despues": 25941,
+      "mismasFilas": false,
+      "columnasCambiadas": {},
+      "filasBorradas": 0
+    },
+    {
+      "tabla": "storage.buckets",
+      "antes": 2,
+      "despues": 3,
+      "mismasFilas": false,
+      "columnasCambiadas": {},
+      "filasBorradas": 0
+    },
+    {
+      "tabla": "public.productos",
+      "antes": 545,
+      "despues": 545,
+      "mismasFilas": true,
+      "columnasCambiadas": {
+        "costo": 242,
+        "updated_at": 242
+      },
+      "filasBorradas": 0
+    },
+    {
+      "tabla": "public.plan_cuentas",
+      "antes": 3591,
+      "despues": 3838,
+      "mismasFilas": false,
+      "columnasCambiadas": {},
+      "filasBorradas": 0
+    },
+    {
+      "tabla": "public.rol_permisos",
+      "antes": 85678,
+      "despues": 92662,
+      "mismasFilas": false,
+      "columnasCambiadas": {},
+      "filasBorradas": 0
+    },
+    {
+      "tabla": "public.activos_fijos",
+      "antes": 41,
+      "despues": 41,
+      "mismasFilas": true,
+      "columnasCambiadas": {
+        "metadata": 1,
+        "updated_at": 1
+      },
+      "filasBorradas": 0
+    },
+    {
+      "tabla": "public.producto_existencias",
+      "antes": 545,
+      "despues": 545,
+      "mismasFilas": true,
+      "columnasCambiadas": {},
+      "filasBorradas": 0
+    },
+    {
+      "tabla": "public.movimientos_inventario",
+      "antes": 1021,
+      "despues": 1021,
+      "mismasFilas": true,
+      "columnasCambiadas": {},
+      "filasBorradas": 0
+    }
+  ],
+  "funcionesPublicasRetiradas": [],
+  "salud": {
+    "ready": true,
+    "esquema": 590,
+    "cola_muerta": 7,
+    "requerido_aplicado": true
+  },
+  "movimientosBancarios": {
+    "nulos": 0,
+    "total": 40,
+    "inactivos": 0
+  },
+  "defaultActivo": "true",
+  "verificadores": [
+    {
+      "version": 570,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 571,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 572,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 573,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 574,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 575,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 576,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 577,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 578,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 579,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 580,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 581,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 582,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 583,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 584,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 585,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 586,
+      "ok": true,
+      "error": null,
+      "identidadLocal": true
+    },
+    {
+      "version": 587,
+      "ok": true,
+      "error": null,
+      "identidadLocal": true
+    },
+    {
+      "version": 588,
+      "ok": true,
+      "error": null,
+      "identidadLocal": true
+    },
+    {
+      "version": 589,
+      "ok": true,
+      "error": null,
+      "identidadLocal": true
+    },
+    {
+      "version": 590,
+      "ok": true,
+      "error": null
+    }
+  ],
+  "verificadoresFallidos": 0
+}

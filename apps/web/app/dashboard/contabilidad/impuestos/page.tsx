@@ -5,6 +5,7 @@ import { AlertTriangle, Calculator, CheckCircle2, FileCheck2, Loader2, RefreshCw
 import { useApi } from '@/hooks/use-api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { validTaxCalculation, validTaxHistory } from '@/lib/contabilidad/tax-read-contract'
 
 interface Warning {
   codigo: string
@@ -31,6 +32,8 @@ interface CalculoMensual {
   saldo_favor_siguiente: number
   ingresos_netos_mes: number
   ingresos_netos_acumulados: number
+  otros_ingresos_renta_mes: number
+  otros_ingresos_renta_acumulados: number
   coeficiente_renta: number | null
   pago_cuenta_renta: number
   nrus_categoria: number | null
@@ -41,6 +44,7 @@ interface CalculoMensual {
     cantidad_ventas: number
     cantidad_compras: number
     advertencia: string
+    ajustes_renta?: { otros_ingresos_renta_mes: number; otros_ingresos_renta_acumulados: number; sustento_renta: string }
   }
   declaracion_vigente?: Declaracion | null
 }
@@ -52,6 +56,7 @@ interface Declaracion extends Omit<CalculoMensual, 'formulario' | 'source_snapsh
   estado: 'BORRADOR' | 'PRESENTADA' | 'RECTIFICADA' | 'ANULADA'
   constancia_numero?: string | null
   fecha_presentacion?: string | null
+  notas?: string | null
   source_snapshot: CalculoMensual['source_snapshot']
 }
 
@@ -73,12 +78,16 @@ export default function ImpuestosMensualesPage() {
   const [fechaPresentacion, setFechaPresentacion] = useState('')
   const saveIntent = useRef<{ signature: string; key: string } | null>(null)
   const receiptIntent = useRef<{ signature: string; key: string } | null>(null)
+  const loadSequence = useRef(0)
   const [ajustes, setAjustes] = useState({
     saldo_favor_anterior: '0',
     retenciones_igv: '0',
     percepciones_igv: '0',
     otros_creditos_igv: '0',
     coeficiente_renta: '',
+    otros_ingresos_renta_mes: '0',
+    otros_ingresos_renta_acumulados: '0',
+    sustento_renta: '',
     notas: '',
   })
 
@@ -91,51 +100,79 @@ export default function ImpuestosMensualesPage() {
     retenciones_igv: Number(ajustes.retenciones_igv || 0),
     percepciones_igv: Number(ajustes.percepciones_igv || 0),
     otros_creditos_igv: Number(ajustes.otros_creditos_igv || 0),
-    ...(ajustes.coeficiente_renta === '' ? {} : { coeficiente_renta: Number(ajustes.coeficiente_renta) }),
+    coeficiente_renta: ajustes.coeficiente_renta === '' ? null : Number(ajustes.coeficiente_renta),
+    otros_ingresos_renta_mes: Number(ajustes.otros_ingresos_renta_mes || 0),
+    otros_ingresos_renta_acumulados: Number(ajustes.otros_ingresos_renta_acumulados || 0),
+    sustento_renta: ajustes.sustento_renta.trim(),
     ...(ajustes.notas.trim() ? { notas: ajustes.notas.trim() } : {}),
   }), [ajustes, periodo])
 
-  const adoptarDeclaracion = (declaracion?: Declaracion | null) => {
-    if (!declaracion) return
+  const adoptarDeclaracion = (declaracion: Declaracion | null | undefined, calculoActual: CalculoMensual) => {
     setAjustes({
-      saldo_favor_anterior: String(declaracion.saldo_favor_anterior || 0),
-      retenciones_igv: String(declaracion.retenciones_igv || 0),
-      percepciones_igv: String(declaracion.percepciones_igv || 0),
-      otros_creditos_igv: String(declaracion.otros_creditos_igv || 0),
-      coeficiente_renta: declaracion.coeficiente_renta === null ? '' : String(declaracion.coeficiente_renta),
-      notas: '',
+      saldo_favor_anterior: String(declaracion?.saldo_favor_anterior ?? calculoActual.saldo_favor_anterior ?? 0),
+      retenciones_igv: String(declaracion?.retenciones_igv ?? 0),
+      percepciones_igv: String(declaracion?.percepciones_igv ?? 0),
+      otros_creditos_igv: String(declaracion?.otros_creditos_igv ?? 0),
+      coeficiente_renta: declaracion?.coeficiente_renta == null ? '' : String(declaracion.coeficiente_renta),
+      otros_ingresos_renta_mes: String(calculoActual.otros_ingresos_renta_mes ?? 0),
+      otros_ingresos_renta_acumulados: String(calculoActual.otros_ingresos_renta_acumulados ?? 0),
+      sustento_renta: calculoActual.source_snapshot?.ajustes_renta?.sustento_renta || '',
+      notas: declaracion?.notas || '',
     })
-    setConstancia(declaracion.constancia_numero || '')
+    setConstancia(declaracion?.constancia_numero || '')
+    setFechaPresentacion(declaracion?.fecha_presentacion?.slice(0, 16) || '')
   }
 
   const cargar = useCallback(async () => {
+    const sequence = ++loadSequence.current
     setCargando(true)
     setError(null)
+    setMensaje(null)
+    setCalculo(null)
+    setHistorial([])
     try {
       const [calculoResponse, historialResponse] = await Promise.all([
         get(`/api/contabilidad/impuestos/mensual?periodo=${periodo}`),
         get('/api/contabilidad/impuestos/declaraciones?limite=36'),
       ])
-      if (!calculoResponse?.success) throw new Error(calculoResponse?.message || 'No se pudo calcular el período')
+      if (sequence !== loadSequence.current) return
+      if (calculoResponse?.success !== true || !validTaxCalculation(calculoResponse.data, 'mensual', periodo)) {
+        throw new Error(calculoResponse?.message || 'No se pudo calcular el período con una respuesta completa')
+      }
+      if (historialResponse?.success !== true || !validTaxHistory(historialResponse.data, 'mensual')) {
+        throw new Error(historialResponse?.message || 'No se pudo cargar el historial tributario completo')
+      }
       setCalculo(calculoResponse.data)
-      if (historialResponse?.success) setHistorial(historialResponse.data || [])
-      adoptarDeclaracion(calculoResponse.data?.declaracion_vigente)
+      setHistorial(historialResponse.data)
+      adoptarDeclaracion(calculoResponse.data?.declaracion_vigente, calculoResponse.data)
     } catch (err: any) {
-      setError(err?.message || 'No se pudo cargar el espacio tributario')
+      if (sequence === loadSequence.current) setError(err?.message || 'No se pudo cargar el espacio tributario')
     } finally {
-      setCargando(false)
+      if (sequence === loadSequence.current) setCargando(false)
     }
   }, [get, periodo])
 
-  useEffect(() => { cargar() }, [cargar])
+  useEffect(() => {
+    cargar()
+    return () => { loadSequence.current += 1 }
+  }, [cargar])
+
+  const cambiarPeriodo = (value: string) => {
+    loadSequence.current += 1
+    setCalculo(null); setHistorial([]); setError(null); setMensaje(null); setCargando(true)
+    setPeriodo(value)
+  }
 
   const previsualizar = async () => {
+    if (cargando || procesando || calculo?.periodo !== periodo) return
     setProcesando(true)
     setError(null)
     setMensaje(null)
     try {
       const response = await post('/api/contabilidad/impuestos/mensual/calcular', payload)
-      if (!response?.success) throw new Error(response?.message || 'No se pudo recalcular')
+      if (response?.success !== true || !validTaxCalculation(response.data, 'mensual', periodo)) {
+        throw new Error(response?.message || 'No se pudo recalcular con una respuesta completa')
+      }
       setCalculo(response.data)
       setMensaje('Cálculo actualizado. Todavía no se guardó ni presentó.')
     } catch (err: any) {
@@ -146,6 +183,7 @@ export default function ImpuestosMensualesPage() {
   }
 
   const guardar = async () => {
+    if (cargando || procesando || calculo?.periodo !== periodo) return
     setProcesando(true)
     setError(null)
     setMensaje(null)
@@ -159,8 +197,8 @@ export default function ImpuestosMensualesPage() {
       })
       if (!response?.success) throw new Error(response?.message || 'No se pudo guardar')
       saveIntent.current = null
-      setMensaje('Borrador versionado. Revísalo contra SIRE y preséntalo en SUNAT antes de registrar la constancia.')
       await cargar()
+      setMensaje('Borrador versionado. Revísalo contra SIRE y preséntalo en SUNAT antes de registrar la constancia.')
     } catch (err: any) {
       setError(err?.message || 'No se pudo guardar el borrador')
     } finally {
@@ -169,6 +207,7 @@ export default function ImpuestosMensualesPage() {
   }
 
   const registrarConstancia = async () => {
+    if (cargando || procesando || calculo?.periodo !== periodo) return
     const vigente = calculo?.declaracion_vigente
     if (!vigente?.id) {
       setError('Primero guarda un borrador vigente.')
@@ -195,8 +234,8 @@ export default function ImpuestosMensualesPage() {
       })
       if (!response?.success) throw new Error(response?.message || 'No se pudo registrar la constancia')
       receiptIntent.current = null
-      setMensaje('Constancia externa registrada. El ERP conserva la versión y su evidencia.')
       await cargar()
+      setMensaje('Constancia externa registrada. El ERP conserva la versión y su evidencia.')
     } catch (err: any) {
       setError(err?.message || 'No se pudo registrar la constancia')
     } finally {
@@ -227,9 +266,9 @@ export default function ImpuestosMensualesPage() {
             <div className="flex items-end gap-2">
               <div>
                 <label htmlFor="impuestos-periodo" className={labelClass}>Período</label>
-                <input id="impuestos-periodo" type="month" value={periodo} onChange={(event) => setPeriodo(event.target.value)} className={inputClass} />
+                <input id="impuestos-periodo" type="month" value={periodo} onChange={(event) => cambiarPeriodo(event.target.value)} disabled={procesando} className={inputClass} />
               </div>
-              <Button type="button" variant="outline" onClick={cargar} disabled={cargando} className="gap-2">
+              <Button type="button" variant="outline" onClick={cargar} disabled={cargando || procesando} className="gap-2">
                 <RefreshCw className={`h-4 w-4 ${cargando ? 'animate-spin' : ''}`} /> Actualizar
               </Button>
             </div>
@@ -241,12 +280,14 @@ export default function ImpuestosMensualesPage() {
           <p><strong>No es un envío automático.</strong> “Borrador” significa que SUNAT todavía no lo recibió. Sólo una constancia real cambia el estado a presentada.</p>
         </div>
 
-        {error && <div className="rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-600">{error}</div>}
+        {error && <div role="alert" className="rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-600">{error}
+          {!calculo && <Button type="button" variant="outline" onClick={cargar} disabled={cargando || procesando} className="ml-3">Reintentar</Button>}
+        </div>}
         {mensaje && <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-700">{mensaje}</div>}
 
-        {cargando || !calculo ? (
+        {cargando ? (
           <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-        ) : (
+        ) : !calculo ? null : (
           <>
             <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
               {[
@@ -294,6 +335,8 @@ export default function ImpuestosMensualesPage() {
                     ['retenciones_igv', 'Retenciones IGV'],
                     ['percepciones_igv', 'Percepciones IGV'],
                     ['otros_creditos_igv', 'Otros créditos IGV'],
+                    ['otros_ingresos_renta_mes', 'Otros ingresos gravables fuera de CPE (mes)'],
+                    ['otros_ingresos_renta_acumulados', 'Otros ingresos gravables fuera de CPE (acumulado del año)'],
                   ].map(([field, label]) => (
                     <label key={field}><span className={labelClass}>{label}</span>
                       <input type="number" min="0" step="0.01" value={(ajustes as any)[field]} onChange={(event) => setAjustes((current) => ({ ...current, [field]: event.target.value }))} className={inputClass} />
@@ -304,6 +347,10 @@ export default function ImpuestosMensualesPage() {
                       <input type="number" min="0" max="1" step="0.000001" placeholder="Ej. 0.0185" value={ajustes.coeficiente_renta} onChange={(event) => setAjustes((current) => ({ ...current, coeficiente_renta: event.target.value }))} className={inputClass} />
                     </label>
                   )}
+                  <p className="sm:col-span-2 text-xs text-muted-foreground">Revise ingresos sin comprobante de venta, como descuentos financieros obtenidos o intereses. Estos importes complementan la base de renta; no cambian las ventas ni el IGV. El acumulado incluye los meses anteriores del mismo año.</p>
+                  <label className="sm:col-span-2"><span className={labelClass}>Referencia y sustento de otros ingresos</span>
+                    <textarea value={ajustes.sustento_renta} onChange={(event) => setAjustes((current) => ({ ...current, sustento_renta: event.target.value }))} className={`${inputClass} min-h-20`} />
+                  </label>
                   <label className="sm:col-span-2"><span className={labelClass}>Notas de revisión</span>
                     <textarea value={ajustes.notas} onChange={(event) => setAjustes((current) => ({ ...current, notas: event.target.value }))} className={`${inputClass} min-h-20`} />
                   </label>
@@ -346,7 +393,11 @@ export default function ImpuestosMensualesPage() {
               <CardContent className="space-y-2">
                 {historial.length === 0 ? <p className="text-sm text-muted-foreground">Todavía no hay borradores guardados.</p> : historial.map((item) => (
                   <div key={item.id} className="flex flex-col gap-2 rounded-xl border border-cyan-400/15 p-3 text-sm md:flex-row md:items-center md:justify-between">
-                    <div className="flex items-center gap-2"><CheckCircle2 className={`h-4 w-4 ${item.estado === 'PRESENTADA' ? 'text-emerald-500' : 'text-muted-foreground'}`} /><strong>{item.periodo} · v{item.version}</strong><span>{item.regimen}</span></div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2"><CheckCircle2 className={`h-4 w-4 ${item.estado === 'PRESENTADA' ? 'text-emerald-500' : 'text-muted-foreground'}`} /><strong>{item.periodo} · v{item.version}</strong><span>{item.regimen}</span></div>
+                      <p>Ingresos {money(item.ingresos_netos_mes)} · IGV {money(item.igv_resultante)} · Renta {money(item.pago_cuenta_renta)}</p>
+                      {item.source_snapshot?.ajustes_renta?.sustento_renta && <p className="text-xs text-muted-foreground">{item.source_snapshot.ajustes_renta.sustento_renta}</p>}
+                    </div>
                     <div className="text-muted-foreground">{item.estado}{item.constancia_numero ? ` · constancia ${item.constancia_numero}` : ''}</div>
                   </div>
                 ))}

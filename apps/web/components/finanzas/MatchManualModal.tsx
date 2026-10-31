@@ -46,12 +46,18 @@ export default function MatchManualModal({
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const loadMovimientos = useCallback(async () => {
     if (!conciliacionId) return;
 
     setLoading(true);
+    setLoadFailed(false);
     setError(null);
+    setSelectedSistema(null);
+    setSelectedExtracto(null);
+    setMovimientosSistema([]);
+    setMovimientosExtracto([]);
     try {
       // Get conciliación details to get cuenta_bancaria_id
       const conciliacionResponse = await fetchApi(
@@ -85,10 +91,9 @@ export default function MatchManualModal({
         }
       );
 
-      if (sistemaResponse.ok) {
-        const sistemaData = await sistemaResponse.json();
-        setMovimientosSistema(sistemaData.data || []);
-      }
+      if (!sistemaResponse.ok) throw new Error('Movimientos del sistema indisponibles');
+      const sistemaData = await sistemaResponse.json();
+      if (!Array.isArray(sistemaData.data)) throw new Error('Respuesta de movimientos inválida');
 
       // Load movimientos del extracto (no conciliados)
       const extractoResponse = await fetchApi(
@@ -102,12 +107,14 @@ export default function MatchManualModal({
         }
       );
 
-      if (extractoResponse.ok) {
-        const extractoData = await extractoResponse.json();
-        setMovimientosExtracto(extractoData.data || []);
-      }
+      if (!extractoResponse.ok) throw new Error('Extracto indisponible');
+      const extractoData = await extractoResponse.json();
+      if (!Array.isArray(extractoData.data)) throw new Error('Respuesta de extracto inválida');
+      setMovimientosSistema(sistemaData.data);
+      setMovimientosExtracto(extractoData.data);
     } catch (err) {
       console.error('Error loading movimientos:', err);
+      setLoadFailed(true);
       setError('Error al cargar los movimientos bancarios');
     } finally {
       setLoading(false);
@@ -215,6 +222,7 @@ export default function MatchManualModal({
         {error && (
           <div className="bg-destructive/10 border border-red-200 text-destructive px-4 py-3 rounded">
             {error}
+            {loadFailed && <Button type="button" variant="outline" className="ml-3" onClick={loadMovimientos} disabled={loading || submitting}>Reintentar movimientos</Button>}
           </div>
         )}
 
@@ -223,7 +231,7 @@ export default function MatchManualModal({
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <span className="ml-3 text-foreground/80">Cargando movimientos...</span>
           </div>
-        ) : (
+        ) : loadFailed ? null : (
           <div className="grid grid-cols-2 gap-6">
             {/* Movimientos del Sistema */}
             <div className="border rounded-lg p-4">
@@ -369,7 +377,7 @@ export default function MatchManualModal({
           </Button>
           <Button
             onClick={handleMatch}
-            disabled={!canMatch() || submitting}
+            disabled={loading || loadFailed || !canMatch() || submitting}
             className="bg-blue-600 hover:bg-blue-700"
           >
             {submitting ? 'Procesando...' : 'Realizar Match'}

@@ -5,6 +5,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsIn,
   IsUUID,
   Matches,
   MaxLength,
@@ -96,4 +97,15 @@ export class AsignarSucursalesDto {
   @ArrayUnique()
   @IsUUID('4', { each: true })
   sucursal_ids: string[];
+}
+
+/** Serie fiscal de un establecimiento anexo (F/B + tres caracteres). */
+export class RegistrarSerieEstablecimientoDto {
+  @IsIn(['FACTURA', 'BOLETA', 'NOTA_CREDITO', 'NOTA_DEBITO'])
+  tipo_documento: string;
+
+  @Matches(/^[FBfb][A-Za-z0-9]{3}$/, {
+    message: 'La serie debe tener 4 caracteres y empezar con F o B',
+  })
+  serie: string;
 }

@@ -21,6 +21,8 @@ DECLARE
   v_demo jsonb;
   v_audit_restricted_role jsonb;
   v_auditor_role jsonb;
+  v_normative_role uuid;
+  v_normative_actor uuid;
   v_index integer;
 BEGIN
   FOR v_index IN 1..2 LOOP
@@ -69,6 +71,25 @@ BEGIN
     SELECT (v_auditor_role->>'id')::uuid,p.id,true FROM public.permisos p
     WHERE p.tenant_id=(v_demo->>'tenant_id')::uuid AND p.codigo='security.audit.read';
     IF NOT FOUND THEN RAISE EXCEPTION 'PERU_INTEGRATED_AUDIT_PERMISSION_MISSING'; END IF;
+    -- Administrador de normativa independiente, sin privilegio global.
+    -- Se prepara por el dueño de esta base efímera, como el auditor anterior;
+    -- ADMIN_DEMO conserva sus restricciones y sus roles originales.
+    SELECT id INTO v_normative_role FROM public.roles
+    WHERE tenant_id=(v_demo->>'tenant_id')::uuid AND nombre='ADMIN';
+    IF v_normative_role IS NULL THEN
+      INSERT INTO public.roles(tenant_id,nombre,activo,is_system_role)
+      VALUES((v_demo->>'tenant_id')::uuid,'ADMIN',true,true) RETURNING id INTO v_normative_role;
+    END IF;
+    INSERT INTO public.rol_permisos(role_id,permiso_id,concedido)
+    SELECT v_normative_role,p.id,true FROM public.permisos p
+    WHERE p.tenant_id=(v_demo->>'tenant_id')::uuid AND p.codigo IN('configuracion.read','configuracion.write','users.manage')
+    ON CONFLICT DO NOTHING;
+    INSERT INTO public.usuarios_sistema(tenant_id,email,nombre,estado,activo,is_super_admin,password_hash)
+    VALUES((v_demo->>'tenant_id')::uuid,'peru-integrated-normative-admin-'||v_index||'@example.test',
+      'Administrador normativo local','ACTIVO',true,false,
+      extensions.crypt('Local-Peru-2026-Only!',extensions.gen_salt('bf'))) RETURNING id INTO v_normative_actor;
+    INSERT INTO public.user_roles(tenant_id,usuario_sistema_id,role_id)
+    VALUES((v_demo->>'tenant_id')::uuid,v_normative_actor,v_normative_role);
     IF v_index=1 THEN
       INSERT INTO public.usuarios_sistema(tenant_id,email,nombre,estado,activo,is_super_admin,password_hash)
       VALUES(NULL,'peru-integrated-support-1@example.test','Soporte global local','ACTIVO',true,true,

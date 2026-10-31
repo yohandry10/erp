@@ -1,6 +1,8 @@
 'use client'
 
 import { formatFiscalDocumentNumber } from '@/lib/fiscal-document-number'
+import { CpeNoteSignButton } from './CpeNoteSignButton'
+import { CpeSendButton } from './CpeSendButton'
 
 interface CpeDocument {
   id: string
@@ -13,11 +15,16 @@ interface CpeDocument {
   clienteRuc: string
   total: number
   moneda: string
-  estado: 'BORRADOR' | 'FIRMADO' | 'ENVIADO' | 'ACEPTADO' | 'ERROR' | 'RECHAZADO' | 'ANULADO'
+  estado: 'BORRADOR' | 'FIRMADO' | 'ENVIADO' | 'ACEPTADO' | 'ERROR' | 'RECHAZADO' | 'ANULADO' | 'MIGRADO'
   estadoSunat?: string
   isDemoRepresentation?: boolean
+  isHistoricalImport?: boolean
   observaciones?: string
   fechaCreacion: string
+  cxcId?: string | null
+  numeroDocumentoCxc?: string | null
+  saldoPorCobrar?: number | null
+  requiereVincularCobro?: boolean
 }
 
 interface Props {
@@ -25,15 +32,19 @@ interface Props {
   onView: (id: string, tipo: string) => void
   onPdf?: (id: string) => void
   onSend: (id: string) => void
-  onSign?: (id: string) => void
+  onSent?: () => void | Promise<void>
+  onSigned?: () => void | Promise<void>
   onCancel?: (doc: CpeDocument) => void
   onGre?: (doc: CpeDocument) => void
+  onLinkReceivable?: (doc: CpeDocument) => void
+  canManageReceivables?: boolean
   fiscalLabel: string
   canSend: boolean
   countryCode?: string
 }
 
 const estadoColor: Record<string, string> = {
+  MIGRADO: 'border-border/30 bg-muted/50 text-muted-foreground',
   MUESTRA_LOCAL: 'border-amber-300/30 bg-amber-300/10 text-amber-700 dark:text-amber-200',
   ACEPTADO: 'border-cyan-300/30 bg-cyan-300/10 text-primary',
   FIRMADO: 'border-blue-300/30 bg-blue-300/10 text-primary dark:text-blue-200',
@@ -44,7 +55,7 @@ const estadoColor: Record<string, string> = {
   BORRADOR: 'border-border/30 bg-slate-400/10 text-foreground/90',
 }
 
-export function ComprobantesTable({ documents, onView, onPdf, onSend, onSign, onCancel, onGre, fiscalLabel, canSend, countryCode }: Props) {
+export function ComprobantesTable({ documents, onView, onPdf, onSend, onSent, onSigned, onCancel, onGre, onLinkReceivable, canManageReceivables, fiscalLabel, canSend, countryCode }: Props) {
   const isColombia = String(countryCode || '').toUpperCase() === 'CO'
   const canUseSunatCancellation = String(countryCode || '').toUpperCase() === 'PE'
   return (
@@ -72,7 +83,8 @@ export function ComprobantesTable({ documents, onView, onPdf, onSend, onSign, on
           {documents.map((doc) => {
             const type = String(doc.tipoDocumento || doc.tipoComprobante).toUpperCase()
             const isNote = ['07', '08', '91', '92'].some((code) => type.includes(code)) || type.includes('NOTA')
-            const displayState = doc.isDemoRepresentation ? 'MUESTRA_LOCAL' : doc.estado
+            const historical = doc.estado === 'MIGRADO' || doc.isHistoricalImport === true
+            const displayState = historical ? 'MIGRADO' : doc.isDemoRepresentation ? 'MUESTRA_LOCAL' : doc.estado
             const canSendDocument = !doc.isDemoRepresentation
               && canSend
               && ['FIRMADO', 'ERROR'].includes(doc.estado)
@@ -104,23 +116,20 @@ export function ComprobantesTable({ documents, onView, onPdf, onSend, onSign, on
                   className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${estadoColor[displayState] || estadoColor.BORRADOR}`}
                   data-testid={`cpe-status-${doc.id}`}
                 >
-                  {doc.isDemoRepresentation ? 'MUESTRA LOCAL' : doc.estado}
+                  {historical ? 'Historia migrada' : doc.isDemoRepresentation ? 'MUESTRA LOCAL' : doc.estado}
                 </span>
+                {doc.requiereVincularCobro && <p className="mt-2 text-xs text-amber-700 dark:text-amber-200">Pendiente de vincular para cobrar</p>}
+                {doc.cxcId && <p className="mt-2 text-xs">{Number(doc.saldoPorCobrar) > 0 ? `Por cobrar: ${doc.moneda} ${Number(doc.saldoPorCobrar).toFixed(2)}` : 'Sin saldo pendiente'}</p>}
               </td>
               <td className="p-3">
                 <div className="flex flex-wrap justify-end gap-2">
+                {historical ? <span role="note" className="text-xs text-muted-foreground">Sólo lectura; sin constancia fiscal</span> : <>
                 <button className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-primary hover:bg-cyan-400/15" onClick={() => onView(doc.id, doc.tipoDocumento || doc.tipoComprobante)}>Vista A4</button>
                 <button className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-primary hover:bg-cyan-400/15" onClick={() => onPdf?.(doc.id)}>Descargar A4</button>
-                {isNote && doc.estado === 'BORRADOR' && onSign && (
-                  <button
-                    className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-400/15 dark:text-amber-200"
-                    onClick={() => onSign(doc.id)}
-                    data-testid={`sign-note-${doc.id}`}
-                  >
-                    Firmar
-                  </button>
-                )}
-                <button
+                {canManageReceivables && doc.cxcId && <a className="rounded-lg border px-3 py-2 text-xs font-semibold" href={`/dashboard/finanzas/cxc/?documento=${encodeURIComponent(doc.numeroDocumentoCxc || `${doc.serie}-${doc.numero}`)}`}>Cobranza</a>}
+                {canManageReceivables && doc.requiereVincularCobro && onLinkReceivable && <button className="rounded-lg border px-3 py-2 text-xs font-semibold" onClick={() => onLinkReceivable(doc)}>Vincular para cobrar</button>}
+                {isNote && onSigned && <CpeNoteSignButton noteId={doc.id} state={doc.estado} onSigned={onSigned} />}
+                {String(countryCode || '').toUpperCase() === 'PE' && onSent ? <CpeSendButton cpeId={doc.id} enabled={canSendDocument} canRecover={canSend && !doc.isDemoRepresentation && !['BORRADOR','ANULADO','RECHAZADO'].includes(doc.estado)} title={doc.isDemoRepresentation ? 'Las muestras locales nunca se transmiten a la autoridad fiscal' : !canSend ? 'Envío a SUNAT no disponible' : doc.estado === 'RECHAZADO' ? 'El rechazo fiscal es definitivo y no se reintenta' : !canSendDocument ? 'El comprobante no está en un estado enviable' : 'Enviar a SUNAT'} onSent={onSent} /> : <button
                   className="rounded-lg border border-blue-400/20 bg-blue-500/10 px-3 py-2 text-xs font-semibold text-primary dark:text-blue-200 hover:bg-blue-500/15 disabled:opacity-40"
                   onClick={() => canSendDocument && onSend(doc.id)}
                   disabled={!canSendDocument}
@@ -135,7 +144,7 @@ export function ComprobantesTable({ documents, onView, onPdf, onSend, onSign, on
                         : `Enviar a ${fiscalLabel}`}
                 >
                   Enviar {fiscalLabel}
-                </button>
+                </button>}
                 {onGre && (
                   <button className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-primary hover:bg-cyan-400/15" onClick={() => onGre(doc)}>GRE</button>
                 )}
@@ -148,6 +157,7 @@ export function ComprobantesTable({ documents, onView, onPdf, onSend, onSign, on
                     Anulación
                   </button>
                 )}
+                </>}
                 </div>
               </td>
             </tr>

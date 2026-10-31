@@ -21,8 +21,11 @@ import { cn } from '@/lib/utils'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { parseDateLocal } from '@/lib/date-utils'
 import { LogoUploader } from '@/components/configuracion/LogoUploader'
+import { CompanyDataEditor } from '@/components/configuracion/CompanyDataEditor'
+import { SalesReportSettings, type SalesReportConfiguration } from '@/components/configuracion/SalesReportSettings'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import { useTenant } from '@/contexts/TenantContext'
+import { usePermission } from '@/hooks/use-permission'
 
 interface ConfigurationStatus {
   isComplete: boolean
@@ -52,7 +55,7 @@ interface ConfigurationStatus {
   }
 }
 
-interface EmpresaConfig {
+interface EmpresaConfig extends Partial<SalesReportConfiguration> {
   ruc?: string
   razonSocial?: string
   nombreComercial?: string
@@ -164,11 +167,13 @@ function SectionCard({
   icon: Icon,
   children,
   ok,
+  evaluated = true,
 }: {
   title: string
   icon: LucideIcon
   children: React.ReactNode
   ok: boolean
+  evaluated?: boolean
 }) {
   return (
     <section className="relative flex h-full flex-col rounded-2xl border border-border bg-card/95 text-card-foreground shadow-md backdrop-blur-xl p-5">
@@ -177,7 +182,7 @@ function SectionCard({
           <Icon className="h-[18px] w-[18px]" />
           {title}
         </h2>
-        <StatusPill ok={ok} />
+        {evaluated ? <StatusPill ok={ok} /> : <span className="text-xs font-semibold text-muted-foreground">No evaluado</span>}
       </div>
       <div className="flex flex-1 flex-col justify-between gap-1">{children}</div>
     </section>
@@ -187,6 +192,7 @@ function SectionCard({
 export default function ConfigurationOverview({ section = 'resumen' }: { section?: Section }) {
   const country = useCountryContext()
   const { user, isSuperAdmin } = useTenant()
+  const { hasPermission: canReadLaborConfiguration, loading: laborPermissionLoading } = usePermission('rrhh', 'access', '__global__')
   const isArgentina = country.paisCodigo === 'AR'
   const isColombia = country.paisCodigo === 'CO'
   const isPeru = country.paisCodigo === 'PE'
@@ -250,6 +256,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
   }, [post])
 
   const loadConfiguration = useCallback(async (isRefresh = false) => {
+    if (laborPermissionLoading) return
     try {
       if (isRefresh) {
         setRefreshing(true)
@@ -264,7 +271,9 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
         !isPeru
           ? Promise.resolve({ success: true, data: null })
           : get('/configuracion/ose'),
-        get('/rrhh/configuracion-laboral'),
+        canReadLaborConfiguration && (section === 'resumen' || section === 'rrhh')
+          ? get('/rrhh/configuracion-laboral')
+          : Promise.resolve({ success: true, data: null }),
       ])
 
       if (!statusResponse?.success) {
@@ -292,7 +301,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
       setLoading(false)
       setRefreshing(false)
     }
-  }, [autoridadFiscal, get, isPeru])
+  }, [autoridadFiscal, get, isPeru, section, canReadLaborConfiguration, laborPermissionLoading])
 
   const registerDianHabilitation = useCallback(async () => {
     const reference = dianEvidenceReference.trim()
@@ -593,7 +602,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
             ofrecerlo aqui era mandar a una puerta cerrada: se pulsa, no pasa
             nada visible y de ahi sale la impresion de «no se puede». */}
         {status?.isDemo !== true && (
-          <Link className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border bg-transparent px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent" href="/dashboard/wizard">Editar en asistente</Link>
+          <Link className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border bg-transparent px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent" href="/dashboard/wizard">Ver asistente</Link>
         )}
       </nav>
 
@@ -644,6 +653,10 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
               value={isArgentina ? (empresa as any)?.provinciaFiscal : empresa?.ubigeo}
             />
             <FieldRow label="Correo" value={empresa?.email} />
+            <FieldRow label="Teléfono" value={empresa?.telefono} />
+            {empresa && status?.isDemo !== true && (
+              <CompanyDataEditor company={empresa} onSaved={async () => { await loadConfiguration(true) }} />
+            )}
             {section === 'empresa' && (
               <div className="mt-4 border-t border-border pt-4">
                 <h3 className="mb-1 text-sm font-semibold text-foreground">Logo de la empresa</h3>
@@ -862,11 +875,13 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
                 <FieldRow label="Serie nota débito" value={empresa?.serieNotaDebito} />
               </>
             )}
+            {empresa && <SalesReportSettings configuration={empresa} onSaved={async () => { await loadConfiguration(true) }} />}
           </SectionCard>
         )}
 
         {!hidden('rrhh') && (
-          <SectionCard title={`RRHH ${country.paisNombre || ''}`} icon={Users} ok={checks.labor}>
+          <SectionCard title={`RRHH ${country.paisNombre || ''}`} icon={Users} ok={checks.labor} evaluated={canReadLaborConfiguration}>
+            {!canReadLaborConfiguration ? <p className="text-sm text-muted-foreground">No tienes acceso para consultar la configuración laboral.</p> : <>
             <FieldRow
               label="Moneda de planilla"
               value={country.moneda}
@@ -910,6 +925,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
                 </Link>
               </>
             )}
+            </>}
           </SectionCard>
         )}
 

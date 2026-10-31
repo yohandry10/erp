@@ -416,6 +416,7 @@ async resolveNumeroCpe(
     provided: any,
     documentoReceptor: string,
     pais = 'PE',
+    operation = '0101',
   ): string {
     const normalized = String(provided || '').trim().toUpperCase();
     if (pais === 'AR') {
@@ -459,7 +460,7 @@ async resolveNumeroCpe(
     };
     const resolved = map[normalized] || (documentoReceptor.length === 11 ? '6' : '1');
 
-    if (tipoDocumentoCpe === '01' && resolved !== '6') {
+    if (tipoDocumentoCpe === '01' && resolved !== '6' && operation !== '0200') {
       throw new BadRequestException('La factura requiere receptor con RUC');
     }
 

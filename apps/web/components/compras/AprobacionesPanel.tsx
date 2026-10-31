@@ -1,7 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
+import { useAuth } from '@/contexts/AuthContext'
+import { readOrderApprovals, type OrderApproval as Aprobacion } from '@/lib/compras/purchase-order-history-contract'
 import { parseDateLocal } from '@/lib/date-utils'
 import {
   CheckCircle,
@@ -13,21 +15,11 @@ import {
   AlertCircle
 } from 'lucide-react'
 
-interface Aprobacion {
-  id: string
-  orden_id: string
-  nivel: number
-  aprobador_id: string
-  aprobador_nombre: string
-  estado: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA'
-  fecha_aprobacion?: string
-  comentarios?: string
-  created_at: string
-}
-
 interface AprobacionesPanelProps {
   ordenId: string
   estadoOrden: string
+  approvedActor?: string | null
+  approvedAt?: string | null
 }
 
 const ESTADO_CONFIG = {
@@ -60,33 +52,40 @@ const formatApproverName = (name: string) => {
   return normalized || 'Sistema'
 }
 
-export default function AprobacionesPanel({ ordenId, estadoOrden }: AprobacionesPanelProps) {
-  const { get } = useApi()
+export default function AprobacionesPanel({ ordenId, estadoOrden, approvedActor, approvedAt }: AprobacionesPanelProps) {
+  const { get } = useApi({ requireLive: true, throwOnError: true, showErrorToast: false, retries: 0 })
+  const { session } = useAuth()
+  const tenantId = session?.user?.tenant_id || ''
+  const actorId = session?.user?.id || ''
+  const latestRead = useRef(0)
+  const activeScope = useRef('')
+  activeScope.current = `${tenantId}:${actorId}:${ordenId}`
   const [aprobaciones, setAprobaciones] = useState<Aprobacion[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const loadAprobaciones = useCallback(async () => {
+    if (!tenantId || !actorId) return
+    const request = ++latestRead.current
+    const scope = `${tenantId}:${actorId}:${ordenId}`
     try {
       setLoading(true)
       setError(null)
+      setAprobaciones([])
       const response = await get(`/api/compras/ordenes/${ordenId}/aprobaciones`)
-
-      if (response?.success && response.data) {
-        setAprobaciones(response.data)
-      } else {
-        setError('No se pudieron cargar las aprobaciones')
-      }
+      const rows = readOrderApprovals(response, { orderId: ordenId, tenantId, actorId }, approvedActor, approvedAt)
+      if (request === latestRead.current && scope === activeScope.current) setAprobaciones(rows)
     } catch (err: any) {
       console.error('Error loading aprobaciones:', err)
-      setError(err.message || 'Error al cargar las aprobaciones')
+      if (request === latestRead.current && scope === activeScope.current) setError(err.message || 'Error al cargar las aprobaciones')
     } finally {
-      setLoading(false)
+      if (request === latestRead.current && scope === activeScope.current) setLoading(false)
     }
-  }, [get, ordenId])
+  }, [get, ordenId, tenantId, actorId, approvedActor, approvedAt])
 
   useEffect(() => {
     loadAprobaciones()
+    return () => { latestRead.current++ }
   }, [loadAprobaciones])
 
   const formatDate = (dateString: string) => {
@@ -112,7 +111,7 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
   }
 
   // No mostrar el panel si la orden no está en proceso de aprobación o no tiene aprobaciones
-  if (!loading && aprobaciones.length === 0 && estadoOrden !== 'APROBACION') {
+  if (!loading && !error && aprobaciones.length === 0 && estadoOrden !== 'APROBACION') {
     return null
   }
 
@@ -149,6 +148,7 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
         <div className="text-center p-8 text-[var(--red-500)]">
           <AlertCircle size={32} />
           <p className="text-[0.875rem]">{error}</p>
+          <button type="button" onClick={() => void loadAprobaciones()} className="mt-3 rounded-lg border border-border px-4 py-2">Reintentar aprobaciones</button>
         </div>
       </div>
     )

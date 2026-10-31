@@ -39,6 +39,7 @@ describe('CPE Integration Verification', () => {
         insert: jest.fn().mockReturnThis(),
         update: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
+        in: jest.fn(),
         single: jest.fn().mockReturnThis(),
         maybeSingle: jest.fn().mockReturnThis(),
         rpc: jest.fn().mockReturnThis(),
@@ -216,6 +217,11 @@ describe('CPE Integration Verification', () => {
         } as any;
 
         // Mock DB responses
+        // Perfil y costo leídos por las dos consultas del mapper. Antes el mock
+        // no tenía `in` y la implementación convertía ese fallo en costo cero.
+        mockSupabaseClient.in.mockResolvedValue({
+            data: [{ id: 'prod-1', afectacion_igv: '10', costo: 50, precio_compra: 60 }], error: null,
+        });
         // 1. Empresa Config: el servicio decide primero la jurisdicción para
         // saber si debe congelar un snapshot DIAN o seguir el flujo SUNAT.
         mockSupabaseClient.single.mockResolvedValueOnce({

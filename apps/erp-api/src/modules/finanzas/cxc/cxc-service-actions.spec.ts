@@ -6,6 +6,13 @@ import { EventBusService } from '../../../shared/events/event-bus.service';
 import { AuditService } from '../../audit/audit.service';
 import { RetencionesValidationService } from '../shared/retenciones-validation.service';
 import { AplicarNotaCreditoDto } from './dto';
+import { readCxcNoteReceipt, readCxcRescheduleReceipt } from './cxc-adjustment-receipt';
+
+// RPC routing is exercised here; ledger integrity has its own receipt suite.
+jest.mock('./cxc-adjustment-receipt', () => ({
+  readCxcNoteReceipt: jest.fn(async (...args: any[]) => { const raw = args[8]; return Array.isArray(raw) ? raw[0] : raw; }),
+  readCxcRescheduleReceipt: jest.fn(async (...args: any[]) => { const raw = args[6]; return raw?.cuenta ?? raw; }),
+}));
 
 describe('CxcService - acciones complementarias', () => {
   let service: CxcService;
@@ -65,6 +72,33 @@ describe('CxcService - acciones complementarias', () => {
     jest.restoreAllMocks();
   });
 
+  it.each([
+    ['VENCIDO', ['legacy-overdue', 'current-overdue']],
+    ['PENDIENTE', ['pending']],
+  ])('lista estado público %s con sus variantes canónicas sin cruzar empresa', async (estado, expected) => {
+    const rows = [
+      { id: 'legacy-overdue', tenant_id: 'tenant-list', estado: 'VENCIDA' },
+      { id: 'current-overdue', tenant_id: 'tenant-list', estado: 'VENCIDO' },
+      { id: 'pending', tenant_id: 'tenant-list', estado: 'PENDIENTE' },
+      { id: 'foreign-overdue', tenant_id: 'tenant-other', estado: 'VENCIDA' },
+    ];
+    const filters: Array<(row: any) => boolean> = [];
+    const query: any = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn((key, value) => { filters.push(row => row[key] === value); return query; }),
+      in: jest.fn((key, values) => { filters.push(row => values.includes(row[key])); return query; }),
+      order: jest.fn().mockReturnThis(),
+      range: jest.fn(async () => { const data = rows.filter(row => filters.every(filter => filter(row))); return { data, count: data.length, error: null }; }),
+      insert: jest.fn(), update: jest.fn(), delete: jest.fn(),
+    };
+    mockSupabaseClient.from.mockReturnValue(query);
+    const result = await service.listarCuentasPorCobrar('tenant-list', { estado: estado as any });
+    expect(result.data.map(row => row.id)).toEqual(expected);
+    expect(result.pagination.total).toBe(expected.length);
+    expect(query.eq).toHaveBeenCalledWith('tenant_id', 'tenant-list');
+    for (const writer of [query.insert, query.update, query.delete]) expect(writer).not.toHaveBeenCalled();
+  });
+
   describe('aplicarNotaCredito', () => {
     const mockTenantCountry = (pais: string) => {
       mockSupabaseClient.from.mockImplementation((table: string) => {
@@ -119,6 +153,10 @@ describe('CxcService - acciones complementarias', () => {
         success: true,
         data: { documento_id: 'nota-doc-1', cpe_id: 'nota-cpe-1' },
       });
+      expect(readCxcNoteReceipt).toHaveBeenCalledWith(mockSupabaseClient, 'tenant-1',
+        '22222222-2222-4222-8222-222222222222', 'cxc-1', '11111111-1111-4111-8111-111111111111',
+        { monto: 150, codigo_motivo: '10', motivo: 'Ajuste comercial documentado' }, '07', 'cxc-note:test-1',
+        { documento_id: 'nota-doc-1', cpe_id: 'nota-cpe-1' });
     });
 
     it('despacha Colombia como nota DIAN 91 y conserva el motivo del catálogo DIAN', async () => {
@@ -210,6 +248,9 @@ describe('CxcService - acciones complementarias', () => {
         p_idempotency_key: 'reprogramacion-cxc-001',
       }));
       expect(mockSupabaseClient.from).not.toHaveBeenCalled();
+      expect(readCxcRescheduleReceipt).toHaveBeenCalledWith(mockSupabaseClient, tenantId, 'user-99', cuentaId,
+        { nueva_fecha_vencimiento: '2099-12-31', motivo: 'Extensión de plazo', comentarios: 'Aprobado por tesorería' },
+        'reprogramacion-cxc-001', { cuenta: cuentaDespues, idempotent: false });
       expect(auditService.registrarCambio).not.toHaveBeenCalled();
       expect(result).toEqual({
         success: true,
@@ -217,7 +258,15 @@ describe('CxcService - acciones complementarias', () => {
       });
     });
 
-    it('lanza excepción cuando la fecha es inválida', async () => {
+    it.each(['2099-12-31T15:30:00Z', '2099-12-31T00:30:00+14:00'])('conserva el día civil ISO %s antes de ejecutar la RPC y verificar el recibo', async value => {
+      const cuenta = { id: cuentaId, fecha_vencimiento: '2099-12-31' };
+      mockSupabaseClient.rpc = jest.fn().mockResolvedValue({ data: { cuenta, idempotent: false }, error: null });
+      await service.reprogramarCuentaPorCobrar(tenantId, cuentaId, { nueva_fecha_vencimiento: value }, 'user-99', 'stable-original-key');
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('reprogramar_cxc_tx', expect.objectContaining({ p_fecha_vencimiento: '2099-12-31', p_idempotency_key: 'stable-original-key' }));
+      expect(readCxcRescheduleReceipt).toHaveBeenCalledWith(mockSupabaseClient, tenantId, 'user-99', cuentaId, { nueva_fecha_vencimiento: '2099-12-31' }, 'stable-original-key', { cuenta, idempotent: false });
+    });
+
+    it('lanza excepción cuando la fecha es inválida antes de ejecutar la RPC', async () => {
       mockSupabaseClient.rpc = jest.fn().mockResolvedValue({
         data: null, error: { code: '22007', message: 'invalid input syntax for type date' },
       });
@@ -232,6 +281,7 @@ describe('CxcService - acciones complementarias', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
 
       expect(mockSupabaseClient.from).not.toHaveBeenCalled();
+      expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
       expect(auditService.registrarCambio).not.toHaveBeenCalled();
     });
 
@@ -256,6 +306,14 @@ describe('CxcService - acciones complementarias', () => {
 
       await expect(service.reprogramarCuentaPorCobrar(tenantId, cuentaId, { nueva_fecha_vencimiento: '2099-12-31' }, 'user-1', 'clave-001'))
         .rejects.toBeInstanceOf(expected);
+    });
+
+    it('rechaza días civiles inexistentes sin llamar a la RPC', async () => {
+      mockSupabaseClient.rpc = jest.fn();
+      for (const value of ['2026-02-30', '0000-01-01', '2026-13-01']) {
+        await expect(service.reprogramarCuentaPorCobrar(tenantId, cuentaId, { nueva_fecha_vencimiento: value }, 'user-99')).rejects.toBeInstanceOf(BadRequestException);
+      }
+      expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
     });
   });
 

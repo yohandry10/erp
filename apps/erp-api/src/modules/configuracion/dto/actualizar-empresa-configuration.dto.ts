@@ -8,12 +8,13 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 /**
  * Body de `PUT /api/configuration/empresa`.
  *
- * Declara los 62 campos que el controlador lee, ni uno más: con
+ * Declara los campos que el controlador lee: con
  * `forbidNonWhitelisted` activo, cualquier campo no declarado devolvería 400 y
  * lo que hoy funciona dejaría de funcionar. `logoUrl` se conserva sólo para
  * devolver el error explícito que dirige al endpoint multipart dedicado; este
@@ -26,6 +27,10 @@ import {
  * real es el propio flujo de configuración, no una expresión regular aquí.
  */
 export class ActualizarEmpresaConfigurationDto {
+  @ValidateIf((_, value) => value !== undefined) @IsBoolean() habilitar_dashboards_otif?: boolean;
+  @ValidateIf((_, value) => value !== undefined) @IsBoolean() habilitar_dashboards_sunat?: boolean;
+  @ValidateIf((_, value) => value !== undefined) @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(100) objetivo_otif?: number;
+  @ValidateIf((_, value) => value !== undefined) @IsInt() @Min(1) @Max(86400) frecuencia_actualizacion_dashboards?: number;
   // Identidad y domicilio fiscal
   @IsOptional() @IsString() @MaxLength(20) ruc?: string;
   @IsOptional() @IsString() @MaxLength(300) razonSocial?: string;

@@ -1,12 +1,15 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
+import { useAuth } from '@/contexts/AuthContext'
+import { readInvoiceOrder } from '@/lib/ventas/invoice-generation-operation'
 import { useEmpresaConfig } from '@/hooks/use-empresa-config'
 import { PedidoVenta, EstadoPedido } from '@/types/ventas'
 import { toast } from '@/components/ui/use-toast'
 import GenerarFacturaButton from '@/components/ventas/GenerarFacturaButton'
+import RegistrarEntregaButton from '@/components/ventas/RegistrarEntregaButton'
 import CancelarPedidoButton from '@/components/ventas/CancelarPedidoButton'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
@@ -18,6 +21,7 @@ import CpeA4PreviewModal from '@/components/cpe/CpeA4PreviewModal'
 import { Button } from '@/components/ui/button'
 import { Eye } from 'lucide-react'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { SupplyOrderOrigin } from '@/components/ventas/SupplyOrderOrigin'
 
 const ESTADO_COLORS: Record<EstadoPedido, { bg: string; text: string }> = {
   [EstadoPedido.PENDIENTE]: { bg: '#fef3c7', text: '#92400e' },
@@ -34,6 +38,12 @@ const ESTADO_COLORS: Record<EstadoPedido, { bg: string; text: string }> = {
 }
 
 export default function PedidoDetailPage() {
+  const { session } = useAuth()
+  const params = useParams()
+  return <PedidoDetailWorkspace key={`${session?.user?.tenant_id || ''}:${session?.user?.id || ''}:${params.id}`} />
+}
+
+function PedidoDetailWorkspace() {
   const { formatCurrency } = useLocalizedMoney()
   const { tasaIgv, nombreImpuesto } = useTaxConfig()
   const {
@@ -42,7 +52,12 @@ export default function PedidoDetailPage() {
   } = usePermission('inventario', 'ver', 'logistica')
   const router = useRouter()
   const params = useParams()
-  const { get, post } = useApi()
+  const { get, post } = useApi({ requireLive: true, throwOnError: true, showErrorToast: false })
+  const { session } = useAuth()
+  const tenantId = session?.user?.tenant_id || ''
+  const actorId = session?.user?.id || ''
+  const readEpoch = useRef(0)
+  const [readError, setReadError] = useState<string | null>(null)
   const { config: empresaConfig, loading: empresaConfigLoading } = useEmpresaConfig()
   const country = useCountryContext()
 
@@ -51,43 +66,29 @@ export default function PedidoDetailPage() {
   const [showCpePreview, setShowCpePreview] = useState(false)
 
   const pedidoId = params.id as string
+  const scopeIdentity = `${tenantId}:${actorId}:${pedidoId}`
+  const currentScope = useRef(scopeIdentity); currentScope.current = scopeIdentity
 
   const loadPedido = useCallback(async () => {
+    const read = ++readEpoch.current
+    const scope = `${tenantId}:${actorId}:${pedidoId}`
+    setLoading(true); setReadError(null)
     try {
-      setLoading(true)
-      console.debug('[PedidoDetailPage] Cargando pedido...', { pedidoId })
       const response = await get(`/ventas/pedidos/${pedidoId}`)
-
-      console.debug('[PedidoDetailPage] Respuesta detalle pedido', response)
-      if (response?.success && response.data) {
-        setPedido(response.data)
-        console.debug('[PedidoDetailPage] Estado pedido actualizado', {
-          estado: response.data?.estado,
-          factura_id: response.data?.factura_id,
-        })
-      } else {
-        toast({
-          title: 'Error',
-          description: 'No se pudo cargar el pedido',
-          variant: 'destructive'
-        })
-        router.push('/dashboard/ventas/pedidos')
-      }
+      if (read !== readEpoch.current || currentScope.current !== scope) return
+      readInvoiceOrder(response, { tenantId, actorId, orderId: pedidoId })
+      setPedido(response.data)
     } catch (error) {
-      console.error('Error loading pedido:', error)
-      toast({
-        title: 'Error',
-        description: 'No se pudo cargar el pedido',
-        variant: 'destructive'
-      })
-      router.push('/dashboard/ventas/pedidos')
+      if (read !== readEpoch.current || currentScope.current !== scope) return
+      setPedido(null); setReadError('No se pudo consultar el pedido completo en vivo. Reintente la consulta.')
     } finally {
-      setLoading(false)
+      if (read === readEpoch.current && currentScope.current === scope) setLoading(false)
     }
-  }, [get, pedidoId, router])
+  }, [get, pedidoId, tenantId, actorId])
 
   useEffect(() => {
     loadPedido()
+    return () => { readEpoch.current += 1 }
   }, [loadPedido])
 
   const handleFacturaGenerada = (result: { facturaId: string | null; sugerioGre: boolean }) => {
@@ -129,7 +130,12 @@ export default function PedidoDetailPage() {
   }
 
   if (!pedido) {
-    return null
+    return <div className="space-y-4 p-6">
+      <div role="alert" className="rounded-lg border border-destructive/40 p-4">{readError || 'No se pudo consultar el pedido.'}</div>
+      <Button onClick={() => void loadPedido()} disabled={loading}>Reintentar consulta del pedido</Button>
+      <GenerarFacturaButton pedidoId={pedidoId} canGenerate={false} onSuccess={loadPedido}
+        config={{ usar_flujo_logistica: empresaConfig?.usar_flujo_logistica ?? false, gre_automatico_habilitado: empresaConfig?.gre_automatico_habilitado ?? true, gre_obligatorio: empresaConfig?.gre_obligatorio ?? false }} />
+    </div>
   }
 
   const clienteInfo = (pedido as any).cliente ?? (pedido as any).clientes ?? null
@@ -308,10 +314,11 @@ export default function PedidoDetailPage() {
         </div>
       )}
 
-      {!empresaConfigLoading && puedeGenerarFactura && (
+      {!empresaConfigLoading && (
         <div className="flex gap-3 flex-wrap">
           <GenerarFacturaButton
             pedidoId={pedidoId}
+            canGenerate={puedeGenerarFactura}
             onSuccess={loadPedido}
             config={facturaButtonConfig}
             documentType={documentType}
@@ -353,6 +360,8 @@ export default function PedidoDetailPage() {
         </div>
       )}
 
+      <RegistrarEntregaButton order={pedido as any} onSuccess={loadPedido} />
+
       {pedido.factura_id && (
         <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-4">
           <p className="mb-3 text-sm text-muted-foreground">
@@ -364,6 +373,8 @@ export default function PedidoDetailPage() {
           </Button>
         </div>
       )}
+
+      <SupplyOrderOrigin pedidoId={pedido.id} estado={pedido.estado} />
 
       {/* Cliente Info */}
       <div className="p-6 shadow border">

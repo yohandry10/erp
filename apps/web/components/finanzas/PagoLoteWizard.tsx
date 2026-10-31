@@ -46,6 +46,7 @@ interface CuentaPorPagar {
 }
 
 interface PagoLoteWizardProps {
+  initialSelectedIds?: string[];
   cuentasBancarias: CuentaBancaria[];
   cxpsDisponibles: CuentaPorPagar[];
   onSubmit: (data: {
@@ -74,6 +75,7 @@ export function PagoLoteWizard({
   cxpsDisponibles,
   onSubmit,
   onCancel,
+  initialSelectedIds = [],
 }: PagoLoteWizardProps) {
   const [currentStep, setCurrentStep] = useState<WizardStep>('seleccion-cuenta');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -126,6 +128,12 @@ export function PagoLoteWizard({
   const saldoSuficiente = cuentaSeleccionada
     ? cuentaSeleccionada.saldo >= montoTotalLote
     : false;
+  const amountsValid = selectedCxpIds.length > 0 && selectedCxpIds.every(id => {
+    const cxp = cxpsFiltradas.find(row => row.id === id);
+    const amount = montosParciales[id] ?? cxp?.saldo;
+    return cxp && typeof amount === 'number' && Number.isFinite(amount) && amount > 0
+      && amount <= cxp.saldo && Math.abs(amount * 100 - Math.round(amount * 100)) < 0.000001;
+  });
 
   // Manejar cambio de selección de CxPs
   const handleSelectionChange = useCallback((ids: string[], montos: Record<string, number>) => {
@@ -135,7 +143,7 @@ export function PagoLoteWizard({
 
   // Manejar envío del formulario
   const handleSubmit = async () => {
-    if (!cuentaBancariaId || !referenciaLote.trim() || selectedCxpIds.length === 0) {
+    if (!cuentaBancariaId || !referenciaLote.trim() || !amountsValid || !saldoSuficiente || isSubmitting) {
       return;
     }
 
@@ -176,7 +184,12 @@ export function PagoLoteWizard({
       <div className="space-y-4">
         <div>
           <Label htmlFor="cuenta-bancaria">Cuenta Bancaria *</Label>
-          <Select value={cuentaBancariaId} onValueChange={setCuentaBancariaId}>
+          <Select value={cuentaBancariaId} onValueChange={id => {
+            setCuentaBancariaId(id);
+            const bank = cuentasBancarias.find(row => row.id === id);
+            setSelectedCxpIds(initialSelectedIds.filter(cxpId => cxpsDisponibles.some(row => row.id === cxpId && row.moneda === bank?.moneda)));
+            setMontosParciales({});
+          }}>
             <SelectTrigger id="cuenta-bancaria">
               <SelectValue placeholder="Seleccione una cuenta" />
             </SelectTrigger>
@@ -298,6 +311,8 @@ export function PagoLoteWizard({
       )}
 
       <SeleccionarCxpLote
+        initialSelectedIds={selectedCxpIds}
+        initialMontos={montosParciales}
         cxps={cxpsFiltradas}
         onSelectionChange={handleSelectionChange}
         monedaFiltro={cuentaSeleccionada?.moneda}
@@ -310,7 +325,7 @@ export function PagoLoteWizard({
         <Button
           type="button"
           onClick={() => setCurrentStep('confirmacion')}
-          disabled={selectedCxpIds.length === 0}
+          disabled={!amountsValid}
         >
           Siguiente: Confirmar
         </Button>
@@ -480,7 +495,7 @@ export function PagoLoteWizard({
           <Button
             type="button"
             onClick={handleSubmit}
-            disabled={!saldoSuficiente || isSubmitting}
+            disabled={!saldoSuficiente || !amountsValid || isSubmitting}
           >
             {isSubmitting ? (
               <>

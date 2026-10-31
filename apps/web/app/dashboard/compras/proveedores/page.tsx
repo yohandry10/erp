@@ -1,5 +1,6 @@
 'use client'
 
+import { requestConfirmation } from '@/lib/confirm-action'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
@@ -98,7 +99,7 @@ export default function ProveedoresPage() {
   }
 
   const handleDelete = async (id: string, razonSocial: string) => {
-    if (!confirm(`¿Está seguro de desactivar el proveedor "${razonSocial}"?`)) {
+    if (!(await requestConfirmation(`¿Está seguro de desactivar el proveedor "${razonSocial}"?`))) {
       return
     }
 

@@ -141,6 +141,9 @@ jobs:
       - name: Run tests with coverage
         run: pnpm test:cov
 
+      - name: Verify data migration tooling
+        run: node --test scripts/migracion/migracion.test.mjs
+
       - name: Verify desktop session persistence
         run: pnpm --filter @erp-suite/web test:auth-session
 
@@ -148,8 +151,52 @@ jobs:
         run: pnpm --filter @erp-suite/web test:tenant-catalog
       - name: Candidate profile contract
         run: pnpm --filter @erp-suite/web test:candidate-profile
+      - name: Receivables complete live read contract
+        run: pnpm --filter @erp-suite/web test:cxc-read
+      - name: Frozen SIRE download integrity
+        run: pnpm --filter @erp-suite/web test:sire-download
+      - name: Verified receivables collection receipts
+        run: pnpm --filter @erp-suite/web test:cxc-collection
+      - name: Durable original receivables collection requests
+        run: pnpm --filter @erp-suite/web test:cxc-collection-operation
+      - name: Verified receivables adjustment receipts
+        run: pnpm --filter @erp-suite/web test:cxc-adjustments
+      - name: Durable original receivables adjustment requests
+        run: pnpm --filter @erp-suite/web test:cxc-adjustment-operation
+      - name: Complete scoped payables payment history
+        run: pnpm --filter @erp-suite/web test:cxp-history
+      - name: Original durable depreciation batch
+        run: pnpm --filter @erp-suite/web test:depreciation-batch
+      - name: Original durable asset update and retirement
+        run: pnpm --filter @erp-suite/web test:asset-lifecycle
+      - name: Asset creation SQL code and original request
+        run: pnpm --filter @erp-suite/web test:asset-create-code
+      - name: Readonly imported CPE history and fiscal state
+        run: pnpm --filter @erp-suite/web test:cpe-historical-read
+
+      - name: Wizard optional series and logo payload contracts
+        working-directory: apps/web
+        run: node node_modules/@playwright/test/cli.js test tests/e2e/wizard-company-read-contract.spec.ts tests/e2e/wizard-logo-contract.spec.ts --workers=1 --retries=0 --reporter=line
+        env:
+          PLAYWRIGHT_SKIP_GLOBAL_AUTH: "1"
+          PLAYWRIGHT_SKIP_WEBSERVER: "1"
+          E2E_ISOLATED_BROWSER: "1"
+          npm_lifecycle_event: test:e2e:isolated
+          SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:3002
+          E2E_API_ORIGIN: http://127.0.0.1:3002
+          BASE_URL: http://127.0.0.1:3001
+
+      - name: Verify CPE RA RC live read contract
+        run: pnpm --filter @erp-suite/web test:cpe-baja-read
       - name: Worker PROD-only configuration
         run: pnpm --filter @erp-suite/worker test:runtime-config
+      - name: Payroll payment fiscal-day boundaries
+        run: pnpm --filter @erp-suite/web test:payroll-payment-fiscal-date
+
+      - name: Requirement evidence rejects false acceptance
+        run: python -m unittest discover -s scripts/ci -p test_uat_evidence.py
 
       - name: Publicar reporte de cobertura
         if: always()
@@ -171,7 +218,8 @@ jobs:
 
   database-contracts:
     name: PostgreSQL 16 fresh schema + SQL contracts
-    runs-on: ubuntu-latest
+    # Fijado: ubuntu-latest pasó a 26.04, que no trae postgresql-client-16.
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     needs: [install]
     services:
@@ -189,7 +237,7 @@ jobs:
           --health-retries 20
     env:
       E2E_EPHEMERAL_LOCAL_DB: "1"
-      REQUIRED_DATABASE_SCHEMA_VERSION: "569"
+      REQUIRED_DATABASE_SCHEMA_VERSION: "590"
       PGPASSWORD: postgres
       PGHOST: 127.0.0.1
       PGPORT: 5442
@@ -215,6 +263,11 @@ jobs:
       - name: Rebuild and verify the required database contract
         run: node scripts/ci/verify-database-contracts.mjs
 
+      - name: Verify tenant data export
+        env:
+          PSQL_BIN: psql
+        run: node scripts/datos/test-exportar-tenant-local.mjs
+
       - name: Database contract summary
         if: always()
         run: |
@@ -225,8 +278,9 @@ jobs:
 
   peru-integrated:
     name: Peru API, browser and backup recovery
-    runs-on: ubuntu-latest
-    timeout-minutes: 50
+    # Fijado: ubuntu-latest pasó a 26.04, que no trae postgresql-client-16.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
     needs: [install]
     steps:
       - name: Checkout
@@ -246,6 +300,14 @@ jobs:
           sudo apt-get install -y postgresql-client-16
       - name: Install Chromium
         run: pnpm --filter @erp-suite/web exec playwright install --with-deps chromium
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Python browser driver
+        run: |
+          python -m pip install playwright==1.56.0
+          python -m playwright install --with-deps chromium
       - name: Verify integrated Peru flows and recovery
         run: node scripts/ci/run-peru-integrated-local.mjs --survey --records
       - name: Preserve local test evidence
@@ -261,7 +323,8 @@ jobs:
 
   peru-company-storage:
     name: Peru company logo with real local Storage
-    runs-on: ubuntu-latest
+    # Fijado: ubuntu-latest pasó a 26.04, que no trae postgresql-client-16.
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     needs: [install]
     steps:
@@ -284,6 +347,8 @@ jobs:
         run: pnpm --filter @erp-suite/web exec playwright install --with-deps chromium
       - name: Verify company logo API, browser and Storage
         run: node scripts/ci/run-peru-company-storage-local.mjs --browser
+      - name: Verify Storage backup and restore
+        run: node scripts/ci/test-storage-backup-local.mjs
       - name: Preserve selected local evidence
         if: always()
         uses: actions/upload-artifact@v4

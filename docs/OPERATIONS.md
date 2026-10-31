@@ -19,6 +19,29 @@ pnpm build
 Para pruebas con escritura se usa el runner aislado
 `node scripts/ci/run-peru-integrated-local.mjs --browser`, que crea y elimina
 únicamente su infraestructura efímera y no carga secretos productivos.
+El UAT570 conservado usa web3310/API3311 y
+`artifacts/peru-uat-stack-570.mjs resume|restart-api|restart-web`; no se resetea
+su contenedor con operaciones de aceptación. Las pruebas de escritorio usan
+identificadores y carpetas WebView2 separados para servidor local y paquete
+estático. `E2E_TAURI_STATIC=1` añade sólo `http://tauri.localhost` al CORS del
+harness, cuyo PostgreSQL/PostgREST y web siguen obligatoriamente en loopback.
+No modifica el CORS productivo. El build nativo con `NEXT_DIST_DIR` exporta en
+ese directorio; el override de prueba debe usarlo como `frontendDist`.
+La583 local incluye SELECT de `service_role` en `documento_archivos` para la
+relación consultada al descargar documentos, y en `cxc_cobro_reversas` para
+consultar la trazabilidad de anulación financiera CPE. También incluye SELECT
+del servidor en `producto_precios_sucursal` y `producto_stock_sucursal` para
+la consulta opcional histórica `includeSucursal`; el stock operativo sigue
+en `producto_existencias`/`stock_por_sucursal`. La lectura del reparto de una
+línea contable requiere además SELECT del servidor en `distribucion_analitica`;
+su alta y eliminación conservan las RPC transaccionales. No añadeDML ni cambiaRLS,
+owner o permisos de clientes. El gatefresh/restore y la aplicación local
+`document-files-read-local-ddl.json`, `cpe-cancellation-read-local-ddl.json`
+y `product-branch-read-local-ddl.json`
+contrastan preservación de todas las filas y demás ACL. Los permisos DML que
+ya existían en el respaldo restaurado se conservan; el verificador exige el
+SELECT nuevo sin delegación. Sigue sin promoción
+aPROD569. No ejecutar el grant por separado enPROD.
 El arranque operativo requiere primero el preflight PROD indicado más abajo;
 después se ejecuta el paquete compilado mediante `pnpm --filter @erp-suite/erp-api start`.
 
@@ -307,6 +330,121 @@ La opción `--survey` añade inspección de carga de las pantallas estáticas de
 dashboard con navegador y API reales. Sus resultados y capturas quedan en
 `module-survey/` dentro de la evidencia del ensayo; no acreditan todas las
 operaciones de cada módulo ni las páginas que requieren un identificador.
+
+## Respaldo, recuperación y devolución de datos
+
+Alcance del respaldo productivo:
+
+- Base: `scripts/backup-peru-prod.mjs` (public, app, auth, storage y
+  supabase_migrations; sin roles globales).
+- Archivos: `node scripts/datos/respaldar-storage.mjs --env-file .env.production`
+  descarga, sólo lectura, todos los buckets y objetos de Storage con su
+  configuración y un manifiesto SHA-256 en `artifacts/storage-backups/`
+  (ignorada por Git); el informe sin datos queda en
+  `artifacts/storage-backup-<run>.json`.
+- Configuración: `render.yaml`, migraciones y código están en Git; los
+  secretos viven en Render, Vercel y `.env.production` fuera del repositorio,
+  y su custodia es del responsable de la cuenta. Los certificados digitales
+  que guarda la aplicación viajan con el respaldo de la base.
+
+Objetivos propuestos, pendientes de aprobación del cliente en la implantación:
+respaldo diario de base y archivos (RPO 24 horas; menor sólo con PITR del
+proveedor, que no está contratado), restauración completa en un proyecto
+nuevo en 8 horas (RTO) y retención de 35 copias diarias y 12 mensuales,
+cifradas y fuera del proveedor. El RTO de PROD no está acreditado: los ensayos
+miden volúmenes locales.
+
+Ensayos locales:
+
+- `pnpm test:storage-backup` levanta dos Storage efímeros en Docker, respalda,
+  rechaza un respaldo alterado, restaura una empresa y luego todo, verifica
+  cada objeto por SHA-256 y rechaza destinos remotos.
+  `scripts/datos/restaurar-storage.mjs` sólo escribe en Storage local:
+  recuperar PROD sigue el procedimiento de operaciones destructivas.
+- `pnpm test:tenant-export` (base efímera) exporta una empresa y comprueba que
+  no aparecen datos de otra, que los conteos salen de la misma instantánea y
+  que los secretos van vacíos.
+- La restauración de la base se ensaya con `scripts/rehearse-peru-prod-local.mjs`.
+
+Devolución al terminar el servicio: `node scripts/datos/exportar-tenant.mjs
+--tenant <uuid> --env-file .env.production --pg-bin <PostgreSQL 17> --con-archivos`
+genera en `artifacts/exportaciones/` un CSV por tabla de la empresa (las 280
+con `tenant_id` y las hijas por clave foránea obligatoria), sus archivos de
+Storage y un manifiesto con conteos y SHA-256, desde una instantánea de sólo
+lectura. Las columnas de credenciales y secretos se entregan vacías. Borrar
+la empresa después de confirmar la entrega exige autorización explícita y el
+procedimiento de operaciones destructivas.
+
+## Migración desde otro sistema
+
+Proceso estándar para pasar a este ERP desde cualquier sistema. Nada depende del
+origen salvo el mapeo del paso 2. Dos capas con la misma fecha de corte (580–582):
+el archivo íntegro guarda cada tabla del extracto tal cual; la migración operativa
+carga terceros, maestros y saldos abiertos por los writers del ERP.
+
+El extracto es una carpeta con un archivo por tabla, exportado del sistema anterior
+en cualquiera de estos formatos: DBF (dBase, FoxPro, Clipper, con memo .fpt), CSV,
+TSV, JSON, JSONL o Excel de una hoja. Si el cliente ya entrega sus datos en las
+plantillas del ERP, se omiten los pasos 1 a 3 y se empieza por el 4 o el 5. Cada
+migración declara el sistema de origen (`sistemaOrigen`, en la pantalla "Sistema de
+origen"): los registros de dos sistemas se siguen y concilian por separado.
+
+1. Perfil del extracto, sólo lectura: `node scripts/migracion/perfilar.mjs <carpeta>`
+   escribe
+   `perfil-extracto.json` y `perfil-extracto.md`: formato y página de códigos, volumen y
+   borrados, campos, vacíos, claves candidatas, rango histórico y alertas,
+   incluidas las columnas sensibles (claves, PIN, tarjetas). Si el byte de
+   página de códigos de un DBF no es confiable, forzar `--codificacion cp850`.
+2. Mapeo, lo único propio de cada sistema: partir de `scripts/migracion/simulacion/mapeo-simulacion.json` (las 16
+   salidas) y reemplazar tablas, uniones, filtros y campos por los del perfil.
+   Las unidades se homologan a NIU, KGM, LTR, MTR o ZZ sin convertir
+   cantidades; un valor sin correspondencia detiene la transformación con el
+   valor exacto. El stock usa `almacen_codigo` del almacén migrado y toma su
+   sucursal o la principal.
+3. Transformación: `node scripts/migracion/transformar.mjs <mapeo> <extracto> <salida>`
+   produce las plantillas en el orden de importación, `control.json` (totales
+   con las reglas de la conciliación 582) y `extracto.json` (filas leídas,
+   descartadas y por qué).
+4. Archivo íntegro: `ERP_API_TOKEN=<token de un ADMIN> node scripts/migracion/archivar.mjs
+   <extracto> --api <url>/api --lote <clave estable> --origen "<sistema>" [--fecha-corte AAAA-MM-DD]`
+   carga todas las tablas, también los registros borrados, en tandas
+   idempotentes de hasta 2000 filas; la base redacta las columnas de
+   credenciales y medios de pago aunque la tanda llegue directo al API. El lote
+   cierra sólo si lo cargado coincide con lo leído y queda inmutable; repetir
+   con la misma `--lote` reanuda una carga cortada y una fila que cambió se
+   rechaza. Un extracto que no sirve se descarta con motivo
+   (`POST /api/migration/origen/archivo/lotes/:id/descartar`). Se consulta en la
+   pantalla por texto, tabla y página con `migration.archivo.read`.
+5. Ensayo integral en `/dashboard/migracion`: indicar el sistema de origen y
+   adjuntar las plantillas, la fecha de corte y `control.json`. Corre todo en la base en el orden real y
+   se revierte. Repetir hasta cero errores, conciliación cuadrada y cruce de
+   bancos con el asiento de apertura cuadrado en moneda local; los errores se
+   devuelven al cliente para corregir en su sistema y reentregar el extracto.
+6. Importación en orden: clientes, proveedores, almacenes, plan de cuentas,
+   productos, cuentas bancarias, listas de precios, CxC, CxP, balance de
+   apertura, contratos, OC del cliente, cronograma, OC de compra, pedidos de
+   venta y stock; después, conciliación con el mismo `control.json`. Un
+   reintento no duplica y un dato cambiado en el sistema anterior se rechaza por registro. Las
+   OC de compra quedan en borrador y las aprueba alguien distinto de quien
+   migró.
+
+Simulación local completa (Docker, sin nada remoto):
+`PSQL_BIN=<psql> node scripts/migracion/simulacion/simular-migracion-local.mjs`.
+Levanta PostgreSQL 16 con la cadena, PostgREST y el API Nest real; un ERP
+sintético entrega un extracto con errores sembrados y se recorre perfil,
+archivo, ensayo, reentrega, importación, conciliación, reintento, origen
+cambiado, aprobación y aislamiento. Evidencia en
+`artifacts/migracion-simulacion/evidence.json`; también `pnpm simulate:migracion`.
+
+El ensayo integral, la conciliación y el archivo usan un cliente de datos sin
+reintentos con `SUPABASE_LONG_FETCH_TIMEOUT_MS` (10 minutos por defecto, entre 1
+y 30); el resto del API conserva `SUPABASE_FETCH_TIMEOUT_MS`. La pantalla espera
+hasta 15 minutos por operación.
+
+El extracto y sus salidas pueden contener datos del cliente: se procesan fuera
+del repositorio y no se versionan. `pnpm test:migracion` prueba las herramientas con
+extractos sintéticos, incluidos dos ERP con otros formatos y columnas que llegan a
+las mismas plantillas.
 
 ## Operaciones destructivas en PROD
 

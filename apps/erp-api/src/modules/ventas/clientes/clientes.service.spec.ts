@@ -230,6 +230,32 @@ describe('ClientesService', () => {
       });
     });
 
+    it('envía la misma clave y cuerpo al writer durable de edición', async () => {
+      mockSupabaseClient.single.mockResolvedValue({ data: {
+        id: 'cliente-1', tenant_id: 'tenant-a', documento_tipo: 'DNI', codigo: '12345678',
+      }, error: null });
+      mockSupabaseClient.rpc.mockResolvedValue({ data: {
+        id: 'cliente-1', tenant_id: 'tenant-a', telefono: '987000001',
+      }, error: null });
+      const body = { telefono: '987000001' };
+      await service.update('cliente-1', body, 'tenant-a', 'user-1', 'customer-edit-stable-1');
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('actualizar_cliente_idempotente_tx_571', {
+        p_cliente_id: 'cliente-1', p_tenant_id: 'tenant-a', p_actor_id: 'user-1',
+        p_cambios: body, p_idempotency_key: 'customer-edit-stable-1',
+      });
+      mockSupabaseClient.rpc.mockResolvedValue({ data: null, error: {
+        code: '23505', message: 'CUSTOMER_UPDATE_IDEMPOTENCY_CONFLICT',
+      } });
+      await expect(service.update('cliente-1', { telefono: 'otro' }, 'tenant-a', 'user-1', 'customer-edit-stable-1'))
+        .rejects.toThrow('La clave de edición ya pertenece a otra solicitud');
+    });
+
+    it('rechaza una clave inválida antes de consultar o escribir', async () => {
+      await expect(service.update('cliente-1', {}, 'tenant-a', 'user-1', 'corta')).rejects.toThrow('clave');
+      expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
+      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
+    });
+
     it('delete delega la desactivación idempotente al RPC con actor y tenant', async () => {
       mockSupabaseClient.rpc.mockResolvedValue({
         data: { id: 'cliente-1', activo: false, idempotent: false },

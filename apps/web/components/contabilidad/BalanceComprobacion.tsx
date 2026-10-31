@@ -1,23 +1,16 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useAccountingStatement, previousAccountingPeriod } from '@/hooks/use-accounting-statement'
+import { readStatementBalance } from '@/lib/contabilidad/statement-read-contract'
+import FinanceReportStatus from '@/components/finanzas/FinanceReportStatus'
+
 import { AlertCircle, Download, FileText } from 'lucide-react'
-import { useApi } from '@/hooks/use-api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { exportToExcel, formatCurrencyForExcel } from '@/lib/excel-export'
 import { exportBalanceComprobacionToPDF } from '@/lib/pdf-export'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import { useCountryContext } from '@/hooks/use-country-context'
-
-interface BalanceComprobacionItem {
-  cuenta: string
-  nombre: string
-  saldo_inicial: number
-  debe: number
-  haber: number
-  saldo_final: number
-}
 
 interface BalanceComprobacionProps {
   anio: number
@@ -27,57 +20,12 @@ interface BalanceComprobacionProps {
 
 export function BalanceComprobacion({ anio, mes, showComparison = false }: BalanceComprobacionProps) {
   const country = useCountryContext()
-  const { get } = useApi()
+  const report = useAccountingStatement('/api/contabilidad/estados/balance-comprobacion', anio, mes, readStatementBalance, showComparison)
+  const { loading, error, reload } = report
+  const data = report.data ?? []
+  const previousData = report.previousData ?? []
+  const getPreviousPeriod = () => previousAccountingPeriod(anio, mes)
   const { formatCurrency } = useLocalizedMoney()
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [data, setData] = useState<BalanceComprobacionItem[]>([])
-  const [previousData, setPreviousData] = useState<BalanceComprobacionItem[]>([])
-
-  const normalizeBalanceResponse = (payload: unknown): BalanceComprobacionItem[] => {
-    if (Array.isArray(payload)) return payload as BalanceComprobacionItem[]
-    if (payload && typeof payload === 'object' && Array.isArray((payload as { cuentas?: unknown }).cuentas)) {
-      return (payload as { cuentas: BalanceComprobacionItem[] }).cuentas
-    }
-    return []
-  }
-
-  const getPreviousPeriod = useCallback(() => {
-    if (mes === 1) return { anio: anio - 1, mes: 12 }
-    return { anio, mes: mes - 1 }
-  }, [anio, mes])
-
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      const response = await get(`/api/contabilidad/estados/balance-comprobacion?anio=${anio}&mes=${mes}`)
-
-      if (response?.success && response.data) {
-        setData(normalizeBalanceResponse(response.data))
-      } else {
-        setError('No se pudieron cargar los datos')
-      }
-
-      if (showComparison) {
-        const { anio: prevAnio, mes: prevMes } = getPreviousPeriod()
-        const prevResponse = await get(`/api/contabilidad/estados/balance-comprobacion?anio=${prevAnio}&mes=${prevMes}`)
-        setPreviousData(prevResponse?.success && prevResponse.data ? normalizeBalanceResponse(prevResponse.data) : [])
-      } else {
-        setPreviousData([])
-      }
-    } catch (err: any) {
-      console.error('Error loading balance comprobacion:', err)
-      setError(err.message || 'Error al cargar el balance de comprobación')
-    } finally {
-      setLoading(false)
-    }
-  }, [anio, get, getPreviousPeriod, mes, showComparison])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
 
   const getPreviousItemValue = (cuenta: string): number => {
     const prevItem = previousData.find((item) => item.cuenta === cuenta)
@@ -160,16 +108,7 @@ export function BalanceComprobacion({ anio, mes, showComparison = false }: Balan
     exportBalanceComprobacionToPDF(data, anio, mes, totales, country.moneda, country.locale)
   }
 
-  if (loading) {
-    return (
-      <Card className="border-cyan-400/20 bg-card/65 text-foreground">
-        <CardContent className="flex min-h-[260px] flex-col items-center justify-center gap-4 p-8">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-cyan-400/20 border-t-cyan-300" />
-          <p className="text-sm font-medium text-muted-foreground">Cargando Balance de Comprobación...</p>
-        </CardContent>
-      </Card>
-    )
-  }
+  if (loading || error || !report.data) return <FinanceReportStatus loading={loading} retry={reload} />
 
   return (
     <Card className="border-cyan-400/20 bg-card/70 text-foreground shadow-xl shadow-blue-950/20">

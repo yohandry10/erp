@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { ImporterResult, ImporterRowError } from '../dto/import.dto';
-import { ParsedCsv, nonEmpty, toNumber, validateHeaders } from '../util/csv-parser.util';
+import { ParsedCsv, nonEmpty, toDateOrNull, toNumber, validateHeaders } from '../util/csv-parser.util';
 import { Importer, ImporterContext, emptyResult } from './importer.interface';
 import { MigrationRunsService } from '../migration-runs.service';
+import { mensajeOrigen } from './suministro-origen.importer';
 
 const REQUIRED = [
   'external_id_producto',
@@ -12,6 +13,38 @@ const REQUIRED = [
   'cantidad',
   'costo_unitario',
 ];
+// Con almacen_codigo no hacen falta los UUID: la sucursal es la del almacén o la principal.
+const REQUIRED_POR_CODIGO = ['external_id_producto', 'almacen_codigo', 'cantidad', 'costo_unitario'];
+const UUID = /^[0-9a-f-]{36}$/i;
+
+/** Identidad de la fila: con lote, una apertura por lote en el mismo almacén. */
+function externalIdStock(producto: string, almacenId: string, fechaCorte: string, lote: string | null) {
+  return lote ? `stock:${producto}:${lote}:${almacenId}:${fechaCorte}` : `stock:${producto}:${almacenId}:${fechaCorte}`;
+}
+const loteDe = (row: Record<string, string>) => nonEmpty(row['lote'])?.toUpperCase() ?? null;
+
+/** Filas del ensayo de migración: el producto se resuelve por código en la base. */
+export function filasEnsayoStock(parsed: ParsedCsv, fechaCorte: string) {
+  return parsed.rows.map((row, idx) => {
+    const producto = nonEmpty(row['external_id_producto']) ?? '';
+    const lote = loteDe(row);
+    const codigo = nonEmpty(row['almacen_id']) ? null : nonEmpty(row['almacen_codigo'])?.trim() ?? null;
+    return {
+      external_id: externalIdStock(producto, codigo ?? (row['almacen_id'] ?? '').trim(), fechaCorte, lote),
+      fila: idx + 2,
+      stock: {
+        producto_codigo: producto,
+        ...(codigo ? { almacen_codigo: codigo } : { almacen_id: (row['almacen_id'] ?? '').trim() }),
+        sucursal_id: (row['sucursal_id'] ?? '').trim(),
+        fecha_corte: fechaCorte,
+        cantidad: toNumber(row['cantidad']),
+        costo_unitario: toNumber(row['costo_unitario']),
+        ...(lote ? { lote, fecha_vencimiento: toDateOrNull(row['fecha_vencimiento']) } : {}),
+        ...(nonEmpty(row['descripcion']) ? { notas: row['descripcion'].trim() } : {}),
+      },
+    };
+  });
+}
 
 @Injectable()
 export class StockInicialImporter implements Importer {
@@ -25,10 +58,13 @@ export class StockInicialImporter implements Importer {
   ) {}
 
   getTemplate() {
-    const headers = [...REQUIRED, 'descripcion'];
+    // lote y fecha_vencimiento son obligatorios para productos con control de lote.
+    // almacen_codigo reemplaza a los UUID cuando el almacén ya se migró con su código.
+    const headers = [...REQUIRED, 'descripcion', 'lote', 'fecha_vencimiento', 'almacen_codigo'];
     const sample = [
-      ['PROD-00001', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000', '120', '8.50', 'Stock inicial laboratorio'],
-      ['PROD-00002', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000', '50', '120.00', 'Stock inicial farmacia'],
+      ['PROD-00001', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000', '120', '8.50', 'Stock inicial laboratorio', '', '', ''],
+      ['PROD-00002', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000', '50', '120.00', 'Stock inicial farmacia', 'L2405A', '2027-05-31', ''],
+      ['PROD-00003', '', '', '30', '4.20', 'Stock en almacén migrado del sistema anterior', '', '', 'ALM-CALLAO'],
     ];
     return {
       filename: 'plantilla_migracion_stock_inicial.csv',
@@ -38,7 +74,8 @@ export class StockInicialImporter implements Importer {
 
   validate(parsed: ParsedCsv): ImporterRowError[] {
     const errs: ImporterRowError[] = [];
-    const headerErrs = validateHeaders(parsed.headers, REQUIRED);
+    const porCodigo = validateHeaders(parsed.headers, REQUIRED_POR_CODIGO).length === 0;
+    const headerErrs = porCodigo ? [] : validateHeaders(parsed.headers, REQUIRED);
     headerErrs.forEach((m) => errs.push({ rowIndex: 1, message: m }));
     if (headerErrs.length > 0) return errs;
 
@@ -48,8 +85,9 @@ export class StockInicialImporter implements Importer {
       if (!externalProd) {
         errs.push({ rowIndex, field: 'external_id_producto', message: 'external_id_producto requerido' });
       }
+      const almacenCodigo = nonEmpty(row['almacen_id']) ? null : nonEmpty(row['almacen_codigo']);
       const sucursalId = nonEmpty(row['sucursal_id']);
-      if (!sucursalId || !/^[0-9a-f-]{36}$/i.test(sucursalId)) {
+      if (almacenCodigo ? sucursalId && !UUID.test(sucursalId) : !sucursalId || !UUID.test(sucursalId)) {
         errs.push({ rowIndex, externalId: externalProd, field: 'sucursal_id', message: 'sucursal_id debe ser UUID válido' });
       }
       const cantidad = toNumber(row['cantidad']);
@@ -61,8 +99,16 @@ export class StockInicialImporter implements Importer {
         errs.push({ rowIndex, externalId: externalProd, field: 'costo_unitario', message: 'costo_unitario inválido (>=0)' });
       }
       const almacenId = nonEmpty(row['almacen_id']);
-      if (!almacenId || !/^[0-9a-f-]{36}$/i.test(almacenId)) {
-        errs.push({ rowIndex, externalId: externalProd, field: 'almacen_id', message: 'almacen_id requerido y debe ser UUID válido' });
+      if (!almacenCodigo && (!almacenId || !UUID.test(almacenId))) {
+        errs.push({ rowIndex, externalId: externalProd, field: 'almacen_id', message: 'almacen_id (UUID) o almacen_codigo requerido' });
+      }
+      const lote = loteDe(row);
+      const vence = nonEmpty(row['fecha_vencimiento']);
+      if (lote && lote.length > 80) {
+        errs.push({ rowIndex, externalId: externalProd, field: 'lote', message: 'lote: hasta 80 caracteres' });
+      }
+      if (vence && (!lote || !/^\d{4}-\d{2}-\d{2}$/.test(vence) || Number.isNaN(Date.parse(vence)))) {
+        errs.push({ rowIndex, externalId: externalProd, field: 'fecha_vencimiento', message: 'fecha_vencimiento exige lote y formato AAAA-MM-DD' });
       }
     });
     return errs;
@@ -128,6 +174,38 @@ export class StockInicialImporter implements Importer {
       });
     }
 
+    // Almacenes por código: uno exacto (sin distinguir mayúsculas) o error de la fila.
+    const codigosAlmacen = Array.from(new Set(parsed.rows
+      .filter((r) => !nonEmpty(r['almacen_id']) && nonEmpty(r['almacen_codigo']))
+      .map((r) => r['almacen_codigo'].trim())));
+    const almacenes = new Map<string, Array<{ id: string; sucursal_id: string | null }>>();
+    let sucursalPrincipal: string | null = null;
+    if (codigosAlmacen.length > 0) {
+      const { data: alms, error: almErr } = await client
+        .from('almacenes')
+        .select('id, codigo, sucursal_id')
+        .eq('tenant_id', ctx.tenantId)
+        .eq('activo', true)
+        .in('codigo', Array.from(new Set([...codigosAlmacen, ...codigosAlmacen.map((c) => c.toUpperCase())])));
+      const { data: suc, error: sucErr } = await client
+        .from('sucursales')
+        .select('id')
+        .eq('tenant_id', ctx.tenantId)
+        .order('es_principal', { ascending: false })
+        .order('id')
+        .limit(1);
+      if (almErr || sucErr) {
+        result.errors.push({ rowIndex: 1, message: `Error precargando almacenes: ${(almErr ?? sucErr)!.message}` });
+        result.errorRows = parsed.rows.length;
+        return result;
+      }
+      (alms ?? []).forEach((a: any) => {
+        const k = String(a.codigo).toUpperCase();
+        almacenes.set(k, [...(almacenes.get(k) ?? []), { id: a.id, sucursal_id: a.sucursal_id }]);
+      });
+      sucursalPrincipal = suc?.[0]?.id ?? null;
+    }
+
     for (let i = 0; i < parsed.rows.length; i++) {
       const rowIndex = i + 2;
       const row = parsed.rows[i];
@@ -171,9 +249,36 @@ export class StockInicialImporter implements Importer {
         continue;
       }
 
-      const sucursalId = row['sucursal_id'].trim();
-      // Las filas con almacen_id ausente o inválido se descartaron arriba.
-      const almacenId = nonEmpty(row['almacen_id'])!;
+      // Las filas sin almacén válido se descartaron arriba.
+      let almacenId = nonEmpty(row['almacen_id']);
+      let sucursalId = nonEmpty(row['sucursal_id']);
+      if (!almacenId) {
+        const codigo = row['almacen_codigo'].trim();
+        const candidatos = almacenes.get(codigo.toUpperCase()) ?? [];
+        if (candidatos.length !== 1 || !(sucursalId ?? candidatos[0].sucursal_id ?? sucursalPrincipal)) {
+          const msg = candidatos.length > 1
+            ? `almacen_codigo="${codigo}" coincide con más de un almacén.`
+            : candidatos.length === 0 ? `almacen_codigo="${codigo}" no existe en este tenant: migre antes los almacenes.`
+              : 'La empresa no tiene sucursal para el almacén.';
+          result.errors.push({ rowIndex, externalId: externalProd, field: 'almacen_codigo', message: msg });
+          result.errorRows++;
+          if (ctx.runCtx) {
+            await this.runs.recordRow({
+              runId: ctx.runCtx.runId,
+              tenantId: ctx.tenantId,
+              rowIndex,
+              externalId: externalProd,
+              status: 'error',
+              targetTable: 'movimientos_inventario',
+              errorMessage: msg,
+              rawData: row,
+            });
+          }
+          continue;
+        }
+        almacenId = candidatos[0].id;
+        sucursalId = sucursalId ?? candidatos[0].sucursal_id ?? sucursalPrincipal;
+      }
       const cantidad = toNumber(row['cantidad']);
       const costo = toNumber(row['costo_unitario']);
 
@@ -190,7 +295,7 @@ export class StockInicialImporter implements Importer {
           p_tenant_id: ctx.tenantId,
           p_actor_id: ctx.startedBy,
           p_run_id: ctx.runCtx?.runId ?? null,
-          p_external_id: `stock:${externalProd}:${almacenId}:${ctx.fechaCorte}`,
+          p_external_id: externalIdStock(externalProd, almacenId, ctx.fechaCorte, loteDe(row)),
           p_stock: {
             producto_id: productoId,
             almacen_id: almacenId,
@@ -200,6 +305,7 @@ export class StockInicialImporter implements Importer {
             costo_unitario: costo,
             external_id_producto: externalProd,
             notas: nonEmpty(row['descripcion']) ?? `Apertura migración al ${ctx.fechaCorte}`,
+            ...(loteDe(row) ? { lote: loteDe(row), fecha_vencimiento: toDateOrNull(row['fecha_vencimiento']) } : {}),
           },
         });
         if (movErr) throw movErr;
@@ -223,7 +329,7 @@ export class StockInicialImporter implements Importer {
           });
         }
       } catch (err: any) {
-        const msg = err?.message || String(err);
+        const msg = mensajeOrigen(err?.message || String(err));
         this.logger.warn(`Error stock fila ${rowIndex} (${externalProd}): ${msg}`);
         result.errorRows++;
         result.errors.push({ rowIndex, externalId: externalProd, message: msg });

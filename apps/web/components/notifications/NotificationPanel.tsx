@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Bell, Loader2, RefreshCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -17,10 +17,9 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  // Un fallo al marcar o borrar ya no se pinta como éxito: el aviso se queda y se explica.
-  const [actionError, setActionError] = useState<string | null>(null)
-  // throwOnError: sin él useApi devuelve null ante un 4xx/5xx y el panel daba
-  // por hecho el marcado o el borrado.
+  const [mutationError, setMutationError] = useState<string | null>(null)
+  const [mutating, setMutating] = useState(false)
+  const mutationInFlight = useRef(false)
   const { get, put, delete: del } = useApi({ showErrorToast: false, throwOnError: true })
   const { hasPermission: canDelete } = usePermission('notifications', 'delete', '')
   // Un aviso compartido (global o de rol) marcado como leído queda leído para toda
@@ -39,12 +38,16 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
       } else if (Array.isArray(response)) {
         setNotifications(response)
       } else {
-        setNotifications([])
-        if (response?.success === false) setError('No se pudieron cargar las notificaciones.')
+        throw new Error('Respuesta de notificaciones incompleta')
       }
     } catch (error) {
       console.error('Error fetching notifications:', error)
-      setError('Error de conexión al cargar notificaciones.')
+      const status = (error as { status?: number } | null)?.status
+      setError(status === 403
+        ? 'No tienes permiso para consultar las notificaciones.'
+        : status === 401
+          ? 'Tu sesión ha vencido. Inicia sesión para consultar las notificaciones.'
+          : 'No se pudieron cargar las notificaciones. Reintenta la consulta.')
       setNotifications([])
     } finally {
       setLoading(false)
@@ -55,43 +58,47 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
     fetchNotifications()
   }, [fetchNotifications])
 
-  const handleMarkAsRead = async (id: string) => {
-    const target = notifications.find((item) => item.id === id)
-    if (target && !canMark(target)) return
+  const mutate = async (operation: () => Promise<any>, apply: () => void) => {
+    if (mutationInFlight.current) return
+    mutationInFlight.current = true
+    setMutating(true)
+    setMutationError(null)
     try {
-      await put(`/api/notifications/${id}/read`)
-      setActionError(null)
-      setNotifications((prev) => prev.map((item) => (item.id === id ? { ...item, leida: true } : item)))
+      const response = await operation()
+      if (response == null || response?.success === false) throw new Error('Operación no confirmada')
+      apply()
       onNotificationRead?.()
-    } catch (error) {
-      console.error('Error marking notification as read:', error)
-      setActionError('No se pudo marcar la notificación como leída. Inténtalo de nuevo.')
+    } catch {
+      setMutationError('No se pudo actualizar la notificación.')
+    } finally {
+      mutationInFlight.current = false
+      setMutating(false)
     }
   }
 
-  const handleDelete = async (id: string) => {
-    try {
-      await del(`/api/notifications/${id}`)
-      setActionError(null)
-      setNotifications((prev) => prev.filter((item) => item.id !== id))
-      onNotificationRead?.()
-    } catch (error) {
-      console.error('Error deleting notification:', error)
-      setActionError('No se pudo eliminar la notificación. Inténtalo de nuevo.')
-    }
+  const handleMarkAsRead = (id: string) => {
+    const target = notifications.find(item => item.id === id)
+    if (!target || !canMark(target)) return
+    return mutate(
+    () => put(`/api/notifications/${id}/read`),
+    () => setNotifications((prev) => prev.map((item) => (item.id === id ? { ...item, leida: true } : item))),
+  )
+
   }
 
-  const handleMarkAllAsRead = async () => {
-    try {
-      await put('/api/notifications/mark-all-read')
-      setActionError(null)
-      setNotifications((prev) => prev.map((item) => (canMark(item) ? { ...item, leida: true } : item)))
-      onNotificationRead?.()
-    } catch (error) {
-      console.error('Error marking all notifications as read:', error)
-      setActionError('No se pudieron marcar todas como leídas. Inténtalo de nuevo.')
-    }
+  const handleDelete = (id: string) => {
+    if (!canDelete) return
+    return mutate(
+    () => del(`/api/notifications/${id}`),
+    () => setNotifications((prev) => prev.filter((item) => item.id !== id)),
+  )
+
   }
+
+  const handleMarkAllAsRead = () => mutate(
+    () => put('/api/notifications/mark-all-read'),
+    () => setNotifications((prev) => prev.map((item) => canMark(item) ? { ...item, leida: true } : item)),
+  )
 
   const unreadCount = notifications.filter((item) => !item.leida).length
 
@@ -119,6 +126,7 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
             size="sm"
             variant="ghost"
             onClick={handleMarkAllAsRead}
+            disabled={mutating || loading || Boolean(error)}
             className="shrink-0 text-primary hover:bg-cyan-400/10 hover:text-white group-data-[erp-theme=light]/dashboard:text-cyan-700 group-data-[erp-theme=light]/dashboard:hover:text-cyan-900"
           >
             Marcar todas
@@ -126,11 +134,7 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
         )}
       </header>
 
-      {actionError && (
-        <p role="status" className="shrink-0 border-b border-amber-300/25 bg-amber-400/10 px-5 py-2 text-sm text-amber-100 group-data-[erp-theme=light]/dashboard:border-amber-200 group-data-[erp-theme=light]/dashboard:bg-amber-50 group-data-[erp-theme=light]/dashboard:text-amber-900">
-          {actionError}
-        </p>
-      )}
+      {mutationError && <p role="alert" className="px-5 py-3 text-sm text-destructive">{mutationError}</p>}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {loading ? (
@@ -173,6 +177,7 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
               <NotificationItem
                 key={notification.id}
                 notification={notification}
+                disabled={mutating}
                 onMarkAsRead={handleMarkAsRead}
                 onDelete={handleDelete}
                 canDelete={canDelete}

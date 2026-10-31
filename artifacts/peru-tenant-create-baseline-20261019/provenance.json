@@ -1,0 +1,16 @@
+{
+  "capturedAt": "2026-10-19T23:37:08.952Z",
+  "capture": "Before launch",
+  "source_hashes": {
+    "artifacts/peru-block-runner-20261019.mjs": "7246a177ad17594e8a839721fab2b998c8e52808bdd53b3ad08ab934e9e4939d",
+    "scripts/ci/test-peru-tenant-create-local.mjs": "9bd046872530f113c51842444e808cabb3697ac54b8c991c00b285f0ac549802",
+    "scripts/ci/peru-local-smtp-sink.mjs": "af601f15f5beb86aabc65046663fe33779b3b37c18c18365b514f84d056347ff",
+    "scripts/ci/prepare-peru-first-client-local.mjs": "aa066de4808c3370b7bd18c2538f1fd82b6b136b8a5e2e1ca67ef579f8a14306",
+    "apps/erp-api/tests/e2e/helpers/local-api-harness.ts": "b1c4d7c61c10a2b5b0c28c367c8790196d667dd8d03bdd65058bf982efc3e968",
+    "apps/erp-api/src/modules/tenants/tenant-management.service.ts": "8420691f7f8752591def3d34c78beb71af55ff101ecfb37fb3404169a6d1bd57",
+    "apps/web/components/superadmin/components/CrearTenantModal.tsx": "ab582021a7887de5318c3b5e86d79bd26a61fd1b1cf18071c4ec9fb27d3aeecc",
+    "apps/web/tests/e2e/peru-tenant-create-local.spec.ts": "3fb73bf1db0ef3aa8bb9e1607f619e3071e6dc50b6e432349fb888ec732cd94b"
+  },
+  "complete_acceptance": false,
+  "remoteWrites": false
+}

@@ -5,12 +5,16 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { setTimeout as delay } from 'node:timers/promises';
 import {createHmac} from 'node:crypto';
+import {readLocalProductionWebBuild} from './local-production-web-build.mjs';
 
 // No toma URLs de Supabase ni carga dotenv. Crea recursos nuevos sin volúmenes
 // y sólo detiene los procesos/contenedores cuyo identificador obtuvo al crearlos.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const productionWebBuild=readLocalProductionWebBuild(root,process.env.LOCAL_PRODUCTION_WEB_BUILD_GATE,'http://127.0.0.1:3186');
 const withBrowser = process.argv.includes('--browser');
-if (process.argv.slice(2).some(arg => arg !== '--browser')) throw new Error('Uso: node scripts/ci/run-peru-company-storage-local.mjs [--browser]');
+const withWizardLogo = process.argv.includes('--wizard-logo');
+if (withWizardLogo && !withBrowser) throw new Error('--wizard-logo exige --browser');
+if (process.argv.slice(2).some(arg => !['--browser','--wizard-logo'].includes(arg))) throw new Error('Uso: node scripts/ci/run-peru-company-storage-local.mjs [--browser] [--wizard-logo]');
 const runId = new Date().toISOString().replace(/[^0-9]/g, '') + '-' + process.pid;
 const output = path.join(root, 'artifacts', `peru-company-storage-${runId}`);
 mkdirSync(output, { recursive: true });
@@ -25,8 +29,8 @@ const gatewayPort='55519';
 const apiPort = '3186';
 const webPort = '3185';
 const apiUrl = `http://127.0.0.1:${apiPort}`;
-const webUrl = `http://127.0.0.1:${webPort}`;
-const distDir = `.next-peru-integrated-${runId}`;
+const webUrl = `http://localhost:${webPort}`;
+const distDir = productionWebBuild?.buildDirectory ?? `.next-peru-integrated-${runId}`;
 const apiDirectory = path.join(root, 'apps/erp-api');
 const webDirectory = path.join(root, 'apps/web');
 const apiRequire = createRequire(path.join(apiDirectory, 'package.json'));
@@ -61,9 +65,9 @@ delete env.REQUIRED_DATABASE_SCHEMA_VERSION;
 function docker(args) {
   return execFileSync('docker', args, { encoding: 'utf8', windowsHide: true, timeout: 60000 }).trim();
 }
-function launch(label, executable, args, cwd = root) {
+function launch(label, executable, args, cwd = root, childEnv = env) {
   const log = openSync(path.join(output, `${label}.log`), 'w');
-  const child = spawn(executable, args, { cwd, env, windowsHide: true, stdio: ['ignore', log, log] });
+  const child = spawn(executable, args, { cwd, env: childEnv, windowsHide: true, stdio: ['ignore', log, log] });
   closeSync(log);
   children.push(child);
   return child;
@@ -196,11 +200,13 @@ try {
   await run('configuration-client',process.execPath,['scripts/ci/prepare-peru-first-client-local.mjs','configuration-admin']);
   await run('second-company-client',process.execPath,['scripts/ci/prepare-peru-first-client-local.mjs','company-logo']);
   await run('company-logo-lifecycle',process.execPath,['scripts/ci/test-peru-company-logo-local.mjs']);
+  if (withWizardLogo) await run('wizard-logo-client',process.execPath,['scripts/ci/prepare-peru-first-client-local.mjs','wizard']);
+  if (withWizardLogo) await run('wizard-reset-client',process.execPath,['scripts/ci/prepare-peru-first-client-local.mjs','wizard-reset']);
 
   if (withBrowser) {
-    const web = launch('web', process.execPath, [webRequire.resolve('next/dist/bin/next'), 'dev', '-p', webPort, '--hostname', '127.0.0.1'], webDirectory);
+    const web = launch('web', process.execPath, [webRequire.resolve('next/dist/bin/next'), productionWebBuild ? 'start' : 'dev', '-p', webPort, '--hostname', '127.0.0.1'], webDirectory, productionWebBuild ? {...env,NODE_ENV:'production'} : env);
     await waitReady('Web', () => readFileSync(path.join(output, 'web.log'), 'utf8').includes('Ready in') && httpReady(`${webUrl}/login/`), web);
-    await run('browser', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-company-logo-local.spec.ts', '--reporter=list'], webDirectory);
+    await run('browser', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-company-logo-local.spec.ts', ...(withWizardLogo?['tests/e2e/peru-wizard-logo-local.spec.ts','tests/e2e/peru-wizard-reset-local.spec.ts']:[]), '--reporter=list,./tests/e2e/reporters/uat-assertions.ts', '--output',path.join(output,'browser-results')], webDirectory);
   }
   await run('backup-restore', process.execPath, ['scripts/ci/test-peru-backup-restore-local.mjs', pg, path.join(output, 'backup'), '--keep-restored-on-network', network]);
   const restored=JSON.parse(readFileSync(path.join(output,'backup/retained-target.json'),'utf8'));
@@ -214,6 +220,6 @@ try {
   process.exitCode = 1;
 } finally {
   await cleanup();
-  writeFileSync(path.join(output, 'run.json'), JSON.stringify({ completedAt: new Date().toISOString(), success, withBrowser,
+  writeFileSync(path.join(output, 'run.json'), JSON.stringify({ completedAt: new Date().toISOString(), success, withBrowser, webRuntime:withBrowser?(productionWebBuild?'production':'development'):null, productionWebBuild,
     scope:'company_logo_real_storage_subset', storage_image:'supabase/storage-api@sha256:f1546fac6d1c7e345428ac904bfaa7be7cecd50a1f549fe1cf38c628a7b15c85', transport:'Origen contractual exacto reescrito al gateway loopback antes del socket; ningún destino remoto', database: 'PostgreSQL 16 efímero', output, remoteWrites: false }, null, 2));
 }

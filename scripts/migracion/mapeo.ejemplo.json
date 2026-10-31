@@ -1,0 +1,68 @@
+{
+  "descripcion": "Ejemplo de mapeo de un sistema anterior al ERP. Los nombres de tablas y campos son supuestos: reemplazarlos con los del perfil real (perfil-extracto.md).",
+  "fechaCorte": "2026-10-31",
+  "codificacion": "cp850",
+  "salidas": {
+    "contratos": {
+      "tabla": "CONTDET",
+      "unir": [{ "tabla": "CONTRATO", "campo": "IDCONT", "con": "IDCONT", "como": "C" }],
+      "filtro": [{ "campo": "C.ESTADO", "en": ["V", "P"] }],
+      "columnas": {
+        "id_origen_contrato": "C.IDCONT",
+        "numero": "C.NUMERO",
+        "cliente_codigo": "C.CODCLI",
+        "asunto": "C.DESCRIP",
+        "moneda": { "mapa": "C.MONEDA", "valores": { "S": "PEN", "D": "USD" } },
+        "vigencia_desde": "C.FECINI",
+        "vigencia_hasta": "C.FECFIN",
+        "id_origen_linea": "ITEM",
+        "producto_codigo": "CODPRO",
+        "cantidad_original": "CANTIDAD",
+        "cantidad_ejecutada": "CANTENT",
+        "precio_unitario": "PRECIO",
+        "estado": { "valor": "VIGENTE" }
+      }
+    },
+    "oc": {
+      "tabla": "OCDET",
+      "unir": [{ "tabla": "OCCAB", "campo": "IDOC", "con": "IDOC", "como": "O" }],
+      "filtro": [{ "campo": "O.ANULADA", "distinto": true }],
+      "columnas": {
+        "id_origen_oc": "O.IDOC",
+        "id_origen_contrato": "O.IDCONT",
+        "numero": "O.NUMOC",
+        "fecha_emision": "O.FECHA",
+        "id_origen_linea": "ITEM",
+        "id_origen_linea_contrato": "ITEMCONT",
+        "cantidad_original": "CANTIDAD",
+        "cantidad_entregada": "CANTENT"
+      }
+    },
+    "cronograma": {
+      "tabla": "CRONOG",
+      "filtro": [{ "campo": "ESTADO", "en": ["P"] }],
+      "columnas": {
+        "id_origen_entrega": { "concat": ["IDOC", "ITEM", "NROENT"], "sep": "-" },
+        "id_origen_oc": "IDOC",
+        "id_origen_linea_oc": "ITEM",
+        "fecha_programada": "FECENT",
+        "cantidad": "CANTIDAD",
+        "cantidad_entregada": "CANTENT",
+        "destino": "LUGAR"
+      }
+    },
+    "stock": {
+      "tabla": "SALDOS",
+      "filtro": [{ "campo": "STOCK", "mayor": 0 }],
+      "columnas": {
+        "external_id_producto": "CODPRO",
+        "sucursal_id": { "valor": "00000000-0000-0000-0000-000000000000" },
+        "almacen_id": { "mapa": "CODALM", "valores": { "01": "00000000-0000-0000-0000-000000000000" } },
+        "cantidad": "STOCK",
+        "costo_unitario": "COSTO",
+        "lote": "LOTE",
+        "fecha_vencimiento": "FECVEN"
+      }
+    }
+  }
+}

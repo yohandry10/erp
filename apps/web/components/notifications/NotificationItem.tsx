@@ -26,6 +26,7 @@ interface NotificationItemProps {
   onDelete: (id: string) => void
   canDelete?: boolean
   onClose?: () => void
+  disabled?: boolean
 }
 
 const severityConfig = {
@@ -72,6 +73,7 @@ export function NotificationItem({
   onDelete,
   canDelete = true,
   onClose,
+  disabled = false,
 }: NotificationItemProps) {
   const router = useRouter()
   const config = severityConfig[notification.severity] ?? severityConfig.info
@@ -80,11 +82,13 @@ export function NotificationItem({
   const message = notification.message?.trim() || ''
 
   const handleOpen = () => {
+    if (disabled) return
     if (!notification.leida) onMarkAsRead(notification.id)
   }
 
   const handleActionClick = (event: React.MouseEvent) => {
     event.stopPropagation()
+    if (disabled) return
     if (!notification.action_url) return
 
     onMarkAsRead(notification.id)
@@ -94,6 +98,7 @@ export function NotificationItem({
 
   const handleDelete = (event: React.MouseEvent) => {
     event.stopPropagation()
+    if (disabled) return
     onDelete(notification.id)
   }
 
@@ -101,6 +106,7 @@ export function NotificationItem({
     <article
       role="button"
       tabIndex={0}
+      aria-disabled={disabled}
       onClick={handleOpen}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') handleOpen()
@@ -130,6 +136,7 @@ export function NotificationItem({
               size="icon"
               variant="ghost"
               aria-label="Eliminar notificación"
+              disabled={disabled}
               onClick={handleDelete}
               className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-cyan-400/10 hover:text-primary group-data-[erp-theme=light]/dashboard:hover:text-cyan-800"
             >
@@ -150,6 +157,7 @@ export function NotificationItem({
             size="sm"
             variant="ghost"
             onClick={handleActionClick}
+            disabled={disabled}
             className="mt-3 h-8 px-0 text-primary hover:bg-transparent hover:text-white group-data-[erp-theme=light]/dashboard:text-cyan-700 group-data-[erp-theme=light]/dashboard:hover:text-cyan-900"
           >
             {notification.action_label}

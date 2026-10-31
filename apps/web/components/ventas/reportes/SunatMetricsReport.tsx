@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { useApi } from '@/hooks/use-api'
+import { useMemo } from 'react'
+import { useSalesReport, ReportReadError, ReportDisabled } from './use-sales-report'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from '@/components/ui/use-toast'
 import { Badge } from '@/components/ui/badge'
@@ -26,6 +26,7 @@ interface SunatTendencia {
 }
 
 interface SunatResponse {
+  habilitado: boolean
   total: number
   aceptados: number
   observados: number
@@ -57,40 +58,12 @@ const statusColors: Record<string, string> = {
 }
 
 export default function SunatMetricsReport({ filters }: Props) {
-  const { get } = useApi()
-  const [data, setData] = useState<SunatResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    loadData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters])
-
-  const loadData = async () => {
-    try {
-      setLoading(true)
-      const response = await get('/ventas/reportes/sunat-kpis', {
-        params: filters
-      })
-
-      if (response?.success) {
-        setData(response.data)
-      } else {
-        throw new Error('Respuesta inválida del servidor')
-      }
-    } catch (error) {
-      console.error('Error cargando KPIs SUNAT:', error)
-      toast({
-        title: 'Error al cargar métricas SUNAT',
-        description: 'No se pudieron obtener las tasas de aceptación y rechazo.',
-        variant: 'destructive'
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { data: reportData, loading, error, retry } = useSalesReport<SunatResponse>('/ventas/reportes/sunat-kpis', filters, 'object')
+  const data = reportData
 
   const tendenciaRows = useMemo(() => data?.tendencia ?? [], [data])
+
+  if (error) return <ReportReadError error={error} retry={retry} />
 
   if (loading) {
     return (
@@ -120,6 +93,9 @@ export default function SunatMetricsReport({ filters }: Props) {
       </Card>
     )
   }
+
+  if (typeof data.habilitado !== 'boolean') return <ReportReadError error="El reporte recibido está incompleto. Vuelve a intentarlo" retry={retry} />
+  if (!data.habilitado) return <ReportDisabled name="KPIs SUNAT" />
 
   return (
     <div className="space-y-6">
@@ -196,7 +172,9 @@ export default function SunatMetricsReport({ filters }: Props) {
         <CardContent className="space-y-3">
           {data.incidencias.length === 0 ? (
             <div className="text-sm text-muted-foreground">
-              No se registran incidencias en el periodo. Todos los envíos fueron aceptados.
+              No se registran observaciones ni rechazos en el periodo.
+              {data.pendientes > 0 && ` Hay ${data.pendientes} documentos pendientes de respuesta.`}
+              {data.total > 0 && data.aceptados === data.total && ' Todos los documentos del periodo fueron aceptados.'}
             </div>
           ) : (
             data.incidencias.map((incidencia) => (

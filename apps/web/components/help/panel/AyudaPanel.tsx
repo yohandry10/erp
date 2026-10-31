@@ -11,6 +11,8 @@ interface AyudaPanelProps {
   guia: GuiaModulo | null
   temas: TemaAyuda[]
   temasCargando: boolean
+  temasError: boolean
+  onReintentarTemas: () => void
   onAbrirTema: (tema: TemaAyuda) => Promise<string | null>
   tourNombre: string | null
   onIniciarTour: () => void
@@ -31,6 +33,8 @@ export function AyudaPanel({
   guia,
   temas,
   temasCargando,
+  temasError,
+  onReintentarTemas,
   onAbrirTema,
   tourNombre,
   onIniciarTour,
@@ -38,6 +42,7 @@ export function AyudaPanel({
   const [temaAbierto, setTemaAbierto] = useState<string | null>(null)
   const [respuestas, setRespuestas] = useState<Record<string, string>>({})
   const [cargandoTema, setCargandoTema] = useState<string | null>(null)
+  const [errorTema, setErrorTema] = useState<string | null>(null)
 
   useEffect(() => {
     if (!abierto) setTemaAbierto(null)
@@ -62,9 +67,16 @@ export function AyudaPanel({
     setTemaAbierto(tema.id)
     if (respuestas[tema.id] === undefined) {
       setCargandoTema(tema.id)
-      const respuesta = await onAbrirTema(tema)
-      setRespuestas((prev) => ({ ...prev, [tema.id]: respuesta ?? 'Sin detalle disponible.' }))
-      setCargandoTema(null)
+      setErrorTema(null)
+      try {
+        const respuesta = await onAbrirTema(tema)
+        if (respuesta === null) throw new Error('Respuesta no disponible')
+        setRespuestas((prev) => ({ ...prev, [tema.id]: respuesta }))
+      } catch {
+        setErrorTema(tema.id)
+      } finally {
+        setCargandoTema(null)
+      }
     }
   }
 
@@ -144,12 +156,17 @@ export function AyudaPanel({
         )}
 
         {/* Temas ya redactados: todo lo que se ve tiene respuesta */}
-        {(temasCargando || temas.length > 0) && (
+        {(temasCargando || temasError || temas.length > 0) && (
           <section>
             <p className="m-0 mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Temas frecuentes
             </p>
-            {temasCargando ? (
+            {temasError ? (
+              <div role="alert" className="text-sm">
+                <p>No se pudieron cargar los temas frecuentes.</p>
+                <button type="button" onClick={onReintentarTemas} className="text-primary underline">Reintentar temas</button>
+              </div>
+            ) : temasCargando ? (
               <p className="m-0 text-sm text-muted-foreground">Cargando temas…</p>
             ) : (
               <ul className="m-0 flex list-none flex-col gap-1 p-0">
@@ -170,7 +187,7 @@ export function AyudaPanel({
                       </button>
                       {activo && (
                         <p className="m-0 whitespace-pre-line px-2 pb-2 text-sm leading-relaxed text-foreground/80">
-                          {cargandoTema === tema.id ? 'Cargando…' : respuestas[tema.id]}
+                          {cargandoTema === tema.id ? 'Cargando…' : errorTema === tema.id ? 'No se pudo cargar este tema. Ciérralo y vuelve a abrirlo para reintentar.' : respuestas[tema.id]}
                         </p>
                       )}
                     </li>

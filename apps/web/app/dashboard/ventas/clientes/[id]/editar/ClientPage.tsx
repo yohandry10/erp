@@ -5,25 +5,37 @@ import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import ClienteForm from '@/components/ventas/ClienteForm'
 import { ArrowLeft } from 'lucide-react'
+import Link from 'next/link'
+import { listOfflineRequests } from '@/lib/offline-store'
 
 export default function EditarClientePage() {
   const router = useRouter()
   const params = useParams()
   // Propagar el error del backend: sin esto el hook devuelve null y el mensaje
   // concreto de validación se pierde tras un texto genérico.
-  const { get, put } = useApi({ throwOnError: true, showErrorToast: false })
+  const { get, put, unwrapObject } = useApi({ throwOnError: true, showErrorToast: false })
   const clienteId = params.id as string
 
   const [cliente, setCliente] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [pendingQueueId, setPendingQueueId] = useState<string | null>(null)
 
   const loadCliente = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await get(`/api/ventas/clientes/${clienteId}`)
+      const response = unwrapObject<any>(await get(`/api/ventas/clientes/${clienteId}`), {})
 
       if (response?.id) {
-        setCliente(response)
+        const queue = response.tenant_id ? await listOfflineRequests(response.tenant_id) : []
+        const pending = queue.find(item => item.method === 'PUT'
+          && item.endpoint.replace(/\/$/, '') === `/api/ventas/clientes/${clienteId}`
+          && (item.status === 'pending' || item.status === 'failed'))
+        setPendingQueueId(pending?.id ?? null)
+        let changes = {}
+        if (pending?.body) {
+          try { changes = JSON.parse(pending.body) } catch { /* Mantener el registro confirmado. */ }
+        }
+        setCliente({ ...response, ...changes, id: response.id, tenant_id: response.tenant_id })
       } else {
         alert('Cliente no encontrado')
         router.push('/dashboard/ventas/clientes')
@@ -34,15 +46,21 @@ export default function EditarClientePage() {
     } finally {
       setLoading(false)
     }
-  }, [clienteId, get, router])
+  }, [clienteId, get, router, unwrapObject])
 
   useEffect(() => {
     loadCliente()
   }, [loadCliente])
 
   const handleSubmit = async (data: any) => {
+    if (pendingQueueId) return
     try {
       const response = await put(`/api/ventas/clientes/${clienteId}`, data)
+
+      if (response?.queued === true && response?.data?.offline_queue_id) {
+        setPendingQueueId(response.data.offline_queue_id)
+        return
+      }
 
       if (response?.id) {
         alert('✅ Cliente actualizado exitosamente')
@@ -92,12 +110,17 @@ export default function EditarClientePage() {
       </div>
 
       {/* Form Card */}
+      {pendingQueueId && <div role="status" className="rounded-lg border border-amber-400 p-4 text-sm">
+        <p>Cambio guardado en este dispositivo. Pendiente de sincronizar; todavía no se ha actualizado el servidor.</p>
+        <Link href="/dashboard/offline/" className="font-medium underline">Revisar y sincronizar</Link>
+      </div>}
       <div className="p-8 shadow border">
         <ClienteForm
           initialData={cliente}
           onSubmit={handleSubmit}
           onCancel={handleCancel}
           submitLabel="Actualizar Cliente"
+          submitDisabled={!!pendingQueueId}
         />
       </div>
     </div>

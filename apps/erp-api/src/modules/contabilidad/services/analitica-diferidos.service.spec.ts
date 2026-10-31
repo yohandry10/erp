@@ -468,6 +468,21 @@ describe('DiferidosService', () => {
       expect(rpcs).toHaveLength(0);
     });
 
+    it.each(['DIFERIDO_NO_VIGENTE:dif-1', 'DIFERIDO_CAMBIO_CONCURRENTEMENTE:dif-1'])(
+      'informa conflicto si el agregado cambia después de leerlo: %s', async message => {
+        conDiferidos([diferidoGasto]);
+        resultadosRpc.devengar_diferidos_tx = { data: null, error: { message } };
+
+        await expect(service.devengarPeriodo(TENANT, USER, 2026, 3)).rejects.toMatchObject({
+          status: 409,
+          message: 'El registro de diferidos cambió durante el devengo. Actualiza la lista y revisa el período antes de reintentar.',
+        });
+        expect(rpcs).toHaveLength(1);
+        expect(inserciones).toHaveLength(0);
+        expect(actualizaciones).toHaveLength(0);
+      },
+    );
+
     it('no intenta compensaciones parciales cuando la transacción de devengo falla', async () => {
       conDiferidos([diferidoGasto]);
       resultadosRpc.devengar_diferidos_tx = {

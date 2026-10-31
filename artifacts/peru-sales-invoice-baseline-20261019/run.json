@@ -1,0 +1,10 @@
+{
+  "completedAt": "2026-10-19T23:36:52.709Z",
+  "success": false,
+  "withBrowser": true,
+  "block": "invoice",
+  "scope": "sales_order_invoice_subset",
+  "database": "PostgreSQL 16 efímero (migraciones completas)",
+  "output": "artifacts\\peru-invoice-local-20261019233304064-1944",
+  "remoteWrites": false
+}

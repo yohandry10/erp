@@ -248,6 +248,59 @@ export const guias: Record<string, GuiaModulo> = {
     conectaCon: ['Inventario, CPE y Cuentas por cobrar: la devolución revierte stock, comprobante y deuda'],
   },
 
+  '/dashboard/ventas/contratos': {
+    titulo: 'Contratos de suministro',
+    queEs: 'El expediente de cada contrato: líneas y montos, OC del cliente, cronograma, entregas y conformidades, estado de cuenta, penalidades y adjuntos.',
+    quePuedesHacer: [
+      'Registrar el contrato y activarlo; cambiarlo después sólo con adenda',
+      'Registrar las OC del cliente, programar entregas y vincular el pedido de cada una',
+      'Registrar la recepción del cliente con lo aceptado, lo rechazado y su acta',
+      'Revisar el estado de cuenta: por facturar, facturado, cobrado y saldo',
+      'Configurar reglas de penalidad, calcular al corte y enviar a aprobación',
+    ],
+    conectaCon: [
+      'Pedidos y Logística: cada entrega se despacha desde un pedido vinculado',
+      'Facturación y CxC: un contrato contra conformidad no factura sin aceptación total',
+      'Alertas y Tablero: atrasos, rechazos y cobranza salen de este expediente',
+    ],
+  },
+
+  '/dashboard/inventario/lotes': {
+    titulo: 'Lotes y vencimientos',
+    queEs: 'El stock por lote con su fecha de vencimiento y lo reservado para cada pedido.',
+    quePuedesHacer: [
+      'Activar el control de lote y la vida útil mínima por producto',
+      'Consultar saldos por lote y movimientos',
+      'Regularizar stock sin lote y reasignar reservas entre lotes',
+    ],
+    conectaCon: [
+      'Recepciones: el lote y el vencimiento se registran al recibir',
+      'Despacho: sale primero lo que vence primero, salvo un lote indicado',
+      'Alertas: avisan de lotes por vencer o vencidos',
+    ],
+  },
+
+  '/dashboard/alertas': {
+    titulo: 'Alertas de suministro',
+    queEs: 'Avisos de entregas próximas, atrasadas o incompletas, lotes por vencer y cobranza contractual.',
+    quePuedesHacer: [
+      'Ver y reconocer las alertas que te llegaron',
+      'Configurar anticipación, destinatarios, escalamiento y correo por tipo',
+    ],
+    conectaCon: ['Contratos, Lotes y CxC: cada alerta se resuelve sola cuando su condición desaparece'],
+  },
+
+  '/dashboard/tablero-suministro': {
+    titulo: 'Tablero de suministro',
+    queEs: 'Los indicadores de cumplimiento, entregas, stock, vencimientos, facturación, cobranza y penalidades, cada uno con su detalle.',
+    quePuedesHacer: [
+      'Filtrar por contrato, cliente y fechas, y abrir el documento de cada fila',
+      'Registrar un corte y exportarlo a Excel',
+      'Crear credenciales de lectura para Power BI y revisar sus accesos',
+    ],
+    conectaCon: ['Excel y Power BI leen el mismo corte que la pantalla, por eso cuadran'],
+  },
+
   '/dashboard/finanzas/cxc': {
     titulo: 'Cuentas por cobrar',
     queEs: 'Lo que tus clientes te deben, con vencimientos y días de atraso.',
@@ -362,6 +415,18 @@ export const guias: Record<string, GuiaModulo> = {
     conectaCon: [
       'CPE y GRE: sin certificado digital a nombre del RUC emisor no hay emisión fiscal real',
     ],
+  },
+
+  '/dashboard/migracion': {
+    titulo: 'Migración desde otro sistema',
+    queEs: 'El paso desde el sistema anterior en dos capas: el archivo íntegro de cada tabla del sistema anterior y la migración de terceros, maestros y saldos abiertos.',
+    quePuedesHacer: [
+      'Descargar plantillas y ensayar toda la migración junta sin escribir',
+      'Importar archivo por archivo en orden y repetir sin duplicar',
+      'Conciliar contra los totales del extracto y cruzar bancos con el asiento de apertura',
+      'Buscar en el archivo íntegro la historia que no se migra',
+    ],
+    conectaCon: ['Clientes, Inventario, Compras, Ventas, Bancos y Contabilidad: se migran saldos abiertos; la historia queda en el archivo'],
   },
 
   '/dashboard/offline': {

@@ -7,6 +7,7 @@ import { TiposCambioService } from '../../contabilidad/services/tipos-cambio.ser
 import { RevaluacionService } from '../../contabilidad/services/revaluacion.service';
 import { LadoTipoCambio } from '@erp-suite/dtos';
 import { lecturaFinancieraFallida } from '../finanzas-errors';
+import { fechaHoyDelTenant } from '../../../shared/utils/fecha-tenant.util';
 
 /** Valuación en moneda local de un pago, más la diferencia de cambio realizada. */
 export interface ValuacionPago {
@@ -325,7 +326,7 @@ export class TesoreriaService {
     }
 
     // Ordenar por fecha de vencimiento ascendente (próximos vencimientos primero)
-    queryBuilder = queryBuilder.order('fecha_vencimiento', { ascending: true });
+    queryBuilder = queryBuilder.order('fecha_vencimiento', { ascending: true }).order('id', { ascending: true });
 
     // Aplicar paginación
     queryBuilder = queryBuilder.range(offset, offset + limit - 1);
@@ -333,17 +334,19 @@ export class TesoreriaService {
     // Ejecutar query
     const { data, error, count } = await queryBuilder;
 
-    if (error) {
+    if (error || !Array.isArray(data) || !Number.isSafeInteger(count) || count < 0) {
       console.error('Error obteniendo programación de pagos:', error);
       throw lecturaFinancieraFallida('la programación de pagos');
     }
 
-    // Calcular días hasta vencimiento y clasificar por urgencia
-    const hoy = new Date();
-    const hoyISO = hoy.toISOString().split('T')[0];
-    const hoyUTC = Date.UTC(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+    // Calcular días hasta vencimiento y clasificar por urgencia. «Hoy» es el del
+    // contribuyente: con el servidor en UTC, desde las 19:00 de Lima la deuda que
+    // vencía hoy figuraba VENCIDA con -1 día.
+    const hoyISO = await fechaHoyDelTenant(client, tenantId);
+    const [hoyY, hoyM, hoyD] = hoyISO.split('-').map(Number);
+    const hoyUTC = Date.UTC(hoyY, hoyM - 1, hoyD);
 
-    const dataEnriquecida = (data || []).map((cxp) => {
+    const dataEnriquecida = data.map((cxp) => {
       const fechaStr: string = (cxp as any).fecha_vencimiento;
       const [year, month, day] = fechaStr.split('-').map(Number);
       const fechaVencimientoUTC = Date.UTC(year, month - 1, day);
@@ -380,7 +383,7 @@ export class TesoreriaService {
     return {
       success: true,
       data: dataEnriquecida,
-      total: count || 0,
+      total: count,
       page,
       limit,
     };
@@ -462,22 +465,23 @@ export class TesoreriaService {
   ): Promise<{ success: boolean; data: any }> {
     const client = this.supabase.getClient();
 
-    // Configurar fechas de proyección
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-
-    const fechaDesde = query.fecha_desde ? new Date(query.fecha_desde) : hoy;
-    fechaDesde.setHours(0, 0, 0, 0);
+    // Configurar fechas de proyección. Las fechas de calendario se manejan en UTC
+    // explícito y «hoy» es el del contribuyente: con el servidor en UTC, desde las
+    // 19:00 de Lima la proyección empezaba mañana y omitía lo que vence hoy.
+    const desde = query.fecha_desde
+      ? String(query.fecha_desde).slice(0, 10)
+      : await fechaHoyDelTenant(client, tenantId);
+    const fechaDesde = new Date(`${desde}T00:00:00.000Z`);
 
     let fechaHasta: Date;
     if (query.fecha_hasta) {
-      fechaHasta = new Date(query.fecha_hasta);
+      fechaHasta = new Date(`${String(query.fecha_hasta).slice(0, 10)}T00:00:00.000Z`);
     } else {
       const diasProyeccion = query.dias_proyeccion || 90;
       fechaHasta = new Date(fechaDesde);
-      fechaHasta.setDate(fechaHasta.getDate() + diasProyeccion);
+      fechaHasta.setUTCDate(fechaHasta.getUTCDate() + diasProyeccion);
     }
-    fechaHasta.setHours(23, 59, 59, 999);
+    fechaHasta.setUTCHours(23, 59, 59, 999);
 
     // 1. Obtener saldos actuales de cuentas bancarias
     let queryCuentas = client
@@ -545,7 +549,7 @@ export class TesoreriaService {
       throw lecturaFinancieraFallida('las cuentas por pagar');
     }
 
-    // 3. Obtener CxC pendientes (ingresos proyectados) si la tabla existe
+    // 3. Obtener CxC pendientes; un fallo de lectura no equivale a cero ingresos.
     let cxcPendientes: any[] = [];
     try {
       let queryCxC = client
@@ -569,12 +573,13 @@ export class TesoreriaService {
 
       const { data: cxc, error: errorCxC } = await queryCxC;
 
-      if (!errorCxC && cxc) {
-        cxcPendientes = cxc;
+      if (errorCxC || !Array.isArray(cxc)) {
+        throw lecturaFinancieraFallida('las cuentas por cobrar');
       }
-    } catch (error) {
-      // Si la tabla no existe o hay error, continuar sin CxC
-      console.log('CxC no disponible para proyección de flujo de caja');
+      cxcPendientes = cxc;
+    } catch {
+      this.logger.warn('No se pudieron consultar las cuentas por cobrar para flujo de caja');
+      throw lecturaFinancieraFallida('las cuentas por cobrar');
     }
 
     // 4. Agrupar movimientos por fecha y moneda

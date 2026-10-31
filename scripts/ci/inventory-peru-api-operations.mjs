@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const requireRoot = createRequire(path.join(root, 'package.json'));
 const ts = requireRoot('typescript');
-const files = execFileSync('rg', ['--files', 'apps/erp-api/src', '-g', '*controller.ts'], { cwd: root, encoding: 'utf8' })
+const files = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '--', 'apps/erp-api/src/*controller.ts'], { cwd: root, encoding: 'utf8' })
   .trim().split(/\r?\n/).map(file => file.replaceAll('\\', '/')).sort();
 const navigation = JSON.parse(readFileSync(path.join(root, 'artifacts/peru-route-inventory-20260923.json'), 'utf8'));
 const operations = [];

@@ -6,6 +6,8 @@ export interface ImporterContext {
   tenantId: string;
   startedBy?: string | null;
   fechaCorte?: string | null;
+  /** Sistema del que vienen los datos; sin él, la base usa SISTEMA_ANTERIOR. */
+  sistemaOrigen?: string | null;
   totalDeclarado?: number | null;
   dryRun: boolean;
   runCtx?: RunContext;

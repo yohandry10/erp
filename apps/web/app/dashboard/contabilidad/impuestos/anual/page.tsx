@@ -5,18 +5,22 @@ import { AlertTriangle, CalendarCheck2, FileCheck2, Loader2, RefreshCw } from 'l
 import { useApi } from '@/hooks/use-api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { validTaxCalculation, validTaxHistory } from '@/lib/contabilidad/tax-read-contract'
 
 interface Warning { codigo: string; mensaje: string; bloquea_presentacion?: boolean }
 interface DeclaracionAnual {
   id: string; ejercicio: number; regimen: string; version: number; estado: string
   constancia_numero?: string | null; fecha_presentacion?: string | null
+  notas?: string | null
   adiciones_tributarias: number; deducciones_tributarias: number
   perdidas_compensables: number; pagos_cuenta_renta: number
   credito_itan_renta: number; otros_creditos_renta: number; deducciones_itan: number
+  ingresos_netos: number; renta_por_pagar: number
 }
 interface CalculoAnual {
   ejercicio: number; regimen: string; formulario: string; uit: number
   ingresos_netos: number; resultado_contable: number
+  otros_ingresos_revisados: number
   adiciones_tributarias: number; deducciones_tributarias: number; perdidas_compensables: number
   renta_neta_imponible: number; impuesto_renta_calculado: number
   pagos_cuenta_renta: number; credito_itan_renta: number; otros_creditos_renta: number
@@ -44,6 +48,7 @@ export default function RentaAnualPage() {
   const [fechaPresentacion, setFechaPresentacion] = useState('')
   const saveIntent = useRef<{ signature: string; key: string } | null>(null)
   const receiptIntent = useRef<{ signature: string; key: string } | null>(null)
+  const loadSequence = useRef(0)
   const [ajustes, setAjustes] = useState({
     adiciones_tributarias: '0', deducciones_tributarias: '0', perdidas_compensables: '0',
     pagos_cuenta_renta: '', credito_itan_renta: '0', otros_creditos_renta: '0',
@@ -67,38 +72,58 @@ export default function RentaAnualPage() {
   }), [ajustes, ejercicio])
 
   const adoptar = (row?: DeclaracionAnual | null) => {
-    if (!row) return
-    setAjustes((current) => ({
-      ...current,
-      adiciones_tributarias: String(row.adiciones_tributarias || 0),
-      deducciones_tributarias: String(row.deducciones_tributarias || 0),
-      perdidas_compensables: String(row.perdidas_compensables || 0),
-      pagos_cuenta_renta: String(row.pagos_cuenta_renta || 0),
-      credito_itan_renta: String(row.credito_itan_renta || 0),
-      otros_creditos_renta: String(row.otros_creditos_renta || 0),
-      deducciones_itan: String(row.deducciones_itan || 0),
-    }))
-    setConstancia(row.constancia_numero || '')
+    setAjustes({
+      adiciones_tributarias: String(row?.adiciones_tributarias ?? 0),
+      deducciones_tributarias: String(row?.deducciones_tributarias ?? 0),
+      perdidas_compensables: String(row?.perdidas_compensables ?? 0),
+      pagos_cuenta_renta: row ? String(row.pagos_cuenta_renta ?? 0) : '',
+      credito_itan_renta: String(row?.credito_itan_renta ?? 0),
+      otros_creditos_renta: String(row?.otros_creditos_renta ?? 0),
+      deducciones_itan: String(row?.deducciones_itan ?? 0),
+      notas: row?.notas || '',
+    })
+    setConstancia(row?.constancia_numero || '')
+    setFechaPresentacion(row?.fecha_presentacion?.slice(0, 16) || '')
   }
 
   const cargar = useCallback(async () => {
+    const sequence = ++loadSequence.current
     setCargando(true); setError(null)
+    setMensaje(null); setCalculo(null); setHistorial([])
     try {
       const [calcResponse, historyResponse] = await Promise.all([
         get(`/api/contabilidad/impuestos/anual?ejercicio=${ejercicio}`),
         get('/api/contabilidad/impuestos/anuales?limite=24'),
       ])
-      if (!calcResponse?.success) throw new Error(calcResponse?.message || 'No se pudo calcular Renta Anual')
+      if (sequence !== loadSequence.current) return
+      if (calcResponse?.success !== true || !validTaxCalculation(calcResponse.data, 'anual', ejercicio)) {
+        throw new Error(calcResponse?.message || 'No se pudo calcular Renta Anual con una respuesta completa')
+      }
+      if (historyResponse?.success !== true || !validTaxHistory(historyResponse.data, 'anual')) {
+        throw new Error(historyResponse?.message || 'No se pudo cargar el historial anual completo')
+      }
       setCalculo(calcResponse.data)
       adoptar(calcResponse.data?.declaracion_vigente)
-      if (historyResponse?.success) setHistorial(historyResponse.data || [])
-    } catch (err: any) { setError(err?.message || 'No se pudo cargar Renta Anual') }
-    finally { setCargando(false) }
+      setHistorial(historyResponse.data)
+    } catch (err: any) {
+      if (sequence === loadSequence.current) setError(err?.message || 'No se pudo cargar Renta Anual')
+    }
+    finally { if (sequence === loadSequence.current) setCargando(false) }
   }, [ejercicio, get])
 
-  useEffect(() => { cargar() }, [cargar])
+  useEffect(() => {
+    cargar()
+    return () => { loadSequence.current += 1 }
+  }, [cargar])
+
+  const cambiarEjercicio = (value: number) => {
+    loadSequence.current += 1
+    setCalculo(null); setHistorial([]); setError(null); setMensaje(null); setCargando(true)
+    setEjercicio(value)
+  }
 
   const ejecutar = async (guardar: boolean) => {
+    if (cargando || procesando || calculo?.ejercicio !== ejercicio) return
     setProcesando(true); setError(null); setMensaje(null)
     try {
       const signature = JSON.stringify(payload)
@@ -110,9 +135,12 @@ export default function RentaAnualPage() {
       if (!response?.success) throw new Error(response?.message || 'No se pudo procesar el borrador anual')
       if (guardar) {
         saveIntent.current = null
-        setMensaje('Nueva versión guardada. Presente FV 710 e ITAN en SUNAT antes de registrar la constancia.')
         await cargar()
+        setMensaje('Nueva versión guardada. Presente FV 710 e ITAN en SUNAT antes de registrar la constancia.')
       } else {
+        if (!validTaxCalculation(response.data, 'anual', ejercicio)) {
+          throw new Error('No se pudo recalcular con una respuesta completa')
+        }
         setCalculo(response.data)
         setMensaje('Cálculo actualizado; todavía no está guardado ni presentado.')
       }
@@ -121,6 +149,7 @@ export default function RentaAnualPage() {
   }
 
   const registrar = async () => {
+    if (cargando || procesando || calculo?.ejercicio !== ejercicio) return
     const vigente = calculo?.declaracion_vigente
     if (!vigente?.id || !constancia.trim()) { setError('Guarda el borrador e ingresa la constancia obtenida en SUNAT.'); return }
     setProcesando(true); setError(null); setMensaje(null)
@@ -138,8 +167,8 @@ export default function RentaAnualPage() {
       })
       if (!response?.success) throw new Error(response?.message || 'No se pudo registrar la constancia')
       receiptIntent.current = null
-      setMensaje('Constancia anual externa registrada y versión anterior rectificada, si correspondía.')
       await cargar()
+      setMensaje('Constancia anual externa registrada y versión anterior rectificada, si correspondía.')
     } catch (err: any) { setError(err?.message || 'No se pudo registrar la constancia') }
     finally { setProcesando(false) }
   }
@@ -156,25 +185,27 @@ export default function RentaAnualPage() {
             <h1 className="text-3xl font-bold">Renta Anual e ITAN — Perú</h1>
             <p className="mt-2 max-w-3xl text-sm text-muted-foreground">Conciliación asistida del FV 710 desde resultados y balance. Las reparaciones tributarias y exclusiones ITAN requieren sustento del contador.</p>
           </div></div>
-          <div className="flex items-end gap-2"><label><span className={labelClass}>Ejercicio</span><input type="number" min="2024" max={currentYear} value={ejercicio} onChange={(event) => setEjercicio(Number(event.target.value))} className={`${inputClass} w-28`} /></label>
-            <Button variant="outline" onClick={cargar} disabled={cargando} className="gap-2"><RefreshCw className={`h-4 w-4 ${cargando ? 'animate-spin' : ''}`} />Actualizar</Button></div>
+          <div className="flex items-end gap-2"><label><span className={labelClass}>Ejercicio</span><input type="number" min="2024" max={currentYear} value={ejercicio} onChange={(event) => cambiarEjercicio(Number(event.target.value))} disabled={procesando} className={`${inputClass} w-28`} /></label>
+            <Button variant="outline" onClick={cargar} disabled={cargando || procesando} className="gap-2"><RefreshCw className={`h-4 w-4 ${cargando ? 'animate-spin' : ''}`} />Actualizar</Button></div>
         </div>
       </section>
 
       <div className="flex gap-3 rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm"><AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" /><p><strong>No presenta a SUNAT.</strong> El sistema congela el papel de trabajo; sólo la constancia obtenida en SOL acredita la presentación.</p></div>
-      {error && <div className="rounded-xl border border-red-400/30 bg-red-400/10 p-4 text-sm text-red-600">{error}</div>}
+      {error && <div role="alert" className="rounded-xl border border-red-400/30 bg-red-400/10 p-4 text-sm text-red-600">{error}
+        {!calculo && <Button variant="outline" onClick={cargar} disabled={cargando || procesando} className="ml-3">Reintentar</Button>}
+      </div>}
       {mensaje && <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-700">{mensaje}</div>}
 
-      {cargando || !calculo ? <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div> : <>
+      {cargando ? <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div> : !calculo ? null : <>
         <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">{[
           ['Régimen', calculo.regimen], ['Formulario', calculo.formulario.replaceAll('_', ' ')], ['UIT', money(calculo.uit)],
-          ['Renta por pagar', money(calculo.renta_por_pagar)], ['ITAN calculado', money(calculo.itan_calculado)],
+          ['Renta por pagar', money(calculo.renta_por_pagar)], [`ITAN estimado ${calculo.ejercicio + 1}`, money(calculo.itan_calculado)],
           ['Estado', vigente ? `${vigente.estado} · v${vigente.version}` : 'Sin guardar'],
         ].map(([label, value]) => <div key={label} className="rounded-2xl border border-cyan-400/20 bg-card/70 p-4"><div className={labelClass}>{label}</div><div className="mt-2 font-bold">{value}</div></div>)}</section>
 
         <div className="grid gap-4 xl:grid-cols-2">
           <Card className="border-cyan-400/20 bg-card/70"><CardHeader><CardTitle>Base contable</CardTitle></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2">{[
-            ['Ingresos netos', calculo.ingresos_netos], ['Resultado contable', calculo.resultado_contable], ['Activos netos', calculo.activos_netos], ['Pagos a cuenta detectados', calculo.pagos_cuenta_renta],
+            ['Ingresos netos', calculo.ingresos_netos], ['Otros ingresos revisados en los meses', calculo.otros_ingresos_revisados], ['Resultado contable', calculo.resultado_contable], ['Activos netos', calculo.activos_netos], ['Pagos a cuenta detectados', calculo.pagos_cuenta_renta],
           ].map(([label, value]) => <div key={label as string} className="rounded-xl border border-cyan-400/15 p-3"><div className={labelClass}>{label}</div><div className="mt-1 font-bold">{money(value as number)}</div></div>)}
             <p className="sm:col-span-2 text-xs text-muted-foreground">Corte {new Date(calculo.source_snapshot.corte).toLocaleString('es-PE')} · {calculo.source_snapshot.cantidad_ventas} CPE · ejercicio {calculo.source_snapshot.ejercicio_cerrado ? 'cerrado' : 'abierto'}.</p>
           </CardContent></Card>
@@ -187,8 +218,10 @@ export default function RentaAnualPage() {
         </div>
 
         <Card className="border-cyan-400/20 bg-card/70"><CardHeader><CardTitle>Determinación</CardTitle></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{[
-          ['Renta neta imponible', calculo.renta_neta_imponible], ['Impuesto a la renta', calculo.impuesto_renta_calculado], ['Saldo a favor', calculo.saldo_favor_renta], ['Base imponible ITAN', calculo.base_imponible_itan], ['ITAN', calculo.itan_calculado],
+          ['Renta neta imponible', calculo.renta_neta_imponible], ['Impuesto a la renta', calculo.impuesto_renta_calculado], ['Saldo a favor', calculo.saldo_favor_renta], [`Base ITAN ${calculo.ejercicio + 1}`, calculo.base_imponible_itan], [`ITAN ${calculo.ejercicio + 1}`, calculo.itan_calculado],
         ].map(([label, value]) => <div key={label as string} className="rounded-xl border border-cyan-400/15 p-3"><div className={labelClass}>{label}</div><div className="mt-1 font-bold">{money(value as number)}</div></div>)}</CardContent></Card>
+        <p className="text-sm text-muted-foreground">El balance al 31 de diciembre de {calculo.ejercicio} es la base de la estimación ITAN de {calculo.ejercicio + 1}. La obligación y las exclusiones deben revisarse antes de declarar; este cálculo no acredita su presentación ni pago.</p>
+        <p className="text-sm text-muted-foreground">Los ingresos revisados en los borradores mensuales complementan el total de ingresos para seleccionar el formulario. La renta imponible parte del resultado contable, que ya incluye esos ingresos; no se suman otra vez.</p>
 
         <Card className="border-amber-400/30 bg-amber-400/5"><CardHeader><CardTitle>Advertencias y controles</CardTitle></CardHeader><CardContent className="space-y-2">{calculo.warnings.map((warning) => <div key={warning.codigo} className="flex gap-3 rounded-xl border border-amber-400/20 p-3 text-sm"><AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" /><p>{warning.mensaje}{warning.bloquea_presentacion && <strong> Bloquea la constancia.</strong>}</p></div>)}</CardContent></Card>
 
@@ -198,7 +231,7 @@ export default function RentaAnualPage() {
           <Button onClick={registrar} disabled={procesando || bloqueada || !vigente || vigente.estado === 'PRESENTADA'} className="gap-2"><FileCheck2 className="h-4 w-4" />Registrar constancia</Button>
         </CardContent></Card>
 
-        <Card className="border-cyan-400/20 bg-card/70"><CardHeader><CardTitle>Historial anual</CardTitle></CardHeader><CardContent className="space-y-2">{historial.length === 0 ? <p className="text-sm text-muted-foreground">Sin versiones guardadas.</p> : historial.map((row) => <div key={row.id} className="flex justify-between rounded-xl border border-cyan-400/15 p-3 text-sm"><strong>{row.ejercicio} · v{row.version} · {row.regimen}</strong><span>{row.estado}{row.constancia_numero ? ` · ${row.constancia_numero}` : ''}</span></div>)}</CardContent></Card>
+        <Card className="border-cyan-400/20 bg-card/70"><CardHeader><CardTitle>Historial anual</CardTitle></CardHeader><CardContent className="space-y-2">{historial.length === 0 ? <p className="text-sm text-muted-foreground">Sin versiones guardadas.</p> : historial.map((row) => <div key={row.id} className="flex justify-between rounded-xl border border-cyan-400/15 p-3 text-sm"><div><strong>{row.ejercicio} · v{row.version} · {row.regimen}</strong><p>Ingresos {money(row.ingresos_netos)} · Renta {money(row.renta_por_pagar)}</p></div><span>{row.estado}{row.constancia_numero ? ` · ${row.constancia_numero}` : ''}</span></div>)}</CardContent></Card>
       </>}
     </div>
   </div>

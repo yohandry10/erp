@@ -1,0 +1,119 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "Presupuestos de contabilidad API/DB local; sin aceptación integral",
+  "scenarios": [
+    {
+      "scenario": "Presupuestos: editar el monto y volver a uno anterior se aplica cada vez",
+      "passed": true
+    },
+    {
+      "scenario": "Presupuestos: borrar y volver a crear el mismo presupuesto lo crea de nuevo",
+      "passed": true
+    },
+    {
+      "scenario": "Presupuestos: duplicado del mismo centro, cuenta y periodo responde 409 legible",
+      "passed": true
+    },
+    {
+      "scenario": "Presupuestos: inexistente o ajeno responde 404",
+      "passed": true
+    },
+    {
+      "scenario": "Presupuestos: sin lectura responde 503 legible",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "auth/login",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/periodos",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/periodos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/centros-costo",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/presupuestos",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "endpoint": "contabilidad/presupuestos/:id",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "contabilidad/presupuestos/:id",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "endpoint": "contabilidad/presupuestos/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/presupuestos",
+      "status": 201
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "contabilidad/presupuestos/:id",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/presupuestos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/presupuestos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "endpoint": "contabilidad/presupuestos",
+      "status": 409
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/presupuestos/:id",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/presupuestos/:id",
+      "status": 404
+    },
+    {
+      "method": "PUT",
+      "endpoint": "contabilidad/presupuestos/:id",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "endpoint": "contabilidad/presupuestos",
+      "status": 503
+    }
+  ]
+}

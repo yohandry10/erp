@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useWizard } from './useWizard'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react'
@@ -23,10 +23,17 @@ export function WizardContainer({ children }: WizardContainerProps) {
   const servicioFiscal = country.servicioFiscal || 'SUNAT'
 
   const [progressLoaded, setProgressLoaded] = useState(false)
-  const recoverProgress = async () => setProgressLoaded(await loadProgress())
+  const progressGeneration = useRef(0)
+  const recoverProgress = async () => {
+    const generation = ++progressGeneration.current
+    setProgressLoaded(false)
+    const loaded = await loadProgress()
+    if (generation === progressGeneration.current) setProgressLoaded(loaded)
+  }
 
   useEffect(() => {
     void recoverProgress()
+    return () => { progressGeneration.current += 1 }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -102,7 +109,7 @@ export function WizardContainer({ children }: WizardContainerProps) {
 
         {/* Error Alert */}
         {state.error && (
-          <div className="mb-8 p-5 bg-[#fef3c7] border flex items-center gap-4 text-[#92400e] shadow">
+          <div role="alert" className="mb-8 p-5 bg-[#fef3c7] border flex items-center gap-4 text-[#92400e] shadow">
             <AlertTriangle size={24} />
             <span className="font-medium">{state.error}</span>
           </div>

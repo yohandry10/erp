@@ -27,13 +27,13 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { session, loading: authLoading } = useAuth();
+  const { session, loading: authLoading, signOut } = useAuth();
   const country = useCountryContext();
   const { theme: dashboardTheme, toggleTheme } = useDashboardTheme();
   const esSuperadminSinTenant = Boolean(
     session?.user?.is_super_admin && !session.user.tenant_id,
   );
-  const jurisdictionRedirect = country.loading || country.requiresSetup
+  const jurisdictionRedirect = country.loading || country.error || country.requiresSetup
     ? null
     : jurisdictionRedirectFor(pathname, country.paisCodigo);
 
@@ -76,7 +76,7 @@ export default function DashboardLayout({
       return;
     }
 
-    if (country.loading) {
+    if (country.loading || country.error) {
       return;
     }
 
@@ -95,6 +95,7 @@ export default function DashboardLayout({
     authLoading,
     session,
     country.loading,
+    country.error,
     country.requiresSetup,
     esSuperadminSinTenant,
     pathname,
@@ -123,6 +124,21 @@ export default function DashboardLayout({
         <div className="rounded-2xl border border-border bg-card px-6 py-5 text-center shadow-xl">
           <p className="text-sm font-semibold">Preparando configuración fiscal del tenant…</p>
           <p className="mt-1 text-xs text-muted-foreground">País, moneda y reglas tributarias</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (country.error && !esSuperadminSinTenant) {
+    return (
+      <div data-erp-theme={dashboardTheme} className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
+        <div role="alert" className="max-w-lg rounded-2xl border border-border bg-card px-6 py-5 text-center shadow-xl">
+          <h1 className="text-lg font-semibold">{country.error}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Revisa la conexión y vuelve a intentarlo.</p>
+          <button type="button" disabled={country.retrying} onClick={country.retry} className="mt-4 rounded-lg bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">
+            {country.retrying ? 'Reintentando…' : 'Reintentar'}
+          </button>
+          <button type="button" onClick={() => void signOut()} className="ml-3 rounded-lg border border-border px-4 py-2">Cerrar Sesión</button>
         </div>
       </div>
     );

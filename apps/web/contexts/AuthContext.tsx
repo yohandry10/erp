@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useState, useEffect, ReactNode 
 import { usePathname } from 'next/navigation'
 import { customAuth, Session, User } from '@/lib/auth-service'
 import { clearPermissionCache } from '@/hooks/use-permission'
+import { isDesktopRuntime } from '@/lib/offline-store'
 
 const PUBLIC_PATHS = new Set(['/login', '/demo', '/'])
 
@@ -109,7 +110,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // sesión válida: si la hubiera, habría redirigido a /dashboard antes de
     // renderizar. Saltamos el fetch a /auth/profile para evitar el 401 esperado
     // en consola.
-    if (isPublicPath(pathname)) {
+    // Static native windows have no middleware: restore their secure session.
+    if (isPublicPath(pathname) && !isDesktopRuntime()) {
       setSession(null)
       setUser(null)
       storeSessionSnapshot(null)

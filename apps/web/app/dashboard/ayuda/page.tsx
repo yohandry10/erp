@@ -2,7 +2,8 @@
 
 import { OnboardingSettings } from '@/components/onboarding'
 import { CatalogoModulos } from '@/components/help'
-import { BookOpen, Compass, Keyboard, LifeBuoy } from 'lucide-react'
+import { CicloSuministro } from '@/components/help/module-guide/CicloSuministro'
+import { BookOpen, Compass, Keyboard, LifeBuoy, Route } from 'lucide-react'
 import { PageShell } from '@/components/erp/page-shell'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -75,6 +76,21 @@ export default function AyudaPage() {
           </Card>
         </div>
       </div>
+
+      <Card className="mt-4 border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-white group-data-[erp-theme=light]/dashboard:text-foreground">
+            <Route className="h-5 w-5 text-primary group-data-[erp-theme=light]/dashboard:text-blue-600" />
+            Ciclo de suministro por función
+          </CardTitle>
+          <p className="m-0 text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
+            Qué hace cada perfil, en orden, desde el contrato hasta el cobro y el tablero.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <CicloSuministro />
+        </CardContent>
+      </Card>
 
       <Card className="mt-4 border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
         <CardHeader>

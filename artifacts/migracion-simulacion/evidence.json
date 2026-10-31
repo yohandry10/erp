@@ -1,0 +1,718 @@
+{
+  "alcance": "Simulación integral de la migración desde otro sistema",
+  "fecha": "2026-10-31",
+  "entorno": "PostgreSQL 16, PostgREST y API Nest efímeros en 127.0.0.1; ERP sintético; nada remoto",
+  "remoteWrites": false,
+  "extracto": {
+    "tablas": 27,
+    "filas": 88438,
+    "borrados": 6,
+    "plantados": [
+      {
+        "archivo": "clientes",
+        "id": "C00007",
+        "causa": "email inválido en el sistema anterior"
+      },
+      {
+        "archivo": "proveedores",
+        "id": "P0003",
+        "causa": "proveedor sin correo en el sistema anterior"
+      },
+      {
+        "archivo": "productos",
+        "id": "med-0099",
+        "causa": "código repetido con otra capitalización"
+      },
+      {
+        "archivo": "cxc",
+        "id": "CXC-199999",
+        "causa": "documento de un cliente que no existe"
+      },
+      {
+        "archivo": "contratos",
+        "id": "3",
+        "causa": "contrato ejecutado al 100% pero vigente en el sistema anterior"
+      },
+      {
+        "archivo": "stock",
+        "id": "stock:MED-0001:ORI-01:2026-10-31",
+        "causa": "producto con control de lote sin lote ni vencimiento en el sistema anterior"
+      },
+      {
+        "archivo": "stock",
+        "id": "stock:MED-0001:L2349B:ORI-04:2026-10-31",
+        "causa": "mismo lote con otro vencimiento en otro almacén"
+      }
+    ]
+  },
+  "base": {
+    "migraciones": 586,
+    "hasta": 590,
+    "verificadores": 99
+  },
+  "ensayo_v1": {
+    "fase": "Ensayo integral v1: errores reales detectados, nada persiste",
+    "ms": 54061,
+    "registros": 8028,
+    "errores": 6,
+    "errores_archivo": 2,
+    "por_entidad": {
+      "PRODUCTO": 1,
+      "CXC": 1,
+      "CXP": 1,
+      "CONTRATO": 1,
+      "STOCK": 2
+    },
+    "conciliacion_cuadra": false,
+    "persistido": 0
+  },
+  "archivo": {
+    "tablas": 27,
+    "filas": 88443,
+    "tandas": 64,
+    "redactados": {
+      "USUARIOS": [
+        "CLAVE"
+      ]
+    },
+    "busqueda_kardex": 8956
+  },
+  "importacion": [
+    {
+      "archivo": "clientes.csv",
+      "filas": 570,
+      "correctas": 570,
+      "creadas": 570,
+      "enlazadas": 0,
+      "errores": 0,
+      "ms": 5114
+    },
+    {
+      "archivo": "proveedores.csv",
+      "filas": 144,
+      "correctas": 144,
+      "creadas": 144,
+      "enlazadas": 0,
+      "errores": 0,
+      "ms": 1307
+    },
+    {
+      "archivo": "almacenes.csv",
+      "filas": 4,
+      "correctas": 4,
+      "creadas": 4,
+      "enlazadas": 0,
+      "errores": 0,
+      "ms": 141
+    },
+    {
+      "archivo": "plan_cuentas.csv",
+      "filas": 20,
+      "correctas": 20,
+      "creadas": 12,
+      "enlazadas": 8,
+      "errores": 0,
+      "ms": 253
+    },
+    {
+      "archivo": "productos.csv",
+      "filas": 1450,
+      "correctas": 1450,
+      "creadas": 1450,
+      "enlazadas": 0,
+      "errores": 0,
+      "ms": 15157
+    },
+    {
+      "archivo": "cuentas_bancarias.csv",
+      "filas": 4,
+      "correctas": 4,
+      "creadas": 4,
+      "enlazadas": 0,
+      "errores": 0,
+      "ms": 128
+    },
+    {
+      "archivo": "listas_precios.csv",
+      "filas": 900,
+      "correctas": 900,
+      "creadas": 3,
+      "enlazadas": 0,
+      "errores": 0,
+      "ms": 3971
+    },
+    {
+      "archivo": "cxc_abiertas.csv",
+      "filas": 517,
+      "correctas": 517,
+      "creadas": 517,
+      "enlazadas": 0,
+      "errores": 0,
+      "ms": 4490
+    },
+    {
+      "archivo": "cxp_abiertas.csv",
+      "filas": 180,
+      "correctas": 180,
+      "creadas": 180,
+      "enlazadas": 0,
+      "errores": 0,
+      "ms": 1598
+    },
+    {
+      "archivo": "balance_apertura.csv",
+      "filas": 8,
+      "correctas": 8,
+      "creadas": 1,
+      "enlazadas": 0,
+      "errores": 0,
+      "ms": 111
+    },
+    {
+      "archivo": "contratos_suministro.csv",
+      "filas": 143,
+      "correctas": 143,
+      "creadas": 34,
+      "enlazadas": 0,
+      "errores": 0,
+      "ms": 1064
+    },
+    {
+      "archivo": "oc_suministro.csv",
+      "filas": 182,
+      "correctas": 182,
+      "creadas": 71,
+      "enlazadas": 0,
+      "errores": 0,
+      "ms": 1153
+    },
+    {
+      "archivo": "cronograma_suministro.csv",
+      "filas": 546,
+      "correctas": 546,
+      "creadas": 546,
+      "enlazadas": 0,
+      "errores": 0,
+      "ms": 4337
+    },
+    {
+      "archivo": "oc_compra.csv",
+      "filas": 111,
+      "correctas": 111,
+      "creadas": 38,
+      "enlazadas": 0,
+      "errores": 0,
+      "ms": 806
+    },
+    {
+      "archivo": "pedidos_venta.csv",
+      "filas": 377,
+      "correctas": 377,
+      "creadas": 132,
+      "enlazadas": 0,
+      "errores": 0,
+      "ms": 2490
+    },
+    {
+      "archivo": "stock_inicial.csv",
+      "filas": 4313,
+      "correctas": 4313,
+      "creadas": 4313,
+      "enlazadas": 0,
+      "errores": 0,
+      "ms": 55962
+    }
+  ],
+  "conciliacion": {
+    "cuadra": true,
+    "entidades": [
+      {
+        "entidad": "almacenes",
+        "origen": {
+          "registros": 4
+        },
+        "cuadra": true
+      },
+      {
+        "entidad": "balance",
+        "origen": {
+          "debe": 270892712.05,
+          "haber": 270892712.05,
+          "lineas": 8
+        },
+        "cuadra": true
+      },
+      {
+        "entidad": "clientes",
+        "origen": {
+          "registros": 570
+        },
+        "cuadra": true
+      },
+      {
+        "entidad": "contratos",
+        "origen": {
+          "valor": 54590574.88,
+          "lineas": 122,
+          "cantidad": 174698,
+          "registros": 34
+        },
+        "cuadra": true
+      },
+      {
+        "entidad": "cuentas_bancarias",
+        "origen": {
+          "registros": 4,
+          "saldo_local": 290850.85
+        },
+        "cuadra": true
+      },
+      {
+        "entidad": "cuentas_contables",
+        "origen": {
+          "registros": 20
+        },
+        "cuadra": true
+      },
+      {
+        "entidad": "cxc",
+        "origen": {
+          "saldo": 9371284.75,
+          "registros": 517
+        },
+        "cuadra": true
+      },
+      {
+        "entidad": "cxp",
+        "origen": {
+          "saldo": 2924879.51,
+          "registros": 180
+        },
+        "cuadra": true
+      },
+      {
+        "entidad": "entregas",
+        "origen": {
+          "cantidad": 59962,
+          "registros": 546
+        },
+        "cuadra": true
+      },
+      {
+        "entidad": "listas_precios",
+        "origen": {
+          "lineas": 900,
+          "registros": 3
+        },
+        "cuadra": true
+      },
+      {
+        "entidad": "oc",
+        "origen": {
+          "valor": 20030720.48,
+          "lineas": 182,
+          "cantidad": 61850,
+          "registros": 71
+        },
+        "cuadra": true
+      },
+      {
+        "entidad": "oc_compra",
+        "origen": {
+          "valor": 2813037.33,
+          "lineas": 88,
+          "cantidad": 13116,
+          "registros": 38
+        },
+        "cuadra": true
+      },
+      {
+        "entidad": "pedidos_venta",
+        "origen": {
+          "valor": 13441129.02,
+          "lineas": 304,
+          "cantidad": 44940,
+          "registros": 132
+        },
+        "cuadra": true
+      },
+      {
+        "entidad": "productos",
+        "origen": {
+          "con_lote": 894,
+          "registros": 1450
+        },
+        "cuadra": true
+      },
+      {
+        "entidad": "proveedores",
+        "origen": {
+          "registros": 144
+        },
+        "cuadra": true
+      },
+      {
+        "entidad": "stock",
+        "origen": {
+          "lotes": 874,
+          "valor": 261227076.45,
+          "cantidad": 1296955,
+          "registros": 4313
+        },
+        "cuadra": true
+      }
+    ],
+    "cruce_bancos": {
+      "bancos": 290850.85,
+      "cuadra": true,
+      "cuentas": [
+        {
+          "bancos": 152340.55,
+          "cuadra": true,
+          "apertura": 152340.55,
+          "cuenta_contable": "104101",
+          "cuentas_bancarias": 1
+        },
+        {
+          "bancos": 93800,
+          "cuadra": true,
+          "apertura": 93800,
+          "cuenta_contable": "104102",
+          "cuentas_bancarias": 1
+        },
+        {
+          "bancos": 48210.3,
+          "cuadra": true,
+          "apertura": 48210.3,
+          "cuenta_contable": "104103",
+          "cuentas_bancarias": 1
+        },
+        {
+          "bancos": -3500,
+          "cuadra": true,
+          "apertura": -3500,
+          "cuenta_contable": "104104",
+          "cuentas_bancarias": 1
+        }
+      ],
+      "apertura": 290850.85
+    },
+    "independiente": {
+      "clientes": 570,
+      "cxc_saldo": 9371284.75,
+      "productos": 1450,
+      "oc_borrador": 38,
+      "stock_lotes": 874,
+      "balance_cuadra": true,
+      "movimientos_banco": 4
+    }
+  },
+  "exito": true,
+  "fases": [
+    {
+      "fase": "Extracto v1: generar, perfilar y transformar",
+      "ms": 2663,
+      "tablas": 27,
+      "alertas_sensibles": [
+        "USUARIOS.DBF: CLAVE: dato sensible (credencial o medio de pago); se redacta en el archivo y no se migra"
+      ],
+      "mapeo_v1": "GLN sin correspondencia: detenido",
+      "plantados": 7,
+      "control": {
+        "clientes": {
+          "registros": 570
+        },
+        "proveedores": {
+          "registros": 144
+        },
+        "almacenes": {
+          "registros": 4
+        },
+        "cuentas_contables": {
+          "registros": 20
+        },
+        "productos": {
+          "registros": 1451,
+          "con_lote": 895
+        },
+        "cuentas_bancarias": {
+          "registros": 4,
+          "saldo_local": 290850.85
+        },
+        "listas_precios": {
+          "registros": 3,
+          "lineas": 900
+        },
+        "cxc": {
+          "registros": 518,
+          "saldo": 9395028.23
+        },
+        "cxp": {
+          "registros": 180,
+          "saldo": 2924879.51
+        },
+        "balance": {
+          "lineas": 8,
+          "debe": 270916455.53,
+          "haber": 270916455.53
+        },
+        "oc_compra": {
+          "registros": 38,
+          "lineas": 88,
+          "cantidad": 13116,
+          "valor": 2813037.33
+        },
+        "pedidos_venta": {
+          "registros": 132,
+          "lineas": 304,
+          "cantidad": 44940,
+          "valor": 13441129.02
+        },
+        "contratos": {
+          "registros": 34,
+          "lineas": 122,
+          "cantidad": 174698,
+          "valor": 54590574.88
+        },
+        "oc": {
+          "registros": 71,
+          "lineas": 182,
+          "cantidad": 61850,
+          "valor": 20030720.48
+        },
+        "entregas": {
+          "registros": 546,
+          "cantidad": 59962
+        },
+        "stock": {
+          "registros": 4313,
+          "lotes": 873,
+          "cantidad": 1296955,
+          "valor": 261227076.45
+        }
+      }
+    },
+    {
+      "fase": "Infraestructura efímera: PostgreSQL 16 con la cadena, PostgREST y API Nest",
+      "ms": 308781,
+      "migraciones": 586,
+      "hasta": 590,
+      "verificadores": 99,
+      "usuarios": 8
+    },
+    {
+      "fase": "Archivo íntegro v1: carga interrumpida y descarte con motivo",
+      "ms": 1656,
+      "tandas_antes_del_corte": 3,
+      "estado": "DESCARTADO"
+    },
+    {
+      "fase": "Ensayo integral v1: errores reales detectados, nada persiste",
+      "ms": 54061,
+      "registros": 8028,
+      "errores": 6,
+      "errores_archivo": 2,
+      "por_entidad": {
+        "PRODUCTO": 1,
+        "CXC": 1,
+        "CXP": 1,
+        "CONTRATO": 1,
+        "STOCK": 2
+      },
+      "conciliacion_cuadra": false,
+      "persistido": 0
+    },
+    {
+      "fase": "Extracto v2: reentrega corregida por el cliente",
+      "ms": 1024,
+      "plantados": 0,
+      "control": {
+        "clientes": {
+          "registros": 570
+        },
+        "proveedores": {
+          "registros": 144
+        },
+        "almacenes": {
+          "registros": 4
+        },
+        "cuentas_contables": {
+          "registros": 20
+        },
+        "productos": {
+          "registros": 1450,
+          "con_lote": 894
+        },
+        "cuentas_bancarias": {
+          "registros": 4,
+          "saldo_local": 290850.85
+        },
+        "listas_precios": {
+          "registros": 3,
+          "lineas": 900
+        },
+        "cxc": {
+          "registros": 517,
+          "saldo": 9371284.75
+        },
+        "cxp": {
+          "registros": 180,
+          "saldo": 2924879.51
+        },
+        "balance": {
+          "lineas": 8,
+          "debe": 270892712.05,
+          "haber": 270892712.05
+        },
+        "oc_compra": {
+          "registros": 38,
+          "lineas": 88,
+          "cantidad": 13116,
+          "valor": 2813037.33
+        },
+        "pedidos_venta": {
+          "registros": 132,
+          "lineas": 304,
+          "cantidad": 44940,
+          "valor": 13441129.02
+        },
+        "contratos": {
+          "registros": 34,
+          "lineas": 122,
+          "cantidad": 174698,
+          "valor": 54590574.88
+        },
+        "oc": {
+          "registros": 71,
+          "lineas": 182,
+          "cantidad": 61850,
+          "valor": 20030720.48
+        },
+        "entregas": {
+          "registros": 546,
+          "cantidad": 59962
+        },
+        "stock": {
+          "registros": 4313,
+          "lotes": 874,
+          "cantidad": 1296955,
+          "valor": 261227076.45
+        }
+      }
+    },
+    {
+      "fase": "Archivo íntegro v2: carga reanudable, cierre por conteo y consulta",
+      "ms": 28155,
+      "lote": "2a7aeca5-6d85-409b-8dee-a34b2a149ea1",
+      "tablas": 27,
+      "filas": 88443,
+      "nuevas": 68938,
+      "existentes_tras_reanudar": 19505
+    },
+    {
+      "fase": "Ensayo integral v2: sin errores, conciliación y cruce bancario cuadran",
+      "ms": 85520,
+      "registros": 8027,
+      "errores": 0,
+      "cruce_bancos": {
+        "bancos": 290850.85,
+        "cuadra": true,
+        "cuentas": [
+          {
+            "bancos": 152340.55,
+            "cuadra": true,
+            "apertura": 152340.55,
+            "cuenta_contable": "104101",
+            "cuentas_bancarias": 1
+          },
+          {
+            "bancos": 93800,
+            "cuadra": true,
+            "apertura": 93800,
+            "cuenta_contable": "104102",
+            "cuentas_bancarias": 1
+          },
+          {
+            "bancos": 48210.3,
+            "cuadra": true,
+            "apertura": 48210.3,
+            "cuenta_contable": "104103",
+            "cuentas_bancarias": 1
+          },
+          {
+            "bancos": -3500,
+            "cuadra": true,
+            "apertura": -3500,
+            "cuenta_contable": "104104",
+            "cuentas_bancarias": 1
+          }
+        ],
+        "apertura": 290850.85
+      }
+    },
+    {
+      "fase": "Importación real v2 por HTTP, archivo por archivo y en orden",
+      "ms": 98082,
+      "archivos": 16,
+      "filas": 9469
+    },
+    {
+      "fase": "Conciliación por HTTP y verificación independiente en SQL",
+      "ms": 221,
+      "cuadra": true,
+      "entidades": 16,
+      "independiente": {
+        "clientes": 570,
+        "cxc_saldo": 9371284.75,
+        "productos": 1450,
+        "oc_borrador": 38,
+        "stock_lotes": 874,
+        "balance_cuadra": true,
+        "movimientos_banco": 4
+      }
+    },
+    {
+      "fase": "Sin efectos: ni eventos, ni comprobantes, un solo asiento (apertura)",
+      "ms": 64,
+      "asientos_nuevos": 1,
+      "eventos_nuevos": 0,
+      "comprobantes_nuevos": 0
+    },
+    {
+      "fase": "Reintento completo: todo omitido, nada duplicado",
+      "ms": 52958,
+      "filas": 9469,
+      "omitidas": 9469
+    },
+    {
+      "fase": "Origen cambiado: el sistema anterior altera un precio ya migrado y se rechaza",
+      "ms": 10139,
+      "rechazados": 1,
+      "omitidos": 1449
+    },
+    {
+      "fase": "Operación sobre lo migrado: la OC la aprueba otra persona",
+      "ms": 278,
+      "autoaprobacion": 400,
+      "aprobacion_tercero": 200
+    },
+    {
+      "fase": "Permisos y aislamiento entre empresas",
+      "ms": 404,
+      "auditor_lee": true,
+      "auditor_importa": 403,
+      "vendedor_lee": 403,
+      "otra_empresa": "sin lotes, 404 al lote ajeno, conciliación vacía"
+    }
+  ],
+  "http": {
+    "solicitudes": 139,
+    "por_estado": {
+      "200": 7,
+      "201": 127,
+      "400": 1,
+      "403": 3,
+      "404": 1
+    }
+  }
+}

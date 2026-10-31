@@ -1,0 +1,186 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - complementary [ref=e5]:
+          - link "N NEON ERP SUITE" [ref=e7] [cursor=pointer]:
+            - /url: /dashboard/
+            - generic [ref=e8]: "N"
+            - generic [ref=e9]:
+              - generic [ref=e10]: NEON
+              - generic [ref=e11]: ERP SUITE
+          - navigation [ref=e12]:
+            - link "Dashboard" [ref=e13] [cursor=pointer]:
+              - /url: /dashboard/
+              - img [ref=e14]
+              - generic [ref=e19]: Dashboard
+            - button "Ventas" [ref=e21] [cursor=pointer]:
+              - generic [ref=e22]:
+                - img [ref=e23]
+                - generic [ref=e26]: Ventas
+              - img [ref=e27]
+            - button "Finanzas" [ref=e30] [cursor=pointer]:
+              - generic [ref=e31]:
+                - img [ref=e32]
+                - generic [ref=e34]: Finanzas
+              - img [ref=e35]
+            - link "Offline" [ref=e37] [cursor=pointer]:
+              - /url: /dashboard/offline/
+              - img [ref=e38]
+              - generic [ref=e45]: Offline
+            - link "Ayuda" [ref=e46] [cursor=pointer]:
+              - /url: /dashboard/ayuda/
+              - img [ref=e47]
+              - generic [ref=e50]: Ayuda
+          - generic [ref=e51]:
+            - generic [ref=e52]:
+              - generic [ref=e53]: Responsable
+              - generic [ref=e54]: supply-feature@erp.local
+            - button "Cerrar Sesión" [ref=e55] [cursor=pointer]:
+              - img [ref=e56]
+              - generic [ref=e59]: Cerrar Sesión
+        - main [ref=e60]:
+          - generic [ref=e62]:
+            - button "Abrir notificaciones" [ref=e63] [cursor=pointer]:
+              - img [ref=e64]
+            - button "Cambiar a tema oscuro" [ref=e67] [cursor=pointer]:
+              - img [ref=e68]
+              - generic [ref=e70]: Oscuro
+          - generic [ref=e71]:
+            - navigation [ref=e73]:
+              - link "Dashboard" [ref=e75] [cursor=pointer]:
+                - /url: /dashboard/
+                - img [ref=e76]
+                - text: Dashboard
+              - generic [ref=e79]:
+                - img [ref=e80]
+                - link "Ventas" [ref=e82] [cursor=pointer]:
+                  - /url: /dashboard/ventas/
+                  - img [ref=e83]
+                  - text: Ventas
+              - generic [ref=e87]:
+                - img [ref=e88]
+                - generic [ref=e90]: Contratos
+            - generic [ref=e92]:
+              - generic [ref=e93]:
+                - generic [ref=e94]:
+                  - heading "Contratos de suministro" [level=1] [ref=e95]
+                  - paragraph [ref=e96]: Organice las OC del cliente y sus entregas programadas por producto, cantidad, fecha y destino.
+                - generic [ref=e97]:
+                  - button "Actualizar" [ref=e98] [cursor=pointer]:
+                    - img [ref=e99]
+                    - text: Actualizar
+                  - button "Nuevo contrato" [ref=e104] [cursor=pointer]:
+                    - img [ref=e105]
+                    - text: Nuevo contrato
+              - status [ref=e106]: Pedido vinculado
+              - generic [ref=e107]:
+                - complementary "Lista de contratos" [ref=e108]:
+                  - generic [ref=e109]:
+                    - textbox "Buscar contrato por número u objeto" [ref=e110]
+                    - button "Buscar" [ref=e111] [cursor=pointer]
+                  - list [ref=e112]:
+                    - listitem [ref=e113]:
+                      - button "SUP-001 Activo Suministro programado local Cliente local · PEN" [ref=e114] [cursor=pointer]:
+                        - generic [ref=e115]:
+                          - generic [ref=e116]: SUP-001
+                          - generic [ref=e117]: Activo
+                        - generic [ref=e118]: Suministro programado local
+                        - generic [ref=e119]: Cliente local · PEN
+                  - generic [ref=e120]:
+                    - button "Página anterior" [disabled]:
+                      - img
+                    - generic [ref=e121]: Página 1 · 1 contratos
+                    - button "Página siguiente" [disabled]:
+                      - img
+                - region "Expediente del contrato" [ref=e122]:
+                  - generic [ref=e123]:
+                    - generic [ref=e124]:
+                      - heading "SUP-001 · Suministro programado local" [level=2] [ref=e125]
+                      - paragraph [ref=e126]: Cliente local · PEN · 01/01/2026 al 31/12/2026
+                      - paragraph [ref=e127]: "Estado: Activo"
+                    - generic [ref=e128]:
+                      - button "Registrar OC del cliente" [ref=e129] [cursor=pointer]
+                      - button "Programar entrega" [ref=e130] [cursor=pointer]
+                      - button "Registrar adenda" [ref=e131] [cursor=pointer]
+                  - generic [ref=e132]:
+                    - heading "Cantidades del contrato" [level=3] [ref=e133]
+                    - paragraph [ref=e134]: Los saldos muestran cantidades pendientes de asignar a OC. Los precios unitarios no incluyen impuestos.
+                    - table [ref=e136]:
+                      - rowgroup [ref=e137]:
+                        - row "Producto Contratado En OC Sin asignar Precio (PEN)" [ref=e138]:
+                          - columnheader "Producto" [ref=e139]
+                          - columnheader "Contratado" [ref=e140]
+                          - columnheader "En OC" [ref=e141]
+                          - columnheader "Sin asignar" [ref=e142]
+                          - columnheader "Precio (PEN)" [ref=e143]
+                      - rowgroup [ref=e144]:
+                        - row "SKU-1 Producto de suministro NIU 100 60 40 12.345678" [ref=e145]:
+                          - cell "SKU-1 Producto de suministro NIU" [ref=e146]:
+                            - generic [ref=e147]: SKU-1
+                            - text: Producto de suministro
+                            - generic [ref=e148]: NIU
+                          - cell "100" [ref=e149]
+                          - cell "60" [ref=e150]
+                          - cell "40" [ref=e151]
+                          - cell "12.345678" [ref=e152]
+                  - generic [ref=e153]:
+                    - heading "OC del cliente" [level=3] [ref=e154]
+                    - generic [ref=e155]:
+                      - heading "OC-001 · 27/10/2026 · Activa" [level=4] [ref=e156]
+                      - list [ref=e157]:
+                        - listitem [ref=e158]:
+                          - generic [ref=e159]: Producto de suministro
+                          - generic [ref=e160]: 60 en OC · Precio 12.345678 PEN · 20 por programar
+                      - generic [ref=e161]:
+                        - button "Modificar OC OC-001" [ref=e162] [cursor=pointer]
+                        - button "Anular OC OC-001" [ref=e163] [cursor=pointer]
+                  - generic [ref=e164]:
+                    - heading "Cronograma de entregas" [level=3] [ref=e165]
+                    - paragraph [ref=e166]: El despacho se registra en los pedidos vinculados. La conformidad de entrega tendrá su propio registro.
+                    - list [ref=e167]:
+                      - listitem [ref=e168]:
+                        - generic [ref=e169]:
+                          - generic [ref=e170]: 10/11/2026 · OC-001
+                          - generic [ref=e171]: Programada
+                        - paragraph [ref=e172]: Producto de suministro · 40 NIU
+                        - paragraph [ref=e173]: Almacén del cliente
+                        - generic [ref=e174]:
+                          - button "Reprogramar" [ref=e175] [cursor=pointer]
+                          - button "Anular programación" [ref=e176] [cursor=pointer]
+                  - region "Pedidos operativos del contrato" [ref=e177]:
+                    - generic [ref=e178]:
+                      - heading "Pedidos operativos" [level=3] [ref=e179]
+                      - button "Vincular pedido" [ref=e180] [cursor=pointer]
+                    - paragraph [ref=e181]: Cada línea del pedido se asigna completa a una programación. La confirmación, reserva, despacho y cancelación se gestionan desde Pedidos.
+                    - list [ref=e182]:
+                      - listitem [ref=e183]:
+                        - generic [ref=e184]:
+                          - link "PV-2026-0040" [active] [ref=e185] [cursor=pointer]:
+                            - /url: /dashboard/ventas/pedidos/57000000-0000-4000-8000-000000000040/
+                          - generic [ref=e186]: PENDIENTE
+                        - list [ref=e187]:
+                          - listitem [ref=e188]:
+                            - paragraph [ref=e189]: "Producto de suministro: 30 vinculadas · 0 despachadas · 0 facturadas"
+                            - paragraph [ref=e190]: OC-001 · 10/11/2026 · Almacén del cliente
+                        - button "Desvincular PV-2026-0040" [ref=e191] [cursor=pointer]
+                  - region "Adjuntos del expediente" [ref=e192]:
+                    - generic [ref=e193]:
+                      - heading "Adjuntos del expediente" [level=3] [ref=e194]
+                      - button "Adjuntar documento" [ref=e195] [cursor=pointer]
+                    - paragraph [ref=e196]: Archivos privados de contrato, OC y adendas. PDF, DOCX sin macros, PNG o JPG; hasta 10 MB por archivo. Adjuntar no acredita firma ni aprobación legal.
+                    - paragraph [ref=e197]: Aún no hay documentos adjuntos.
+                    - list
+                  - group [ref=e198]:
+                    - generic "Historial del contrato (1)" [ref=e199] [cursor=pointer]
+      - button "Abrir ayuda" [ref=e200] [cursor=pointer]:
+        - img [ref=e201]
+    - region "Notifications (F8)":
+      - list
+  - button "Open Next.js Dev Tools" [ref=e209] [cursor=pointer]:
+    - img [ref=e210]
+  - alert [ref=e213]
+```

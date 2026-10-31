@@ -1,8 +1,12 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import Decimal from 'decimal.js';
 import { readUnavailable } from '../ventas-errors';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { paisDelTenant } from '../../../shared/utils/fecha-tenant.util';
 import { fechaDeDocumentoEnPais, zonaHorariaDePais } from '../../../shared/utils/fecha-peru.util';
+
+const addMoney = (left: number, right: unknown): number =>
+  new Decimal(left).plus(String(right ?? 0)).toDecimalPlaces(2).toNumber();
 
 /**
  * ReportesService
@@ -87,7 +91,7 @@ export class ReportesService {
         };
       }
 
-      acc[clienteId].total += Number(pedido.total);
+      acc[clienteId].total = addMoney(acc[clienteId].total, pedido.total);
       acc[clienteId].cantidad_pedidos += 1;
       if (pedido.estado === 'FACTURADO' || pedido.estado === 'COMPLETADO' || pedido.estado === 'COMPLETADO_CON_GRE') {
         acc[clienteId].cantidad_facturas += 1;
@@ -206,7 +210,7 @@ export class ReportesService {
       }
 
       acc[estado].cantidad += 1;
-      acc[estado].total += Number(pedido.total);
+      acc[estado].total = addMoney(acc[estado].total, pedido.total);
 
       return acc;
     }, {});
@@ -280,7 +284,7 @@ export class ReportesService {
       }
 
       acc[productoId].unidades_vendidas += Number(detalle.cantidad);
-      acc[productoId].importe_total += Number(detalle.subtotal);
+      acc[productoId].importe_total = addMoney(acc[productoId].importe_total, detalle.subtotal);
       acc[productoId].pedidos.add(detalle.pedido_id);
       acc[productoId].cantidad_pedidos = acc[productoId].pedidos.size;
 
@@ -351,7 +355,7 @@ export class ReportesService {
         };
       }
 
-      acc[clienteId].total_facturacion += Number(pedido.total);
+      acc[clienteId].total_facturacion = addMoney(acc[clienteId].total_facturacion, pedido.total);
       acc[clienteId].cantidad_pedidos += 1;
       acc[clienteId].cantidad_facturas += 1;
 
@@ -360,7 +364,7 @@ export class ReportesService {
 
     const totales: Record<string, number> = {};
     for (const item of Object.values(grouped) as any[]) {
-      totales[item.moneda] = (totales[item.moneda] || 0) + Number(item.total_facturacion);
+      totales[item.moneda] = addMoney(totales[item.moneda] || 0, item.total_facturacion);
     }
 
     const result = Object.values(grouped)
@@ -562,7 +566,7 @@ export class ReportesService {
     if (facturasError) throw readUnavailable('las facturas del reporte');
 
     const sumar = (items: any[] | null | undefined, field: string) =>
-      (items || []).reduce((acc, item) => acc + Number(item?.[field] ?? 0), 0);
+      (items || []).reduce((acc, item) => addMoney(acc, item?.[field]), 0);
 
     const pipeline = {
       cotizaciones: {
@@ -646,10 +650,12 @@ export class ReportesService {
         resumen: {
           pedidosAnalizados: 0,
           pedidosEntregados: 0,
+          pedidosConEntregaConfirmada: 0,
+          pedidosOtif: 0,
           totalSolicitado: 0,
           totalEntregado: 0,
           fillRate: 0,
-          otif: 0,
+          otif: null,
           pedidosConBackorder: 0,
           unidadesPendientesBackorder: 0,
         },
@@ -671,13 +677,13 @@ export class ReportesService {
     const pedidosQuery = client
       .from('pedidos_venta')
       .select('id, numero, fecha, estado, tracking_estado, tracking_actualizado_en', { count: 'exact' })
-      .eq('tenant_id', tenantId);
+      .eq('tenant_id', tenantId)
+      .in('estado', ['CONFIRMADO', 'EN_PREPARACION', 'LISTO_DESPACHO', 'DESPACHO_PARCIAL', 'LISTO_FACTURAR', 'FACTURADO', 'COMPLETADO', 'COMPLETADO_CON_GRE']);
 
     const pedidosFiltrados = fechaDesde ? pedidosQuery.gte('fecha', fechaDesde) : pedidosQuery;
     const pedidosResult = fechaHasta ? pedidosFiltrados.lte('fecha', fechaHasta) : pedidosFiltrados;
 
-    const { data: pedidos, error: pedidosError } = await pedidosResult;
-    if (pedidosError) throw readUnavailable('los pedidos del reporte');
+    const pedidos = await this.allReportRows(pedidosResult);
 
     const pedidoIds = (pedidos || []).map((pedido) => pedido.id);
     if (pedidoIds.length === 0) {
@@ -686,10 +692,12 @@ export class ReportesService {
         resumen: {
           pedidosAnalizados: 0,
           pedidosEntregados: 0,
+          pedidosConEntregaConfirmada: 0,
+          pedidosOtif: 0,
           totalSolicitado: 0,
           totalEntregado: 0,
           fillRate: 0,
-          otif: 0,
+          otif: null,
           pedidosConBackorder: 0,
           unidadesPendientesBackorder: 0,
         },
@@ -708,42 +716,32 @@ export class ReportesService {
       };
     }
 
-    const [detallePedidoResult, movimientosResult, backordersResult] = await Promise.all([
-      client
-        .from('pedidos_venta_detalle')
-        .select('pedido_id, cantidad')
-        .in('pedido_id', pedidoIds),
-      client
-        .from('movimientos_inventario')
-        .select('referencia_id, cantidad, created_at')
-        .eq('tenant_id', tenantId)
-        .eq('referencia_tipo', 'PEDIDO')
-        .eq('tipo', 'SALIDA')
-        .in('referencia_id', pedidoIds),
-      client
-        .from('pedido_backorders')
-        .select('pedido_id, detalle_id, cantidad_pendiente, prioridad, proxima_fecha_compromiso, estado')
-        .eq('tenant_id', tenantId)
-        .in('pedido_id', pedidoIds),
-    ]);
-
-    if (detallePedidoResult.error) throw detallePedidoResult.error;
-    if (movimientosResult.error) throw movimientosResult.error;
-    if (backordersResult.error) throw backordersResult.error;
+    const detallesPedido: any[] = [], despachos: any[] = [], backordersRaw: any[] = [];
+    // Acota el filtro IN y recorre las páginas de cada fuente canónica.
+    for (let offset = 0; offset < pedidoIds.length; offset += 200) {
+      const ids = pedidoIds.slice(offset, offset + 200);
+      const [detalleRows, despachoRows, backorderRows] = await Promise.all([
+        this.allReportRows(client.from('pedidos_venta_detalle').select('id, pedido_id, cantidad').eq('tenant_id', tenantId).in('pedido_id', ids)),
+        this.allReportRows(client.from('pedido_despachos').select('id, pedido_id, cantidad').eq('tenant_id', tenantId).eq('estado', 'REGISTRADO').in('pedido_id', ids)),
+        this.allReportRows(client.from('pedido_backorders').select('id, pedido_id, detalle_id, cantidad_pendiente, prioridad, proxima_fecha_compromiso, estado').eq('tenant_id', tenantId).in('pedido_id', ids)),
+      ]);
+      detallesPedido.push(...detalleRows);
+      despachos.push(...despachoRows);
+      backordersRaw.push(...backorderRows);
+    }
 
     const solicitadoPorPedido = this.agruparCantidadPorId(
-      detallePedidoResult.data || [],
+      detallesPedido,
       'pedido_id',
       'cantidad',
     );
 
     const entregadoPorPedido = this.agruparCantidadPorId(
-      movimientosResult.data || [],
-      'referencia_id',
+      despachos,
+      'pedido_id',
       'cantidad',
     );
 
-    const backordersRaw = backordersResult.data || [];
     const backordersPorPedido = new Map<string, Array<{
       detalle_id: string;
       cantidad_pendiente: number;
@@ -756,6 +754,7 @@ export class ReportesService {
 
     backordersRaw.forEach((item) => {
       const pendiente = Number(item.cantidad_pendiente ?? 0);
+      if (pendiente <= 0 || ['ANULADO', 'CANCELADO', 'CANCELADA', 'CERRADO', 'ATENDIDO'].includes(String(item.estado).toUpperCase())) return;
       unidadesBackorder += pendiente;
 
       const payload = {
@@ -812,14 +811,16 @@ export class ReportesService {
       let diasHastaEntrega: number | null = null;
       let dentroDeSla: boolean | null = null;
 
-      if (pedido.tracking_estado === 'ENTREGADO' && pedido.tracking_actualizado_en) {
-        const fechaPedido = new Date(pedido.fecha);
-        const fechaEntrega = new Date(pedido.tracking_actualizado_en);
-        diasHastaEntrega = Math.max(
-          Math.floor((fechaEntrega.getTime() - fechaPedido.getTime()) / (1000 * 60 * 60 * 24)),
-          0,
-        );
-        dentroDeSla = diasHastaEntrega <= SLA_DIAS;
+      if (pedido.tracking_estado === 'ENTREGADO' && pedido.tracking_actualizado_en
+        && Number.isFinite(new Date(pedido.tracking_actualizado_en).getTime())) {
+        const zona = zonaHorariaDePais(dashboardConfig.pais);
+        const fechaPedido = new Date(fechaDeDocumentoEnPais(pedido.fecha, zona));
+        const fechaEntrega = new Date(fechaDeDocumentoEnPais(pedido.tracking_actualizado_en, zona));
+        const dias = (fechaEntrega.getTime() - fechaPedido.getTime()) / (1000 * 60 * 60 * 24);
+        if (Number.isFinite(dias) && dias >= 0) {
+          diasHastaEntrega = dias;
+          dentroDeSla = dias <= SLA_DIAS;
+        }
       }
 
       if (dentroDeSla === false) {
@@ -864,8 +865,9 @@ export class ReportesService {
     });
 
     const fillRateGlobal = totalSolicitado > 0 ? totalEntregado / totalSolicitado : 0;
-    const otif =
-      pedidosEntregados > 0 ? (pedidosEntregados - pedidosFueraSla) / pedidosEntregados : 0;
+    const pedidosConEntregaConfirmada = detalle.filter(item => item.dentroDeSla !== null).length;
+    const pedidosOtif = detalle.filter(item => item.dentroDeSla === true && item.solicitado > 0 && item.entregado >= item.solicitado).length;
+    const otif = pedidosConEntregaConfirmada > 0 ? pedidosOtif / pedidosConEntregaConfirmada : null;
 
     const pedidosSinEntrega = (detalles: any[]) =>
       detalles.filter((item) => item.entregado === 0).length;
@@ -890,10 +892,12 @@ export class ReportesService {
       resumen: {
         pedidosAnalizados: pedidos?.length ?? 0,
         pedidosEntregados,
+        pedidosConEntregaConfirmada,
+        pedidosOtif,
         totalSolicitado: this.round2(totalSolicitado),
         totalEntregado: this.round2(totalEntregado),
         fillRate: this.round2(fillRateGlobal * 100),
-        otif: this.round2(otif * 100),
+        otif: otif === null ? null : this.round2(otif * 100),
         pedidosConBackorder,
         unidadesPendientesBackorder: this.round2(unidadesBackorder),
       },
@@ -1079,24 +1083,18 @@ export class ReportesService {
       .getClient()
       .from('empresa_config')
       .select(
-        'habilitar_dashboards_otif, objetivo_otif, habilitar_dashboards_sunat, frecuencia_actualizacion_dashboards',
+        'habilitar_dashboards_otif, objetivo_otif, habilitar_dashboards_sunat, frecuencia_actualizacion_dashboards, pais',
       )
       .eq('tenant_id', tenantId)
       .maybeSingle();
 
-    if (error || !data) {
-      return {
-        habilitar_dashboards_otif: true,
-        objetivo_otif: 95,
-        habilitar_dashboards_sunat: true,
-        frecuencia_actualizacion_dashboards: 60,
-      };
-    }
+    if (error || !data) throw readUnavailable('la configuración del reporte');
 
     return {
-      habilitar_dashboards_otif: data.habilitar_dashboards_otif ?? true,
+      pais: data.pais,
+      habilitar_dashboards_otif: data.habilitar_dashboards_otif === true,
       objetivo_otif: data.objetivo_otif ?? 95,
-      habilitar_dashboards_sunat: data.habilitar_dashboards_sunat ?? true,
+      habilitar_dashboards_sunat: data.habilitar_dashboards_sunat === true,
       frecuencia_actualizacion_dashboards: data.frecuencia_actualizacion_dashboards ?? 60,
     };
   }

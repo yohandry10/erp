@@ -1,3 +1,4 @@
+import { fiscalCountryFixture } from './fixtures/fiscal-country'
 import {
   expect,
   test,
@@ -88,9 +89,9 @@ async function fulfillCommonApi(route: Route) {
     await fulfillJson(route, user);
     return true;
   }
+  if (pathname.replace(/\/$/, '') === '/api/tenants/me') { await fulfillJson(route, { data: { id: user.tenant_id, nombre: 'Empresa aislada', estado: 'ACTIVO' } }); return true; }
   if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
-    await fulfillJson(route, {
-      data: {
+    await fulfillJson(route, fiscalCountryFixture(user.tenant_id, {
         pais_id: 1,
         pais: "PE",
         paisCodigo: "PE",
@@ -98,8 +99,7 @@ async function fulfillCommonApi(route: Route) {
         monedaDefecto: "PEN",
         locale: "es-PE",
         timezone: "America/Lima",
-      },
-    });
+      }));
     return true;
   }
   if (/\/api\/demo\/status\/?$/.test(pathname)) {
@@ -292,31 +292,35 @@ test.describe("QA visual financiera y Kardex 496", () => {
       if (await fulfillCommonApi(route)) return;
       const pathname = new URL(route.request().url()).pathname;
       if (/\/api\/rrhh\/empleados\/?$/.test(pathname))
-        return fulfillJson(route, { data: [] });
+        return fulfillJson(route, { success: true, data: [] });
       if (/\/api\/rrhh\/liquidaciones\/?$/.test(pathname)) {
         return fulfillJson(route, {
+          success: true,
           data: [
             {
               id: "49600000-0000-4000-8000-000000000001",
+              tenant_id: user.tenant_id,
               id_empleado: "49600000-0000-4000-8000-000000000002",
               fecha_terminacion: "2026-08-12",
               pais_codigo: "PE",
               moneda: "PEN",
               total_liquidacion: 1250,
               estado: "APROBADA",
-              empleados: { nombres: "Ana", apellidos: "Control" },
+              empleados: { id: "49600000-0000-4000-8000-000000000002", nombres: "Ana", apellidos: "Control", numero_documento: "12345678" },
             },
           ],
         });
       }
       if (/\/api\/rrhh\/cts\/depositos\/?$/.test(pathname))
-        return fulfillJson(route, { data: [] });
-      if (/\/api\/finanzas\/bancos\/cuentas\/?$/.test(pathname)) {
+        return fulfillJson(route, { success: true, data: [] });
+      if (/\/api\/(?:finanzas\/bancos\/cuentas|rrhh\/liquidaciones\/tesoreria\/destinos)\/?$/.test(pathname)) {
         return fulfillJson(route, {
+          success: true,
           data: [
             {
               id: "49600000-0000-4000-8000-000000000003",
               banco: "Banco QA",
+              nombre: "Banco QA",
               moneda: "PEN",
               activa: true,
               estado: "ACTIVO",
@@ -371,6 +375,15 @@ test.describe("QA visual financiera y Kardex 496", () => {
     await installSession(context, page);
     let updatePayload: Record<string, unknown> | null = null;
     const productId = "49600000-0000-4000-8000-000000000010";
+    const product = {
+      id: productId, tenant_id: user.tenant_id, codigo: "LEG-496", nombre: "Producto histórico",
+      marca: null, descripcion: null, unidad_medida: null, categoria: "Legacy", precio_venta: 100,
+      precio_compra: 80, stock_minimo: 1, stock_actual: 0, stock: 0, stock_reservado: 0,
+      codigo_barras: null, impuesto: 18, afectacion_igv: "10", es_servicio: false, controla_stock: true,
+      imagen_url: "", atributos_extra: {}, activo: true, estado: "ACTIVO", created_by: user.id,
+      updated_by: user.id, created_at: "2026-08-01T00:00:00.000Z", updated_at: "2026-08-01T00:00:00.000Z",
+      creation_fingerprint: null,
+    };
 
     await page.route("**/api/**", async (route) => {
       if (await fulfillCommonApi(route)) return;
@@ -380,7 +393,7 @@ test.describe("QA visual financiera y Kardex 496", () => {
         return fulfillJson(route, {
           success: true,
           data: [
-            { id: "49600000-0000-4000-8000-000000000011", nombre: "Legacy" },
+            { id: "49600000-0000-4000-8000-000000000011", tenant_id: user.tenant_id, nombre: "Legacy", activo: true },
           ],
         });
       }
@@ -391,25 +404,14 @@ test.describe("QA visual financiera y Kardex 496", () => {
       if (isProductPath && request.method() === "GET") {
         return fulfillJson(route, {
           success: true,
-          data: {
-            id: productId,
-            codigo: "LEG-496",
-            nombre: "Producto histórico",
-            marca: null,
-            unidad_medida: null,
-            categoria: "Legacy",
-            precio_venta: 100,
-            precio_compra: 80,
-            stock_minimo: 1,
-            impuesto: 18,
-            afectacion_igv: "10",
-            imagen_url: null,
-          },
+          data: product,
         });
       }
       if (isProductPath && request.method() === "PUT") {
         updatePayload = request.postDataJSON();
-        return fulfillJson(route, { success: true, data: { id: productId } });
+        return fulfillJson(route, { success: true, data: { ...product, ...updatePayload,
+          marca: updatePayload?.marca || null, operation_id: "49600000-0000-4000-8000-000000000012",
+          idempotent: false, updated_at: "2026-08-12T00:00:00.000Z" } });
       }
       if (/\/api\/inventario\/productos\/?$/.test(pathname)) {
         return fulfillJson(route, { success: true, data: [] });

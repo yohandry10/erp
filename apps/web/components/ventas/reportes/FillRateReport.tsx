@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { useApi } from '@/hooks/use-api'
+import { useMemo } from 'react'
+import { useSalesReport, ReportReadError, ReportDisabled } from './use-sales-report'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from '@/components/ui/use-toast'
 import { CalendarClock, CheckCircle2, Clock3, Loader2, PackageMinus, Truck } from 'lucide-react'
@@ -32,13 +32,17 @@ interface FillRateDetalle {
 }
 
 interface FillRateResponse {
+  habilitado: boolean
+  objetivoOtif: number
   resumen: {
     pedidosAnalizados: number
     pedidosEntregados: number
+    pedidosConEntregaConfirmada: number
+    pedidosOtif: number
     totalSolicitado: number
     totalEntregado: number
     fillRate: number
-    otif: number
+    otif: number | null
     pedidosConBackorder: number
     unidadesPendientesBackorder: number
   }
@@ -70,43 +74,13 @@ const numberFormatter = new Intl.NumberFormat('es-PE', {
 })
 
 export default function FillRateReport({ filters }: Props) {
-  const { get } = useApi()
-  const [data, setData] = useState<FillRateResponse | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { data: reportData, loading, error, retry } = useSalesReport<FillRateResponse>('/ventas/reportes/fill-rate', filters, 'object')
+  const data = reportData
 
-  useEffect(() => {
-    loadData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters])
-
-  const loadData = async () => {
-    try {
-      setLoading(true)
-      const response = await get('/ventas/reportes/fill-rate', {
-        params: filters
-      })
-
-      if (response?.success) {
-        setData(response.data)
-      } else {
-        throw new Error('Respuesta inválida del servidor')
-      }
-    } catch (error) {
-      console.error('Error cargando fill-rate:', error)
-      toast({
-        title: 'Error al cargar logística',
-        description: 'No se pudieron obtener las métricas de fill-rate y OTIF.',
-        variant: 'destructive'
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const topIncidencias = useMemo(() => {
+  const detalleRows = useMemo(() => {
     if (!data?.detalle) return []
     return data.detalle
-      .filter((item) => item.solicitado > 0 && item.entregado < item.solicitado)
+      .slice()
       .sort((a, b) => a.fillRate - b.fillRate)
       .slice(0, 10)
   }, [data])
@@ -115,12 +89,14 @@ export default function FillRateReport({ filters }: Props) {
     return data?.backorders?.topPrioritarios ?? []
   }, [data])
 
+  if (error) return <ReportReadError error={error} retry={retry} />
+
   if (loading) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Fill-rate &amp; OTIF</CardTitle>
-          <CardDescription className="text-xs leading-snug">Evaluando entregas en el periodo seleccionado…</CardDescription>
+          <CardDescription className="text-xs leading-snug">Evaluando despachos y entregas confirmadas en el periodo seleccionado…</CardDescription>
         </CardHeader>
         <CardContent className="py-12 flex flex-col items-center justify-center gap-2 text-foreground/80">
           <Loader2 className="h-8 w-8 animate-spin" />
@@ -144,6 +120,9 @@ export default function FillRateReport({ filters }: Props) {
     )
   }
 
+  if (typeof data.habilitado !== 'boolean') return <ReportReadError error="El reporte recibido está incompleto. Vuelve a intentarlo" retry={retry} />
+  if (!data.habilitado) return <ReportDisabled name="Fill-rate & OTIF" />
+
   const { resumen, incidencias } = data
 
   return (
@@ -156,13 +135,13 @@ export default function FillRateReport({ filters }: Props) {
               Fill-rate global
             </CardTitle>
             <CardDescription className="text-xs leading-snug">
-              Porcentaje de unidades entregadas sobre lo solicitado
+              Porcentaje de unidades despachadas sobre lo solicitado en pedidos confirmados
             </CardDescription>
           </CardHeader>
           <CardContent className="mt-auto">
             <p className="text-4xl font-semibold text-emerald-400">{resumen.fillRate.toFixed(1)}%</p>
             <p className="text-sm text-muted-foreground mt-1">
-              {numberFormatter.format(resumen.totalEntregado)} unidades entregadas de{' '}
+              {numberFormatter.format(resumen.totalEntregado)} unidades despachadas de{' '}
               {numberFormatter.format(resumen.totalSolicitado)}
             </p>
           </CardContent>
@@ -175,14 +154,13 @@ export default function FillRateReport({ filters }: Props) {
               OTIF (On Time In Full)
             </CardTitle>
             <CardDescription className="text-indigo-100">
-              Entregas completas dentro del SLA definido
+              Entregas confirmadas, completas y dentro de cinco días calendario
             </CardDescription>
           </CardHeader>
           <CardContent className="mt-auto">
-            <p className="text-4xl font-semibold text-primary">{resumen.otif.toFixed(1)}%</p>
+            <p className="text-4xl font-semibold text-primary">{resumen.otif === null ? 'No evaluado' : `${resumen.otif.toFixed(1)}%`}</p>
             <p className="text-sm text-indigo-100 mt-1">
-              {resumen.pedidosEntregados - incidencias.pedidosFueraSla} de {resumen.pedidosEntregados}{' '}
-              envíos dentro del SLA
+              {resumen.pedidosOtif} de {resumen.pedidosConEntregaConfirmada} entregas confirmadas cumplen OTIF. Objetivo: {numberFormatter.format(data.objetivoOtif)}%.
             </p>
           </CardContent>
         </Card>
@@ -209,10 +187,10 @@ export default function FillRateReport({ filters }: Props) {
           <CardHeader className="pb-2 space-y-1">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-start gap-2">
               <PackageMinus className="h-4 w-4 shrink-0" />
-              Pedidos sin entrega
+              Pedidos sin despacho
             </CardTitle>
             <CardDescription className="text-xs leading-snug">
-              Pedidos confirmados sin salidas registradas
+              Pedidos confirmados sin despachos registrados
             </CardDescription>
           </CardHeader>
           <CardContent className="mt-auto">
@@ -244,7 +222,7 @@ export default function FillRateReport({ filters }: Props) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Detalle de entregas</CardTitle>
+          <CardTitle>Detalle de despachos</CardTitle>
           <CardDescription className="text-xs leading-snug">
             Pedidos con menor nivel de cumplimiento para seguimiento operativo
           </CardDescription>
@@ -256,7 +234,7 @@ export default function FillRateReport({ filters }: Props) {
                 <th className="px-3 py-2 text-left font-medium text-foreground/80">Pedido</th>
                 <th className="px-3 py-2 text-left font-medium text-foreground/80">Estado</th>
                 <th className="px-3 py-2 text-right font-medium text-foreground/80">Solicitado</th>
-                <th className="px-3 py-2 text-right font-medium text-foreground/80">Entregado</th>
+                <th className="px-3 py-2 text-right font-medium text-foreground/80">Despachado</th>
                 <th className="px-3 py-2 text-right font-medium text-foreground/80">Fill-rate</th>
                 <th className="px-3 py-2 text-right font-medium text-foreground/80">Pendiente BO</th>
                 <th className="px-3 py-2 text-left font-medium text-foreground/80">Compromisos</th>
@@ -266,14 +244,14 @@ export default function FillRateReport({ filters }: Props) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {topIncidencias.length === 0 ? (
+              {detalleRows.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="px-3 py-6 text-center text-muted-foreground">
-                    No hay incidentes registrados en el periodo. ¡Buen trabajo del equipo logístico!
+                        No hay pedidos confirmados en el periodo seleccionado.
                   </td>
                 </tr>
               ) : (
-                topIncidencias.map((item) => (
+                detalleRows.map((item) => (
                   <tr key={item.pedido_id} className="bg-card">
                     <td className="px-3 py-2 font-medium text-foreground/85">{item.numero}</td>
                     <td className="px-3 py-2 text-foreground/80">{item.estado}</td>

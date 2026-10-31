@@ -201,12 +201,31 @@ describe('CashReconciliationService: saldo teórico igual al del writer', () => 
       TENANT,
     );
 
-    expect(resultado.diferencia).toBeCloseTo(-0.04, 2);
+    expect(resultado.diferencia).toBe(0);
+    expect(resultado.diferencia_nominal).toBeCloseTo(-0.04, 2);
+    expect(resultado.saldo_teorico).toBe(203.8);
+    expect(resultado.saldo_teorico_nominal).toBe(203.84);
     expect(resultado.tipo_diferencia).toBe('REDONDEO_EFECTIVO_LEGAL');
     expect(resultado.redondeo_efectivo_legal).toBe(true);
     expect(resultado.redondeo_efectivo_documentado).toBe(0.04);
     expect(resultado.redondeo_efectivo_cantidad).toBe(1);
     expect(resultado.requiere_supervisor).toBe(false);
+  });
+
+  it('no descuenta el redondeo dos veces al comparar el faltante con la tolerancia', async () => {
+    const { servicio } = construirServicio({
+      montoInicio: 203.84, ultimoSaldoNuevo: 203.84,
+      tolerancia: 20, redondeoDocumentado: 0.04, redondeoCantidad: 1,
+    });
+    const resultado = await servicio.validarCierre(SESION, 183.8, {
+      billetes: { 100: 1, 50: 1, 20: 1, 10: 1 },
+      monedas: { 2: 1, 1: 1, 0.5: 1, 0.2: 1, 0.1: 1 },
+    } as any, TENANT);
+    expect(resultado.diferencia).toBe(-20);
+    expect(resultado.diferencia_nominal).toBe(-20.04);
+    expect(resultado.tipo_diferencia).toBe('FALTANTE');
+    expect(resultado.requiere_supervisor).toBe(false);
+    expect(resultado.redondeo_efectivo_legal).toBe(false);
   });
 
   it('trata S/ -0.04 sin evidencia como faltante que requiere supervisor', async () => {

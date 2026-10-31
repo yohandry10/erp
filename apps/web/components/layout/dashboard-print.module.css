@@ -1,4 +1,13 @@
 @media print {
+  :global(html):has(.dashboard [data-print-page]),
+  :global(body):has(.dashboard [data-print-page]) {
+    background: white !important;
+    color: black !important;
+    color-scheme: light !important;
+  }
+  :global(body):has(.dashboard [data-print-page]) *:has([data-print-page]) {
+    background-color: white !important;
+  }
   .dashboard:has([data-print-page]) [data-dashboard-chrome],
   .dashboard:has([data-print-page]) [data-dashboard-content] nav,
   .dashboard [data-print-page] button {
@@ -37,4 +46,148 @@
   }
   .dashboard [data-print-page] table { font-size: 10pt; }
   .dashboard [data-print-page] tr { break-inside: avoid; }
+  .dashboard [data-print-page="purchase-order"] {
+    font-size: 9pt;
+  }
+  .dashboard [data-print-page="purchase-order"] [data-order-operational] {
+    display: none !important;
+  }
+  .dashboard [data-print-page="purchase-order"] [data-order-main],
+  .dashboard [data-print-page="purchase-order"] [data-order-main] > div {
+    display: block !important;
+  }
+  .dashboard [data-print-page="purchase-order"] > div,
+  .dashboard [data-print-page="purchase-order"] [data-order-main] > div > div {
+    margin-bottom: 8pt !important;
+  }
+  .dashboard [data-print-page="purchase-order"] div[class*="rounded-2xl"],
+  .dashboard [data-print-page="purchase-order"] > div:first-of-type {
+    padding: 8pt !important;
+    border-radius: 0 !important;
+    break-inside: avoid;
+  }
+  .dashboard [data-print-page="purchase-order"] div[class*="grid"] {
+    gap: 6pt !important;
+  }
+  .dashboard [data-print-page="purchase-order"] [data-order-supplier-fields] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .dashboard [data-print-page="purchase-order"] h1 { font-size: 18pt !important; }
+  .dashboard [data-print-page="purchase-order"] h2 { font-size: 11pt !important; }
+  .dashboard [data-print-page="purchase-order"] div[class*="border-b"] {
+    margin-bottom: 6pt !important;
+    padding-bottom: 6pt !important;
+  }
+  .dashboard [data-print-page="purchase-order"] div[class*="overflow"] {
+    overflow: visible !important;
+  }
+  .dashboard [data-print-page="purchase-order"] table {
+    width: 100% !important;
+    table-layout: fixed;
+    font-size: 8.5pt !important;
+  }
+  .dashboard [data-print-page="purchase-order"] th,
+  .dashboard [data-print-page="purchase-order"] td {
+    padding: 5pt 3pt !important;
+    overflow-wrap: anywhere;
+  }
+  .dashboard [data-print-page="purchase-order"] th:first-child { width: 30%; }
+  .dashboard [data-print-page="financial-reports"] div[class*="overflow"] {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+  .dashboard [data-print-page="financial-reports"] *,
+  .dashboard:has([data-print-page="financial-reports"]) [data-dashboard-content] {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    filter: none !important;
+    contain: none !important;
+    border-radius: 0 !important;
+  }
+  .dashboard [data-print-page="financial-reports"] div {
+    position: static !important;
+  }
+  .dashboard [data-print-page="financial-reports"] > div:first-child::before {
+    display: none !important;
+  }
+  .dashboard [data-print-page="financial-reports"] [data-finance-movements] thead {
+    display: table-header-group;
+  }
+  .dashboard [data-print-page="financial-reports"] [data-finance-movements] td span {
+    padding: 0 !important;
+  }
+  .dashboard [data-print-page="financial-reports"] [data-finance-cashflow] > div[class*="grid"],
+  .dashboard [data-print-page="financial-reports"] [data-finance-cashflow] > div:last-child > div {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+  .dashboard [data-print-page="financial-reports"] [data-finance-week],
+  .dashboard [data-print-page="financial-reports"] [data-finance-provider] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    padding: 8pt !important;
+    margin-bottom: 6pt !important;
+  }
+  .dashboard [data-print-page="financial-reports"] [data-finance-provider] > div {
+    margin-bottom: 6pt !important;
+  }
+  .dashboard [data-print-page="financial-reports"] [data-finance-cashflow] {
+    padding: 8pt !important;
+  }
+  .dashboard [data-print-page="financial-reports"] [data-finance-cashflow] > div:last-child {
+    break-inside: auto;
+  }
+  .dashboard [data-print-page="financial-reports"] [data-finance-movements] {
+    table-layout: fixed !important;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    width: 100% !important;
+    font-size: 9pt !important;
+  }
+  .dashboard [data-print-page="financial-reports"] [data-finance-movements] th,
+  .dashboard [data-print-page="financial-reports"] [data-finance-movements] td {
+    padding: 5pt 3pt !important;
+    overflow-wrap: anywhere;
+    white-space: normal !important;
+  }
+  .dashboard [data-print-page="financial-reports"] [data-finance-movements] td * {
+    font-size: inherit !important;
+  }
+  .dashboard [data-print-page="financial-reports"] [data-finance-movements] th:nth-child(1) { width: 9%; }
+  .dashboard [data-print-page="financial-reports"] [data-finance-movements] th:nth-child(2) { width: 18%; }
+  .dashboard [data-print-page="financial-reports"] [data-finance-movements] th:nth-child(3) { width: 40%; }
+  .dashboard [data-print-page="financial-reports"] [data-finance-movements] th:nth-child(4) { width: 8%; }
+  .dashboard [data-print-page="financial-reports"] [data-finance-movements] th:nth-child(5) { width: 13%; }
+  .dashboard [data-print-page="financial-reports"] [data-finance-movements] th:nth-child(6) { width: 12%; }
+  .dashboard [data-testid="sales-summary-report"] > div[class*="grid"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6pt !important;
+  }
+  .dashboard [data-testid="sales-summary-report"] > div[class*="overflow"] {
+    overflow: visible !important;
+  }
+  .dashboard [data-testid="sales-summary-report"] table {
+    table-layout: fixed !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    font-size: 9pt !important;
+  }
+  .dashboard [data-testid="sales-summary-report"] th,
+  .dashboard [data-testid="sales-summary-report"] td {
+    padding: 5pt 3pt !important;
+    overflow-wrap: anywhere;
+    white-space: normal !important;
+  }
+  .dashboard [data-testid="sales-summary-report"] td * {
+    font-size: inherit !important;
+  }
+  .dashboard [data-testid="sales-summary-report"] th:nth-child(1) { width: 11%; }
+  .dashboard [data-testid="sales-summary-report"] th:nth-child(2) { width: 16%; }
+  .dashboard [data-testid="sales-summary-report"] th:nth-child(3) { width: 23%; }
+  .dashboard [data-testid="sales-summary-report"] th:nth-child(n+4) { width: 10%; }
+  .dashboard [data-testid="sales-summary-report"] th {
+    font-size: 8pt !important;
+    letter-spacing: normal !important;
+    overflow-wrap: normal;
+  }
 }

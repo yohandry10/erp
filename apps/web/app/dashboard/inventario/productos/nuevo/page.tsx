@@ -11,6 +11,12 @@ import {
 } from "@/lib/afectacion-labels";
 import { ProductImageField } from "@/components/ProductImageField";
 import { uploadProductImage } from "@/lib/product-images";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePermission } from "@/hooks/use-permission";
+import { ProtectedComponent } from "@/components/auth/ProtectedComponent";
+import { ProductCreateIntent, ProductCreatePayload, productCreateIntentKey, readProductCreateIntent,
+  confirmProductCreated, preserveProductImage, recoveredProductImage, productImageIntentKey,
+  confirmCreatedProductImage } from "@/lib/product-create-operation";
 
 type CampoExtra = {
   key: string;
@@ -34,7 +40,20 @@ const camposClass =
 
 export default function NuevoProductoPage() {
   const router = useRouter();
-  const { get, post, apiCall } = useApi();
+  const { get, post, apiCall } = useApi({ requireLive: true, throwOnError: true, showErrorToast: false, retries: 0 });
+  const { session, loading: authLoading } = useAuth();
+  const { hasPermission, loading: permissionLoading } = usePermission('inventario', 'create', 'productos');
+  const tenantId = session?.user?.tenant_id || '', actorId = session?.user?.id || '';
+  const scopeIdentity = `${tenantId}:${actorId}`;
+  const activeScope = useRef(scopeIdentity); activeScope.current = scopeIdentity;
+  const epoch = useRef(0), inflight = useRef(false);
+  const [intentReady, setIntentReady] = useState('');
+  const [pendingIntent, setPendingIntent] = useState<ProductCreateIntent | null>(null);
+  const [recoveryError, setRecoveryError] = useState('');
+  const [catalogError, setCatalogError] = useState('');
+  const [catalogRetry, setCatalogRetry] = useState(0);
+  const scopeReady = !authLoading && intentReady === scopeIdentity && !!tenantId && !!actorId;
+  const visibleIntent = scopeReady && pendingIntent?.tenantId === tenantId && pendingIntent?.actorId === actorId ? pendingIntent : null;
   const country = useCountryContext();
   // El backend exige almacen_id para poder abrir el stock fisico. El formulario
   // nunca lo pedia, asi que cualquier alta con stock inicial fallaba.
@@ -47,9 +66,8 @@ export default function NuevoProductoPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [atributosExtra, setAtributosExtra] = useState<Record<string, string>>({});
-  const intentRef = useRef<{ fingerprint: string; key: string } | null>(null);
-  const imageIntentRef = useRef<{ fingerprint: string; key: string } | null>(null);
   const [productImage, setProductImage] = useState<File | null>(null);
+  const [costoCeroConfirmado, setCostoCeroConfirmado] = useState(false);
   const [formData, setFormData] = useState({
     codigo: "",
     nombre: "",
@@ -64,6 +82,8 @@ export default function NuevoProductoPage() {
     codigoBarras: "",
     afectacionIgv: "10",
     almacenId: "",
+    esServicio: false,
+    controlaStock: true,
   });
 
   const impuestoNombre = country.paisCodigo === "PE" ? "IGV" : "IVA";
@@ -75,14 +95,42 @@ export default function NuevoProductoPage() {
       : 0;
 
   useEffect(() => {
+    epoch.current++; inflight.current = false;
+    setIntentReady(''); setPendingIntent(null); setRecoveryError(''); setSubmitError(null); setIsLoading(false);
+    setErrors({}); setAtributosExtra({}); setProductImage(null); setCostoCeroConfirmado(false);
+    setAlmacenes([]); setCategoriasConfig([]); setCatalogError(''); setCatalogLoading(true);
+    setFormData({ codigo: '', nombre: '', marca: '', unidadMedida: 'NIU', descripcion: '', categoria: '',
+      precioVenta: '', precioCompra: '', stock: '', stockMinimo: '', codigoBarras: '', afectacionIgv: '10',
+      almacenId: '', esServicio: false, controlaStock: true });
+    if (authLoading || !tenantId || !actorId) return;
+    try {
+      const scope = { tenantId, actorId };
+      setPendingIntent(readProductCreateIntent(localStorage.getItem(productCreateIntentKey(scope)), scope));
+      setIntentReady(scopeIdentity);
+    } catch {
+      setIntentReady(scopeIdentity);
+      setRecoveryError('No se pudo recuperar el producto pendiente. Sus datos se conservan para revisar el resultado.');
+    }
+    return () => { epoch.current++ };
+  }, [tenantId, actorId, scopeIdentity, authLoading]);
+
+  useEffect(() => {
+    if (!scopeReady || pendingIntent || recoveryError) return;
     let vigente = true;
+    const requestedScope = scopeIdentity;
     (async () => {
       try {
+        setCatalogLoading(true); setCatalogError(''); setAlmacenes([]); setCategoriasConfig([]);
         const [almResp, catResp] = await Promise.all([
           get("/inventario/almacenes"),
           get("/inventario/categorias"),
         ]);
-        if (!vigente) return;
+        if (!vigente || activeScope.current !== requestedScope) return;
+        const complete = (r: any) => r?.success === true && !r.offline && !r.cached && !r.queued && !r.pending
+          && Array.isArray(r.data) && r.data.every((row: any) => row && typeof row.id === 'string'
+            && /^[0-9a-f-]{36}$/i.test(row.id) && typeof row.nombre === 'string' && !!row.nombre.trim()
+            && row.tenant_id === tenantId && row.activo === true);
+        if (!complete(almResp) || !complete(catResp)) throw new Error('Los catálogos no están confirmados. Reintenta su carga con conexión.');
         if (almResp?.success && Array.isArray(almResp.data)) {
           setAlmacenes(almResp.data);
           if (almResp.data.length > 0) {
@@ -102,19 +150,19 @@ export default function NuevoProductoPage() {
           );
         }
       } catch {
-        if (vigente) {
+        if (vigente && activeScope.current === requestedScope) {
           setAlmacenes([]);
           setCategoriasConfig([]);
+          setCatalogError('No se pudieron confirmar los almacenes y categorías. Reintenta su carga con conexión.');
         }
       } finally {
-        if (vigente) setCatalogLoading(false);
+        if (vigente && activeScope.current === requestedScope) setCatalogLoading(false);
       }
     })();
     return () => {
       vigente = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [get, tenantId, scopeIdentity, scopeReady, pendingIntent, recoveryError, catalogRetry]);
 
   const validateForm = () => {
     const nextErrors: Record<string, string> = {};
@@ -141,12 +189,18 @@ export default function NuevoProductoPage() {
     if (Number.isNaN(stock) || stock < 0) {
       nextErrors.stock = "El stock inicial no puede ser negativo";
     }
+    if ((formData.esServicio || !formData.controlaStock) && stock > 0) {
+      nextErrors.stock = "Los servicios y productos sin control de stock requieren stock inicial cero";
+    }
     if (Number.isNaN(stockMinimo) || stockMinimo < 0) {
       nextErrors.stockMinimo = "El stock mínimo no puede ser negativo";
     }
     if (stock > 0 && !formData.almacenId) {
       nextErrors.almacenId =
         "Elige el almacén donde entra el stock inicial";
+    }
+    if (stock > 0 && precioCompra === 0 && !costoCeroConfirmado) {
+      nextErrors.precioCompra = "Confirma el costo cero del stock inicial o registra su costo de adquisición";
     }
 
     setErrors(nextErrors);
@@ -156,11 +210,14 @@ export default function NuevoProductoPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (inflight.current || !scopeReady || recoveryError || !hasPermission || permissionLoading || (!pendingIntent && (catalogLoading || catalogError))) return;
     setSubmitError(null);
-    if (!validateForm()) {
+    if (!pendingIntent && !validateForm()) {
       return;
     }
-
+    inflight.current = true;
+    const submittedScope = activeScope.current, submittedEpoch = ++epoch.current;
+    const current = () => activeScope.current === submittedScope && epoch.current === submittedEpoch;
     setIsLoading(true);
     try {
       const payload = {
@@ -172,62 +229,60 @@ export default function NuevoProductoPage() {
         categoria: formData.categoria,
         precio_venta: Number(formData.precioVenta),
         precio_compra: formData.precioCompra === "" ? 0 : Number(formData.precioCompra),
+        ...(Number(formData.stock) > 0 && Number(formData.precioCompra) === 0
+          ? { costo_cero_confirmado: costoCeroConfirmado } : {}),
         stock_inicial: formData.stock === "" ? 0 : Number(formData.stock),
         stock_minimo: formData.stockMinimo === "" ? 0 : Number(formData.stockMinimo),
         stock_reservado: 0,
-        almacen_id: formData.almacenId || null,
+        almacen_id: formData.esServicio || !formData.controlaStock ? null : formData.almacenId || null,
+        es_servicio: formData.esServicio,
+        controla_stock: !formData.esServicio && formData.controlaStock,
         codigo_barras: formData.codigoBarras.trim() || undefined,
         impuesto: tasaEfectiva,
         afectacion_igv: formData.afectacionIgv,
         atributos_extra: Object.keys(atributosExtra).length > 0 ? atributosExtra : undefined,
       };
-      const fingerprint = JSON.stringify(payload);
-      if (intentRef.current?.fingerprint !== fingerprint) {
-        intentRef.current = {
-          fingerprint,
-          key: `inventory-product-create:${crypto.randomUUID()}`,
-        };
-      }
-      const response = await post("/inventario/productos", {
-        ...payload,
-        idempotency_key: intentRef.current.key,
-      });
-
-      if (response?.success) {
-        const productId = String(response.data?.id || "");
-        if (!productId) {
-          throw new Error("El alta no devolvió el identificador del producto");
+      const scope = { tenantId, actorId }, key = productCreateIntentKey(scope);
+      const previous = localStorage.getItem(key), stored = readProductCreateIntent(previous, scope);
+      const candidate: ProductCreateIntent = pendingIntent || { version: 1, ...scope, createdAt: new Date().toISOString(), stage: 'CREATE',
+        payload: JSON.parse(JSON.stringify({ ...payload, idempotency_key: `inventory-product-create:${crypto.randomUUID()}` })) as ProductCreatePayload,
+        ...(productImage ? { image: await preserveProductImage(productImage) } : {}) };
+      if (!current()) return;
+      let serialized = JSON.stringify(candidate), intent = readProductCreateIntent(serialized, scope);
+      if (!intent || stored && JSON.stringify(stored) !== serialized) throw new Error('Hay otro producto pendiente. Sus datos se conservan.');
+      const file = intent.image ? await recoveredProductImage(intent) : null;
+      if (!current()) return;
+      const persist = (value: ProductCreateIntent, expected: string | null) => {
+        if (localStorage.getItem(key) !== expected) throw new Error('El producto pendiente cambió. Sus datos se conservan.');
+        // Intención durable: datos de negocio e ids de empresa y usuario, sin token ni contraseña.
+        // codeql[js/clear-text-storage-of-sensitive-data]
+        const raw = JSON.stringify(value); localStorage.setItem(key, raw);
+        if (localStorage.getItem(key) !== raw) throw new Error('No se pudo conservar el producto antes del envío.');
+        setPendingIntent(value); return raw;
+      };
+      serialized = persist(intent, previous);
+      if (intent.stage === 'CREATE') {
+        const response = await post('/inventario/productos', intent.payload);
+        if (!current()) return;
+        const created = confirmProductCreated(response, scope, intent);
+        if (intent.image) {
+          intent = { ...intent, stage: 'IMAGE', created: { id: created.id, operationId: created.operation_id, fingerprint: created.creation_fingerprint } };
+          serialized = persist(intent, serialized);
         }
-        if (productImage) {
-          const imageFingerprint = [
-            productImage.name,
-            productImage.type,
-            productImage.size,
-            productImage.lastModified,
-          ].join(":");
-          if (imageIntentRef.current?.fingerprint !== imageFingerprint) {
-            imageIntentRef.current = {
-              fingerprint: imageFingerprint,
-              key: `inventory-product-image-upload:${productId}:${crypto.randomUUID()}`,
-            };
-          }
-          await uploadProductImage(
-            apiCall,
-            productId,
-            productImage,
-            imageIntentRef.current.key,
-          );
-        }
-        alert("✅ Producto creado exitosamente");
-        router.push("/dashboard/inventario/productos");
-      } else {
-        throw new Error(response?.message || "Error al crear producto");
       }
+      if (intent.stage === 'IMAGE') {
+        const response = await uploadProductImage(apiCall, intent.created!.id, file!, productImageIntentKey(intent));
+        if (!current()) return;
+        confirmCreatedProductImage(response, scope, intent);
+      }
+      if (localStorage.getItem(key) !== serialized) throw new Error('El producto pendiente cambió. Sus datos se conservan.');
+      localStorage.removeItem(key);
+      if (localStorage.getItem(key) !== null) throw new Error('No se pudo retirar el producto confirmado. Reintenta para confirmar su resultado.');
+      setPendingIntent(null); alert('✅ Producto creado exitosamente'); router.push('/dashboard/inventario/productos');
     } catch (error: any) {
-      console.error("Error:", error);
-      setSubmitError(error.message || "Error al crear producto");
+      if (current()) setSubmitError(error.message || 'No se pudo confirmar el producto; sus datos se conservan.');
     } finally {
-      setIsLoading(false);
+      if (current()) { setIsLoading(false); inflight.current = false; }
     }
   };
 
@@ -236,8 +291,17 @@ export default function NuevoProductoPage() {
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
     >,
   ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name } = e.target;
+    const value = e.target instanceof HTMLInputElement && e.target.type === 'checkbox'
+      ? e.target.checked : e.target.value;
+    setFormData((prev) => {
+      const next = { ...prev, [name]: value };
+      if ((name === 'esServicio' && value === true) || (name === 'unidadMedida' && value === 'ZZ')) {
+        next.esServicio = true;
+        next.controlaStock = false;
+      }
+      return next;
+    });
     // Al cambiar la categoría, limpiar atributos extra
     if (name === 'categoria') {
       setAtributosExtra({});
@@ -252,6 +316,17 @@ export default function NuevoProductoPage() {
     if (submitError) setSubmitError(null);
   };
 
+  const back = <button onClick={() => router.push('/dashboard/inventario/productos')}>Volver a Productos</button>;
+  if (scopeReady && recoveryError) return <div data-testid="product-create-recovery-error" role="alert" className="space-y-4 p-6">{recoveryError}{back}</div>;
+  if (!scopeReady) return <p role="status" className="p-6">Confirmando sesión y producto pendiente...</p>;
+  if (visibleIntent) return <div data-testid="product-create-pending" className="space-y-4 p-6">
+    <h1>Producto pendiente de confirmación</h1><p>{visibleIntent.payload.codigo} — {visibleIntent.payload.nombre}</p>
+    <p>{visibleIntent.payload.es_servicio ? 'Servicio' : 'Producto físico'} · {visibleIntent.payload.controla_stock ? 'Con control de stock' : 'Sin control de stock'} · Stock inicial: {visibleIntent.payload.stock_inicial}</p>
+    <p>{visibleIntent.stage === 'IMAGE' ? 'El alta está confirmada; falta confirmar la imagen.' : 'Reintenta para confirmar el alta con los datos conservados.'}</p>
+    {visibleIntent.image && <p>Imagen conservada: {visibleIntent.image.name} ({visibleIntent.image.size} bytes)</p>}
+    {submitError && <p role="alert">{submitError}</p>}
+    <ProtectedComponent modulo="inventario" accion="create" recurso="productos"><button onClick={handleSubmit} disabled={isLoading} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">{isLoading ? 'Procesando...' : 'Reintentar producto pendiente'}</button></ProtectedComponent>{back}
+  </div>;
   return (
     <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
       <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
@@ -284,7 +359,9 @@ export default function NuevoProductoPage() {
         </div>
       </div>
 
+      <ProtectedComponent modulo="inventario" accion="create" recurso="productos" fallback={<p>No tienes permiso para crear productos.</p>}>
       <form onSubmit={handleSubmit} noValidate className={camposClass}>
+        {catalogError && <div role="alert">{catalogError}<button type="button" onClick={() => setCatalogRetry(v => v + 1)}>Reintentar catálogos</button></div>}
         {(submitError || Object.keys(errors).length > 0) && (
           <div
             role="alert"
@@ -392,6 +469,18 @@ export default function NuevoProductoPage() {
             </p>
           </div>
 
+          <div className="mt-4 space-y-3">
+            <label htmlFor="nuevo-es-servicio" className="flex items-center gap-2">
+              <input id="nuevo-es-servicio" name="esServicio" type="checkbox" checked={formData.esServicio} onChange={handleChange} />
+              Es un servicio
+            </label>
+            <label htmlFor="nuevo-controla-stock" className="flex items-center gap-2">
+              <input id="nuevo-controla-stock" name="controlaStock" type="checkbox" checked={formData.controlaStock} disabled={formData.esServicio} onChange={handleChange} />
+              Controlar stock
+            </label>
+            <p className="text-xs text-muted-foreground">Los servicios y productos sin control de stock no generan movimientos de inventario y requieren stock inicial cero.</p>
+          </div>
+
           <div className="mt-4">
             <label htmlFor="nuevo-descripcion">Descripción</label>
             <textarea id="nuevo-descripcion"
@@ -444,10 +533,9 @@ export default function NuevoProductoPage() {
         <div className="mb-8">
           <ProductImageField
             file={productImage}
-            disabled={isLoading}
+            disabled={isLoading || catalogLoading || !!catalogError}
             onFileChange={(file) => {
               setProductImage(file);
-              imageIntentRef.current = null;
               if (submitError) setSubmitError(null);
             }}
           />
@@ -524,7 +612,7 @@ export default function NuevoProductoPage() {
                 type="number"
                 name="precioCompra"
                 value={formData.precioCompra}
-                onChange={handleChange}
+                onChange={(event) => { setCostoCeroConfirmado(false); handleChange(event); }}
                 step="0.01"
                 min="0"
                 aria-invalid={Boolean(errors.precioCompra)}
@@ -542,6 +630,14 @@ export default function NuevoProductoPage() {
                 >
                   {errors.precioCompra}
                 </p>
+              )}
+              {Number(formData.stock) > 0 && Number(formData.precioCompra) === 0 && (
+                <label htmlFor="nuevo-costo-cero-confirmado" className="mt-3 flex items-start gap-2">
+                  <input id="nuevo-costo-cero-confirmado" type="checkbox"
+                    checked={costoCeroConfirmado}
+                    onChange={(event) => setCostoCeroConfirmado(event.target.checked)} />
+                  Confirmo que el stock inicial tiene costo cero
+                </label>
               )}
             </div>
             <div>
@@ -664,6 +760,7 @@ export default function NuevoProductoPage() {
               <label htmlFor="nuevo-stock">Stock Inicial</label>
               <input id="nuevo-stock"
                 type="number"
+                step="0.000001"
                 name="stock"
                 value={formData.stock}
                 onChange={handleChange}
@@ -687,6 +784,7 @@ export default function NuevoProductoPage() {
               <label htmlFor="nuevo-stock-minimo">Stock Mínimo</label>
               <input id="nuevo-stock-minimo"
                 type="number"
+                step="0.000001"
                 name="stockMinimo"
                 value={formData.stockMinimo}
                 onChange={handleChange}
@@ -721,7 +819,7 @@ export default function NuevoProductoPage() {
           <button
             type="submit"
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-            disabled={isLoading}
+            disabled={isLoading || catalogLoading || !!catalogError}
           >
             {isLoading ? (
               <>
@@ -737,6 +835,7 @@ export default function NuevoProductoPage() {
           </button>
         </div>
       </form>
+      </ProtectedComponent>
     </div>
   );
 }

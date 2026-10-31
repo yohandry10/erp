@@ -1,3 +1,4 @@
+import { requireTenantRecord } from '../../shared/utils/require-tenant-record';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EventBusService } from '../../shared/events/event-bus.service';
@@ -11,10 +12,12 @@ import {
   diasVacacionesPendientes,
   mesesDelSemestreGratificatorio,
   remuneracionComputableCts,
+  periodoGratificacionParaCts,
+  regimenBonificacionGratificacionPeru,
+  mesesGratificablesDelPeriodo,
   parseFechaLocal,
   semestreCts,
   tiempoComputableCts,
-  tiempoCtsTrunca,
   tiempoDeServicios,
 } from './liquidacion-peru.util';
 import { calcularLiquidacionArgentina, validarCuilArgentina } from './planillas-argentina.util';
@@ -25,7 +28,12 @@ import axios from 'axios';
 import { createHash, randomUUID } from 'crypto';
 import { decryptText, encryptText } from '../../shared/utils/secure-config.utils';
 import { fechaHoyDelTenant } from '../../shared/utils/fecha-tenant.util';
+import { fechaHoyEnPeru, rangoDelDiaEnPais } from '../../shared/utils/fecha-peru.util';
 import { lecturaRrhhFallida, relanzarLecturaRrhh } from './rrhh-errors';
+import { readCompleteCatalog } from '../../shared/utils/complete-catalog-read';
+import type { GratificacionPreviaDto, GratificacionPreviaEmpleadoDto, RemuneracionGratificacionPreviaDto, RemuneracionPreviaEmpleadoDto } from './dto/rrhh-acciones.dto';
+import { TIPOS_SOLICITUD_RRHH } from './dto/rrhh-operaciones.dto';
+import type { NormativaPeruPeriodoDto } from './dto/normativa-peru.dto';
 
 // Respaldo si normativa_peru_periodos no tiene fila para el periodo consultado.
 const RMV_PERU_FALLBACK = 1130;
@@ -102,25 +110,23 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('empleados')
-      .select(`
+    const data = await readCompleteCatalog(this.supabaseService.getClient(), 'empleados', `
         *,
         departamentos!empleados_id_departamento_fkey_runtime(nombre),
         contratos!contratos_id_empleado_fkey_runtime(*),
+        rrhh_peru_fichas_laborales(*),
         empleado_horarios!empleado_horarios_id_empleado_fkey(
           id,
           horarios_trabajo!empleado_horarios_id_horario_fkey(*)
         )
-      `)
-      .eq('tenant_id', currentTenantId); // ✅ Filtro de tenant
-
-    if (error) throw error;
+      `, query => query.eq('tenant_id', currentTenantId), row => row.tenant_id === currentTenantId);
 
     return {
       success: true,
-      data: data || [],
+      data,
+      tenant_id: currentTenantId,
+      total: data.length,
+      fuentes_empleados: { complete: true, total: data.length, page_size: 1000 },
     };
   }
 
@@ -137,7 +143,42 @@ export class RrhhService {
       .select('*')
       .eq('tenant_id', currentTenantId); // ✅ Filtro de tenant
 
-    if (error) throw error;
+    if (error) throw lecturaRrhhFallida('los departamentos');
+    return data;
+  }
+
+  async getNormativaPeruPeriodo(tenantId: string, periodo: string) {
+    if (!tenantId || typeof periodo !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(periodo)) {
+      throw new BadRequestException('Empresa y período YYYY-MM válido son obligatorios');
+    }
+    if (await this.obtenerPaisLaboral(tenantId) !== 'PE') {
+      throw new BadRequestException('La normativa peruana corresponde únicamente a empresas Perú');
+    }
+    const client = this.supabaseService.getClient();
+    const calculationPeriods = [periodo];
+    if (periodo.endsWith('-06')) calculationPeriods.push(`${periodo.slice(0,4)}-07`);
+    if (periodo.endsWith('-11')) calculationPeriods.push(`${periodo.slice(0,4)}-12`);
+    const [own, global, payrolls] = await Promise.all([
+      client.from('normativa_peru_periodos').select('*').eq('tenant_id', tenantId).eq('periodo', periodo).order('created_at', {ascending: false}),
+      client.from('normativa_peru_periodos').select('*').is('tenant_id', null).eq('periodo', periodo).eq('activo', true).maybeSingle(),
+      client.from('planillas').select('id,estado').eq('tenant_id', tenantId).in('periodo', calculationPeriods).in('estado', ['calculada','aprobada','pagada']),
+    ]);
+    if (own.error || global.error || payrolls.error) throw lecturaRrhhFallida('la normativa del período');
+    const versions = own.data || [];
+    const active = versions.find((row: any) => row.activo === true);
+    return {success: true, data: {periodo, normativa: active || global.data || null,
+      origen: active ? 'EMPRESA' : global.data ? 'GLOBAL' : 'SIN_CONFIGURAR',
+      bloqueada: (payrolls.data || []).length > 0, versiones: versions}};
+  }
+
+  async guardarNormativaPeruPeriodo(tenantId: string, actorId: string, normativa: NormativaPeruPeriodoDto, idempotencyKey?: string) {
+    const key = String(idempotencyKey || '').trim();
+    if (!tenantId || !actorId) throw new ForbiddenException('Empresa y administrador autenticado son obligatorios');
+    if (key.length < 8 || key.length > 200) throw new BadRequestException('Idempotency-Key debe tener entre 8 y 200 caracteres');
+    const {data, error} = await this.supabaseService.getClient().rpc('guardar_normativa_peru_periodo_tx_570', {
+      p_tenant_id: tenantId, p_actor_id: actorId, p_payload: normativa, p_idempotency_key: key,
+    });
+    if (error) this.throwRrhhLifecycleRpcError(error);
     return data;
   }
 
@@ -147,7 +188,7 @@ export class RrhhService {
       const periodo = (await fechaHoyDelTenant(this.supabaseService.getClient(), tenantId)).slice(0, 7);
       const client = this.supabaseService.getClient();
       const selectNormativa =
-        'periodo, uit, rmv, asignacion_familiar, afp_aporte, afp_prima_seguro, afp_comision_flujo_default, onp_aporte, essalud_aporte, quinta_deduccion_uit, bancarizacion_pen_min, bancarizacion_usd_min, igv_tasa, fuente';
+        'periodo, uit, rmv, asignacion_familiar, afp_aporte, afp_prima_seguro, afp_comision_flujo_default, afp_remuneracion_max_asegurable, onp_aporte, essalud_aporte, quinta_deduccion_uit, bancarizacion_pen_min, bancarizacion_usd_min, igv_tasa, fuente';
       const [{ data: tenantNormativa, error: tenantError }, { data: globalNormativa, error: globalError }] =
         await Promise.all([
           client
@@ -155,7 +196,7 @@ export class RrhhService {
             .select(selectNormativa)
             .eq('tenant_id', tenantId)
             .eq('activo', true)
-            .lte('periodo', periodo)
+            .eq('periodo', periodo)
             .order('periodo', { ascending: false })
             .limit(1)
             .maybeSingle(),
@@ -164,7 +205,7 @@ export class RrhhService {
             .select(selectNormativa)
             .is('tenant_id', null)
             .eq('activo', true)
-            .lte('periodo', periodo)
+            .eq('periodo', periodo)
             .order('periodo', { ascending: false })
             .limit(1)
             .maybeSingle(),
@@ -1024,7 +1065,7 @@ export class RrhhService {
     if (estado) query = query.eq('estado', estado);
 
     const { data, error } = await query;
-    if (error) throw error;
+    if (error) throw lecturaRrhhFallida('las solicitudes');
 
     return { success: true, data: data || [] };
   }
@@ -1041,8 +1082,27 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
+    const fechaValida = (valor: unknown) => {
+      if (typeof valor !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(valor)) return false;
+      const fecha = parseFechaLocal(valor);
+      return !Number.isNaN(fecha.getTime()) && fecha.getFullYear() === Number(valor.slice(0, 4))
+        && fecha.getMonth() + 1 === Number(valor.slice(5, 7)) && fecha.getDate() === Number(valor.slice(8, 10));
+    };
+    if (!TIPOS_SOLICITUD_RRHH.includes(solicitudData?.tipo)
+      || !fechaValida(solicitudData?.fecha_inicio) || !fechaValida(solicitudData?.fecha_fin)
+      || solicitudData.fecha_fin < solicitudData.fecha_inicio) {
+      throw new BadRequestException('La solicitud requiere un tipo válido y fechas reales de inicio y fin en orden');
+    }
+    const desde = parseFechaLocal(solicitudData.fecha_inicio);
+    const hasta = parseFechaLocal(solicitudData.fecha_fin);
+    const dias = (Date.UTC(hasta.getFullYear(), hasta.getMonth(), hasta.getDate())
+      - Date.UTC(desde.getFullYear(), desde.getMonth(), desde.getDate())) / 86400000 + 1;
+    if (solicitudData.dias !== undefined && solicitudData.dias !== dias) {
+      throw new BadRequestException('Los días de la solicitud deben coincidir con su rango de fechas inclusivo');
+    }
+
     const data = await this.ejecutarOperacionRrhh(
-      'REQUEST_CREATE', solicitudData, currentTenantId, actorId, idempotencyKey,
+      'REQUEST_CREATE', { ...solicitudData, dias }, currentTenantId, actorId, idempotencyKey,
     );
     return { success: true, data };
   }
@@ -1091,46 +1151,22 @@ export class RrhhService {
 
   // ===== BENEFICIOS =====
   async getBeneficios(tenantId?: string) {
-    // ✅ MULTI-TENANT: Filtrar por tenant
-    if (!tenantId) {
-      throw new Error('Tenant requerido para RRHH');
-    }
-    const currentTenantId = tenantId;
-
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('beneficios')
-      .select('*')
-      .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
-      .eq('activo', true)
-      .order('nombre');
-
-    if (error) throw error;
-    return { success: true, data: data || [] };
+    if (!tenantId) throw new BadRequestException('Tenant requerido para RRHH');
+    const client = this.supabaseService.getClient();
+    const data = await readCompleteCatalog(client, 'beneficios', '*',
+      query => query.eq('tenant_id', tenantId).eq('activo', true),
+      row => row.tenant_id === tenantId, [['nombre', true], ['id', true]]);
+    return { success: true, data };
   }
 
   async getBeneficiosEmpleado(empleadoId: string, tenantId?: string) {
-    // ✅ MULTI-TENANT: Filtrar por tenant
-    if (!tenantId) {
-      throw new Error('Tenant requerido para RRHH');
-    }
-    const currentTenantId = tenantId;
-
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('empleado_beneficios')
-      .select(
-        `
-        *,
-        beneficios(*)
-      `,
-      )
-      .eq('id_empleado', empleadoId)
-      .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
-      .eq('estado', 'activo');
-
-    if (error) throw error;
-    return { success: true, data: data || [] };
+    if (!tenantId) throw new BadRequestException('Tenant requerido para RRHH');
+    const client = this.supabaseService.getClient();
+    await requireTenantRecord(client, 'empleados', tenantId, empleadoId, 'Empleado');
+    const data = await readCompleteCatalog(client, 'empleado_beneficios', '*,beneficios!empleado_beneficios_id_beneficio_fkey(*)',
+      query => query.eq('tenant_id', tenantId).eq('id_empleado', empleadoId).eq('estado', 'activo'),
+      row => row.tenant_id === tenantId && row.id_empleado === empleadoId && row.beneficios?.id === row.id_beneficio && row.beneficios?.tenant_id === tenantId, [['id', true]]);
+    return { success: true, data };
   }
 
   async asignarBeneficio(
@@ -1222,46 +1258,22 @@ export class RrhhService {
 
   // ===== CAPACITACIONES =====
   async getCapacitaciones(tenantId?: string) {
-    // ✅ MULTI-TENANT: Filtrar por tenant
-    if (!tenantId) {
-      throw new Error('Tenant requerido para RRHH');
-    }
-    const currentTenantId = tenantId;
-
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('capacitaciones')
-      .select('*')
-      .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
-      .eq('activo', true)
-      .order('fecha_inicio', { ascending: false });
-
-    if (error) throw error;
-    return { success: true, data: data || [] };
+    if (!tenantId) throw new BadRequestException('Tenant requerido para RRHH');
+    const client = this.supabaseService.getClient();
+    const data = await readCompleteCatalog(client, 'capacitaciones', '*',
+      query => query.eq('tenant_id', tenantId).eq('activo', true),
+      row => row.tenant_id === tenantId, [['fecha_inicio', false], ['id', true]]);
+    return { success: true, data };
   }
 
   async getCapacitacionesEmpleado(empleadoId: string, tenantId?: string) {
-    // ✅ MULTI-TENANT: Filtrar por tenant
-    if (!tenantId) {
-      throw new Error('Tenant requerido para RRHH');
-    }
-    const currentTenantId = tenantId;
-
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('empleado_capacitaciones')
-      .select(
-        `
-        *,
-        capacitaciones(*)
-      `,
-      )
-      .eq('id_empleado', empleadoId)
-      .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
-      .order('fecha_inscripcion', { ascending: false });
-
-    if (error) throw error;
-    return { success: true, data: data || [] };
+    if (!tenantId) throw new BadRequestException('Tenant requerido para RRHH');
+    const client = this.supabaseService.getClient();
+    await requireTenantRecord(client, 'empleados', tenantId, empleadoId, 'Empleado');
+    const data = await readCompleteCatalog(client, 'empleado_capacitaciones', '*,capacitaciones!empleado_capacitaciones_id_capacitacion_fkey(*)',
+      query => query.eq('tenant_id', tenantId).eq('id_empleado', empleadoId),
+      row => row.tenant_id === tenantId && row.id_empleado === empleadoId && row.capacitaciones?.id === row.id_capacitacion && row.capacitaciones?.tenant_id === tenantId, [['fecha_inscripcion', false], ['id', false]]);
+    return { success: true, data };
   }
 
   async inscribirCapacitacion(
@@ -1291,6 +1303,8 @@ export class RrhhService {
     fechaTerminacion: string,
     tenantId?: string,
     usuarioId?: string,
+    gratificacionPrevia?: GratificacionPreviaDto,
+    remuneracionGratificacionPrevia?: RemuneracionGratificacionPreviaDto,
   ) {
     // ✅ MULTI-TENANT: Filtrar por tenant
     if (!tenantId) {
@@ -1300,21 +1314,24 @@ export class RrhhService {
       throw new BadRequestException('Actor requerido para calcular la liquidación');
     }
     const currentTenantId = tenantId;
+    const paisLaboral = await this.obtenerPaisLaboral(currentTenantId);
 
     // Obtener datos del empleado y contrato
-    const { data: empleado, error: empError } =
-      await this.supabaseService.getClient()
+    const empleadoQuery = this.supabaseService.getClient()
         .from('empleados')
         .select(
           `
         *,
-        contratos!inner(*)
+        contratos!inner(*),
+        rrhh_peru_fichas_laborales(regimen_salud_codigo,regimen_laboral_codigo,eps_servicios_propios_codigo,activo)
       `,
         )
         .eq('id', empleadoId)
-        .eq('tenant_id', currentTenantId)
-        .in('contratos.estado', ['vigente', 'renovado', 'en_periodo_prueba'])
-        .single();
+        .eq('tenant_id', currentTenantId);
+    if (paisLaboral !== 'PE') {
+      empleadoQuery.in('contratos.estado', ['vigente', 'renovado', 'en_periodo_prueba']);
+    }
+    const { data: empleado, error: empError } = await empleadoQuery.single();
 
     if (empError && empError.code !== 'PGRST116') throw empError;
     if (!empleado) throw new NotFoundException('Empleado no encontrado');
@@ -1331,8 +1348,6 @@ export class RrhhService {
     if (!Number.isFinite(sueldoMensual) || sueldoMensual <= 0) {
       throw new ConflictException('El contrato activo no tiene una remuneración válida');
     }
-    const paisLaboral = await this.obtenerPaisLaboral(currentTenantId);
-
     if (paisLaboral === 'AR') {
       const configMetadata =
         contrato?.metadata && typeof contrato.metadata === 'object' ? contrato.metadata : {};
@@ -1442,9 +1457,23 @@ export class RrhhService {
 
     const fechaIngreso = parseFechaLocal(empleado.fecha_ingreso);
     const fechaTerminacionDate = parseFechaLocal(fechaTerminacion);
+    // El día del cese se trabaja: el servicio termina al iniciar el día
+    // siguiente. Con el cese exclusivo un 31 de octubre perdía un mes de
+    // gratificación trunca.
+    const finServicios = new Date(
+      fechaTerminacionDate.getFullYear(),
+      fechaTerminacionDate.getMonth(),
+      fechaTerminacionDate.getDate() + 1,
+    );
+    // La asignación familiar es remuneración computable (Ley 25129) para
+    // vacaciones, gratificación, CTS e indemnización, igual que en la CTS semestral.
+    const asignacionFamiliar = this.tieneHijosEmpleado(empleado)
+      ? Number(((await this.obtenerRmvVigente(fechaTerminacion.slice(0, 7), currentTenantId)) * 0.1).toFixed(2))
+      : 0;
+    const remuneracionMensual = Number((sueldoMensual + asignacionFamiliar).toFixed(2));
 
     // La ley liquida por dozavos y treintavos, no por años decimales.
-    const tiempoTotal = tiempoDeServicios(fechaIngreso, fechaTerminacionDate);
+    const tiempoTotal = tiempoDeServicios(fechaIngreso, finServicios);
 
     // Se adeudan tanto las vacaciones vencidas de periodos ya cumplidos como las
     // truncas del periodo en curso, así que ambas salen del tiempo total de
@@ -1457,23 +1486,41 @@ export class RrhhService {
     );
 
     const vacacionesPendientes = diasVacacionesPendientes(tiempoTotal, vacacionesUsadas);
-    const montoVacaciones = calcularVacacionesTruncas(sueldoMensual, tiempoTotal, vacacionesUsadas);
+    const montoVacaciones = calcularVacacionesTruncas(remuneracionMensual, tiempoTotal, vacacionesUsadas);
 
-    const remuneracionCts = remuneracionComputableCts(sueldoMensual);
-    const tiempoCtsPendiente = tiempoCtsTrunca(fechaIngreso, fechaTerminacionDate);
-    const ctsTrunca = calcularCts(remuneracionCts, tiempoCtsPendiente);
+    const gratificacionCts = await this.obtenerGratificacionPercibidaCts(
+      currentTenantId, empleadoId, fechaIngreso, fechaTerminacionDate, usuarioId, gratificacionPrevia,
+    );
+    const remuneracionCts = remuneracionComputableCts(remuneracionMensual, gratificacionCts.monto);
 
     // Un depósito semestral calculado pero aún no depositado también se incluye
     // en la liquidación. Los ya DEPOSITADOS jamás se vuelven a pagar.
-    const { data: depositosPendientes, error: depositosError } = await this.supabaseService
+    const { data: depositosCts, error: depositosError } = await this.supabaseService
       .getClient()
       .from('depositos_cts')
-      .select('id,periodo,monto,meses_computables,dias_computables')
+      .select('id,periodo,monto,meses_computables,dias_computables,semestre_fin,estado')
       .eq('tenant_id', currentTenantId)
       .eq('empleado_id', empleadoId)
-      .eq('estado', 'CALCULADO')
-      .lt('semestre_fin', fechaTerminacion);
+      .in('estado', ['CALCULADO', 'DEPOSITADO'])
+      .lte('semestre_fin', fechaTerminacion);
     if (depositosError) throw depositosError;
+    const depositosPendientes = (depositosCts || []).filter((d: any) => d.estado === 'CALCULADO');
+
+    // La CTS trunca cubre el tiempo que ningún semestre depositado o pendiente
+    // cubre: desde el día siguiente al último de ellos hasta el fin de servicios.
+    const ultimoSemestreCubierto = (depositosCts || [])
+      .map((d: any) => String(d.semestre_fin))
+      .sort()
+      .pop();
+    const inicioCtsTrunca = ultimoSemestreCubierto
+      ? (() => {
+          const fin = parseFechaLocal(ultimoSemestreCubierto);
+          const siguiente = new Date(fin.getFullYear(), fin.getMonth(), fin.getDate() + 1);
+          return siguiente > fechaIngreso ? siguiente : fechaIngreso;
+        })()
+      : fechaIngreso;
+    const tiempoCtsPendiente = tiempoDeServicios(inicioCtsTrunca, finServicios);
+    const ctsTrunca = calcularCts(remuneracionCts, tiempoCtsPendiente);
 
     const ctsSemestresPendientes = (depositosPendientes || []).reduce(
       (total: number, deposito: any) => total + Number(deposito.monto || 0),
@@ -1488,18 +1535,35 @@ export class RrhhService {
         0,
       );
 
-    const gratificacionTrunca = calcularGratificacionTrunca(
-      sueldoMensual,
-      mesesDelSemestreGratificatorio(fechaIngreso, fechaTerminacionDate),
+    const mesesGratificacionTrunca = mesesDelSemestreGratificatorio(fechaIngreso, fechaTerminacionDate);
+    const baseGratificacionTrunca = await this.obtenerBaseGratificacionTrunca(
+      empleado, fechaTerminacionDate, currentTenantId, usuarioId,
+      mesesGratificacionTrunca, remuneracionGratificacionPrevia,
     );
+    const regimenBonificacion = regimenBonificacionGratificacionPeru(empleado);
+    const gratificacionTruncaCalculada = calcularGratificacionTrunca(
+      baseGratificacionTrunca.monto, mesesGratificacionTrunca, regimenBonificacion,
+    );
+    // La gratificación de diciembre pertenece al mismo semestre del cese.
+    // Lo ya percibido no vuelve a pagarse como beneficio trunco.
+    const gratificacionDelMismoSemestre = fechaTerminacionDate.getMonth() === 11;
+    const gratificacionPendiente = Number(Math.max(0, gratificacionTruncaCalculada.gratificacion
+      - (gratificacionDelMismoSemestre ? gratificacionCts.monto : 0)).toFixed(2));
+    const bonificacionPendiente = Number(Math.max(0, gratificacionTruncaCalculada.bonificacionExtraordinaria
+      - (gratificacionDelMismoSemestre ? gratificacionCts.bonificacion_extraordinaria : 0)).toFixed(2));
+    const gratificacionTrunca = {
+      gratificacion: gratificacionPendiente, bonificacionExtraordinaria: bonificacionPendiente,
+      total: Number((gratificacionPendiente + bonificacionPendiente).toFixed(2)),
+    };
 
     const indemnizacion =
       motivoTerminacion === 'despido'
-        ? calcularIndemnizacionDespido(sueldoMensual, tiempoTotal)
+        ? calcularIndemnizacionDespido(remuneracionMensual, tiempoTotal)
         : 0;
 
-    const totalLiquidacion =
-      montoCts + montoVacaciones + gratificacionTrunca.total + indemnizacion;
+    const totalLiquidacion = Number(
+      (montoCts + montoVacaciones + gratificacionTrunca.total + indemnizacion).toFixed(2),
+    );
 
     return this.guardarLiquidacionCalculada(currentTenantId, usuarioId, {
       id_empleado: empleadoId,
@@ -1518,19 +1582,70 @@ export class RrhhService {
       // La tabla no tiene columnas para vacaciones truncas ni gratificación
       // trunca; el desglose queda aquí para poder auditar el importe pagado.
       metadata: {
-        remuneracion_mensual: sueldoMensual,
+        remuneracion_mensual: remuneracionMensual,
+        asignacion_familiar: asignacionFamiliar,
         tiempo_servicios: tiempoTotal,
         remuneracion_computable_cts: remuneracionCts,
+        gratificacion_cts: gratificacionCts,
         tiempo_cts_trunca: tiempoCtsPendiente,
         monto_cts_trunca: ctsTrunca,
         depositos_cts_pendientes: depositosPendientes || [],
         monto_cts_semestres_pendientes: Number(ctsSemestresPendientes.toFixed(2)),
         monto_vacaciones_truncas: montoVacaciones,
         gratificacion_trunca: gratificacionTrunca.gratificacion,
+        base_gratificacion_trunca: baseGratificacionTrunca,
+        regimen_bonificacion_gratificacion: regimenBonificacion,
+        tasa_bonificacion_gratificacion: regimenBonificacion === 'EPS' ? 0.0675 : 0.09,
+        bonificacion_extraordinaria: gratificacionTrunca.bonificacionExtraordinaria,
         bonificacion_extraordinaria_9: gratificacionTrunca.bonificacionExtraordinaria,
         vacaciones_dias_gozados: vacacionesUsadas,
       },
     });
+  }
+
+  private async obtenerBaseGratificacionTrunca(
+    empleado: any, cese: Date, tenantId: string, actorId: string,
+    mesesComputables: number, declaracion?: RemuneracionGratificacionPreviaDto,
+  ): Promise<Record<string, any> & { monto: number }> {
+    const cierre = new Date(cese.getFullYear(), cese.getMonth(), 0);
+    const periodo = `${cierre.getFullYear()}-${String(cierre.getMonth() + 1).padStart(2, '0')}`;
+    if (declaracion) {
+      if (declaracion.periodo !== periodo || !Number.isFinite(declaracion.monto)
+        || declaracion.monto <= 0 || Math.abs(declaracion.monto * 100 - Math.round(declaracion.monto * 100)) > 1e-6
+        || !String(declaracion.referencia || '').trim()) {
+        throw new BadRequestException(`La base computable declarada debe corresponder a ${periodo}, con importe positivo y referencia`);
+      }
+      return {
+        periodo, monto: declaracion.monto, fuente: 'FUENTE_EXTERNA_DECLARADA',
+        referencia: declaracion.referencia.trim(), declarado_por: actorId,
+      };
+    }
+    if (mesesComputables === 0) return { periodo, monto: 0, fuente: 'SIN_DERECHO' };
+
+    // La base de la trunca es la vigente en el mes anterior al cese (D.S.
+    // 005-2002-TR, art.5.3), no el salario de un contrato iniciado este mes.
+    const fechaCierre = `${periodo}-${String(cierre.getDate()).padStart(2, '0')}`;
+    const contratos = (empleado.contratos || []).filter((c: any) =>
+      /^\d{4}-\d{2}-\d{2}$/.test(String(c.fecha_inicio || ''))
+      && c.fecha_inicio <= fechaCierre
+      && (!c.fecha_fin || c.fecha_fin >= fechaCierre)
+      && !['borrador', 'anulado', 'cancelado'].includes(String(c.estado || '').toLowerCase()),
+    ).sort((a: any, b: any) => String(b.fecha_inicio).localeCompare(String(a.fecha_inicio)));
+    const anterior = contratos[0];
+    const sueldo = Number(anterior?.sueldo_bruto);
+    if (!anterior || !Number.isFinite(sueldo) || sueldo <= 0) {
+      throw new ConflictException(`No hay remuneración histórica verificable para ${periodo}; declare la base computable de ese mes y su referencia`);
+    }
+    if (contratos[1]?.fecha_inicio === anterior.fecha_inicio && Number(contratos[1].sueldo_bruto) !== sueldo) {
+      throw new ConflictException(`Hay contratos históricos incompatibles para ${periodo}; revise los contratos o declare la base computable con su referencia`);
+    }
+    const asignacionFamiliar = this.tieneHijosEmpleado(empleado)
+      ? Number(((await this.obtenerRmvVigente(periodo, tenantId)) * 0.1).toFixed(2)) : 0;
+    return {
+      periodo, monto: Number((sueldo + asignacionFamiliar).toFixed(2)),
+      sueldo_bruto: sueldo, asignacion_familiar: asignacionFamiliar,
+      contrato_id: anterior.id, fuente: 'CONTRATO_HISTORICO',
+    };
   }
 
   private async guardarLiquidacionCalculada(
@@ -1574,8 +1689,19 @@ export class RrhhService {
       .select('*, empleados!liquidaciones_id_empleado_fkey(id,nombres,apellidos,numero_documento)')
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false });
-    if (error) throw error;
-    return { success: true, data: data || [] };
+    if (error || !Array.isArray(data) || data.some((row: any) => !row?.empleados || row.empleados.id !== row.id_empleado)) throw lecturaRrhhFallida('las liquidaciones');
+    return { success: true, data };
+  }
+
+  async getDestinosBancariosLaborales(tenantId: string) {
+    if (!tenantId) throw new BadRequestException('Tenant requerido para pagos laborales');
+    const { data, error } = await this.supabaseService.getClient()
+      .from('cuentas_bancarias')
+      .select('id,nombre,banco,numero_cuenta,moneda')
+      .eq('tenant_id', tenantId).eq('activa', true).eq('activo', true)
+      .order('nombre', { ascending: true });
+    if (error || !Array.isArray(data)) throw lecturaRrhhFallida('los destinos bancarios de pagos laborales');
+    return { success: true, data };
   }
 
   async pagarLiquidacion(
@@ -1628,6 +1754,105 @@ export class RrhhService {
     return data;
   }
 
+  private async obtenerGratificacionPercibidaCts(
+    tenantId: string, empleadoId: string, ingreso: Date, alDia: Date, actorId: string,
+    declaracion?: GratificacionPreviaDto,
+  ): Promise<{
+    periodo: string; monto: number; bonificacion_extraordinaria: number;
+    fuente: 'PLANILLA_PAGADA' | 'FUENTE_EXTERNA_DECLARADA' | 'SIN_DERECHO';
+    fecha_pago?: string; referencia?: string; planilla_ids?: string[]; declarado_por?: string;
+  }> {
+    const periodo = periodoGratificacionParaCts(alDia);
+    const corte = new Date(alDia.getFullYear(), alDia.getMonth(), alDia.getDate() + 1);
+    const cortePagoUtc = rangoDelDiaEnPais('PE', new Date(Date.UTC(
+      alDia.getFullYear(), alDia.getMonth(), alDia.getDate(), 12,
+    ))).hasta;
+    if (declaracion) {
+      const fechaPago = parseFechaLocal(declaracion.fecha_pago);
+      const fechaValida = /^\d{4}-\d{2}-\d{2}$/.test(declaracion.fecha_pago)
+        && !Number.isNaN(fechaPago.getTime())
+        && fechaPago.getFullYear() === Number(declaracion.fecha_pago.slice(0, 4))
+        && fechaPago.getMonth() + 1 === Number(declaracion.fecha_pago.slice(5, 7))
+        && fechaPago.getDate() === Number(declaracion.fecha_pago.slice(8, 10));
+      if (declaracion.periodo !== periodo || !Number.isFinite(declaracion.monto)
+        || declaracion.monto < 0 || Math.abs(Math.round(declaracion.monto * 100) - declaracion.monto * 100) > 1e-6
+        || (declaracion.bonificacion_extraordinaria !== undefined
+          && (!Number.isFinite(declaracion.bonificacion_extraordinaria) || declaracion.bonificacion_extraordinaria < 0))
+        || !fechaValida || fechaPago >= corte || fechaPago < parseFechaLocal(`${periodo}-01`)
+        || !String(declaracion.referencia || '').trim()) {
+        throw new BadRequestException(`La gratificación previa requiere período ${periodo}, importe válido, referencia y fecha de percepción anterior al cierre`);
+      }
+    }
+    if (!(mesesGratificablesDelPeriodo(periodo, ingreso) ?? 0)) {
+      if (declaracion && declaracion.monto !== 0) {
+        throw new BadRequestException('No corresponde una gratificación previa de un semestre sin meses completos trabajados');
+      }
+      return { periodo, monto: 0, bonificacion_extraordinaria: 0, fuente: 'SIN_DERECHO' };
+    }
+    try {
+      const client = this.supabaseService.getClient();
+      const { data: planillas, error: planillasError } = await client.from('planillas')
+        .select('id,fecha_pago').eq('tenant_id', tenantId).eq('periodo', periodo)
+        .eq('estado', 'pagada').lt('fecha_pago', cortePagoUtc);
+      if (planillasError) throw lecturaRrhhFallida('las gratificaciones pagadas');
+      const planillaIds = (planillas || []).map((p: any) => String(p.id));
+      if (planillaIds.length) {
+        const { data: catalogo, error: conceptoError } = await client.from('conceptos_planilla')
+          .select('id,codigo').eq('tenant_id', tenantId).in('codigo', ['006', '007']);
+        if (conceptoError) throw lecturaRrhhFallida('el concepto de gratificación');
+        const concepto = (catalogo || []).find((c: any) => c.codigo === '006');
+        const bono = (catalogo || []).find((c: any) => c.codigo === '007');
+        if (concepto) {
+          const { data: detalles, error: detallesError } = await client.from('empleado_planilla')
+            .select('id,planilla_id').eq('tenant_id', tenantId).eq('empleado_id', empleadoId)
+            .in('planilla_id', planillaIds);
+          if (detallesError) throw lecturaRrhhFallida('las gratificaciones del empleado');
+          const detalleIds = (detalles || []).map((d: any) => String(d.id));
+          if (detalleIds.length) {
+            const { data: conceptos, error: montosError } = await client.from('empleado_planilla_conceptos')
+              .select('empleado_planilla_id,concepto_id,monto').eq('tenant_id', tenantId)
+              .in('concepto_id', [concepto.id, bono?.id].filter(Boolean)).in('empleado_planilla_id', detalleIds);
+            if (montosError) throw lecturaRrhhFallida('los importes de gratificación');
+            const gratificaciones = (conceptos || []).filter((c: any) => c.concepto_id === concepto.id);
+            if (gratificaciones.length) {
+              const montos = (conceptos || []).map((c: any) => Number(c.monto));
+              if (montos.some((m: number) => !Number.isFinite(m) || m < 0)) {
+                throw new ConflictException('El historial de gratificación tiene importes inválidos; regularice la planilla');
+              }
+              const monto = Number(gratificaciones.reduce((s: number, c: any) => s + Number(c.monto), 0).toFixed(2));
+              const bonificacion = Number((conceptos || []).filter((c: any) => c.concepto_id === bono?.id)
+                .reduce((s: number, c: any) => s + Number(c.monto), 0).toFixed(2));
+              if (declaracion && (declaracion.monto !== monto
+                || (declaracion.bonificacion_extraordinaria !== undefined && declaracion.bonificacion_extraordinaria !== bonificacion))) {
+                throw new ConflictException('La gratificación declarada difiere del importe pagado registrado en la planilla');
+              }
+              const detallesUsados = new Set(conceptos.map((c: any) => String(c.empleado_planilla_id)));
+              const ids = [...new Set<string>((detalles || []).filter((d: any) => detallesUsados.has(String(d.id)))
+                .map((d: any) => String(d.planilla_id)))];
+              const fechas = (planillas || []).filter((p: any) => ids.includes(String(p.id)))
+                .map((p: any) => String(p.fecha_pago)).sort();
+              return {
+                periodo, monto, bonificacion_extraordinaria: bonificacion,
+                fuente: 'PLANILLA_PAGADA', planilla_ids: ids, fecha_pago: fechas.at(-1),
+              };
+            }
+          }
+        }
+      }
+    } catch (error) {
+      relanzarLecturaRrhh(error, 'la gratificación percibida para CTS');
+    }
+    if (!declaracion) {
+      throw new ConflictException(`Falta la gratificación percibida de ${periodo}; indique el importe y la referencia de su fuente histórica, incluso si fue cero`);
+    }
+    // Documenta la base CTS; no registra ni simula un pago de gratificación.
+    return {
+      periodo, monto: declaracion.monto, bonificacion_extraordinaria: declaracion.bonificacion_extraordinaria ?? 0,
+      fuente: 'FUENTE_EXTERNA_DECLARADA',
+      fecha_pago: declaracion.fecha_pago, referencia: declaracion.referencia.trim(), declarado_por: actorId,
+    };
+  }
+
   async getDepositosCts(tenantId: string, periodo?: string) {
     if (!tenantId) throw new BadRequestException('Tenant requerido para RRHH');
     let query = this.supabaseService.getClient()
@@ -1637,19 +1862,20 @@ export class RrhhService {
       .order('periodo', { ascending: false });
     if (periodo) query = query.eq('periodo', periodo);
     const { data, error } = await query;
-    if (error) throw error;
-    const empleadoIds = [...new Set((data || []).map((item: any) => item.empleado_id).filter(Boolean))];
-    if (empleadoIds.length === 0) return { success: true, data: data || [] };
+    if (error || !Array.isArray(data) || data.some((item: any) => !item?.empleado_id)) throw lecturaRrhhFallida('los depósitos CTS');
+    const empleadoIds = [...new Set(data.map((item: any) => item.empleado_id))];
+    if (empleadoIds.length === 0) return { success: true, data };
     const { data: empleados, error: empleadosError } = await this.supabaseService.getClient()
       .from('empleados')
       .select('id,nombres,apellidos,numero_documento')
       .eq('tenant_id', tenantId)
       .in('id', empleadoIds);
-    if (empleadosError) throw empleadosError;
-    const empleadosPorId = new Map((empleados || []).map((empleado: any) => [empleado.id, empleado]));
+    if (empleadosError || !Array.isArray(empleados)) throw lecturaRrhhFallida('los empleados de los depósitos CTS');
+    const empleadosPorId = new Map(empleados.map((empleado: any) => [empleado.id, empleado]));
+    if (empleadoIds.some(id => !empleadosPorId.has(id))) throw lecturaRrhhFallida('los empleados de los depósitos CTS');
     return {
       success: true,
-      data: (data || []).map((item: any) => ({ ...item, empleados: empleadosPorId.get(item.empleado_id) })),
+      data: data.map((item: any) => ({ ...item, empleados: empleadosPorId.get(item.empleado_id) })),
     };
   }
 
@@ -1693,35 +1919,47 @@ export class RrhhService {
     hasta: Date,
     tenantId: string,
   ): Promise<number> {
-    // Días gozados dentro del periodo vacacional en curso. Contarlos por año
-    // calendario no correspondía: el periodo corre entre aniversarios de ingreso.
-    const startDate = desde.toISOString().slice(0, 10);
-    const endDate = hasta.toISOString().slice(0, 10);
+    // La liquidación conserva todo el récord desde el ingreso hasta el cese,
+    // incluidos aniversarios; cada fecha gozada se descuenta una sola vez.
+    const key = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const parse = (value: unknown): number => {
+      if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw lecturaRrhhFallida('las fechas de vacaciones gozadas');
+      const stamp = Date.parse(`${value}T00:00:00Z`);
+      if (!Number.isFinite(stamp) || new Date(stamp).toISOString().slice(0, 10) !== value) throw lecturaRrhhFallida('las fechas de vacaciones gozadas');
+      return stamp;
+    };
+    const startDate = key(desde);
+    const endDate = key(hasta);
+    const start = parse(startDate), end = parse(endDate);
+    if (end < start) throw new BadRequestException('La fecha de cese no puede ser anterior al ingreso');
 
     const { data, error } = await this.supabaseService
       .getClient()
       .from('solicitudes')
-      .select('dias')
+      .select('fecha_inicio,fecha_fin')
       .eq('id_empleado', empleadoId)
       // Sin filtrar el tipo, una licencia, un permiso o un descanso médico
       // descontaban días del récord vacacional y recortaban la liquidación.
       .eq('tipo', 'vacaciones')
       .eq('estado', 'aprobada')
-      .gte('fecha_inicio', startDate)
-      .lte('fecha_fin', endDate)
+      .lte('fecha_inicio', endDate)
+      .gte('fecha_fin', startDate)
       .eq('tenant_id', tenantId);
 
-    if (error) {
+    if (error || !Array.isArray(data)) {
       this.logger.warn(
-        `Error calculando vacaciones usadas: ${error.message}`,
+        `Error calculando vacaciones usadas: ${error?.message || 'respuesta incompleta'}`,
       );
-      return 0;
+      throw lecturaRrhhFallida('las vacaciones gozadas para la liquidación');
     }
 
-    return (data || []).reduce(
-      (sum: number, s: any) => sum + Number(s.dias || 0),
-      0,
-    );
+    const fechasGozadas = new Set<number>();
+    for (const row of data) {
+      const inicio = parse(row?.fecha_inicio), fin = parse(row?.fecha_fin);
+      if (fin < inicio) throw lecturaRrhhFallida('las fechas de vacaciones gozadas');
+      for (let day = Math.max(start, inicio); day <= Math.min(end, fin); day += 86400000) fechasGozadas.add(day);
+    }
+    return fechasGozadas.size;
   }
 
 
@@ -1769,23 +2007,13 @@ export class RrhhService {
 
   // ===== EXPEDIENTE =====
   async getExpediente(empleadoId: string, tenantId?: string) {
-    // ✅ MULTI-TENANT: Filtrar por tenant
-    if (!tenantId) {
-      throw new Error('Tenant requerido para RRHH');
-    }
-    const currentTenantId = tenantId;
-
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('expediente_documentos')
-      .select('*')
-      .eq('id_empleado', empleadoId)
-      .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
-      .eq('activo', true)
-      .order('fecha_subida', { ascending: false });
-
-    if (error) throw error;
-    return { success: true, data: data || [] };
+    if (!tenantId) throw new BadRequestException('Tenant requerido para RRHH');
+    const client = this.supabaseService.getClient();
+    await requireTenantRecord(client, 'empleados', tenantId, empleadoId, 'Empleado');
+    const data = await readCompleteCatalog(client, 'expediente_documentos', '*',
+      query => query.eq('tenant_id', tenantId).eq('id_empleado', empleadoId).eq('activo', true),
+      row => row.tenant_id === tenantId && row.id_empleado === empleadoId, [['fecha_subida', false], ['id', false]]);
+    return { success: true, data };
   }
 
   async subirDocumento(
@@ -2244,24 +2472,13 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
-    let query = this.supabaseService
-      .getClient()
-      .from('contratos')
-      .select(
-        `
+    return readCompleteCatalog(this.supabaseService.getClient(), 'contratos', `
         *,
         empleados(nombres, apellidos, numero_documento)
-      `,
-      )
-      .eq('tenant_id', currentTenantId)
-      .order('fecha_inicio', { ascending: false });
-
-    if (empleadoId) query = query.eq('id_empleado', empleadoId);
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    return data || [];
+      `, query => {
+        query = query.eq('tenant_id', currentTenantId);
+        return empleadoId ? query.eq('id_empleado', empleadoId) : query;
+      }, row => row.tenant_id === currentTenantId && typeof row.id_empleado === 'string' && !!row.id_empleado && (!empleadoId || row.id_empleado === empleadoId), [['fecha_inicio', false], ['id', true]]);
   }
 
   /**
@@ -2273,7 +2490,11 @@ export class RrhhService {
    * ni está afecta a aportes o a renta, por eso tiene su propio libro. Recalcular
    * un semestre actualiza el importe en vez de duplicar el depósito.
    */
-  async calcularDepositosCts(periodo: string, tenantId: string, usuarioId: string) {
+  async calcularDepositosCts(
+    periodo: string, tenantId: string, usuarioId: string,
+    gratificacionesPrevias: GratificacionPreviaEmpleadoDto[] = [],
+    remuneracionesPrevias: RemuneracionPreviaEmpleadoDto[] = [],
+  ) {
     if (!tenantId) {
       throw new BadRequestException('Tenant requerido para RRHH');
     }
@@ -2292,6 +2513,14 @@ export class RrhhService {
         `La CTS se deposita en mayo y noviembre. El periodo "${periodo}" no corresponde a un depósito.`,
       );
     }
+    // Calcular antes de que termine el semestre contaba meses no trabajados y,
+    // si se depositaba, una liquidación posterior volvía a pagar ese tramo.
+    const finSemestreFecha = `${semestre.fin.getFullYear()}-${String(semestre.fin.getMonth() + 1).padStart(2, '0')}-01`;
+    if (fechaHoyEnPeru() < finSemestreFecha) {
+      throw new BadRequestException(
+        `El semestre de la CTS ${periodo} aún no termina; se calcula a partir del ${semestre.fin.toISOString().slice(0, 10)}.`,
+      );
+    }
 
     const client = this.supabaseService.getClient();
     const { data: empleados, error } = await client
@@ -2302,22 +2531,41 @@ export class RrhhService {
 
     if (error) throw error;
 
-    const rmv = await this.obtenerRmvVigente(periodo, tenantId);
-    const asignacionFamiliar = Number((rmv * 0.1).toFixed(2));
+    const declaraciones = new Map<string, GratificacionPreviaEmpleadoDto>();
+    for (const declaracion of gratificacionesPrevias) {
+      if (declaraciones.has(declaracion.empleado_id)
+        || !(empleados || []).some((e: any) => e.id === declaracion.empleado_id)) {
+        throw new BadRequestException('Las gratificaciones previas deben corresponder a empleados activos distintos de esta empresa');
+      }
+      declaraciones.set(declaracion.empleado_id, declaracion);
+    }
+
+    const basesDeclaradas = new Map<string, RemuneracionPreviaEmpleadoDto>();
+    for (const declaracion of remuneracionesPrevias) {
+      if (basesDeclaradas.has(declaracion.empleado_id)
+        || !(empleados || []).some((e: any) => e.id === declaracion.empleado_id)) {
+        throw new BadRequestException('Las remuneraciones previas deben corresponder a empleados activos distintos de esta empresa');
+      }
+      basesDeclaradas.set(declaracion.empleado_id, declaracion);
+    }
     const depositos = [];
 
     for (const empleado of empleados || []) {
-      const contrato = contratoVigenteDe(empleado);
-      if (!contrato) continue;
-
       const tiempo = tiempoComputableCts(periodo, parseFechaLocal(empleado.fecha_ingreso));
       if (!tiempo || (tiempo.meses === 0 && tiempo.dias === 0)) continue;
 
-      // La asignación familiar es remuneración computable (Ley 25129), así que
-      // integra la base de la CTS igual que la de los aportes.
-      const remuneracion =
-        (parseFloat(contrato.sueldo_bruto) || 0) + (this.tieneHijosEmpleado(empleado) ? asignacionFamiliar : 0);
-      const computable = remuneracionComputableCts(remuneracion);
+      // Base real del cierre abril/octubre; los aumentos posteriores no alteran
+      // un semestre histórico. La declaración admite base computable externa
+      // con remuneraciones variables documentadas, excluyendo el1/6 añadido abajo.
+      const baseCts = await this.obtenerBaseGratificacionTrunca(empleado, semestre.fin, tenantId, usuarioId,
+        tiempo.meses || tiempo.dias ? 1 : 0, basesDeclaradas.get(empleado.id));
+      const remuneracion = baseCts.monto;
+      const ingreso = parseFechaLocal(empleado.fecha_ingreso);
+      const gratificacionCts = await this.obtenerGratificacionPercibidaCts(
+        tenantId, empleado.id, ingreso, new Date(semestre.fin.getTime() - 86400000),
+        usuarioId, declaraciones.get(empleado.id),
+      );
+      const computable = remuneracionComputableCts(remuneracion, gratificacionCts.monto);
 
       depositos.push({
         tenant_id: tenantId,
@@ -2330,7 +2578,12 @@ export class RrhhService {
         dias_computables: tiempo.dias,
         monto: calcularCts(computable, tiempo),
         estado: 'CALCULADO',
-        metadata: { remuneracion_mensual: remuneracion, asignacion_familiar_incluida: remuneracion > (parseFloat(contrato.sueldo_bruto) || 0) },
+        metadata: {
+          remuneracion_mensual: remuneracion,
+          asignacion_familiar_incluida: Number(baseCts.asignacion_familiar ?? 0) > 0,
+          base_remuneracion_cts: baseCts,
+          gratificacion_cts: gratificacionCts,
+        },
       });
     }
 

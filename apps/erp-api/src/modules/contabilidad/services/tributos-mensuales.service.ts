@@ -1,6 +1,9 @@
+import { leerConsultaCompleta } from './consulta-completa';
 import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import {
   esCompraFiscal,
+  esBorradorVentaFiscal,
+  esNotaFiscalSinDocumento,
   esEstadoFiscal,
   esVentaFiscal,
   importeFiscal,
@@ -8,6 +11,8 @@ import {
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { uitPeruPorEjercicio } from './uit-peru';
 import { mutarTributo, TributoIntent } from './tributos-intent';
+import { compraFiscalOriginal } from './compra-fiscal-original';
+import Decimal from 'decimal.js';
 
 export type RegimenTributarioPeru = 'NRUS' | 'RER' | 'MYPE' | 'GENERAL';
 
@@ -17,6 +22,9 @@ export interface AjustesTributariosMensuales {
   percepciones_igv?: number;
   otros_creditos_igv?: number;
   coeficiente_renta?: number | null;
+  otros_ingresos_renta_mes?: number;
+  otros_ingresos_renta_acumulados?: number;
+  sustento_renta?: string;
   notas?: string;
 }
 
@@ -71,6 +79,22 @@ function sum(rows: any[], field: string): number {
   );
 }
 
+/** La fuente fiscal se expresa en PEN con la cotización documental, no la del pago. */
+function fuenteEnSoles(row: any, fields: string[], compra = false): any {
+  const moneda = String(row.moneda || 'PEN').trim().toUpperCase();
+  const rate = moneda === 'PEN' ? 1 : Number(compra
+    ? (row.fiscal_metadata?.tipo_cambio ?? row.tipo_cambio_origen)
+    : row.documento?.tipo_cambio);
+  if (!Number.isFinite(rate) || rate <= 0) {
+    throw new BadRequestException('El documento en moneda extranjera necesita un tipo de cambio de origen válido para calcular los impuestos.');
+  }
+  const fuente = { ...row };
+  for (const field of fields) {
+    fuente[field] = new Decimal(row[field] ?? 0).mul(rate).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
+  }
+  return fuente;
+}
+
 /**
  * Consolida las filas crudas en las magnitudes del periodo, aplicando las mismas
  * reglas fiscales que los libros: solo los tipos que forman cada registro, sin
@@ -89,13 +113,18 @@ export function consolidarFuentesMensuales(
   ventasDoceMesesRaw: any[] = [],
 ): { fuentes: FuentesTributariasMensuales; ventasMes: any[]; comprasMes: any[] } {
   const esVenta = (fila: any) =>
-    esVentaFiscal(fila?.tipo_documento) && esEstadoFiscal(fila?.estado);
+    esVentaFiscal(fila?.tipo_documento) && esEstadoFiscal(fila?.estado)
+      && !esBorradorVentaFiscal(fila?.estado)
+      && !esNotaFiscalSinDocumento(fila?.tipo_documento, fila?.documento_id);
   const esCompra = (fila: any) =>
     esCompraFiscal(fila?.tipo_documento) && esEstadoFiscal(fila?.estado);
 
-  const ventasMes = (ventasMesRaw || []).filter(esVenta);
-  const ventasAnio = (ventasAnioRaw || []).filter(esVenta);
-  const comprasMes = (comprasMesRaw || []).filter(esCompra);
+  const ventaEnSoles = (fila: any) => fuenteEnSoles(fila,
+    ['total_gravadas', 'total_exoneradas', 'total_inafectas', 'total_exportacion', 'total_igv']);
+  const ventasMes = (ventasMesRaw || []).filter(esVenta).map(ventaEnSoles);
+  const ventasAnio = (ventasAnioRaw || []).filter(esVenta).map(ventaEnSoles);
+  const comprasMes = (comprasMesRaw || []).map(compraFiscalOriginal).filter(esCompra)
+    .map((fila: any) => fuenteEnSoles(fila, ['subtotal', 'igv', 'total'], true));
 
   const ingresosAcumulados = ['total_gravadas', 'total_exoneradas', 'total_inafectas', 'total_exportacion']
     .reduce((total, field) => total + sum(ventasAnio, field), 0);
@@ -108,7 +137,7 @@ export function consolidarFuentesMensuales(
       (fila: any) => String(fila?.destino_credito_fiscal ?? 'GRAVADAS').toUpperCase() === destino,
     );
 
-  const ventas12m = (ventasDoceMesesRaw || []).filter(esVenta);
+  const ventas12m = (ventasDoceMesesRaw || []).filter(esVenta).map(ventaEnSoles);
   const gravadas12m = sum(ventas12m, 'total_gravadas') + sum(ventas12m, 'total_exportacion');
   const noGravadas12m = sum(ventas12m, 'total_exoneradas') + sum(ventas12m, 'total_inafectas');
 
@@ -159,8 +188,16 @@ export function calcularTributoMensualPeru(
   const igvVentas = money(fuentes.igv_ventas);
   const comprasGravadas = money(fuentes.compras_gravadas);
   const igvCompras = money(fuentes.igv_compras);
-  const ingresosNetosMes = money(ventasGravadas + ventasExoneradas + ventasInafectas + exportaciones);
-  const ingresosNetosAcumulados = money(fuentes.ingresos_netos_acumulados);
+  const otrosIngresosMes = money(ajustes.otros_ingresos_renta_mes);
+  const otrosIngresosAcumulados = money(ajustes.otros_ingresos_renta_acumulados);
+  if (otrosIngresosAcumulados < otrosIngresosMes) {
+    throw new BadRequestException('Los otros ingresos gravables acumulados no pueden ser menores a los del mes.');
+  }
+  if ((otrosIngresosMes > 0 || otrosIngresosAcumulados > 0) && !ajustes.sustento_renta?.trim()) {
+    throw new BadRequestException('Registre la referencia y el sustento revisado de los ingresos gravables fuera de CPE.');
+  }
+  const ingresosNetosMes = money(ventasGravadas + ventasExoneradas + ventasInafectas + exportaciones + otrosIngresosMes);
+  const ingresosNetosAcumulados = money(fuentes.ingresos_netos_acumulados + otrosIngresosAcumulados);
   const saldoFavorAnterior = money(ajustes.saldo_favor_anterior);
   const retencionesIgv = money(ajustes.retenciones_igv);
   const percepcionesIgv = money(ajustes.percepciones_igv);
@@ -294,6 +331,8 @@ export function calcularTributoMensualPeru(
     saldo_favor_siguiente: saldoFavorSiguiente,
     ingresos_netos_mes: ingresosNetosMes,
     ingresos_netos_acumulados: ingresosNetosAcumulados,
+    otros_ingresos_renta_mes: otrosIngresosMes,
+    otros_ingresos_renta_acumulados: otrosIngresosAcumulados,
     coeficiente_renta: coeficiente,
     pago_cuenta_renta: pagoCuentaRenta,
     nrus_categoria: nrusCategoria,
@@ -346,22 +385,21 @@ export class TributosMensualesService {
     const { desde, hasta, inicioAnio, inicioDoceMeses } = this.validarPeriodo(periodo);
     const client = this.supabase.getClient();
     const [ventasMesResult, ventasAnioResult, ventasDoceMesesResult, comprasMesResult] = await Promise.all([
-      client.from('cpe')
-        .select('id, tipo_documento, estado, total_gravadas, total_exoneradas, total_inafectas, total_exportacion, total_igv')
+      leerConsultaCompleta(() => client.from('cpe')
+        .select('id, documento_id, tipo_documento, estado, moneda, documento:documentos!documento_id(tipo_cambio), total_gravadas, total_exoneradas, total_inafectas, total_exportacion, total_igv')
         .eq('tenant_id', tenantId).gte('fecha_emision', desde).lt('fecha_emision', hasta)
-        .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA","RECHAZADO")'),
-      client.from('cpe')
-        .select('id, tipo_documento, estado, total_gravadas, total_exoneradas, total_inafectas, total_exportacion')
+        .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA","RECHAZADO")').order('id')),
+      leerConsultaCompleta(() => client.from('cpe')
+        .select('id, documento_id, tipo_documento, estado, moneda, documento:documentos!documento_id(tipo_cambio), total_gravadas, total_exoneradas, total_inafectas, total_exportacion')
         .eq('tenant_id', tenantId).gte('fecha_emision', inicioAnio).lt('fecha_emision', hasta)
-        .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA","RECHAZADO")'),
-      client.from('cpe')
-        .select('id, tipo_documento, estado, total_gravadas, total_exoneradas, total_inafectas, total_exportacion')
+        .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA","RECHAZADO")').order('id')),
+      leerConsultaCompleta(() => client.from('cpe')
+        .select('id, documento_id, tipo_documento, estado, moneda, documento:documentos!documento_id(tipo_cambio), total_gravadas, total_exoneradas, total_inafectas, total_exportacion')
         .eq('tenant_id', tenantId).gte('fecha_emision', inicioDoceMeses).lt('fecha_emision', hasta)
-        .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA","RECHAZADO")'),
-      client.from('cuentas_por_pagar')
-        .select('id, tipo_documento, estado, subtotal, igv, total, destino_credito_fiscal')
-        .eq('tenant_id', tenantId).gte('fecha_emision', desde).lt('fecha_emision', hasta)
-        .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA","RECHAZADO")'),
+        .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA","RECHAZADO")').order('id')),
+      leerConsultaCompleta(() => client.from('cuentas_por_pagar')
+        .select('id, tipo_documento, estado, moneda, tipo_cambio_origen, fiscal_metadata, subtotal, igv, total, destino_credito_fiscal, metadata, original_fiscal_amounts')
+        .eq('tenant_id', tenantId).gte('fecha_emision', desde).lt('fecha_emision', hasta).order('id')),
     ]);
     for (const result of [ventasMesResult, ventasAnioResult, ventasDoceMesesResult, comprasMesResult]) {
       if (result.error) throw new Error(`No se pudieron consolidar las fuentes tributarias: ${result.error.message}`);
@@ -380,6 +418,8 @@ export class TributosMensualesService {
         periodo,
         ventas_origen: 'cpe',
         compras_origen: 'cuentas_por_pagar',
+        moneda_calculo: 'PEN',
+        conversion: 'tipo_cambio_documental_congelado',
         cantidad_ventas: ventasMes.length,
         cantidad_compras: comprasMes.length,
         advertencia: 'Contrastar con propuestas RVIE/RCE de SIRE antes de presentar.',
@@ -408,17 +448,21 @@ export class TributosMensualesService {
    * Se sigue admitiendo el valor explicito: tras una rectificacion el arrastre
    * legitimo puede no ser el que quedo guardado. Lo que cambia es el defecto.
    */
-  private async saldoFavorDelMesAnterior(tenantId: string, periodo: string): Promise<number> {
+  private async parametrosDelMesAnterior(tenantId: string, periodo: string) {
     const { data, error } = await this.supabase.getClient()
       .from('tributos_declaraciones_mensuales')
-      .select('saldo_favor_siguiente')
+      .select('saldo_favor_siguiente, source_snapshot')
       .eq('tenant_id', tenantId)
       .eq('periodo', this.periodoAnterior(periodo))
       .eq('vigente', true)
       .maybeSingle();
 
     if (error) throw new ServiceUnavailableException('No se pudo recuperar el saldo tributario anterior. Reintente la consulta.');
-    return Math.max(Number((data as any)?.saldo_favor_siguiente ?? 0), 0);
+    return {
+      saldo: Math.max(Number((data as any)?.saldo_favor_siguiente ?? 0), 0),
+      otrosAcumulados: money((data as any)?.source_snapshot?.ajustes_renta?.otros_ingresos_renta_acumulados),
+      sustentoRenta: String((data as any)?.source_snapshot?.ajustes_renta?.sustento_renta || ''),
+    };
   }
 
   async calcular(tenantId: string, periodo: string, ajustes: AjustesTributariosMensuales = {}) {
@@ -427,20 +471,35 @@ export class TributosMensualesService {
       this.obtenerFuentes(tenantId, periodo),
     ]);
 
-    const arrastrado = await this.saldoFavorDelMesAnterior(tenantId, periodo);
-    const ajustesConArrastre: AjustesTributariosMensuales = {
-      ...ajustes,
-      saldo_favor_anterior: ajustes.saldo_favor_anterior ?? arrastrado,
-    };
-    const calculo = calcularTributoMensualPeru(regimen, fuentes, ajustesConArrastre, Number(periodo.slice(0, 4)));
-    (snapshot as any).saldo_favor_arrastrado = arrastrado;
-    (snapshot as any).saldo_favor_origen =
-      ajustes.saldo_favor_anterior === undefined ? 'periodo_anterior' : 'declarado';
     const { data: declaracion, error: declaracionError } = await this.supabase.getClient()
       .from('tributos_declaraciones_mensuales')
       .select('*').eq('tenant_id', tenantId).eq('periodo', periodo).eq('vigente', true)
       .maybeSingle();
     if (declaracionError) throw new ServiceUnavailableException('No se pudo consultar la declaración tributaria vigente. Reintente la consulta.');
+    const anterior = await this.parametrosDelMesAnterior(tenantId, periodo);
+    const arrastrado = anterior.saldo;
+    const rentaVigente = declaracion?.source_snapshot?.ajustes_renta;
+    const ajustesConArrastre: AjustesTributariosMensuales = {
+      saldo_favor_anterior: ajustes.saldo_favor_anterior ?? declaracion?.saldo_favor_anterior ?? arrastrado,
+      retenciones_igv: ajustes.retenciones_igv ?? declaracion?.retenciones_igv,
+      percepciones_igv: ajustes.percepciones_igv ?? declaracion?.percepciones_igv,
+      otros_creditos_igv: ajustes.otros_creditos_igv ?? declaracion?.otros_creditos_igv,
+      coeficiente_renta: ajustes.coeficiente_renta === undefined ? declaracion?.coeficiente_renta : ajustes.coeficiente_renta,
+      otros_ingresos_renta_mes: ajustes.otros_ingresos_renta_mes ?? rentaVigente?.otros_ingresos_renta_mes ?? 0,
+      otros_ingresos_renta_acumulados: ajustes.otros_ingresos_renta_acumulados ?? rentaVigente?.otros_ingresos_renta_acumulados ?? (periodo.endsWith('-01') ? 0 : anterior.otrosAcumulados),
+      sustento_renta: ajustes.sustento_renta ?? rentaVigente?.sustento_renta ?? (periodo.endsWith('-01') ? '' : anterior.sustentoRenta),
+    };
+    const calculo = calcularTributoMensualPeru(regimen, fuentes, ajustesConArrastre, Number(periodo.slice(0, 4)));
+    (snapshot as any).saldo_favor_arrastrado = arrastrado;
+    snapshot.ajustes_renta = {
+      otros_ingresos_renta_mes: calculo.otros_ingresos_renta_mes,
+      otros_ingresos_renta_acumulados: calculo.otros_ingresos_renta_acumulados,
+      sustento_renta: ajustesConArrastre.sustento_renta?.trim() || '',
+      origen: 'revision_expresa_fuera_cpe',
+    };
+    (snapshot as any).saldo_favor_origen =
+      ajustes.saldo_favor_anterior !== undefined ? 'declarado'
+        : declaracion ? 'declaracion_vigente' : 'periodo_anterior';
     return { periodo, ...calculo, source_snapshot: snapshot, declaracion_vigente: declaracion || null };
   }
 

@@ -1,3 +1,5 @@
+import { cpeListFixture } from './fixtures/cpe-list'
+import { fiscalCountryFixture } from './fixtures/fiscal-country'
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { SignJWT } from 'jose'
 import fs from 'node:fs'
@@ -83,17 +85,16 @@ test.describe('notas DIAN 91/92 desde CPE', () => {
       })
 
       if (/\/api\/auth\/profile\/?$/.test(pathname)) return json(user)
-      if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
-        return json({
-          data: {
+      if (pathname.replace(/\/$/, '') === '/api/tenants/me') return json({ data: { id: user.tenant_id, nombre: 'Empresa aislada', estado: 'ACTIVO' } });
+    if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
+        return json(fiscalCountryFixture(user.tenant_id, {
             pais_id: 2,
             pais: 'CO',
             paisCodigo: 'CO',
             monedaDefecto: 'COP',
             locale: 'es-CO',
             servicioFiscal: 'DIAN',
-          },
-        })
+          }))
       }
       if (/\/api\/configuration\/status\/?$/.test(pathname)) {
         return json({
@@ -156,7 +157,7 @@ test.describe('notas DIAN 91/92 desde CPE', () => {
               saldo_impuesto: 0,
               saldo_total: 107100,
             }],
-            cpe: { id: '52900000-0000-4000-8000-000000000002', estado: 'ACEPTADO' },
+            cpe: { id: '52900000-0000-4000-8000-000000000002', documento_id:'52900000-0000-4000-8000-000000000001', estado: 'ACEPTADO', sunat_status:'ACCEPTED' },
           }],
         })
       }
@@ -181,9 +182,7 @@ test.describe('notas DIAN 91/92 desde CPE', () => {
         return json({ success: false, message: 'La demo no transmite' })
       }
       if (/\/api\/cpe\/comprobantes\/?$/.test(pathname)) {
-        return json({
-          success: true,
-          data: [{
+        return json(cpeListFixture([{
             id: '52900000-0000-4000-8000-000000000003',
             tipoDocumento: '91',
             tipoComprobante: 'Nota Crédito DIAN',
@@ -196,8 +195,7 @@ test.describe('notas DIAN 91/92 desde CPE', () => {
             moneda: 'COP',
             estado: 'FIRMADO',
             fechaCreacion: '2026-08-29T12:00:00-05:00',
-          }],
-        })
+          }]))
       }
       return json({ success: true, data: [] })
     })
@@ -268,6 +266,7 @@ test.describe('notas DIAN 91/92 desde CPE', () => {
     await authenticate(context)
     let creates = 0
     let originRequests = 0
+    let originUnavailable = true
     await page.route('**/api/**', async (route) => {
       const request = route.request()
       const pathname = new URL(request.url()).pathname
@@ -278,17 +277,16 @@ test.describe('notas DIAN 91/92 desde CPE', () => {
       })
 
       if (/\/api\/auth\/profile\/?$/.test(pathname)) return json(user)
-      if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
-        return json({
-          data: {
+      if (pathname.replace(/\/$/, '') === '/api/tenants/me') return json({ data: { id: user.tenant_id, nombre: 'Empresa aislada', estado: 'ACTIVO' } });
+    if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
+        return json(fiscalCountryFixture(user.tenant_id, {
             pais_id: 2,
             pais: 'CO',
             paisCodigo: 'CO',
             monedaDefecto: 'COP',
             locale: 'es-CO',
             servicioFiscal: 'DIAN',
-          },
-        })
+          }))
       }
       if (/\/api\/configuration\/status\/?$/.test(pathname)) {
         return json({
@@ -310,7 +308,7 @@ test.describe('notas DIAN 91/92 desde CPE', () => {
       }
       if (/\/api\/cpe\/notas-referenciadas\/origenes\/?$/.test(pathname)) {
         originRequests += 1
-        if (originRequests <= 3) {
+        if (originUnavailable) {
           return route.fulfill({
             status: 503,
             contentType: 'application/json',
@@ -322,6 +320,7 @@ test.describe('notas DIAN 91/92 desde CPE', () => {
       if (/\/api\/cpe\/notas-referenciadas\/?$/.test(pathname) && request.method() === 'POST') {
         creates += 1
       }
+      if (/\/api\/cpe\/?$/.test(pathname) && request.method() === 'GET') return json(cpeListFixture([]))
       return json({ success: true, data: [] })
     })
 
@@ -330,16 +329,18 @@ test.describe('notas DIAN 91/92 desde CPE', () => {
     await page.getByRole('button', { name: 'Nueva NC / ND DIAN' }).click()
 
     await expect(page.getByTestId('referenced-note-origin-error')).toHaveText(
-      /No se pudieron cargar las facturas aceptadas por DIAN.*reintenta la consulta/i,
+      /No se pudo consultar la información completa de CPE.*Reintente/i,
     )
     await expect(page.getByTestId('referenced-note-empty-state')).toHaveCount(0)
     await expect(page.getByTestId('create-referenced-note')).toBeDisabled()
-    await page.getByRole('button', { name: 'Reintentar' }).click()
+    const requestsBeforeRetry = originRequests
+    originUnavailable = false
+    await page.getByTestId('referenced-note-origin-error').getByRole('button', { name: 'Reintentar',exact:true }).click()
 
     await expect(page.getByTestId('referenced-note-empty-state')).toHaveText(
       'Para emitir NC/ND DIAN necesitas una factura electrónica aceptada por DIAN del mismo contribuyente; la demo no fabrica aceptación fiscal.',
     )
-    expect(originRequests).toBe(4)
+    expect(originRequests).toBe(requestsBeforeRetry + 1)
     await expect(page.getByRole('spinbutton', { name: 'Total exacto de líneas (COP)' })).toBeVisible()
     await expect(page.getByTestId('referenced-note-type')).toBeDisabled()
     await expect(page.getByTestId('referenced-note-reason')).toBeDisabled()

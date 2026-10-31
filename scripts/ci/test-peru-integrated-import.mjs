@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { testPeruMasterLifecycle } from './test-peru-master-lifecycle.mjs';
 import { testPeruInventoryLifecycle } from './test-peru-inventory-lifecycle.mjs';
+import { inspectLocalImportedCxcRead } from './inspect-peru-imported-cxc-read-local.mjs';
 
 // Importación de maestros por la API local; incluye filas válidas e inválidas.
 // El runner exige una base efímera y bloquea destinos remotos.
@@ -115,16 +116,24 @@ export async function testMigrationImport({ request, sql, uuid, results, tenantI
       { authorization: `Bearer ${otherTenantToken}` });
     const cuentaId = sql(`SELECT id FROM ${item.table} WHERE tenant_id=${uuid(tenantId)} AND external_id='${externalId}';`);
     uuid(cuentaId);
+    if(item.kind==='cxc'){
+      const response=await request('finanzas/cxc?search='+encodeURIComponent(suffix));
+      const actorId=sql(`SELECT id FROM usuarios_sistema WHERE tenant_id=${uuid(tenantId)} AND activo ORDER BY created_at,id LIMIT 1;`);
+      inspectLocalImportedCxcRead({response,tenantId,actorId,sqlRow:JSON.parse(sql(`SELECT row_to_json(c) FROM cuentas_por_cobrar c WHERE id=${uuid(cuentaId)} AND tenant_id=${uuid(tenantId)};`))});
+      const overdue=await request('finanzas/cxc?estado=VENCIDO&search='+encodeURIComponent(suffix));
+      assert.deepEqual(overdue.data.map(row=>row.id),[cuentaId],'El filtro público VENCIDO debe incluir la apertura canónica VENCIDA');
+    }
     results.push({ scenario: `${item.runType}: dry-run detecta referencia ajena, saldo parcial persiste, bitácora y reintento aislados`,
       passed: true, run_id: imported.runId, cuenta_id: cuentaId });
   }
   const sucursal = (await request('sucursales', { nombre: `Sucursal apertura ${suffix}`,
     codigo: `AP-${suffix}`, direccion: 'Av. Local 123', ubigeo: '150101' })).data;
   const almacen = (await request('inventario/almacenes', { idempotency_key: randomUUID(),
-    codigo: `AL-${suffix}`, nombre: `Almacén apertura ${suffix}`, es_principal: true })).data;
+    codigo: `AL-${suffix}`, nombre: `Almacén apertura ${suffix}`, es_principal: true, sucursal_id: sucursal.id })).data;
   const sucursalId = sucursal.id;
   const almacenId = almacen.id;
   assert.ok(sucursalId && almacenId, 'primer cliente puede crear sucursal y almacén para stock inicial');
+  assert.equal(sql(`SELECT sucursal_id FROM almacenes WHERE id=${uuid(almacenId)} AND tenant_id=${uuid(tenantId)};`), sucursalId, 'Almacén y caja pertenecen al mismo establecimiento');
   const caja = (await request('cajas', { nombre: `Caja primer cliente ${suffix}`, almacen_id: almacenId,
     sucursal_id: sucursalId }, 201, { 'idempotency-key': randomUUID() })).data;
   assert.ok(caja.id);

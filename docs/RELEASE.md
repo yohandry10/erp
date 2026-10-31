@@ -314,6 +314,49 @@ Reglas:
 - El rollback se prueba localmente o en una transacción revertida antes de usar
   datos reales; DEV no es un destino permitido.
 
+## Puesta en marcha de un cliente con suministro y migración
+
+1. Promoción DB-first de 570..590, ya aplicada el 31-oct-2026 (`CURRENT_STATE.md`); el
+   procedimiento queda para el siguiente lote, cambiando el rango: respaldo
+   nuevo de base y de Storage, ensayo sobre ese respaldo con
+   `node scripts/rehearse-promotion-local.mjs --dump <respaldo> --desde 570 --hasta 590`,
+   preflight, lote transaccional y readiness 590. El ensayo corre sin red, fuerza
+   un rollback, compara cada tabla y ejecuta los verificadores sobre esos datos; es
+   lo único que emula los privilegios por defecto de Supabase, que CI no tiene.
+   Se aplica con `node scripts/promote-lote-prod.mjs --desde 570 --hasta 590 --pr <n>
+   --backup <manifiesto> --rehearsal <informe> --apply --env-file <.env.production>
+   --pg-bin <PostgreSQL 17/bin>`; sin `--apply` sólo comprueba las compuertas: respaldo
+   de menos de 24 horas, ensayo de esos mismos bytes sobre ese respaldo y CI en verde.
+   El API y la web se despliegan después; `render.yaml` ya exige 590. Esta
+   promoción va antes de fusionar a `main`:
+   Render despliega `main` en cuanto pasan los checks (`autoDeployTrigger:
+   checksPass`), y ese API no arranca sano contra un esquema anterior.
+2. Parametrización acordada con el cliente: base de facturación de cada contrato,
+   reglas de penalidad según sus cláusulas, política de lote y vida útil por
+   producto, reglas y destinatarios de alertas, correo productivo y el perfil
+   de cada usuario (SUMINISTRO, ALMACEN, FINANZAS, GERENCIA, ADMIN).
+3. Capacitación por función con Ayuda › Ciclo de suministro por función y las
+   fichas de cada pantalla; una sesión por perfil.
+4. Piloto con contratos reales elegidos por el cliente antes del corte: uno con
+   lotes y facturación contra conformidad, uno con entregas parciales y
+   rechazo, uno con penalidad y uno migrado del sistema anterior. Facturar en el piloto exige
+   la emisión fiscal del contribuyente configurada y acreditada.
+5. Ensayo de migración: ensayo integral (no escribe) hasta cero errores,
+   conciliación y cruce de bancos cuadrados. El día del corte: el sistema anterior en sólo
+   lectura, extracción, transformación, archivo íntegro, ensayo, importación en
+   orden y conciliación con el mismo `control.json` (`OPERATIONS.md`).
+6. Soporte: nivel 1, usuario clave del cliente por función; nivel 2, soporte del
+   ERP; nivel 3, desarrollo. Contingencia: el sistema anterior queda consultable en sólo
+   lectura; sin conciliación cuadrada no se libera el corte; un error posterior
+   se corrige hacia delante (anulación, adenda o regularización), sin borrar.
+7. Aceptación: el cliente ejecuta el ciclo completo con sus usuarios y firma la
+   validación de saldos de apertura (contratos, OC, entregas, stock por lote y
+   CxC), documentos y reportes (tablero, Excel y Power BI al mismo corte).
+
+Pendiente de datos del negocio, que no se suponen: equipo y responsables
+reales, licenciamiento, costos desglosados, exclusiones, SLA, condiciones
+comerciales y la aprobación de RPO, RTO y retención (`OPERATIONS.md`).
+
 ## Rollback
 
 Preparar antes del despliegue:

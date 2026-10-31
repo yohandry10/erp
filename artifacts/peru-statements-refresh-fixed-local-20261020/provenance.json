@@ -1,0 +1,15 @@
+{
+  "capturedAt": "2026-10-20T08:57:02.589Z",
+  "capture": "Before launch",
+  "source_hashes": {
+    "artifacts/peru-block-runner-20261019.mjs": "19587cc45acffc4c1602642866b822b77e512f47442d76e09adc38bac8da0c06",
+    "scripts/ci/test-peru-statements-refresh-local.mjs": "7d1254a4d8b2950deb61c35f5012415451242c12b82e9e519f330b7e4a216a49",
+    "scripts/ci/peru-local-smtp-sink.mjs": "af601f15f5beb86aabc65046663fe33779b3b37c18c18365b514f84d056347ff",
+    "scripts/ci/prepare-peru-first-client-local.mjs": "018bcc6223bd3fd8ffbf69e68ceca0480eb2b0f86e7a2fcc53c36b079e2bfc11",
+    "apps/erp-api/tests/e2e/helpers/local-api-harness.ts": "b1c4d7c61c10a2b5b0c28c367c8790196d667dd8d03bdd65058bf982efc3e968",
+    "apps/web/app/dashboard/contabilidad/estados/page.tsx": "c21870a56bdc974fa65f7a4b3e264bbee72502f5fdd069c82c51dd8d745aff25",
+    "apps/web/tests/e2e/peru-statements-refresh-local.spec.ts": "08df936e6b2ed238134e36204a977091df2dd76f968690b063afa041aac5ee94"
+  },
+  "complete_acceptance": false,
+  "remoteWrites": false
+}

@@ -1,0 +1,10 @@
+{
+  "completedAt": "2026-10-20T08:54:26.721Z",
+  "success": false,
+  "withBrowser": false,
+  "block": "derived_keys",
+  "scope": "derived_keys_subset",
+  "database": "PostgreSQL 16 efímero (migraciones completas)",
+  "output": "artifacts\\peru-derived_keys-local-20261020085222500-26544",
+  "remoteWrites": false
+}
