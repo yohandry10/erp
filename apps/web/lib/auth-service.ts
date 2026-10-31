@@ -1,5 +1,5 @@
 import { buildApiUrl } from './api-url';
-import { getOfflineStatus, isDesktopRuntime } from './offline-store';
+import { clearCachedApiResponses, getOfflineStatus, isDesktopRuntime } from './offline-store';
 import {
   clearDesktopAccessToken,
   loadDesktopAccessToken,
@@ -97,6 +97,8 @@ class AuthService {
   private accessToken: string | null = null;
   private listeners: ((session: Session | null) => void)[] = [];
   private profileInFlight: Promise<User | null> | null = null;
+  private desktopTokenRead: Promise<void> | null = null;
+  private sessionRevision = 0;
 
   constructor() {
     // Persistencia en memoria únicamente. El token real vive en cookie HttpOnly.
@@ -200,6 +202,7 @@ class AuthService {
   }
 
   private clearSession() {
+    this.sessionRevision += 1;
     this.session = null;
     this.accessToken = null;
     void queueDesktopTokenMutation(clearDesktopAccessToken).catch(() => undefined);
@@ -223,6 +226,7 @@ class AuthService {
     data: { user: User; session: Session } | null;
     error: Error | null;
   }> {
+    this.sessionRevision += 1;
     try {
       const response = await fetch(buildApiUrl('/api/auth/login/'), {
         method: 'POST',
@@ -250,6 +254,9 @@ class AuthService {
         };
       }
 
+      // Una autenticación nueva debe volver a autorizar las lecturas; el mismo
+      // usuario puede haber perdido permisos desde su sesión anterior.
+      await clearCachedApiResponses(loginUser.id, loginUser.tenant_id);
       this.accessToken = loginData.access_token;
 
       // Refrescar desde cookie/token para obtener el payload canónico del usuario.
@@ -258,6 +265,7 @@ class AuthService {
         user: profileUser || loginUser,
         access_token: loginData.access_token,
       };
+      await queueDesktopTokenMutation(() => saveDesktopAccessToken(loginData.access_token));
       this.saveSession(session);
 
       return {
@@ -311,17 +319,33 @@ class AuthService {
     return { session: this.session, accessToken: this.accessToken };
   }
 
+  // Esperar sólo el almacén protegido, sin consultar el perfil por cada request.
+  // Los efectos hijos pueden consultar el país antes de que AuthContext termine
+  // de restaurar el token tras una recarga del paquete estático.
+  async getRequestSession(): Promise<{ session: Session | null; accessToken: string | null }> {
+    this.getCachedSession();
+    if (!this.accessToken && isDesktopRuntime()) {
+      if (!this.desktopTokenRead) {
+        const revision = this.sessionRevision;
+        this.desktopTokenRead = (async () => {
+          try {
+            await desktopTokenMutation.catch(() => undefined);
+            const token = await loadDesktopAccessToken();
+            if (revision === this.sessionRevision && !this.accessToken) this.accessToken = token;
+          } catch (error) {
+            console.warn('[auth] No se pudo recuperar la sesión protegida de escritorio:', error);
+          }
+        })().finally(() => { this.desktopTokenRead = null; });
+      }
+      await this.desktopTokenRead;
+    }
+    return this.getCachedSession();
+  }
+
   async getSession(): Promise<{ data: { session: Session | null }; error: Error | null }> {
     let storedSession: Session | null = null;
 
-    if (!this.accessToken && isDesktopRuntime()) {
-      try {
-        await desktopTokenMutation.catch(() => undefined);
-        this.accessToken = await loadDesktopAccessToken();
-      } catch (error) {
-        console.warn('[auth] No se pudo recuperar la sesión protegida de escritorio:', error);
-      }
-    }
+    await this.getRequestSession();
 
     if (!this.session && typeof window !== 'undefined') {
       try {
@@ -442,6 +466,7 @@ export const customAuth = {
   signOut: authService.signOut.bind(authService),
   getSession: authService.getSession.bind(authService),
   getCachedSession: authService.getCachedSession.bind(authService),
+  getRequestSession: authService.getRequestSession.bind(authService),
   setSession: authService.setSession.bind(authService),
   onAuthStateChange: authService.onAuthStateChange.bind(authService),
 };

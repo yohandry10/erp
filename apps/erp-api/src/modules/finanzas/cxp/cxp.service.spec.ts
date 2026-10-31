@@ -80,6 +80,34 @@ describe('CxpService', () => {
     const tenantId = 'tenant-123';
     const userId = 'user-456';
 
+    it('impide que una NC sin ajuste soportado cree otra deuda de proveedor', async () => {
+      await expect(service.crearCuentaPorPagar(tenantId, {
+        proveedor_id: 'prov-001', numero_documento: 'FC01-20', fecha_emision: '2026-10-07',
+        subtotal: 100, igv: 18, total: 118, tipo_documento: 'NOTA_CREDITO',
+        documento_referencia_tipo: 'FACTURA', documento_referencia_serie: 'F001',
+        documento_referencia_numero: '1', documento_referencia_fecha: '2026-10-01',
+      }, userId)).rejects.toThrow('Vincule la nota de crédito');
+      expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
+    });
+
+    it('registra una NC de devolución con el writer fiscal sin pasar por alta de deuda', async () => {
+      mockSupabaseClient.rpc.mockResolvedValueOnce({
+        data: { id: 'nc-1', saldo: 0, metadata: { registro_fiscal_sin_obligacion: true } }, error: null,
+      });
+      const result = await service.crearCuentaPorPagar(tenantId, {
+        proveedor_id: 'prov-001', numero_documento: 'FC01-20', fecha_emision: '2026-10-07',
+        subtotal: 100, igv: 18, total: 118, tipo_documento: 'NOTA_CREDITO',
+        devolucion_proveedor_id: 'dev-1', documento_referencia_tipo: 'FACTURA',
+        documento_referencia_serie: 'F001', documento_referencia_numero: '1',
+        documento_referencia_fecha: '2026-10-01',
+      }, userId);
+      expect(result.data.saldo).toBe(0);
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledTimes(1);
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('registrar_nota_credito_proveedor_devolucion_tx',
+        expect.objectContaining({ p_actor_id: userId, p_devolucion_id: 'dev-1' }));
+      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
+    });
+
     it('rechaza moneda extranjera sin tipo de cambio antes de persistir', async () => {
       await expect(service.crearCuentaPorPagar(tenantId, {
         proveedor_id: 'prov-001',
@@ -679,6 +707,70 @@ describe('CxpService', () => {
       expect(result.success).toBe(true);
       expect(result.data.proveedores).toBeDefined();
       expect(result.data.proveedores.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('crédito proveedor 570 y pagos confirmados', () => {
+    it('registra un descuento por writer NC y nunca por alta positiva de deuda', async () => {
+      mockSupabaseClient.rpc.mockResolvedValueOnce({
+        data: { id: 'nc-570', saldo: 0, saldo_credito_proveedor: 118 }, error: null,
+      });
+      const result = await service.crearCuentaPorPagar('tenant-570', {
+        proveedor_id: 'prov-570', numero_documento: 'FC02-570', fecha_emision: '2026-10-07',
+        subtotal: 100, igv: 18, total: 118, tipo_documento: 'NOTA_CREDITO',
+        factura_proveedor_id: 'invoice-570', motivo_nota_credito: 'DESCUENTO', cuenta_ajuste_id: 'account-63',
+        documento_referencia_tipo: 'FACTURA', documento_referencia_serie: 'F002',
+        documento_referencia_numero: '570', documento_referencia_fecha: '2026-10-01',
+      }, 'actor-570');
+      expect(result.data.saldo_credito_proveedor).toBe(118);
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledTimes(1);
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('registrar_nota_credito_proveedor_tx',
+        expect.objectContaining({ p_tenant_id: 'tenant-570', p_actor_id: 'actor-570', p_factura_id: 'invoice-570' }));
+      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
+    });
+
+    it('envía aplicación de crédito con actor y key sin pago adicional', async () => {
+      mockSupabaseClient.rpc.mockResolvedValueOnce({ data: { nota: { id: 'nc-570', saldo_credito_proveedor: 0 } }, error: null });
+      await service.usarCreditoProveedor('tenant-570', 'nc-570', {
+        accion: 'APLICACION', monto: 118, fecha: '2026-10-07', factura_id: 'target-570', idempotency_key: 'credit-apply-570',
+      }, 'actor-570');
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('aplicar_credito_proveedor_tx', expect.objectContaining({
+        p_tenant_id: 'tenant-570', p_actor_id: 'actor-570', p_nota_credito_id: 'nc-570', p_idempotency_key: 'credit-apply-570',
+      }));
+      expect(mockTesoreriaService.registrarPago).not.toHaveBeenCalled();
+    });
+
+    it('exige destino real para aplicación y banco real para reembolso', async () => {
+      const common = { monto: 118, fecha: '2026-10-07', idempotency_key: 'credit-invalid-570' };
+      await expect(service.usarCreditoProveedor('tenant-570', 'nc-570', { ...common, accion: 'APLICACION' }, 'actor-570'))
+        .rejects.toThrow('Seleccione la factura');
+      await expect(service.usarCreditoProveedor('tenant-570', 'nc-570', { ...common, accion: 'REEMBOLSO' }, 'actor-570'))
+        .rejects.toThrow('Seleccione la cuenta bancaria');
+      expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
+    });
+
+    it('devuelve pagos reales completos de banco y efectivo sin contar la NC como pago', async () => {
+      const tenant = 'aa510000-0000-4000-8000-000000000001';
+      const account = 'aa510000-0000-4000-8000-000000000002';
+      const bankId = 'aa510000-0000-4000-8000-000000000003';
+      const bankPayment = 'aa510000-0000-4000-8000-000000000004';
+      const cashPayment = 'aa510000-0000-4000-8000-000000000005';
+      const query = (result: any) => {
+        const value: any = { eq: jest.fn(() => value), order: jest.fn(() => value), range: jest.fn(() => value),
+          maybeSingle: jest.fn(async () => result), then: (resolve: any) => Promise.resolve(result).then(resolve) };
+        return { select: jest.fn(() => value) };
+      };
+      mockSupabaseClient.from.mockReturnValueOnce(query({ data: { id: account, tenant_id: tenant, moneda: 'PEN' }, error: null }))
+        .mockReturnValueOnce(query({ data: [{ id: bankPayment, tenant_id: tenant, cxp_id: account, fecha: '2026-10-07', monto: 1180,
+          tipo: 'CARGO', metodo_pago: 'TRANSFERENCIA', conciliado: false, cuenta_bancaria_id: bankId,
+          cuenta_bancaria: { id: bankId, banco: 'Fixture', numero_cuenta: '000', moneda: 'PEN' } }], count: 1, error: null }))
+        .mockReturnValueOnce(query({ data: [{ id: cashPayment, tenant_id: tenant, cuenta_por_pagar_id: account, fecha_pago: '2026-10-06', monto: 100,
+          moneda: 'PEN', metodo_pago: 'EFECTIVO', estado: 'APLICADO', activo: true }], count: 1, error: null }));
+      const result = await service.obtenerHistorialPagos(tenant, account);
+      expect(result.data.map((payment) => payment.id)).toEqual([bankPayment, cashPayment]);
+      expect(result.data.reduce((sum, payment) => sum + payment.monto, 0)).toBe(1280);
+      expect(result.fuentes_pagos).toEqual({ complete: true, total: 2, bank_total: 1, cash_total: 1, page_size: 1000 });
+      expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
     });
   });
 

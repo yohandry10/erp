@@ -12,12 +12,12 @@ export class OrdenCompraDetalleDto {
   descripcion: string;
 
   @ApiProperty({ description: 'Cantidad solicitada', example: 10 })
-  @IsNumber({}, { message: 'La cantidad debe ser un número' })
+  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'La cantidad admite como máximo dos decimales' })
   @Min(0.01, { message: 'La cantidad debe ser mayor a 0' })
   cantidad: number;
 
   @ApiProperty({ description: 'Precio unitario', example: 2500.00 })
-  @IsNumber({}, { message: 'El precio unitario debe ser un número' })
+  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'El precio unitario admite como máximo dos decimales' })
   @Min(0, { message: 'El precio unitario no puede ser negativo' })
   precio_unitario: number;
 

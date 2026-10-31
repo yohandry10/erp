@@ -5,6 +5,7 @@ import {
   PdfGeneratorService,
   getCpeDemoPdfNotice,
   getCpeNonFiscalPdfNotice,
+  getCpePeruPendingAcceptanceNotice,
   resolveCpePrintedNoteReference,
   resolveCpePrintedLineTotal,
   resolveCpePrintedUnitPrice,
@@ -14,6 +15,15 @@ import { PdfFormatHelperService, normalizeFiscalDocumentType } from './pdf-forma
 const pdfFormatHelper = new PdfFormatHelperService();
 
 describe('representación impresa CPE', () => {
+  it('READY y estados incompletos sin CDR no anuncian aceptación SUNAT en el PDF', () => {
+    const signed = { simulated_origin: false, estado: 'FIRMADO', sunat_status: 'READY', cdr_sunat: null };
+    for (const cpe of [signed, { ...signed, estado: 'ACEPTADO', sunat_status: 'ACCEPTED' },
+      { ...signed, cdr_sunat: '<CDR />' }, { ...signed, estado: 'ACEPTADO', sunat_status: 'ACCEPTED', cdr_sunat: {} }]) {
+      expect(getCpePeruPendingAcceptanceNotice(cpe)).toContain('Sin aceptación SUNAT');
+    }
+    expect(getCpePeruPendingAcceptanceNotice({ ...signed, estado: 'ACEPTADO', sunat_status: 'ACCEPTED', cdr_sunat: '<CDR />' })).toBeNull();
+    expect(getCpePeruPendingAcceptanceNotice({ ...signed, simulated_origin: true })).toBeNull();
+  });
   it('renderiza con el país histórico del CPE y no con el país actual del tenant', async () => {
     const service = new PdfGeneratorService({} as any, pdfFormatHelper) as any;
     jest.spyOn(service, 'getCpeData').mockResolvedValue({
@@ -133,6 +143,19 @@ describe('representación impresa CPE', () => {
       cantidad: 2,
       precio_unitario: 100,
     })).toBe(200);
+  });
+
+  it('no toma el precio unitario con IGV de una factura de pedido como importe de la línea', () => {
+    // Forma persistida por la facturación de pedidos: precio_venta es unitario.
+    const pedidoLine = {
+      cantidad: 30,
+      precio_unitario: 45,
+      precio_venta: 53.1,
+      valor_venta: 1350,
+      igv: 243,
+    };
+    expect(resolveCpePrintedLineTotal(pedidoLine)).toBe(1593);
+    expect(resolveCpePrintedUnitPrice(pedidoLine)).toBeCloseTo(53.1, 2);
   });
 
   it('declara de forma inequívoca que el PDF demo peruano no tiene validez SUNAT', () => {
@@ -585,6 +608,31 @@ describe('representación impresa CPE', () => {
     expect(client.from).toHaveBeenCalledWith('documento_detalles');
     expect(detailsChain.eq).toHaveBeenCalledWith('tenant_id', 'tenant-1');
     expect(detailsChain.eq).toHaveBeenCalledWith('documento_id', 'doc-1');
+  });
+
+  it('mantiene el IGV contractual al imprimir importes redondeados y operaciones exoneradas', () => {
+    const service = new PdfGeneratorService({} as any, {} as any) as any;
+    const cpe = {
+      total_gravadas: 3.39, total_igv: 0.61, total_exoneradas: 0.13,
+      items: [
+        { afectacion_igv: '10', valor_venta: 3.39, igv: 0.61 },
+        { afectacion_igv: '20', valor_venta: 0.13, igv: 0, tasa_igv: 0 },
+      ],
+    };
+    expect(service.getTaxLabel(cpe, 'PE')).toBe('IGV (18%)');
+    expect(service.getTaxLabel({ ...cpe, tasa_igv: 0.18 }, 'PE')).toBe('IGV (18%)');
+  });
+
+  it('representa tasas persistidas sin sustituir IVA de otros países ni atribuir una sola tasa a líneas mixtas', () => {
+    const service = new PdfGeneratorService({} as any, {} as any) as any;
+    expect(service.getTaxLabel({ total_gravadas: 3.39, total_igv: 0.64 }, 'CO')).toBe('IVA (19%)');
+    expect(service.getTaxLabel({ total_gravadas: 3.39, total_igv: 0.71 }, 'AR')).toBe('IVA (21%)');
+    expect(service.getTaxLabel({ items: [
+      { afectacion_igv: '10', tasa_igv: 5 }, { afectacion_igv: '20', tasa_igv: 0 },
+    ] }, 'CO')).toBe('IVA (5%)');
+    expect(service.getTaxLabel({ tasa_igv: 18, items: [
+      { afectacion_igv: '10', tasa_igv: 18 }, { afectacion_igv: '10', tasa_igv: 10 },
+    ] }, 'PE')).toBe('IGV');
   });
 
   it('muestra unidad y omite renglones de totales con importe cero', () => {

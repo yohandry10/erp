@@ -1,3 +1,7 @@
+import { salesOrderFixture } from './fixtures/sales-order'
+import { cpeA4Fixture } from './fixtures/cpe-a4'
+import { cpeListFixture } from './fixtures/cpe-list'
+import { fiscalCountryFixture } from './fixtures/fiscal-country'
 import { expect, test } from '@playwright/test'
 import { SignJWT } from 'jose'
 
@@ -24,32 +28,32 @@ const onePageA4Pdf = () => {
 }
 
 const user = {
-  id: 'cotizacion-dialog-user',
+  id: '5a1e0000-0000-4000-8000-000000000100',
   email: 'cotizacion-dialog@erp.local',
   nombre: 'QA',
   apellido: 'Cotizaciones',
   roles: ['ADMIN'],
-  tenant_id: 'cotizacion-dialog-tenant',
+  tenant_id: '5a1e0000-0000-4000-8000-000000000101',
   is_super_admin: false,
 }
 
 const sellerUser = {
-  id: 'pedido-vendedor-user',
-  email: 'pedido-vendedor@erp.local',
+  id: '5a1e0000-0000-4000-8000-000000000102',
+  email: '5a1e0000-0000-4000-8000-000000000106@erp.local',
   nombre: 'QA',
   apellido: 'Vendedor',
   roles: ['VENDEDOR'],
-  tenant_id: 'pedido-vendedor-tenant',
+  tenant_id: '5a1e0000-0000-4000-8000-000000000103',
   is_super_admin: false,
 }
 
 const logisticsUser = {
-  id: 'pedido-logistica-user',
-  email: 'pedido-logistica@erp.local',
+  id: '5a1e0000-0000-4000-8000-000000000104',
+  email: '5a1e0000-0000-4000-8000-000000000107@erp.local',
   nombre: 'QA',
   apellido: 'Logística',
   roles: ['ADMIN'],
-  tenant_id: 'pedido-logistica-tenant',
+  tenant_id: '5a1e0000-0000-4000-8000-000000000105',
   is_super_admin: false,
 }
 
@@ -91,8 +95,9 @@ test('el cliente encuentra y abre la representación A4 de una factura demo', as
     })
 
     if (/\/api\/auth\/profile\/?$/.test(pathname)) return json(user)
+    if (pathname.replace(/\/$/, '') === '/api/tenants/me') return json({ data: { id: user.tenant_id, nombre: 'Empresa aislada', estado: 'ACTIVO' } });
     if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
-      return json({ data: { pais_id: 1, pais: 'PE', paisCodigo: 'PE', monedaDefecto: 'PEN', locale: 'es-PE' } })
+      return json(fiscalCountryFixture(user.tenant_id, { pais_id: 1, pais: 'PE', paisCodigo: 'PE', monedaDefecto: 'PEN', locale: 'es-PE' }))
     }
     if (/\/api\/demo\/status\/?$/.test(pathname)) {
       return json({ is_demo: true, is_expired: false, dias_restantes: 14 })
@@ -103,25 +108,23 @@ test('el cliente encuentra y abre la representación A4 de una factura demo', as
     if (/\/api\/cpe\/stats\/?$/.test(pathname)) {
       return json({ success: true, data: { cpeEmitidosHoy: 1, cpeDelMes: 1, montoFacturado: 118, rechazados: 0 } })
     }
-    if (/\/api\/cpe\/comprobantes\/cpe-a4-demo\/pdf\/?$/.test(pathname)) {
+    if (/\/api\/cpe\/comprobantes\/c9e00000-0000-4000-8000-000000000001\/pdf\/?$/.test(pathname)) {
       return route.fulfill({
         status: 200,
         contentType: 'application/pdf',
         body: onePageA4Pdf(),
       })
     }
-    if (/\/api\/cpe\/comprobantes\/cpe-n[cd]-demo\/pdf\/?$/.test(pathname)) {
+    if (/\/api\/cpe\/comprobantes\/(?:c9e00000-0000-4000-8000-000000000002|c9e00000-0000-4000-8000-000000000003)\/pdf\/?$/.test(pathname)) {
       return route.fulfill({
         status: 200,
         contentType: 'application/pdf',
         body: onePageA4Pdf(),
       })
     }
-    if (/\/api\/cpe\/comprobantes\/cpe-a4-demo\/?$/.test(pathname)) {
-      return json({
-        success: true,
-        data: {
-          id: 'cpe-a4-demo',
+    if (/\/api\/cpe\/comprobantes\/c9e00000-0000-4000-8000-000000000001\/?$/.test(pathname)) {
+      return json(cpeA4Fixture({
+          id: 'c9e00000-0000-4000-8000-000000000001',
           tipo_documento: '01',
           serie: 'F001',
           numero: 42,
@@ -153,12 +156,11 @@ test('el cliente encuentra y abre la representación A4 de una factura demo', as
             precio_unitario: index === 0 ? 50 : 1,
             total_item: index === 0 ? 118 : 1,
           })),
-        },
-      })
+        }))
     }
-    if (/\/api\/cpe\/comprobantes\/cpe-nc-demo\/?$/.test(pathname)) {
-      return json({ success: true, data: {
-        id: 'cpe-nc-demo', tipo_documento: '07', serie: 'FC01', numero: 7,
+    if (/\/api\/cpe\/comprobantes\/c9e00000-0000-4000-8000-000000000002\/?$/.test(pathname)) {
+      return json(cpeA4Fixture({
+        id: 'c9e00000-0000-4000-8000-000000000002', tipo_documento: '07', serie: 'FC01', numero: 7,
         fecha_emision: '2026-08-29', pais_codigo: 'PE', moneda: 'PEN', estado: 'FIRMADO',
         simulated_origin: true,
         razon_social_receptor: 'Cliente Nota S.A.C.', documento_receptor: '20600000013',
@@ -169,11 +171,11 @@ test('el cliente encuentra y abre la representación A4 de una factura demo', as
         fiscal_qr_data_url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
         emisor: { ruc: '20600000021', razon_social: 'Comercial Andina Demo S.A.C.', direccion_fiscal: 'Lima' },
         items: [{ cantidad: 1, unidad_medida: 'NIU', descripcion: 'Producto devuelto', total_item: 59 }],
-      } })
+      }))
     }
-    if (/\/api\/cpe\/comprobantes\/cpe-nd-demo\/?$/.test(pathname)) {
-      return json({ success: true, data: {
-        id: 'cpe-nd-demo', tipo_documento: '08', serie: 'FD01', numero: 8,
+    if (/\/api\/cpe\/comprobantes\/c9e00000-0000-4000-8000-000000000003\/?$/.test(pathname)) {
+      return json(cpeA4Fixture({
+        id: 'c9e00000-0000-4000-8000-000000000003', tipo_documento: '08', serie: 'FD01', numero: 8,
         fecha_emision: '2026-08-29', pais_codigo: 'PE', moneda: 'PEN', estado: 'FIRMADO',
         simulated_origin: true,
         razon_social_receptor: 'Cliente Nota S.A.C.', documento_receptor: '20600000013',
@@ -183,18 +185,16 @@ test('el cliente encuentra y abre la representación A4 de una factura demo', as
         fiscal_qr_data_url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
         emisor: { ruc: '20600000021', razon_social: 'Comercial Andina Demo S.A.C.', direccion_fiscal: 'Lima' },
         items: [{ cantidad: 1, unidad_medida: 'ZZ', descripcion: 'Intereses', total_item: 11.8 }],
-      } })
+      }))
     }
     if (/\/api\/cpe\/comprobantes\/?$/.test(pathname)) {
-      return json({
-        success: true,
-        data: [{
-          id: 'cpe-a4-demo',
+      return json(cpeListFixture([{
+          id: 'c9e00000-0000-4000-8000-000000000001',
           tipoDocumento: '01',
           tipoComprobante: 'Factura',
           serie: 'F001',
           numero: 42,
-          fechaEmision: '25/08/2026',
+          fechaEmision: '2026-08-25',
           cliente: 'Cliente Vista Previa S.A.C.',
           clienteRuc: '20600000013',
           total: 118,
@@ -202,15 +202,14 @@ test('el cliente encuentra y abre la representación A4 de una factura demo', as
           estado: 'FIRMADO',
           fechaCreacion: '2026-08-25T12:00:00Z',
         }, {
-          id: 'cpe-nc-demo', tipoDocumento: '07', tipoComprobante: 'Nota de crédito', serie: 'FC01', numero: 7,
-          fechaEmision: '29/08/2026', cliente: 'Cliente Nota S.A.C.', clienteRuc: '20600000013',
+          id: 'c9e00000-0000-4000-8000-000000000002', tipoDocumento: '07', tipoComprobante: 'Nota de crédito', serie: 'FC01', numero: 7,
+          fechaEmision: '2026-08-29', cliente: 'Cliente Nota S.A.C.', clienteRuc: '20600000013',
           total: 59, moneda: 'PEN', estado: 'FIRMADO', fechaCreacion: '2026-08-29T12:00:00Z',
         }, {
-          id: 'cpe-nd-demo', tipoDocumento: '08', tipoComprobante: 'Nota de débito', serie: 'FD01', numero: 8,
-          fechaEmision: '29/08/2026', cliente: 'Cliente Nota S.A.C.', clienteRuc: '20600000013',
+          id: 'c9e00000-0000-4000-8000-000000000003', tipoDocumento: '08', tipoComprobante: 'Nota de débito', serie: 'FD01', numero: 8,
+          fechaEmision: '2026-08-29', cliente: 'Cliente Nota S.A.C.', clienteRuc: '20600000013',
           total: 11.8, moneda: 'PEN', estado: 'FIRMADO', fechaCreacion: '2026-08-29T13:00:00Z',
-        }],
-      })
+        }],true))
     }
     return json({ success: true, data: [] })
   })
@@ -223,7 +222,7 @@ test('el cliente encuentra y abre la representación A4 de una factura demo', as
     window.localStorage.setItem('selectedCountry', '1')
   }, user)
 
-  await page.goto('/dashboard/cpe/?cpe_id=cpe-a4-demo', { waitUntil: 'domcontentloaded' })
+  await page.goto('/dashboard/cpe/?cpe_id=c9e00000-0000-4000-8000-000000000001', { waitUntil: 'domcontentloaded' })
   await expect(page.getByText(/Usa “Vista A4” para ver un resumen/i)).toBeVisible({ timeout: 30_000 })
 
   const dialog = page.getByRole('dialog', { name: /Factura F001-00000042/i })
@@ -248,14 +247,14 @@ test('el cliente encuentra y abre la representación A4 de una factura demo', as
   await expect(dialog.getByRole('button', { name: 'Descargar A4' })).toBeEnabled()
   await expect(dialog.getByRole('button', { name: 'Abrir PDF / imprimir' })).toBeEnabled()
 
-  await page.goto('/dashboard/cpe/?cpe_id=cpe-nc-demo', { waitUntil: 'domcontentloaded' })
+  await page.goto('/dashboard/cpe/?cpe_id=c9e00000-0000-4000-8000-000000000002', { waitUntil: 'domcontentloaded' })
   const creditDialog = page.getByRole('dialog', { name: /Nota de crédito FC01-00000007/i })
   const creditReference = creditDialog.getByTestId('cpe-a4-note-reference')
   await expect(creditReference).toContainText('Factura electrónica F001-00000015')
   await expect(creditReference).toContainText(/Código de motivo:\s*10/)
   await expect(creditReference).toContainText('Devolución parcial acordada con el cliente')
 
-  await page.goto('/dashboard/cpe/?cpe_id=cpe-nd-demo', { waitUntil: 'domcontentloaded' })
+  await page.goto('/dashboard/cpe/?cpe_id=c9e00000-0000-4000-8000-000000000003', { waitUntil: 'domcontentloaded' })
   const debitDialog = page.getByRole('dialog', { name: /Nota de débito FD01-00000008/i })
   const debitReference = debitDialog.getByTestId('cpe-a4-note-reference')
   await expect(debitReference).toContainText('Boleta de venta electrónica B001-00000009')
@@ -297,10 +296,11 @@ test('la representación A4 localiza etiquetas fiscales para Colombia y Argentin
     })
 
     if (/\/api\/auth\/profile\/?$/.test(pathname)) return json(user)
+    if (pathname.replace(/\/$/, '') === '/api/tenants/me') return json({ data: { id: user.tenant_id, nombre: 'Empresa aislada', estado: 'ACTIVO' } });
     if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
-      return json({ data: activeCountry === 'CO'
-        ? { pais_id: 3, pais: 'CO', paisCodigo: 'CO', monedaDefecto: 'COP', locale: 'es-CO' }
-        : { pais_id: 2, pais: 'AR', paisCodigo: 'AR', monedaDefecto: 'ARS', locale: 'es-AR' } })
+      return json(fiscalCountryFixture(user.tenant_id, activeCountry === 'CO'
+        ? { pais_id: 2, pais: 'CO', paisCodigo: 'CO', monedaDefecto: 'COP', locale: 'es-CO' }
+        : { pais_id: 5, pais: 'AR', paisCodigo: 'AR', monedaDefecto: 'ARS', locale: 'es-AR' }))
     }
     if (/\/api\/demo\/status\/?$/.test(pathname)) {
       return json({ is_demo: true, is_expired: false, dias_restantes: 14 })
@@ -311,17 +311,15 @@ test('la representación A4 localiza etiquetas fiscales para Colombia y Argentin
     if (/\/api\/cpe\/stats\/?$/.test(pathname)) {
       return json({ success: true, data: { cpeEmitidosHoy: 1, cpeDelMes: 1, montoFacturado: 119000, rechazados: 0 } })
     }
-    if (/\/api\/cpe\/comprobantes\/cpe-co-demo\/pdf\/?$/.test(pathname)) {
+    if (/\/api\/cpe\/comprobantes\/c9e00000-0000-4000-8000-000000000004\/pdf\/?$/.test(pathname)) {
       return route.fulfill({ status: 200, contentType: 'application/pdf', body: onePageA4Pdf() })
     }
-    if (/\/api\/cpe\/comprobantes\/cpe-ar-demo\/pdf\/?$/.test(pathname)) {
+    if (/\/api\/cpe\/comprobantes\/c9e00000-0000-4000-8000-000000000005\/pdf\/?$/.test(pathname)) {
       return route.fulfill({ status: 200, contentType: 'application/pdf', body: onePageA4Pdf() })
     }
-    if (/\/api\/cpe\/comprobantes\/cpe-co-demo\/?$/.test(pathname)) {
-      return json({
-        success: true,
-        data: {
-          id: 'cpe-co-demo', tipo_documento: '01', serie: 'FV01', numero: 9,
+    if (/\/api\/cpe\/comprobantes\/c9e00000-0000-4000-8000-000000000004\/?$/.test(pathname)) {
+      return json(cpeA4Fixture({
+          id: 'c9e00000-0000-4000-8000-000000000004', tipo_documento: '01', serie: 'FV01', numero: 9,
           fecha_emision: '2026-08-29', pais_codigo: 'CO', moneda: 'COP', estado: 'BORRADOR',
           simulated_origin: true,
           razon_social_receptor: 'Cliente Colombiano S.A.S.', documento_receptor: '9011234567',
@@ -340,14 +338,11 @@ test('la representación A4 localiza etiquetas fiscales para Colombia y Argentin
             direccion_fiscal: 'Bogotá D.C.',
           },
           items: [{ cantidad: 1, unidad_medida: 'NIU', descripcion: 'Servicio Colombia', total_item: 119000 }],
-        },
-      })
+        }))
     }
-    if (/\/api\/cpe\/comprobantes\/cpe-ar-demo\/?$/.test(pathname)) {
-      return json({
-        success: true,
-        data: {
-          id: 'cpe-ar-demo', tipo_documento: '003', tipo_documento_fiscal: '003', serie: '00012', numero: 10,
+    if (/\/api\/cpe\/comprobantes\/c9e00000-0000-4000-8000-000000000005\/?$/.test(pathname)) {
+      return json(cpeA4Fixture({
+          id: 'c9e00000-0000-4000-8000-000000000005', tipo_documento: '003', tipo_documento_fiscal: '003', serie: '00012', numero: 10,
           fecha_emision: '2026-08-29', pais_codigo: 'AR', moneda: 'ARS', estado: 'BORRADOR',
           simulated_origin: true,
           razon_social_receptor: 'Cliente Argentino S.A.', documento_receptor: '30712345678',
@@ -361,19 +356,18 @@ test('la representación A4 localiza etiquetas fiscales para Colombia y Argentin
           },
           emisor: { ruc: '30700000001', razon_social: 'Emisor Argentina S.A.', direccion_fiscal: 'Buenos Aires' },
           items: [{ cantidad: 1, unidad_medida: 'UN', descripcion: 'Servicio Argentina', total_item: 121000 }],
-        },
-      })
+        }))
     }
     if (/\/api\/cpe\/comprobantes\/?$/.test(pathname)) {
-      return json({ success: true, data: activeCountry === 'CO' ? [{
-        id: 'cpe-co-demo', tipoDocumento: '01', tipoComprobante: 'Factura', serie: 'FV01', numero: 9,
-        fechaEmision: '29/08/2026', cliente: 'Cliente Colombiano S.A.S.', clienteRuc: '9011234567',
-        total: 119000, moneda: 'COP', estado: 'FIRMADO',
+      return json(cpeListFixture(activeCountry === 'CO' ? [{
+        id: 'c9e00000-0000-4000-8000-000000000004', tipoDocumento: '01', tipoComprobante: 'Factura', serie: 'FV01', numero: 9,
+        fechaEmision: '2026-08-29', cliente: 'Cliente Colombiano S.A.S.', clienteRuc: '9011234567',
+        total: 119000, moneda: 'COP', estado: 'FIRMADO', fechaCreacion:'2026-08-29T12:00:00Z',
       }] : [{
-        id: 'cpe-ar-demo', tipoDocumento: '003', tipoComprobante: 'Nota de crédito', serie: '00012', numero: 10,
-        fechaEmision: '29/08/2026', cliente: 'Cliente Argentino S.A.', clienteRuc: '30712345678',
-        total: 121000, moneda: 'ARS', estado: 'FIRMADO',
-      }] })
+        id: 'c9e00000-0000-4000-8000-000000000005', tipoDocumento: '003', tipoComprobante: 'Nota de crédito', serie: '00012', numero: 10,
+        fechaEmision: '2026-08-29', cliente: 'Cliente Argentino S.A.', clienteRuc: '30712345678',
+        total: 121000, moneda: 'ARS', estado: 'FIRMADO', fechaCreacion:'2026-08-29T12:00:00Z',
+      }],true))
     }
     return json({ success: true, data: [] })
   })
@@ -386,7 +380,7 @@ test('la representación A4 localiza etiquetas fiscales para Colombia y Argentin
     window.localStorage.setItem('selectedCountry', '3')
   }, user)
 
-  await page.goto('/dashboard/cpe/?cpe_id=cpe-co-demo', { waitUntil: 'domcontentloaded' })
+  await page.goto('/dashboard/cpe/?cpe_id=c9e00000-0000-4000-8000-000000000004', { waitUntil: 'domcontentloaded' })
   const dialog = page.getByRole('dialog', { name: /Factura FV019/i })
   await expect(dialog).toBeVisible({ timeout: 30_000 })
   await expect(dialog.getByText(/Muestra demo · sin validez DIAN/i)).toBeVisible()
@@ -400,7 +394,7 @@ test('la representación A4 localiza etiquetas fiscales para Colombia y Argentin
   await expect(dialog.getByText(/SUNAT/i)).toHaveCount(0)
 
   activeCountry = 'AR'
-  await page.goto('/dashboard/cpe/?cpe_id=cpe-ar-demo', { waitUntil: 'domcontentloaded' })
+  await page.goto('/dashboard/cpe/?cpe_id=c9e00000-0000-4000-8000-000000000005', { waitUntil: 'domcontentloaded' })
   const arDialog = page.getByRole('dialog', { name: /Nota de crédito 00012-00000010/i })
   await expect(arDialog).toBeVisible({ timeout: 30_000 })
   await expect(
@@ -475,8 +469,9 @@ test('ADMIN autoaprueba su cotización en un solo flujo y conserva la observaci�
     })
 
     if (/\/api\/auth\/profile\/?$/.test(pathname)) return json(user)
+    if (pathname.replace(/\/$/, '') === '/api/tenants/me') return json({ data: { id: user.tenant_id, nombre: 'Empresa aislada', estado: 'ACTIVO' } });
     if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
-      return json({ data: { pais_id: 1, pais: 'PE', paisCodigo: 'PE', monedaDefecto: 'PEN' } })
+      return json(fiscalCountryFixture(user.tenant_id, { pais_id: 1, pais: 'PE', paisCodigo: 'PE', monedaDefecto: 'PEN' }))
     }
     if (/\/api\/demo\/status\/?$/.test(pathname)) return json({ is_demo: false, is_expired: false })
     if (/\/api\/usuarios-sistema\/me\/permissions\/?$/.test(pathname)) {
@@ -600,8 +595,9 @@ test('la bandeja aprueba pedidos sin prompt nativo y envía el sustento', async 
     })
 
     if (/\/api\/auth\/profile\/?$/.test(pathname)) return json(user)
+    if (pathname.replace(/\/$/, '') === '/api/tenants/me') return json({ data: { id: user.tenant_id, nombre: 'Empresa aislada', estado: 'ACTIVO' } });
     if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
-      return json({ data: { pais_id: 1, pais: 'PE', paisCodigo: 'PE', monedaDefecto: 'PEN', locale: 'es-PE' } })
+      return json(fiscalCountryFixture(user.tenant_id, { pais_id: 1, pais: 'PE', paisCodigo: 'PE', monedaDefecto: 'PEN', locale: 'es-PE' }))
     }
     if (/\/api\/demo\/status\/?$/.test(pathname)) return json({ is_demo: false, is_expired: false })
     if (/\/api\/usuarios-sistema\/me\/permissions\/?$/.test(pathname)) return json({ data: [] })
@@ -698,16 +694,15 @@ test('el vendedor entrega el pedido a Logística sin recibir accesos que no pose
     })
 
     if (/\/api\/auth\/profile\/?$/.test(pathname)) return json(sellerUser)
+    if (pathname.replace(/\/$/, '') === '/api/tenants/me') return json({ data: { id: sellerUser.tenant_id, nombre: 'Empresa aislada', estado: 'ACTIVO' } });
     if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
-      return json({
-        data: {
+      return json(fiscalCountryFixture(sellerUser.tenant_id, {
           pais_id: 1,
           pais: 'PE',
           paisCodigo: 'PE',
           monedaDefecto: 'PEN',
           usar_flujo_logistica: true,
-        },
-      })
+        }))
     }
     if (/\/api\/demo\/status\/?$/.test(pathname)) return json({ is_demo: false, is_expired: false })
     if (/\/api\/usuarios-sistema\/me\/permissions\/?$/.test(pathname)) {
@@ -733,11 +728,9 @@ test('el vendedor entrega el pedido a Logística sin recibir accesos que no pose
         },
       })
     }
-    if (/\/api\/ventas\/pedidos\/pedido-vendedor\/?$/.test(pathname)) {
-      return json({
-        success: true,
-        data: {
-          id: 'pedido-vendedor',
+    if (/\/api\/ventas\/pedidos\/5a1e0000-0000-4000-8000-000000000106\/?$/.test(pathname)) {
+      return json(salesOrderFixture(sellerUser,{
+          id: '5a1e0000-0000-4000-8000-000000000106',
           numero: 'PED-QA-VENDEDOR',
           estado: 'CONFIRMADO',
           created_at: '2026-08-25T12:00:00-05:00',
@@ -752,15 +745,14 @@ test('el vendedor entrega el pedido a Logística sin recibir accesos que no pose
             documento_numero: '20600000013',
           },
           detalle: [{
-            id: 'detalle-vendedor',
+            id: '5a1e0000-0000-4000-8000-000000000108',
             descripcion: 'Producto QA',
             cantidad: 1,
             cantidad_despachada: 0,
             precio_unitario: 100,
             subtotal: 100,
           }],
-        },
-      })
+        }))
     }
     if (/\/api\/inventario\/logistica\/ordenes-pendientes\/?$/.test(pathname)) {
       logisticsRequests += 1
@@ -778,7 +770,7 @@ test('el vendedor entrega el pedido a Logística sin recibir accesos que no pose
     window.localStorage.setItem('selectedCountry', '1')
   }, sellerUser)
 
-  await page.goto('/dashboard/ventas/pedidos/pedido-vendedor/', { waitUntil: 'domcontentloaded' })
+  await page.goto('/dashboard/ventas/pedidos/5a1e0000-0000-4000-8000-000000000106/', { waitUntil: 'domcontentloaded' })
   await expect(page.getByRole('heading', { name: 'Pedido PED-QA-VENDEDOR' })).toBeVisible({ timeout: 30_000 })
   await expect(page.getByText('Pendiente de atención por el equipo de Logística', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Ir a Logística' })).toHaveCount(0)
@@ -815,7 +807,7 @@ test('el rol autorizado abre Logística y carga las órdenes pendientes', async 
 
   let logisticsRequests = 0
   const pedido = {
-    id: 'pedido-logistica',
+    id: '5a1e0000-0000-4000-8000-000000000107',
     numero: 'PED-QA-LOGISTICA',
     estado: 'CONFIRMADO',
     created_at: '2026-08-25T12:00:00-05:00',
@@ -830,7 +822,7 @@ test('el rol autorizado abre Logística y carga las órdenes pendientes', async 
       documento_numero: '20600000013',
     },
     detalle: [{
-      id: 'detalle-logistica',
+      id: '5a1e0000-0000-4000-8000-000000000109',
       descripcion: 'Producto QA',
       cantidad: 1,
       cantidad_despachada: 0,
@@ -848,16 +840,15 @@ test('el rol autorizado abre Logística y carga las órdenes pendientes', async 
     })
 
     if (/\/api\/auth\/profile\/?$/.test(pathname)) return json(logisticsUser)
+    if (pathname.replace(/\/$/, '') === '/api/tenants/me') return json({ data: { id: logisticsUser.tenant_id, nombre: 'Empresa aislada', estado: 'ACTIVO' } });
     if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
-      return json({
-        data: {
+      return json(fiscalCountryFixture(logisticsUser.tenant_id, {
           pais_id: 1,
           pais: 'PE',
           paisCodigo: 'PE',
           monedaDefecto: 'PEN',
           usar_flujo_logistica: true,
-        },
-      })
+        }))
     }
     if (/\/api\/demo\/status\/?$/.test(pathname)) return json({ is_demo: false, is_expired: false })
     if (/\/api\/usuarios-sistema\/me\/permissions\/?$/.test(pathname)) {
@@ -883,8 +874,8 @@ test('el rol autorizado abre Logística y carga las órdenes pendientes', async 
         },
       })
     }
-    if (/\/api\/ventas\/pedidos\/pedido-logistica\/?$/.test(pathname)) {
-      return json({ success: true, data: pedido })
+    if (/\/api\/ventas\/pedidos\/5a1e0000-0000-4000-8000-000000000107\/?$/.test(pathname)) {
+      return json(salesOrderFixture(logisticsUser,pedido))
     }
     if (/\/api\/inventario\/logistica\/ordenes-pendientes\/?$/.test(pathname)) {
       logisticsRequests += 1
@@ -902,7 +893,7 @@ test('el rol autorizado abre Logística y carga las órdenes pendientes', async 
     window.localStorage.setItem('selectedCountry', '1')
   }, logisticsUser)
 
-  await page.goto('/dashboard/ventas/pedidos/pedido-logistica/', { waitUntil: 'domcontentloaded' })
+  await page.goto('/dashboard/ventas/pedidos/5a1e0000-0000-4000-8000-000000000107/', { waitUntil: 'domcontentloaded' })
   await expect(page.getByRole('heading', { name: 'Pedido PED-QA-LOGISTICA' })).toBeVisible({ timeout: 30_000 })
   await page.getByRole('button', { name: 'Ir a Logística' }).click()
 

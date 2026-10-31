@@ -10,6 +10,30 @@ const REQUIRED = ['external_id', 'tipo', 'tipo_documento', 'numero_documento', '
 const TIPOS = new Set(['PERSONA', 'EMPRESA']);
 const TIPOS_DOC = new Set(['DNI', 'RUC', 'CE', 'CEX', 'PASAPORTE', 'PAS']);
 
+/** Payload de importar_proveedor_historico_tx; el ensayo integral usa el mismo. */
+export function payloadProveedor(row: Record<string, string>): Record<string, any> {
+  const tipoDoc = String(row['tipo_documento']).toUpperCase().trim();
+  const numDocTexto = String(row['numero_documento']).trim();
+  const payload: Record<string, any> = {
+    documento_tipo: tipoDoc,
+    documento_identidad: numDocTexto,
+    documento_numero: numDocTexto,
+    razon_social: row['razon_social'],
+    direccion: nonEmpty(row['direccion']),
+    email: nonEmpty(row['email']),
+    telefono: nonEmpty(row['telefono']),
+    pais: nonEmpty(row['pais']) ?? 'PE',
+    sujeto_detraccion: toBoolean(row['sujeto_detraccion'], false),
+    sujeto_retencion: toBoolean(row['sujeto_retencion'], false),
+  };
+
+  const dt = toNumber(row['detraccion_tasa']);
+  if (Number.isFinite(dt) && dt > 0) payload.detraccion_tasa = dt;
+  const rt = toNumber(row['retencion_tasa']);
+  if (Number.isFinite(rt) && rt > 0) payload.retencion_tasa = rt;
+  return payload;
+}
+
 @Injectable()
 export class ProveedoresImporter implements Importer {
   readonly runType = 'proveedores' as const;
@@ -158,25 +182,7 @@ export class ProveedoresImporter implements Importer {
         continue;
       }
 
-      const tipoDoc = String(row['tipo_documento']).toUpperCase().trim();
-      const numDocTexto = String(row['numero_documento']).trim();
-      const payload: Record<string, any> = {
-        documento_tipo: tipoDoc,
-        documento_identidad: numDocTexto,
-        documento_numero: numDocTexto,
-        razon_social: row['razon_social'],
-        direccion: nonEmpty(row['direccion']),
-        email: nonEmpty(row['email']),
-        telefono: nonEmpty(row['telefono']),
-        pais: nonEmpty(row['pais']) ?? 'PE',
-        sujeto_detraccion: toBoolean(row['sujeto_detraccion'], false),
-        sujeto_retencion: toBoolean(row['sujeto_retencion'], false),
-      };
-
-      const dt = toNumber(row['detraccion_tasa']);
-      if (Number.isFinite(dt) && dt > 0) payload.detraccion_tasa = dt;
-      const rt = toNumber(row['retencion_tasa']);
-      if (Number.isFinite(rt) && rt > 0) payload.retencion_tasa = rt;
+      const payload = payloadProveedor(row);
 
       if (ctx.dryRun) {
         result.okRows++;

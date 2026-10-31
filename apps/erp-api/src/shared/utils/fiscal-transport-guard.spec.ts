@@ -1,4 +1,5 @@
 import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import { GlobalExceptionFilter } from '../../common/filters/global-exception.filter';
 import {
   assertExternalFiscalTransportAllowed,
   DEMO_EXTERNAL_TRANSPORT_BLOCKED,
@@ -46,5 +47,23 @@ describe('assertExternalFiscalTransportAllowed', () => {
 
     await expect(assertExternalFiscalTransportAllowed(service as any, 'tenant-dudoso'))
       .rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
+  it('conserva el rechazo sin reserva como código estable en la respuesta HTTP', async () => {
+    const { service } = buildSupabase({ data: { is_demo: true }, error: null });
+    const response = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    const request = { method: 'POST', url: '/api/gre/guias/guide/enviar-sunat', headers: {}, ip: '127.0.0.1' };
+    const host = { switchToHttp: () => ({ getResponse: () => response, getRequest: () => request }) };
+    const failure = await assertExternalFiscalTransportAllowed(service as any, 'tenant-demo').catch(error => error);
+
+    expect(failure).toBeInstanceOf(BadRequestException);
+    new GlobalExceptionFilter().catch(failure, host as any);
+
+    expect(response.status).toHaveBeenCalledWith(400);
+    expect(response.json).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 400,
+      error: DEMO_EXTERNAL_TRANSPORT_BLOCKED,
+      message: expect.stringContaining('no transmite ni consulta'),
+    }));
   });
 });

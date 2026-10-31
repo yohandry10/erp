@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 @Injectable()
 export class SupabaseService {
   private supabase: SupabaseClient;
+  private supabaseLargo: SupabaseClient; // Operaciones largas por diseño (ensayo de migración)
   private publicSupabase: SupabaseClient;
   private adminSupabase: SupabaseClient; // Cliente admin para auth operations
   private readonly publicQueryAllowlist = new Set([
@@ -40,6 +41,7 @@ export class SupabaseService {
   private readonly fetchTimeoutMs: number;
   private readonly fetchMaxRetries: number;
   private readonly fetchRetryBaseMs: number;
+  private readonly longFetchTimeoutMs: number;
   private readonly networkBackoffMs: number;
   private lastNetworkFailureAt: number | null = null;
 
@@ -57,6 +59,7 @@ export class SupabaseService {
     this.fetchTimeoutMs = this.readIntEnv('SUPABASE_FETCH_TIMEOUT_MS', 8000);
     this.fetchMaxRetries = this.readIntEnv('SUPABASE_FETCH_MAX_RETRIES', 2);
     this.fetchRetryBaseMs = this.readIntEnv('SUPABASE_FETCH_RETRY_BASE_MS', 250);
+    this.longFetchTimeoutMs = this.readIntEnv('SUPABASE_LONG_FETCH_TIMEOUT_MS', 600000);
     this.networkBackoffMs = this.readIntEnv('SUPABASE_NETWORK_BACKOFF_MS', 30000);
 
     if (!supabaseUrl || !serviceRoleKey) {
@@ -91,48 +94,63 @@ export class SupabaseService {
         headers: {
           'X-Client-Info': 'erp-api',
         },
-        fetch: async (input, init = {}) => {
-          const context = this.tenantContext.getContext();
-          const tenantId = context?.tenantId ?? null;
-          const isSuperAdmin = context?.isSuperAdmin ?? false;
-          const headers = new (globalThis as any).Headers((init as any).headers ?? {});
-
-          headers.set('apikey', this.serviceRoleKey);
-
-          if (!tenantId && !isSuperAdmin) {
-            // HARDENING: sin tenant no permitimos consultas, evita fuga multi-tenant.
-            this.logger.error('SupabaseService: intento de consulta sin tenant en contexto.');
-            throw new Error('Tenant context required');
-          }
-
-          if (tenantId) {
-            headers.set('X-Tenant-Id', tenantId);
-            headers.set('x-tenant-id', tenantId);
-          } else if (isSuperAdmin) {
-            // HARDENING: superadmin puede operar sin tenant explícito.
-            headers.set('X-Superadmin-Bypass', 'true');
-          }
-
-          if (context?.userId) {
-            headers.set('X-User-Id', context.userId);
-            headers.set('x-user-id', context.userId);
-          }
-
-          // Siempre utilizar la service role key para operar desde el backend.
-          headers.set('Authorization', `Bearer ${this.serviceRoleKey}`);
-
-          // NOTA: El contexto se establece via headers HTTP (X-Tenant-Id, X-User-Id)
-          // Las funciones app.current_tenant_id() y app.current_user_id() intentan leer
-          // estos headers desde request.headers. Si Supabase PostgREST no expone
-          // request.headers, las políticas allow_login_select permiten SELECT sin contexto.
-
-          init = { ...init, headers };
-
-          return this.fetchWithRetry(input, init, 'supabase');
+        fetch: this.fetchConTenant('supabase', this.fetchTimeoutMs, this.fetchMaxRetries),
+      },
+    });
+    // Un ensayo integral de migración corre minutos en una sola transacción:
+    // un intento con su propio límite, porque reintentar repetiría todo el trabajo.
+    this.supabaseLargo = createClient(supabaseUrl, serviceRoleKey, {
+      global: {
+        headers: {
+          'X-Client-Info': 'erp-api-largo',
         },
+        fetch: this.fetchConTenant('supabase-largo', this.longFetchTimeoutMs, 0),
       },
     });
     console.log('✅ Supabase client initialized successfully');
+  }
+
+  /** Fetch con el contexto tenant en cabeceras, el límite de espera y los reintentos dados. */
+  private fetchConTenant(contexto: string, timeoutMs: number, maxRetries: number) {
+    return async (input: any, init: any = {}) => {
+      const context = this.tenantContext.getContext();
+      const tenantId = context?.tenantId ?? null;
+      const isSuperAdmin = context?.isSuperAdmin ?? false;
+      const headers = new (globalThis as any).Headers((init as any).headers ?? {});
+
+      headers.set('apikey', this.serviceRoleKey);
+
+      if (!tenantId && !isSuperAdmin) {
+        // HARDENING: sin tenant no permitimos consultas, evita fuga multi-tenant.
+        this.logger.error('SupabaseService: intento de consulta sin tenant en contexto.');
+        throw new Error('Tenant context required');
+      }
+
+      if (tenantId) {
+        headers.set('X-Tenant-Id', tenantId);
+        headers.set('x-tenant-id', tenantId);
+      } else if (isSuperAdmin) {
+        // HARDENING: superadmin puede operar sin tenant explícito.
+        headers.set('X-Superadmin-Bypass', 'true');
+      }
+
+      if (context?.userId) {
+        headers.set('X-User-Id', context.userId);
+        headers.set('x-user-id', context.userId);
+      }
+
+      // Siempre utilizar la service role key para operar desde el backend.
+      headers.set('Authorization', `Bearer ${this.serviceRoleKey}`);
+
+      // NOTA: El contexto se establece via headers HTTP (X-Tenant-Id, X-User-Id)
+      // Las funciones app.current_tenant_id() y app.current_user_id() intentan leer
+      // estos headers desde request.headers. Si Supabase PostgREST no expone
+      // request.headers, las políticas allow_login_select permiten SELECT sin contexto.
+
+      init = { ...init, headers };
+
+      return this.fetchWithRetry(input, init, contexto, timeoutMs, maxRetries);
+    };
   }
 
   private readIntEnv(key: string, fallback: number): number {
@@ -173,15 +191,21 @@ export class SupabaseService {
     await new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  private async fetchWithRetry(input: any, init: any, context: string): Promise<Response> {
-    const maxRetries = Math.max(0, this.fetchMaxRetries);
+  private async fetchWithRetry(
+    input: any, init: any, context: string, timeoutMs = this.fetchTimeoutMs, retries = this.fetchMaxRetries,
+  ): Promise<Response> {
+    const maxRetries = Math.max(0, retries);
     let lastError: any;
+    // Con señal propia (`.abortSignal()`) quien llama fija el plazo: una operación
+    // pesada e idempotente, como el alta de empresa, no se corta a los 8 s ni se
+    // reintenta mientras la primera sigue en curso.
+    const callerSignal: AbortSignal | undefined = init?.signal;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), this.fetchTimeoutMs);
-      const signal = init?.signal
-        ? this.mergeAbortSignals(init.signal, controller.signal)
+      const timeout = callerSignal ? null : setTimeout(() => controller.abort(), timeoutMs);
+      const signal = callerSignal
+        ? this.mergeAbortSignals(callerSignal, controller.signal)
         : controller.signal;
 
       try {
@@ -190,7 +214,7 @@ export class SupabaseService {
         return response;
       } catch (error) {
         lastError = error;
-        if (attempt < maxRetries && this.isRetryableFetchError(error)) {
+        if (!callerSignal?.aborted && attempt < maxRetries && this.isRetryableFetchError(error)) {
           const delay = this.fetchRetryBaseMs * Math.pow(2, attempt);
           this.logger.warn(
             `Supabase fetch fallo (${context}) intento ${attempt + 1}/${maxRetries + 1}: ${error?.message || error}`,
@@ -201,7 +225,7 @@ export class SupabaseService {
         this.recordNetworkFailure(error);
         throw error;
       } finally {
-        clearTimeout(timeout);
+        if (timeout) clearTimeout(timeout);
       }
     }
 
@@ -253,6 +277,15 @@ export class SupabaseService {
   getClient(options?: { silent?: boolean }): SupabaseClient {
     this.ensureContext(options?.silent);
     return this.wrapSucursalScope(this.supabase);
+  }
+
+  /**
+   * Igual que getClient, para operaciones largas por diseño: sin reintentos y
+   * con SUPABASE_LONG_FETCH_TIMEOUT_MS. No usarlo para escrituras por fila.
+   */
+  getLongRunningClient(): SupabaseClient {
+    this.ensureContext();
+    return this.wrapSucursalScope(this.supabaseLargo);
   }
 
   /**

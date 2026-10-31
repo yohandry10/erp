@@ -1,256 +1,59 @@
-﻿'use client'
+'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { useEffect, useState } from 'react'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { useApi } from '@/hooks/use-api'
-import { useCountryContext } from '@/hooks/use-country-context'
+import { useCxcAdjustmentOperation } from '@/hooks/use-cxc-adjustment-operation'
+import { useToast } from '@/components/ui/use-toast'
+import { fiscalDateForCountry } from '@/lib/fiscal-date'
+import { cxcAdjustmentPayload } from '@/lib/finanzas/cxc-adjustment-operation'
+import type { CxcAdjustmentAccount } from '@/lib/finanzas/cxc-adjustment-contract'
 
-interface CuentaPorCobrarResumen {
-  id: string
-  saldo: number
-  moneda: string
-  serie?: string | null
-  numero?: string | null
-}
-
-interface NotaCreditoModalProps {
-  isOpen: boolean
-  cuenta: CuentaPorCobrarResumen | null
-  onClose: () => void
-  onSuccess: () => void
-}
-
-const formatCurrency = (value: number, currency: string = 'PEN') =>
-  Intl.NumberFormat('es-PE', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-  }).format(value || 0)
-
+type Account = CxcAdjustmentAccount & { serie?: string | null; numero?: string | null }
+interface NotaCreditoModalProps { isOpen: boolean; cuenta: Account | null; onClose: () => void; onSuccess: () => void }
+const reasonsPE = [['10', 'Otros conceptos'], ['04', 'Descuento global'], ['05', 'Descuento por ítem'], ['08', 'Bonificación'], ['09', 'Disminución de valor'], ['11', 'Ajuste de operaciones de exportación'], ['12', 'Ajuste del IVAP'], ['13', 'Ajustes de cuotas o fechas']]
+const reasonsCO = [['1', 'Devolución parcial'], ['2', 'Anulación'], ['3', 'Descuento global'], ['4', 'Ajuste de precio'], ['5', 'Otros']]
 export function NotaCreditoModal({ isOpen, cuenta, onClose, onSuccess }: NotaCreditoModalProps) {
-  // throwOnError: el rechazo (p. ej. factura aún no aceptada) se muestra en el formulario.
-  const { post } = useApi({ showSuccessToast: true, showErrorToast: false, throwOnError: true })
-  const country = useCountryContext()
-  const isColombia = country.paisCodigo === 'CO'
-  const [monto, setMonto] = useState('')
-  const [fechaEmision, setFechaEmision] = useState(() => new Date().toISOString().split('T')[0])
-  const [serie, setSerie] = useState('')
-  const [numero, setNumero] = useState('')
-  const [motivo, setMotivo] = useState('Ajuste por nota de crédito')
-  const [referencia, setReferencia] = useState('')
-  const [notas, setNotas] = useState('')
-  const [codigoMotivo, setCodigoMotivo] = useState('10')
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const retryIntent = useRef<{ fingerprint: string; key: string } | null>(null)
-
+  const operation = useCxcAdjustmentOperation('notas-credito', cuenta, isOpen, onClose, onSuccess), { toast } = useToast()
+  const isColombia = operation.country === 'CO'
+  const [monto, setMonto] = useState(''), [motivo, setMotivo] = useState(''), [codigoMotivo, setCodigoMotivo] = useState('10')
   useEffect(() => {
-    if (!isOpen || !cuenta) {
-      return
-    }
-
-    setMonto(String(cuenta.saldo ?? ''))
-    setSerie(cuenta.serie ?? '')
-    setNumero(cuenta.numero ?? '')
-    setCodigoMotivo(isColombia ? '1' : '10')
-    setError(null)
-  }, [isOpen, cuenta, isColombia])
-
-  const handleClose = () => {
-    if (submitting) return
-    onClose()
-  }
-
+    const p = operation.pending ? cxcAdjustmentPayload(operation.pending) : null
+    setMonto(String(p?.monto ?? cuenta?.saldo ?? '')); setMotivo(p?.motivo || 'Ajuste por nota de crédito'); setCodigoMotivo(p?.codigo_motivo || (isColombia ? '1' : '10'))
+  }, [isOpen, cuenta, operation.pending, operation.ready, isColombia])
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (!cuenta) return
-
-    const montoNumber = parseFloat(monto)
-    if (Number.isNaN(montoNumber) || montoNumber <= 0) {
-      setError('El monto de la nota de crédito debe ser mayor a cero')
-      return
+    if (!cuenta || !operation.ready) return
+    if (!operation.pending) {
+      if (!['PE', 'CO'].includes(operation.country)) { operation.setError('Este flujo requiere una jurisdicción fiscal compatible.'); return }
+      if (!cuenta.documento_id) { operation.setError('La cuenta requiere un documento fiscal origen verificable antes de crear la nota.'); return }
+      if (!/^\d+(?:\.\d{1,2})?$/.test(monto) || Number(monto) <= 0 || Math.round(Number(monto) * 100) > Math.round(cuenta.saldo * 100)) { operation.setError('El importe debe ser mayor a cero y no superar el saldo pendiente.'); return }
+      if (motivo.trim().length < 3 || motivo.trim().length > 500) { operation.setError('El motivo debe tener entre 3 y 500 caracteres.'); return }
     }
-
-    if (montoNumber - (cuenta.saldo ?? 0) > 0.05) {
-      setError(
-        `El monto no puede superar el saldo pendiente (${formatCurrency(cuenta.saldo ?? 0, cuenta.moneda)})`
-      )
-      return
-    }
-
-    try {
-      setSubmitting(true)
-      setError(null)
-      const basePayload = {
-        monto: montoNumber,
-        fecha_emision: fechaEmision,
-        serie: serie || undefined,
-        numero: numero || undefined,
-        motivo: motivo || undefined,
-        referencia: referencia || undefined,
-        notas: notas || undefined,
-        codigo_motivo: codigoMotivo,
-      }
-
-      const fingerprint = JSON.stringify(basePayload)
-      if (!retryIntent.current || retryIntent.current.fingerprint !== fingerprint) {
-        retryIntent.current = {
-          fingerprint,
-          key: `cxc-note-ui:${crypto.randomUUID()}`,
-        }
-      }
-      const payload = { ...basePayload, idempotency_key: retryIntent.current.key }
-
-      const response = await post(`/api/finanzas/cxc/${cuenta.id}/notas-credito`, payload)
-      if (response) {
-        retryIntent.current = null
-        onSuccess()
-        onClose()
-      }
-    } catch (err: any) {
-      console.error('Error aplicando nota de crédito', err)
-      setError(err?.message ?? 'No se pudo aplicar la nota de crédito')
-    } finally {
-      setSubmitting(false)
+    if (await operation.send({ monto: Number(monto), codigo_motivo: codigoMotivo, motivo: motivo.trim(), documento_id: cuenta.documento_id, fecha_emision: fiscalDateForCountry(operation.country) })) {
+      toast({ title: 'Nota de crédito creada', description: 'El documento está pendiente de firma y aceptación fiscal. El saldo de la CxC todavía no se reduce.' })
     }
   }
-
-  return (
-    <Dialog open={isOpen} onOpenChange={(open) => (open ? undefined : handleClose())}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{isColombia ? 'Emitir nota crédito DIAN 91' : 'Aplicar nota de crédito'}</DialogTitle>
-          <DialogDescription>
-            {isColombia
-              ? 'Crea una nota 91 referenciada. La CxC sólo se ajustará después de que la DIAN acepte el documento.'
-              : 'Registra una nota de crédito asociada a la cuenta seleccionada.'}
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 gap-4">
-            <div>
-              <Label htmlFor="nc-monto">Monto</Label>
-              <Input
-                id="nc-monto"
-                type="number"
-                min="0"
-                step="0.01"
-                value={monto}
-                onChange={(e) => setMonto(e.target.value)}
-                required
-              />
-              <p className="mt-1 text-xs text-muted-foreground">
-                Saldo actual: {formatCurrency(cuenta?.saldo ?? 0, cuenta?.moneda || 'PEN')}
-              </p>
-            </div>
-
-            <div>
-              <Label htmlFor="nc-fecha">Fecha de emisión</Label>
-              <Input
-                id="nc-fecha"
-                type="date"
-                value={fechaEmision}
-                onChange={(e) => setFechaEmision(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="nc-serie">Serie</Label>
-                <Input id="nc-serie" value={serie} onChange={(e) => setSerie(e.target.value)} />
-              </div>
-              <div>
-                <Label htmlFor="nc-numero">Número</Label>
-                <Input id="nc-numero" value={numero} onChange={(e) => setNumero(e.target.value)} />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="nc-codigo-motivo">Código de motivo</Label>
-              <select
-                id="nc-codigo-motivo"
-                value={codigoMotivo}
-                onChange={(event) => setCodigoMotivo(event.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                {(isColombia
-                  ? [
-                      ['1', 'Devolución parcial o no aceptación parcial'],
-                      ['2', 'Anulación de factura electrónica'],
-                      ['3', 'Rebaja o descuento'],
-                      ['4', 'Ajuste de precio'],
-                      ['5', 'Otros'],
-                    ]
-                  : [
-                      ['04', 'Descuento global'],
-                      ['05', 'Descuento por ítem'],
-                      ['08', 'Bonificación'],
-                      ['09', 'Disminución en el valor'],
-                      ['10', 'Otros conceptos'],
-                      ['11', 'Ajuste de exportación'],
-                      ['12', 'Ajuste IVAP'],
-                      ['13', 'Corrección del monto neto pendiente'],
-                    ]
-                ).map(([code, label]) => <option key={code} value={code}>{code} - {label}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <Label htmlFor="nc-motivo">Motivo</Label>
-              <Input
-                id="nc-motivo"
-                value={motivo}
-                onChange={(e) => setMotivo(e.target.value)}
-                placeholder="Motivo de la nota de crédito"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="nc-referencia">Referencia</Label>
-              <Input
-                id="nc-referencia"
-                value={referencia}
-                onChange={(e) => setReferencia(e.target.value)}
-                placeholder="Documento o correlativo de nota de crédito"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="nc-notas">Notas internas</Label>
-              <Textarea
-                id="nc-notas"
-                rows={3}
-                value={notas}
-                onChange={(e) => setNotas(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {error && <p className="text-sm text-destructive">{error}</p>}
-
-          <DialogFooter className="gap-2">
-            <Button type="button" variant="outline" onClick={handleClose} disabled={submitting}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? 'Procesando...' : isColombia ? 'Crear nota DIAN 91' : 'Aplicar nota de crédito'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
+  return <Dialog open={isOpen} onOpenChange={open => open ? undefined : operation.close()}>
+    <DialogContent className="max-w-lg"><DialogHeader>
+      <DialogTitle>{operation.pending ? 'Confirmar nota de crédito pendiente' : isColombia ? 'Emitir nota crédito DIAN 91' : 'Crear nota de crédito'}</DialogTitle>
+      <DialogDescription>{operation.pending ? 'Se conserva la solicitud original. Reintenta su confirmación sin cambiar el documento ni la clave.' : 'Crea un documento fiscal referenciado. La cuenta sólo se ajusta después de la aceptación fiscal; fecha, serie y número se asignan en el servidor.'}</DialogDescription>
+    </DialogHeader>
+      <form onSubmit={handleSubmit} className="space-y-4"><fieldset disabled={operation.frozen || !operation.ready} className="grid grid-cols-1 gap-4">
+        <div><Label htmlFor="nc-monto">Monto</Label><Input id="nc-monto" type="number" min="0.01" step="0.01" value={monto} onChange={e => setMonto(e.target.value)} required /></div>
+        <div><Label htmlFor="nc-codigo-motivo">Código del motivo</Label><select id="nc-codigo-motivo" value={codigoMotivo} onChange={e => setCodigoMotivo(e.target.value)} className="w-full rounded-md border bg-background p-2">
+          {(isColombia ? reasonsCO : reasonsPE).map(([value, label]) => <option key={value} value={value}>{value} - {label}</option>)}
+        </select></div>
+        <div><Label htmlFor="nc-motivo">Motivo</Label><Textarea id="nc-motivo" value={motivo} onChange={e => setMotivo(e.target.value)} minLength={3} maxLength={500} required /></div>
+      </fieldset>
+        {operation.error && <p role="alert" data-testid="cxc-note-error" className="text-sm text-destructive">{operation.error}</p>}
+        <DialogFooter className="gap-2"><Button type="button" variant="outline" disabled={operation.saving} onClick={operation.close}>Cerrar</Button>
+          <Button type="submit" disabled={operation.saving || !operation.ready}>{operation.saving ? 'Procesando...' : operation.pending ? 'Reintentar misma nota' : isColombia ? 'Crear nota DIAN 91' : 'Crear nota de crédito'}</Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
+  </Dialog>
 }

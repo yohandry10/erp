@@ -1,8 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useApi } from '@/hooks/use-api'
+import { useSalesReport, ReportReadError } from './use-sales-report'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -37,36 +36,9 @@ interface Props {
 }
 
 export default function CotizacionesPendientesReport({ filters }: Props) {
+  const { data: reportData, loading, error, retry } = useSalesReport<CotizacionPendiente[]>('/ventas/reportes/cotizaciones-pendientes', filters, 'array')
+  const data = reportData || []
   const router = useRouter()
-  const { get } = useApi()
-  const [data, setData] = useState<CotizacionPendiente[]>([])
-  const [loading, setLoading] = useState(true)
-
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true)
-      const response = await get('/ventas/reportes/cotizaciones-pendientes', {
-        params: filters
-      })
-
-      if (response?.success) {
-        setData(response.data || [])
-      }
-    } catch (error) {
-      console.error('Error loading report:', error)
-      toast({
-        title: 'Error',
-        description: 'No se pudo cargar el reporte',
-        variant: 'destructive'
-      })
-    } finally {
-      setLoading(false)
-    }
-  }, [filters, get])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
 
   const handleVerDetalle = (cotizacionId: string) => {
     router.push(`/dashboard/ventas/cotizaciones/${cotizacionId}`)
@@ -111,6 +83,8 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
   const totalCotizaciones = data.length
   const porVencer = data.filter(c => c.dias_vigencia >= 0 && c.dias_vigencia <= 3).length
   const vencidas = data.filter(c => c.dias_vigencia < 0).length
+
+  if (error) return <ReportReadError error={error} retry={retry} />
 
   return (
     <Card>

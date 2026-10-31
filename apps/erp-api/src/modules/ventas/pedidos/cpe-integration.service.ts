@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, ServiceUnavailableException, Logger } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
@@ -716,7 +716,7 @@ export class CPEIntegrationService {
           productoIds,
           exigeAfectacionExplicita,
         ),
-        this.obtenerCostoPorProducto(pedido.tenant_id, productoIds),
+        this.obtenerCostoPorProducto(pedido.tenant_id, productoIds, countryCode),
       ]);
     }
 
@@ -956,13 +956,13 @@ export class CPEIntegrationService {
   }
 
   /**
-   * Resuelve el costo real desde el catálogo porque pedidos_venta_detalle no
-   * persiste costo_unitario. `costo` puede venir en cero en datos migrados, por
-   * lo que precio_compra es el fallback operativo usado también por POS.
+   * En Perú la 570 conserva el promedio ponderado en costo, incluido cero.
+   * No sustituye una lectura fallida o incompleta por el precio del catálogo.
    */
   private async obtenerCostoPorProducto(
     tenantId: string,
     productoIds: string[],
+    countryCode = 'PE',
   ): Promise<Map<string, number>> {
     const ids = Array.from(new Set((productoIds ?? []).filter(Boolean)));
     const costos = new Map<string, number>();
@@ -972,21 +972,47 @@ export class CPEIntegrationService {
       const { data, error } = await this.supabase
         .getClient()
         .from('productos')
-        .select('id, costo, precio_compra')
+        .select('id, costo, costo_promedio_base, precio_compra, stock_actual, es_servicio, controla_stock')
         .eq('tenant_id', tenantId)
         .in('id', ids);
 
       if (error) {
         this.logger.warn(`No se pudo leer el costo de los productos del pedido: ${error.message}`);
+        if (countryCode === 'PE') throw new ServiceUnavailableException('No se pudo verificar el costo de los productos; reintente');
         return costos;
       }
 
       for (const producto of data ?? []) {
         const costo = Number(producto.costo ?? 0);
         const precioCompra = Number(producto.precio_compra ?? 0);
-        costos.set(producto.id, costo > 0 ? costo : Math.max(precioCompra, 0));
+        if (countryCode === 'PE') {
+          if (producto.costo_promedio_base == null && (producto.es_servicio === true || producto.controla_stock === false)) {
+            costos.set(producto.id, 0);
+            continue;
+          }
+          // Con existencias físicas el ledger debe haber confirmado la base.
+          // El catálogo provisional sólo sirve cuando todavía no existe stock.
+          if (producto.costo_promedio_base == null && Number(producto.stock_actual ?? 0) !== 0) {
+            throw new ConflictException('Un producto tiene existencias sin valorización de inventario confirmada');
+          }
+          const valorCosto = producto.costo_promedio_base ?? producto.costo;
+          const costoVerificado = Number(valorCosto);
+          if (valorCosto == null || valorCosto === '' || !Number.isFinite(costoVerificado) || costoVerificado < 0) {
+            throw new ConflictException('Un producto no tiene un costo de inventario verificado; regularice su valorización');
+          }
+          costos.set(producto.id, costoVerificado);
+        } else {
+          costos.set(producto.id, costo > 0 ? costo : Math.max(precioCompra, 0));
+        }
+      }
+      if (countryCode === 'PE' && ids.some(id => !costos.has(id))) {
+        throw new ConflictException('No se pudo verificar el costo de todos los productos del pedido');
       }
     } catch (error) {
+      if (countryCode === 'PE') {
+        if (error instanceof ConflictException || error instanceof ServiceUnavailableException) throw error;
+        throw new ServiceUnavailableException('No se pudo verificar el costo de los productos; reintente');
+      }
       this.logger.warn(
         `No se pudo leer el costo de los productos del pedido: ${(error as Error)?.message}`,
       );

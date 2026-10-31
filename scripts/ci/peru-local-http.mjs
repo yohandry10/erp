@@ -8,7 +8,9 @@ export async function fetchWithLocalLoginRetry(url,options={},onThrottle) {
   const endpoint=new URL(url);
   assert.ok(['127.0.0.1','localhost','[::1]'].includes(endpoint.hostname));
   for(let attempt=0;attempt<2;attempt++) {
-    const response=await fetch(url,{...options,signal:AbortSignal.timeout(30000)});
+    // El reintento espera hasta 60 s: la señal del primer intento ya pudo caducar.
+    const signal=attempt===0?(options.signal ?? AbortSignal.timeout(30000)):AbortSignal.timeout(30000);
+    const response=await fetch(url,{...options,signal});
     if(attempt===0&&response.status===429&&options.method==='POST'
       &&endpoint.pathname.replace(/\/$/,'')==='/api/auth/login') {
       const seconds=Number(response.headers.get('retry-after'));

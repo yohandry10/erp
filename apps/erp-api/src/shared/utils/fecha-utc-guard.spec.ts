@@ -42,6 +42,34 @@ const PATRON = String.raw`new Date\(.*\)\.toISOString\(\)\.(split\('T'\)\[0\]|sl
  */
 const PERMITIDOS = new Map<string, string>([
   [
+    'modules/contabilidad/services/asset-create-receipt.ts',
+    'valida que una fecha civil exista: se construye y se lee en UTC, sin reloj ni zona',
+  ],
+  [
+    'modules/contabilidad/services/asset-depreciation-batch.fixture.ts',
+    'último día de un mes pedido: se construye y se lee en UTC, sin reloj ni zona',
+  ],
+  [
+    'modules/contabilidad/services/asset-depreciation-batch.ts',
+    'último día de un mes pedido: se construye y se lee en UTC, sin reloj ni zona',
+  ],
+  [
+    'modules/contabilidad/services/asset-lifecycle-original.ts',
+    'valida que una fecha civil exista: se construye y se lee en UTC, sin reloj ni zona',
+  ],
+  [
+    'modules/finanzas/cxc/cxc-adjustment-receipt.ts',
+    'valida que una fecha civil exista: se construye y se lee en UTC, sin reloj ni zona',
+  ],
+  [
+    'modules/inventario/logistica/delivery-receipt.ts',
+    'valida que una fecha civil exista: se construye y se lee en UTC, sin reloj ni zona',
+  ],
+  [
+    'modules/rrhh/planillas-eps.util.ts',
+    'valida que una fecha civil exista: se construye y se lee en UTC, sin reloj ni zona',
+  ],
+  [
     'modules/finanzas/bancos/bancos.service.ts',
     'nombre del archivo CSV exportado; no decide ni se persiste',
   ],
@@ -115,7 +143,7 @@ describe('fechas UTC en lógica de negocio', () => {
   it('la lista de excepciones no crece sin justificación', () => {
     // Si esto falla es porque se añadió una excepción: cada entrada debe explicar
     // por qué esa fecha no necesita la zona del tenant.
-    expect(PERMITIDOS.size).toBe(9);
+    expect(PERMITIDOS.size).toBe(16);
     for (const [, motivo] of PERMITIDOS) {
       expect(motivo.length).toBeGreaterThan(20);
     }

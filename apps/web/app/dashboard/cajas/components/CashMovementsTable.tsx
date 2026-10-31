@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { useApi } from '@/hooks/use-api';
+import React from 'react';
+import { useCashRead } from '@/hooks/use-cash-read';
+import { readCashMovements } from '@/lib/cash-read-contract';
 import { useCountryContext } from '@/hooks/use-country-context';
 
 interface MovimientoCaja {
@@ -27,33 +28,8 @@ interface CashMovementsTableProps {
 export function CashMovementsTable({ sesionId, className = '' }: CashMovementsTableProps) {
     const country = useCountryContext();
     const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$');
-    const { get } = useApi();
-    const [movimientos, setMovimientos] = useState<MovimientoCaja[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    const cargarMovimientos = useCallback(async () => {
-        try {
-            setLoading(true);
-            const response = await get(`/cajas/movimientos/${sesionId}`);
-            if (response?.success) {
-                setMovimientos(response.data || []);
-            } else {
-                throw new Error(response?.message || 'Error cargando movimientos');
-            }
-        } catch (err: any) {
-            console.error('Error cargando movimientos:', err);
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    }, [get, sesionId]);
-
-    useEffect(() => {
-        if (sesionId) {
-            cargarMovimientos();
-        }
-    }, [cargarMovimientos, sesionId]);
+    const { data, loading, error, reload } = useCashRead<MovimientoCaja[]>(`/cajas/movimientos/${sesionId}`, readCashMovements, Boolean(sesionId));
+    const movimientos = data || [];
 
     const formatearHora = (fecha: string) => {
         return new Date(fecha).toLocaleTimeString('es-PE', {
@@ -85,7 +61,7 @@ export function CashMovementsTable({ sesionId, className = '' }: CashMovementsTa
     }
 
     if (error) {
-        return <div className="p-4 text-center text-red-500">Error: {error}</div>;
+        return <div role="alert" className="p-4 text-center text-red-500">{error}<button type="button" onClick={reload} className="block mx-auto mt-2 text-sm text-primary hover:underline">Reintentar movimientos</button></div>;
     }
 
     if (movimientos.length === 0) {

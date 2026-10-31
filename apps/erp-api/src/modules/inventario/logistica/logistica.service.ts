@@ -1,3 +1,6 @@
+import {fullDeliveryReceipt} from './delivery-receipt';
+import {RegistrarEntregaDto} from './dto/registrar-entrega.dto';
+import {ForbiddenException,ConflictException} from '@nestjs/common';
 import { Injectable, BadRequestException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { NotificationsService } from '../../notifications/notifications.service';
@@ -5,6 +8,7 @@ import { NotificationType, NotificationSeverity } from '../../notifications/noti
 import { AuditService } from '../../audit/audit.service';
 import { PedidoLockService } from '../../../shared/locks/pedido-lock.service';
 import { EstadoPedido } from '../../ventas/pedidos/entities';
+import { mensajeErrorLote } from '../inventario-errors';
 import {
   PrepararPedidoDto,
   ConfirmarDespachoDto,
@@ -67,7 +71,7 @@ export class LogisticaService {
       (pedidos || []).map(async (pedido) => {
         const { data: detalle, error: detalleError } = await client
           .from('pedidos_venta_detalle')
-          .select('id, producto_id, descripcion, cantidad')
+          .select('id, producto_id, descripcion, cantidad, cantidad_despachada, productos(es_servicio, controla_stock)')
           .eq('pedido_id', pedido.id)
           .eq('tenant_id', tenantId);
 
@@ -80,7 +84,10 @@ export class LogisticaService {
           ...pedido,
           cantidad_items:
             (detalle || []).reduce((sum, d) => sum + Number(d.cantidad || 0), 0),
-          items: detalle || [],
+          items: (detalle || []).map((line) => ({ ...line,
+            cantidad_despachada: Number(line.cantidad_despachada ?? 0),
+            despachable: Boolean(line.productos) && !(line.productos as any)?.es_servicio && (line.productos as any)?.controla_stock !== false,
+          })),
         };
       }),
     );
@@ -136,7 +143,7 @@ export class LogisticaService {
       (pedidos || []).map(async (pedido) => {
         const { data: detalle, error: detalleError } = await client
           .from('pedidos_venta_detalle')
-          .select('id, producto_id, descripcion, cantidad')
+          .select('id, producto_id, descripcion, cantidad, cantidad_despachada, productos(es_servicio, controla_stock)')
           .eq('pedido_id', pedido.id)
           .eq('tenant_id', tenantId);
 
@@ -148,7 +155,10 @@ export class LogisticaService {
         return {
           ...pedido,
           cantidad_items: detalle?.length || 0,
-          items: detalle || [],
+          items: (detalle || []).map((line) => ({ ...line,
+            cantidad_despachada: Number(line.cantidad_despachada ?? 0),
+            despachable: Boolean(line.productos) && !(line.productos as any)?.es_servicio && (line.productos as any)?.controla_stock !== false,
+          })),
         };
       }),
     );
@@ -229,8 +239,17 @@ export class LogisticaService {
 
       if (error || !data) {
         console.error('Error en despacho atómico:', error);
+        // El writer consulta el recibo de la misma clave antes de validar el
+        // pendiente. Este rechazo demuestra que la intención no se aplicó;
+        // un despacho ya confirmado habría devuelto su replay.
+        if (error?.code === '23514' && error.message?.startsWith('Cantidad de despacho inválida para detalle ')) {
+          throw new BadRequestException({
+            message: 'Las cantidades del pedido cambiaron. Revisa el pendiente antes de confirmar nuevamente.',
+            error: 'DISPATCH_NOT_APPLIED',
+          });
+        }
         throw new BadRequestException(
-          error?.message || 'No se pudo confirmar el despacho',
+          mensajeErrorLote(error?.message) || error?.message || 'No se pudo confirmar el despacho',
         );
       }
 
@@ -242,7 +261,7 @@ export class LogisticaService {
 
       // Auditoría y notificación no son proyecciones financieras. Un fallo
       // posterior al commit no debe convertir un despacho confirmado en 500.
-      await Promise.allSettled([
+      if (resultado.idempotent !== true) await Promise.allSettled([
         this.registrarAuditoria(
           pedidoId,
           tenantId,
@@ -272,6 +291,31 @@ export class LogisticaService {
   /**
    * Actualiza el tracking del pedido (EN_TRANSITO / ENTREGADO / INCIDENCIA)
    */
+  async registrarEntrega(pedidoId: string, tenantId: string, dto: RegistrarEntregaDto, userId?: string) {
+    const uuid = (value: unknown) => typeof value === 'string' && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(value);
+    if (!uuid(tenantId) || !uuid(pedidoId) || !uuid(userId) || dto.estado !== 'ENTREGADO' || typeof dto.notas !== 'string' || dto.notas !== dto.notas.trim() || dto.notas.length > 10000 || !dto.expected_snapshot || typeof dto.expected_snapshot !== 'object' || Array.isArray(dto.expected_snapshot) || dto.expected_snapshot.id !== pedidoId || dto.expected_snapshot.tenant_id !== tenantId || typeof dto.idempotency_key !== 'string' || dto.idempotency_key !== dto.idempotency_key.trim() || dto.idempotency_key.length < 8 || dto.idempotency_key.length > 200) {
+      throw new BadRequestException('Consulta el pedido completo antes de registrar la entrega.');
+    }
+    const rawKeys = ["id", "igv", "fecha", "notas", "total", "codigo", "estado", "gre_id", "moneda", "nombre", "numero", "metadata", "subtotal", "pedido_id", "tenant_id", "cliente_id", "created_at", "created_by", "factura_id", "updated_at", "aprobado_en", "aprobado_por", "fecha_pedido", "confirmado_en", "cotizacion_id", "observaciones", "confirmado_por", "estado_credito", "tipo_documento", "tracking_notas", "tracking_estado", "requiere_aprobacion", "tracking_actualizado_en", "motivo_requiere_aprobacion"];
+    const snapshot=dto.expected_snapshot;
+    const money=(v:unknown)=>typeof v==='number'&&Number.isFinite(v)&&Number.isSafeInteger(Math.round(v*100))&&Math.abs(v*100-Math.round(v*100))<.00001;
+    if(Object.keys(snapshot).length!==rawKeys.length||!rawKeys.every(k=>Object.prototype.hasOwnProperty.call(snapshot,k))||!['DESPACHO_PARCIAL','LISTO_FACTURAR','FACTURADO','COMPLETADO'].includes(String(snapshot.estado))||!money(snapshot.subtotal)||!money(snapshot.igv)||!money(snapshot.total)||typeof snapshot.updated_at!=='string'||!Number.isFinite(Date.parse(snapshot.updated_at)))throw new BadRequestException('La fotografía conservada del pedido está incompleta.');
+    const payload = {estado:dto.estado,notas:dto.notas,expected_snapshot:dto.expected_snapshot};
+    let result: any;
+    try{result=await this.supabase.getClient().rpc('registrar_entrega_pedido_tx_570',{
+      p_tenant_id:tenantId,p_actor_id:userId,p_pedido_id:pedidoId,p_payload:payload,p_idempotency_key:dto.idempotency_key,
+    });}catch{throw new ServiceUnavailableException('No se pudo confirmar la entrega. Conserva la operación para reintentar.');}
+    const {data,error}=result||{};
+    if(error){
+      if(error.code==='42501')throw new ForbiddenException('No tienes permiso para registrar la entrega.');
+      if(error.code==='40001')throw new ConflictException('El pedido cambió desde la consulta. La entrega no se registró con esta operación.');
+      if(error.code==='P0002')throw new NotFoundException('El pedido no está disponible en esta empresa.');
+      if(['22023','23514','23505'].includes(error.code))throw new BadRequestException('La entrega no pudo registrarse con los datos conservados. Revisa el estado del pedido.');
+      throw new ServiceUnavailableException('No se pudo confirmar la entrega. Conserva la operación para reintentar.');
+    }
+    return fullDeliveryReceipt(data,tenantId,userId!,pedidoId,dto.idempotency_key,payload);
+  }
+
   async actualizarTracking(pedidoId: string, tenantId: string, dto: ActualizarTrackingDto, userId?: string) {
     return this.operarLogistica(pedidoId, tenantId, 'TRACKING', dto, userId);
   }

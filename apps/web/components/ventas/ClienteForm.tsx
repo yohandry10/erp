@@ -25,10 +25,10 @@ import {
 // para no delegar al error genérico del writer una decisión que toma el usuario.
 const createClienteSchema = (isColombia: boolean) => z.object({
   tipo: z.nativeEnum(TipoCliente, {
-    errorMap: () => ({ message: 'Seleccione un tipo de cliente' })
+    error: 'Seleccione un tipo de cliente'
   }),
   documento_tipo: z.nativeEnum(TipoDocumento, {
-    errorMap: () => ({ message: 'Seleccione un tipo de documento' })
+    error: 'Seleccione un tipo de documento'
   }),
   documento_numero: z.string()
     .min(6, 'El documento debe tener al menos 6 caracteres')
@@ -57,6 +57,7 @@ interface ClienteFormProps {
   onCancel?: () => void
   submitLabel?: string
   loading?: boolean
+  submitDisabled?: boolean
 }
 
 export default function ClienteForm({
@@ -64,7 +65,8 @@ export default function ClienteForm({
   onSubmit,
   onCancel,
   submitLabel = 'Guardar Cliente',
-  loading: externalLoading = false
+  loading: externalLoading = false,
+  submitDisabled = false,
 }: ClienteFormProps) {
   const country = useCountryContext()
   const isArgentina = country.paisCodigo === 'AR'
@@ -559,7 +561,7 @@ export default function ClienteForm({
         )}
         <Button
           type="submit"
-          disabled={loading} className="bg-[var(--gradient-primary)] text-white"
+          disabled={loading || submitDisabled} className="bg-[var(--gradient-primary)] text-white"
         >
           {loading ? (
             <>

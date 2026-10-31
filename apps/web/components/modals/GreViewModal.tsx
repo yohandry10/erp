@@ -2,8 +2,10 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useApiCall } from '@/hooks/use-api'
-import { unwrapApiObject } from '@/lib/api-contract'
-import { fetchApi } from '@/lib/api-fetch'
+import { useAuth } from '@/contexts/AuthContext'
+import { useGreRead } from '@/hooks/use-gre-read'
+import { GreAction, GreIntent, greDetail, greConfirmation, readGreIntent, greTransportNotApplied } from '@/lib/gre-read-contract'
+import { liveGreFile, saveGreFile } from '@/lib/gre-download'
 import { parseDateLocal } from '@/lib/date-utils'
 
 interface GreViewModalProps {
@@ -12,137 +14,81 @@ interface GreViewModalProps {
   documentId: string
 }
 
-interface GreData {
-  id: string
-  numero: string
-  destinatario: string
-  direccionDestino: string
-  fechaTraslado: string
-  fechaCreacion: string
-  modalidad: 'TRANSPORTE_PUBLICO' | 'TRANSPORTE_PRIVADO'
-  motivo: string
-  pesoTotal: number
-  estado: 'BORRADOR' | 'FIRMADO' | 'ENVIADO' | 'ACEPTADO' | 'RECHAZADO' | 'ANULADO' | 'ERROR'
-  observaciones?: string
-  transportista?: string
-  transportistaDocumento?: string
-  placaVehiculo?: string
-  licenciaConducir?: string
-  conductorDocumentoTipo?: string
-  conductorDocumentoNumero?: string
-  conductorNombres?: string
-  conductorApellidos?: string
-  sunatStatus?: string
-  items?: { descripcion: string; cantidad: number; unidadMedida?: string }[]
-  errorMessage?: string
-}
-
 export default function GreViewModal({ isOpen, onClose, documentId }: GreViewModalProps) {
-  const [greData, setGreData] = useState<GreData | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [errorCarga, setErrorCarga] = useState<string | null>(null)
-  const { get, post } = useApiCall<GreData>()
+  const { session, loading: authLoading } = useAuth()
+  const { post } = useApiCall({ requireLive: true, throwOnError: true, showErrorToast: false, retries: 0 })
+  const validate = useCallback((response: any) => greDetail(response, documentId), [documentId])
+  const read = useGreRead(`/api/gre/guias/${documentId}`, validate, isOpen && !!documentId)
+  const greData = read.data; const loading = read.loading; const errorCarga = read.error
+  const actor = session?.user
+  const storageKey = actor?.tenant_id && actor?.id && documentId ? `erp.gre-action-intent.${actor.tenant_id}.${actor.id}.${documentId}` : ''
+  const scope = `${storageKey}:${isOpen}`; const scopeRef = useRef(scope); scopeRef.current = scope
+  const [pendingState, setPendingState] = useState<{ scope: string; intent: GreIntent | null }>({ scope: '', intent: null })
+  const pending = pendingState.scope === scope ? pendingState.intent : null
+  const [intentReady, setIntentReady] = useState('')
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [actionMessage, setActionMessage] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
-  const operationKeys = useRef(new Map<string, string>())
-
-  const keyFor = (action: string) => {
-    const semantic = `${documentId}:${action}`
-    const existing = operationKeys.current.get(semantic)
-    if (existing) return existing
-    const key = `gre-${action}:${crypto.randomUUID()}`
-    operationKeys.current.set(semantic, key)
-    return key
-  }
-
-  const runLifecycleAction = async (action: 'firmar' | 'enviar-sunat' | 'reenviar' | 'consultar-sunat' | 'anular') => {
-    setActionLoading(true)
-    try {
-      const body = action === 'anular' ? { motivo: 'Anulación operativa solicitada por el usuario' } : {}
-      await post(`/api/gre/guias/${documentId}/${action}`, body, {
-        headers: { 'Idempotency-Key': keyFor(action) },
-      })
-      operationKeys.current.delete(`${documentId}:${action}`)
-      await loadGreData()
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
-  const loadGreData = useCallback(async () => {
-    if (!documentId) return
-
-    setLoading(true)
-    setErrorCarga(null)
-    try {
-      const result = await get(`/api/gre/guias/${documentId}`)
-      setGreData(unwrapApiObject<GreData>(result, null as any))
-    } catch (error) {
-      console.error('Error cargando GRE:', error)
-      // Con `setGreData(null)` a secas, un fallo de carga se ve igual que una guia
-      // que no existe. En un documento fiscal esa distincion importa.
-      setErrorCarga(error instanceof Error ? error.message : 'No se pudo cargar la guia de remision.')
-      setGreData(null)
-    }
-    setLoading(false)
-  }, [get, documentId])
-
+  const [downloading, setDownloading] = useState(false)
   useEffect(() => {
-    if (isOpen && documentId) {
-      loadGreData()
-    }
-  }, [documentId, isOpen, loadGreData])
-
-  const handleDownloadPdf = async () => {
+    setActionError(null); setActionMessage(null); setActionLoading(false); setDownloading(false); setIntentReady('')
+    if (!isOpen || authLoading || !storageKey) return
     try {
-      const response = await fetchApi(`/api/gre/guias/${documentId}/pdf/`, {
-        method: 'GET',
-      })
-
-      if (!response.ok || !response.headers.get('content-type')?.startsWith('application/pdf')) throw new Error('No se pudo descargar el PDF de la guía.')
-      if (response.ok) {
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `GRE-${greData?.numero}.pdf`
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-      }
+      setPendingState({ scope, intent: readGreIntent(localStorage.getItem(storageKey), documentId) }); setIntentReady(scope)
+    } catch (error) { setActionError(error instanceof Error ? error.message : 'No se pudo recuperar el intento de GRE.') }
+  }, [scope, storageKey, documentId, authLoading, isOpen])
+  const runLifecycleAction = async (action: GreAction) => {
+    if (!greData || loading || actionLoading || pending && pending.action !== action || intentReady !== scope) return
+    const current = scope
+    const intent = pending || { documentId, action, key: `gre-${action}:${crypto.randomUUID()}` }
+    setActionLoading(true); setActionError(null); setActionMessage(null)
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(intent)); setPendingState({ scope, intent })
+      const body = action === 'anular' ? { motivo: 'Anulación operativa solicitada por el usuario' } : {}
+      const response = await post(`/api/gre/guias/${documentId}/${action}`, body, { headers: { 'Idempotency-Key': intent.key } })
+      const confirmed = greConfirmation(response, intent)
+      if (scopeRef.current !== current) return
+      localStorage.removeItem(storageKey); setPendingState({ scope, intent: null })
+      setActionMessage(`Acción confirmada. Estado de la guía: ${confirmed.estado}.`)
+      await read.reload()
     } catch (error) {
-      console.error('Error descargando PDF:', error)
-      alert(error instanceof Error ? error.message : 'No se pudo descargar la guia.')
-    }
-  }
-
-  const handlePrint = async () => {
-    if (!greData) return
-    const printWindow = window.open('', '_blank', 'width=800,height=900')
-    if (!printWindow) {
-      alert('Por favor permite las ventanas emergentes para imprimir')
-      return
-    }
-    try {
-      const response = await fetchApi(`/api/gre/guias/${documentId}/pdf/`, { method: 'GET' })
-      if (!response.ok || !response.headers.get('content-type')?.startsWith('application/pdf')) {
-        throw new Error('No se pudo cargar el PDF de la guía para imprimir.')
+      if (scopeRef.current === current) {
+        if (greTransportNotApplied(error, action)) {
+          localStorage.removeItem(storageKey); setPendingState({ scope, intent: null })
+          setActionError(`${error instanceof Error ? error.message : 'El transporte fiscal está bloqueado.'} La acción no se aplicó; puede continuar consultando la guía.`)
+        } else setActionError(`${error instanceof Error ? error.message : 'No se pudo confirmar la acción.'} El intento se conserva; reintente para consultar su resultado sin crear otra operación.`)
       }
-      const url = window.URL.createObjectURL(await response.blob())
+    } finally { if (scopeRef.current === current) setActionLoading(false) }
+  }
+  const actionDisabled = actionLoading || !!pending || loading || !greData || intentReady !== scope
+  const handleDownloadPdf = async () => {
+    if (!greData || loading || downloading) return
+    const current = scope; setDownloading(true); setActionError(null)
+    try {
+      const blob = await liveGreFile(`/api/gre/guias/${documentId}/pdf/`, 'pdf')
+      if (scopeRef.current === current) saveGreFile(blob, `GRE-${greData.numero}.pdf`)
+    } catch (error) {
+      if (scopeRef.current === current) setActionError(error instanceof Error ? error.message : 'No se pudo descargar la guía.')
+    } finally { if (scopeRef.current === current) setDownloading(false) }
+  }
+  const handlePrint = async () => {
+    if (!greData || loading || downloading) return
+    const current = scope; setDownloading(true); setActionError(null)
+    const printWindow = window.open('', '_blank', 'width=800,height=900')
+    if (!printWindow) { setActionError('Permita las ventanas emergentes para imprimir'); setDownloading(false); return }
+    try {
+      const blob = await liveGreFile(`/api/gre/guias/${documentId}/pdf/`, 'pdf')
+      if (scopeRef.current !== current) { printWindow.close(); return }
+      const url = window.URL.createObjectURL(blob)
       printWindow.document.write(`<!DOCTYPE html><html><head><title>GRE ${escapeHtml(greData.numero)}</title></head><body style="margin:0"><iframe id="gre-print" title="Guía de remisión para imprimir" src="${url}" style="width:100%;height:100vh;border:0"></iframe></body></html>`)
       const frame = printWindow.document.getElementById('gre-print') as HTMLIFrameElement | null
-      frame?.addEventListener('load', () => {
-        printWindow.focus()
-        printWindow.print()
-      })
-      printWindow.document.close()
-      setTimeout(() => window.URL.revokeObjectURL(url), 60000)
+      frame?.addEventListener('load', () => { printWindow.focus(); printWindow.print() })
+      printWindow.document.close(); setTimeout(() => window.URL.revokeObjectURL(url), 60000)
     } catch (error) {
       printWindow.close()
-      alert(error instanceof Error ? error.message : 'No se pudo imprimir la guía.')
-    }
+      if (scopeRef.current === current) setActionError(error instanceof Error ? error.message : 'No se pudo imprimir la guía.')
+    } finally { if (scopeRef.current === current) setDownloading(false) }
   }
-
 
   const getModalidadText = (modalidad: string) => {
     return modalidad === 'TRANSPORTE_PUBLICO' ? 'Transporte Público' : 'Transporte Privado'
@@ -196,7 +142,7 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
         }
       }}
     >
-      <div className="bg-card rounded-lg w-[95%] max-w-[1200px] max-h-[95vh] overflow-auto shadow relative"
+      <div role="dialog" aria-modal="true" aria-label="Detalle GRE" className="bg-card rounded-lg w-[95%] max-w-[1200px] max-h-[95vh] overflow-auto shadow relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -212,37 +158,37 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
             </div>
             <div className="flex gap-2 items-center">
               {greData?.estado === 'BORRADOR' && (
-                <button disabled={actionLoading} onClick={() => runLifecycleAction('firmar')} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-sm">
+                <button disabled={actionDisabled} onClick={() => runLifecycleAction('firmar')} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-sm">
                   Firmar
                 </button>
               )}
               {greData?.estado === 'FIRMADO' && (
-                <button disabled={actionLoading} onClick={() => runLifecycleAction('enviar-sunat')} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-sm">
+                <button disabled={actionDisabled} onClick={() => runLifecycleAction('enviar-sunat')} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-sm">
                   Enviar
                 </button>
               )}
               {greData?.estado === 'ERROR' && (
-                <button disabled={actionLoading} onClick={() => runLifecycleAction('reenviar')} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-sm">
+                <button disabled={actionDisabled} onClick={() => runLifecycleAction('reenviar')} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-sm">
                   Reintentar envío
                 </button>
               )}
               {greData?.estado === 'ENVIADO' && (
-                <button disabled={actionLoading} onClick={() => runLifecycleAction('consultar-sunat')} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-sm">
+                <button disabled={actionDisabled} onClick={() => runLifecycleAction('consultar-sunat')} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-sm">
                   Consultar estado
                 </button>
               )}
               {greData && ['BORRADOR', 'FIRMADO', 'ERROR'].includes(greData.estado) && (
-                <button disabled={actionLoading} onClick={() => runLifecycleAction('anular')} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-sm">
+                <button disabled={actionDisabled} onClick={() => runLifecycleAction('anular')} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-sm">
                   Anular
                 </button>
               )}
               <button
-                onClick={handleDownloadPdf} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-sm cursor-pointer flex items-center gap-[4px]"
+                disabled={loading || !greData || downloading} onClick={handleDownloadPdf} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-sm cursor-pointer flex items-center gap-[4px]"
               >
                 💾 Descargar
               </button>
               <button
-                onClick={handlePrint} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-sm cursor-pointer flex items-center gap-[4px]"
+                disabled={loading || !greData || downloading} onClick={handlePrint} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-sm cursor-pointer flex items-center gap-[4px]"
               >
                 🖨️ Imprimir
               </button>
@@ -257,6 +203,13 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
 
         {/* Body */}
         <div className="p-6">
+          {actionError && <div role="alert" className="mb-4 rounded-xl border border-destructive p-4 text-destructive">{actionError}</div>}
+          {actionMessage && <p role="status" className="mb-4 text-primary">{actionMessage}</p>}
+          {pending && <div className="mb-4 rounded-xl border p-4">
+            <p>Hay una acción pendiente de confirmación: {pending.action}. Se conserva la misma clave al reintentar.</p>
+            <button disabled={actionLoading || loading || !greData} onClick={() => runLifecycleAction(pending.action)} className="mt-2 rounded-lg border px-4 py-2">Reintentar acción</button>
+          </div>}
+
           {loading ? (
             <div className="flex justify-center items-center h-[400px] flex-col gap-4">
               <div className="w-10 h-10 rounded-full"></div>
@@ -466,6 +419,7 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
                   ? `No se pudo cargar la guía de remisión: ${errorCarga}`
                   : 'No se encontró la guía de remisión'}
               </p>
+              {errorCarga && <button onClick={read.reload} className="mt-4 rounded-lg border px-4 py-2">Reintentar detalle</button>}
             </div>
           )}
         </div>

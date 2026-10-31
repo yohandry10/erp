@@ -47,7 +47,20 @@ sin datos de clientes.
 ## Autenticación y autorización
 
 - Web mantiene sesión mediante cookie HttpOnly.
+- El login mantiene sus controles deshabilitados hasta hidratar y resolver la
+  sesión inicial. Así no pierde valores escritos antes de activar los handlers.
+  La confirmación y el efecto de sesión comparten una única redirección completa,
+  conservando el reenvío de la cookie sin interrumpir la siguiente navegación.
+- Cerrar sesión desde el menú usa AuthContext para limpiar identidad y permisos,
+  y navega completamente a login. Así una ruta precargada o un contexto React
+  anterior no redirige al dashboard ni interrumpe el acceso de otra cuenta.
+  El recorrido principal→empresa2→principal se repitió en el mismo navegador,
+  con auditoría y notificaciones aisladas y sin borrar cookies manualmente.
 - Tauri usa Bearer local cifrado; no se persiste en claro.
+- Las rutas públicas del paquete estático restauran ese almacén y confirman el
+  perfil. No aplican el atajo del middleware web ni borran la identidad compartida
+  mientras otra ventana nativa tiene una sesión válida; revocada o ausente sigue
+  sin autenticar al usuario.
 - Los passwords, JWT, service-role keys y headers de autorización no entran en
   localStorage, sessionStorage, logs ni outbox.
 - Los controllers aplican autenticación, tenant actual y permisos por recurso.
@@ -80,8 +93,9 @@ sin datos de clientes.
 
 Los parches de dependencias sin versión publicada viven en `patches/` y se
 instalan mediante `pnpm.patchedDependencies` en desarrollo, CI y las tres
-imágenes Docker. Para `node-forge@1.4.0`, el parche reproduce el cambio de
-`digitalbazaar/forge#1152` contra GHSA-86w9-cpqp-85rv. Para `braces@3.0.3`,
+imágenes Docker. `node-forge` 1.4.2 ya publica la corrección de GHSA-86w9-cpqp-85rv:
+no lleva parche, pero el gate sigue comprobando sobre la copia instalada que rechaza
+la firma falsificada. Para `braces@3.0.3`,
 GHSA-vfj7-8cjw-p6xm se corrige limitando a 128 la profundidad del parser y los
 tres recorridos recursivos, incluidos los AST entregados directamente.
 `scripts/ci/audit-dependencies.mjs` conserva los avisos del registro, verifica
@@ -147,16 +161,72 @@ orquestan; servicios y generadores contienen reglas. Todo asiento debe:
 
 ## Desktop y offline
 
-- Tauri usa SQLite local por tenant.
+- Tauri2 se reconoce por `__TAURI_INTERNALS__`; login espera la persistencia
+  del token en el almacén seguro antes de notificar la sesión y navegar.
+  Las consultas iniciales esperan una restauración compartida del token antes
+  de enviar headers, sin consultar el perfil por cada petición. Logout o login
+  nuevos descartan una lectura protegida anterior que llegue tarde.
+- Las proyecciones, snapshots, binarios y cola nativos usan un archivo SQLite
+  por empresa/usuario, identificado por hash de ambos. No importan lecturas del
+  archivo compartido anterior. Las operaciones legacy sólo se consultan y
+  modifican cuando coinciden sus dos propietarios; se conservan en su archivo.
 - La outbox es durable, idempotente y no guarda secretos.
 - El bus registra el tipo y la entrega del evento sin volcar el payload:
   documentos, datos personales y remuneraciones permanecen fuera de esos logs.
-- Los snapshots y cachés se aíslan por tenant.
+- La cachéHTTP del navegador y sus snapshots exigen empresa y usuario de la
+  sesión. Escritura, reemplazo y fallback usan ambos identificadores; sin ellos
+  no almacenan ni entregan contenido. Las entradas antiguas sin usuario quedan
+  inaccesibles y se recuperan mediante una lectura autorizada nueva. Un lector
+  con403 no puede recibir respuestas guardadas por otro actor de su empresa
+  cuando falla la red. Login nuevo y rechazos401/403 invalidan la cachéHTTP del
+  actor; no borran la cola de operaciones ni las respuestas de otros usuarios.
+  Una revisión de autorización por actor descarta consultas iniciadas antes de
+  esa invalidación: una respuesta tardía no puede repoblar la caché ni entregarse
+  como lectura vigente. El listado de clientes descarta respuestas anteriores
+  y retira filas y métricas cuando falla la consulta, incluido un403 real tras
+  cambiar el rol del mismo usuario en otra sesión.
+  SQLite aplica una revisión de autorización por actor. Login y401/403 eliminan
+  snapshots/binarios y cambian la revisión en una transacción que conserva la
+  cola. Una respuesta vieja no puede autorizar ni hidratar de nuevo las lecturas.
+  Las proyecciones retenidas requieren un snapshot autorizado de la sesión
+  vigente para servir como fallback. UI nativa de clientes verificó rechazo,
+  respuesta tardía, recarga y conservación de pendientes; otros catálogos y
+  binarios no reciben aceptación funcional por ese caso.
 - Las escrituras offline se sincronizan con contratos explícitos.
+- Firma y envío del Centro de Documentos exigen confirmación en vivo, igual
+  que su writer fiscal canónico. No entran en la cola genérica por las rutas
+  `documentos/:id/generar-xml` o `enviar-sunat`. Los originales legacy se
+  conservan con su empresa/actor y cuerpo/clave para revisión manual; leer o
+  sincronizar la cola no autoriza reenviarlos. Los borradores conservan su
+  contrato no fiscal.
+- La cola del navegador también exige empresa y usuario de sesión para listar,
+  contar, sincronizar, cambiar estado o eliminar. Los pendientes de otros actores
+  y los legacy sin propietario se conservan sin exponerse. La sincronización
+  captura al dueño antes de leer su cola y mappings; persiste el ACK o fallo de
+  la solicitud ya enviada en ese mismo scope y detiene el siguiente envío si
+  cambia el actor o su revisión de autorización. Estas carreras se verificaron
+  técnicamente; el aislamiento del pendiente se repitió desdeUI en navegador.
+- Edición nativa de cliente y su cola se confirman localmente en una transacción
+  y responden202 pendiente. La sincronización mantiene metadatos en headers y
+  excluye del DTO de transporte los campos locales generados de cliente,
+  conservando el cuerpo durable para recuperar intenciones anteriores.
 - Los correlativos fiscales locales no sustituyen la validación del backend.
 - El runtime no habilita shell arbitrario.
+- El frontend de escritorio se exporta como archivos estáticos. Las ventanas
+  se crean desde su configuración con un hook de recursos nativos que resuelve
+  sólo plantillas de negocio exportadas. Sustituye el segmento de ID en HTML/RSC,
+  sin consultar archivos arbitrarios, y conserva la CSP actualizando el hash del
+  script cuyo contenido cambia. Navegación y recarga con IDs reales se comprobaron
+  en clientes, RMA y el guard de edición de asiento inmutable en Windows.
 
 ## Frontend
+
+- La edición posterior al onboarding de datos básicos de empresa usa el writer
+  atómico existente y `configuracion.write`. Sólo envía los campos modificados.
+  La clave de intención se conserva por empresa/actor para reintentar el mismo
+  payload; sessionStorage guarda únicamente su huella eID, sin campos ni secretos.
+  El asistente completado se ofrece para consulta. Certificado, país/RUC y
+  parámetros fiscales conservan sus flujos propios.
 
 - Stack visual: Tailwind CSS 3.4 + shadcn/ui/Radix.
 - `globals.css` contiene únicamente Tailwind, tokens y base.
@@ -181,6 +251,38 @@ conservan el fallo cerrado por falta de handler.
 - Métricas y auditoría no deben alterar el flujo de negocio.
 - Integraciones externas usan adaptadores y fallan cerrado en operaciones
   fiscales o financieras.
+
+Migración desde otro sistema (580): sustitución con fecha de corte, no convivencia. Un
+sistema anterior no tiene por qué exponer una API transaccional y mantener ambos exigiría definir
+dueño por dato, dirección de intercambio y resolución de conflictos sobre
+saldos que cambian a diario. Se migran saldos abiertos por los writers vigentes
+(contratos 570 e inventario) y la historia queda consultable en el sistema anterior. Cada
+registro de origen se enlaza a su par del ERP con la huella de su contenido;
+un reintento idéntico no duplica y un cambio en el origen se rechaza. El
+ensayo completo corre en la base y se revierte, de modo que puede repetirse
+sin escribir. El proceso no conoce ningún sistema en particular: el origen es un
+dato que acompaña a cada migración, los registros de dos orígenes no se pisan y lo
+propio de cada sistema queda en un mapeo fuera del código.
+
+La 582 completa la sustitución en dos capas:
+
+- Archivo íntegro: un lote inmutable por extracto, que cierra sólo si lo
+  cargado coincide con lo leído, para que nada del sistema anterior se pierda aunque no
+  tenga equivalente operativo. Es consulta pura y sin efectos; las credenciales
+  se redactan antes de cargar porque el archivo lo leen auditoría y gerencia.
+- Migración operativa: entra sólo por los writers vigentes, y el ERP adopta lo
+  que ya tiene antes de crear. Nunca adivina: un código ambiguo o dos registros
+  de origen sobre un mismo registro del ERP son errores del registro.
+
+Reglas de cada saldo migrado:
+
+- Bancos: el saldo de apertura es un movimiento migrado sin asiento, porque la
+  contabilidad llega en el balance de apertura. Lleva su valor en moneda local
+  y se cruza por cuenta contable con ese asiento.
+- Pedidos de venta: se crean con el writer base y no con el comercial, para
+  conservar el precio pactado en el sistema anterior.
+- OC de compra: llegan en borrador para respetar la segregación de
+  aprobación.
 
 ## Reglas para cambios arquitectónicos
 

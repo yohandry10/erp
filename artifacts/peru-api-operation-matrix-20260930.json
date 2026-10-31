@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-10-19T20:47:33.643Z",
+  "generated_at": "2026-10-19T22:26:22.898Z",
   "inventory": "artifacts/peru-api-operation-inventory-20260930.json",
-  "evidence": "artifacts/peru-integrated-main-39313892124",
+  "evidence": "artifacts/peru-integrated-main-39328687047",
   "additional_evidence": [
     {
-      "evidence": "artifacts/peru-storage-ci-39313892124",
+      "evidence": "artifacts/peru-storage-ci-39328687047",
       "scope": "company_logo_real_storage_subset",
       "phase_success": true,
       "complete_erp_acceptance": false,
@@ -1004,39 +1004,35 @@
           "status": 201
         },
         {
-          "trace_index": 1979,
-          "status": 201
-        },
-        {
           "trace_index": 1980,
           "status": 201
         },
         {
-          "trace_index": 1985,
+          "trace_index": 1981,
           "status": 201
         },
         {
-          "trace_index": 1999,
+          "trace_index": 1986,
+          "status": 201
+        },
+        {
+          "trace_index": 2000,
           "status": 401
         },
         {
-          "trace_index": 2001,
+          "trace_index": 2002,
           "status": 201
         },
         {
-          "trace_index": 2008,
+          "trace_index": 2009,
           "status": 401
-        },
-        {
-          "trace_index": 2017,
-          "status": 201
         },
         {
           "trace_index": 2018,
           "status": 201
         },
         {
-          "trace_index": 2070,
+          "trace_index": 2019,
           "status": 201
         },
         {
@@ -1044,15 +1040,15 @@
           "status": 201
         },
         {
-          "trace_index": 2086,
+          "trace_index": 2072,
           "status": 201
         },
         {
-          "trace_index": 2100,
+          "trace_index": 2087,
           "status": 201
         },
         {
-          "trace_index": 2136,
+          "trace_index": 2101,
           "status": 201
         },
         {
@@ -1060,19 +1056,19 @@
           "status": 201
         },
         {
-          "trace_index": 2147,
-          "status": 401
+          "trace_index": 2138,
+          "status": 201
         },
         {
           "trace_index": 2148,
+          "status": 401
+        },
+        {
+          "trace_index": 2149,
           "status": 201
         },
         {
-          "trace_index": 2155,
-          "status": 201
-        },
-        {
-          "trace_index": 2158,
+          "trace_index": 2156,
           "status": 201
         },
         {
@@ -1080,7 +1076,7 @@
           "status": 201
         },
         {
-          "trace_index": 2163,
+          "trace_index": 2160,
           "status": 201
         },
         {
@@ -1092,7 +1088,7 @@
           "status": 201
         },
         {
-          "trace_index": 2170,
+          "trace_index": 2166,
           "status": 201
         },
         {
@@ -1100,11 +1096,11 @@
           "status": 201
         },
         {
-          "trace_index": 2176,
+          "trace_index": 2172,
           "status": 201
         },
         {
-          "trace_index": 2180,
+          "trace_index": 2177,
           "status": 201
         },
         {
@@ -1112,19 +1108,31 @@
           "status": 201
         },
         {
-          "trace_index": 2183,
+          "trace_index": 2182,
           "status": 201
         },
         {
-          "trace_index": 2220,
+          "trace_index": 2184,
           "status": 201
         },
         {
-          "trace_index": 2223,
+          "trace_index": 2221,
           "status": 201
         },
         {
-          "trace_index": 2237,
+          "trace_index": 2222,
+          "status": 201
+        },
+        {
+          "trace_index": 2249,
+          "status": 201
+        },
+        {
+          "trace_index": 2252,
+          "status": 201
+        },
+        {
+          "trace_index": 2266,
           "status": 201
         }
       ],
@@ -1177,32 +1185,28 @@
           "status": 401
         },
         {
-          "trace_index": 2145,
-          "status": 401
-        },
-        {
           "trace_index": 2146,
           "status": 401
         },
         {
-          "trace_index": 2149,
-          "status": 200
-        },
-        {
-          "trace_index": 2156,
-          "status": 200
-        },
-        {
-          "trace_index": 2161,
+          "trace_index": 2147,
           "status": 401
+        },
+        {
+          "trace_index": 2150,
+          "status": 200
+        },
+        {
+          "trace_index": 2157,
+          "status": 200
         },
         {
           "trace_index": 2162,
-          "status": 200
+          "status": 401
         },
         {
-          "trace_index": 2167,
-          "status": 401
+          "trace_index": 2163,
+          "status": 200
         },
         {
           "trace_index": 2168,
@@ -1210,18 +1214,22 @@
         },
         {
           "trace_index": 2169,
-          "status": 200
-        },
-        {
-          "trace_index": 2173,
-          "status": 200
-        },
-        {
-          "trace_index": 2175,
           "status": 401
         },
         {
-          "trace_index": 2179,
+          "trace_index": 2170,
+          "status": 200
+        },
+        {
+          "trace_index": 2174,
+          "status": 200
+        },
+        {
+          "trace_index": 2176,
+          "status": 401
+        },
+        {
+          "trace_index": 2180,
           "status": 401
         }
       ],
@@ -1308,43 +1316,41 @@
       "source": "apps/erp-api/src/modules/auth/auth.controller.ts:167",
       "existing_evidence": [
         {
-          "trace_index": 2132,
+          "trace_index": 2133,
           "status": 400
-        },
-        {
-          "trace_index": 2134,
-          "status": 200
         },
         {
           "trace_index": 2135,
           "status": 200
         },
         {
-          "trace_index": 2152,
+          "trace_index": 2136,
           "status": 200
         },
         {
-          "trace_index": 2157,
+          "trace_index": 2153,
+          "status": 200
+        },
+        {
+          "trace_index": 2158,
           "status": 200
         }
       ],
       "defects": [
         {
           "id": "auth-reset-web-routes-404",
-          "status": "local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-auth-baseline-20261019",
             "observed_error": "La web llamaba /api/auth/request-password-reset y /api/auth/reset-password (404) y no enviaba el email al confirmar; el login no enlazaba la recuperación.",
             "local_only": true
           },
           "correction": "Login enlaza /reset-password/; la página usa password-reset/request y password-reset/confirm con email, token y la regla del DTO",
-          "pending": [
-            "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
-          ]
+          "pending": []
         },
         {
           "id": "auth-reset-link-wrong-page",
-          "status": "local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-auth-baseline-20261019",
             "observed_error": "El correo enlazaba http://localhost:3000 (APP_URL no está en el Blueprint) y /reset-password?token=, que mostraba el formulario de solicitud: el token nunca se podía usar.",
@@ -1352,12 +1358,12 @@
           },
           "correction": "Enlaces con APP_URL o FRONTEND_URL; /reset-password/ procesa token y email de la consulta",
           "pending": [
-            "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
+            "Configurar SMTP/proveedor y FRONTEND_URL en Render: en PROD la solicitud responde 503 (artifacts/peru-production-auth-smoke-after-144-20261019.json)."
           ]
         },
         {
           "id": "auth-email-config-false-flags",
-          "status": "local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_merged_main_deployment_verified",
           "proof": {
             "source": "apps/erp-api/src/shared/email/email.service.spec.ts",
             "observed_error": "EMAIL_DISABLED=false y SMTP_SECURE=false (texto) se evaluaban como verdaderos y SMTP_HOST caía en localhost: el servicio se declaraba configurado sin servidor y los envíos fallaban en silencio.",
@@ -1365,7 +1371,7 @@
           },
           "correction": "Banderas booleanas interpretadas; sin SMTP_HOST no hay servicio; sin correo la solicitud responde 503 en vez de prometer un enlace",
           "pending": [
-            "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
+            "Configurar SMTP/proveedor y FRONTEND_URL en Render: en PROD la solicitud responde 503 (artifacts/peru-production-auth-smoke-after-144-20261019.json)."
           ]
         },
         {
@@ -1411,23 +1417,23 @@
       "source": "apps/erp-api/src/modules/auth/auth.controller.ts:201",
       "existing_evidence": [
         {
-          "trace_index": 2138,
-          "status": 200
-        },
-        {
           "trace_index": 2139,
-          "status": 401
+          "status": 200
         },
         {
           "trace_index": 2140,
           "status": 401
         },
         {
-          "trace_index": 2151,
+          "trace_index": 2141,
           "status": 401
         },
         {
-          "trace_index": 2153,
+          "trace_index": 2152,
+          "status": 401
+        },
+        {
+          "trace_index": 2154,
           "status": 401
         }
       ],
@@ -1454,47 +1460,45 @@
       "source": "apps/erp-api/src/modules/auth/auth.controller.ts:224",
       "existing_evidence": [
         {
-          "trace_index": 2133,
-          "status": 400
-        },
-        {
-          "trace_index": 2141,
+          "trace_index": 2134,
           "status": 400
         },
         {
           "trace_index": 2142,
-          "status": 401
+          "status": 400
         },
         {
           "trace_index": 2143,
-          "status": 429
-        },
-        {
-          "trace_index": 2144,
-          "status": 200
-        },
-        {
-          "trace_index": 2150,
           "status": 401
         },
         {
-          "trace_index": 2154,
+          "trace_index": 2144,
+          "status": 429
+        },
+        {
+          "trace_index": 2145,
+          "status": 200
+        },
+        {
+          "trace_index": 2151,
+          "status": 401
+        },
+        {
+          "trace_index": 2155,
           "status": 401
         }
       ],
       "defects": [
         {
           "id": "auth-reset-web-routes-404",
-          "status": "local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-auth-baseline-20261019",
             "observed_error": "La web llamaba /api/auth/request-password-reset y /api/auth/reset-password (404) y no enviaba el email al confirmar; el login no enlazaba la recuperación.",
             "local_only": true
           },
           "correction": "Login enlaza /reset-password/; la página usa password-reset/request y password-reset/confirm con email, token y la regla del DTO",
-          "pending": [
-            "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -1561,31 +1565,29 @@
       "source": "apps/erp-api/src/modules/auth/auth.controller.ts:267",
       "existing_evidence": [
         {
-          "trace_index": 2160,
+          "trace_index": 2161,
           "status": 201
         },
         {
-          "trace_index": 2177,
+          "trace_index": 2178,
           "status": 503
         },
         {
-          "trace_index": 2178,
+          "trace_index": 2179,
           "status": 201
         }
       ],
       "defects": [
         {
           "id": "auth-logout-outage-200",
-          "status": "local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-auth-baseline-20261019",
             "observed_error": "Si la RPC de revocación fallaba, logout y logout-all respondían 201 de éxito y las sesiones seguían activas.",
             "local_only": true
           },
           "correction": "La falla de revocación responde 503; logout igual retira la cookie del navegador",
-          "pending": [
-            "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -1617,31 +1619,29 @@
       "source": "apps/erp-api/src/modules/auth/auth.controller.ts:283",
       "existing_evidence": [
         {
-          "trace_index": 2166,
+          "trace_index": 2167,
           "status": 201
         },
         {
-          "trace_index": 2172,
+          "trace_index": 2173,
           "status": 503
         },
         {
-          "trace_index": 2174,
+          "trace_index": 2175,
           "status": 201
         }
       ],
       "defects": [
         {
           "id": "auth-logout-outage-200",
-          "status": "local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-auth-baseline-20261019",
             "observed_error": "Si la RPC de revocación fallaba, logout y logout-all respondían 201 de éxito y las sesiones seguían activas.",
             "local_only": true
           },
           "correction": "La falla de revocación responde 503; logout igual retira la cookie del navegador",
-          "pending": [
-            "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -4675,7 +4675,7 @@
           "status": 201
         },
         {
-          "trace_index": 2021,
+          "trace_index": 2022,
           "status": 201
         }
       ],
@@ -5960,6 +5960,10 @@
         {
           "trace_index": 1886,
           "status": 201
+        },
+        {
+          "trace_index": 2223,
+          "status": 201
         }
       ],
       "defects": [
@@ -6074,55 +6078,55 @@
       "source": "apps/erp-api/src/modules/configuracion/configuration.controller.ts:795",
       "existing_evidence": [
         {
-          "trace_index": 2224,
+          "trace_index": 2253,
           "status": 201
         },
         {
-          "trace_index": 2225,
+          "trace_index": 2254,
           "status": 201
         },
         {
-          "trace_index": 2226,
+          "trace_index": 2255,
           "status": 201
         },
         {
-          "trace_index": 2227,
+          "trace_index": 2256,
           "status": 409
         },
         {
-          "trace_index": 2228,
+          "trace_index": 2257,
           "status": 400
         },
         {
-          "trace_index": 2229,
+          "trace_index": 2258,
           "status": 400
         },
         {
-          "trace_index": 2230,
+          "trace_index": 2259,
           "status": 400
         },
         {
-          "trace_index": 2231,
+          "trace_index": 2260,
           "status": 413
         },
         {
-          "trace_index": 2232,
+          "trace_index": 2261,
           "status": 201
         },
         {
-          "trace_index": 2233,
+          "trace_index": 2262,
           "status": 403
         },
         {
-          "trace_index": 2235,
+          "trace_index": 2264,
           "status": 400
         },
         {
-          "trace_index": 2236,
+          "trace_index": 2265,
           "status": 201
         },
         {
-          "trace_index": 2238,
+          "trace_index": 2267,
           "status": 201
         }
       ],
@@ -6151,15 +6155,15 @@
       "source": "apps/erp-api/src/modules/configuracion/configuration.controller.ts:837",
       "existing_evidence": [
         {
-          "trace_index": 2234,
+          "trace_index": 2263,
           "status": 403
         },
         {
-          "trace_index": 2239,
+          "trace_index": 2268,
           "status": 200
         },
         {
-          "trace_index": 2240,
+          "trace_index": 2269,
           "status": 200
         }
       ],
@@ -7346,11 +7350,11 @@
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-centros-costo.controller.ts:58",
       "existing_evidence": [
         {
-          "trace_index": 1971,
+          "trace_index": 1972,
           "status": 200
         },
         {
-          "trace_index": 1974,
+          "trace_index": 1975,
           "status": 404
         }
       ],
@@ -7373,11 +7377,11 @@
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-centros-costo.controller.ts:96",
       "existing_evidence": [
         {
-          "trace_index": 1968,
+          "trace_index": 1969,
           "status": 201
         },
         {
-          "trace_index": 1969,
+          "trace_index": 1970,
           "status": 201
         }
       ],
@@ -7400,7 +7404,7 @@
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-centros-costo.controller.ts:138",
       "existing_evidence": [
         {
-          "trace_index": 1970,
+          "trace_index": 1971,
           "status": 200
         }
       ],
@@ -7423,7 +7427,7 @@
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-centros-costo.controller.ts:193",
       "existing_evidence": [
         {
-          "trace_index": 1972,
+          "trace_index": 1973,
           "status": 200
         }
       ],
@@ -7446,7 +7450,7 @@
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-centros-costo.controller.ts:304",
       "existing_evidence": [
         {
-          "trace_index": 1973,
+          "trace_index": 1974,
           "status": 200
         }
       ],
@@ -7481,11 +7485,11 @@
           "status": 200
         },
         {
-          "trace_index": 1963,
+          "trace_index": 1964,
           "status": 200
         },
         {
-          "trace_index": 1966,
+          "trace_index": 1967,
           "status": 200
         }
       ],
@@ -7530,11 +7534,11 @@
           "status": 503
         },
         {
-          "trace_index": 1961,
+          "trace_index": 1962,
           "status": 200
         },
         {
-          "trace_index": 1962,
+          "trace_index": 1963,
           "status": 200
         }
       ],
@@ -7581,6 +7585,10 @@
         {
           "trace_index": 1960,
           "status": 409
+        },
+        {
+          "trace_index": 1961,
+          "status": 201
         }
       ],
       "defects": [
@@ -7629,15 +7637,15 @@
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-conciliacion.controller.ts:91",
       "existing_evidence": [
         {
-          "trace_index": 1964,
+          "trace_index": 1965,
           "status": 404
         },
         {
-          "trace_index": 1965,
+          "trace_index": 1966,
           "status": 200
         },
         {
-          "trace_index": 1967,
+          "trace_index": 1968,
           "status": 404
         }
       ],
@@ -9438,7 +9446,7 @@
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-multimoneda.controller.ts:59",
       "existing_evidence": [
         {
-          "trace_index": 1977,
+          "trace_index": 1978,
           "status": 200
         }
       ],
@@ -9484,11 +9492,11 @@
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-multimoneda.controller.ts:100",
       "existing_evidence": [
         {
-          "trace_index": 1975,
+          "trace_index": 1976,
           "status": 201
         },
         {
-          "trace_index": 1976,
+          "trace_index": 1977,
           "status": 201
         }
       ],
@@ -9511,7 +9519,7 @@
       "source": "apps/erp-api/src/modules/contabilidad/controllers/contabilidad-multimoneda.controller.ts:124",
       "existing_evidence": [
         {
-          "trace_index": 1978,
+          "trace_index": 1979,
           "status": 200
         }
       ],
@@ -12326,6 +12334,14 @@
         {
           "trace_index": 1592,
           "status": 201
+        },
+        {
+          "trace_index": 2225,
+          "status": 201
+        },
+        {
+          "trace_index": 2236,
+          "status": 201
         }
       ],
       "defects": [
@@ -14246,7 +14262,7 @@
           "status": 200
         },
         {
-          "trace_index": 2066,
+          "trace_index": 2067,
           "status": 503
         }
       ],
@@ -14387,7 +14403,7 @@
           "status": 200
         },
         {
-          "trace_index": 2037,
+          "trace_index": 2038,
           "status": 200
         }
       ],
@@ -14465,11 +14481,11 @@
           "status": 201
         },
         {
-          "trace_index": 2019,
+          "trace_index": 2020,
           "status": 201
         },
         {
-          "trace_index": 2089,
+          "trace_index": 2090,
           "status": 201
         }
       ],
@@ -14541,15 +14557,15 @@
       "source": "apps/erp-api/src/modules/finanzas/bancos/bancos.controller.ts:94",
       "existing_evidence": [
         {
-          "trace_index": 2052,
+          "trace_index": 2053,
           "status": 200
         },
         {
-          "trace_index": 2055,
+          "trace_index": 2056,
           "status": 404
         },
         {
-          "trace_index": 2068,
+          "trace_index": 2069,
           "status": 503
         }
       ],
@@ -14626,11 +14642,11 @@
           "status": 201
         },
         {
-          "trace_index": 2020,
+          "trace_index": 2021,
           "status": 201
         },
         {
-          "trace_index": 2090,
+          "trace_index": 2091,
           "status": 201
         }
       ],
@@ -14710,15 +14726,15 @@
       "source": "apps/erp-api/src/modules/finanzas/bancos/bancos.controller.ts:139",
       "existing_evidence": [
         {
-          "trace_index": 2053,
+          "trace_index": 2054,
           "status": 200
         },
         {
-          "trace_index": 2056,
+          "trace_index": 2057,
           "status": 200
         },
         {
-          "trace_index": 2067,
+          "trace_index": 2068,
           "status": 503
         }
       ],
@@ -14804,15 +14820,15 @@
       "source": "apps/erp-api/src/modules/finanzas/bancos/bancos.controller.ts:170",
       "existing_evidence": [
         {
-          "trace_index": 2054,
+          "trace_index": 2055,
           "status": 200
         },
         {
-          "trace_index": 2057,
+          "trace_index": 2058,
           "status": 400
         },
         {
-          "trace_index": 2069,
+          "trace_index": 2070,
           "status": 503
         }
       ],
@@ -14853,7 +14869,7 @@
           "status": 200
         },
         {
-          "trace_index": 2058,
+          "trace_index": 2059,
           "status": 200
         }
       ],
@@ -14876,7 +14892,7 @@
       "source": "apps/erp-api/src/modules/finanzas/conciliacion/conciliacion.controller.ts:40",
       "existing_evidence": [
         {
-          "trace_index": 2059,
+          "trace_index": 2060,
           "status": 200
         }
       ],
@@ -14899,7 +14915,7 @@
       "source": "apps/erp-api/src/modules/finanzas/conciliacion/conciliacion.controller.ts:53",
       "existing_evidence": [
         {
-          "trace_index": 2060,
+          "trace_index": 2061,
           "status": 200
         }
       ],
@@ -15340,6 +15356,14 @@
         {
           "trace_index": 342,
           "status": 200
+        },
+        {
+          "trace_index": 2247,
+          "status": 404
+        },
+        {
+          "trace_index": 2248,
+          "status": 503
         }
       ],
       "defects": [
@@ -15364,11 +15388,19 @@
           "verified_checks": [
             "CPE/CxC desde pedido despachado; cobro parcial a banco y saldo en efectivo a caja con replay; caja inexistente 400 sin efectos; búsqueda y aislamiento; arqueo y dos asientos únicos"
           ]
+        },
+        {
+          "id": "cxc-detail-reads",
+          "source": "scripts/ci/test-peru-cxc-operations-local.mjs",
+          "verified_checks": [
+            "Detalle ajeno 404 y lectura caída 503"
+          ]
         }
       ],
       "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "Transmisión SUNAT real; moneda extranjera en cobro; UI del documento desde pedido"
+        "Transmisión SUNAT real; moneda extranjera en cobro; UI del documento desde pedido",
+        "Cobro previo desde la UI, roles distintos de ADMIN y CxC en moneda extranjera"
       ]
     },
     {
@@ -15428,7 +15460,40 @@
       "method": "POST",
       "endpoint": "/api/finanzas/cxc/:id/notas-credito",
       "source": "apps/erp-api/src/modules/finanzas/cxc/cxc.controller.ts:90",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 2239,
+          "status": 409
+        },
+        {
+          "trace_index": 2240,
+          "status": 409
+        },
+        {
+          "trace_index": 2241,
+          "status": 400
+        },
+        {
+          "trace_index": 2242,
+          "status": 400
+        },
+        {
+          "trace_index": 2243,
+          "status": 404
+        },
+        {
+          "trace_index": 2244,
+          "status": 404
+        },
+        {
+          "trace_index": 2245,
+          "status": 503
+        },
+        {
+          "trace_index": 2246,
+          "status": 503
+        }
+      ],
       "defects": [
         {
           "id": "cxc-credit-note-raw-codes",
@@ -15444,14 +15509,18 @@
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "cxc-credit-note-gates",
+          "source": "scripts/ci/test-peru-cxc-operations-local.mjs",
+          "verified_checks": [
+            "Sin contabilidad de origen o sin aceptación SUNAT 409 legible y sin efectos; catálogo/monto 400; ajena 404; configuración o writer caídos 503"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Nota sobre factura aceptada por SUNAT real (requiere CDR del contribuyente)"
       ]
     },
     {
@@ -15460,7 +15529,56 @@
       "method": "POST",
       "endpoint": "/api/finanzas/cxc/:id/reprogramar",
       "source": "apps/erp-api/src/modules/finanzas/cxc/cxc.controller.ts:106",
-      "existing_evidence": [],
+      "existing_evidence": [
+        {
+          "trace_index": 2226,
+          "status": 201
+        },
+        {
+          "trace_index": 2227,
+          "status": 201
+        },
+        {
+          "trace_index": 2228,
+          "status": 409
+        },
+        {
+          "trace_index": 2229,
+          "status": 201
+        },
+        {
+          "trace_index": 2230,
+          "status": 201
+        },
+        {
+          "trace_index": 2231,
+          "status": 201
+        },
+        {
+          "trace_index": 2232,
+          "status": 404
+        },
+        {
+          "trace_index": 2233,
+          "status": 404
+        },
+        {
+          "trace_index": 2234,
+          "status": 400
+        },
+        {
+          "trace_index": 2235,
+          "status": 400
+        },
+        {
+          "trace_index": 2237,
+          "status": 409
+        },
+        {
+          "trace_index": 2238,
+          "status": 503
+        }
+      ],
       "defects": [
         {
           "id": "cxc-reprogram-derived-key-false-success",
@@ -15489,14 +15607,25 @@
           ]
         }
       ],
-      "verified_cases": [],
-      "result": "pending_functional_execution",
+      "verified_cases": [
+        {
+          "id": "cxc-reprogram-intents",
+          "source": "scripts/ci/test-peru-cxc-operations-local.mjs",
+          "verified_checks": [
+            "Una intención aplica una vez y su reintento la recupera; otra fecha con la misma clave 409; sin clave cada pedido es nuevo"
+          ]
+        },
+        {
+          "id": "cxc-reprogram-rejections",
+          "source": "scripts/ci/test-peru-cxc-operations-local.mjs",
+          "verified_checks": [
+            "Inexistente o ajena 404, fecha inválida 400, anulada 409, writer caído 503; ninguna cambia la cuenta"
+          ]
+        }
+      ],
+      "result": "functional_cases_verified_with_remaining_checks",
       "pending_checks": [
-        "persistencia y resultado funcional",
-        "permisos",
-        "aislamiento",
-        "validaciones",
-        "recuperación de errores"
+        "Cobro previo desde la UI, roles distintos de ADMIN y CxC en moneda extranjera"
       ]
     },
     {
@@ -15507,7 +15636,7 @@
       "source": "apps/erp-api/src/modules/finanzas/cxp/cxp.controller.ts:28",
       "existing_evidence": [
         {
-          "trace_index": 2061,
+          "trace_index": 2062,
           "status": 503
         }
       ],
@@ -15548,15 +15677,15 @@
       "source": "apps/erp-api/src/modules/finanzas/cxp/cxp.controller.ts:43",
       "existing_evidence": [
         {
-          "trace_index": 2028,
+          "trace_index": 2029,
           "status": 200
         },
         {
-          "trace_index": 2031,
+          "trace_index": 2032,
           "status": 200
         },
         {
-          "trace_index": 2062,
+          "trace_index": 2063,
           "status": 503
         }
       ],
@@ -15593,15 +15722,15 @@
       "source": "apps/erp-api/src/modules/finanzas/cxp/cxp.controller.ts:58",
       "existing_evidence": [
         {
-          "trace_index": 2029,
+          "trace_index": 2030,
           "status": 200
         },
         {
-          "trace_index": 2032,
+          "trace_index": 2033,
           "status": 400
         },
         {
-          "trace_index": 2063,
+          "trace_index": 2064,
           "status": 503
         }
       ],
@@ -15638,7 +15767,7 @@
       "source": "apps/erp-api/src/modules/finanzas/cxp/cxp.controller.ts:73",
       "existing_evidence": [
         {
-          "trace_index": 2030,
+          "trace_index": 2031,
           "status": 200
         }
       ],
@@ -15740,11 +15869,7 @@
           "status": 200
         },
         {
-          "trace_index": 2026,
-          "status": 200
-        },
-        {
-          "trace_index": 2035,
+          "trace_index": 2027,
           "status": 200
         },
         {
@@ -15752,15 +15877,19 @@
           "status": 200
         },
         {
-          "trace_index": 2041,
+          "trace_index": 2037,
           "status": 200
         },
         {
-          "trace_index": 2049,
+          "trace_index": 2042,
           "status": 200
         },
         {
-          "trace_index": 2065,
+          "trace_index": 2050,
+          "status": 200
+        },
+        {
+          "trace_index": 2066,
           "status": 503
         }
       ],
@@ -15883,15 +16012,15 @@
           "status": 201
         },
         {
-          "trace_index": 2022,
-          "status": 201
-        },
-        {
           "trace_index": 2023,
           "status": 201
         },
         {
           "trace_index": 2024,
+          "status": 201
+        },
+        {
+          "trace_index": 2025,
           "status": 201
         }
       ],
@@ -15934,11 +16063,11 @@
       "source": "apps/erp-api/src/modules/finanzas/cxp/cxp.controller.ts:137",
       "existing_evidence": [
         {
-          "trace_index": 2025,
+          "trace_index": 2026,
           "status": 200
         },
         {
-          "trace_index": 2027,
+          "trace_index": 2028,
           "status": 404
         }
       ],
@@ -16006,19 +16135,19 @@
       "source": "apps/erp-api/src/modules/finanzas/cxp/cxp.controller.ts:174",
       "existing_evidence": [
         {
-          "trace_index": 2046,
-          "status": 400
-        },
-        {
           "trace_index": 2047,
-          "status": 201
+          "status": 400
         },
         {
           "trace_index": 2048,
           "status": 201
         },
         {
-          "trace_index": 2051,
+          "trace_index": 2049,
+          "status": 201
+        },
+        {
+          "trace_index": 2052,
           "status": 404
         }
       ],
@@ -16055,7 +16184,7 @@
       "source": "apps/erp-api/src/modules/finanzas/cxp/cxp.controller.ts:193",
       "existing_evidence": [
         {
-          "trace_index": 2038,
+          "trace_index": 2039,
           "status": 200
         }
       ],
@@ -16141,7 +16270,7 @@
       "source": "apps/erp-api/src/modules/finanzas/tesoreria/tesoreria.controller.ts:102",
       "existing_evidence": [
         {
-          "trace_index": 2039,
+          "trace_index": 2040,
           "status": 200
         }
       ],
@@ -16164,19 +16293,19 @@
       "source": "apps/erp-api/src/modules/finanzas/tesoreria/tesoreria.controller.ts:174",
       "existing_evidence": [
         {
-          "trace_index": 2043,
+          "trace_index": 2044,
           "status": 200
         },
         {
-          "trace_index": 2045,
+          "trace_index": 2046,
           "status": 200
         },
         {
-          "trace_index": 2050,
+          "trace_index": 2051,
           "status": 200
         },
         {
-          "trace_index": 2064,
+          "trace_index": 2065,
           "status": 503
         }
       ],
@@ -16213,19 +16342,19 @@
       "source": "apps/erp-api/src/modules/finanzas/tesoreria/tesoreria.controller.ts:275",
       "existing_evidence": [
         {
-          "trace_index": 2033,
-          "status": 201
-        },
-        {
           "trace_index": 2034,
           "status": 201
         },
         {
-          "trace_index": 2040,
+          "trace_index": 2035,
+          "status": 201
+        },
+        {
+          "trace_index": 2041,
           "status": 400
         },
         {
-          "trace_index": 2042,
+          "trace_index": 2043,
           "status": 400
         }
       ],
@@ -16248,7 +16377,7 @@
       "source": "apps/erp-api/src/modules/finanzas/tesoreria/tesoreria.controller.ts:376",
       "existing_evidence": [
         {
-          "trace_index": 2044,
+          "trace_index": 2045,
           "status": 200
         }
       ],
@@ -19102,22 +19231,22 @@
       "source": "apps/erp-api/src/modules/notifications.controller.ts:39",
       "existing_evidence": [
         {
-          "trace_index": 2189,
+          "trace_index": 2190,
           "status": 200
         },
         {
-          "trace_index": 2191,
+          "trace_index": 2192,
           "status": 200
         },
         {
-          "trace_index": 2212,
+          "trace_index": 2213,
           "status": 503
         }
       ],
       "defects": [
         {
           "id": "notifications-list-403-for-operational-roles",
-          "status": "local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-notifications-baseline-20261019",
             "observed_error": "La campana mostraba el contador a cualquier usuario, pero la lista y el marcado exigían notifications.read/update, que vendedores y cajeros no tienen: veían \"3\" y al abrir obtenían 403.",
@@ -19125,22 +19254,19 @@
           },
           "correction": "Leer la propia lista y marcar los avisos personales no exige permiso; los compartidos (globales o de rol) siguen exigiendo notifications.update porque el estado leído es por aviso; borrar sigue protegido y la UI oculta lo que no se puede hacer",
           "pending": [
-            "CI exacto, main y runtime.",
-            "Estado leído por usuario (migración) para que cada rol pueda despejar su campana."
+            "Estado leído por usuario (migración) para que cada rol despeje sus avisos compartidos."
           ]
         },
         {
           "id": "notifications-errors-as-200",
-          "status": "local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-notifications-baseline-20261019",
             "observed_error": "Toda falla (ajena, inexistente, mal formada o base caída) respondía 200 con success:false; la UI la tomaba por éxito o por \"sin notificaciones\".",
             "local_only": true
           },
           "correction": "404 ajena o inexistente, 400 mal formada, 503 indisponible; la UI conserva el aviso y explica el fallo",
-          "pending": [
-            "CI exacto, main y runtime."
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -19172,47 +19298,45 @@
       "source": "apps/erp-api/src/modules/notifications.controller.ts:63",
       "existing_evidence": [
         {
-          "trace_index": 2190,
+          "trace_index": 2191,
           "status": 200
         },
         {
-          "trace_index": 2192,
+          "trace_index": 2193,
           "status": 200
         },
         {
-          "trace_index": 2194,
+          "trace_index": 2195,
           "status": 200
         },
         {
-          "trace_index": 2196,
+          "trace_index": 2197,
           "status": 200
         },
         {
-          "trace_index": 2203,
+          "trace_index": 2204,
           "status": 200
         },
         {
-          "trace_index": 2206,
+          "trace_index": 2207,
           "status": 200
         },
         {
-          "trace_index": 2213,
+          "trace_index": 2214,
           "status": 503
         }
       ],
       "defects": [
         {
           "id": "notifications-errors-as-200",
-          "status": "local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-notifications-baseline-20261019",
             "observed_error": "Toda falla (ajena, inexistente, mal formada o base caída) respondía 200 con success:false; la UI la tomaba por éxito o por \"sin notificaciones\".",
             "local_only": true
           },
           "correction": "404 ajena o inexistente, 400 mal formada, 503 indisponible; la UI conserva el aviso y explica el fallo",
-          "pending": [
-            "CI exacto, main y runtime."
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -19244,44 +19368,40 @@
       "source": "apps/erp-api/src/modules/notifications.controller.ts:71",
       "existing_evidence": [
         {
-          "trace_index": 2193,
+          "trace_index": 2194,
           "status": 200
         },
         {
-          "trace_index": 2195,
+          "trace_index": 2196,
           "status": 200
         },
         {
-          "trace_index": 2214,
+          "trace_index": 2215,
           "status": 503
         }
       ],
       "defects": [
         {
           "id": "notifications-errors-as-200",
-          "status": "local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-notifications-baseline-20261019",
             "observed_error": "Toda falla (ajena, inexistente, mal formada o base caída) respondía 200 con success:false; la UI la tomaba por éxito o por \"sin notificaciones\".",
             "local_only": true
           },
           "correction": "404 ajena o inexistente, 400 mal formada, 503 indisponible; la UI conserva el aviso y explica el fallo",
-          "pending": [
-            "CI exacto, main y runtime."
-          ]
+          "pending": []
         },
         {
           "id": "notifications-count-and-mark-all-incomplete",
-          "status": "local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-notifications-baseline-20261019",
             "observed_error": "El contador sólo contaba avisos personales y \"marcar todas\" sólo marcaba esos: los globales y de rol seguían pendientes y volvían tras recargar.",
             "local_only": true
           },
           "correction": "El contador iguala la lista visible; marcar todas marca lo personal y, con notifications.update, también lo compartido",
-          "pending": [
-            "CI exacto, main y runtime."
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -19313,10 +19433,6 @@
       "source": "apps/erp-api/src/modules/notifications.controller.ts:80",
       "existing_evidence": [
         {
-          "trace_index": 2184,
-          "status": 201
-        },
-        {
           "trace_index": 2185,
           "status": 201
         },
@@ -19333,11 +19449,15 @@
           "status": 201
         },
         {
-          "trace_index": 2207,
+          "trace_index": 2189,
           "status": 201
         },
         {
-          "trace_index": 2215,
+          "trace_index": 2208,
+          "status": 201
+        },
+        {
+          "trace_index": 2216,
           "status": 201
         }
       ],
@@ -19364,12 +19484,8 @@
       "source": "apps/erp-api/src/modules/notifications.controller.ts:95",
       "existing_evidence": [
         {
-          "trace_index": 2197,
-          "status": 200
-        },
-        {
           "trace_index": 2198,
-          "status": 404
+          "status": 200
         },
         {
           "trace_index": 2199,
@@ -19381,25 +19497,29 @@
         },
         {
           "trace_index": 2201,
+          "status": 404
+        },
+        {
+          "trace_index": 2202,
           "status": 400
         },
         {
-          "trace_index": 2204,
+          "trace_index": 2205,
           "status": 403
         },
         {
-          "trace_index": 2216,
+          "trace_index": 2217,
           "status": 503
         },
         {
-          "trace_index": 2219,
+          "trace_index": 2220,
           "status": 200
         }
       ],
       "defects": [
         {
           "id": "notifications-list-403-for-operational-roles",
-          "status": "local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-notifications-baseline-20261019",
             "observed_error": "La campana mostraba el contador a cualquier usuario, pero la lista y el marcado exigían notifications.read/update, que vendedores y cajeros no tienen: veían \"3\" y al abrir obtenían 403.",
@@ -19407,22 +19527,19 @@
           },
           "correction": "Leer la propia lista y marcar los avisos personales no exige permiso; los compartidos (globales o de rol) siguen exigiendo notifications.update porque el estado leído es por aviso; borrar sigue protegido y la UI oculta lo que no se puede hacer",
           "pending": [
-            "CI exacto, main y runtime.",
-            "Estado leído por usuario (migración) para que cada rol pueda despejar su campana."
+            "Estado leído por usuario (migración) para que cada rol despeje sus avisos compartidos."
           ]
         },
         {
           "id": "notifications-errors-as-200",
-          "status": "local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-notifications-baseline-20261019",
             "observed_error": "Toda falla (ajena, inexistente, mal formada o base caída) respondía 200 con success:false; la UI la tomaba por éxito o por \"sin notificaciones\".",
             "local_only": true
           },
           "correction": "404 ajena o inexistente, 400 mal formada, 503 indisponible; la UI conserva el aviso y explica el fallo",
-          "pending": [
-            "CI exacto, main y runtime."
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -19455,22 +19572,22 @@
       "source": "apps/erp-api/src/modules/notifications.controller.ts:109",
       "existing_evidence": [
         {
-          "trace_index": 2202,
+          "trace_index": 2203,
           "status": 200
         },
         {
-          "trace_index": 2205,
+          "trace_index": 2206,
           "status": 200
         },
         {
-          "trace_index": 2217,
+          "trace_index": 2218,
           "status": 503
         }
       ],
       "defects": [
         {
           "id": "notifications-list-403-for-operational-roles",
-          "status": "local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-notifications-baseline-20261019",
             "observed_error": "La campana mostraba el contador a cualquier usuario, pero la lista y el marcado exigían notifications.read/update, que vendedores y cajeros no tienen: veían \"3\" y al abrir obtenían 403.",
@@ -19478,22 +19595,19 @@
           },
           "correction": "Leer la propia lista y marcar los avisos personales no exige permiso; los compartidos (globales o de rol) siguen exigiendo notifications.update porque el estado leído es por aviso; borrar sigue protegido y la UI oculta lo que no se puede hacer",
           "pending": [
-            "CI exacto, main y runtime.",
-            "Estado leído por usuario (migración) para que cada rol pueda despejar su campana."
+            "Estado leído por usuario (migración) para que cada rol despeje sus avisos compartidos."
           ]
         },
         {
           "id": "notifications-count-and-mark-all-incomplete",
-          "status": "local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-notifications-baseline-20261019",
             "observed_error": "El contador sólo contaba avisos personales y \"marcar todas\" sólo marcaba esos: los globales y de rol seguían pendientes y volvían tras recargar.",
             "local_only": true
           },
           "correction": "El contador iguala la lista visible; marcar todas marca lo personal y, con notifications.update, también lo compartido",
-          "pending": [
-            "CI exacto, main y runtime."
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -19526,12 +19640,8 @@
       "source": "apps/erp-api/src/modules/notifications.controller.ts:118",
       "existing_evidence": [
         {
-          "trace_index": 2208,
-          "status": 403
-        },
-        {
           "trace_index": 2209,
-          "status": 404
+          "status": 403
         },
         {
           "trace_index": 2210,
@@ -19539,26 +19649,28 @@
         },
         {
           "trace_index": 2211,
+          "status": 404
+        },
+        {
+          "trace_index": 2212,
           "status": 200
         },
         {
-          "trace_index": 2218,
+          "trace_index": 2219,
           "status": 503
         }
       ],
       "defects": [
         {
           "id": "notifications-errors-as-200",
-          "status": "local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_merged_main_deployment_verified",
           "proof": {
             "source": "artifacts/peru-notifications-baseline-20261019",
             "observed_error": "Toda falla (ajena, inexistente, mal formada o base caída) respondía 200 con success:false; la UI la tomaba por éxito o por \"sin notificaciones\".",
             "local_only": true
           },
           "correction": "404 ajena o inexistente, 400 mal formada, 503 indisponible; la UI conserva el aviso y explica el fallo",
-          "pending": [
-            "CI exacto, main y runtime."
-          ]
+          "pending": []
         }
       ],
       "verified_cases": [
@@ -19717,7 +19829,7 @@
       "source": "apps/erp-api/src/modules/permissions/permission.controller.ts:26",
       "existing_evidence": [
         {
-          "trace_index": 2011,
+          "trace_index": 2012,
           "status": 200
         }
       ],
@@ -19795,7 +19907,7 @@
           "status": 404
         },
         {
-          "trace_index": 2014,
+          "trace_index": 2015,
           "status": 404
         }
       ],
@@ -19887,19 +19999,19 @@
           "status": 201
         },
         {
-          "trace_index": 2012,
+          "trace_index": 2013,
           "status": 201
         },
         {
-          "trace_index": 2084,
+          "trace_index": 2085,
           "status": 201
         },
         {
-          "trace_index": 2098,
+          "trace_index": 2099,
           "status": 201
         },
         {
-          "trace_index": 2221,
+          "trace_index": 2250,
           "status": 201
         }
       ],
@@ -19979,7 +20091,7 @@
           "status": 200
         },
         {
-          "trace_index": 2016,
+          "trace_index": 2017,
           "status": 200
         }
       ],
@@ -20015,7 +20127,7 @@
       "source": "apps/erp-api/src/modules/permissions/role.controller.ts:127",
       "existing_evidence": [
         {
-          "trace_index": 2013,
+          "trace_index": 2014,
           "status": 200
         }
       ],
@@ -20074,7 +20186,7 @@
       "source": "apps/erp-api/src/modules/permissions/role.controller.ts:195",
       "existing_evidence": [
         {
-          "trace_index": 2015,
+          "trace_index": 2016,
           "status": 200
         }
       ],
@@ -21197,7 +21309,7 @@
           "status": 201
         },
         {
-          "trace_index": 2072,
+          "trace_index": 2073,
           "status": 201
         }
       ],
@@ -21403,19 +21515,19 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:140",
       "existing_evidence": [
         {
-          "trace_index": 2076,
-          "status": 200
-        },
-        {
           "trace_index": 2077,
           "status": 200
         },
         {
-          "trace_index": 2105,
+          "trace_index": 2078,
+          "status": 200
+        },
+        {
+          "trace_index": 2106,
           "status": 403
         },
         {
-          "trace_index": 2128,
+          "trace_index": 2129,
           "status": 503
         }
       ],
@@ -21452,7 +21564,7 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:147",
       "existing_evidence": [
         {
-          "trace_index": 2088,
+          "trace_index": 2089,
           "status": 200
         }
       ],
@@ -21491,11 +21603,11 @@
           "status": 201
         },
         {
-          "trace_index": 2074,
+          "trace_index": 2075,
           "status": 201
         },
         {
-          "trace_index": 2078,
+          "trace_index": 2079,
           "status": 201
         }
       ],
@@ -21538,7 +21650,7 @@
           "status": 201
         },
         {
-          "trace_index": 2082,
+          "trace_index": 2083,
           "status": 201
         }
       ],
@@ -21573,7 +21685,7 @@
           "status": 200
         },
         {
-          "trace_index": 2083,
+          "trace_index": 2084,
           "status": 200
         }
       ],
@@ -21608,7 +21720,7 @@
           "status": 200
         },
         {
-          "trace_index": 2106,
+          "trace_index": 2107,
           "status": 403
         }
       ],
@@ -21639,7 +21751,7 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:198",
       "existing_evidence": [
         {
-          "trace_index": 2075,
+          "trace_index": 2076,
           "status": 200
         }
       ],
@@ -21682,7 +21794,7 @@
           "status": 201
         },
         {
-          "trace_index": 2087,
+          "trace_index": 2088,
           "status": 201
         }
       ],
@@ -21713,15 +21825,15 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:221",
       "existing_evidence": [
         {
-          "trace_index": 2079,
+          "trace_index": 2080,
           "status": 404
         },
         {
-          "trace_index": 2080,
+          "trace_index": 2081,
           "status": 200
         },
         {
-          "trace_index": 2081,
+          "trace_index": 2082,
           "status": 200
         }
       ],
@@ -21780,15 +21892,15 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:257",
       "existing_evidence": [
         {
-          "trace_index": 2094,
+          "trace_index": 2095,
           "status": 200
         },
         {
-          "trace_index": 2104,
+          "trace_index": 2105,
           "status": 403
         },
         {
-          "trace_index": 2129,
+          "trace_index": 2130,
           "status": 503
         }
       ],
@@ -21863,11 +21975,11 @@
           "status": 201
         },
         {
-          "trace_index": 2091,
+          "trace_index": 2092,
           "status": 201
         },
         {
-          "trace_index": 2092,
+          "trace_index": 2093,
           "status": 201
         }
       ],
@@ -21898,7 +22010,7 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:291",
       "existing_evidence": [
         {
-          "trace_index": 2097,
+          "trace_index": 2098,
           "status": 400
         }
       ],
@@ -22288,15 +22400,15 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:396",
       "existing_evidence": [
         {
-          "trace_index": 2093,
+          "trace_index": 2094,
           "status": 200
         },
         {
-          "trace_index": 2101,
+          "trace_index": 2102,
           "status": 403
         },
         {
-          "trace_index": 2107,
+          "trace_index": 2108,
           "status": 404
         }
       ],
@@ -22346,15 +22458,15 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:406",
       "existing_evidence": [
         {
-          "trace_index": 2095,
+          "trace_index": 2096,
           "status": 200
         },
         {
-          "trace_index": 2102,
+          "trace_index": 2103,
           "status": 403
         },
         {
-          "trace_index": 2108,
+          "trace_index": 2109,
           "status": 404
         }
       ],
@@ -22391,15 +22503,15 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:420",
       "existing_evidence": [
         {
-          "trace_index": 2096,
+          "trace_index": 2097,
           "status": 200
         },
         {
-          "trace_index": 2103,
+          "trace_index": 2104,
           "status": 403
         },
         {
-          "trace_index": 2109,
+          "trace_index": 2110,
           "status": 404
         }
       ],
@@ -22510,7 +22622,7 @@
           "status": 201
         },
         {
-          "trace_index": 2073,
+          "trace_index": 2074,
           "status": 201
         }
       ],
@@ -22757,11 +22869,11 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:524",
       "existing_evidence": [
         {
-          "trace_index": 2117,
+          "trace_index": 2118,
           "status": 201
         },
         {
-          "trace_index": 2118,
+          "trace_index": 2119,
           "status": 201
         }
       ],
@@ -22788,15 +22900,15 @@
           "status": 200
         },
         {
-          "trace_index": 2123,
+          "trace_index": 2124,
           "status": 200
         },
         {
-          "trace_index": 2126,
+          "trace_index": 2127,
           "status": 200
         },
         {
-          "trace_index": 2131,
+          "trace_index": 2132,
           "status": 503
         }
       ],
@@ -22833,11 +22945,11 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:544",
       "existing_evidence": [
         {
-          "trace_index": 2119,
+          "trace_index": 2120,
           "status": 201
         },
         {
-          "trace_index": 2120,
+          "trace_index": 2121,
           "status": 201
         }
       ],
@@ -22860,11 +22972,11 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:555",
       "existing_evidence": [
         {
-          "trace_index": 2121,
+          "trace_index": 2122,
           "status": 200
         },
         {
-          "trace_index": 2125,
+          "trace_index": 2126,
           "status": 404
         }
       ],
@@ -22887,11 +22999,11 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:568",
       "existing_evidence": [
         {
-          "trace_index": 2122,
+          "trace_index": 2123,
           "status": 200
         },
         {
-          "trace_index": 2124,
+          "trace_index": 2125,
           "status": 400
         }
       ],
@@ -22928,19 +23040,19 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:583",
       "existing_evidence": [
         {
-          "trace_index": 2110,
-          "status": 201
-        },
-        {
           "trace_index": 2111,
           "status": 201
         },
         {
           "trace_index": 2112,
+          "status": 201
+        },
+        {
+          "trace_index": 2113,
           "status": 409
         },
         {
-          "trace_index": 2115,
+          "trace_index": 2116,
           "status": 400
         }
       ],
@@ -22963,7 +23075,7 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:596",
       "existing_evidence": [
         {
-          "trace_index": 2113,
+          "trace_index": 2114,
           "status": 201
         }
       ],
@@ -22986,15 +23098,15 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:609",
       "existing_evidence": [
         {
-          "trace_index": 2114,
+          "trace_index": 2115,
           "status": 200
         },
         {
-          "trace_index": 2116,
+          "trace_index": 2117,
           "status": 200
         },
         {
-          "trace_index": 2130,
+          "trace_index": 2131,
           "status": 503
         }
       ],
@@ -23474,7 +23586,7 @@
       "source": "apps/erp-api/src/modules/rrhh/rrhh.controller.ts:832",
       "existing_evidence": [
         {
-          "trace_index": 2127,
+          "trace_index": 2128,
           "status": 200
         }
       ],
@@ -24774,19 +24886,19 @@
       "source": "apps/erp-api/src/modules/usuarios.controller.ts:78",
       "existing_evidence": [
         {
-          "trace_index": 1981,
+          "trace_index": 1982,
           "status": 200
         },
         {
-          "trace_index": 1991,
+          "trace_index": 1992,
           "status": 403
         },
         {
-          "trace_index": 2005,
+          "trace_index": 2006,
           "status": 403
         },
         {
-          "trace_index": 2009,
+          "trace_index": 2010,
           "status": 403
         }
       ],
@@ -24827,11 +24939,11 @@
       "source": "apps/erp-api/src/modules/usuarios.controller.ts:106",
       "existing_evidence": [
         {
-          "trace_index": 1982,
+          "trace_index": 1983,
           "status": 200
         },
         {
-          "trace_index": 2010,
+          "trace_index": 2011,
           "status": 403
         }
       ],
@@ -24872,7 +24984,7 @@
       "source": "apps/erp-api/src/modules/usuarios.controller.ts:130",
       "existing_evidence": [
         {
-          "trace_index": 1983,
+          "trace_index": 1984,
           "status": 200
         }
       ],
@@ -24913,31 +25025,31 @@
       "source": "apps/erp-api/src/modules/usuarios.controller.ts:172",
       "existing_evidence": [
         {
-          "trace_index": 1984,
-          "status": 201
-        },
-        {
-          "trace_index": 1986,
+          "trace_index": 1985,
           "status": 201
         },
         {
           "trace_index": 1987,
-          "status": 409
+          "status": 201
         },
         {
           "trace_index": 1988,
-          "status": 400
+          "status": 409
         },
         {
           "trace_index": 1989,
+          "status": 400
+        },
+        {
+          "trace_index": 1990,
           "status": 403
         },
         {
-          "trace_index": 1992,
+          "trace_index": 1993,
           "status": 403
         },
         {
-          "trace_index": 2182,
+          "trace_index": 2183,
           "status": 201
         }
       ],
@@ -25006,11 +25118,11 @@
       "source": "apps/erp-api/src/modules/usuarios.controller.ts:197",
       "existing_evidence": [
         {
-          "trace_index": 1994,
+          "trace_index": 1995,
           "status": 200
         },
         {
-          "trace_index": 2003,
+          "trace_index": 2004,
           "status": 404
         }
       ],
@@ -25051,19 +25163,19 @@
       "source": "apps/erp-api/src/modules/usuarios.controller.ts:215",
       "existing_evidence": [
         {
-          "trace_index": 1993,
+          "trace_index": 1994,
           "status": 403
         },
         {
-          "trace_index": 1997,
+          "trace_index": 1998,
           "status": 200
         },
         {
-          "trace_index": 2000,
+          "trace_index": 2001,
           "status": 200
         },
         {
-          "trace_index": 2006,
+          "trace_index": 2007,
           "status": 403
         }
       ],
@@ -25104,11 +25216,11 @@
       "source": "apps/erp-api/src/modules/usuarios.controller.ts:226",
       "existing_evidence": [
         {
-          "trace_index": 2004,
+          "trace_index": 2005,
           "status": 404
         },
         {
-          "trace_index": 2007,
+          "trace_index": 2008,
           "status": 200
         }
       ],
@@ -25149,11 +25261,11 @@
       "source": "apps/erp-api/src/modules/usuarios.controller.ts:234",
       "existing_evidence": [
         {
-          "trace_index": 1990,
+          "trace_index": 1991,
           "status": 200
         },
         {
-          "trace_index": 1998,
+          "trace_index": 1999,
           "status": 401
         }
       ],
@@ -25194,7 +25306,7 @@
       "source": "apps/erp-api/src/modules/usuarios.controller.ts:246",
       "existing_evidence": [
         {
-          "trace_index": 1996,
+          "trace_index": 1997,
           "status": 200
         }
       ],
@@ -25235,11 +25347,11 @@
       "source": "apps/erp-api/src/modules/usuarios.controller.ts:256",
       "existing_evidence": [
         {
-          "trace_index": 1995,
+          "trace_index": 1996,
           "status": 200
         },
         {
-          "trace_index": 2002,
+          "trace_index": 2003,
           "status": 404
         }
       ],
@@ -25444,15 +25556,15 @@
           "status": 201
         },
         {
-          "trace_index": 2085,
+          "trace_index": 2086,
           "status": 201
         },
         {
-          "trace_index": 2099,
+          "trace_index": 2100,
           "status": 201
         },
         {
-          "trace_index": 2222,
+          "trace_index": 2251,
           "status": 201
         }
       ],
@@ -25612,7 +25724,7 @@
       "defects": [
         {
           "id": "auth-email-config-false-flags",
-          "status": "local_acceptance_passed_ci_pending",
+          "status": "corrected_ci_merged_main_deployment_verified",
           "proof": {
             "source": "apps/erp-api/src/shared/email/email.service.spec.ts",
             "observed_error": "EMAIL_DISABLED=false y SMTP_SECURE=false (texto) se evaluaban como verdaderos y SMTP_HOST caía en localhost: el servicio se declaraba configurado sin servidor y los envíos fallaban en silencio.",
@@ -25620,7 +25732,7 @@
           },
           "correction": "Banderas booleanas interpretadas; sin SMTP_HOST no hay servicio; sin correo la solicitud responde 503 en vez de prometer un enlace",
           "pending": [
-            "CI exacto, main y runtime; configurar SMTP productivo y FRONTEND_URL en Render."
+            "Configurar SMTP/proveedor y FRONTEND_URL en Render: en PROD la solicitud responde 503 (artifacts/peru-production-auth-smoke-after-144-20261019.json)."
           ]
         }
       ],
@@ -25888,6 +26000,10 @@
         },
         {
           "trace_index": 1744,
+          "status": 201
+        },
+        {
+          "trace_index": 2224,
           "status": 201
         }
       ],
@@ -27124,7 +27240,34 @@
           "status": 200
         }
       ],
-      "defects": [],
+      "defects": [
+        {
+          "id": "sales-approval-overdue-summary-hidden",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-sales-approvals-baseline-20261019",
+            "observed_error": "La bandeja decía «Sin morosidad» con una cuenta vencida: sólo miraba un estado VENCIDO que no se persiste.",
+            "local_only": true
+          },
+          "correction": "Mora por fecha de vencimiento (como la política SQL 441), sin cuentas anuladas; con la lectura del cliente o de sus cuentas caída no se muestra resumen (cambio de código sin escenario propio)",
+          "pending": [
+            "CI exacto, main y runtime."
+          ]
+        },
+        {
+          "id": "sales-approval-ui-failed-load-empty",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-sales-approvals-baseline-20261019",
+            "observed_error": "Con la lectura caída la pantalla afirmaba «No hay pedidos pendientes de aprobación».",
+            "local_only": true
+          },
+          "correction": "La bandeja muestra el error del servidor y Actualizar la recupera",
+          "pending": [
+            "CI exacto, main y runtime."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "http_contract_observed_not_full_acceptance",
       "pending_checks": [
@@ -27142,7 +27285,21 @@
       "endpoint": "/api/ventas/pedidos/:id/aprobaciones",
       "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts:127",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "sales-approval-foreign-history-200",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-sales-approvals-baseline-20261019",
+            "observed_error": "El historial de un pedido ajeno o inexistente respondía 200 vacío.",
+            "local_only": true
+          },
+          "correction": "Comprueba el pedido del tenant antes de leer: 404",
+          "pending": [
+            "CI exacto, main y runtime."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -27160,7 +27317,60 @@
       "endpoint": "/api/ventas/pedidos/:id/aprobaciones/decision",
       "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts:141",
       "existing_evidence": [],
-      "defects": [],
+      "defects": [
+        {
+          "id": "sales-approval-self-decision-400",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-sales-approvals-baseline-20261019",
+            "observed_error": "El creador que decidía su propio pedido recibía 400, como si la petición estuviera mal formada.",
+            "local_only": true
+          },
+          "correction": "403 con el motivo; el pedido no cambia",
+          "pending": [
+            "CI exacto, main y runtime."
+          ]
+        },
+        {
+          "id": "sales-approval-lost-response-400",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-sales-approvals-baseline-20261019",
+            "observed_error": "Sobre un pedido ya resuelto toda decisión respondía 400 «no está pendiente»: repetir la misma tras perder la respuesta fallaba aunque ya estaba registrada y una distinta no se distinguía como conflicto.",
+            "local_only": true
+          },
+          "correction": "Si la última decisión es la misma del mismo aprobador se devuelve con idempotent_replay; una distinta responde 409",
+          "pending": [
+            "CI exacto, main y runtime."
+          ]
+        },
+        {
+          "id": "sales-approval-writer-raw-400",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-sales-approvals-baseline-20261019",
+            "observed_error": "Sin writer la decisión respondía 400 con el texto crudo «permission denied for function decidir_aprobacion_pedido_tx».",
+            "local_only": true
+          },
+          "correction": "503 legible; errores de dominio del RPC con su código propio (404/403/409)",
+          "pending": [
+            "CI exacto, main y runtime."
+          ]
+        },
+        {
+          "id": "sales-approval-ui-reason-hidden",
+          "status": "local_acceptance_passed_ci_pending",
+          "proof": {
+            "source": "artifacts/peru-sales-approvals-baseline-20261019",
+            "observed_error": "El motivo del servidor no aparecía al rechazar la autoaprobación ni ante un pedido ya resuelto (el aviso genérico de la pantalla reemplaza al del hook: sólo cabe uno), y ese pedido seguía en la bandeja con el diálogo abierto.",
+            "local_only": true
+          },
+          "correction": "Un único aviso con el motivo del servidor; con 404/409 cierra el diálogo y recarga la bandeja",
+          "pending": [
+            "CI exacto, main y runtime."
+          ]
+        }
+      ],
       "verified_cases": [],
       "result": "pending_functional_execution",
       "pending_checks": [
@@ -27176,7 +27386,7 @@
       "operation": "findOne",
       "method": "GET",
       "endpoint": "/api/ventas/pedidos/:id",
-      "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts:169",
+      "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts:170",
       "existing_evidence": [
         {
           "trace_index": 197,
@@ -27246,7 +27456,7 @@
       "operation": "update",
       "method": "PUT",
       "endpoint": "/api/ventas/pedidos/:id",
-      "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts:191",
+      "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts:192",
       "existing_evidence": [
         {
           "trace_index": 1775,
@@ -27302,7 +27512,7 @@
       "operation": "confirmar",
       "method": "POST",
       "endpoint": "/api/ventas/pedidos/:id/confirmar",
-      "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts:214",
+      "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts:215",
       "existing_evidence": [
         {
           "trace_index": 200,
@@ -27364,7 +27574,7 @@
       "operation": "cancelar",
       "method": "POST",
       "endpoint": "/api/ventas/pedidos/:id/cancelar",
-      "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts:245",
+      "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts:246",
       "existing_evidence": [
         {
           "trace_index": 1780,
@@ -27395,7 +27605,7 @@
       "operation": "generarFactura",
       "method": "POST",
       "endpoint": "/api/ventas/pedidos/:id/generar-factura",
-      "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts:277",
+      "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts:278",
       "existing_evidence": [],
       "defects": [],
       "verified_cases": [],
@@ -27413,7 +27623,7 @@
       "operation": "getHistorial",
       "method": "GET",
       "endpoint": "/api/ventas/pedidos/:id/historial",
-      "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts:300",
+      "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts:301",
       "existing_evidence": [
         {
           "trace_index": 1783,
@@ -27467,7 +27677,7 @@
       "operation": "listarGresDelPedido",
       "method": "GET",
       "endpoint": "/api/ventas/pedidos/:id/gres",
-      "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts:317",
+      "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts:318",
       "existing_evidence": [
         {
           "trace_index": 1784,
@@ -27494,7 +27704,7 @@
       "operation": "generarDocumento",
       "method": "POST",
       "endpoint": "/api/ventas/pedidos/:id/generar-documento",
-      "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts:331",
+      "source": "apps/erp-api/src/modules/ventas/pedidos/pedidos.controller.ts:332",
       "existing_evidence": [
         {
           "trace_index": 207,

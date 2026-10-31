@@ -1,0 +1,12 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "complete_acceptance": false,
+  "scope": "UI real del inicio del dashboard con API/PostgreSQL locales",
+  "checks": [
+    {
+      "operation": "Sin lectura de comprobantes el inicio avisa en vez de mostrar ventas en cero",
+      "passed": true
+    }
+  ]
+}

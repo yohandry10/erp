@@ -1,0 +1,40 @@
+{
+  "alcance": "Suministro suministro F01-F07: migraciones 570-579, API, web y pruebas",
+  "fecha": "2026-10-28",
+  "entorno": "Sólo infraestructura local efímera; nada se aplicó en PROD",
+  "sql": {
+    "comando": "E2E_EPHEMERAL_LOCAL_DB=1 REQUIRED_DATABASE_SCHEMA_VERSION=579 node scripts/ci/verify-database-contracts.mjs",
+    "motor": "PostgreSQL 16 local, base erp_e2e recreada desde cero",
+    "resultado": "OK: 575 migraciones hasta 579, 88 verificadores vigentes y 67 históricos"
+  },
+  "api": {
+    "comando": "jest src/modules/{inventario,ventas,compras,cpe,alertas,tableros,permissions,__tests__,logistica} src/app.controller.runtime.spec.ts",
+    "resultado": "86 suites, 985 pruebas aprobadas",
+    "tipos": "tsc --noEmit sin errores"
+  },
+  "web": {
+    "tipos": "tsc --noEmit sin errores (incluye tests/e2e)",
+    "offline": "tests/offline/verify-offline-store.mjs aprobado",
+    "playwright": {
+      "modo": "Next dev aislado con dobles HTTP locales; sin API ni base remotas",
+      "especificaciones": [
+        "inventario-lotes-feature",
+        "supply-contracts-feature",
+        "supply-expediente-feature",
+        "supply-entregas-feature",
+        "supply-estado-cuenta-feature",
+        "supply-alertas-feature",
+        "supply-penalidades-feature",
+        "supply-tablero-feature"
+      ],
+      "resultado": "23 aprobadas, sin reintentos",
+      "capturas": "artifacts/suministro-f0*/browser/*.png (escritorio claro y móvil oscuro)"
+    }
+  },
+  "documentos": "scripts/check-docs-contract.mjs: 6 archivos canónicos, sin subdirectorios",
+  "no_verificado": [
+    "Promoción de 570-579 a PROD",
+    "Actualización programada real en Power BI Service",
+    "Envío real del correo de alertas"
+  ]
+}

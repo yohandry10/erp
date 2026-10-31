@@ -138,6 +138,10 @@ class ProductoMaestroBaseDto {
 
 export class CreateProductoMaestroDto extends ProductoMaestroBaseDto {
   @IsOptional()
+  @IsBoolean()
+  costo_cero_confirmado?: boolean;
+
+  @IsOptional()
   @IsUUID()
   almacen_id?: string;
 
@@ -195,6 +199,11 @@ class AlmacenBaseDto {
   @IsOptional()
   @IsBoolean()
   es_principal?: boolean;
+
+  /** Establecimiento anexo dueño del stock; sin él, la casa matriz. */
+  @IsOptional()
+  @IsUUID()
+  sucursal_id?: string;
 }
 
 export class CreateAlmacenDto extends AlmacenBaseDto {

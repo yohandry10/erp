@@ -1,0 +1,16 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "scope": "GRE manual con commit real y pérdida de respuesta local",
+  "checks": [
+    {
+      "check": "Respuesta perdida conserva campos y clave; retry recupera guía firmada sin duplicar",
+      "passed": true
+    },
+    {
+      "check": "Nueva intención idéntica tras confirmación persiste otro ID y reload muestra ambas",
+      "passed": true
+    }
+  ],
+  "unexpected_errors": []
+}

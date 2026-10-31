@@ -16,14 +16,13 @@ import { PermissionGuard } from "../../../common/guards/permission.guard";
 import { RequirePermission } from "../../../common/decorators/require-permission.decorator";
 import {
   CreateActivoFijoDto,
-  UpdateActivoFijoDto,
   DepreciarPeriodoDto,
-  DarDeBajaActivoDto,
   ActivoFijoResponseDto,
   CuotaDepreciacionDto,
   ResultadoDepreciacionDto,
 } from "@erp-suite/dtos";
 import { ActivosFijosService } from "../services/activos-fijos.service";
+import { UpdateAssetOriginalDto, RetireAssetOriginalDto } from "../dto/asset-original-request.dto";
 
 @ApiTags("contabilidad")
 @Controller("contabilidad")
@@ -82,8 +81,8 @@ export class ContabilidadActivosController {
     @Body() dto: CreateActivoFijoDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    const data = await this.activosService.crear(tenantId, userId, dto, idempotencyKey);
-    return { success: true, data, message: `Activo ${data.codigo} registrado` };
+    const receipt = await this.activosService.crearConRecibo(tenantId, userId, dto, idempotencyKey);
+    return { success: true, ...receipt, message: `Activo ${receipt.data.codigo} registrado` };
   }
 
   @Put("activos-fijos/:id")
@@ -99,11 +98,10 @@ export class ContabilidadActivosController {
     @CurrentTenant() tenantId: string,
     @CurrentUser("id") userId: string,
     @Param("id") activoId: string,
-    @Body() dto: UpdateActivoFijoDto,
+    @Body() dto: UpdateAssetOriginalDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    const data = await this.activosService.actualizar(tenantId, activoId, dto, userId, idempotencyKey);
-    return { success: true, data, message: `Activo ${data.codigo} actualizado` };
+    return this.activosService.ejecutarOperacionOriginal(tenantId,userId,activoId,'UPDATE',dto,idempotencyKey);
   }
 
   @Post("activos-fijos/depreciar")
@@ -120,19 +118,9 @@ export class ContabilidadActivosController {
     @CurrentTenant() tenantId: string,
     @CurrentUser("id") userId: string,
     @Body() dto: DepreciarPeriodoDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    const data = await this.activosService.depreciarPeriodo(
-      tenantId,
-      userId,
-      dto.anio,
-      dto.mes,
-    );
-
-    return {
-      success: true,
-      data,
-      message: `Depreciación ${data.periodo}: ${data.activos_depreciados} activo(s), total ${data.total_depreciado}`,
-    };
+    return this.activosService.depreciarPeriodo(tenantId, userId, dto.anio, dto.mes, idempotencyKey);
   }
 
   @Post("activos-fijos/:id/baja")
@@ -152,9 +140,9 @@ export class ContabilidadActivosController {
     @CurrentTenant() tenantId: string,
     @CurrentUser("id") userId: string,
     @Param("id") activoId: string,
-    @Body() dto: DarDeBajaActivoDto,
+    @Body() dto: RetireAssetOriginalDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    const data = await this.activosService.darDeBaja(tenantId, userId, activoId, dto);
-    return { success: true, data, message: `Activo ${data.codigo} retirado (${data.situacion})` };
+    return this.activosService.ejecutarOperacionOriginal(tenantId,userId,activoId,'RETIRE',dto,idempotencyKey);
   }
 }

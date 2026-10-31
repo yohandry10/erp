@@ -1,5 +1,6 @@
 'use client'
 
+import { requestConfirmation } from '@/lib/confirm-action'
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useWizard } from '../useWizard'
@@ -46,7 +47,7 @@ export function CompletionStep() {
   }
 
   const handleReset = async () => {
-    const confirmed = window.confirm('¿Seguro que deseas reiniciar la configuración? Se solicitarán nuevamente todos los datos.')
+    const confirmed = (await requestConfirmation('¿Seguro que deseas reiniciar la configuración? Se solicitarán nuevamente todos los datos.'))
     if (!confirmed) {
       return
     }

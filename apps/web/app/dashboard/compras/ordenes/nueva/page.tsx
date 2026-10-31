@@ -1,40 +1,93 @@
 'use client'
 
+import { requestConfirmation } from '@/lib/confirm-action'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { OCWizard } from '@/components/compras/OCWizard'
 import { ArrowLeft } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
+import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
+import {
+  confirmPurchaseOrderCreated, purchaseOrderCreateIntentKey, readPurchaseOrderCreateIntent,
+  type PurchaseOrderCreateIntent, type PurchaseOrderCreatePayload, type PurchaseOrderCreateExpectation,
+} from '@/lib/compras/purchase-order-create-operation'
 import toast from 'react-hot-toast'
 
 export default function NuevaOrdenCompraPage() {
   const router = useRouter()
-  const { post } = useApi()
+  const { post } = useApi({ requireLive: true, throwOnError: true, showErrorToast: false, retries: 0 })
+  const { session } = useAuth()
+  const tenantId = session?.user?.tenant_id || ''
+  const actorId = session?.user?.id || ''
+  const scopeIdentity = `${tenantId}:${actorId}`
+  const activeScope = useRef(scopeIdentity)
+  activeScope.current = scopeIdentity
+  const epoch = useRef(0)
   const [isLoading, setIsLoading] = useState(false)
+  const [pendingIntent, setPendingIntent] = useState<PurchaseOrderCreateIntent | null>(null)
+  const [intentReady, setIntentReady] = useState('')
+  const [recoveryError, setRecoveryError] = useState('')
+  const [operationError, setOperationError] = useState('')
+  const scopeReady = intentReady === scopeIdentity && !!tenantId && !!actorId
+  const visibleIntent = scopeReady && pendingIntent?.tenantId === tenantId && pendingIntent?.actorId === actorId ? pendingIntent : null
 
-  const handleSubmit = async (data: any) => {
+  useEffect(() => {
+    epoch.current++
+    setIsLoading(false); setIntentReady(''); setPendingIntent(null)
+    setRecoveryError(''); setOperationError('')
+    if (!tenantId || !actorId) return
     try {
-      setIsLoading(true)
-      console.log('📤 Enviando orden de compra:', data)
-
-      const response = await post('/api/compras/ordenes', data)
-
-      if (response?.success) {
-        toast.success('✅ Orden de compra creada exitosamente')
-        router.push('/dashboard/compras/ordenes')
-      } else {
-        throw new Error(response?.message || 'Error al crear la orden de compra')
-      }
+      const scope = { tenantId, actorId }
+      setPendingIntent(readPurchaseOrderCreateIntent(localStorage.getItem(purchaseOrderCreateIntentKey(scope)),scope))
+      setIntentReady(scopeIdentity)
     } catch (error: any) {
-      console.error('❌ Error creando orden de compra:', error)
+      setRecoveryError(error?.message || 'No se pudo recuperar la orden pendiente. Sus datos se conservan.')
+    }
+    return () => { epoch.current++ }
+  }, [tenantId,actorId,scopeIdentity])
+
+  const handleSubmit = async (data?: PurchaseOrderCreatePayload, expectation?: PurchaseOrderCreateExpectation) => {
+    if (isLoading || recoveryError || intentReady !== activeScope.current) return
+    const submittedScope = activeScope.current
+    const submittedEpoch = ++epoch.current
+    const current = () => activeScope.current === submittedScope && epoch.current === submittedEpoch
+    setIsLoading(true); setOperationError('')
+    try {
+      const scope = { tenantId, actorId }
+      const key = purchaseOrderCreateIntentKey(scope)
+      const stored = readPurchaseOrderCreateIntent(localStorage.getItem(key),scope)
+      if (!pendingIntent && (!data || !expectation)) throw new Error('Completa la orden antes de enviarla.')
+      const candidate = pendingIntent || { version: 1 as const, ...scope, ...expectation!, createdAt: new Date().toISOString(), payload: data! }
+      const serialized = JSON.stringify(candidate)
+      const intent = readPurchaseOrderCreateIntent(serialized,scope)
+      if (!intent) throw new Error('La orden está incompleta.')
+      if (stored && JSON.stringify(stored) !== serialized) throw new Error('Hay otra orden pendiente. Sus datos se conservan.')
+      // Intención durable: datos de negocio e ids de empresa y usuario, sin token ni contraseña.
+      // codeql[js/clear-text-storage-of-sensitive-data]
+      localStorage.setItem(key,serialized)
+      if (localStorage.getItem(key) !== serialized) throw new Error('No se pudo conservar la orden antes del envío.')
+      setPendingIntent(intent)
+      const response = await post('/api/compras/ordenes',intent.payload)
+      if (!current()) return
+      confirmPurchaseOrderCreated(response,scope,intent)
+      if (localStorage.getItem(key) !== serialized) throw new Error('La orden pendiente cambió. Se conserva para revisar su resultado.')
+      localStorage.removeItem(key)
+      if (localStorage.getItem(key) !== null) throw new Error('No se pudo retirar la orden confirmada. Sus datos se conservan para reintentar.')
+      setPendingIntent(null)
+      toast.success('✅ Orden de compra creada exitosamente')
+      router.push('/dashboard/compras/ordenes')
+    } catch (error: any) {
+      if (!current()) return
+      setOperationError(error?.message || 'La orden no está confirmada. Sus datos se conservan.')
       toast.error(`Error: ${error.message || 'No se pudo crear la orden de compra'}`)
     } finally {
-      setIsLoading(false)
+      if (current()) setIsLoading(false)
     }
   }
 
-  const handleCancel = () => {
-    if (confirm('¿Está seguro de cancelar? Se perderán los datos ingresados.')) {
+  const handleCancel = async () => {
+    if ((await requestConfirmation('¿Está seguro de cancelar? Se perderán los datos ingresados.'))) {
       router.push('/dashboard/compras/ordenes')
     }
   }
@@ -57,11 +110,36 @@ export default function NuevaOrdenCompraPage() {
 
       {/* Wizard */}
       <div className="relative rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl">
-        <OCWizard
+        {recoveryError && <p role="alert" data-testid="purchase-order-create-recovery-error" className="mb-4 rounded-lg border border-red-500/40 p-4 text-red-500">{recoveryError}</p>}
+        {scopeReady && operationError && <p role="alert" data-testid="purchase-order-create-error" className="mb-4 rounded-lg border border-red-500/40 p-4 text-red-500">{operationError}</p>}
+        {visibleIntent ? (
+          <div className="space-y-4" data-testid="purchase-order-create-pending">
+            <p role="status">Hay una orden pendiente de confirmación. Se conservan sus datos para reintentar el mismo registro.</p>
+            <dl className="grid gap-2 rounded-lg border border-border p-4 sm:grid-cols-2">
+              <div><dt className="text-sm text-muted-foreground">Número de orden</dt><dd>{visibleIntent.payload.numero}</dd></div>
+              <div><dt className="text-sm text-muted-foreground">Fecha de orden</dt><dd>{visibleIntent.payload.fecha_orden}</dd></div>
+              <div><dt className="text-sm text-muted-foreground">Moneda</dt><dd>{visibleIntent.payload.moneda}</dd></div>
+              <div><dt className="text-sm text-muted-foreground">Días de crédito</dt><dd>{visibleIntent.payload.dias_credito}</dd></div>
+              <div><dt className="text-sm text-muted-foreground">Entrega esperada</dt><dd>{visibleIntent.payload.fecha_entrega_esperada || '30 días desde la orden'}</dd></div>
+              <div><dt className="text-sm text-muted-foreground">Condiciones de pago</dt><dd>{visibleIntent.payload.condiciones_pago || (visibleIntent.payload.dias_credito > 0 ? 'Crédito' : 'Contado')}</dd></div>
+              {visibleIntent.payload.observaciones && <div className="sm:col-span-2"><dt className="text-sm text-muted-foreground">Observaciones</dt><dd>{visibleIntent.payload.observaciones}</dd></div>}
+            </dl>
+            <table><thead><tr><th>Producto</th><th>Cantidad</th><th>Precio unitario</th></tr></thead><tbody>
+              {visibleIntent.payload.detalles.map((d,index) => <tr key={index}><td>{d.descripcion}</td><td>{d.cantidad}</td><td>{d.precio_unitario}</td></tr>)}
+            </tbody></table>
+            <ProtectedComponent modulo="compras" accion="create" recurso="ordenes" fallback={null}>
+              <button type="button" onClick={() => void handleSubmit()} disabled={isLoading || !!recoveryError || intentReady !== activeScope.current}
+                className="rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground disabled:opacity-50">
+                {isLoading ? 'Guardando...' : 'Reintentar orden pendiente'}
+              </button>
+            </ProtectedComponent>
+          </div>
+        ) : scopeReady ? <OCWizard
+          key={scopeIdentity}
           onSubmit={handleSubmit}
           onCancel={handleCancel}
-          isLoading={isLoading}
-        />
+          isLoading={isLoading || !!recoveryError || intentReady !== activeScope.current}
+        /> : !recoveryError && <p role="status">Recuperando datos de la orden…</p>}
       </div>
     </div>
   )

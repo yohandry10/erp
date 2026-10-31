@@ -4,6 +4,7 @@ import { CashMovementsService, TipoMovimiento } from './cash-movements.service';
 import { CashReconciliationService } from './cash-reconciliation.service';
 import PDFDocument from 'pdfkit';
 import * as crypto from 'crypto';
+import Decimal from 'decimal.js';
 
 import { fechaHoyDelTenant } from '../../../shared/utils/fecha-tenant.util';
 export interface ResumenFiscal {
@@ -77,6 +78,61 @@ export class CashReportsService {
             taxLabel: currency === 'PEN' ? 'IGV (18%)' : currency === 'COP' ? 'IVA (19%)' : 'IVA',
             documentLabel: currency === 'PEN' ? 'Boletas' : currency === 'COP' ? 'Documentos equivalentes' : 'Comprobantes',
         };
+    }
+
+    private arqueoPersistido(sesion: any) {
+        if (sesion.estado !== 'CERRADA') return null;
+        const result = sesion.close_result;
+        if (result != null && (typeof result !== 'object' || Array.isArray(result))) {
+            throw new ServiceUnavailableException('No se pudo leer el arqueo persistido del cierre.');
+        }
+        const frozen = result || {};
+        const money = (value: unknown): number | null => {
+            if (value == null) return null;
+            if (!(typeof value === 'number' || typeof value === 'string' && value.trim())) {
+                throw new ServiceUnavailableException('El arqueo persistido está incompleto.');
+            }
+            try {
+                const decimal = new Decimal(value as Decimal.Value);
+                if (!decimal.isFinite()) throw new Error('invalid amount');
+                return decimal.toDecimalPlaces(2).toNumber();
+            } catch {
+                throw new ServiceUnavailableException('El arqueo persistido está incompleto.');
+            }
+        };
+        const administrativo = frozen.cierre_administrativo ?? sesion.cierre_administrativo ?? false;
+        if (typeof administrativo !== 'boolean') throw new ServiceUnavailableException('El tipo de arqueo persistido no es válido.');
+        const nominal = money(frozen.monto_esperado_nominal);
+        const redondeo = money(frozen.redondeo_efectivo_documentado);
+        const esperado = money(frozen.monto_esperado_fisico ?? frozen.monto_esperado ?? sesion.monto_esperado);
+        const cantidad = frozen.redondeo_efectivo_cantidad ?? null;
+        if (esperado == null || cantidad != null && (!Number.isSafeInteger(cantidad) || cantidad < 0)) {
+            throw new ServiceUnavailableException('El arqueo persistido está incompleto.');
+        }
+        const contado = administrativo ? null : money(frozen.monto_contado ?? sesion.monto_contado);
+        const operativa = administrativo ? null : money(frozen.diferencia_operativa ?? frozen.diferencia ?? sesion.diferencia);
+        const diferenciaNominal = administrativo ? null : money(frozen.diferencia_nominal);
+        if (!administrativo && (contado == null || operativa == null)
+            || nominal != null && redondeo != null && !new Decimal(nominal).minus(redondeo).equals(esperado)
+            || contado != null && operativa != null && !new Decimal(contado).minus(esperado).equals(operativa)
+            || contado != null && nominal != null && diferenciaNominal != null && !new Decimal(contado).minus(nominal).equals(diferenciaNominal)) {
+            throw new ServiceUnavailableException('Los importes del arqueo persistido no son consistentes.');
+        }
+        return { administrativo, nominal, redondeo, cantidad, esperado, contado, operativa, diferenciaNominal };
+    }
+
+    private lineasArqueoPersistido(sesion: any, moneda: string): string[] {
+        const a = this.arqueoPersistido(sesion);
+        if (!a) return [];
+        const amount = (value: number | null) => value == null ? 'no disponible' : `${moneda} ${value.toFixed(2)}`;
+        return [
+            `Saldo nominal: ${amount(a.nominal)}`,
+            `Redondeo efectivo documentado: ${amount(a.redondeo)}${a.cantidad == null ? '' : ` (${a.cantidad} ${a.cantidad === 1 ? 'ajuste' : 'ajustes'})`}`,
+            `Efectivo esperado: ${amount(a.esperado)}`,
+            `Efectivo contado: ${a.administrativo ? 'sin arqueo (cierre administrativo)' : amount(a.contado)}`,
+            `Diferencia operativa: ${a.administrativo ? 'no verificada' : amount(a.operativa) + (a.operativa! < 0 ? ' (Faltante)' : a.operativa! > 0 ? ' (Sobrante)' : ' (Cuadrado)')}`,
+            `Diferencia nominal: ${a.administrativo ? 'no verificada' : amount(a.diferenciaNominal)}`,
+        ];
     }
 
     private buildDeterministicUuid(input: string): string {
@@ -304,6 +360,7 @@ export class CashReportsService {
                 monto_contado: datos.sesion.monto_contado,
                 diferencia: datos.sesion.diferencia,
                 hash_integridad: datos.sesion.hash_integridad,
+                arqueo: this.arqueoPersistido(datos.sesion),
             },
             denominaciones: {
                 apertura: datos.sesion.denominaciones_apertura,
@@ -400,7 +457,7 @@ export class CashReportsService {
         lineas.push('3. VENTAS POR MÉTODO DE PAGO');
         lineas.push('-'.repeat(48));
         const mp = datos.resumen_metodos_pago;
-        lineas.push(`Efectivo: ${fiscal.currency} ${mp.efectivo.toFixed(2)} (${mp.cantidad_efectivo} ventas)`);
+        lineas.push(`Efectivo nominal de ventas: ${fiscal.currency} ${mp.efectivo.toFixed(2)} (${mp.cantidad_efectivo} ventas)`);
         lineas.push(`Tarjeta: ${fiscal.currency} ${mp.tarjeta.toFixed(2)} (${mp.cantidad_tarjeta} ventas)`);
         lineas.push(`Transferencia: ${fiscal.currency} ${mp.transferencia.toFixed(2)} (${mp.cantidad_transferencia} ventas)`);
         if (mp.otros > 0) {
@@ -429,23 +486,11 @@ export class CashReportsService {
             lineas.push('-'.repeat(48));
             lineas.push('5. ARQUEO FINAL');
             lineas.push('-'.repeat(48));
-            lineas.push(`Saldo teórico: ${fiscal.currency} ${Number(datos.sesion.monto_esperado ?? 0).toFixed(2)}`);
-
-            // Un cierre administrativo no cuenta el efectivo. El trigger de
-            // normalización guarda contado 0 y deriva la diferencia, así que
-            // imprimir esos números afirmaría un arqueo que nunca se hizo.
-            if (datos.sesion.cierre_administrativo) {
-                lineas.push('Saldo contado: sin arqueo (cierre administrativo)');
-                lineas.push('Diferencia: no verificada');
-                if (datos.sesion.razon_cierre_administrativo) {
-                    lineas.push(`Motivo: ${datos.sesion.razon_cierre_administrativo}`);
-                }
-            } else {
-                lineas.push(`Saldo contado: ${fiscal.currency} ${Number(datos.sesion.monto_contado ?? 0).toFixed(2)}`);
-                lineas.push(`Diferencia: ${fiscal.currency} ${Number(datos.sesion.diferencia ?? 0).toFixed(2)}`);
+            lineas.push(...this.lineasArqueoPersistido(datos.sesion, fiscal.currency));
+            if (datos.sesion.cierre_administrativo && datos.sesion.razon_cierre_administrativo) {
+                lineas.push(`Motivo: ${datos.sesion.razon_cierre_administrativo}`);
             }
-
-            if (datos.sesion.denominaciones_cierre) {
+            if (!datos.sesion.cierre_administrativo && datos.sesion.denominaciones_cierre) {
                 lineas.push('');
                 lineas.push('Denominaciones de cierre:');
                 lineas.push(this.reconciliationService.generarResumenDenominaciones(datos.sesion.denominaciones_cierre, fiscal.currency));
@@ -635,7 +680,7 @@ export class CashReportsService {
                 this.addTable(doc,
                     ['Método', 'Cantidad', 'Monto'],
                     [
-                        ['Efectivo', mp.cantidad_efectivo.toString(), `${fiscal.currency} ${mp.efectivo.toFixed(2)}`],
+                        ['Efectivo (nominal)', mp.cantidad_efectivo.toString(), `${fiscal.currency} ${mp.efectivo.toFixed(2)}`],
                         ['Tarjeta', mp.cantidad_tarjeta.toString(), `${fiscal.currency} ${mp.tarjeta.toFixed(2)}`],
                         ['Transferencia', mp.cantidad_transferencia.toString(), `${fiscal.currency} ${mp.transferencia.toFixed(2)}`],
                         ['Otros', mp.cantidad_otros.toString(), `${fiscal.currency} ${mp.otros.toFixed(2)}`],
@@ -666,13 +711,7 @@ export class CashReportsService {
                     this.addSectionTitle(doc, '5. ARQUEO FINAL', colorPrimario);
 
                     doc.fontSize(11).fillColor(colorSecundario);
-                    doc.text(`Saldo teórico: ${fiscal.currency} ${datos.sesion.monto_esperado?.toFixed(2) || '0.00'}`);
-                    doc.text(`Saldo contado: ${fiscal.currency} ${datos.sesion.monto_contado?.toFixed(2) || '0.00'}`);
-
-                    const diferencia = datos.sesion.diferencia || 0;
-                    const colorDiferencia = diferencia === 0 ? '#38a169' : (diferencia > 0 ? '#3182ce' : '#e53e3e');
-                    doc.fillColor(colorDiferencia)
-                        .text(`Diferencia: ${fiscal.currency} ${diferencia.toFixed(2)} ${diferencia > 0 ? '(Sobrante)' : diferencia < 0 ? '(Faltante)' : '(Cuadrado)'}`);
+                    for (const linea of this.lineasArqueoPersistido(datos.sesion, fiscal.currency)) doc.text(linea);
                 }
 
                 // ========== RESUMEN FISCAL ==========
@@ -1019,6 +1058,18 @@ export class CashReportsService {
         push(['METODO_PAGO', 'Cant Tarjeta', mp.cantidad_tarjeta]);
         push(['METODO_PAGO', 'Cant Transferencia', mp.cantidad_transferencia]);
         push(['METODO_PAGO', 'Cant Otros', mp.cantidad_otros]);
+        const arqueo = this.arqueoPersistido(datos.sesion);
+        if (arqueo) {
+            const amount = (value: number | null) => value == null ? '' : value.toFixed(2);
+            push(['ARQUEO', 'Tipo', arqueo.administrativo ? 'ADMINISTRATIVO' : 'FISICO']);
+            push(['ARQUEO', 'Saldo nominal', amount(arqueo.nominal)]);
+            push(['ARQUEO', 'Redondeo efectivo documentado', amount(arqueo.redondeo)]);
+            push(['ARQUEO', 'Cantidad ajustes de redondeo', arqueo.cantidad]);
+            push(['ARQUEO', 'Efectivo esperado', amount(arqueo.esperado)]);
+            push(['ARQUEO', 'Efectivo contado', arqueo.administrativo ? 'SIN ARQUEO' : amount(arqueo.contado)]);
+            push(['ARQUEO', 'Diferencia operativa', arqueo.administrativo ? 'NO VERIFICADA' : amount(arqueo.operativa)]);
+            push(['ARQUEO', 'Diferencia nominal', arqueo.administrativo ? 'NO VERIFICADA' : amount(arqueo.diferenciaNominal)]);
+        }
 
         return rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
     }

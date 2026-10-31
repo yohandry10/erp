@@ -1,11 +1,15 @@
+import { leerConsultaCompleta } from './consulta-completa';
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import {
   signoFiscal,
+  esBorradorVentaFiscal,
   TIPOS_DOCUMENTO_COMPRA_FISCAL,
   TIPOS_DOCUMENTO_VENTA_FISCAL,
 } from './documento-fiscal.rules';
 import { SupabaseService } from "../../../shared/supabase/supabase.service";
 import { TenantContextService } from "../../../shared/tenant/tenant-context.service";
+import { compraFiscalOriginal } from './compra-fiscal-original';
+import Decimal from 'decimal.js';
 
 /**
  * Servicio de Exportación PLE (Programa de Libros Electrónicos) SUNAT
@@ -173,7 +177,7 @@ export class PleExportService {
     const fechaInicio = `${anio}-${mes.toString().padStart(2, "0")}-01`;
     const fechaFinExclusiva = this.getFechaInicioMesSiguiente(anio, mes);
 
-    const { data: asientos, error } = await this.supabase
+    const { data: asientos, error } = await leerConsultaCompleta(() => this.supabase
       .getClient()
       .from("asientos_contables")
       .select(
@@ -190,7 +194,7 @@ export class PleExportService {
       .gte("fecha", fechaInicio)
       .lt("fecha", fechaFinExclusiva)
       .order("fecha")
-      .order("numero_asiento");
+      .order("numero_asiento").order("id"));
 
     if (error) {
       this.logger.error("Error obteniendo asientos:", error);
@@ -314,7 +318,7 @@ export class PleExportService {
     const fechaInicio = `${anio}-${mes.toString().padStart(2, "0")}-01`;
     const fechaFinExclusiva = this.getFechaInicioMesSiguiente(anio, mes);
 
-    const { data: movimientos, error } = await this.supabase
+    const { data: movimientos, error } = await leerConsultaCompleta(() => this.supabase
       .getClient()
       .from("detalle_asientos")
       .select(
@@ -331,7 +335,7 @@ export class PleExportService {
       .gte("asientos_contables.fecha", fechaInicio)
       .lt("asientos_contables.fecha", fechaFinExclusiva)
       .order("codigo", { foreignTable: "plan_cuentas" })
-      .order("fecha", { foreignTable: "asientos_contables" });
+      .order("fecha", { foreignTable: "asientos_contables" }).order("id"));
 
     if (error) {
       this.logger.error("Error obteniendo movimientos:", error);
@@ -495,7 +499,7 @@ export class PleExportService {
     const fechaInicio = `${anio}-${mes.toString().padStart(2, "0")}-01`;
     const fechaFin = this.getFechaFinMes(anio, mes);
 
-    const { data: comprobantes, error } = await this.supabase
+    const { data: comprobantes, error } = await leerConsultaCompleta(() => this.supabase
       .getClient()
       .from("documentos")
       .select(
@@ -503,7 +507,7 @@ export class PleExportService {
         id, serie, numero, tipo_documento, fecha_emision, fecha_vencimiento,
         moneda, tipo_cambio, estado,
         subtotal, impuesto_igv, total,
-        total_gravadas, total_exoneradas, total_inafectas, total_exportacion,
+        total_gravadas, total_exoneradas, total_inafectas, total_exportacion, documento_origen_id, metadata,
         receptor_tipo_doc, receptor_numero_doc, receptor_razon_social
       `,
       )
@@ -513,18 +517,30 @@ export class PleExportService {
       .lte("fecha_emision", `${fechaFin}T23:59:59`)
       .order("fecha_emision")
       .order("serie")
-      .order("numero");
+      .order("numero").order("id"));
 
     if (error) {
       this.logger.error("Error obteniendo comprobantes de venta:", error);
       throw error;
     }
 
+    const emitidos = (comprobantes || []).filter((doc: any) => !esBorradorVentaFiscal(doc.estado));
+    const origenIds = [...new Set(emitidos.map((doc: any) =>
+      doc.documento_origen_id || doc.metadata?.source_document_id).filter(Boolean))];
+    const originales = new Map<string, any>();
+    for (let desde = 0; desde < origenIds.length; desde += 200) {
+      const { data, error: origenError } = await this.supabase.getClient()
+        .from('documentos').select('id, tenant_id, tipo_documento, serie, numero, fecha_emision')
+        .eq('tenant_id', tenantId).in('id', origenIds.slice(desde, desde + 200));
+      if (origenError) throw origenError;
+      for (const original of data || []) originales.set(original.id, original);
+    }
+
     const periodo = this.getPeriodoPle(anio, mes);
     const lineas: string[] = [];
     let correlativo = 1;
 
-    for (const comprobante of comprobantes || []) {
+    for (const comprobante of emitidos) {
       const doc = comprobante as any;
       const anulado = ["ANULADO", "ANULADA", "CANCELADO", "CANCELADA"].includes(
         String(doc.estado || "").toUpperCase(),
@@ -534,8 +550,20 @@ export class PleExportService {
       // misma regla escrita dos veces y sólo una vez bien. Ahora la declara
       // `documento-fiscal.rules`.
       const signo = signoFiscal(doc.tipo_documento);
-      const gravadas = signo * Math.abs(Number(doc.total_gravadas ?? doc.subtotal ?? 0));
-      const igv = signo * Math.abs(Number(doc.impuesto_igv || 0));
+      const moneda = String(doc.moneda || 'PEN').trim().toUpperCase();
+      const tipoCambio = moneda === 'PEN' ? 1 : Number(doc.tipo_cambio);
+      if (!Number.isFinite(tipoCambio) || tipoCambio <= 0) {
+        throw new BadRequestException(`Tipo de cambio de origen requerido para ${doc.serie}-${doc.numero}`);
+      }
+      const importe = (valor: unknown) => anulado ? 0 : signo * new Decimal(Number(valor || 0))
+        .abs().mul(tipoCambio).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
+      const gravadas = importe(doc.total_gravadas ?? doc.subtotal);
+      const igv = importe(doc.impuesto_igv);
+      const esNota = ['07', '08'].includes(this.codigoTipoComprobante(doc.tipo_documento));
+      const original = originales.get(doc.documento_origen_id || doc.metadata?.source_document_id);
+      if (esNota && (!original || original.tenant_id !== tenantId)) {
+        throw new BadRequestException(`Referencia del comprobante original requerida para ${doc.serie}-${doc.numero}`);
+      }
 
       lineas.push(
         this.toPleLine([
@@ -555,25 +583,25 @@ export class PleExportService {
           ), // 11 Tipo doc identidad (cat. 06)
           numeroDocIdentidad, // 12 Numero doc identidad
           this.sanitizePleText(doc.receptor_razon_social, 100), // 13 Apellidos y nombres o razon social
-          this.formatPleAmount(doc.total_exportacion), // 14 Valor facturado de la exportacion
+          this.formatPleAmount(importe(doc.total_exportacion)), // 14 Valor facturado de la exportacion
           this.formatPleAmount(gravadas), // 15 Base imponible de la operacion gravada
           "0.00", // 16 Descuento de la base imponible
           this.formatPleAmount(igv), // 17 IGV
           "0.00", // 18 Descuento del IGV
-          this.formatPleAmount(doc.total_exoneradas), // 19 Importe total de la operacion exonerada
-          this.formatPleAmount(doc.total_inafectas), // 20 Importe total de la operacion inafecta
+          this.formatPleAmount(importe(doc.total_exoneradas)), // 19 Importe total de la operacion exonerada
+          this.formatPleAmount(importe(doc.total_inafectas)), // 20 Importe total de la operacion inafecta
           "0.00", // 21 ISC
           "0.00", // 22 Base imponible del arroz pilado
           "0.00", // 23 IVAP
           "0.00", // 24 Otros tributos y cargos
-          this.formatPleAmount(doc.total), // 25 Importe total del comprobante
+          this.formatPleAmount(importe(doc.total)), // 25 Importe total del comprobante
           this.sanitizePleText(doc.moneda || "PEN", 3), // 26 Codigo de moneda (cat. 02)
-          this.formatPleAmount(doc.tipo_cambio || 1), // 27 Tipo de cambio
-          "", // 28 Fecha del comprobante modificado
-          "", // 29 Tipo del comprobante modificado
-          "", // 30 Serie del comprobante modificado
+          tipoCambio.toFixed(3), // 27 Tipo de cambio
+          esNota ? this.formatPleDate(original.fecha_emision) : "", // 28 Fecha del comprobante modificado
+          esNota ? this.codigoTipoComprobante(original.tipo_documento) : "", // 29 Tipo del comprobante modificado
+          esNota ? this.sanitizePleText(original.serie, 20) : "", // 30 Serie del comprobante modificado
           "", // 31 Codigo de la dependencia aduanera
-          "", // 32 Numero del comprobante modificado
+          esNota ? this.sanitizePleText(original.numero, 20) : "", // 32 Numero del comprobante modificado
           "", // 33 Identificacion del contrato o proyecto
           "", // 34 Error tipo 1: inconsistencia en el tipo de cambio
           "", // 35 Indicador de comprobante cancelado con medio de pago
@@ -635,13 +663,13 @@ export class PleExportService {
     const fechaInicio = `${anio}-${mes.toString().padStart(2, "0")}-01`;
     const fechaFin = this.getFechaFinMes(anio, mes);
 
-    const { data: compras, error } = await this.supabase
+    const { data: compras, error } = await leerConsultaCompleta(() => this.supabase
       .getClient()
       .from("cuentas_por_pagar")
       .select(
         `
         id, numero_documento, tipo_documento, fecha_emision, fecha_vencimiento,
-        subtotal, igv, total, moneda, tipo_cambio_origen, estado, fiscal_metadata,
+        subtotal, igv, total, moneda, tipo_cambio_origen, estado, fiscal_metadata, metadata, original_fiscal_amounts,
         proveedores!cuentas_por_pagar_proveedor_id_fkey(ruc, numero_documento, razon_social, tipo_documento)
       `,
       )
@@ -652,7 +680,7 @@ export class PleExportService {
       .gte("fecha_emision", fechaInicio)
       .lte("fecha_emision", fechaFin)
       .order("fecha_emision")
-      .order("numero_documento");
+      .order("numero_documento").order("id"));
 
     if (error) {
       this.logger.error("Error obteniendo comprobantes de compra:", error);
@@ -664,7 +692,7 @@ export class PleExportService {
     let correlativo = 1;
 
     for (const compra of compras || []) {
-      const doc = compra as any;
+      const doc = compraFiscalOriginal(compra as any);
       const anulado = ["ANULADA", "ANULADO"].includes(
         String(doc.estado || "").toUpperCase(),
       );
@@ -678,9 +706,6 @@ export class PleExportService {
       const { serie, numero } = this.partirSerieNumero(doc.numero_documento);
       const fiscal = doc.fiscal_metadata || {};
       const signo = signoFiscal(doc.tipo_documento);
-      const igv = signo * Math.abs(Number(doc.igv || 0));
-      const base = signo * Math.abs(Number(doc.subtotal || 0));
-      const total = signo * Math.abs(Number(doc.total || 0));
       const moneda = String(doc.moneda || "PEN").toUpperCase();
       const tipoCambio = moneda === "PEN"
         ? 1
@@ -690,6 +715,14 @@ export class PleExportService {
           `Tipo de cambio requerido para ${doc.numero_documento}`,
         );
       }
+      // El archivo declara contabilidad en soles. MONEDA/TIPO_CAMBIO conservan
+      // la referencia documental; las casillas monetarias usan el cambio de
+      // origen, nunca el del pago ni el cierre actual.
+      const importe = (value: unknown) => signo * new Decimal(Number(value || 0)).abs()
+        .mul(tipoCambio).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
+      const igv = importe(doc.igv);
+      const base = importe(doc.subtotal);
+      const total = importe(doc.total);
       // Sin IGV en el comprobante no hay credito fiscal que sustentar: la base
       // se declara como adquisicion no gravada, no como gravada con IGV cero.
       const tieneIgv = Math.abs(igv) > 0;

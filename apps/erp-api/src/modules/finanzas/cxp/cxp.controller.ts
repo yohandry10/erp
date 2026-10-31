@@ -10,13 +10,14 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { UuidParamPipe } from '../../../common/pipes/uuid-param.pipe';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../../common/guards/permission.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { CxpService } from './cxp.service';
-import { CrearCxpDto, FiltrarCxpDto, ActualizarCxpDto, AplicarPagoCxpDto, AnularCxpDto, VencimientosCxpDto } from './dto';
+import { CrearCxpDto, FiltrarCxpDto, ActualizarCxpDto, AplicarPagoCxpDto, AnularCxpDto, VencimientosCxpDto, UsarCreditoProveedorDto } from './dto';
 
 @ApiTags('Finanzas - Cuentas por Pagar')
 @ApiBearerAuth()
@@ -103,6 +104,16 @@ export class CxpController {
     return this.cxpService.listarTasasDetraccion(tenantId, fecha);
   }
 
+  @Get('devoluciones-nota-credito')
+  @RequirePermission('finanzas.cxp.ver')
+  @ApiOperation({ summary: 'Devoluciones emitidas pendientes de nota de crédito del proveedor' })
+  async listarDevolucionesParaNotaCredito(
+    @CurrentTenant() tenantId: string,
+    @Query('proveedor_id') proveedorId?: string,
+  ) {
+    return this.cxpService.listarDevolucionesParaNotaCredito(tenantId, proveedorId);
+  }
+
   @Get(':id')
   @RequirePermission('finanzas.cxp.ver')
   @ApiOperation({
@@ -113,7 +124,7 @@ export class CxpController {
   @ApiResponse({ status: 404, description: 'Cuenta por pagar no encontrada' })
   async obtenerCuentaPorPagar(
     @CurrentTenant() tenantId: string,
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
   ) {
     return this.cxpService.obtenerCuentaPorPagar(tenantId, id);
   }
@@ -144,7 +155,7 @@ export class CxpController {
   @ApiResponse({ status: 400, description: 'Datos inválidos o cuenta no modificable' })
   @ApiResponse({ status: 404, description: 'Cuenta por pagar no encontrada' })
   async actualizarCuentaPorPagar(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Body() actualizarCxpDto: ActualizarCxpDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
@@ -163,12 +174,27 @@ export class CxpController {
   @ApiResponse({ status: 400, description: 'Datos inválidos, monto excede saldo o cuenta no permite pagos' })
   @ApiResponse({ status: 404, description: 'Cuenta por pagar no encontrada' })
   async aplicarPago(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Body() aplicarPagoDto: AplicarPagoCxpDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
   ) {
     return this.cxpService.aplicarPago(tenantId, id, aplicarPagoDto, user?.id);
+  }
+
+  @Get(':id/credito-movimientos')
+  @RequirePermission('finanzas.cxp.ver')
+  @ApiOperation({ summary: 'Historial del crédito recibido del proveedor' })
+  async obtenerMovimientosCredito(@CurrentTenant() tenantId: string, @Param('id', UuidParamPipe) id: string) {
+    return this.cxpService.obtenerMovimientosCreditoProveedor(tenantId, id);
+  }
+
+  @Post(':id/usar-credito')
+  @RequirePermission('finanzas.cxp.gestionar')
+  @ApiOperation({ summary: 'Aplicar crédito recibido a una factura o registrar su reembolso bancario' })
+  async usarCredito(@CurrentTenant() tenantId: string, @Param('id', UuidParamPipe) id: string,
+    @CurrentUser() user: any, @Body() dto: UsarCreditoProveedorDto) {
+    return this.cxpService.usarCreditoProveedor(tenantId, id, dto, user?.id);
   }
 
   @Post(':id/anular')
@@ -181,7 +207,7 @@ export class CxpController {
   @ApiResponse({ status: 400, description: 'La cuenta ya está anulada o tiene pagos aplicados' })
   @ApiResponse({ status: 404, description: 'Cuenta por pagar no encontrada' })
   async anularCuentaPorPagar(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @Body() anularCxpDto: AnularCxpDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
@@ -199,7 +225,7 @@ export class CxpController {
   @ApiResponse({ status: 200, description: 'Historial de pagos obtenido exitosamente' })
   @ApiResponse({ status: 404, description: 'Cuenta por pagar no encontrada' })
   async obtenerHistorialPagos(
-    @Param('id') id: string,
+    @Param('id', UuidParamPipe) id: string,
     @CurrentTenant() tenantId: string,
   ) {
     return this.cxpService.obtenerHistorialPagos(tenantId, id);

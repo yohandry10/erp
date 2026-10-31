@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { X, ChevronLeft, ChevronRight, SkipForward } from 'lucide-react'
 import { TourStep } from './types'
 
@@ -23,27 +23,25 @@ export function OnboardingTooltip({
   onSkip,
   onClose,
 }: OnboardingTooltipProps) {
-  const [position, setPosition] = useState({ top: 0, left: 0 })
+  const [position, setPosition] = useState({ top: 0, left: 0, centered: true })
+  const tooltip = useRef<HTMLDivElement>(null)
   const isModal = step.tipo === 'modal'
   const isFirst = currentIndex === 0
   const isLast = currentIndex === totalSteps - 1
 
   useEffect(() => {
-    if (isModal || !step.selector) {
-      setPosition({
-        top: window.innerHeight / 2,
-        left: window.innerWidth / 2,
-      })
-      return
-    }
-
     const updatePosition = () => {
-      const element = document.querySelector(step.selector!)
-      if (!element) return
+      const element = step.selector ? document.querySelector(step.selector) : null
+      const rect = element?.getBoundingClientRect()
+      if (isModal || !rect || !rect.width || !rect.height ||
+          rect.bottom <= 0 || rect.right <= 0 ||
+          rect.top >= window.innerHeight || rect.left >= window.innerWidth) {
+        setPosition({ top: window.innerHeight / 2, left: window.innerWidth / 2, centered: true })
+        return
+      }
 
-      const rect = element.getBoundingClientRect()
-      const tooltipWidth = 320
-      const tooltipHeight = 200
+      const tooltipWidth = tooltip.current?.offsetWidth ?? 320
+      const tooltipHeight = tooltip.current?.offsetHeight ?? 200
       const padding = 16
 
       let top = 0
@@ -78,7 +76,7 @@ export function OnboardingTooltip({
         top = window.innerHeight - tooltipHeight - padding
       }
 
-      setPosition({ top, left })
+      setPosition({ top, left, centered: false })
     }
 
     updatePosition()
@@ -92,9 +90,10 @@ export function OnboardingTooltip({
   }, [step, isModal])
 
   return (
-    <div className="fixed z-[10000] w-[320px] bg-card rounded-xl shadow"
+    <div ref={tooltip} className="fixed z-[10000] w-[320px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-32px)] overflow-y-auto bg-card rounded-xl shadow"
       role="dialog"
       aria-label={step.titulo}
+      style={{ top: position.top, left: position.left, transform: position.centered ? 'translate(-50%, -50%)' : undefined }}
     >
       {/* Header */}
       <div className="flex items-center justify-between py-3 px-4 border-b"
@@ -120,7 +119,7 @@ export function OnboardingTooltip({
         >
           {step.titulo}
         </h3>
-        <p className="text-sm text-[#4b5563] leading-6 mt-2 mr-0 mb-0 ml-0"
+        <p className="text-sm text-foreground/85 leading-6 mt-2 mr-0 mb-0 ml-0"
         >
           {step.descripcion}
         </p>
@@ -148,7 +147,7 @@ export function OnboardingTooltip({
         <div className="flex items-center gap-2">
           {!isFirst && (
             <button
-              onClick={onPrev} className="flex items-center gap-[4px] py-[6px] px-3 rounded-lg text-sm text-[#4b5563] border-0 cursor-pointer"
+              onClick={onPrev} className="flex items-center gap-[4px] py-[6px] px-3 rounded-lg text-sm text-foreground/85 border-0 cursor-pointer"
             >
               <ChevronLeft className="w-4 h-4" />
               Anterior

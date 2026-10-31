@@ -2,7 +2,9 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { useApi } from '@/hooks/use-api'
+import { useAuth } from '@/contexts/AuthContext'
+import { useCxpRead } from '@/hooks/use-cxp-read'
+import { readCxpDetail, readCxpPayments } from '@/lib/finanzas/cxp-detail-contract'
 import {
   ArrowLeft, FileText, Calendar, DollarSign, Building2,
   Clock, CheckCircle, XCircle, CreditCard, History
@@ -10,79 +12,43 @@ import {
 import { PagoProveedorModal } from '@/components/finanzas'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import { usePermission } from '@/hooks/use-permission'
+import { parseDateLocal } from '@/lib/date-utils'
+import CreditoProveedorPanel from './CreditoProveedorPanel'
 
 const toNumber = (value: unknown) => {
   const numeric = Number(value)
   return Number.isFinite(numeric) ? numeric : 0
 }
 
-const normalizeCxp = (raw: any) => ({
-  ...raw,
-  id: raw?.id || '',
-  numero_documento: raw?.numero_documento || raw?.numero || 'N/A',
-  tipo_documento: raw?.tipo_documento || 'Documento',
-  estado: raw?.estado || 'PENDIENTE',
-  total: toNumber(raw?.total),
-  saldo: toNumber(raw?.saldo ?? raw?.total),
-  moneda: raw?.moneda || 'PEN',
-  fecha_emision: raw?.fecha_emision || '',
-  fecha_vencimiento: raw?.fecha_vencimiento || '',
-})
-
 export default function CxpDetallePage() {
   const { currency, locale, formatCurrency: formatLocalizedCurrency, taxIdLabel } = useLocalizedMoney()
   const router = useRouter()
   const params = useParams()
-  const { get } = useApi()
+  const { session } = useAuth()
   const { hasPermission: canManageCxp } = usePermission('finanzas', 'gestionar', 'cxp')
   const id = params?.id as string
 
-  const [cxp, setCxp] = useState<any>(null)
-  const [pagos, setPagos] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadingPagos, setLoadingPagos] = useState(true)
   const [showPagoModal, setShowPagoModal] = useState(false)
-
-  const loadCxp = useCallback(async () => {
-    if (!id) return
-
-    try {
-      setLoading(true)
-      const response = await get(`/api/finanzas/cxp/${id}`)
-      if (response?.success) setCxp(normalizeCxp(response.data))
-    } catch (error) {
-      console.error('Error loading cuenta por pagar:', error)
-      alert('Error: No se pudo cargar la cuenta por pagar')
-    } finally {
-      setLoading(false)
-    }
-  }, [get, id])
-
-  const loadPagos = useCallback(async () => {
-    if (!id) return
-
-    try {
-      setLoadingPagos(true)
-      const response = await get(`/api/finanzas/cxp/${id}/pagos`)
-      if (response?.success) setPagos(Array.isArray(response.data) ? response.data : [])
-    } catch (error) {
-      console.error('Error loading pagos:', error)
-    } finally {
-      setLoadingPagos(false)
-    }
-  }, [get, id])
-
-  useEffect(() => {
-    loadCxp()
-    loadPagos()
-  }, [loadCxp, loadPagos])
+  const tenantId = session?.user?.tenant_id || ''
+  const validateDetail = useCallback((response: any) => readCxpDetail(response, id, tenantId), [id, tenantId])
+  const detail = useCxpRead(`/api/finanzas/cxp/${id}`, validateDetail, Boolean(id && tenantId))
+  const cxp = detail.data
+  const validatePayments = useCallback((response: any) => readCxpPayments(response, cxp?.moneda || '', id, tenantId), [cxp?.moneda, id, tenantId])
+  const history = useCxpRead(`/api/finanzas/cxp/${id}/pagos`, validatePayments, Boolean(cxp))
+  const pagos = history.data || []
+  const loading = detail.loading
+  const loadingPagos = history.loading
+  const pagosError = history.error
+  const loadCxp = detail.reload
+  const loadPagos = history.reload
+  useEffect(() => { setShowPagoModal(false) }, [id, tenantId, session?.user?.id])
 
   const formatCurrency = (amount: number, moneda: string = currency) => {
     return formatLocalizedCurrency(toNumber(amount), moneda)
   }
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
+    const date = parseDateLocal(dateString)
     if (Number.isNaN(date.getTime())) return '-'
     return date.toLocaleDateString(locale, {
       year: 'numeric', month: 'long', day: 'numeric'
@@ -94,7 +60,9 @@ export default function CxpDetallePage() {
     loadPagos()
   }
 
-  const canApplyPayment = canManageCxp && cxp && cxp.estado !== 'PAGADA' && cxp.estado !== 'ANULADA' && toNumber(cxp.saldo) > 0
+  const canApplyPayment = canManageCxp && cxp && history.data !== null && !history.loading && !history.error && cxp.estado !== 'PAGADA' && cxp.estado !== 'ANULADA' && cxp.saldo > 0
+  const canReadPaymentContext = canManageCxp && cxp && history.data !== null && !history.loading && !history.error
+  useEffect(() => { if (!canReadPaymentContext) setShowPagoModal(false) }, [canReadPaymentContext])
 
   if (loading) {
     return (
@@ -112,7 +80,10 @@ export default function CxpDetallePage() {
       <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
         <div className="text-center p-12">
           <XCircle size={48} className="text-red-500" />
-          <h3>Cuenta por pagar no encontrada</h3>
+          <div role="alert" data-testid="cxp-detail-error">
+            <p>{detail.error || 'No se pudo consultar la cuenta por pagar.'}</p>
+            <button type="button" onClick={() => void loadCxp()} className="mt-2 text-primary underline">Reintentar cuenta</button>
+          </div>
           <button
             onClick={() => router.push('/dashboard/finanzas/cxp')}
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 mt-4"
@@ -124,7 +95,9 @@ export default function CxpDetallePage() {
     )
   }
 
-  const totalPagado = toNumber(cxp.total) - toNumber(cxp.saldo)
+  const esNotaFiscal = cxp.metadata?.registro_fiscal_sin_obligacion === true
+  const totalPagado = esNotaFiscal ? 0 : pagos.reduce((sum, pago) => sum + Math.round(pago.monto * 100), 0) / 100
+  const totalComprobante = toNumber(cxp.original_fiscal_amounts?.total ?? cxp.total)
 
   return (
     <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
@@ -136,10 +109,11 @@ export default function CxpDetallePage() {
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Cuenta por Pagar</h1>
+            <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">{esNotaFiscal ? 'Nota de crédito recibida' : 'Cuenta por Pagar'}</h1>
             <p className="mt-2 text-base text-muted-foreground">{cxp.numero_documento}</p>
           </div>
         </div>
+        <button type="button" onClick={() => void loadCxp()} className="text-primary underline">Actualizar cuenta</button>
         {canApplyPayment && (
           <button
             onClick={() => setShowPagoModal(true)} className="py-3 px-6 rounded-lg border-0 bg-[#10b981] text-white cursor-pointer text-[0.875rem] font-semibold flex items-center gap-2 transition shadow"
@@ -158,6 +132,17 @@ export default function CxpDetallePage() {
         )}
       </div>
 
+      {esNotaFiscal && (
+        <div className="mb-6 rounded-xl border border-blue-300/30 bg-blue-300/10 p-4">
+          <p>{cxp.metadata?.devolucion_proveedor_id ? 'Esta nota sustenta la devolución ya aplicada.' : 'Esta nota ajustó la compra y su deuda. La parte que ya estaba pagada se registra como crédito disponible.'} No crea otra deuda ni representa un pago al proveedor.</p>
+          {cxp.metadata?.ajustes_fiscales_preservados && Object.values(cxp.metadata.ajustes_fiscales_preservados).some((value) => Number(value) > 0) && <p className="mt-2 text-sm">Los impuestos retenidos, percibidos o depositados permanecen registrados. Esta nota no representa una devolución de SUNAT ni cancela esos comprobantes.</p>}
+          <div className="mt-3 flex flex-wrap gap-4">
+            <button className="text-primary underline" onClick={() => router.push(`/dashboard/finanzas/cxp/${cxp.metadata.factura_proveedor_id}`)}>Ver comprobante original</button>
+            {cxp.metadata?.devolucion_proveedor_id && <button className="text-primary underline" onClick={() => router.push(`/dashboard/compras/devoluciones/${cxp.metadata.devolucion_proveedor_id}`)}>Ver devolución</button>}
+          </div>
+        </div>
+      )}
+      {cxp.metadata?.source === 'SUPPLIER_CREDIT_NC_570' && <CreditoProveedorPanel nota={cxp} onUpdated={() => { void loadCxp(); void loadPagos() }} />}
       <div className="mb-8 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-5 grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] mb-8">
         <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
           <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
@@ -165,21 +150,21 @@ export default function CxpDetallePage() {
             <FileText className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary text-blue-500" />
           </div>
           <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-2xl">
-            {formatCurrency(cxp.total, cxp.moneda)}
+            {formatCurrency(totalComprobante, cxp.moneda)}
           </div>
-          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Monto original</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">{esNotaFiscal ? 'Importe de la nota recibida' : 'Importe del comprobante original'}</div>
         </div>
 
         <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
           <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
-            <h3>PAGADO</h3>
+            <h3>{esNotaFiscal ? 'PAGOS REALIZADOS' : 'PAGADO'}</h3>
             <CheckCircle className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary text-[#10b981]" />
           </div>
           <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-2xl text-[#10b981]">
-            {formatCurrency(totalPagado, cxp.moneda)}
+            {loadingPagos ? 'Consultando…' : pagosError ? 'No disponible' : formatCurrency(totalPagado, cxp.moneda)}
           </div>
           <div className="mt-2 text-[0.8125rem] text-muted-foreground">
-            {totalPagado > 0 && toNumber(cxp.total) > 0 ? `${((totalPagado / toNumber(cxp.total)) * 100).toFixed(1)}% del total` : 'Sin pagos'}
+            {pagosError ? 'No se pudo consultar los pagos' : loadingPagos ? 'Cargando pagos confirmados' : esNotaFiscal ? 'Nota recibida sin pago al proveedor' : totalPagado > 0 ? 'Pagos confirmados en banco o caja' : 'Sin pagos'}
           </div>
         </div>
 
@@ -325,11 +310,17 @@ export default function CxpDetallePage() {
           <History size={20} />
           Historial de Pagos
         </h3>
+        <button type="button" onClick={() => void loadPagos()} disabled={loadingPagos} className="mb-4 text-primary underline disabled:opacity-50">Actualizar historial</button>
         <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
           {loadingPagos ? (
             <div className="text-center p-8 text-muted-foreground">
               <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
               <p>Cargando historial de pagos...</p>
+            </div>
+          ) : pagosError ? (
+            <div role="alert" className="p-6 text-red-500">
+              <p>{pagosError}</p>
+              <button type="button" onClick={() => void loadPagos()} className="mt-2 text-primary underline">Reintentar historial</button>
             </div>
           ) : pagos.length === 0 ? (
             <div className="text-center p-8 text-muted-foreground">
@@ -354,7 +345,7 @@ export default function CxpDetallePage() {
                       Método
                     </th>
                     <th className="text-center p-3 font-semibold text-xs text-muted-foreground">
-                      Estado
+                      Conciliación
                     </th>
                     <th className="text-right p-3 font-semibold text-xs text-muted-foreground">
                       Monto
@@ -423,7 +414,7 @@ export default function CxpDetallePage() {
       </div>
 
       {/* Pago Modal */}
-      {cxp && canManageCxp && (
+      {canReadPaymentContext && (
         <PagoProveedorModal
           isOpen={showPagoModal}
           onClose={() => setShowPagoModal(false)}
@@ -431,6 +422,9 @@ export default function CxpDetallePage() {
           cxpNumero={cxp.numero_documento}
           saldoPendiente={cxp.saldo}
           moneda={cxp.moneda}
+          proveedorId={cxp.proveedor_id}
+          total={cxp.total}
+          canApply={Boolean(canApplyPayment)}
           onPagoSuccess={handlePagoSuccess}
         />
       )}

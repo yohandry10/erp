@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Query } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Query, ServiceUnavailableException } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
@@ -29,7 +29,7 @@ export class HelpController {
     });
 
     if (error) {
-      throw new BadRequestException(error.message || 'Error searching help');
+      throw new ServiceUnavailableException('No se pudo consultar el catálogo de ayuda. Intenta nuevamente.');
     }
 
     const resultado = data && data.length > 0 ? data[0] : null;
@@ -61,7 +61,7 @@ export class HelpController {
     });
 
     if (error) {
-      throw new BadRequestException(error.message || 'Error fetching suggestions');
+      throw new ServiceUnavailableException('No se pudo consultar el catálogo de ayuda. Intenta nuevamente.');
     }
 
     return {

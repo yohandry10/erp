@@ -8,8 +8,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useApiCall } from '@/hooks/use-api'
 import { useCountryContext } from '@/hooks/use-country-context'
-import { apiSucceeded, unwrapApiArray, unwrapApiData, unwrapApiObject } from '@/lib/api-contract'
+import { apiSucceeded } from '@/lib/api-contract'
 import { parseDateLocal } from '@/lib/date-utils'
+import { useAuth } from '@/contexts/AuthContext'
+import { usePermission } from '@/hooks/use-permission'
+import { readSireReports, readSireStats, readSireOperations, readSireFrozenDownload } from '@/lib/sire-read-contract'
 
 const getCurrentPeriod = () => new Date().toISOString().slice(0, 7)
 
@@ -33,6 +36,8 @@ interface SireReport {
 }
 
 interface SireStats {
+  periodoActual: string
+  totalDetalles: number
   reportesDelMes: number
   registrosTotales: number
   enviadosASunat: number
@@ -81,13 +86,32 @@ const getStatusClass = (estado: string) => {
 }
 
 export default function SIREPage() {
+  const { session } = useAuth()
+  return <SireWorkspace key={`${session?.user?.tenant_id || ''}:${session?.user?.id || ''}`} />
+}
+
+function SireWorkspace() {
+  const { session } = useAuth()
+  const tenantId = session?.user?.tenant_id || ''
+  const actorId = session?.user?.id || ''
+  const emitPermission = usePermission('sire','emitir','')
+  const canEmit = emitPermission.hasPermission && !emitPermission.loading
   const country = useCountryContext()
-  const isPeru = (country.paisCodigo || 'PE').toUpperCase() === 'PE'
+  const isPeru = !country.loading && !country.error && country.paisCodigo.toUpperCase() === 'PE'
 
   const [reports, setReports] = useState<SireReport[]>([])
   const [stats, setStats] = useState<SireStats | null>(null)
+  const [readBusy, setReadBusy] = useState(true)
+  const [readReady, setReadReady] = useState(false)
+  const [readError, setReadError] = useState<string | null>(null)
+  const [operationsBusy, setOperationsBusy] = useState(false)
+  const [operationsError, setOperationsError] = useState<string | null>(null)
+  const operationsSeq = useRef(0)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [activeDownloadId, setActiveDownloadId] = useState<string | null>(null)
+  const [downloadError, setDownloadError] = useState<{ reportId: string; message: string } | null>(null)
+  const downloadRequestSeq = useRef(0)
+  const downloadBusy = useRef(false)
   const [activeSunatSendId, setActiveSunatSendId] = useState<string | null>(null)
   const [pendingAcceptanceId, setPendingAcceptanceId] = useState<string | null>(null)
   const sendKeysRef = useRef<Record<string, string>>({})
@@ -103,11 +127,16 @@ export default function SIREPage() {
   const periodoInputRef = useRef<HTMLInputElement>(null)
   const reportRequestSeq = useRef(0)
 
-  const { get, post, loading } = useApiCall<SireReport[]>()
-  const { get: getStats } = useApiCall<SireStats>()
-  const { get: getOperations } = useApiCall<SireOperation[]>()
+  const { get } = useApiCall<SireReport[]>({requireLive:true,retries:0,showErrorToast:false})
+  const { post } = useApiCall({requireLive:true,retries:0,showErrorToast:true})
+  const { get: getStats } = useApiCall<SireStats>({requireLive:true,retries:0,showErrorToast:false})
+  const { get: getOperations } = useApiCall<SireOperation[]>({requireLive:true,retries:0,showErrorToast:false})
 
   const updateFilters = useCallback((patch: Partial<SireFilters>) => {
+    reportRequestSeq.current += 1; operationsSeq.current += 1
+    downloadRequestSeq.current += 1; downloadBusy.current = false; setActiveDownloadId(null); setDownloadError(null)
+    setReports([]); setStats(null); setReadReady(false); setReadBusy(false); setReadError(null)
+    setSelectedReportId(null); setOperations([]); setPendingAcceptanceId(null)
     setFiltersState(prev => {
       const next = { ...prev, ...patch }
       filtersRef.current = next
@@ -115,67 +144,35 @@ export default function SIREPage() {
     })
   }, [])
 
-  const loadReports = useCallback(async (overrideFilters?: SireFilters) => {
-    const baseFilters = overrideFilters ?? filtersRef.current
-    const visiblePeriodo = periodoInputRef.current?.value
-    const effectiveFilters = {
-      ...baseFilters,
-      periodo: visiblePeriodo || baseFilters.periodo,
-    }
-    const requestSeq = ++reportRequestSeq.current
-    const queryParams = new URLSearchParams()
-    if (effectiveFilters.periodo) queryParams.append('periodo', effectiveFilters.periodo)
-    if (effectiveFilters.tipoReporte) queryParams.append('tipoReporte', effectiveFilters.tipoReporte)
-    if (effectiveFilters.estado) queryParams.append('estado', effectiveFilters.estado)
-
-    const response = await get(`/api/sire/reportes?${queryParams}`)
-    const reports = unwrapApiArray<SireReport>(response)
-    if (requestSeq !== reportRequestSeq.current) {
-      return
-    }
-    const currentVisiblePeriodo = periodoInputRef.current?.value
-    if (currentVisiblePeriodo && currentVisiblePeriodo !== effectiveFilters.periodo) {
-      return
-    }
-
-    if (apiSucceeded(response)) {
-      setReports(reports)
-    } else {
-      setReports([])
-    }
-  }, [get])
-
-  const loadStats = useCallback(async () => {
-    const response = await getStats('/api/sire/stats')
-    if (apiSucceeded(response)) {
-      const stats = unwrapApiObject<SireStats>(response, {
-        reportesDelMes: 0,
-        registrosTotales: 0,
-        enviadosASunat: 0,
-        pendientes: 0
-      })
-      setStats(stats)
-    } else {
-      setStats({
-        reportesDelMes: 0,
-        registrosTotales: 0,
-        enviadosASunat: 0,
-        pendientes: 0
-      })
-    }
-  }, [getStats])
-
   const loadData = useCallback(async (overrideFilters?: SireFilters) => {
-    await Promise.all([
-      loadReports(overrideFilters),
-      loadStats()
-    ])
-  }, [loadReports, loadStats])
+    if (!tenantId || !actorId || !isPeru) return
+    const baseFilters = overrideFilters ?? filtersRef.current
+    const effectiveFilters = {...baseFilters,periodo:periodoInputRef.current?.value || baseFilters.periodo}
+    const requestSeq = ++reportRequestSeq.current
+    downloadRequestSeq.current += 1; downloadBusy.current = false; setActiveDownloadId(null); setDownloadError(null)
+    const signature = JSON.stringify(effectiveFilters)
+    const query = new URLSearchParams()
+    for (const [key,value] of Object.entries(effectiveFilters)) if (value) query.set(key,value)
+    setReadBusy(true); setReadReady(false); setReadError(null); setReports([]); setStats(null)
+    setSelectedReportId(null); setOperations([]); operationsSeq.current += 1; setPendingAcceptanceId(null)
+    try {
+      const [reportResponse,statsResponse] = await Promise.all([get(`/api/sire/reportes?${query}`),getStats('/api/sire/stats')])
+      const currentReports = readSireReports(reportResponse,tenantId,effectiveFilters)
+      const currentStats = readSireStats(statsResponse,tenantId)
+      if (requestSeq !== reportRequestSeq.current || signature !== JSON.stringify({...filtersRef.current,periodo:periodoInputRef.current?.value || filtersRef.current.periodo})) return
+      setReports(currentReports); setStats(currentStats); setReadReady(true)
+    } catch (error) {
+      if (requestSeq !== reportRequestSeq.current) return
+      setReports([]); setStats(null); setReadReady(false)
+      setReadError(error instanceof Error ? error.message : 'No se pudo completar la lectura SIRE. Reintente la consulta.')
+    } finally { if (requestSeq === reportRequestSeq.current) setReadBusy(false) }
+  },[get,getStats,tenantId,actorId,isPeru])
 
   useEffect(() => {
     if (!country.loading && isPeru) {
       loadData()
     }
+    return () => {reportRequestSeq.current += 1; operationsSeq.current += 1; downloadRequestSeq.current += 1; downloadBusy.current = false}
   }, [country.loading, isPeru, loadData])
 
   useEffect(() => {
@@ -193,30 +190,38 @@ export default function SIREPage() {
     }
   }, [isPeru, loadData, reports])
 
-  const downloadReport = async (reportId: string, filename: string) => {
-    if (activeDownloadId) return
+  const downloadReport = async (reportId: string) => {
+    const expected = reports.find(report => report.id === reportId)
+    if (downloadBusy.current || !readReady || readBusy || readError || !expected) return
+    const readEpoch = reportRequestSeq.current
+    const requestSeq = ++downloadRequestSeq.current
+    downloadBusy.current = true
+    setDownloadError(null)
     setActiveDownloadId(reportId)
     try {
       const response = await get(`/api/sire/reportes/${reportId}/download`)
-      const content = unwrapApiData<string | Blob | null>(response, null)
-      if (apiSucceeded(response) && content) {
-        const blob = new Blob([content], { type: 'text/plain' })
+      const verified = await readSireFrozenDownload(response, expected, tenantId)
+      if (readEpoch === reportRequestSeq.current && requestSeq === downloadRequestSeq.current) {
+        const blob = new Blob([verified.content], { type: 'text/plain;charset=utf-8' })
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = filename
+        a.download = verified.filename
         document.body.appendChild(a)
         a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
+        window.setTimeout(() => { window.URL.revokeObjectURL(url); a.remove() }, 60_000)
+      }
+    } catch {
+      if (readEpoch === reportRequestSeq.current && requestSeq === downloadRequestSeq.current) {
+        setDownloadError({ reportId, message: 'No se pudo verificar o descargar la instantánea seleccionada. Reintenta la descarga.' })
       }
     } finally {
-      setActiveDownloadId(null)
+      if (requestSeq === downloadRequestSeq.current) { downloadBusy.current = false; setActiveDownloadId(null) }
     }
   }
 
   const sendToSunat = async (reportId: string) => {
-    if (activeSunatSendId) return
+    if (!canEmit || !readReady || readBusy || readError || activeSunatSendId || !reports.some(r=>r.id===reportId)) return
     setPendingAcceptanceId(null)
     setActiveSunatSendId(reportId)
     try {
@@ -230,8 +235,7 @@ export default function SIREPage() {
       )
       if (apiSucceeded(response)) {
         delete sendKeysRef.current[reportId]
-        await loadReports(filtersRef.current)
-        await loadStats()
+        await loadData(filtersRef.current)
       }
     } finally {
       setActiveSunatSendId(null)
@@ -239,7 +243,7 @@ export default function SIREPage() {
   }
 
   const querySunatTicket = async (reportId: string) => {
-    if (activeSunatSendId) return
+    if (!canEmit || !readReady || readBusy || readError || activeSunatSendId || !reports.some(r=>r.id===reportId)) return
     setActiveSunatSendId(reportId)
     try {
       const key = queryKeysRef.current[reportId]
@@ -252,8 +256,7 @@ export default function SIREPage() {
       )
       if (apiSucceeded(response)) {
         delete queryKeysRef.current[reportId]
-        await loadReports(filtersRef.current)
-        await loadStats()
+        await loadData(filtersRef.current)
       }
     } finally {
       setActiveSunatSendId(null)
@@ -261,9 +264,16 @@ export default function SIREPage() {
   }
 
   const viewOperations = async (reportId: string) => {
-    const response = await getOperations(`/api/sire/reportes/${reportId}/operaciones`)
-    setSelectedReportId(reportId)
-    setOperations(apiSucceeded(response) ? unwrapApiArray<SireOperation>(response) : [])
+    if (!readReady || readBusy || readError || !reports.some(r=>r.id===reportId)) return
+    const request = ++operationsSeq.current
+    setSelectedReportId(reportId); setOperations([]); setOperationsBusy(true); setOperationsError(null)
+    try {
+      const response = await getOperations(`/api/sire/reportes/${reportId}/operaciones`)
+      const current = readSireOperations(response,tenantId,reportId)
+      if (request === operationsSeq.current) setOperations(current)
+    } catch (error) {
+      if (request === operationsSeq.current) setOperationsError(error instanceof Error ? error.message : 'No se pudo cargar la bitácora SIRE.')
+    } finally { if (request === operationsSeq.current) setOperationsBusy(false) }
   }
 
   const getStatusText = (estado: string) => {
@@ -297,7 +307,11 @@ export default function SIREPage() {
     loadData(nextFilters)
   }, [loadData])
 
-  if (!country.loading && !isPeru) {
+  if (country.loading || country.error) {
+    return <div className="p-5"><h1 className="text-3xl font-black">SIRE</h1><p role={country.error ? 'alert' : undefined}>{country.error || 'Cargando configuración fiscal…'}</p>{country.error && <Button onClick={country.retry} disabled={country.retrying}>Reintentar configuración</Button>}</div>
+  }
+
+  if (!isPeru) {
     return (
       <div className="min-h-screen bg-background p-5 text-foreground">
         <Card className="mx-auto max-w-[1600px] border-cyan-400/20 bg-card/70 text-foreground shadow-2xl shadow-blue-950/30">
@@ -324,19 +338,25 @@ export default function SIREPage() {
               <h1 className="mt-3 text-3xl font-black tracking-tight text-foreground">SIRE - Sistema de Registros Electrónicos</h1>
               <p className="mt-2 max-w-3xl text-sm text-muted-foreground">Compara los datos del ERP con RVIE/RCE, acepta la propuesta oficial y conserva el ticket SUNAT. La generación final del libro se realiza en SOL.</p>
             </div>
-            <Button type="button" onClick={() => setIsModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+            {canEmit && <Button type="button" disabled={!readReady || readBusy || !!readError} onClick={() => setIsModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
               <FileText className="h-4 w-4" />
               Generar reporte
-            </Button>
+            </Button>}
           </div>
         </section>
 
+        {readError && <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{readError}</div>}
+        {downloadError && <div role="alert" data-testid="sire-download-error" className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+          <p>{downloadError.message}</p>
+          <Button type="button" variant="outline" className="mt-2" disabled={Boolean(activeDownloadId) || !readReady || readBusy || Boolean(readError)} onClick={() => downloadReport(downloadError.reportId)}>Reintentar descarga</Button>
+        </div>}
+        <p className="text-sm text-muted-foreground">Estadísticas de la empresa{stats ? ` · mes actual ${stats.periodoActual}` : ''}. Los registros y estados acumulados no dependen del filtro del listado.</p>
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            ['Reportes del mes', stats?.reportesDelMes || 0, 'Reportes generados'],
-            ['Registros totales', stats?.registrosTotales?.toLocaleString() || '0', 'Transacciones procesadas'],
-            ['Aceptados por SUNAT', stats?.enviadosASunat || 0, 'Tickets en estado Terminado'],
-            ['Pendientes', stats?.pendientes || 0, 'Por aceptar o consultar'],
+            ['Reportes del mes', stats?.reportesDelMes ?? '—', 'Reportes generados'],
+            ['Registros totales', stats?.registrosTotales?.toLocaleString() ?? '—', 'Transacciones procesadas'],
+            ['Aceptados por SUNAT', stats?.enviadosASunat ?? '—', 'Tickets en estado Terminado'],
+            ['Pendientes', stats?.pendientes ?? '—', 'Por aceptar o consultar'],
           ].map(([label, value, description]) => (
             <Card key={label} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
               <CardContent className="flex items-start justify-between gap-3 p-4">
@@ -412,15 +432,15 @@ export default function SIREPage() {
             <CardTitle className="text-base text-foreground">Reportes SIRE</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            {reports.length === 0 && !loading ? (
+            {readError ? <div className="p-8 text-muted-foreground">Reportes no disponibles. Reintente la consulta.</div> : readBusy ? <div className="p-8 text-muted-foreground">Cargando reportes y estadísticas SIRE…</div> : !readReady ? <div className="p-8 text-muted-foreground">Actualice la consulta para ver los reportes del filtro actual.</div> : reports.length === 0 ? (
               <div className="flex min-h-[320px] flex-col items-center justify-center p-8 text-center">
                 <FileText className="mb-3 h-12 w-12 text-cyan-200/50" />
                 <h3 className="text-lg font-bold text-foreground">No hay reportes SIRE</h3>
                 <p className="mt-2 text-sm text-muted-foreground">Comienza generando tu primer reporte para SUNAT.</p>
-                <Button type="button" onClick={() => setIsModalOpen(true)} className="mt-4 gap-2 bg-blue-600 text-white hover:bg-blue-500">
+                {canEmit && <Button type="button" onClick={() => setIsModalOpen(true)} className="mt-4 gap-2 bg-blue-600 text-white hover:bg-blue-500">
                   <FileText className="h-4 w-4" />
                   Generar primer reporte
-                </Button>
+                </Button>}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -471,8 +491,8 @@ export default function SIREPage() {
                                 <Button
                                   type="button"
                                   size="sm"
-                                  onClick={() => downloadReport(report.id, report.filename || 'reporte.txt')}
-                                  disabled={activeDownloadId === report.id}
+                                  onClick={() => downloadReport(report.id)}
+                                  disabled={!readReady || readBusy || !!readError || Boolean(activeDownloadId)}
                                   variant="outline"
                                   className="gap-1 border-cyan-400/20 bg-cyan-400/10 px-2 text-primary hover:bg-cyan-400/15 hover:text-foreground"
                                 >
@@ -482,8 +502,8 @@ export default function SIREPage() {
                                 <Button
                                   type="button"
                                   size="sm"
-                                  onClick={() => setPendingAcceptanceId(report.id)}
-                                  disabled={activeSunatSendId === report.id}
+                                  onClick={() => {if (canEmit && readReady && !readBusy && !readError) setPendingAcceptanceId(report.id)}}
+                                  disabled={!canEmit || !readReady || readBusy || !!readError || activeSunatSendId === report.id}
                                   className="gap-1 bg-cyan-600 text-white hover:bg-cyan-500"
                                 >
                                   <Send className="h-4 w-4" />
@@ -496,7 +516,7 @@ export default function SIREPage() {
                                 type="button"
                                 size="sm"
                                 onClick={() => querySunatTicket(report.id)}
-                                disabled={activeSunatSendId === report.id}
+                                disabled={!canEmit || !readReady || readBusy || !!readError || activeSunatSendId === report.id}
                                 className="gap-1 bg-amber-600 text-white hover:bg-amber-500"
                               >
                                 <RefreshCw className="h-4 w-4" />
@@ -507,8 +527,8 @@ export default function SIREPage() {
                               <Button
                                 type="button"
                                 size="sm"
-                                onClick={() => downloadReport(report.id, report.filename || 'reporte.txt')}
-                                disabled={activeDownloadId === report.id}
+                                onClick={() => downloadReport(report.id)}
+                                disabled={!readReady || readBusy || !!readError || Boolean(activeDownloadId)}
                                 variant="outline"
                               className="gap-1 border-cyan-400/20 bg-cyan-400/10 text-primary hover:bg-cyan-400/15 hover:text-foreground"
                               >
@@ -521,7 +541,7 @@ export default function SIREPage() {
                                 Procesando...
                               </span>
                             ) : null}
-                            {report.estado === 'ERROR' ? (
+                            {report.estado === 'ERROR' && canEmit ? (
                               <Button
                                 type="button"
                                 size="sm"
@@ -556,10 +576,10 @@ export default function SIREPage() {
           <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
             <CardHeader className="flex-row items-center justify-between border-b border-cyan-400/10 px-5 py-4">
               <CardTitle className="text-base text-foreground">Bitácora SUNAT del reporte</CardTitle>
-              <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedReportId(null)}>Cerrar</Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => {operationsSeq.current += 1;setSelectedReportId(null);setOperations([]);setOperationsError(null)}}>Cerrar</Button>
             </CardHeader>
             <CardContent className="p-4">
-              {operations.length ? (
+              {operationsError ? <p role="alert" className="text-destructive">{operationsError}</p> : operationsBusy ? <p className="text-muted-foreground">Cargando bitácora…</p> : operations.length ? (
                 <div className="space-y-2">
                   {operations.map((operation) => (
                     <div key={operation.id} className="rounded-xl border border-cyan-400/10 bg-card/60 p-3 text-sm">
@@ -585,12 +605,15 @@ export default function SIREPage() {
       </div>
 
       <SireReportModal
-        isOpen={isModalOpen}
+        isOpen={isModalOpen && canEmit}
+        canGenerate={canEmit && readReady && !readBusy && !readError}
+        tenantId={tenantId}
+        actorId={actorId}
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleReportGenerated}
       />
 
-      {pendingAcceptanceId ? (
+      {pendingAcceptanceId && canEmit && readReady && !readBusy && !readError ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm"
           role="dialog"
@@ -614,7 +637,7 @@ export default function SIREPage() {
               <Button type="button" variant="outline" onClick={() => setPendingAcceptanceId(null)}>
                 Cancelar
               </Button>
-              <Button type="button" onClick={() => sendToSunat(pendingAcceptanceId)}>
+              <Button type="button" disabled={!canEmit || !readReady || readBusy || !!readError} onClick={() => sendToSunat(pendingAcceptanceId)}>
                 Confirmar aceptación
               </Button>
             </div>

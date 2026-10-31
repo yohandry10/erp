@@ -1,0 +1,164 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - complementary [ref=e5]:
+          - link "N NEON ERP SUITE" [ref=e7] [cursor=pointer]:
+            - /url: /dashboard/
+            - generic [ref=e8]: "N"
+            - generic [ref=e9]:
+              - generic [ref=e10]: NEON
+              - generic [ref=e11]: ERP SUITE
+          - navigation [ref=e12]:
+            - link "Dashboard" [ref=e13] [cursor=pointer]:
+              - /url: /dashboard/
+              - img [ref=e14]
+              - generic [ref=e19]: Dashboard
+            - link "POS" [ref=e20] [cursor=pointer]:
+              - /url: /dashboard/pos/
+              - img [ref=e21]
+              - generic [ref=e25]: POS
+            - link "Documentos" [ref=e26] [cursor=pointer]:
+              - /url: /dashboard/documentos/
+              - img [ref=e27]
+              - generic [ref=e30]: Documentos
+            - link "Contabilidad" [ref=e31] [cursor=pointer]:
+              - /url: /dashboard/contabilidad/
+              - img [ref=e32]
+              - generic [ref=e35]: Contabilidad
+            - link "Analytics" [ref=e36] [cursor=pointer]:
+              - /url: /dashboard/analytics/
+              - img [ref=e37]
+              - generic [ref=e40]: Analytics
+            - button "Productos" [ref=e42] [cursor=pointer]:
+              - generic [ref=e43]:
+                - img [ref=e44]
+                - generic [ref=e48]: Productos
+              - img [ref=e49]
+            - link "CPE" [ref=e51] [cursor=pointer]:
+              - /url: /dashboard/cpe/
+              - img [ref=e52]
+              - generic [ref=e55]: CPE
+            - link "GRE" [ref=e56] [cursor=pointer]:
+              - /url: /dashboard/gre/
+              - img [ref=e57]
+              - generic [ref=e62]: GRE
+            - link "Reportes SIRE" [ref=e63] [cursor=pointer]:
+              - /url: /dashboard/sire/
+              - img [ref=e64]
+              - generic [ref=e67]: Reportes SIRE
+            - link "Compras" [ref=e68] [cursor=pointer]:
+              - /url: /dashboard/compras/
+              - img [ref=e69]
+              - generic [ref=e73]: Compras
+            - button "Ventas" [ref=e75] [cursor=pointer]:
+              - generic [ref=e76]:
+                - img [ref=e77]
+                - generic [ref=e80]: Ventas
+              - img [ref=e81]
+            - button "Finanzas" [ref=e84] [cursor=pointer]:
+              - generic [ref=e85]:
+                - img [ref=e86]
+                - generic [ref=e88]: Finanzas
+              - img [ref=e89]
+            - link "Usuarios" [ref=e91] [cursor=pointer]:
+              - /url: /dashboard/usuarios/
+              - img [ref=e92]
+              - generic [ref=e97]: Usuarios
+            - link "RRHH" [ref=e98] [cursor=pointer]:
+              - /url: /dashboard/rrhh/
+              - img [ref=e99]
+              - generic [ref=e104]: RRHH
+            - link "PLAME / T-Registro" [ref=e105] [cursor=pointer]:
+              - /url: /dashboard/rrhh/planilla-electronica/
+              - img [ref=e106]
+              - generic [ref=e109]: PLAME / T-Registro
+            - link "Liquidaciones y CTS" [ref=e110] [cursor=pointer]:
+              - /url: /dashboard/rrhh/liquidaciones/
+              - img [ref=e111]
+              - generic [ref=e114]: Liquidaciones y CTS
+            - link "Configuración" [ref=e115] [cursor=pointer]:
+              - /url: /dashboard/configuracion/
+              - img [ref=e116]
+              - generic [ref=e119]: Configuración
+            - link "Offline" [ref=e120] [cursor=pointer]:
+              - /url: /dashboard/offline/
+              - img [ref=e121]
+              - generic [ref=e128]: Offline
+            - link "Ayuda" [ref=e129] [cursor=pointer]:
+              - /url: /dashboard/ayuda/
+              - img [ref=e130]
+              - generic [ref=e133]: Ayuda
+          - generic [ref=e134]:
+            - generic [ref=e135]:
+              - generic [ref=e136]: Responsable
+              - generic [ref=e137]: supply-feature@erp.local
+            - button "Cerrar Sesión" [ref=e138] [cursor=pointer]:
+              - img [ref=e139]
+              - generic [ref=e142]: Cerrar Sesión
+        - main [ref=e143]:
+          - generic [ref=e145]:
+            - button "Abrir notificaciones" [ref=e146] [cursor=pointer]:
+              - img [ref=e147]
+            - button "Cambiar a tema claro" [ref=e150] [cursor=pointer]:
+              - img [ref=e151]
+              - generic [ref=e157]: Claro
+          - generic [ref=e158]:
+            - navigation [ref=e160]:
+              - link "Dashboard" [ref=e162] [cursor=pointer]:
+                - /url: /dashboard/
+                - img [ref=e163]
+                - text: Dashboard
+              - generic [ref=e166]:
+                - img [ref=e167]
+                - link "Ventas" [ref=e169] [cursor=pointer]:
+                  - /url: /dashboard/ventas/
+                  - img [ref=e170]
+                  - text: Ventas
+              - generic [ref=e174]:
+                - img [ref=e175]
+                - generic [ref=e177]: Contratos
+            - generic [ref=e179]:
+              - generic [ref=e180]:
+                - generic [ref=e181]:
+                  - heading "Contratos de suministro" [level=1] [ref=e182]
+                  - paragraph [ref=e183]: Organice las OC del cliente y sus entregas programadas por producto, cantidad, fecha y destino.
+                - generic [ref=e184]:
+                  - button "Actualizar" [ref=e185] [cursor=pointer]:
+                    - img [ref=e186]
+                    - text: Actualizar
+                  - button "Nuevo contrato" [ref=e191] [cursor=pointer]:
+                    - img [ref=e192]
+                    - text: Nuevo contrato
+              - generic [ref=e193]:
+                - complementary "Lista de contratos" [ref=e194]:
+                  - generic [ref=e195]:
+                    - textbox "Buscar contrato por número u objeto" [ref=e196]
+                    - button "Buscar" [ref=e197] [cursor=pointer]
+                  - list [ref=e198]:
+                    - listitem [ref=e199]:
+                      - button "SUP-001 Activo Suministro programado local Cliente local · PEN" [ref=e200] [cursor=pointer]:
+                        - generic [ref=e201]:
+                          - generic [ref=e202]: SUP-001
+                          - generic [ref=e203]: Activo
+                        - generic [ref=e204]: Suministro programado local
+                        - generic [ref=e205]: Cliente local · PEN
+                  - generic [ref=e206]:
+                    - button "Página anterior" [disabled]:
+                      - img
+                    - generic [ref=e207]: Página 1 · 1 contratos
+                    - button "Página siguiente" [disabled]:
+                      - img
+                - region "Expediente del contrato" [ref=e208]:
+                  - paragraph [ref=e209]: Seleccione un contrato para consultar sus productos, OC y cronograma.
+      - button "Abrir ayuda" [ref=e210] [cursor=pointer]:
+        - img [ref=e211]
+    - region "Notifications (F8)":
+      - list
+  - button "Open Next.js Dev Tools" [ref=e219] [cursor=pointer]:
+    - img [ref=e220]
+  - alert [ref=e223]
+```

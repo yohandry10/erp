@@ -50,6 +50,14 @@ export class GreController {
     };
   }
 
+  @Get('guias/catalogo-traslados')
+  @RequirePermission('gre.guias.ver')
+  @ApiOperation({summary:'Catálogo completo de guías vigentes para traslado de inventario'})
+  async catalogoTraslados(@CurrentTenant() tenantId:string){
+    const data=await this.greService.catalogoTraslados(tenantId);
+    return {success:true,complete:true,tenant_id:tenantId,total:data.length,data};
+  }
+
   @Get('guias/:id')
   @RequirePermission('gre.guias.ver')
   @ApiOperation({ summary: 'Obtener una GRE con sus líneas' })

@@ -1,0 +1,23 @@
+{
+  "success": true,
+  "remoteWrites": false,
+  "checks": [
+    {
+      "scenario": "Servicio real con respuesta final perdida recupera un solo archivo e historial",
+      "passed": true
+    },
+    {
+      "scenario": "Descarga firmada entrega bytes exactos; bucket público y rol anon no pueden leer",
+      "passed": true
+    },
+    {
+      "scenario": "Subida interrumpida antes de finalizar verifica objeto ya existente y completa el adjunto",
+      "passed": true
+    },
+    {
+      "scenario": "Retirar bloquea nuevos enlaces y conserva el objeto privado y su historial",
+      "passed": true
+    }
+  ],
+  "checkedAt": "2026-10-27T19:22:58.481Z"
+}

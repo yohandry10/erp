@@ -223,6 +223,19 @@ export class RevertirAjusteFiscalCxcDto {
   idempotency_key!: string;
 }
 
+export class RevertirDetraccionProveedorDto {
+  @IsString()
+  @Length(3, 500)
+  motivo!: string;
+
+  @IsDateString()
+  fecha!: string;
+
+  @IsString()
+  @Length(8, 160)
+  idempotency_key!: string;
+}
+
 export class ListarAjustesFiscalesQueryDto {
   @ApiPropertyOptional({ enum: OrigenAjusteFiscal })
   @IsOptional()

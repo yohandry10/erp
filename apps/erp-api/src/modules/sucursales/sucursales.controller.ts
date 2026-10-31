@@ -16,6 +16,7 @@ import { SucursalesService } from "./sucursales.service";
 import {
   AsignarSucursalesDto,
   CreateSucursalDto,
+  RegistrarSerieEstablecimientoDto,
   UpdateSucursalDto,
 } from "./dto/sucursales.dto";
 import { CurrentTenant } from "../../common/decorators/current-tenant.decorator";
@@ -103,6 +104,25 @@ export class SucursalesController {
       dto,
       user?.id,
       key ?? `sucursal:${randomUUID()}`,
+    );
+    return { success: true, data };
+  }
+
+  @Post(":id/series")
+  @RequirePermission("configuracion.sucursales.update")
+  async registrarSerie(
+    @CurrentTenant() tenantId: string,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: RegistrarSerieEstablecimientoDto,
+    @CurrentUser() user: any,
+    @Headers("idempotency-key") key?: string,
+  ) {
+    const data = await this.service.registrarSerie(
+      tenantId,
+      id,
+      dto,
+      user?.id,
+      key ?? `serie:${randomUUID()}`,
     );
     return { success: true, data };
   }

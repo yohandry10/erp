@@ -1,3 +1,4 @@
+import { UuidParamPipe } from '../../../common/pipes/uuid-param.pipe';
 import {
   Controller,
   Get,
@@ -18,8 +19,10 @@ import { PermissionGuard } from "../../../common/guards/permission.guard";
 import { RequirePermission } from "../../../common/decorators/require-permission.decorator";
 import { CreatePeriodoDto, PeriodoResponseDto } from "@erp-suite/dtos";
 import { PeriodosService } from "../services/periodos.service";
-
+
+
 import { PeriodoContableDto } from '../dto/periodo-contable.dto';
+import { lecturaContableFallida } from '../contabilidad-errors';
 
 @ApiTags("contabilidad")
 @Controller("contabilidad")
@@ -114,7 +117,7 @@ export class ContabilidadPeriodosController {
   })
   async obtenerPeriodoPorId(
     @CurrentTenant() tenantId: string,
-    @Param("id") periodoId: string,
+    @Param("id", UuidParamPipe) periodoId: string,
   ): Promise<{ success: boolean; data: PeriodoResponseDto | null }> {
     try {
       console.log(
@@ -131,7 +134,7 @@ export class ContabilidadPeriodosController {
         .single();
 
       if (error && error.code !== "PGRST116") {
-        throw new Error(`Error obteniendo período: ${error.message}`);
+        throw lecturaContableFallida(error, 'el período contable');
       }
       if (!data) {
         throw new NotFoundException("Período no encontrado");
@@ -160,60 +163,10 @@ export class ContabilidadPeriodosController {
   })
   async validarCierrePeriodo(
     @CurrentTenant() tenantId: string,
-    @Param("id") periodoId: string,
-  ): Promise<{
-    asientos: { valido: boolean; asientosDescuadrados: any[] };
-    eventos: { valido: boolean; eventosPendientes: number };
-  }> {
-    try {
-      console.log(
-        `🔍 [Contabilidad] Validando cierre de período ${periodoId} para tenant ${tenantId}`,
-      );
-
-      // Get the period by ID to extract anio and mes
-      const { data: periodoData, error: periodoError } =
-        await this.supabaseService
-          .getClient()
-          .from("periodos_contables")
-          .select("*")
-          .eq("id", periodoId)
-          .eq("tenant_id", tenantId)
-          .single();
-
-      if (periodoError && periodoError.code !== "PGRST116") {
-        throw new Error(`Error obteniendo período: ${periodoError.message}`);
-      }
-      if (!periodoData) {
-        throw new NotFoundException("Período no encontrado");
-      }
-
-      // Validate asientos
-      const validacionAsientos =
-        await this.periodosService.validarAsientosCuadran(
-          tenantId,
-          periodoData.anio,
-          periodoData.mes,
-        );
-
-      // Validate eventos
-      const validacionEventos =
-        await this.periodosService.validarEventosPendientes(
-          tenantId,
-          periodoData.anio,
-          periodoData.mes,
-        );
-
-      return {
-        asientos: validacionAsientos,
-        eventos: validacionEventos,
-      };
-    } catch (error) {
-      console.error(
-        "❌ [Contabilidad] Error validando cierre de período:",
-        error,
-      );
-      throw error;
-    }
+    @Param("id", UuidParamPipe) periodoId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.periodosService.validarCierre(tenantId, periodoId, user.id);
   }
 
   @Post("periodos/:id/cerrar")
@@ -236,7 +189,7 @@ export class ContabilidadPeriodosController {
   async cerrarPeriodo(
     @CurrentTenant() tenantId: string,
     @CurrentUser("id") userId: string,
-    @Param("id") periodoId: string,
+    @Param("id", UuidParamPipe) periodoId: string,
   ): Promise<{ success: boolean; data: PeriodoResponseDto; message: string }> {
     try {
       console.log(
@@ -254,7 +207,7 @@ export class ContabilidadPeriodosController {
           .single();
 
       if (periodoError && periodoError.code !== "PGRST116") {
-        throw new Error(`Error obteniendo período: ${periodoError.message}`);
+        throw lecturaContableFallida(periodoError, 'el período contable');
       }
       if (!periodoData) {
         throw new NotFoundException("Período no encontrado");
@@ -293,9 +246,10 @@ export class ContabilidadPeriodosController {
     @CurrentUser("id") usuarioId: string,
     @Param("periodo") periodo: string,
     @Query("dias_vencido") diasVencido?: string,
+    @Headers("idempotency-key") idempotencyKey?: string,
   ) {
     const dias = Number(diasVencido ?? 360);
-    if (!Number.isFinite(dias) || dias < 1) {
+    if (!Number.isInteger(dias) || dias < 1 || dias > 2147483647 || (diasVencido !== undefined && !/^\d+$/.test(diasVencido.trim()))) {
       throw new BadRequestException("dias_vencido debe ser un entero positivo");
     }
 
@@ -303,7 +257,8 @@ export class ContabilidadPeriodosController {
       tenantId,
       periodo,
       usuarioId,
-      Math.trunc(dias),
+      dias,
+      idempotencyKey,
     );
     return { success: true, data };
   }
@@ -335,7 +290,7 @@ export class ContabilidadPeriodosController {
   async reabrirPeriodo(
     @CurrentTenant() tenantId: string,
     @CurrentUser("id") userId: string,
-    @Param("id") periodoId: string,
+    @Param("id", UuidParamPipe) periodoId: string,
   ): Promise<{ success: boolean; data: PeriodoResponseDto; message: string }> {
     try {
       console.log(
@@ -353,7 +308,7 @@ export class ContabilidadPeriodosController {
           .single();
 
       if (periodoError && periodoError.code !== "PGRST116") {
-        throw new Error(`Error obteniendo período: ${periodoError.message}`);
+        throw lecturaContableFallida(periodoError, 'el período contable');
       }
       if (!periodoData) {
         throw new NotFoundException("Período no encontrado");
@@ -397,7 +352,7 @@ export class ContabilidadPeriodosController {
   async bloquearPeriodo(
     @CurrentTenant() tenantId: string,
     @CurrentUser("id") userId: string,
-    @Param("id") periodoId: string,
+    @Param("id", UuidParamPipe) periodoId: string,
   ): Promise<{ success: boolean; data: PeriodoResponseDto; message: string }> {
     try {
       console.log(
@@ -415,7 +370,7 @@ export class ContabilidadPeriodosController {
           .single();
 
       if (periodoError && periodoError.code !== "PGRST116") {
-        throw new Error(`Error obteniendo período: ${periodoError.message}`);
+        throw lecturaContableFallida(periodoError, 'el período contable');
       }
       if (!periodoData) {
         throw new NotFoundException("Período no encontrado");

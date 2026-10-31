@@ -1,5 +1,12 @@
-import { IsString, IsNotEmpty, IsOptional, IsIn, MaxLength, IsDateString, IsNumber, Min, IsBoolean } from 'class-validator';
+import {
+  ArrayMaxSize, ArrayMinSize, IsArray, ValidateNested, IsString, IsNotEmpty, IsOptional, IsIn, IsInt, IsUUID, Matches, Max, MaxLength, MinLength,
+  IsDateString, IsNumber, Min, IsBoolean, IsObject,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
+
+/** Nombre corto del sistema de origen: cualquier ERP o archivo (la base lo normaliza a mayúsculas). */
+const SISTEMA_ORIGEN = /^[A-Za-z0-9][A-Za-z0-9 ._-]{1,29}$/;
 
 export const MIGRATION_RUN_TYPES = [
   'clientes',
@@ -12,9 +19,29 @@ export const MIGRATION_RUN_TYPES = [
   'balance_apertura',
   'stock_inicial',
   'comprobantes_historico',
+  'contratos_suministro',
+  'oc_suministro',
+  'cronograma_suministro',
+  'almacenes',
+  'listas_precios',
+  'oc_compra',
+  'pedidos_venta',
 ] as const;
 
 export type MigrationRunType = (typeof MIGRATION_RUN_TYPES)[number];
+
+/** Maestros y saldos abiertos del sistema anterior que entran por importar_maestro_origen_582. */
+export const MIGRATION_ORIGEN_MAESTRO_RUN_TYPES = [
+  'almacenes',
+  'plan_cuentas',
+  'productos',
+  'cuentas_bancarias',
+  'listas_precios',
+  'oc_compra',
+  'pedidos_venta',
+] as const satisfies readonly MigrationRunType[];
+
+export type MigrationOrigenMaestroRunType = (typeof MIGRATION_ORIGEN_MAESTRO_RUN_TYPES)[number];
 
 export const MIGRATION_IMPORTER_RUN_TYPES = [
   'clientes',
@@ -24,6 +51,10 @@ export const MIGRATION_IMPORTER_RUN_TYPES = [
   'balance_apertura',
   'stock_inicial',
   'comprobantes_historico',
+  'contratos_suministro',
+  'oc_suministro',
+  'cronograma_suministro',
+  ...MIGRATION_ORIGEN_MAESTRO_RUN_TYPES,
 ] as const satisfies readonly MigrationRunType[];
 
 export type MigrationImporterRunType = (typeof MIGRATION_IMPORTER_RUN_TYPES)[number];
@@ -56,6 +87,9 @@ export class MigrationImportDto {
   @IsBoolean()
   @IsOptional()
   dryRun?: boolean;
+
+  @ApiProperty({ description: 'Sistema del que vienen los datos (SAP, Odoo, un Excel…)', required: false })
+  @IsOptional() @IsString() @Matches(SISTEMA_ORIGEN) sistemaOrigen?: string;
 }
 
 export class MigrationPreviewDto {
@@ -70,6 +104,79 @@ export class MigrationPreviewDto {
   @IsNotEmpty()
   @IsIn(MIGRATION_IMPORTER_RUN_TYPES as unknown as string[])
   runType: MigrationImporterRunType;
+}
+
+/** Ensayo integral: archivos CSV en base64, en el orden real; nada se escribe. */
+export class OrigenEnsayoDto {
+  @IsOptional() @IsString() @MaxLength(20 * 1024 * 1024) clientes?: string;
+  @IsOptional() @IsString() @MaxLength(20 * 1024 * 1024) proveedores?: string;
+  @IsOptional() @IsString() @MaxLength(20 * 1024 * 1024) almacenes?: string;
+  @IsOptional() @IsString() @MaxLength(20 * 1024 * 1024) plan_cuentas?: string;
+  @IsOptional() @IsString() @MaxLength(20 * 1024 * 1024) productos?: string;
+  @IsOptional() @IsString() @MaxLength(20 * 1024 * 1024) cuentas_bancarias?: string;
+  @IsOptional() @IsString() @MaxLength(20 * 1024 * 1024) listas_precios?: string;
+  @IsOptional() @IsString() @MaxLength(20 * 1024 * 1024) cxc?: string;
+  @IsOptional() @IsString() @MaxLength(20 * 1024 * 1024) cxp?: string;
+  @IsOptional() @IsString() @MaxLength(20 * 1024 * 1024) balance?: string;
+  @IsOptional() @IsString() @MaxLength(20 * 1024 * 1024) contratos?: string;
+  @IsOptional() @IsString() @MaxLength(20 * 1024 * 1024) oc?: string;
+  @IsOptional() @IsString() @MaxLength(20 * 1024 * 1024) cronograma?: string;
+  @IsOptional() @IsString() @MaxLength(20 * 1024 * 1024) oc_compra?: string;
+  @IsOptional() @IsString() @MaxLength(20 * 1024 * 1024) pedidos_venta?: string;
+  @IsOptional() @IsString() @MaxLength(20 * 1024 * 1024) stock?: string;
+  @ApiProperty({ description: 'Fecha de corte de saldos, balance y stock (YYYY-MM-DD)', required: false })
+  @IsOptional() @IsDateString() fechaCorte?: string;
+  @ApiProperty({ description: 'Totales de control del extracto por entidad', required: false })
+  @IsOptional() @IsObject() control?: Record<string, unknown>;
+  @ApiProperty({ description: 'Sistema del que vienen los datos', required: false })
+  @IsOptional() @IsString() @Matches(SISTEMA_ORIGEN) sistemaOrigen?: string;
+}
+
+export class OrigenConciliacionDto {
+  @ApiProperty({ description: 'Totales de control del extracto por entidad' })
+  @IsObject() control!: Record<string, unknown>;
+  @ApiProperty({ description: 'Sistema del que vienen los datos', required: false })
+  @IsOptional() @IsString() @Matches(SISTEMA_ORIGEN) sistemaOrigen?: string;
+}
+
+/** Archivo íntegro: un lote por extracto. */
+export class OrigenArchivoLoteDto {
+  @IsString() @MinLength(3) @MaxLength(200) descripcion!: string;
+  @IsOptional() @IsDateString() fechaCorte?: string;
+  @ApiProperty({ description: 'Sistema del que viene el extracto', required: false })
+  @IsOptional() @IsString() @Matches(SISTEMA_ORIGEN) sistemaOrigen?: string;
+}
+
+/** Una fila del extracto: su clave estable en la tabla y su contenido tal cual. */
+export class OrigenArchivoFilaDto {
+  @IsString() @MinLength(1) @MaxLength(250) clave!: string;
+  @IsObject() fila!: Record<string, unknown>;
+}
+
+export class OrigenArchivoFilasDto {
+  @ApiProperty({ description: 'Nombre de la tabla de origen (letras, dígitos, _ . $ -)' })
+  @IsString() @Matches(/^[A-Za-z0-9_.$-]{1,80}$/) tabla!: string;
+  // Sin @Type la conversión implícita trataría cada fila como un arreglo vacío.
+  @ApiProperty({ description: 'Hasta 2000 filas {clave, fila}', type: [OrigenArchivoFilaDto] })
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(2000) @ValidateNested({ each: true }) @Type(() => OrigenArchivoFilaDto)
+  filas!: OrigenArchivoFilaDto[];
+}
+
+export class OrigenArchivoCierreDto {
+  @ApiProperty({ description: 'Filas declaradas por tabla; el lote cierra sólo si coinciden' })
+  @IsObject() tablas!: Record<string, number>;
+}
+
+export class OrigenArchivoDescarteDto {
+  @IsString() @MinLength(5) @MaxLength(1000) motivo!: string;
+}
+
+export class OrigenArchivoConsultaDto {
+  @IsOptional() @IsUUID() loteId?: string;
+  @IsOptional() @IsString() @Matches(/^[A-Za-z0-9_.$-]{1,80}$/) tabla?: string;
+  @IsOptional() @IsString() @MaxLength(200) texto?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) pagina?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200) limite?: number;
 }
 
 export interface ImporterRowError {

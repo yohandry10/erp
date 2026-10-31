@@ -1,12 +1,16 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApi } from '@/hooks/use-api';
 import { PagoLoteWizard } from '@/components/finanzas/PagoLoteWizard';
 import { ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useFinanceReport } from '@/hooks/use-finance-report';
+import FinanceReportStatus from '@/components/finanzas/FinanceReportStatus';
+import { loadTreasuryBatch, readTreasuryBatch, readBatchPaymentConfirmation } from '@/lib/finanzas/report-read-contract';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CuentaBancaria {
   id: string;
@@ -37,43 +41,21 @@ interface CuentaPorPagar {
 
 export default function PagoLotePage() {
   const router = useRouter();
-  const { get, post } = useApi({ retries: 1, timeoutMs: 8000 });
-
-  const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancaria[]>([]);
-  const [cxpsDisponibles, setCxpsDisponibles] = useState<CuentaPorPagar[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { post } = useApi({ retries: 1, timeoutMs: 8000, requireLive: true, throwOnError: true, showErrorToast: false });
+  const { session } = useAuth();
+  const actor = `${session?.user?.tenant_id || ''}:${session?.user?.id || ''}`;
+  const actorRef = useRef(actor); actorRef.current = actor;
+  const { data, loading, error: readError, reload: loadData } = useFinanceReport(
+    '/api/finanzas/tesoreria/programacion?page=1&limit=100', readTreasuryBatch, undefined, loadTreasuryBatch);
+  const cuentasBancarias = (data?.banks ?? []) as CuentaBancaria[];
+  const cxpsDisponibles = (data?.payments ?? []) as CuentaPorPagar[];
+  const [requestedIds, setRequestedIds] = useState<string[]>([]);
   const [processingResult, setProcessingResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Cargar cuentas bancarias
-      const cuentasResponse = await get('/api/finanzas/bancos/cuentas');
-      if (cuentasResponse?.success) {
-        setCuentasBancarias(cuentasResponse.data || []);
-      }
-
-      const cxpResponses = await Promise.all([
-        get('/api/finanzas/tesoreria/programacion?estado=PENDIENTE&page=1&limit=100'),
-        get('/api/finanzas/tesoreria/programacion?estado=PARCIAL&page=1&limit=100'),
-      ]);
-      setCxpsDisponibles(
-        cxpResponses.flatMap((response) => (response?.success ? response.data || [] : [])),
-      );
-    } catch (err) {
-      console.error('Error loading data:', err);
-      setError('Error al cargar los datos. Por favor, intente nuevamente.');
-    } finally {
-      setLoading(false);
-    }
-  }, [get]);
-
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    setRequestedIds([...new Set((new URLSearchParams(window.location.search).get('cxp_ids') || '').split(',').filter(Boolean))]);
+  }, []);
+  useEffect(() => { setProcessingResult(null); setError(null); }, [actor]);
 
   const handleSubmit = async (data: {
     pagos: Array<{ cxp_id: string; monto?: number }>;
@@ -86,15 +68,17 @@ export default function PagoLotePage() {
   }) => {
     try {
       setError(null);
-
+      const submittingActor = actor;
       const response = await post('/api/finanzas/tesoreria/lote', data);
-
-      if (response?.success) {
-        setProcessingResult(response.data);
-      } else {
-        throw new Error(response?.message || 'Error al procesar el lote de pagos');
-      }
+      if (actorRef.current !== submittingActor) return;
+      const confirmed = readBatchPaymentConfirmation(response, data);
+      setProcessingResult({ ...confirmed, pagos: confirmed.pagos.map(payment => {
+        const source = cxpsDisponibles.find(cxp => cxp.id === payment.cxp_id);
+        return { ...payment, proveedor: source?.proveedor.razon_social,
+          numero_documento: source?.numero_documento, estado_anterior: source?.estado };
+      }) });
     } catch (err: any) {
+      if (actorRef.current !== actor) return;
       console.error('Error processing batch payment:', err);
       setError(err.message || 'Error al procesar el lote de pagos');
       throw err;
@@ -112,8 +96,15 @@ export default function PagoLotePage() {
 
   const handleNewBatch = () => {
     setProcessingResult(null);
+    setRequestedIds([]);
     loadData();
   };
+
+  if (readError) return <div className="p-6"><FinanceReportStatus loading={false} retry={loadData} /></div>;
+  if (!loading && !processingResult && requestedIds.some(id => !cxpsDisponibles.some(cxp => cxp.id === id))) {
+    return <div className="p-6" role="alert">Una cuenta seleccionada ya no está disponible para pagar.
+      <Button onClick={handleNewBatch}>Actualizar selección</Button></div>;
+  }
 
   if (loading) {
     return (
@@ -160,7 +151,7 @@ export default function PagoLotePage() {
                   <div className="bg-card p-4 rounded-lg border border-emerald-500/30">
                     <div className="text-sm text-foreground/80">Referencia del Lote</div>
                     <div className="text-lg font-semibold text-foreground">
-                      {processingResult.lote_id || 'N/A'}
+                      {processingResult.referencia_lote}
                     </div>
                   </div>
                   <div className="bg-card p-4 rounded-lg border border-emerald-500/30">
@@ -227,7 +218,7 @@ export default function PagoLotePage() {
                               {pago.monto?.toFixed(2)}
                             </div>
                             <div className="text-xs text-foreground/80">
-                              Saldo: {pago.saldo_anterior?.toFixed(2)} → {pago.saldo_nuevo?.toFixed(2)}
+                              Saldo bancario: {pago.saldo_bancario_anterior.toFixed(2)} → {pago.saldo_bancario_nuevo.toFixed(2)}
                             </div>
                           </div>
                         </div>
@@ -315,8 +306,10 @@ export default function PagoLotePage() {
             </div>
           ) : (
             <PagoLoteWizard
+              key={actor}
               cuentasBancarias={cuentasBancarias}
               cxpsDisponibles={cxpsDisponibles}
+              initialSelectedIds={requestedIds}
               onSubmit={handleSubmit}
               onCancel={handleCancel}
             />

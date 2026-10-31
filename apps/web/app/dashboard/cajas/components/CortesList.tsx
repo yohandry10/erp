@@ -1,8 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React from 'react';
 import { cn } from '@/lib/utils'
-import { useApi } from '@/hooks/use-api';
+import { useCashRead } from '@/hooks/use-cash-read';
+import { readCashCuts } from '@/lib/cash-read-contract';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchApi } from '@/lib/api-fetch';
+import { customAuth } from '@/lib/auth-service';
+import { isOfflineCachedResponse } from '@/lib/offline-store';
 import { useCountryContext } from '@/hooks/use-country-context';
 import { useTaxConfig } from '@/hooks/useTaxConfig';
 
@@ -10,6 +13,7 @@ type Corte = {
   id: string;
   fecha_corte: string;
   caja_id?: string;
+  caja_nombre?: string | null;
   total_ventas?: number;
   total_impuestos?: number;
   total_neto?: number;
@@ -36,43 +40,44 @@ interface Props {
 }
 
 export function CortesList({ className = '', id }: Props) {
-  const { get } = useApi();
   const { session } = useAuth();
   const country = useCountryContext();
   const { nombreImpuesto } = useTaxConfig();
   const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$');
-  const [cortes, setCortes] = useState<Corte[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const cargarCortes = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const resp = await get('/cajas/cortes');
-      if ((resp as any)?.success) {
-        setCortes((resp as any).data || []);
-      } else {
-        throw new Error((resp as any)?.message || 'No se pudieron cargar los cortes');
-      }
-    } catch (err: any) {
-      console.warn('Error cargando cortes:', err);
-      setError(err.message || 'Error desconocido');
-    } finally {
-      setLoading(false);
-    }
-  }, [get]);
-
-  useEffect(() => {
-    cargarCortes();
-  }, [cargarCortes]);
+  const { data, loading, error, reload: cargarCortes } = useCashRead<Corte[]>('/cajas/cortes', readCashCuts);
+  const cortes = data || [];
+  const downloadScope = `${session?.user?.tenant_id || ''}:${session?.user?.id || ''}`;
+  const [downloadError, setDownloadError] = React.useState<{ scope: string; message: string } | null>(null);
 
   const descargarArchivo = async (corteId: string, formato: 'pdf' | 'csv') => {
+    setDownloadError(null);
     try {
       if (!session?.user) throw new Error('No hay sesión activa para descargar.');
+      const actor = (await customAuth.getRequestSession()).session?.user;
       const res = await fetchApi(`/api/cajas/cortes/${corteId}/${formato}`);
-      if (!res.ok) throw new Error(`Error al descargar ${formato.toUpperCase()}`);
+      if (!res.ok || isOfflineCachedResponse(res)) {
+        throw new Error(`No se pudo descargar el ${formato.toUpperCase()} actual. Reintente.`);
+      }
       const blob = await res.blob();
+      const contentType = res.headers.get('content-type')?.toLowerCase() || '';
+      if (formato === 'pdf') {
+        if (!contentType.includes('application/pdf')
+          || !(await blob.slice(0, 5).text()).startsWith('%PDF-')
+          || !(await blob.slice(-1024).text()).includes('%%EOF')) {
+          throw new Error('El servidor no devolvió un PDF completo. Reintente.');
+        }
+      } else {
+        const text = (await blob.text()).replace(/^\uFEFF/, '').trim();
+        if (!contentType.includes('text/csv')
+          || !text.startsWith('"SECCION","CAMPO","VALOR"')
+          || !text.includes('\n"SESION","ID","')) {
+          throw new Error('El servidor no devolvió un CSV de corte válido. Reintente.');
+        }
+      }
+      const currentActor = (await customAuth.getRequestSession()).session?.user;
+      if (!actor || currentActor?.id !== actor.id || currentActor.tenant_id !== actor.tenant_id) {
+        throw new Error('La sesión cambió durante la descarga. Consulte nuevamente el corte.');
+      }
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = blobUrl;
@@ -80,9 +85,9 @@ export function CortesList({ className = '', id }: Props) {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      window.URL.revokeObjectURL(blobUrl);
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
     } catch (err: any) {
-      alert(err.message || 'No se pudo descargar el archivo');
+      setDownloadError({ scope: downloadScope, message: err.message || 'No se pudo descargar el archivo. Reintente.' });
     }
   };
 
@@ -200,34 +205,40 @@ export function CortesList({ className = '', id }: Props) {
   }
 
   return (
-    <div id={id} className={cn(className, "bg-[var(--bg-card,_#fff)] border rounded-xl shadow mt-4 max-w-[1100px] ml-auto mr-auto overflow-hidden")}>
+    <div id={id} className={cn(className, "w-full min-w-0 bg-[var(--bg-card,_#fff)] border rounded-xl shadow mt-4 max-w-[1100px] ml-auto mr-auto overflow-hidden")}>
       <div className="py-4 px-5 border-b flex justify-between items-center bg-[var(--bg-subtle,_#f8fafc)]">
         <h3 className="text-base font-semibold text-[var(--text-primary,_#1f2937)] m-0">Cortes (cierre diario/turno)</h3>
         <button onClick={cargarCortes} className="bg-transparent border-0 text-[hsl(var(--primary))] text-sm cursor-pointer">
           Actualizar
         </button>
       </div>
+      {downloadError?.scope === downloadScope && (
+        <div role="alert" className="border-b border-destructive/30 bg-destructive/10 px-5 py-3 text-sm text-destructive">
+          {downloadError.message}
+        </div>
+      )}
       <div className="overflow-x-auto">
-        <table className="w-[100%]">
+        <table className="w-full min-w-[760px] border-collapse">
           <thead>
             <tr>
-              <th className="text-left text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Fecha</th>
-              <th className="text-left text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Caja</th>
-              <th className="text-left text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Ventas</th>
-              <th className="text-left text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">{nombreImpuesto}</th>
-              <th className="text-left text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Docs</th>
-              <th className="text-left text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Acciones</th>
+              <th scope="col" className="text-left text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Fecha</th>
+              <th scope="col" className="text-left text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Caja</th>
+              <th scope="col" className="text-right text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Ventas</th>
+              <th scope="col" className="text-right text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">{nombreImpuesto}</th>
+              <th scope="col" className="text-right text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Docs</th>
+              <th scope="col" className="text-left text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {cortes.map((corte) => (
               <tr key={corte.id} className="bg-[var(--bg-card,_#fff)]">
-                <td>{formatearFecha(corte.fecha_corte)}</td>
-                <td>{corte.caja_id ?? 'Caja'}</td>
-                <td className="py-3 px-4 text-sm text-[var(--text-primary,_#111827)] border-b">{currencySymbol} {(corte.total_ventas ?? corte.resumen_fiscal?.total ?? 0).toFixed(2)}</td>
-                <td>{currencySymbol} {(corte.total_impuestos ?? corte.resumen_fiscal?.igv ?? 0).toFixed(2)}</td>
-                <td>{corte.total_documentos ?? corte.resumen_fiscal?.cantidad_boletas ?? 0}</td>
-                <td className="flex gap-2">
+                <td className="whitespace-nowrap border-b px-4 py-3 text-sm">{formatearFecha(corte.fecha_corte)}</td>
+                <td className="border-b px-4 py-3 text-sm">{corte.caja_nombre ?? corte.caja_id ?? 'Caja'}</td>
+                <td className="whitespace-nowrap border-b px-4 py-3 text-right text-sm tabular-nums text-[var(--text-primary,_#111827)]">{currencySymbol} {(corte.total_ventas ?? corte.resumen_fiscal?.total ?? 0).toFixed(2)}</td>
+                <td className="whitespace-nowrap border-b px-4 py-3 text-right text-sm tabular-nums">{currencySymbol} {(corte.total_impuestos ?? corte.resumen_fiscal?.igv ?? 0).toFixed(2)}</td>
+                <td className="border-b px-4 py-3 text-right text-sm tabular-nums">{corte.total_documentos ?? corte.resumen_fiscal?.cantidad_boletas ?? 0}</td>
+                <td className="border-b px-4 py-3">
+                  <div className="flex items-center gap-2">
                   <button
                     onClick={() => descargarArchivo(corte.id, 'pdf')} className="text-[hsl(var(--primary))]"
                   >
@@ -238,6 +249,7 @@ export function CortesList({ className = '', id }: Props) {
                   >
                     CSV
                   </button>
+                  </div>
                 </td>
               </tr>
             ))}

@@ -4,14 +4,18 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useApi } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/use-toast';
 import { unwrapApiArray } from '@/lib/api-contract';
+import { fiscalDateForCountry } from '@/lib/fiscal-date';
+import { useCountryContext } from '@/hooks/use-country-context';
 
 const AsistenciaPage = () => {
+  const country = useCountryContext();
   const [empleados, setEmpleados] = useState<any[]>([]);
   const { toast } = useToast();
   const [asistencias, setAsistencias] = useState<any[]>([]);
-  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
+  const [fecha, setFecha] = useState(() => fiscalDateForCountry(country.paisCodigo));
   const [loading, setLoading] = useState(true);
-  const { get, post } = useApi();
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const { get, post } = useApi({throwOnError:true,showErrorToast:false});
   const mutationIntents = useRef(new Map<string, { key: string; hora: string }>());
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED !== 'false';
 
@@ -34,6 +38,7 @@ const AsistenciaPage = () => {
     }
     try {
       setLoading(true);
+      setLoadError(null);
 
       // Cargar empleados
       const empleadosData = await get('/api/rrhh/empleados');
@@ -44,11 +49,7 @@ const AsistenciaPage = () => {
       setAsistencias(unwrapApiArray(asistenciasData));
     } catch (error) {
       console.error('Error cargando asistencias:', error);
-      toast({
-        title: 'No se pudo guardar la asistencia',
-        description: error instanceof Error ? error.message : 'Vuelva a intentarlo; el registro no se guardo.',
-        variant: 'destructive',
-      });
+      setLoadError('No se pudo consultar la asistencia. Reintente la carga para ver las marcaciones.');
     } finally {
       setLoading(false);
     }
@@ -119,6 +120,14 @@ const AsistenciaPage = () => {
   }
 
   const stats = calcularEstadisticas();
+
+  if (loadError && !loading && rrhhEnabled) {
+    return <div className="mx-auto max-w-[1600px] space-y-4 p-6">
+      <h1 className="text-2xl font-bold">Control de Asistencia</h1>
+      <p role="alert">{loadError}</p>
+      <button className="rounded-lg bg-primary px-4 py-2 text-primary-foreground" onClick={loadData}>Reintentar carga</button>
+    </div>;
+  }
 
   if (loading) {
     return (

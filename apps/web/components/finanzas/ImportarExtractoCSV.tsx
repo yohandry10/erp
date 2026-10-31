@@ -16,6 +16,8 @@ import { Upload, FileText, AlertCircle, CheckCircle2, X, Loader2 } from 'lucide-
 import { formatDate } from '@/lib/format-utils';
 import { fetchApi } from '@/lib/api-fetch';
 import { useCountryContext } from '@/hooks/use-country-context';
+import { parseCsvRecords } from '@/lib/csv-records';
+import { parseBankCsvDate } from '@/lib/bank-csv-date';
 
 interface MovimientoCSV {
   fecha: string;
@@ -42,15 +44,15 @@ const BANCO_TEMPLATES: Record<BancoTemplate, { name: string; description: string
   },
   BBVA: {
     name: 'BBVA',
-    description: 'Formato: Fecha, Concepto, Importe, Tipo',
+    description: 'Formato: Fecha, Concepto, Cargo, Abono, Saldo',
   },
   INTERBANK: {
     name: 'Interbank',
-    description: 'Formato: Fecha, Detalle, Débito, Crédito',
+    description: 'Formato: Fecha, Detalle, Referencia, Tipo, Monto',
   },
   SCOTIABANK: {
     name: 'Scotiabank',
-    description: 'Formato: Fecha, Descripción, Monto, Tipo',
+    description: 'Formato: Fecha, Descripción, Cargo, Abono',
   },
   GENERICO: {
     name: 'Genérico',
@@ -120,7 +122,7 @@ export function ImportarExtractoCSV({
     try {
       const text = await file.text();
       setCsvContent(text);
-      const lines = text.split('\n').filter((line) => line.trim());
+      const lines = parseCsvRecords(text);
 
       if (lines.length === 0) {
         setError('El archivo CSV está vacío');
@@ -134,10 +136,7 @@ export function ImportarExtractoCSV({
       // Saltar la primera línea (encabezados)
       for (let i = 1; i < lines.length; i++) {
         try {
-          const movimiento = parseCSVLine(lines[i], bancoTemplate, i + 1);
-          if (movimiento) {
-            movimientos.push(movimiento);
-          }
+          movimientos.push(...parseCSVLine(lines[i], bancoTemplate, i + 1));
         } catch (err) {
           errors.push(`Línea ${i + 1}: ${err instanceof Error ? err.message : 'Error desconocido'}`);
         }
@@ -150,176 +149,84 @@ export function ImportarExtractoCSV({
         setError('No se pudieron procesar los movimientos del archivo');
       }
     } catch (err) {
-      setError('Error al leer el archivo CSV');
+      setError(err instanceof Error ? err.message : 'Error al leer el archivo CSV');
       console.error('Error processing CSV:', err);
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const parseCSVLine = (line: string, template: BancoTemplate, lineNumber: number): MovimientoCSV | null => {
-    const columns = line.split(',').map((col) => col.trim().replace(/^"|"$/g, ''));
+  const parseCSVLine = (columns: string[], template: BancoTemplate, lineNumber: number): MovimientoCSV[] => {
 
+    // La vista previa debe leer igual que el servidor (csv-templates.config):
+    // BBVA y Scotiabank traen cargo y abono separados; Interbank, tipo y monto.
     switch (template) {
       case 'BCP':
-        return parseBCP(columns, lineNumber);
       case 'BBVA':
-        return parseBBVA(columns, lineNumber);
-      case 'INTERBANK':
-        return parseInterbank(columns, lineNumber);
       case 'SCOTIABANK':
-        return parseScotiabank(columns, lineNumber);
+        return parseBCP(columns, lineNumber, template);
+      case 'INTERBANK':
       case 'GENERICO':
       default:
         return parseGenerico(columns, lineNumber);
     }
   };
 
-  const parseBCP = (columns: string[], lineNumber: number): MovimientoCSV | null => {
-    // Formato BCP: Fecha, Descripción, Cargo, Abono, Saldo
+  const parseAmount = (value: string): number => {
+    const normalized = value.replace(/S\/\.?|PEN|USD|\$|\s|,/gi, '');
+    const result = Number(normalized);
+    if (!Number.isFinite(result)) throw new Error(`Monto inválido: ${value}`);
+    return Math.round(Math.abs(result) * 100) / 100;
+  };
+
+  const parseBCP = (columns: string[], lineNumber: number, banco: BancoTemplate): MovimientoCSV[] => {
+    // Formato: Fecha, Descripción, Cargo, Abono[, Saldo]
     if (columns.length < 4) {
-      throw new Error('Formato BCP inválido - columnas insuficientes');
+      throw new Error(`Formato ${BANCO_TEMPLATES[banco].name} inválido - columnas insuficientes`);
     }
 
-    const fecha = parseDate(columns[0]);
+    const fecha = parseBankCsvDate(columns[0]);
     const descripcion = columns[1] || 'Sin descripción';
-    const cargo = parseFloat(columns[2]) || 0;
-    const abono = parseFloat(columns[3]) || 0;
+    const cargo = parseAmount(columns[2]);
+    const abono = parseAmount(columns[3]);
 
     if (cargo === 0 && abono === 0) {
-      return null; // Línea sin movimiento
+      throw new Error('No se encontró cargo ni abono en el registro');
     }
 
-    return {
-      fecha,
-      tipo: cargo > 0 ? 'CARGO' : 'ABONO',
-      monto: cargo > 0 ? cargo : abono,
-      descripcion,
-      referencia: `BCP-${lineNumber}`,
-    };
+    const movements: MovimientoCSV[] = [];
+    if (cargo > 0) movements.push({ fecha, tipo: 'CARGO', monto: cargo, descripcion, referencia: `${banco}-${lineNumber}` });
+    if (abono > 0) movements.push({ fecha, tipo: 'ABONO', monto: abono, descripcion, referencia: `${banco}-${lineNumber}` });
+    return movements;
   };
 
-  const parseBBVA = (columns: string[], lineNumber: number): MovimientoCSV | null => {
-    // Formato BBVA: Fecha, Concepto, Importe, Tipo
-    if (columns.length < 4) {
-      throw new Error('Formato BBVA inválido - columnas insuficientes');
-    }
-
-    const fecha = parseDate(columns[0]);
-    const descripcion = columns[1] || 'Sin descripción';
-    const monto = Math.abs(parseFloat(columns[2]) || 0);
-    const tipo = columns[3].toUpperCase().includes('ABONO') || columns[3].toUpperCase().includes('CREDITO') ? 'ABONO' : 'CARGO';
-
-    if (monto === 0) {
-      return null;
-    }
-
-    return {
-      fecha,
-      tipo,
-      monto,
-      descripcion,
-      referencia: `BBVA-${lineNumber}`,
-    };
-  };
-
-  const parseInterbank = (columns: string[], lineNumber: number): MovimientoCSV | null => {
-    // Formato Interbank: Fecha, Detalle, Débito, Crédito
-    if (columns.length < 4) {
-      throw new Error('Formato Interbank inválido - columnas insuficientes');
-    }
-
-    const fecha = parseDate(columns[0]);
-    const descripcion = columns[1] || 'Sin descripción';
-    const debito = parseFloat(columns[2]) || 0;
-    const credito = parseFloat(columns[3]) || 0;
-
-    if (debito === 0 && credito === 0) {
-      return null;
-    }
-
-    return {
-      fecha,
-      tipo: debito > 0 ? 'CARGO' : 'ABONO',
-      monto: debito > 0 ? debito : credito,
-      descripcion,
-      referencia: `INTERBANK-${lineNumber}`,
-    };
-  };
-
-  const parseScotiabank = (columns: string[], lineNumber: number): MovimientoCSV | null => {
-    // Formato Scotiabank: Fecha, Descripción, Monto, Tipo
-    if (columns.length < 4) {
-      throw new Error('Formato Scotiabank inválido - columnas insuficientes');
-    }
-
-    const fecha = parseDate(columns[0]);
-    const descripcion = columns[1] || 'Sin descripción';
-    const monto = Math.abs(parseFloat(columns[2]) || 0);
-    const tipo = columns[3].toUpperCase().includes('ABONO') || columns[3].toUpperCase().includes('CREDITO') ? 'ABONO' : 'CARGO';
-
-    if (monto === 0) {
-      return null;
-    }
-
-    return {
-      fecha,
-      tipo,
-      monto,
-      descripcion,
-      referencia: `SCOTIA-${lineNumber}`,
-    };
-  };
-
-  const parseGenerico = (columns: string[], lineNumber: number): MovimientoCSV | null => {
+  const parseGenerico = (columns: string[], lineNumber: number): MovimientoCSV[] => {
     // Formato Genérico: Fecha, Descripción, Referencia, Tipo, Monto
-    if (columns.length < 4) {
+    if (columns.length < 5) {
       throw new Error('Formato genérico inválido - columnas insuficientes');
     }
 
-    const fecha = parseDate(columns[0]);
+    const fecha = parseBankCsvDate(columns[0]);
     const descripcion = columns[1] || 'Sin descripción';
     const referencia = columns[2] || `REF-${lineNumber}`;
     const tipoStr = columns[3].toUpperCase();
-    const tipo = tipoStr.includes('ABONO') || tipoStr.includes('CREDITO') || tipoStr.includes('INGRESO') ? 'ABONO' : 'CARGO';
-    const monto = Math.abs(parseFloat(columns[4]) || 0);
+    const abonos = ['ABONO', 'CREDITO', 'INGRESO', 'DEPOSITO'];
+    const cargos = ['CARGO', 'DEBITO', 'EGRESO', 'RETIRO'];
+    if (![...abonos, ...cargos].includes(tipoStr)) throw new Error(`Tipo de movimiento inválido: ${tipoStr}`);
+    const tipo = abonos.includes(tipoStr) ? 'ABONO' : 'CARGO';
+    const monto = parseAmount(columns[4]);
 
     if (monto === 0) {
-      return null;
+      throw new Error('El monto debe ser mayor que cero');
     }
 
-    return {
+    return [{
       fecha,
       tipo,
       monto,
       descripcion,
       referencia,
-    };
-  };
-
-  const parseDate = (dateStr: string): string => {
-    // Intentar varios formatos de fecha
-    const formats = [
-      /^(\d{2})\/(\d{2})\/(\d{4})$/, // DD/MM/YYYY
-      /^(\d{4})-(\d{2})-(\d{2})$/, // YYYY-MM-DD
-      /^(\d{2})-(\d{2})-(\d{4})$/, // DD-MM-YYYY
-    ];
-
-    for (const format of formats) {
-      const match = dateStr.match(format);
-      if (match) {
-        if (format === formats[0] || format === formats[2]) {
-          // DD/MM/YYYY or DD-MM-YYYY
-          const [, day, month, year] = match;
-          return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-        } else {
-          // YYYY-MM-DD
-          return dateStr;
-        }
-      }
-    }
-
-    throw new Error(`Formato de fecha inválido: ${dateStr}`);
+    }];
   };
 
   const handleImport = async () => {
@@ -481,6 +388,7 @@ export function ImportarExtractoCSV({
                 type="button"
                 variant="ghost"
                 size="icon"
+                aria-label="Quitar archivo CSV"
                 onClick={handleRemoveFile}
                 disabled={isProcessing || isUploading}
               >

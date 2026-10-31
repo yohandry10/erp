@@ -45,6 +45,10 @@ import { PedidosModule } from './modules/ventas/pedidos/pedidos.module';
 import { ReportesModule } from './modules/ventas/reportes/reportes.module';
 import { RmaModule } from './modules/ventas/rma/rma.module';
 import { ComercialVentasModule } from './modules/ventas/comercial/comercial-ventas.module';
+import { ContratosModule } from './modules/ventas/contratos/contratos.module';
+import { LotesModule } from './modules/inventario/lotes/lotes.module';
+import { AlertasModule } from './modules/alertas/alertas.module';
+import { TablerosModule } from './modules/tableros/tableros.module';
 import { SecurityDashboardModule } from './modules/security/security.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { OutboxModule } from './shared/outbox/outbox.module';
@@ -120,6 +124,10 @@ import { apiEnvFilePath } from './config/env-files';
     ReportesModule,
     RmaModule,
     ComercialVentasModule,
+    ContratosModule,
+    LotesModule,
+    AlertasModule,
+    TablerosModule,
     OutboxModule, // 🔴 CRÍTICO: Módulo de outbox pattern para eventos persistentes
     SunatRetryModule, // 🔴 CRÍTICO: Módulo de reintentos automáticos para comunicación con SUNAT
     MetricsModule, // 📊 Módulo de métricas para Prometheus y Grafana

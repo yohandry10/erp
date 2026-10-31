@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { requestConfirmation } from '@/lib/confirm-action'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   AlertCircle,
@@ -40,6 +41,13 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useApi } from '@/hooks/use-api'
+import { useAuth } from '@/contexts/AuthContext'
+import { readBudgetCatalog } from '@/lib/accounting-budget-read'
+import { readBudgetExecutionList, readBudgetExecutionDetail } from '@/lib/accounting-budget-execution-view'
+import { readBudgetDetail } from '@/lib/accounting-budget-read'
+import { useBudgetDeleteOperation } from '@/hooks/use-budget-delete-operation'
+import { usePermission } from '@/hooks/use-permission'
+import { readPeriodCatalog } from '@/lib/accounting-period-read'
 import { cn } from '@/lib/utils'
 import { useCountryContext } from '@/hooks/use-country-context'
 
@@ -55,7 +63,7 @@ interface Presupuesto {
   monto_disponible: number
   porcentaje_ejecutado: number
   estado: 'ACTIVO' | 'BLOQUEADO' | 'CERRADO'
-  notas?: string
+  notas?: string | null
   created_at: string
   updated_at: string
   centro_costo?: { codigo: string; nombre: string }
@@ -104,7 +112,7 @@ function BudgetStatusBadge({ estado }: { estado: string }) {
 }
 
 function AlertBadge({ porcentaje }: { porcentaje: number }) {
-  if (porcentaje >= 100) {
+  if (porcentaje > 100) {
     return (
       <Badge variant="outline" className="gap-1.5 border-amber-300/35 bg-amber-300/10 text-amber-400 dark:text-amber-200">
         <AlertCircle className="h-3 w-3" />
@@ -113,7 +121,7 @@ function AlertBadge({ porcentaje }: { porcentaje: number }) {
     )
   }
 
-  if (porcentaje >= 90) {
+  if (porcentaje > 90) {
     return (
       <Badge variant="outline" className="gap-1.5 border-sky-300/35 bg-sky-300/10 text-primary dark:text-sky-200">
         <AlertTriangle className="h-3 w-3" />
@@ -131,8 +139,21 @@ function AlertBadge({ porcentaje }: { porcentaje: number }) {
 }
 
 export default function PresupuestosListaPage() {
+ const {session}=useAuth()
+ return <BudgetListWorkspace key={`${session?.user?.tenant_id || ''}:${session?.user?.id || ''}`} />
+}
+function BudgetListWorkspace() {
+ const {session,loading:authLoading}=useAuth(),tenantId=session?.user?.tenant_id || ''
+ const actorId=session?.user?.id || ''
+ const deletePermission=usePermission('contabilidad','eliminar','presupuestos')
+ const canDelete=deletePermission.hasPermission && !deletePermission.loading
+ const deleteAllowed=useRef(canDelete);deleteAllowed.current=canDelete
+ const deletion=useBudgetDeleteOperation({tenantId,actorId},canDelete,!authLoading && !!tenantId && !!actorId && !deletePermission.loading)
+ const selectingDelete=useRef(false)
+ const [deleteReadError,setDeleteReadError]=useState(''),[deletePreparing,setDeletePreparing]=useState(false),[deleteSuccess,setDeleteSuccess]=useState('')
+ const readEpoch=useRef(0)
   const router = useRouter()
-  const { get, del } = useApi()
+   const {apiCall:get}=useApi<unknown>({requireLive:true,retries:0,timeoutMs:30000,throwOnError:true,showErrorToast:false})
   const country = useCountryContext()
 
   const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([])
@@ -147,54 +168,59 @@ export default function PresupuestosListaPage() {
   const [estadoFilter, setEstadoFilter] = useState('TODOS')
   const [alertaFilter, setAlertaFilter] = useState('TODOS')
 
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
+  const loadData=useCallback(async()=>{
+    const run=++readEpoch.current
+    setLoading(true);setError(null);setPresupuestos([]);setCentrosCosto([]);setPeriodos([])
+    if(authLoading||!tenantId)return
+    try{
+      const [budgets,centers,periods]=await Promise.all([get('/contabilidad/presupuestos/vista-ejecucion'),get('/contabilidad/centros-costo'),get('/contabilidad/periodos')])
+      const rows=readBudgetExecutionList(budgets,tenantId),centerRows=readBudgetCatalog(centers,tenantId,'centers'),periodRows=readPeriodCatalog(periods,tenantId)
+      if(run!==readEpoch.current)return
+      if(rows.some(r=>!centerRows.some(c=>c.id===r.centro_costo_id)||!periodRows.some(p=>p.id===r.periodo_contable_id)))throw new Error('Relaciones de presupuesto incompletas.')
+      setPresupuestos(rows);setCentrosCosto(centerRows);setPeriodos(periodRows)
+    }catch(cause){if(run===readEpoch.current)setError(cause instanceof Error?cause.message:'No se pudo consultar el presupuesto completo.')}
+    finally{if(run===readEpoch.current)setLoading(false)}
+  },[get,tenantId,authLoading])
+  useEffect(()=>{void loadData();return()=>{readEpoch.current++}},[loadData])
 
-      const [presupuestosRes, centrosRes, periodosRes] = await Promise.all([
-        get('/api/contabilidad/presupuestos'),
-        get('/api/contabilidad/centros-costo'),
-        get('/api/contabilidad/periodos'),
-      ])
-
-      if (presupuestosRes?.success && Array.isArray(presupuestosRes.data)) {
-        setPresupuestos(presupuestosRes.data)
-      }
-
-      if (centrosRes?.success && Array.isArray(centrosRes.data)) {
-        setCentrosCosto(centrosRes.data)
-      }
-
-      if (periodosRes?.success && Array.isArray(periodosRes.data)) {
-        setPeriodos(periodosRes.data)
-      }
-    } catch (err: any) {
-      console.error('Error loading data:', err)
-      setError(err.message || 'Error al cargar los datos')
-    } finally {
-      setLoading(false)
-    }
-  }, [get])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
-
+  const applyDeleted = (id: string) => {
+    setPresupuestos(prev=>prev.filter(p=>p.id!==id))
+    setDeleteSuccess('Presupuesto eliminado con el recibo confirmado del servidor.')
+  }
   const handleDelete = async (id: string) => {
-    if (!confirm('¿Está seguro de eliminar este presupuesto?')) return
-
+    if (!canDelete || !deletion.ready || deletion.pending || deletion.recoveryError || deletion.busy || selectingDelete.current) return
+    if (!(await requestConfirmation('¿Está seguro de eliminar este presupuesto?'))) return
+    const run=readEpoch.current,selected=presupuestos.find(p=>p.id===id)
+    if (!selected) return
+    selectingDelete.current=true;setDeletePreparing(true);setDeleteReadError('');setDeleteSuccess('')
     try {
-      const response = await del(`/api/contabilidad/presupuestos/${id}`)
-
-      if (response?.success) {
-        setPresupuestos((prev) => prev.filter((p) => p.id !== id))
-      }
-    } catch (err: any) {
-      console.error('Error deleting presupuesto:', err)
-      alert(err.message || 'Error al eliminar el presupuesto')
+      const raw=await get(`/contabilidad/presupuestos/${id}`)
+      if (run!==readEpoch.current || !deleteAllowed.current) return
+      const snapshot=readBudgetDetail(raw,tenantId,id)
+      readBudgetExecutionDetail({success:true,data:selected},tenantId,id,snapshot)
+      const receipt=await deletion.perform({expected_snapshot:snapshot})
+      if (receipt && run===readEpoch.current && deleteAllowed.current) applyDeleted(receipt.id)
+    } catch(cause) {
+      if (run===readEpoch.current) setDeleteReadError(cause instanceof Error ? cause.message : 'No se pudo consultar el presupuesto antes de eliminarlo.')
+    } finally {
+      selectingDelete.current=false
+      setDeletePreparing(false)
     }
   }
+  const retryDelete = async () => {
+    setDeleteSuccess('');const receipt=await deletion.perform()
+    if(receipt && deleteAllowed.current) applyDeleted(receipt.id)
+  }
+  const deletionPanel=canDelete ? <>
+    {deletion.pending && <div data-testid="budget-delete-pending" className="rounded-lg border border-amber-400/40 bg-card p-4">
+      <h2 className="font-semibold">Baja de presupuesto pendiente de confirmar</h2>
+      <p>Los datos se conservan. Las cifras de la lista corresponden a la última consulta; esta baja todavía no está confirmada.</p>
+      <p>{JSON.parse(deletion.pending.body).expected_snapshot.nombre} · Importe presupuestado: {JSON.parse(deletion.pending.body).expected_snapshot.monto_presupuestado}</p>
+      <Button onClick={()=>void retryDelete()} disabled={deletion.busy || deletePreparing}>Reintentar baja pendiente</Button>
+    </div>}
+    {(deletion.recoveryError || deletion.error || deleteReadError) && <p role="alert">{deletion.recoveryError || deletion.error || deleteReadError}</p>}
+    {deleteSuccess && <p role="status">{deleteSuccess}</p>}
+  </> : null
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat(country.locale || 'es-PE', {
@@ -227,9 +253,9 @@ export default function PresupuestosListaPage() {
 
     if (alertaFilter !== 'TODOS') {
       const porcentaje = toNumber(presupuesto.porcentaje_ejecutado)
-      if (alertaFilter === 'SOBREGIRO' && porcentaje < 100) return false
-      if (alertaFilter === 'ADVERTENCIA' && (porcentaje < 90 || porcentaje >= 100)) return false
-      if (alertaFilter === 'NORMAL' && porcentaje >= 90) return false
+      if (alertaFilter === 'SOBREGIRO' && porcentaje <= 100) return false
+      if (alertaFilter === 'ADVERTENCIA' && (porcentaje <= 90 || porcentaje > 100)) return false
+      if (alertaFilter === 'NORMAL' && porcentaje > 90) return false
     }
 
     return true
@@ -238,8 +264,8 @@ export default function PresupuestosListaPage() {
   const stats = {
     total: presupuestos.length,
     activos: presupuestos.filter((p) => p.estado === 'ACTIVO').length,
-    sobregiros: presupuestos.filter((p) => toNumber(p.porcentaje_ejecutado) >= 100).length,
-    advertencias: presupuestos.filter((p) => toNumber(p.porcentaje_ejecutado) >= 90 && toNumber(p.porcentaje_ejecutado) < 100).length,
+    sobregiros: presupuestos.filter((p) => toNumber(p.porcentaje_ejecutado) > 100).length,
+    advertencias: presupuestos.filter((p) => toNumber(p.porcentaje_ejecutado) > 90 && toNumber(p.porcentaje_ejecutado) <= 100).length,
     totalPresupuestado: presupuestos.reduce((sum, p) => sum + toNumber(p.monto_presupuestado), 0),
     totalEjecutado: presupuestos.reduce((sum, p) => sum + toNumber(p.monto_ejecutado), 0),
   }
@@ -264,9 +290,12 @@ export default function PresupuestosListaPage() {
     )
   }
 
+  if(error)return <div className="p-6"><h1>Gestión de Presupuestos</h1>{deletionPanel}<p role="alert">{error}</p><Button onClick={()=>void loadData()}>Reintentar</Button></div>
+
   return (
     <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.20),transparent_34%),linear-gradient(135deg,#020617_0%,#061a2f_58%,#020617_100%)] p-4 text-foreground group-data-[erp-theme=light]/dashboard:bg-muted/30 group-data-[erp-theme=light]/dashboard:text-foreground lg:p-6">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
+        {deletionPanel}
         <Card className="border-cyan-400/20 bg-card/75 shadow-2xl shadow-cyan-950/20 group-data-[erp-theme=light]/dashboard:bg-card">
           <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
@@ -499,7 +528,7 @@ export default function PresupuestosListaPage() {
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button
+                            {canDelete && <Button
                               variant="outline"
                               size="icon"
                               className="h-8 w-8 border-amber-300/25 bg-amber-300/10 text-amber-400 dark:text-amber-200 hover:bg-amber-300/20"
@@ -507,10 +536,11 @@ export default function PresupuestosListaPage() {
                                 event.stopPropagation()
                                 handleDelete(presupuesto.id)
                               }}
+                              disabled={!deletion.ready || !!deletion.pending || !!deletion.recoveryError || deletion.busy || deletePreparing}
                               title="Eliminar"
                             >
                               <Trash2 className="h-4 w-4" />
-                            </Button>
+                            </Button>}
                           </div>
                         </TableCell>
                       </TableRow>

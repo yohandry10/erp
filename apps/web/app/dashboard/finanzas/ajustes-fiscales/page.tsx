@@ -13,6 +13,7 @@ import {
 import { useApi } from '@/hooks/use-api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { usePermission } from '@/hooks/use-permission'
 
 type Origen = 'CLIENTE' | 'PROVEEDOR'
 type Tipo = 'RETENCION' | 'PERCEPCION' | 'DETRACCION' | 'ANTICIPO'
@@ -96,6 +97,7 @@ const todayInBrowser = () => {
 
 export default function AjustesFiscalesPage() {
   const { get, post } = useApi({ throwOnError: true })
+  const { hasPermission: canReverseDetraction } = usePermission('finanzas', 'gestionar', 'cxp')
   const pendingIdempotencyKeys = useRef(new Map<string, string>())
   const [mode, setMode] = useState<Mode>('AJUSTE')
   const [origen, setOrigen] = useState<Origen>('CLIENTE')
@@ -121,6 +123,9 @@ export default function AjustesFiscalesPage() {
   const [saving, setSaving] = useState(false)
   const [depositando, setDepositando] = useState<string | null>(null)
   const [depositBankId, setDepositBankId] = useState('')
+  const [reverseId, setReverseId] = useState('')
+  const [reverseReason, setReverseReason] = useState('')
+  const [revirtiendo, setRevirtiendo] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -247,6 +252,21 @@ export default function AjustesFiscalesPage() {
     } finally {
       setDepositando(null)
     }
+  }
+
+  const revertirDetraccion = async (operacion: OperacionFiscal) => {
+    if (reverseReason.trim().length < 3) return
+    setRevirtiendo(true)
+    try {
+      const attempt = idempotentAttempt(`reversa-detraccion-${operacion.id}`, {
+        motivo: reverseReason.trim(), fecha,
+      })
+      await post(`/api/retenciones/${operacion.id}/revertir-detraccion-proveedor`, attempt.body)
+      pendingIdempotencyKeys.current.delete(attempt.semanticKey)
+      setReverseId(''); setReverseReason(''); await load()
+    } catch {
+      // Conserva la intención para reintentar sin duplicar el ajuste.
+    } finally { setRevirtiendo(false) }
   }
 
   return (
@@ -383,6 +403,14 @@ export default function AjustesFiscalesPage() {
                   <Button className="mt-4 w-full" variant="outline" disabled={!depositBankId || depositando === item.id} onClick={() => void depositar(item)}>
                     {depositando === item.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Landmark className="mr-2 h-4 w-4" />} Depositar detracción
                   </Button>
+                  {canReverseDetraction && <div className="mt-3">
+                    {reverseId === item.id ? <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">Restaura la deuda del proveedor y revierte la reclasificación contable.</p>
+                      <label className={labelClass}>Fecha de reversión<input type="date" disabled={revirtiendo} className={inputClass} min={item.fecha} value={fecha} onChange={(e) => setFecha(e.target.value)} /></label>
+                      <label className={labelClass}>Motivo<textarea minLength={3} maxLength={500} disabled={revirtiendo} className={inputClass} value={reverseReason} onChange={(e) => setReverseReason(e.target.value)} /></label>
+                      <div className="flex gap-2"><Button disabled={revirtiendo || reverseReason.trim().length < 3 || !fecha} onClick={() => void revertirDetraccion(item)}>{revirtiendo ? 'Revirtiendo…' : 'Confirmar reversión pendiente'}</Button><Button variant="outline" disabled={revirtiendo} onClick={() => setReverseId('')}>Cancelar</Button></div>
+                    </div> : <Button className="w-full" variant="outline" onClick={() => { setReverseId(item.id); setReverseReason('') }}>Revertir detracción no depositada</Button>}
+                  </div>}
                 </div>
               ))}
             </CardContent>

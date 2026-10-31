@@ -64,7 +64,19 @@ export class OutboxEventsService {
     if (error) {
       this.throwReadError(error);
     }
-    return ((data ?? []) as any[]).map((row) => this.normalizeEvent(row));
+    if (!Array.isArray(data) || !Number.isSafeInteger(limit) || limit < 1 || limit > 1000 || data.length > limit) {
+      throw new ServiceUnavailableException('La ventana de eventos contables está incompleta. Reintente la consulta');
+    }
+    const ids = new Set<string>();
+    for (const row of data) {
+      if (!row || typeof row.id !== 'string' || !row.id || ids.has(row.id) ||
+          (row.tenant_id !== undefined && row.tenant_id !== tenantId) ||
+          typeof row.status !== 'string' || (statuses && !statuses.includes(row.status.toLowerCase()))) {
+        throw new ServiceUnavailableException('La ventana de eventos contables contiene datos incoherentes o ajenos');
+      }
+      ids.add(row.id);
+    }
+    return data.map((row) => this.normalizeEvent(row));
   }
 
   /** Reclama atómicamente sólo los tipos cuyo propietario es contabilidad. */
@@ -215,7 +227,16 @@ export class OutboxEventsService {
         this.throwReadError(error);
       }
 
-      const raw = (data ?? {}) as Record<string, unknown>;
+      if (!data || typeof data !== 'object' || Array.isArray(data)) {
+        throw new ServiceUnavailableException('Las estadísticas contables no están disponibles');
+      }
+      const raw = data as Record<string, unknown>;
+      const numeric = (value: unknown) => typeof value === 'number' || (typeof value === 'string' && /^\d+(?:\.\d+)?$/.test(value));
+      if (!['pending','processed','failed','dead_letter','processed_today'].every(k => numeric(raw[k]) && Number.isSafeInteger(Number(raw[k])) && Number(raw[k]) >= 0) ||
+          !Object.prototype.hasOwnProperty.call(raw,'avg_processing_time_ms') ||
+          (raw.avg_processing_time_ms !== null && (!numeric(raw.avg_processing_time_ms) || !Number.isFinite(Number(raw.avg_processing_time_ms)) || Number(raw.avg_processing_time_ms) < 0))) {
+        throw new ServiceUnavailableException('Las estadísticas contables están incompletas o fuera de rango');
+      }
       const stats = {
         pending: Number(raw.pending ?? 0),
         processed: Number(raw.processed ?? 0),

@@ -173,23 +173,10 @@ describe("OutboxEventsService", () => {
       expect(mockSupabaseService.getPublicClient).not.toHaveBeenCalled();
     });
 
-    it("devuelve estadísticas cero cuando el RPC no entrega payload", async () => {
+    it("rechaza payload ausente sin anunciar ceros", async () => {
       const rpc = jest.fn().mockResolvedValue({ data: null, error: null });
       mockSupabaseService.getClient.mockReturnValue({ rpc });
-
-      const result = await service.obtenerEstadisticasEventos(
-        tenantId,
-        actorId,
-      );
-
-      expect(result).toEqual({
-        pending: 0,
-        processed: 0,
-        processed_today: 0,
-        failed: 0,
-        dead_letter: 0,
-        avg_processing_time_ms: null,
-      });
+      await expect(service.obtenerEstadisticasEventos(tenantId, actorId)).rejects.toMatchObject({ status: 503 });
     });
 
     it("propaga el error del RPC de estadísticas", async () => {

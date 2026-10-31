@@ -12,10 +12,10 @@ import { TipoCliente, TipoDocumento } from '@/types/ventas'
 
 export const clienteSchema = z.object({
   tipo: z.nativeEnum(TipoCliente, {
-    errorMap: () => ({ message: 'Tipo de cliente inválido' })
+    error: 'Tipo de cliente inválido'
   }),
   documento_tipo: z.nativeEnum(TipoDocumento, {
-    errorMap: () => ({ message: 'Tipo de documento inválido' })
+    error: 'Tipo de documento inválido'
   }),
   documento_numero: z.string()
     .min(1, 'El número de documento es requerido')
@@ -80,7 +80,7 @@ export type ClienteQuickCreateFormData = z.infer<typeof clienteQuickCreateSchema
 // ============================================================================
 
 export const detalleItemSchema = z.object({
-  producto_id: z.string().uuid('ID de producto inválido'),
+  producto_id: z.guid('ID de producto inválido'),
   descripcion: z.string().min(1, 'La descripción es requerida'),
   cantidad: z.number()
     .positive('La cantidad debe ser mayor a 0')
@@ -98,7 +98,7 @@ export type DetalleItemFormData = z.infer<typeof detalleItemSchema>
 // ============================================================================
 
 export const cotizacionSchema = z.object({
-  cliente_id: z.string().uuid('Debe seleccionar un cliente'),
+  cliente_id: z.guid('Debe seleccionar un cliente'),
   fecha: z.string().or(z.date()),
   fecha_vencimiento: z.string().or(z.date()).optional(),
   notas: z.string().optional(),
@@ -125,8 +125,8 @@ export type CotizacionFormData = z.infer<typeof cotizacionSchema>
 // ============================================================================
 
 export const pedidoSchema = z.object({
-  cliente_id: z.string().uuid('Debe seleccionar un cliente'),
-  cotizacion_id: z.string().uuid().optional(),
+  cliente_id: z.guid('Debe seleccionar un cliente'),
+  cotizacion_id: z.guid().optional(),
   fecha: z.string().or(z.date()),
   notas: z.string().optional(),
   detalle: z.array(detalleItemSchema)

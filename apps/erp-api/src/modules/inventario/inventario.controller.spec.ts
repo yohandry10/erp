@@ -20,14 +20,17 @@ describe('InventarioController', () => {
 
   it('calcula stats con costo y el ledger canonico', async () => {
     const from = jest.fn((table: string) => {
+      if (table === 'empresa_config') return {
+        select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { pais: 'PE' }, error: null }) }) }),
+      };
       if (table === 'productos') {
         return {
           select: () => ({
             eq: () => ({
               eq: async () => ({
                 data: [
-                  { precio_compra: 10, costo: 20, stock_actual: 3, stock_minimo: 1 },
-                  { precio_compra: 0, costo: 4, stock_actual: 2, stock_minimo: 2 },
+                  { precio_compra: 10, costo: 20, costo_promedio_base: 20, stock_actual: 3, stock_minimo: 1 },
+                  { precio_compra: 0, costo: 4, costo_promedio_base: 4, stock_actual: 2, stock_minimo: 2 },
                 ],
                 error: null,
               }),
@@ -55,7 +58,7 @@ describe('InventarioController', () => {
       success: true,
       data: {
         totalProductos: 2,
-        valorInventario: 38,
+        valorInventario: 68,
         productosStockBajo: 1,
         movimientosHoy: 7,
       },

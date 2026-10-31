@@ -97,7 +97,7 @@ export class RegistrarTasaConsolidacionDto {
   tipo: TipoTasaConsolidacion;
 
   @ApiProperty({ description: 'Unidades de moneda de presentación por unidad de moneda origen' })
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 10 })
   @Min(0.0000000001)
   factor_conversion: number;
 }
@@ -135,13 +135,13 @@ export class CrearAjusteConsolidacionDto {
 
   @ApiPropertyOptional({ default: 0 })
   @IsOptional()
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   debe?: number;
 
   @ApiPropertyOptional({ default: 0 })
   @IsOptional()
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   haber?: number;
 

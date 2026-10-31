@@ -55,11 +55,13 @@ export default function UsuariosPage() {
         get('/usuarios-sistema/roles'),
         get('/usuarios-sistema/stats'),
       ])
-      return {
-        usuarios: usuariosData?.success ? (usuariosData.data || []) : [],
-        roles: rolesData?.success ? (rolesData.data || []) : [],
-        stats: statsData?.success ? statsData.data : DEFAULT_STATS,
+      if (!usuariosData?.success || !Array.isArray(usuariosData.data)
+        || !rolesData?.success || !Array.isArray(rolesData.data)
+        || !statsData?.success || !statsData.data
+        || Object.keys(DEFAULT_STATS).some(key => typeof statsData.data[key] !== 'number')) {
+        throw new Error('No se pudo cargar el catálogo completo de usuarios. Reintente la consulta.')
       }
+      return { usuarios: usuariosData.data, roles: rolesData.data, stats: statsData.data }
     },
   })
 
@@ -137,6 +139,19 @@ export default function UsuariosPage() {
           <CardContent className="p-12">
             <ShieldAlert className="mx-auto mb-4 h-10 w-10 text-primary group-data-[erp-theme=light]/dashboard:text-blue-600" />
             <p className="text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">El rol actual no puede administrar usuarios.</p>
+          </CardContent>
+        </Card>
+      </PageShell>
+    )
+  }
+
+  if (isError) {
+    return (
+      <PageShell title="Gestión de Usuarios" description="La consulta de usuarios, roles y métricas no se completó.">
+        <Card>
+          <CardContent className="space-y-4 p-6">
+            <p role="alert">No se pudo cargar el catálogo completo de usuarios. Reintente la consulta.</p>
+            <Button onClick={fetchData}>Reintentar</Button>
           </CardContent>
         </Card>
       </PageShell>

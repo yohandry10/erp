@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { UuidParamPipe } from '../../../common/pipes/uuid-param.pipe';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../../common/guards/permission.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
@@ -66,7 +67,7 @@ export class CxcController {
     description: 'Obtiene el detalle completo de una cuenta por cobrar, incluyendo pagos registrados',
   })
   @ApiResponse({ status: 200, description: 'Detalle obtenido exitosamente' })
-  async obtenerDetalle(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+  async obtenerDetalle(@Param('id', UuidParamPipe) id: string, @CurrentTenant() tenantId: string) {
     return this.cxcService.obtenerCuentaPorCobrar(tenantId, id);
   }
 

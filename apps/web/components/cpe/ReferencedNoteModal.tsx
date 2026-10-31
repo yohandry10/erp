@@ -1,8 +1,11 @@
 'use client'
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useApiCall } from '@/hooks/use-api'
-import { apiSucceeded, unwrapApiArray, unwrapApiObject } from '@/lib/api-contract'
+import { apiSucceeded, unwrapApiObject } from '@/lib/api-contract'
+import { useCpeRead } from '@/hooks/use-cpe-read'
+import { referencedNoteOrigins } from '@/lib/cpe-note-contract'
+import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { formatFiscalDocumentNumber } from '@/lib/fiscal-document-number'
 
@@ -105,15 +108,22 @@ const ARCA_DEBIT_REASONS = [
   ['03', 'Gastos, penalidades u otros conceptos'],
 ] as const
 
-export function ReferencedNoteModal({ isOpen, onClose, onSuccess, countryCode }: Props) {
-  const { get: apiGet, post: apiPost } = useApiCall({
-    throwOnError: true,
+export function ReferencedNoteModal(props: Props) {
+  const { session } = useAuth()
+  if (!props.isOpen || !session?.user?.tenant_id || !session.user.id) return null
+  return <ReferencedNoteDialog key={`${session.user.tenant_id}:${session.user.id}:${props.countryCode}`} {...props} />
+}
+
+function ReferencedNoteDialog({ isOpen, onClose, onSuccess, countryCode }: Props) {
+  const { post: apiPost } = useApiCall({
+    requireLive: true, throwOnError: true, showErrorToast: false, retries: 0, timeoutMs: 30000,
     showSuccessToast: false,
   })
-  const [origins, setOrigins] = useState<Origin[]>([])
-  const [loadingOrigins, setLoadingOrigins] = useState(false)
-  const [originError, setOriginError] = useState<string | null>(null)
-  const [originReload, setOriginReload] = useState(0)
+  const validateOrigins = useCallback((response: any) => referencedNoteOrigins(response) as Origin[], [])
+  const originRead = useCpeRead('/api/cpe/notas-referenciadas/origenes', validateOrigins, isOpen)
+  const origins = useMemo(() => originRead.data ?? [], [originRead.data])
+  const loadingOrigins = originRead.loading
+  const originError = originRead.error
   const [submitting, setSubmitting] = useState(false)
   const isColombia = countryCode === 'CO'
   const isArgentina = countryCode === 'AR'
@@ -177,32 +187,9 @@ export function ReferencedNoteModal({ isOpen, onClose, onSuccess, countryCode }:
   }, [creditType, isColombia])
 
   useEffect(() => {
-    if (!isOpen) return
-    let active = true
-    setOrigins([])
-    setOriginId('')
-    setOriginError(null)
-    setLoadingOrigins(true)
-    apiGet('/api/cpe/notas-referenciadas/origenes')
-      .then((response) => {
-        if (!active) return
-        const next = unwrapApiArray<Origin>(response)
-        setOrigins(next)
-        if (next.length > 0) setOriginId((current) => current || next[0].id)
-      })
-      .catch(() => {
-        if (!active) return
-        setOrigins([])
-        setOriginId('')
-        setOriginError(
-          isColombia
-            ? 'No se pudieron cargar las facturas aceptadas por DIAN. El formulario permanece bloqueado; reintenta la consulta.'
-            : 'No se pudieron cargar los comprobantes fiscalmente aceptados. El formulario permanece bloqueado; reintenta la consulta.',
-        )
-      })
-      .finally(() => active && setLoadingOrigins(false))
-    return () => { active = false }
-  }, [apiGet, isArgentina, isColombia, isOpen, originReload])
+    if (!originRead.data) return
+    setOriginId((current) => origins.some((origin) => origin.id === current) ? current : origins[0]?.id ?? '')
+  }, [originRead.data, origins])
 
   useEffect(() => {
     setReason(isColombia ? '1' : isCredit ? '04' : '01')
@@ -392,7 +379,7 @@ export function ReferencedNoteModal({ isOpen, onClose, onSuccess, countryCode }:
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setOriginReload((current) => current + 1)}
+                onClick={() => { void originRead.reload() }}
               >
                 Reintentar
               </Button>

@@ -3,10 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Check, Package, Scan, AlertCircle, CheckCircle, XCircle } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
+import { clampReceiptQuantity, receiptQuantityRemaining, receiptQuantityTotal } from '@/lib/compras/purchase-receipt-quantity'
 import { useToast } from '@/components/ui/use-toast'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 import { cn } from '@/lib/utils'
 import { parseDateLocal } from '@/lib/date-utils'
+import { useAuth } from '@/contexts/AuthContext'
+import { readPurchaseOrder } from '@/lib/compras/purchase-order-read-contract'
+import { confirmPurchaseReceiptCreated, confirmPurchaseReceiptClosed, purchaseReceiptIntentKey, readPurchaseReceiptIntent, type PurchaseReceiptIntent } from '@/lib/compras/purchase-receipt-operation'
 
 const fieldLabelClass = 'mb-2 block text-sm font-medium text-foreground/85'
 const fieldClass = 'w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground'
@@ -33,7 +37,7 @@ interface OrdenDetalle {
   productos?: {
     id: string
     nombre: string
-    codigo: string
+    codigo: string | null
     unidad_medida?: string
     tipo?: string | null
     es_servicio?: boolean
@@ -102,19 +106,56 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [scannerMode, setScannerMode] = useState(false)
-  const [scanBuffer, setScanBuffer] = useState('')
+  const scanBufferRef = useRef('')
   const [flashItemIndex, setFlashItemIndex] = useState<number | null>(null)
   const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const createIdempotencyKeyRef = useRef<string | null>(null)
-  const { get, post } = useApi()
+  const { get, post } = useApi({ requireLive: true, throwOnError: true, showErrorToast: false, retries: 0 })
+  const { session } = useAuth()
+  const tenantId = session?.user?.tenant_id || ''
+  const actorId = session?.user?.id || ''
+  const scopeIdentity = `${tenantId}:${actorId}:${ordenId}`
+  const activeScope = useRef(scopeIdentity)
+  activeScope.current = scopeIdentity
+  const epoch = useRef(0)
+  const inflight = useRef(false)
+  const [intentReady, setIntentReady] = useState('')
+  const [pendingIntent, setPendingIntent] = useState<PurchaseReceiptIntent | null>(null)
+  const [recoveryError, setRecoveryError] = useState('')
+  const [operationError, setOperationError] = useState('')
+  const [sourceError, setSourceError] = useState('')
+  const scopeReady = intentReady === scopeIdentity && !!tenantId && !!actorId
+  const visibleIntent = scopeReady && pendingIntent?.tenantId === tenantId && pendingIntent?.actorId === actorId && pendingIntent?.orderId === ordenId ? pendingIntent : null
+
+  useEffect(() => {
+    epoch.current++; inflight.current = false
+    setSubmitting(false); setIntentReady(''); setPendingIntent(null)
+    setRecoveryError(''); setOperationError(''); setSourceError('')
+    setOrden(null); setItems([]); setAlmacenes([]); setUbicacionesPorAlmacen({}); setCurrentStep(1); setScannerMode(false)
+    if (!tenantId || !actorId) return
+    try {
+      const scope = { tenantId, actorId, orderId: ordenId }
+      const recovered = readPurchaseReceiptIntent(localStorage.getItem(purchaseReceiptIntentKey(scope)),scope)
+      setPendingIntent(recovered); setIntentReady(scopeIdentity)
+      if (recovered) setLoading(false)
+    } catch (error: any) {
+      setRecoveryError(error?.message || 'No se pudo recuperar la recepción pendiente. Sus datos se conservan.')
+    }
+    return () => { epoch.current++ }
+  }, [tenantId,actorId,ordenId,scopeIdentity])
 
   const loadOrden = useCallback(async () => {
+    const requestedScope = scopeIdentity
     try {
       setLoading(true)
+      setSourceError(''); setOrden(null); setItems([])
       const response = await get(`/api/compras/ordenes/${ordenId}`)
-
-      if (response?.success && response.data) {
-        const ordenData = response.data
+      if (activeScope.current !== requestedScope) return
+      const ordenData = readPurchaseOrder(response,ordenId,tenantId,actorId)
+      if (!ordenData.detalles.every((d: OrdenDetalle) => d.productos?.id === d.producto_id && !!d.productos?.nombre?.trim()
+        && typeof d.productos?.es_servicio === 'boolean' && typeof d.productos?.controla_stock === 'boolean')) {
+        throw new Error('La clasificación de los productos está incompleta. Reintenta la lectura de la orden.')
+      }
+      {
         setOrden(ordenData)
 
         // Initialize items with pending quantities
@@ -143,36 +184,42 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
         }
       }
     } catch (error) {
+      if (activeScope.current !== requestedScope) return
       console.error('Error loading orden:', error)
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar la orden de compra' })
+      setSourceError('No se pudo leer la orden completa. Reintenta con conexión; no se ha enviado una recepción.')
     } finally {
-      setLoading(false)
+      if (activeScope.current === requestedScope) setLoading(false)
     }
-  }, [get, ordenId, toast])
+  }, [get, ordenId, tenantId, actorId, scopeIdentity])
 
   const loadAlmacenes = useCallback(async () => {
+    const requestedScope = scopeIdentity
     try {
       const response = await get('/api/inventario/almacenes')
+      if (activeScope.current !== requestedScope) return
       if (response?.success && response.data) {
         setAlmacenes(response.data)
       }
     } catch (error) {
       console.error('Error loading almacenes:', error)
     }
-  }, [get])
+  }, [get, scopeIdentity])
 
   useEffect(() => {
+    if (!scopeReady || pendingIntent || recoveryError) return
     loadOrden()
     loadAlmacenes()
-  }, [loadAlmacenes, loadOrden])
+  }, [loadAlmacenes, loadOrden, scopeReady, pendingIntent, recoveryError])
 
   const loadUbicaciones = async (almacenId: string) => {
+    const requestedScope = scopeIdentity
     if (ubicacionesPorAlmacen[almacenId]) {
       return // Already loaded
     }
 
     try {
       const response = await get(`/api/inventario/almacenes/${almacenId}/ubicaciones`)
+      if (activeScope.current !== requestedScope) return
       if (response?.success && response.data) {
         setUbicacionesPorAlmacen(prev => ({
           ...prev,
@@ -194,12 +241,12 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
       // Increment quantity by 1
       const updatedItems = [...items]
       const item = updatedItems[itemIndex]
-      const maxCantidad = item.cantidad_pedida - item.cantidad_recibida_anterior
+      const maxCantidad = receiptQuantityRemaining(item.cantidad_pedida, item.cantidad_recibida_anterior)
 
       if (item.cantidad_recibir < maxCantidad) {
         updatedItems[itemIndex] = {
           ...item,
-          cantidad_recibir: item.cantidad_recibir + 1
+          cantidad_recibir: clampReceiptQuantity(item.cantidad_recibir + 1, item.cantidad_pedida, item.cantidad_recibida_anterior)
         }
         setItems(updatedItems)
         setFlashItemIndex(itemIndex)
@@ -215,51 +262,55 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
   useEffect(() => {
     if (!scannerMode) return
 
+    const handleScannerEnter = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || scanBufferRef.current.length === 0) return
+      // A keyboard-wedge scanner must not activate the currently focused button.
+      e.preventDefault()
+      if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current)
+      const code = scanBufferRef.current
+      scanBufferRef.current = ''
+      handleScanComplete(code)
+    }
+
     const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') return
       // Clear previous timeout
       if (scanTimeoutRef.current) {
         clearTimeout(scanTimeoutRef.current)
       }
 
-      // Enter key indicates end of scan
-      if (e.key === 'Enter') {
-        if (scanBuffer.length > 0) {
-          handleScanComplete(scanBuffer)
-          setScanBuffer('')
-        }
-        return
-      }
-
       // Accumulate characters
       if (e.key.length === 1) {
-        setScanBuffer(prev => prev + e.key)
+        scanBufferRef.current += e.key
 
         // Auto-complete after 100ms of no input (scanner is fast)
         scanTimeoutRef.current = setTimeout(() => {
-          if (scanBuffer.length > 0) {
-            handleScanComplete(scanBuffer + e.key)
-            setScanBuffer('')
+          const code = scanBufferRef.current
+          scanBufferRef.current = ''
+          if (code.length > 0) {
+            handleScanComplete(code)
           }
         }, 100)
       }
     }
 
     window.addEventListener('keypress', handleKeyPress)
+    window.addEventListener('keydown', handleScannerEnter)
     return () => {
       window.removeEventListener('keypress', handleKeyPress)
+      window.removeEventListener('keydown', handleScannerEnter)
       if (scanTimeoutRef.current) {
         clearTimeout(scanTimeoutRef.current)
       }
+      scanBufferRef.current = ''
     }
-  }, [handleScanComplete, scanBuffer, scannerMode])
+  }, [handleScanComplete, scannerMode])
 
   const updateItemQuantity = (index: number, cantidad: number) => {
     const updatedItems = [...items]
     const item = updatedItems[index]
-    const maxCantidad = item.cantidad_pedida - item.cantidad_recibida_anterior
-
     // Validate quantity
-    const validCantidad = Math.max(0, Math.min(cantidad, maxCantidad))
+    const validCantidad = clampReceiptQuantity(cantidad, item.cantidad_pedida, item.cantidad_recibida_anterior)
 
     updatedItems[index] = {
       ...item,
@@ -368,24 +419,27 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
   }
 
   const handleSubmit = async () => {
+    if (inflight.current || !scopeReady || recoveryError || (sourceError && !pendingIntent)) return
+    inflight.current = true
+    const submittedScope = activeScope.current
+    const submittedEpoch = ++epoch.current
+    const current = () => activeScope.current === submittedScope && epoch.current === submittedEpoch
     try {
       setSubmitting(true)
+      setOperationError('')
 
       // Filter items with quantity > 0
       const itemsToReceive = items.filter(item => item.cantidad_recibir > 0)
 
-      if (itemsToReceive.length === 0) {
+      if (!pendingIntent && itemsToReceive.length === 0) {
         toast({ variant: 'destructive', title: 'Cantidad requerida', description: 'Debe ingresar al menos una cantidad para recepcionar' })
         return
       }
 
       // Create reception
-      if (!createIdempotencyKeyRef.current) {
-        createIdempotencyKeyRef.current = crypto.randomUUID()
-      }
       const createDto = {
         orden_id: ordenId,
-        idempotency_key: createIdempotencyKeyRef.current,
+        idempotency_key: crypto.randomUUID(),
         items: itemsToReceive.map(item => ({
           detalle_id: item.detalle_id,
           cantidad_recibida: item.cantidad_recibir,
@@ -400,28 +454,45 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
         observaciones: 'Recepción creada desde wizard'
       }
 
-      const createResponse = await post(`/api/compras/recepciones/ordenes/${ordenId}`, createDto)
-
-      const createdRecepcion = createResponse?.data ?? createResponse
-      const createSucceeded = createResponse?.success !== false && Boolean(createdRecepcion?.id)
-
-      if (!createSucceeded) {
-        throw new Error(createResponse?.message || 'Error al crear la recepción')
+      const scope = { tenantId, actorId, orderId: ordenId }
+      const key = purchaseReceiptIntentKey(scope)
+      const previous = localStorage.getItem(key)
+      const stored = readPurchaseReceiptIntent(previous,scope)
+      const candidate = pendingIntent || { version: 1 as const, ...scope, createdAt: new Date().toISOString(), stage: 'CREATE' as const,
+        payload: JSON.parse(JSON.stringify(createDto)), closePayload: { observaciones: 'Recepción cerrada automáticamente' },
+        expected: itemsToReceive.map(item => { const d = orden?.detalles?.find(d => d.id === item.detalle_id); return {
+          detailId: item.detalle_id, productId: item.producto_id, name: d?.productos?.nombre || item.producto_nombre,
+          code: d?.productos?.codigo ?? null, ordered: item.cantidad_pedida, price: d?.precio_unitario,
+          service: item.es_servicio, stock: item.controla_stock,
+        } }) }
+      let serialized = JSON.stringify(candidate)
+      let intent = readPurchaseReceiptIntent(serialized,scope)
+      if (!intent || stored && JSON.stringify(stored) !== serialized) throw new Error('Hay otra recepción pendiente. Sus datos se conservan.')
+      const persist = (value: PurchaseReceiptIntent, expected: string | null) => {
+        if (localStorage.getItem(key) !== expected) throw new Error('La recepción pendiente cambió. Se conserva para revisar su resultado.')
+        const raw = JSON.stringify(value)
+        // Intención durable: datos de negocio e ids de empresa y usuario, sin token ni contraseña.
+        // codeql[js/clear-text-storage-of-sensitive-data]
+        localStorage.setItem(key,raw)
+        if (localStorage.getItem(key) !== raw) throw new Error('No se pudo conservar la recepción antes del envío.')
+        setPendingIntent(value)
+        return raw
       }
-
-      const recepcionId = createdRecepcion.id
-
-      // Close reception immediately
-      const closeResponse = await post(`/api/compras/recepciones/${recepcionId}/cerrar`, {
-        observaciones: 'Recepción cerrada automáticamente'
-      })
-
-      const closedRecepcion = closeResponse?.data ?? closeResponse
-      const closeSucceeded = closeResponse?.success !== false && Boolean(closedRecepcion?.id)
-
-      if (!closeSucceeded) {
-        throw new Error(closeResponse?.message || 'Error al cerrar la recepción')
+      serialized = persist(intent,previous)
+      if (intent.stage === 'CREATE') {
+        const response = await post(`/api/compras/recepciones/ordenes/${ordenId}`,intent.payload)
+        if (!current()) return
+        const closeIntent = confirmPurchaseReceiptCreated(response,scope,intent)
+        serialized = persist(closeIntent,serialized)
+        intent = closeIntent
       }
+      const response = await post(`/api/compras/recepciones/${intent.created!.id}/cerrar`,intent.closePayload)
+      if (!current()) return
+      confirmPurchaseReceiptClosed(response,scope,intent)
+      if (localStorage.getItem(key) !== serialized) throw new Error('La recepción pendiente cambió. Se conserva para revisar su resultado.')
+      localStorage.removeItem(key)
+      if (localStorage.getItem(key) !== null) throw new Error('No se pudo retirar la recepción confirmada. Se conserva para reintentar.')
+      setPendingIntent(null)
 
       toast({
         title: 'Recepción completada',
@@ -429,14 +500,16 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
       })
       onComplete()
     } catch (error: any) {
+      if (!current()) return
       console.error('Error submitting recepcion:', error)
+      setOperationError(error.message || 'No se pudo completar la recepción; sus datos se conservan.')
       toast({ variant: 'destructive', title: 'Error', description: error.message || 'No se pudo completar la recepción' })
     } finally {
-      setSubmitting(false)
+      if (current()) { setSubmitting(false); inflight.current = false }
     }
   }
 
-  const getTotalItems = () => items.reduce((sum, item) => sum + item.cantidad_recibir, 0)
+  const getTotalItems = () => receiptQuantityTotal(items.map(item => item.cantidad_recibir))
 
   const getCalidadIcon = (calidad: string) => {
     switch (calidad) {
@@ -447,7 +520,16 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
     }
   }
 
-  if (loading) {
+  if (recoveryError) return <div role="alert" data-testid="purchase-receipt-recovery-error" className="space-y-4 p-4"><p>{recoveryError}</p><button onClick={onCancel}>Volver a Recepciones</button></div>
+  if (visibleIntent) return <div data-testid="purchase-receipt-pending" className="space-y-4 p-4">
+    <p role="status">Hay una recepción pendiente de confirmación. Sus datos se conservan para reintentar el mismo registro.</p>
+    <p>{visibleIntent.created ? `Recepción ${visibleIntent.created.number}: falta confirmar el cierre.` : 'Falta confirmar la creación de la recepción.'}</p>
+    <ul>{visibleIntent.payload.items.map((item,index) => <li key={item.detalle_id}>{visibleIntent.expected[index].name}: {item.cantidad_recibida} · {item.calidad}{item.lote ? ` · Lote ${item.lote}` : ''}{item.serie ? ` · Serie ${item.serie}` : ''}{item.fecha_expiracion ? ` · Vence ${item.fecha_expiracion}` : ''}{item.observaciones ? ` · ${item.observaciones}` : ''}</li>)}</ul>
+    {operationError && <p role="alert" data-testid="purchase-receipt-operation-error">{operationError}</p>}
+    <ProtectedComponent modulo="compras" accion="create" recurso="recepciones" fallback={null}><button onClick={handleSubmit} disabled={submitting} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">{submitting ? 'Procesando...' : 'Reintentar recepción pendiente'}</button></ProtectedComponent>
+    <button onClick={onCancel}>Volver a Recepciones</button>
+  </div>
+  if (!scopeReady || loading) {
     return (
       <div className="flex min-h-48 items-center justify-center">
         <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
@@ -456,6 +538,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
     )
   }
 
+  if (sourceError) return <div role="alert" className="space-y-4 p-4"><p>{sourceError}</p><button onClick={loadOrden}>Reintentar lectura de orden</button><button onClick={onCancel}>Volver a Recepciones</button></div>
   if (!orden) {
     return (
       <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl px-8 py-12 text-center">
@@ -475,6 +558,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
 
   return (
     <div>
+      {operationError && <p role="alert" data-testid="purchase-receipt-operation-error" className="mb-4 p-4">{operationError}</p>}
       {/* Progress Steps */}
       <div className="mb-8 flex items-center justify-center gap-4 rounded-xl bg-card p-6 shadow-sm">
         {[
@@ -559,8 +643,8 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
 
             <div className="flex flex-col gap-4">
               {items.map((item, index) => {
-                const maxCantidad = item.cantidad_pedida - item.cantidad_recibida_anterior
-                const pendiente = maxCantidad - item.cantidad_recibir
+                const maxCantidad = receiptQuantityRemaining(item.cantidad_pedida, item.cantidad_recibida_anterior)
+                const pendiente = receiptQuantityRemaining(maxCantidad, item.cantidad_recibir)
 
                 return (
                   <div
@@ -878,7 +962,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                         </div>
 
                         <div className="mt-3 rounded-md border border-blue-300 bg-primary/10 p-3 text-xs text-primary">
-                          <strong>Nota:</strong> El almacén es obligatorio para este bien físico. Ubicación, lote y serie son opcionales.
+                          <strong>Nota:</strong> El almacén es obligatorio para este bien físico. Si el producto controla lote, indique lote y vencimiento; si no, ubicación, lote y serie son opcionales.
                         </div>
                       </>
                     ) : (

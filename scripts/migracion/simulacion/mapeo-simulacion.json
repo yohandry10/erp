@@ -1,0 +1,234 @@
+{
+  "descripcion": "Mapeo del extracto sintético de la simulación local. Decisiones: los inactivos, cerrados, anulados y documentos sin saldo quedan sólo en el archivo; las unidades se homologan sin convertir cantidades (CJA, PAR y GLN son la unidad comercial: NIU); ningún almacén de origen reemplaza al principal del ERP.",
+  "fechaCorte": "2026-10-31",
+  "codificacion": "cp850",
+  "salidas": {
+    "clientes": {
+      "tabla": "CLIENTES",
+      "filtro": [{ "campo": "ACTIVO", "en": [true] }],
+      "columnas": {
+        "external_id": "CODCLI",
+        "tipo": { "mapa": "TIPDOC", "valores": { "6": "EMPRESA", "1": "PERSONA" } },
+        "tipo_documento": { "mapa": "TIPDOC", "valores": { "6": "RUC", "1": "DNI" } },
+        "numero_documento": "NRODOC",
+        "razon_social": "RAZON",
+        "direccion": "DIRECC",
+        "email": "EMAIL",
+        "telefono": "TELEF",
+        "limite_credito": "LIMCRE",
+        "pais": { "valor": "PE" }
+      }
+    },
+    "proveedores": {
+      "tabla": "PROVEED",
+      "filtro": [{ "campo": "ACTIVO", "en": [true] }],
+      "columnas": {
+        "external_id": "CODPRO",
+        "tipo": { "valor": "EMPRESA" },
+        "tipo_documento": { "valor": "RUC" },
+        "numero_documento": "NRODOC",
+        "razon_social": "RAZON",
+        "direccion": "DIRECC",
+        "email": "EMAIL",
+        "telefono": "TELEF",
+        "sujeto_detraccion": { "mapa": "DETRAC", "valores": { "true": "true", "false": "false" } },
+        "detraccion_tasa": "TASDET",
+        "pais": { "valor": "PE" }
+      }
+    },
+    "almacenes": {
+      "tabla": "ALMACEN",
+      "columnas": {
+        "id_origen_almacen": "CODALM",
+        "codigo": { "concat": [{ "valor": "ORI-" }, "CODALM"] },
+        "nombre": "NOMBRE",
+        "direccion": "DIRECC",
+        "es_principal": { "valor": "NO" }
+      }
+    },
+    "plan_cuentas": {
+      "tabla": "PLANCTA",
+      "columnas": {
+        "codigo": "CUENTA",
+        "nombre": "DESCRI",
+        "acepta_movimiento": { "mapa": "MOVIM", "valores": { "true": "SI", "false": "NO" } }
+      }
+    },
+    "productos": {
+      "tabla": "ARTICULO",
+      "filtro": [{ "campo": "ACTIVO", "en": [true] }],
+      "columnas": {
+        "id_origen_producto": "CODART",
+        "codigo": { "mayusculas": "CODART" },
+        "nombre": "DESCRI",
+        "categoria": "FAMILIA",
+        "unidad_medida": { "mapa": "UNIDAD", "valores": { "UND": "NIU", "CJA": "NIU", "PAR": "NIU", "GLN": "NIU", "KG": "KGM", "LT": "LTR" } },
+        "precio_venta": "PRECIO",
+        "precio_compra": "COSTO",
+        "afectacion_igv": { "mapa": "IGV", "valores": { "S": "10", "E": "20" } },
+        "controla_lote": { "mapa": "LOTE", "valores": { "true": "SI", "false": "NO" } },
+        "requiere_vencimiento": { "mapa": "LOTE", "valores": { "true": "SI", "false": "NO" } },
+        "dias_minimos_vida_util": "DIASVIDA"
+      }
+    },
+    "cuentas_bancarias": {
+      "tabla": "BANCOS",
+      "columnas": {
+        "id_origen_cuenta": "CODBAN",
+        "nombre": { "concat": ["BANCO", { "mapa": "MONEDA", "valores": { "S": "soles", "D": "dólares" } }], "sep": " " },
+        "banco": "BANCO",
+        "numero_cuenta": "NROCTA",
+        "moneda": { "mapa": "MONEDA", "valores": { "S": "PEN", "D": "USD" } },
+        "cuenta_contable_codigo": "CTACON",
+        "tipo_cuenta": { "valor": "CORRIENTE" },
+        "saldo_apertura": "SALDO",
+        "fecha_apertura": "FECSAL",
+        "tipo_cambio": "TC"
+      }
+    },
+    "listas_precios": {
+      "tabla": "LISTADET",
+      "unir": [{ "tabla": "LISTAPRE", "campo": "IDLIS", "con": "IDLIS", "como": "L" }],
+      "columnas": {
+        "id_origen_lista": "IDLIS",
+        "codigo": { "concat": [{ "valor": "ORI-" }, "IDLIS"] },
+        "nombre": "L.NOMBRE",
+        "moneda": { "mapa": "L.MONEDA", "valores": { "S": "PEN", "D": "USD" } },
+        "vigencia_desde": "L.FECINI",
+        "producto_codigo": { "mayusculas": "CODART" },
+        "precio_unitario": "PRECIO",
+        "cliente_codigo": "L.CODCLI",
+        "cantidad_minima": "CANMIN"
+      }
+    },
+    "cxc": {
+      "tabla": "CXCDOC",
+      "filtro": [{ "campo": "TIPDOC", "en": ["01", "03"] }, { "campo": "SALDO", "mayor": 0 }],
+      "columnas": {
+        "external_id": { "concat": [{ "valor": "CXC-" }, "IDDOC"] },
+        "external_id_cliente": "CODCLI",
+        "tipo_documento": { "mapa": "TIPDOC", "valores": { "01": "FACTURA", "03": "BOLETA" } },
+        "serie": "SERIE",
+        "numero": "NUMERO",
+        "fecha_emision": "FECEMI",
+        "fecha_vencimiento": "FECVEN",
+        "moneda": { "mapa": "MONEDA", "valores": { "S": "PEN", "D": "USD" } },
+        "monto_total": "TOTAL",
+        "saldo_pendiente": "SALDO"
+      }
+    },
+    "cxp": {
+      "tabla": "CXPDOC",
+      "filtro": [{ "campo": "TIPDOC", "en": ["01", "03"] }, { "campo": "SALDO", "mayor": 0 }],
+      "columnas": {
+        "external_id": { "concat": [{ "valor": "CXP-" }, "IDDOC"] },
+        "external_id_proveedor": "CODPRO",
+        "tipo_documento": { "mapa": "TIPDOC", "valores": { "01": "FACTURA", "03": "BOLETA" } },
+        "serie": "SERIE",
+        "numero": "NUMERO",
+        "fecha_emision": "FECEMI",
+        "fecha_vencimiento": "FECVEN",
+        "moneda": { "mapa": "MONEDA", "valores": { "S": "PEN", "D": "USD" } },
+        "monto_total": "TOTAL",
+        "saldo_pendiente": "SALDO"
+      }
+    },
+    "balance": {
+      "tabla": "SALDOCTA",
+      "columnas": { "cuenta_contable_codigo": "CUENTA", "debe": "DEBE", "haber": "HABER", "descripcion": "DESCRI" }
+    },
+    "contratos": {
+      "tabla": "CONTDET",
+      "unir": [{ "tabla": "CONTRATO", "campo": "IDCONT", "con": "IDCONT", "como": "C" }],
+      "filtro": [{ "campo": "C.ESTADO", "en": ["V"] }],
+      "columnas": {
+        "id_origen_contrato": "C.IDCONT",
+        "numero": "C.NUMERO",
+        "cliente_codigo": "C.CODCLI",
+        "asunto": "C.DESCRIP",
+        "moneda": { "mapa": "C.MONEDA", "valores": { "S": "PEN", "D": "USD" } },
+        "vigencia_desde": "C.FECINI",
+        "vigencia_hasta": "C.FECFIN",
+        "id_origen_linea": "ITEM",
+        "producto_codigo": { "mayusculas": "CODART" },
+        "cantidad_original": "CANTIDAD",
+        "cantidad_ejecutada": "CANTENT",
+        "precio_unitario": "PRECIO",
+        "estado": { "valor": "VIGENTE" }
+      }
+    },
+    "oc": {
+      "tabla": "OCDET",
+      "unir": [{ "tabla": "OCCAB", "campo": "IDOC", "con": "IDOC", "como": "O" }],
+      "filtro": [{ "campo": "O.ANULADA", "distinto": true }],
+      "columnas": {
+        "id_origen_oc": "O.IDOC",
+        "id_origen_contrato": "O.IDCONT",
+        "numero": "O.NUMOC",
+        "fecha_emision": "O.FECHA",
+        "id_origen_linea": "ITEM",
+        "id_origen_linea_contrato": "ITEMCONT",
+        "cantidad_original": "CANTIDAD",
+        "cantidad_entregada": "CANTENT"
+      }
+    },
+    "cronograma": {
+      "tabla": "CRONOG",
+      "filtro": [{ "campo": "ESTADO", "en": ["P"] }],
+      "columnas": {
+        "id_origen_entrega": { "concat": ["IDOC", "ITEM", "NROENT"], "sep": "-" },
+        "id_origen_oc": "IDOC",
+        "id_origen_linea_oc": "ITEM",
+        "fecha_programada": "FECENT",
+        "cantidad": "CANTIDAD",
+        "cantidad_entregada": "CANTENT",
+        "destino": "LUGAR"
+      }
+    },
+    "oc_compra": {
+      "tabla": "OCCDET",
+      "unir": [{ "tabla": "OCCOMPRA", "campo": "IDOC", "con": "IDOC", "como": "O" }],
+      "filtro": [{ "campo": "O.ESTADO", "en": ["P"] }],
+      "columnas": {
+        "id_origen_oc": "IDOC",
+        "numero": "O.NUMERO",
+        "proveedor_codigo": "O.CODPRO",
+        "fecha_orden": "O.FECHA",
+        "moneda": { "mapa": "O.MONEDA", "valores": { "S": "PEN", "D": "USD" } },
+        "producto_codigo": { "mayusculas": "CODART" },
+        "cantidad_original": "CANT",
+        "cantidad_recibida": "CANREC",
+        "precio_unitario": "PRECIO",
+        "fecha_entrega_esperada": "O.FECENT",
+        "almacen_codigo": { "concat": [{ "valor": "ORI-" }, "O.CODALM"] }
+      }
+    },
+    "pedidos_venta": {
+      "tabla": "PEDDET",
+      "unir": [{ "tabla": "PEDIDO", "campo": "IDPED", "con": "IDPED", "como": "P" }],
+      "filtro": [{ "campo": "P.ESTADO", "en": ["P"] }],
+      "columnas": {
+        "id_origen_pedido": "IDPED",
+        "numero": "P.NUMERO",
+        "cliente_codigo": "P.CODCLI",
+        "moneda": { "mapa": "P.MONEDA", "valores": { "S": "PEN", "D": "USD" } },
+        "producto_codigo": { "mayusculas": "CODART" },
+        "cantidad_original": "CANT",
+        "cantidad_despachada": "CANDES",
+        "precio_unitario": "PRECIO"
+      }
+    },
+    "stock": {
+      "tabla": "SALDOS",
+      "filtro": [{ "campo": "STOCK", "mayor": 0 }],
+      "columnas": {
+        "external_id_producto": "CODART",
+        "cantidad": "STOCK",
+        "costo_unitario": "COSTO",
+        "lote": "LOTE",
+        "fecha_vencimiento": "FECVEN",
+        "almacen_codigo": { "concat": [{ "valor": "ORI-" }, "CODALM"] }
+      }
+    }
+  }
+}

@@ -8,10 +8,12 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const backports = {
+  // La versión publicada ya corrige el aviso: sin parche ni huellas, pero se sigue
+  // comprobando sobre la copia instalada que rechaza la firma falsificada.
   'node-forge': {
-    version: '1.4.0', advisory: 'GHSA-86w9-cpqp-85rv',
+    version: '1.4.2', advisory: 'GHSA-86w9-cpqp-85rv',
     source: 'https://github.com/digitalbazaar/forge/pull/1152',
-    files: { 'lib/rsa.js': 'acc22e5d36e27832c34e02dd3933aad7977d45b047eead5016520735efedc9c5' },
+    files: {},
   },
   braces: {
     version: '3.0.3', advisory: 'GHSA-vfj7-8cjw-p6xm',

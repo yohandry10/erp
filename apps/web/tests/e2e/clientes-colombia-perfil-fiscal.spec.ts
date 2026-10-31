@@ -1,3 +1,4 @@
+import { fiscalCountryFixture } from './fixtures/fiscal-country'
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { SignJWT } from 'jose'
 import fs from 'node:fs'
@@ -75,16 +76,15 @@ async function prepareColombiaSession(
     })
 
     if (/\/api\/auth\/profile\/?$/.test(pathname)) return json(user)
+    if (pathname.replace(/\/$/, '') === '/api/tenants/me') return json({ data: { id: user.tenant_id, nombre: 'Empresa aislada', estado: 'ACTIVO' } });
     if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
-      return json({
-        data: {
+      return json(fiscalCountryFixture(user.tenant_id, {
           pais_id: 2,
           pais: 'CO',
           paisCodigo: 'CO',
           monedaDefecto: 'COP',
           locale: 'es-CO',
-        },
-      })
+        }))
     }
     if (/\/api\/usuarios-sistema\/me\/permissions\/?$/.test(pathname)) {
       return json({ data: [] })

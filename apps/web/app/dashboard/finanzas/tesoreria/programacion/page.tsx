@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { parseDateLocal } from '@/lib/date-utils'
-import { useApi } from '@/hooks/use-api'
+import { useFinanceReport } from '@/hooks/use-finance-report'
+import { readPaymentSchedule } from '@/lib/finanzas/report-read-contract'
+import FinanceReportStatus from '@/components/finanzas/FinanceReportStatus'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import {
   Calendar,
@@ -78,10 +80,6 @@ const URGENCIA_CONFIG = {
 export default function ProgramacionPagosPage() {
   const { currency, locale, formatCurrency: formatLocalizedCurrency, taxIdLabel } = useLocalizedMoney()
   const router = useRouter()
-  const { get } = useApi()
-
-  const [pagos, setPagos] = useState<PagoProximo[]>([])
-  const [loading, setLoading] = useState(true)
   const [selectedPagos, setSelectedPagos] = useState<Set<string>>(new Set())
 
   // Filtros
@@ -92,13 +90,8 @@ export default function ProgramacionPagosPage() {
 
   // Paginación
   const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
   const [limit] = useState(50)
-
-  const loadProgramacion = useCallback(async () => {
-    try {
-      setLoading(true)
-
+  const endpoint = useMemo(() => {
       const params = new URLSearchParams()
       if (fechaDesde) params.append('fecha_desde', fechaDesde)
       if (fechaHasta) params.append('fecha_hasta', fechaHasta)
@@ -106,29 +99,12 @@ export default function ProgramacionPagosPage() {
       params.append('page', page.toString())
       params.append('limit', limit.toString())
 
-      const response = await get(`/api/finanzas/tesoreria/programacion?${params.toString()}`)
-
-      if (response?.success) {
-        let data = response.data || []
-
-        // Filtrar por urgencia si está seleccionado
-        if (urgenciaFilter) {
-          data = data.filter((p: PagoProximo) => p.urgencia === urgenciaFilter)
-        }
-
-        setPagos(data)
-        setTotal(response.total || 0)
-      }
-    } catch (error) {
-      console.error('Error loading programación:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [get, fechaDesde, fechaHasta, estado, urgenciaFilter, page, limit])
-
-  useEffect(() => {
-    loadProgramacion()
-  }, [loadProgramacion])
+      return `/api/finanzas/tesoreria/programacion?${params.toString()}`
+  }, [fechaDesde, fechaHasta, estado, page, limit])
+  const { data, loading, error, reload: loadProgramacion } = useFinanceReport(endpoint, readPaymentSchedule)
+  const pagos = ((data?.data ?? []) as PagoProximo[]).filter(p => !urgenciaFilter || p.urgencia === urgenciaFilter)
+  const total = data?.total ?? 0
+  useEffect(() => { setSelectedPagos(new Set()) }, [loading, endpoint, urgenciaFilter])
 
   const formatCurrency = (amount: number, moneda: string = currency) => {
     return formatLocalizedCurrency(amount, moneda)
@@ -224,7 +200,7 @@ export default function ProgramacionPagosPage() {
           <p className="mt-2 text-base text-muted-foreground">Planifica los pagos a proveedores por fecha de vencimiento</p>
         </div>
         <div className="flex gap-4 items-center">
-          {selectedPagos.size > 0 && (
+          {!loading && !error && selectedPagos.size > 0 && (
             <button
               onClick={handlePagoMasivo} className="py-3 px-6 rounded-[6px] border-0 bg-blue-500 text-white cursor-pointer text-[0.875rem] font-semibold flex items-center gap-2"
             >
@@ -243,6 +219,8 @@ export default function ProgramacionPagosPage() {
       </div>
 
       {/* Estadísticas */}
+      {!loading && !error && <>
+      <p className="text-sm text-muted-foreground">Resumen de los pagos visibles en esta página</p>
       <div className="mb-8 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-5 grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))]">
         <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
           <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
@@ -295,6 +273,7 @@ export default function ProgramacionPagosPage() {
         </div>
       </div>
 
+      </>}
       {/* Filtros */}
       <div className="relative rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl">
         <div className="flex justify-between items-center mb-4">
@@ -369,11 +348,8 @@ export default function ProgramacionPagosPage() {
       {/* Tabla de Pagos */}
       <div className="relative rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl">
         <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
-          {loading ? (
-            <div className="flex min-h-48 items-center justify-center">
-              <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
-              <p>Cargando programación de pagos...</p>
-            </div>
+          {loading || error ? (
+            <FinanceReportStatus loading={loading} retry={loadProgramacion} />
           ) : pagos.length === 0 ? (
             <div className="text-center p-12 text-muted-foreground">
               <Calendar size={48} className="text-[#d1d5db]" />
@@ -389,7 +365,7 @@ export default function ProgramacionPagosPage() {
                   <thead>
                     <tr>
                       <th className="p-4 w-10">
-                        <input aria-label="Importe"
+                        <input aria-label="Seleccionar todos los pagos visibles"
                           type="checkbox"
                           checked={selectedPagos.size === pagos.length && pagos.length > 0}
                           onChange={handleSelectAll} className="cursor-pointer"
@@ -430,7 +406,7 @@ export default function ProgramacionPagosPage() {
                         key={pago.id} className="border-b"
                       >
                         <td className="p-4">
-                          <input aria-label="Has"
+                          <input aria-label={`Seleccionar ${pago.numero_documento}`}
                             type="checkbox"
                             checked={selectedPagos.has(pago.id)}
                             onChange={() => handleSelectPago(pago.id)} className="cursor-pointer"
@@ -463,10 +439,10 @@ export default function ProgramacionPagosPage() {
                           </div>
                           <div className="text-xs">
                             {pago.dias_hasta_vencimiento < 0
-                              ? `Vencido hace ${Math.abs(pago.dias_hasta_vencimiento)} días`
+                              ? `Vencido hace ${Math.abs(pago.dias_hasta_vencimiento)} ${pago.dias_hasta_vencimiento === -1 ? 'día' : 'días'}`
                               : pago.dias_hasta_vencimiento === 0
                               ? 'Vence hoy'
-                              : `Vence en ${pago.dias_hasta_vencimiento} días`
+                              : `Vence en ${pago.dias_hasta_vencimiento} ${pago.dias_hasta_vencimiento === 1 ? 'día' : 'días'}`
                             }
                           </div>
                         </td>

@@ -1,4 +1,6 @@
-import { Body, Controller, Get, NotFoundException, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException, Body, Controller, Get, Headers, NotFoundException, Param, ParseUUIDPipe, Post, Query, Res, UseGuards,
+} from '@nestjs/common';
 import { Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -8,7 +10,17 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { MigrationService } from './migration.service';
+import { OrigenArchivoService } from './archivo-origen.service';
 import {
+  OrigenArchivoCierreDto,
+  OrigenArchivoConsultaDto,
+  OrigenArchivoDescarteDto,
+  OrigenArchivoFilasDto,
+  OrigenArchivoLoteDto,
+  OrigenConciliacionDto,
+  OrigenEnsayoDto,
+  MIGRATION_ORIGEN_MAESTRO_RUN_TYPES,
+  MigrationOrigenMaestroRunType,
   MigrationImportDto,
   MigrationPreviewDto,
   MigrationRunType,
@@ -23,7 +35,10 @@ import {
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @Throttle({ default: { limit: 20, ttl: 60000 } })
 export class MigrationController {
-  constructor(private readonly service: MigrationService) {}
+  constructor(
+    private readonly service: MigrationService,
+    private readonly archivo: OrigenArchivoService,
+  ) {}
 
   @Get('templates/:runType')
   @RequirePermission('migration.templates.read')
@@ -119,6 +134,134 @@ export class MigrationController {
     @CurrentUser('id') userId: string,
   ) {
     return this.service.import('comprobantes_historico', body, tenantId, userId);
+  }
+
+  @Post('contratos-suministro/import')
+  @RequirePermission('migration.suministro.import')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async importContratosSuministro(
+    @Body() body: MigrationImportDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.service.import('contratos_suministro', body, tenantId, userId);
+  }
+
+  @Post('oc-suministro/import')
+  @RequirePermission('migration.suministro.import')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async importOcSuministro(
+    @Body() body: MigrationImportDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.service.import('oc_suministro', body, tenantId, userId);
+  }
+
+  @Post('cronograma-suministro/import')
+  @RequirePermission('migration.suministro.import')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async importCronogramaSuministro(
+    @Body() body: MigrationImportDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.service.import('cronograma_suministro', body, tenantId, userId);
+  }
+
+  /** Maestros y saldos abiertos del sistema anterior: almacenes, plan de cuentas, productos, bancos, listas, OC y pedidos. */
+  @Post('origen/:runType/import')
+  @RequirePermission('migration.origen.import')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  async importMaestroOrigen(
+    @Param('runType') runType: string,
+    @Body() body: MigrationImportDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    if (!MIGRATION_ORIGEN_MAESTRO_RUN_TYPES.includes(runType as MigrationOrigenMaestroRunType))
+      throw new BadRequestException(`Maestro no soportado: ${runType}`);
+    return this.service.import(runType as MigrationOrigenMaestroRunType, body, tenantId, userId);
+  }
+
+  @Post('origen/archivo/lotes')
+  @RequirePermission('migration.archivo.import')
+  async crearLoteArchivo(
+    @Body() body: OrigenArchivoLoteDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+    @Headers('idempotency-key') key?: string,
+  ) {
+    return this.archivo.crearLote(tenantId, userId, body, key);
+  }
+
+  /** Tandas de hasta 2000 filas: un extracto grande llega en muchas llamadas. */
+  @Post('origen/archivo/lotes/:id/filas')
+  @RequirePermission('migration.archivo.import')
+  @Throttle({ default: { limit: 600, ttl: 60000 } })
+  async archivarFilas(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: OrigenArchivoFilasDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.archivo.archivarFilas(tenantId, userId, id, body);
+  }
+
+  @Post('origen/archivo/lotes/:id/cerrar')
+  @RequirePermission('migration.archivo.import')
+  async cerrarLoteArchivo(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: OrigenArchivoCierreDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+    @Headers('idempotency-key') key?: string,
+  ) {
+    return this.archivo.cerrarLote(tenantId, userId, id, body, key);
+  }
+
+  @Post('origen/archivo/lotes/:id/descartar')
+  @RequirePermission('migration.archivo.import')
+  async descartarLoteArchivo(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: OrigenArchivoDescarteDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+    @Headers('idempotency-key') key?: string,
+  ) {
+    return this.archivo.descartarLote(tenantId, userId, id, body, key);
+  }
+
+  @Get('origen/archivo')
+  @RequirePermission('migration.archivo.read')
+  @Throttle({ default: { limit: 120, ttl: 60000 } })
+  async consultarArchivo(
+    @Query() query: OrigenArchivoConsultaDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.archivo.consultar(tenantId, userId, query);
+  }
+
+  @Post('origen/ensayo')
+  @RequirePermission('migration.origen.import')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async ensayoOrigen(
+    @Body() body: OrigenEnsayoDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.service.ensayoOrigen(body, tenantId, userId);
+  }
+
+  @Post('origen/conciliacion')
+  @RequirePermission('migration.validar.read')
+  async conciliacionOrigen(
+    @Body() body: OrigenConciliacionDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.service.conciliarOrigen(body.control, tenantId, userId, body.sistemaOrigen);
   }
 
   @Get('runs')

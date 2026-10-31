@@ -1,3 +1,4 @@
+import { requireTenantRecord } from '../../shared/utils/require-tenant-record';
 import {
   BadRequestException,
   ConflictException,
@@ -28,6 +29,10 @@ export class UserManagementService {
     private readonly emailService: EmailService,
     private readonly permissionService: PermissionService,
   ) {}
+
+  async assertUserExists(tenantId: string, userId: string): Promise<void> {
+    await requireTenantRecord(this.supabase.getClient(), 'usuarios_sistema', tenantId, userId, 'Usuario');
+  }
 
   private requireActor(actorId?: string): string {
     const actor = actorId?.trim();

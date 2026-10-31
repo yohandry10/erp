@@ -6,6 +6,11 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  IsUUID,
+  IsIn,
+  IsInt,
+  IsDateString,
+  Matches,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -108,12 +113,14 @@ export class ActualizarCandidatoDto extends CandidatoCamposComunes {
   @IsOptional() @IsString() @MaxLength(150) apellidos?: string;
 }
 
+export const TIPOS_SOLICITUD_RRHH = ['vacaciones', 'licencia', 'permiso', 'descanso_medico', 'compensacion', 'otro'];
+
 export class CrearSolicitudDto {
-  @IsUuidOpcional() id_empleado?: string;
-  @IsOptional() @IsString() @MaxLength(30) fecha_inicio?: string;
-  @IsOptional() @IsString() @MaxLength(30) fecha_fin?: string;
-  @IsOptional() @IsNumber() @Min(0) dias?: number;
-  @IsOptional() @IsString() @MaxLength(60) tipo?: string;
+  @IsUUID('4') id_empleado!: string;
+  @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true }) fecha_inicio!: string;
+  @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true }) fecha_fin!: string;
+  @IsOptional() @IsInt() @Min(1) dias?: number;
+  @IsIn(TIPOS_SOLICITUD_RRHH) tipo!: string;
   @IsOptional() @IsString() @MaxLength(2000) motivo?: string;
   @IsOptional() @IsString() @MaxLength(2000) comentario?: string;
   @IsOptional() @IsString() @MaxLength(2000) observaciones?: string;

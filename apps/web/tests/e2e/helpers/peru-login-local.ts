@@ -8,8 +8,10 @@ export async function loginPeruLocal(page: Page, email: string, password: string
   await page.locator('#email').fill(email)
   await page.locator('#password').fill(password)
   for (let attempt = 0; attempt < 2; attempt++) {
-    const [response] = await Promise.all([
-      page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith('/api/auth/login') && response.request().method() === 'POST'),
+    const [{ response, auth }] = await Promise.all([
+      page.waitForResponse(response => new URL(response.url()).pathname.replace(/\/$/, '').endsWith('/api/auth/login') && response.request().method() === 'POST').then(async response => ({
+        response, auth: response.status() === 201 ? await response.json() : null,
+      })),
       page.getByRole('button', { name: 'Iniciar Sesión', exact: true }).click(),
     ])
     if (response.status() === 429 && attempt === 0) {
@@ -22,7 +24,7 @@ export async function loginPeruLocal(page: Page, email: string, password: string
     }
     expect(response.status()).toBe(201)
     await expect(page).toHaveURL(/\/dashboard\//, { timeout: 25000 })
-    return
+    return auth
   }
   throw new Error('Login local no confirmado después del Retry-After')
 }

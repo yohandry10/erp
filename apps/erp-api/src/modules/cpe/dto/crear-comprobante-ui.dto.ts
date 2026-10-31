@@ -26,9 +26,9 @@ import {
  * rompería a los clientes que usan los otros, porque el `ValidationPipe` global
  * corre con `forbidNonWhitelisted`.
  *
- * `tipoOperacion` y `observaciones` se aceptan y se descartan: el formulario los
- * envía siempre y el servicio no los lee. Igual `unidadMedida` y `descuento` en
- * cada ítem. Omitirlos dejaría la emisión en 400.
+ * `tipoOperacion` conserva la operación SUNAT. El formulario también envía
+ * `observaciones`, `unidadMedida` y `descuento`; declararlos evita rechazar
+ * payloads válidos en la frontera del transporte.
  *
  * Nada de esto valida reglas fiscales: eso es trabajo del servicio y de SUNAT.
  * Aquí sólo se comprueba forma y tipo.

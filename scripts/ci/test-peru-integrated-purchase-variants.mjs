@@ -28,7 +28,7 @@ export async function testPurchaseVariants({ request, sql, uuid, results, proces
   assert.equal(blocked.estado, 'PENDIENTE');
   assert.equal((await request('compras/devoluciones', blockedIntent)).id, blocked.id);
   const denied = await request(`compras/devoluciones/${blocked.id}/emitir`, {}, 400);
-  assert.match(denied.message, /SUPPLIER_CREDIT_EXCEEDS_OUTSTANDING/);
+  assert.match(denied.code ?? denied.message, /SUPPLIER_CREDIT_EXCEEDS_OUTSTANDING/);
   assert.equal(await stock(), paidStock);
   assert.equal(Number((await request(`finanzas/cxp/${paidInvoice.id}`)).data.saldo), 0);
   assert.equal((await request(`compras/devoluciones/${blocked.id}`)).estado, 'PENDIENTE');
@@ -169,6 +169,10 @@ export async function testPurchaseVariants({ request, sql, uuid, results, proces
   assert.equal(sql(`SELECT count(*) FROM detalle_asientos d JOIN asientos_contables a ON a.id=d.asiento_id JOIN plan_cuentas p ON p.id=d.cuenta_id WHERE a.source_event_id=${uuid(foreignInvoice.event_id)} AND p.codigo='42' AND d.haber=448.4;`), '1');
   assert.equal(Number((await request(`finanzas/cxp/${foreignInvoice.id}`)).data.saldo), 118);
   pass('factura USD conserva deuda documental y contabiliza en soles con su cotización de origen');
+  writeFileSync(path.join(outputDir, 'supplier-return-cancel-ui-fixture.json'), JSON.stringify({
+    tenant: tenantId, intent: returnIntent(paidOrder.id, paidReceipt.id, [physicalItem(paidReceipt.items[0].id)]),
+    productId: product.id, email: 'peru-integrated-1@example.test',
+  }, null, 2));
   writeFileSync(path.join(outputDir, 'purchase-variants.json'), JSON.stringify({ tenant_id: tenantId,
     service_id: service.id, mixed_order_id: mixedOrder.id, receipt_ids: [first.id, second.id, third.id],
     receipt_event_ids: receiptEvents, cancelled_return_id: blocked.id, unbilled_return_id: returned.id,
