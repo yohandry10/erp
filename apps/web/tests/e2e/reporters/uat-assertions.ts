@@ -13,7 +13,7 @@ export default class UatAssertionsReporter implements Reporter {
   private digest(file: string) { return createHash('sha256').update(readFileSync(file)).digest('hex') }
   private key(test: TestCase, result: TestResult) { return `${test.id}:${result.retry}` }
   onBegin() {
-    const files=execFileSync('rg',['--files','apps/web/app','apps/web/components','apps/web/contexts','apps/web/hooks','apps/web/lib','apps/web/public','apps/web/tests',
+    const files=execFileSync('git',['ls-files','--cached','--others','--exclude-standard','--','apps/web/app','apps/web/components','apps/web/contexts','apps/web/hooks','apps/web/lib','apps/web/public','apps/web/tests',
       'apps/erp-api/src','apps/erp-api/tests','libs','supabase/migrations','supabase/verify','patches','scripts/ci'],
       {cwd:this.root,encoding:'utf8',windowsHide:true,maxBuffer:4*1024*1024}).trim().split(/\r?\n/)
       .map(file=>file.replaceAll('\\','/')).filter(file=>!file.split('/').some(part=>['node_modules','dist','coverage','test-results','playwright-report','screenshots','__pycache__'].includes(part)))

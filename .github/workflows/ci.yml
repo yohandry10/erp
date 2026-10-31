@@ -280,7 +280,7 @@ jobs:
     name: Peru API, browser and backup recovery
     # Fijado: ubuntu-latest pasó a 26.04, que no trae postgresql-client-16.
     runs-on: ubuntu-24.04
-    timeout-minutes: 50
+    timeout-minutes: 120
     needs: [install]
     steps:
       - name: Checkout
@@ -300,6 +300,14 @@ jobs:
           sudo apt-get install -y postgresql-client-16
       - name: Install Chromium
         run: pnpm --filter @erp-suite/web exec playwright install --with-deps chromium
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Python browser driver
+        run: |
+          python -m pip install playwright==1.56.0
+          python -m playwright install --with-deps chromium
       - name: Verify integrated Peru flows and recovery
         run: node scripts/ci/run-peru-integrated-local.mjs --survey --records
       - name: Preserve local test evidence
