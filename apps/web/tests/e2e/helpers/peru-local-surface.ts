@@ -13,7 +13,7 @@ export const test=base.extend({
   },
   page:async({context},use)=>{
     const native=!!process.env.LOCAL_NATIVE_CDP_URL
-    const page=native?context.pages().find(p=>p.url().startsWith('http://tauri.localhost')):await context.newPage()
+    const page=native?context.pages().find(p=>URL.canParse(p.url())&&new URL(p.url()).origin==='http://tauri.localhost'):await context.newPage()
     if(!page)throw Error('No existe la ventana Windows del ensayo efímero')
     try{await use(page)}finally{if(!native)await page.close()}
   },

@@ -63,6 +63,8 @@ export default function NuevaOrdenCompraPage() {
       const intent = readPurchaseOrderCreateIntent(serialized,scope)
       if (!intent) throw new Error('La orden está incompleta.')
       if (stored && JSON.stringify(stored) !== serialized) throw new Error('Hay otra orden pendiente. Sus datos se conservan.')
+      // Intención durable: datos de negocio e ids de empresa y usuario, sin token ni contraseña.
+      // codeql[js/clear-text-storage-of-sensitive-data]
       localStorage.setItem(key,serialized)
       if (localStorage.getItem(key) !== serialized) throw new Error('No se pudo conservar la orden antes del envío.')
       setPendingIntent(intent)

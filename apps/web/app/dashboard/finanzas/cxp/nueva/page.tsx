@@ -347,6 +347,8 @@ export default function NuevaCuentaPorPagarPage() {
         const serialized = JSON.stringify(intent)
         readSupplierInvoiceIntent(serialized, scope)
         if (stored && JSON.stringify(stored) !== serialized) throw new Error('Hay otro registro pendiente. Sus datos se conservan.')
+        // Intención durable: datos de negocio e ids de empresa y usuario, sin token ni contraseña.
+        // codeql[js/clear-text-storage-of-sensitive-data]
         localStorage.setItem(storageKey, serialized)
         if (localStorage.getItem(storageKey) !== serialized) throw new Error('No se pudo conservar el registro antes del envío.')
         setPendingIntent(intent)

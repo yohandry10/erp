@@ -6,6 +6,7 @@ export function parseCsvRecords(content: string, separator = ','): string[][] {
   let quoted = false;
   let closedQuote = false;
   const fail = (message: string): never => { throw new Error(`Registro ${records.length + 1}: ${message}`); };
+  if (typeof content !== 'string') fail('contenido inválido');
   if (separator.length !== 1 || /[\r\n"]/.test(separator)) fail('separador inválido');
   const finishField = () => { columns.push(field.trim()); field = ''; closedQuote = false; };
   const finishRecord = () => { finishField(); if (columns.some(value => value !== '')) records.push(columns); columns = []; };

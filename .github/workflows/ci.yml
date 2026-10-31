@@ -141,6 +141,9 @@ jobs:
       - name: Run tests with coverage
         run: pnpm test:cov
 
+      - name: Verify data migration tooling
+        run: node --test scripts/migracion/migracion.test.mjs
+
       - name: Verify desktop session persistence
         run: pnpm --filter @erp-suite/web test:auth-session
 
@@ -259,9 +262,6 @@ jobs:
 
       - name: Rebuild and verify the required database contract
         run: node scripts/ci/verify-database-contracts.mjs
-
-      - name: Verify data migration tooling
-        run: node --test scripts/migracion/migracion.test.mjs
 
       - name: Verify tenant data export
         env:

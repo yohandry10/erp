@@ -93,8 +93,9 @@ sin datos de clientes.
 
 Los parches de dependencias sin versión publicada viven en `patches/` y se
 instalan mediante `pnpm.patchedDependencies` en desarrollo, CI y las tres
-imágenes Docker. Para `node-forge@1.4.0`, el parche reproduce el cambio de
-`digitalbazaar/forge#1152` contra GHSA-86w9-cpqp-85rv. Para `braces@3.0.3`,
+imágenes Docker. `node-forge` 1.4.2 ya publica la corrección de GHSA-86w9-cpqp-85rv:
+no lleva parche, pero el gate sigue comprobando sobre la copia instalada que rechaza
+la firma falsificada. Para `braces@3.0.3`,
 GHSA-vfj7-8cjw-p6xm se corrige limitando a 128 la profundidad del parser y los
 tres recorridos recursivos, incluidos los AST entregados directamente.
 `scripts/ci/audit-dependencies.mjs` conserva los avisos del registro, verifica

@@ -112,6 +112,8 @@ export default function SolicitudesRrhhPage() {
       const serialized = JSON.stringify(intent)
       const stored = localStorage.getItem(storageKey)
       if (stored !== null && stored !== serialized) throw new Error('La operación pendiente cambió. Se conserva para revisar su resultado.')
+      // Intención durable: datos de negocio e ids de empresa y usuario, sin token ni contraseña.
+      // codeql[js/clear-text-storage-of-sensitive-data]
       localStorage.setItem(storageKey, serialized)
       if (localStorage.getItem(storageKey) !== serialized) throw new Error('No se pudo conservar la operación antes del envío.')
       setPendingIntent(intent)
