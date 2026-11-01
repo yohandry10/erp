@@ -13,6 +13,10 @@ acredita flujos con sesión en PROD. Render sirvió ese commit con la CI de `mai
 curso: `autoDeployTrigger: checksPass` no garantiza que espere a toda la CI, así que el
 esquema debe estar promovido antes de fusionar.
 
+Documentación de producto: `manual/`, con referencias generadas desde el código y
+`pnpm check-manual`. Cubre suministro, lotes, migración y Analytics, pero no está
+terminada: `manual/EVALUACION_DE_PRODUCTO.md` indica qué falta.
+
 Numeración: el candidato de Codex usaba 570–577 para migraciones distintas de las
 de suministro. Al integrarlo pasaron a 583 (estructura de establecimientos y
 operaciones), 584 (edición de clientes), 585 (estimaciones de activos), 586

@@ -1,5 +1,7 @@
 # Documentación del ERP
 
+La documentación de producto para usuarios y soporte está en `manual/`.
+
 Esta carpeta contiene exactamente seis documentos canónicos. No almacena
 auditorías, resultados de pruebas, inventarios generados ni memoria de agentes.
 
