@@ -1,0 +1,86 @@
+{
+  "archiveSha256": "6ac459c1bfbb9569dbd484d4533eab54e2e861cb0678cec155ba1409b2a773c6",
+  "exito": true,
+  "redDelContenedor": "none",
+  "conexionesRemotas": 0,
+  "desde": 591,
+  "hasta": 593,
+  "limites": [
+    "Sin objetos de Storage ni roles globales reales; el tiempo local no acredita el de PROD."
+  ],
+  "restaurarMs": 10502,
+  "esquemaDelRespaldo": 569,
+  "entornoDelRespaldo": "PROD",
+  "aplicadasAntesDelLote": [
+    570,
+    571,
+    572,
+    573,
+    574,
+    575,
+    576,
+    577,
+    578,
+    579,
+    580,
+    581,
+    582,
+    583,
+    584,
+    585,
+    586,
+    587,
+    588,
+    589,
+    590
+  ],
+  "loteSha256": "fdc1b4a2b194d9d040d56b932fabac2c3e709bcd3b359adeec8bb67da10a311d",
+  "migraciones": [
+    "591__anon_sin_escritura.sql",
+    "592__notificaciones_lecturas_por_usuario.sql",
+    "593__cambiar_password_propio.sql"
+  ],
+  "tablas": 333,
+  "filas": 216388,
+  "rollbackMs": 236,
+  "rollbackSinRastro": true,
+  "aplicarMs": 235,
+  "esquemaFinal": 593,
+  "tablasNuevas": [
+    "public.notificaciones_lecturas"
+  ],
+  "tablasPerdidas": [],
+  "columnasPerdidas": [],
+  "tablasConDatosCambiados": [],
+  "funcionesPublicasRetiradas": [],
+  "salud": {
+    "ready": true,
+    "esquema": 593,
+    "cola_muerta": 7,
+    "requerido_aplicado": true
+  },
+  "movimientosBancarios": {
+    "nulos": 0,
+    "total": 40,
+    "inactivos": 0
+  },
+  "defaultActivo": "true",
+  "verificadores": [
+    {
+      "version": 591,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 592,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 593,
+      "ok": true,
+      "error": null
+    }
+  ],
+  "verificadoresFallidos": 0
+}

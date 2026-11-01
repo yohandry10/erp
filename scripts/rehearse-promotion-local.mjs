@@ -71,6 +71,7 @@ try {
   assert.ok(listo, 'PostgreSQL no arrancó');
 
   paso = 'restaurar respaldo';
+  const inicioRestauracion = Date.now();
   docker(['cp', dump, `${contenedor}:/tmp/fuente.dump`]);
   const esquema = docker(['exec', contenedor, 'pg_restore', '--schema-only', '--no-owner', '--file=-', '/tmp/fuente.dump']);
   const roles = new Set(['anon', 'authenticated', 'service_role']);
@@ -84,6 +85,7 @@ try {
   const lista = docker(['exec', contenedor, 'pg_restore', '--list', '/tmp/fuente.dump']).split('\n').filter((l) => !/^\d+; \d+ \d+ SCHEMA - public /.test(l));
   docker(['exec', '-i', contenedor, 'sh', '-c', 'cat > /tmp/restaurar.lista'], lista.join('\n'));
   docker(['exec', contenedor, 'pg_restore', '-U', 'postgres', '-d', 'erp_e2e', '--no-owner', '--exit-on-error', '--single-transaction', '--use-list=/tmp/restaurar.lista', '/tmp/fuente.dump']);
+  informe.restaurarMs = Date.now() - inicioRestauracion;
   informe.esquemaDelRespaldo = Number(sql(consultaEsquema));
   informe.entornoDelRespaldo = sql('SELECT environment FROM app.deployment_environment WHERE singleton;');
 
