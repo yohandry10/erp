@@ -22,10 +22,6 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
   const mutationInFlight = useRef(false)
   const { get, put, delete: del } = useApi({ showErrorToast: false, throwOnError: true })
   const { hasPermission: canDelete } = usePermission('notifications', 'delete', '')
-  // Un aviso compartido (global o de rol) marcado como leído queda leído para toda
-  // la empresa; sólo quien tiene notifications.update lo marca (el API lo exige).
-  const { hasPermission: canMarkShared } = usePermission('notifications', 'update', '')
-  const canMark = (item: Notification) => Boolean(item.usuario_id) || canMarkShared
 
   const fetchNotifications = useCallback(async () => {
     setLoading(true)
@@ -77,8 +73,6 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
   }
 
   const handleMarkAsRead = (id: string) => {
-    const target = notifications.find(item => item.id === id)
-    if (!target || !canMark(target)) return
     return mutate(
     () => put(`/api/notifications/${id}/read`),
     () => setNotifications((prev) => prev.map((item) => (item.id === id ? { ...item, leida: true } : item))),
@@ -97,7 +91,7 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
 
   const handleMarkAllAsRead = () => mutate(
     () => put('/api/notifications/mark-all-read'),
-    () => setNotifications((prev) => prev.map((item) => canMark(item) ? { ...item, leida: true } : item)),
+    () => setNotifications((prev) => prev.map((item) => ({ ...item, leida: true }))),
   )
 
   const unreadCount = notifications.filter((item) => !item.leida).length

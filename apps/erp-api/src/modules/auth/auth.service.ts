@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, Logger, InternalServerErrorException, Inject, forwardRef, HttpException, HttpStatus, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger, InternalServerErrorException, Inject, forwardRef, HttpException, HttpStatus, ServiceUnavailableException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EmailService } from '../../shared/email/email.service';
@@ -147,15 +147,13 @@ export class AuthService {
         .eq('success', false)
         .gte('created_at', cutoffTime.toISOString());
 
-      if (error) {
-        this.logger.error('Error verificando intentos fallidos:', error);
-        return false; // No bloquear si hay error en la consulta
-      }
+      if (error) throw error;
 
       return (attempts?.length || 0) >= maxAttempts;
     } catch (error) {
+      // Falla cerrado: sin esta lectura no hay límite, y atacar la consulta anularía el bloqueo.
       this.logger.error('Error en checkFailedAttemptsLimit:', error);
-      return false;
+      throw new ServiceUnavailableException('Servicio de autenticación temporalmente no disponible');
     }
   }
 
@@ -652,6 +650,37 @@ export class AuthService {
     } catch (error) {
       this.logger.error(`Error resetting password for email: ${email}`, error);
       throw error;
+    }
+  }
+
+  async changeOwnPassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const user = await this.findUserById(userId);
+    if (!user?.password_hash || !(await bcrypt.compare(currentPassword, user.password_hash))) {
+      // 400 y no 401: la sesión es válida, y un 401 haría que la web la cerrara.
+      throw new BadRequestException('La contraseña actual no es correcta');
+    }
+    if (await bcrypt.compare(newPassword, user.password_hash)) {
+      throw new BadRequestException('La contraseña nueva debe ser distinta de la actual');
+    }
+
+    const { data, error } = await this.supabaseService.getAdminClient().rpc('cambiar_password_propio_auth_tx', {
+      p_usuario_id: userId,
+      p_expected_password_hash: user.password_hash,
+      p_new_password_hash: await bcrypt.hash(newPassword, 10),
+    });
+    if (error) {
+      this.logger.error(`No se pudo cambiar la contraseña del usuario ${userId}: ${error.message}`);
+      throw new ServiceUnavailableException('No se pudo cambiar la contraseña. Intente nuevamente.');
+    }
+    if (!data) {
+      throw new BadRequestException('La contraseña actual no es correcta');
+    }
+
+    // La contraseña ya cambió: que falle el aviso por correo no lo deshace.
+    try {
+      await this.emailService.sendPasswordResetConfirmationEmail(user.email, user.nombre || user.nombre_usuario || 'Usuario');
+    } catch (mailError) {
+      this.logger.warn(`Contraseña cambiada, pero no se pudo avisar a ${userId}: ${(mailError as Error)?.message}`);
     }
   }
 

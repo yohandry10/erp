@@ -21,7 +21,12 @@ Actualizado: 2026-11-01. Una página: si algo no cabe aquí, va a su documento d
 | `570..582` | Suministro, lotes y migración desde otro sistema: aplicadas |
 | `583..590` | Correcciones Perú del candidato, que las numeraba 570–577: aplicadas |
 
-Próxima libre: `591`. Comprobar prefijos duplicados antes de añadir una.
+| `591..593` | Anon sin escritura, lectura de avisos por usuario y contraseña propia. Ver la nota de promoción |
+
+Próxima libre: `594`. Comprobar prefijos duplicados antes de añadir una.
+
+**Promoción 591–593:** DB-first. El API que exige 593 no se fusiona sin aplicarlas antes en PROD.
+Ensayadas sobre el respaldo real (`artifacts/promocion-ensayo-591-593-20261101082811/informe.json`).
 
 ## Qué se probó
 
@@ -39,7 +44,8 @@ Expediente de la versión: `artifacts/expediente-590/EXPEDIENTE.md`. Resumen:
 - Extracto real: perfilar, mapear, ensayo con cero errores y conciliación; medir su duración,
   que corre en una transacción con `SUPABASE_LONG_FETCH_TIMEOUT_MS` (10 min por defecto).
 - Instalador Windows firmado; impresora física y prueba de carga.
-- RPO, RTO y retención acordados; medir el RTO de PROD y programar el respaldo de Storage.
+- RPO, RTO y retención acordados; programar el respaldo de Storage. Restaurar la base lleva unos
+  10 s en local con 216.000 filas; falta medir el RTO completo, con proyecto nuevo y secretos.
 - Correo productivo en Render (`SMTP_*` o SendGrid, y `FRONTEND_URL`): sin él, la recuperación de
   contraseña responde 503 y las alertas no salen. Por comprobar en Render.
 - Power BI: actualización programada real.
@@ -60,8 +66,7 @@ Detalle: `docs/RELEASE.md`.
 ## Decisiones pendientes
 
 Defectos abiertos y severidad: `artifacts/expediente-590/DEFECTOS.md`. Los que piden decisión
-de producto: alcance por sucursal si falla su lectura (A-01), límite de login si falla su
-consulta (A-02) y `rrhh.access` único (A-03). Sin investigar: 7 eventos en `cola_muerta` (A-05).
+de producto: `rrhh.access` único (A-03). Los 7 eventos en `cola_muerta` son residuos sin riesgo (A-05).
 
 ## Advertencias operativas
 

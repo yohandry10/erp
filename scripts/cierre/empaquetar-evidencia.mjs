@@ -11,8 +11,8 @@ if (!salida || !raices.length) {
   console.error('Uso: empaquetar-evidencia.mjs <salida-sin-extensión> <carpeta-artifacts>...');
   process.exit(1);
 }
-const FUERA_CARPETA = new Set(['node_modules', '.git', 'target', '.next', 'source']);
-const FUERA_ARCHIVO = /\.(exe|dll|pack|pdb|msi|pfx|p12|pem|key)$|(^|[\\/])\.env/i;
+const FUERA_CARPETA = new Set(['node_modules', '.git', 'target', '.next', 'source', 'db-backups', 'storage-backups', 'exportaciones']);
+const FUERA_ARCHIVO = /\.(exe|dll|pack|pdb|msi|pfx|p12|pem|key|jks|keystore|har)$|\.env(\.|$)|^credentials|^id_rsa|^\.npmrc$/i;
 
 const lista = [], omitidos = {};
 let bytes = 0;
