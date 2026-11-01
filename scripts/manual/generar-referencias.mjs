@@ -25,8 +25,13 @@ const CAPITULOS = [
   ['compras/recepciones', 14], ['compras/devoluciones', 14], ['compras', 13], ['inventario/recepciones', 14],
   ['inventario/productos', 6], ['inventario/logistica', 9], ['inventario', 7], ['pos', 11], ['cajas', 12], ['cpe', 15],
   ['gre', 16], ['documentos', 17], ['finanzas/cxc', 18], ['finanzas/cxp', 19], ['finanzas/bancos', 21],
-  ['finanzas/conciliacion', 21], ['finanzas', 22], ['contabilidad', 23], ['activos', 26], ['consolidacion', 30],
-  ['reportes', 31], ['impuestos', 32], ['sire', 32], ['rrhh/planillas', 34], ['rrhh', 33], ['configuracion', 4],
+  ['finanzas/conciliacion', 21], ['finanzas/ajustes-fiscales', 20], ['finanzas/reportes', 30], ['finanzas', 22],
+  ['contabilidad/periodos', 24], ['contabilidad/centros-costo', 25], ['contabilidad/presupuestos', 25],
+  ['contabilidad/activos-fijos', 26], ['contabilidad/diferidos', 27], ['contabilidad/consignaciones', 28],
+  ['contabilidad/tipos-cambio', 29], ['contabilidad/revaluacion', 29], ['contabilidad/consolidacion', 30],
+  ['contabilidad/estados', 31], ['contabilidad/monitoreo', 31], ['contabilidad/impuestos', 32], ['contabilidad', 23],
+  ['sire', 32], ['rrhh/planillas', 34], ['rrhh/pagos', 34], ['rrhh/liquidaciones', 35],
+  ['rrhh/planilla-electronica', 36], ['rrhh/fichas-sunat', 36], ['rrhh', 33], ['configuracion', 4],
   ['usuarios', 3], ['roles', 3], ['audit-logs', 37], ['ayuda', 37], ['notificaciones', 37], ['wizard', 2],
 ];
 const capitulo = (ruta) => {

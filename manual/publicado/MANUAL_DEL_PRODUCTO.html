@@ -112,6 +112,69 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </table>
 <p><strong>Ejemplo de lectura del proceso.</strong> Una orden por diez unidades puede tener cuatro recibidas, una factura por esas cuatro y un pago parcial. La orden sigue pendiente por seis unidades aunque la factura de las cuatro esté pagada. Consulte cada saldo en su recurso; no cierre la orden porque una deuda se haya cancelado.</p>
 <p><strong>Resultado de esta revisión:</strong> debe poder explicar qué etapa está confirmada, cuál está pendiente y quién puede continuarla. Si sólo se conoce un importe agregado, abra su detalle antes de modificar datos.</p>
+<h3>Dónde está cada cosa</h3>
+<p>Pantalla inicial: <code>/dashboard</code>. El menú lateral solo muestra lo que su usuario puede usar; si falta un módulo, revise sus permisos antes de suponer que no existe.</p>
+<table>
+<thead>
+<tr>
+<th>Necesito</th>
+<th>Módulo</th>
+<th>Capítulo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Vender con cotización y pedido</td>
+<td>Ventas</td>
+<td>08–10</td>
+</tr>
+<tr>
+<td>Vender en mostrador</td>
+<td>Punto de venta y cajas</td>
+<td>11–12</td>
+</tr>
+<tr>
+<td>Vender por contrato</td>
+<td>Contratos de suministro</td>
+<td>43</td>
+</tr>
+<tr>
+<td>Comprar y recibir</td>
+<td>Compras</td>
+<td>13–14</td>
+</tr>
+<tr>
+<td>Controlar stock y lotes</td>
+<td>Inventario</td>
+<td>06–07, 44</td>
+</tr>
+<tr>
+<td>Emitir comprobantes y guías</td>
+<td>CPE y GRE</td>
+<td>15–17</td>
+</tr>
+<tr>
+<td>Cobrar y pagar</td>
+<td>Finanzas</td>
+<td>18–22</td>
+</tr>
+<tr>
+<td>Cerrar el período</td>
+<td>Contabilidad</td>
+<td>23–24, 31</td>
+</tr>
+<tr>
+<td>Pagar al personal</td>
+<td>Recursos humanos</td>
+<td>33–36</td>
+</tr>
+<tr>
+<td>Pasar desde otro sistema</td>
+<td>Migración</td>
+<td>45</td>
+</tr>
+</tbody>
+</table>
 <h2 id="p0-02-primer-acceso-y-preparación-de-la-empresa">02. Primer acceso y preparación de la empresa</h2>
 <h3>Iniciar sesión</h3>
 <ol>
@@ -167,6 +230,77 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 <li>Salga y vuelva a ingresar para comprobar el acceso y la configuración persistidos.</li>
 </ol>
 <p><strong>Criterio de finalización:</strong> el servidor confirma el cierre del asistente y la empresa conserva los datos al volver. Un paso visible en pantalla o un archivo seleccionado todavía no guardado no cumplen ese criterio. Un reinicio de configuración exige revisar su confirmación y recuperar cualquier resultado incierto antes de volver a solicitarlo.</p>
+<h3>Detalle del acceso y del asistente</h3>
+<p><strong>Acceso.</strong> En <code>/login</code> están <strong>Iniciar Sesión</strong>, <strong>¿Olvidaste tu contraseña?</strong> y <strong>Acceso Demo</strong>. Tras <strong>5 intentos fallidos en 15 minutos</strong> con el mismo correo, la cuenta queda bloqueada temporalmente con el mensaje &quot;Cuenta bloqueada temporalmente. Intente más tarde.&quot;. El límite se cuenta por correo: cambiar de equipo o de red no lo evita.</p>
+<p><strong>Pasos del asistente</strong> (<code>/dashboard/wizard</code>), en orden: bienvenida, tipo de empresa, identificación fiscal, configuración fiscal, conexión con la autoridad, certificado, validación, resumen y fin. Algunos cambian de título según el país. Se avanza con <strong>Siguiente</strong>, se vuelve con <strong>Anterior</strong>, y al terminar aparecen <strong>Validar Nuevamente</strong> e <strong>Ir al Dashboard</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ver el progreso</td>
+<td><code>configuracion.read</code></td>
+</tr>
+<tr>
+<td>Guardar un paso, validar el certificado, terminar o reiniciar</td>
+<td><code>configuracion.write</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Autoridad y modo según el país:</strong></p>
+<table>
+<thead>
+<tr>
+<th>País</th>
+<th>Conexión</th>
+<th>Ambientes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Perú</td>
+<td>SUNAT directa u OSE</td>
+<td>Homologación y producción</td>
+</tr>
+<tr>
+<td>Argentina</td>
+<td>ARCA</td>
+<td>Homologación y producción</td>
+</tr>
+<tr>
+<td>Colombia</td>
+<td>DIAN</td>
+<td>Habilitación y producción</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Excepciones:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Situación</th>
+<th>Qué hacer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cuenta bloqueada</td>
+<td>Espere y reintente pasados los 15 minutos; no cree otra cuenta.</td>
+</tr>
+<tr>
+<td>Un paso no guarda</td>
+<td>Use <strong>Reintentar</strong> y compruebe el progreso; no reinicie el asistente.</td>
+</tr>
+<tr>
+<td>El certificado no valida</td>
+<td>Revise archivo y contraseña. Validarlo no equivale a estar habilitado ante la autoridad.</td>
+</tr>
+</tbody>
+</table>
 <h2 id="p0-03-usuarios-roles-permisos-y-sesiones">03. Usuarios, roles, permisos y sesiones</h2>
 <h3>Organizar responsabilidades</h3>
 <table>
@@ -277,6 +411,47 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </ol>
 <p><strong>Ejemplo:</strong> un lector contable puede consultar un registro sin recibir autorización para vender un activo o pagar una planilla. Que un menú sea visible no prueba que pueda ejecutar su acción.</p>
 <p><strong>Resultado esperado:</strong> los permisos efectivos coinciden con el puesto y los datos de otro usuario o empresa no permanecen visibles tras el cambio de sesión. Una denegación se resuelve revisando la asignación; no compartiendo la contraseña del administrador.</p>
+<h3>Detalle de usuarios y roles</h3>
+<p>Pantalla: <code>/dashboard/usuarios</code>, con usuarios y sección de roles. Administrar usuarios y roles exige <code>users.manage</code>. Quien no lo tenga ve <strong>Acceso denegado</strong> o no ve el botón <strong>Nuevo rol</strong>.</p>
+<p><strong>Estados del usuario:</strong> ACTIVO, INACTIVO y SUSPENDIDO. Se filtran por <strong>Todos los estados</strong> y <strong>Todos los roles</strong>.</p>
+<p><strong>Crear un rol:</strong> <strong>Nuevo rol</strong> → nombre y descripción → <strong>Permisos operativos</strong> → crear. Si el catálogo falla, use <strong>Reintentar permisos</strong> antes de guardar, para no crear un rol incompleto.</p>
+<p><strong>Permisos especiales:</strong> cambiar de empresa exige <code>tenants.manage</code>. Consultar sucursales de un usuario y asignárselas exige <code>configuracion.sucursales.assign</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Rechazo del sistema</th>
+<th>Qué significa</th>
+<th>Qué hacer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ADMIN_LAST_SUPERADMIN</code></td>
+<td>Es el último superadministrador</td>
+<td>Cree otro antes de retirarle el acceso</td>
+</tr>
+<tr>
+<td><code>ADMIN_ACTIVE_USER_REQUIRES_ROLE</code></td>
+<td>Un usuario activo debe tener rol</td>
+<td>Asigne otro rol o desactívelo primero</td>
+</tr>
+<tr>
+<td><code>ADMIN_ROLE_INACTIVE</code></td>
+<td>El rol está inactivo</td>
+<td>Actívelo o elija otro</td>
+</tr>
+<tr>
+<td><code>ADMIN_DEMO_USER_LIMIT</code></td>
+<td>La demostración llegó a su límite de usuarios</td>
+<td>Convierta la cuenta o retire un usuario</td>
+</tr>
+<tr>
+<td><code>ADMIN_PERMISSION_INVALID_CROSS_TENANT_OR_RESTRICTED</code></td>
+<td>El permiso es de otra empresa o restringido</td>
+<td>Elija uno del catálogo de su empresa</td>
+</tr>
+</tbody>
+</table>
 <h2 id="p0-04-identidad-parámetros-sucursales-y-series">04. Identidad, parámetros, sucursales y series</h2>
 <h3>Mantener el perfil empresarial</h3>
 <p>Desde <strong>Configuración &gt; Empresa</strong>, consulte y edite los campos que su permiso habilite: razón social, nombre comercial, dirección, teléfono y correo. Revise los obligatorios antes de guardar. Cancelar debe conservar los valores persistidos.</p>
@@ -348,6 +523,48 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 <p>El logo admite PNG o JPEG de hasta <strong>2 MiB</strong>, con un máximo de <strong>4.096 píxeles por dimensión</strong> y <strong>16.000.000 de píxeles en total</strong>. Debe cumplir todos los límites; un archivo pequeño en bytes puede exceder el máximo de resolución. Cambiar la extensión no convierte su contenido en una imagen válida.</p>
 <p>Estos límites son distintos de los de la fotografía de producto, que admite también WebP en su flujo de inventario. Si la carga del logo se rechaza, corrija el archivo y vuelva a cargarlo desde Configuración. No lo sustituya por una dirección web arbitraria ni pegue una imagen codificada en los campos de empresa. El logo es opcional y no acredita habilitación fiscal.
 &lt;!-- revision-omisiones-fin --&gt;</p>
+<h3>Detalle de empresa, sucursales y series</h3>
+<p>Pantallas: <code>/dashboard/configuracion</code>, <code>/dashboard/configuracion/empresa</code> y <code>/dashboard/configuracion/sucursales</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ver configuración y empresa</td>
+<td><code>configuracion.read</code></td>
+</tr>
+<tr>
+<td>Modificar empresa, logo, umbrales GRE y parámetros</td>
+<td><code>configuracion.write</code></td>
+</tr>
+<tr>
+<td>Ver sucursales</td>
+<td><code>configuracion.sucursales.read</code></td>
+</tr>
+<tr>
+<td>Crear una sucursal</td>
+<td><code>configuracion.sucursales.create</code></td>
+</tr>
+<tr>
+<td>Editarla o crear series</td>
+<td><code>configuracion.sucursales.update</code></td>
+</tr>
+<tr>
+<td>Eliminarla</td>
+<td><code>configuracion.sucursales.delete</code></td>
+</tr>
+<tr>
+<td>Asignar sucursales a un usuario</td>
+<td><code>configuracion.sucursales.assign</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Datos de la sucursal:</strong> nombre de hasta 160 caracteres, código de establecimiento de 1 a 4 dígitos y ubigeo de 6 dígitos.</p>
+<p><strong>Antes de asignar sucursales a un usuario</strong>, tenga presente que una sola asignación lo restringe a esa sucursal y quitarlas todas le devuelve el alcance total dentro de la empresa. Para bloquear a alguien, desactive el usuario; no le quite las sucursales.</p>
 <h2 id="p0-05-clientes-proveedores-e-importaciones">05. Clientes, proveedores e importaciones</h2>
 <h3>Alta y mantenimiento individual</h3>
 <p>Registre el tercero con su identidad, documento y datos de contacto. Compruebe los datos antes de usarlo en una cotización, pedido, cuenta o comprobante. Los documentos requeridos dependen del país y del tipo de operación.</p>
@@ -409,6 +626,74 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 <p>Cada campo del CSV admite como máximo <strong>4.096 caracteres</strong>. El límite se aplica a una celda, no al registro completo, y es independiente del tamaño máximo de archivo. Un campo que lo excede se rechaza; no se recorta automáticamente para importar una versión incompleta del dato.</p>
 <p>Si el error afecta una descripción o dirección extensa, revise el contenido y prepare una corrección consciente. No divida una celda mediante comas sin conservar el formato CSV, porque desplazaría las columnas restantes. Mantenga la identificación del registro para verificar luego la fila corregida.
 &lt;!-- revision-omisiones-fin --&gt;</p>
+<h3>Detalle de clientes y proveedores</h3>
+<p>Pantallas: <code>/dashboard/ventas/clientes</code> y <code>/dashboard/compras/proveedores</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Clientes</th>
+<th>Proveedores</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ver</td>
+<td><code>ventas.clientes.ver</code></td>
+<td><code>compras.proveedores.ver</code></td>
+</tr>
+<tr>
+<td>Crear</td>
+<td><code>ventas.clientes.crear</code></td>
+<td><code>compras.proveedores.crear</code></td>
+</tr>
+<tr>
+<td>Editar</td>
+<td><code>ventas.clientes.editar</code></td>
+<td><code>compras.proveedores.editar</code></td>
+</tr>
+<tr>
+<td>Eliminar o desactivar</td>
+<td><code>ventas.clientes.eliminar</code></td>
+<td><code>compras.proveedores.eliminar</code></td>
+</tr>
+<tr>
+<td>Validar RUC</td>
+<td><code>ventas.clientes.validar_ruc</code></td>
+<td>Búsqueda por RUC con <code>compras.proveedores.ver</code></td>
+</tr>
+<tr>
+<td>Importar CSV</td>
+<td><code>migration.clientes.import</code></td>
+<td><code>migration.proveedores.import</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estados:</strong> ACTIVO e INACTIVO. <strong>Desactivar</strong> retira al tercero de las operaciones nuevas y conserva sus documentos históricos.</p>
+<p><strong>Importar CSV:</strong> <strong>Importar</strong> → plantilla → vista previa sin escritura → <strong>Revisar y sincronizar</strong>. Admite hasta 5 MiB y cada campo hasta 4096 caracteres. Un reintento no duplica, porque cada fila conserva su <code>external_id</code>. Los errores indican el número de registro, contando el encabezado como 1, que no siempre coincide con la línea física si un campo tiene saltos de línea. El importador masivo valida documentos peruanos; en otros países se usa el alta individual.</p>
+<p><strong>Exportar página (CSV)</strong> descarga solo lo visible en la página, no todo el catálogo.</p>
+<table>
+<thead>
+<tr>
+<th>Situación</th>
+<th>Qué hacer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Un listado no carga</td>
+<td>Use <strong>Reintentar</strong>. Un error no significa que no haya registros.</td>
+</tr>
+<tr>
+<td>Una columna no se alinea</td>
+<td>Se rechaza antes de escribir: corrija el archivo, nada se truncó.</td>
+</tr>
+<tr>
+<td>Un importador no aparece</td>
+<td>Requiere el permiso <code>migration.*</code> correspondiente.</td>
+</tr>
+</tbody>
+</table>
 <h2 id="p0-06-productos-servicios-y-maestros-de-inventario">06. Productos, servicios y maestros de inventario</h2>
 <h3>Clasificación del catálogo</h3>
 <table>
@@ -495,6 +780,66 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </ol>
 <p><strong>Ejemplo:</strong> recibir 0,75 de un servicio no crea 0,75 unidades de mercadería. La unidad y el control de stock deben reflejar esa naturaleza desde el maestro.</p>
 <p><strong>Resultado esperado:</strong> el catálogo persiste sin duplicados y los cambios de marca o precio afectan operaciones futuras, conservando las fotografías de ventas ya confirmadas.</p>
+<h3>Detalle de productos, categorías y almacenes</h3>
+<p>Pantallas: <code>/dashboard/inventario/productos</code>, <code>/dashboard/inventario/categorias</code> y <code>/dashboard/inventario/almacenes</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ver productos y categorías</td>
+<td><code>inventario.productos.read</code></td>
+</tr>
+<tr>
+<td>Crear</td>
+<td><code>inventario.productos.create</code></td>
+</tr>
+<tr>
+<td>Editar, incluida la imagen</td>
+<td><code>inventario.productos.update</code></td>
+</tr>
+<tr>
+<td><strong>Dar de baja</strong></td>
+<td><code>inventario.productos.delete</code></td>
+</tr>
+<tr>
+<td>Ver, crear, editar o eliminar almacenes</td>
+<td><code>inventario.almacenes.read</code>, <code>inventario.almacenes.create</code>, <code>inventario.almacenes.update</code>, <code>inventario.almacenes.delete</code></td>
+</tr>
+<tr>
+<td>Ver, crear, editar o eliminar ubicaciones</td>
+<td><code>inventario.ubicaciones.read</code>, <code>inventario.ubicaciones.create</code>, <code>inventario.ubicaciones.update</code>, <code>inventario.ubicaciones.delete</code></td>
+</tr>
+<tr>
+<td>Consultar o gestionar lotes</td>
+<td><code>inventario.lotes.read</code>, <code>inventario.lotes.manage</code> (capítulo 44)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estados del producto:</strong> ACTIVO e INACTIVO. <strong>Dar de baja</strong> no borra su historia. Un producto con control de lote sigue además las reglas del capítulo 44.</p>
+<p><strong>Ubicaciones:</strong> se definen dentro de cada almacén, con <strong>Guardar ubicación</strong>. Con lotes activos, una ubicación con saldo está protegida frente a cambios de estado que la dejarían inconsistente.</p>
+<table>
+<thead>
+<tr>
+<th>Situación</th>
+<th>Qué hacer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>El detalle no carga</td>
+<td><strong>Reintentar producto y categorías</strong>; no cree otro producto para seguir.</td>
+</tr>
+<tr>
+<td>Costo vacío o en cero en productos antiguos</td>
+<td>Toma el costo promedio del kardex cuando existe. Ningún costo previo distinto de cero se alteró.</td>
+</tr>
+</tbody>
+</table>
 <h2 id="p0-07-existencias-kardex-ajustes-y-transferencias">07. Existencias, kardex, ajustes y transferencias</h2>
 <h3>Entender los saldos</h3>
 <p>La existencia física, la cantidad reservada y la cantidad disponible no son intercambiables. Reservar aparta disponibilidad; no equivale a una salida física. El despacho y las demás operaciones físicas dejan movimientos con producto, almacén, cantidad, costo y referencia.</p>
@@ -563,6 +908,38 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 <p>La consulta manual del recibo original no repite el ajuste ni la transferencia y puede recuperar el resultado aunque fallen los catálogos actuales. Si el recibo es ajeno, parcial o inválido, la operación continúa pendiente. No cambie producto o almacén para intentar recuperar otra operación.</p>
 <h3>Stock y precios en la sucursal seleccionada</h3>
 <p>Compruebe empresa, sucursal y almacén antes de interpretar disponibilidad o precio. Las fuentes deben terminar de cargar todas sus páginas; no extrapole el stock de una primera página ni reutilice datos de otra sucursal. Si cambia el alcance, espere la nueva consulta y descarte la respuesta del alcance anterior.</p>
+<h3>Detalle de movimientos y kardex</h3>
+<p>Pantallas: <code>/dashboard/inventario</code>, <code>/dashboard/inventario/operaciones</code> y <code>/dashboard/inventario/kardex</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Consultar el kardex</td>
+<td><code>inventario.kardex.read</code></td>
+</tr>
+<tr>
+<td>Consultar movimientos</td>
+<td><code>inventario.movimientos.read</code></td>
+</tr>
+<tr>
+<td>Registrar ajustes y transferencias, o consultar su resultado</td>
+<td><code>inventario.movimientos.create</code></td>
+</tr>
+<tr>
+<td>Consultar recepciones de almacén</td>
+<td><code>inventario.ingresos.write</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tipos de movimiento:</strong> ENTRADA, SALIDA, AJUSTE y DEVOLUCION.</p>
+<p><strong>Estados de una recepción de almacén:</strong> BORRADOR, PENDIENTE, CONFIRMADA, PARCIAL, COMPLETADA y ANULADA. Si aparece <strong>PENDIENTE_COSTO</strong>, falta confirmar el costo; no la dé por valorizada.</p>
+<p><strong>Ajuste:</strong> indique producto, almacén, diferencia y motivo. Si el producto controla lotes, también lote y vencimiento. Un intento interrumpido queda consultable y puede marcarse como <strong>abandonado</strong>: use primero la consulta del original, porque pudo haberse confirmado.</p>
+<p><strong>Filtros del kardex:</strong> <strong>Aplicar filtros</strong> y <strong>Limpiar</strong>. Si falla, <strong>Reintentar kardex</strong> o <strong>Reintentar catálogos</strong>. Una lista que no cargó no significa que no haya movimientos.</p>
 <h2 id="p0-08-gestión-comercial-precios-comisiones-y-cotizaciones">08. Gestión comercial: precios, comisiones y cotizaciones</h2>
 <h3>Listas de precios</h3>
 <p>Las reglas comerciales pueden depender de vendedor, cliente, producto exacto o marca, moneda, cantidad mínima, vigencia y prioridad. Una regla de producto exacto prevalece sobre una regla de marca aplicable.</p>
@@ -620,6 +997,84 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </ol>
 <p><strong>Ejemplo:</strong> una regla para producto exacto prevalece sobre una regla por marca cuando ése sea el alcance aplicable. Al convertir una cotización, el pedido conserva la fotografía de precios de origen; editar hoy el catálogo no revaloriza la propuesta histórica.</p>
 <p><strong>Comprobación final:</strong> propuesta, decisión y pedido corresponden al mismo cliente y moneda. Las comisiones se consultan desde las ventas que realmente las devengan; aprobar una cotización por sí solo no equivale a cobrar ni a devengar una comisión de venta confirmada.</p>
+<h3>Detalle de precios, comisiones y cotizaciones</h3>
+<p>Pantallas: <code>/dashboard/ventas/cotizaciones</code>, <code>/dashboard/ventas/comercial</code> y <code>/dashboard/ventas/aprobaciones</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ver, crear, editar o enviar cotizaciones</td>
+<td><code>ventas.cotizaciones.ver</code>, <code>ventas.cotizaciones.crear</code>, <code>ventas.cotizaciones.editar</code></td>
+</tr>
+<tr>
+<td>Eliminar una cotización</td>
+<td><code>ventas.cotizaciones.eliminar</code></td>
+</tr>
+<tr>
+<td>Aprobarla o rechazarla</td>
+<td><code>ventas.cotizaciones.approve</code></td>
+</tr>
+<tr>
+<td>Convertirla en pedido</td>
+<td><code>ventas.cotizaciones.convertir_pedido</code></td>
+</tr>
+<tr>
+<td>Ver listas de precios o resolver un precio</td>
+<td><code>ventas.precios.ver</code></td>
+</tr>
+<tr>
+<td>Crear listas o cambiar su estado</td>
+<td><code>ventas.precios.gestionar</code></td>
+</tr>
+<tr>
+<td>Ver o gestionar comisiones</td>
+<td><code>ventas.comisiones.ver</code>, <code>ventas.comisiones.gestionar</code></td>
+</tr>
+<tr>
+<td>Ver o crear consolidados de venta</td>
+<td><code>ventas.consolidados.ver</code>, <code>ventas.consolidados.crear</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estados de la cotización:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Estado</th>
+<th>Qué significa</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>BORRADOR</td>
+<td>En preparación</td>
+</tr>
+<tr>
+<td>ENVIADA</td>
+<td>Enviada al cliente</td>
+</tr>
+<tr>
+<td>APROBADA o RECHAZADA</td>
+<td>Con decisión registrada</td>
+</tr>
+<tr>
+<td>CONVERTIDA</td>
+<td>Ya generó un pedido</td>
+</tr>
+<tr>
+<td>VENCIDA</td>
+<td>Pasó su vigencia</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Precios:</strong> el producto exacto prevalece sobre la marca. Desactivar una lista conserva los precios ya congelados en documentos.</p>
+<p><strong>Comisiones:</strong> el devengo nace solo de una venta o factura válida, no de aprobar una propuesta. El libro solo agrega movimientos de devengo, reversa y reintegro: no se reescribe.</p>
+<p><strong>Consolidados:</strong> <strong>Seleccionar primeras 10</strong> o elija hasta diez ventas y use <strong>Cerrar bloque</strong>. El reporte congela cabeceras y líneas, y un bloque emitido no se edita ni se elimina.</p>
 <h2 id="p0-09-pedidos-reservas-preparación-y-entrega">09. Pedidos, reservas, preparación y entrega</h2>
 <h3>Confirmar el pedido</h3>
 <p>Revise cliente, moneda, precios, cantidades y condiciones. La confirmación puede reservar stock. Si aparece una excepción comercial pendiente de aprobación, siga la bandeja correspondiente. Si el bloqueo es crediticio, regularice la cuenta del cliente; no existe una confirmación forzada pública para eludirlo.</p>
@@ -677,6 +1132,114 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </ol>
 <p><strong>Ejemplo:</strong> en un pedido de dos unidades, un primer despacho de una deja otra pendiente. Recuperar la confirmación del primer despacho no debe descontar la segunda. Un nuevo despacho posterior utiliza su propia operación sobre el saldo vigente.</p>
 <p><strong>Si no permite continuar:</strong> distinga una excepción comercial pendiente, un bloqueo crediticio, falta de stock o un estado incompatible. Cada situación tiene su resolución propia. No cambie una cantidad o fecha para ocultar el motivo ni utilice un evento manual para fingir una entrega.</p>
+<h3>Detalle del pedido y su despacho</h3>
+<p>Pantallas: <code>/dashboard/ventas/pedidos</code>, <code>/dashboard/inventario/logistica/ordenes-pendientes</code> y <code>/dashboard/inventario/logistica/listo-despacho</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ver, crear o editar</td>
+<td><code>ventas.pedidos.ver</code>, <code>ventas.pedidos.crear</code>, <code>ventas.pedidos.editar</code></td>
+</tr>
+<tr>
+<td>Confirmar o cancelar</td>
+<td><code>ventas.pedidos.confirmar</code>, <code>ventas.pedidos.cancelar</code></td>
+</tr>
+<tr>
+<td>Ver o resolver aprobaciones</td>
+<td><code>ventas.pedidos_aprobaciones.ver</code>, <code>ventas.pedidos_aprobaciones.resolver</code></td>
+</tr>
+<tr>
+<td>Generar el comprobante</td>
+<td><code>ventas.pedidos.generar_factura</code></td>
+</tr>
+<tr>
+<td>Ver historial o guías</td>
+<td><code>ventas.pedidos.ver_historial</code>, <code>ventas.pedidos.ver_gre</code></td>
+</tr>
+<tr>
+<td>Ver logística</td>
+<td><code>inventario.logistica.ver</code></td>
+</tr>
+<tr>
+<td>Preparar o marcar listo</td>
+<td><code>inventario.logistica.preparar</code></td>
+</tr>
+<tr>
+<td>Despachar, reprogramar pendientes, registrar entrega y seguimiento</td>
+<td><code>inventario.logistica.despachar</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estados del pedido:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Estado</th>
+<th>Qué significa</th>
+<th>Siguiente paso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PENDIENTE</td>
+<td>Registrado</td>
+<td>Confirmar</td>
+</tr>
+<tr>
+<td>PENDIENTE_APROBACION</td>
+<td>Detenido por una excepción</td>
+<td>Resolver la aprobación</td>
+</tr>
+<tr>
+<td>CONFIRMADO</td>
+<td>Aceptado</td>
+<td>Preparar</td>
+</tr>
+<tr>
+<td>EN_PREPARACION</td>
+<td>En almacén</td>
+<td>Marcar listo</td>
+</tr>
+<tr>
+<td>LISTO_DESPACHO</td>
+<td>Preparado</td>
+<td>Confirmar despacho</td>
+</tr>
+<tr>
+<td>DESPACHO_PARCIAL</td>
+<td>Salió una parte</td>
+<td>Despachar o reprogramar lo pendiente</td>
+</tr>
+<tr>
+<td>LISTO_FACTURAR</td>
+<td>Listo para comprobante</td>
+<td>Generar comprobante</td>
+</tr>
+<tr>
+<td>FACTURADO</td>
+<td>Con comprobante</td>
+<td>Entrega y cobro</td>
+</tr>
+<tr>
+<td>COMPLETADO, COMPLETADO_CON_GRE</td>
+<td>Terminado</td>
+<td>Consultar</td>
+</tr>
+<tr>
+<td>CANCELADO</td>
+<td>Cancelado</td>
+<td>Consultar; no se reactiva</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estado de crédito:</strong> SIN_EVALUAR, APROBADO, APROBADO_MANUAL o BLOQUEADO. Es distinto del estado del pedido: un bloqueo de crédito se resuelve por su aprobación, no editando el pedido.</p>
+<p>Un pedido vinculado a un contrato sigue además las reglas del capítulo 43. Si no ve las pantallas de preparación, puede que la logística no esté activada en la empresa: la pantalla lo indica.</p>
 <h2 id="p0-10-devoluciones-de-clientes-notas-y-saldo-a-favor">10. Devoluciones de clientes, notas y saldo a favor</h2>
 <h3>Tramitar una devolución</h3>
 <ol>
@@ -730,6 +1293,50 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </ol>
 <p><strong>Comprobación final:</strong> la cantidad devuelta no supera la elegible, la factura original sigue identificada y la deuda no queda negativa por absorber el excedente. El crédito disponible debe poder explicarse por sus movimientos.</p>
 <p><strong>Recuperación:</strong> si falla el reembolso, conserve su destino y referencia originales y consulte el historial. No emita otra nota para resolver un pago incierto ni repita una recepción para recuperar la nota ya creada.</p>
+<h3>Detalle de la devolución de cliente</h3>
+<p>Pantalla: <code>/dashboard/ventas/rma</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ver devoluciones y saldos a favor</td>
+<td><code>ventas.rma.ver</code></td>
+</tr>
+<tr>
+<td>Crear</td>
+<td><code>ventas.rma.crear</code></td>
+</tr>
+<tr>
+<td>Aprobar</td>
+<td><code>ventas.rma.aprobar</code></td>
+</tr>
+<tr>
+<td>Recibir o revertir la recepción</td>
+<td><code>ventas.rma.recepcionar</code></td>
+</tr>
+<tr>
+<td>Generar la nota de crédito o aplicar el saldo</td>
+<td><code>ventas.rma.generar_nota_credito</code></td>
+</tr>
+<tr>
+<td>Reembolsar</td>
+<td><code>ventas.rma.reembolsar</code></td>
+</tr>
+<tr>
+<td>Revertir un reembolso</td>
+<td><code>ventas.rma.revertir_reembolso</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estados de la devolución:</strong> CREADA, APROBADA, PARCIAL, RECIBIDA, CERRADA y RECHAZADA. <strong>Saldo a favor:</strong> DISPONIBLE o AGOTADO.</p>
+<p><strong>Aprobación segregada:</strong> quien crea la devolución no puede aprobarla (<code>RMA_SEGREGATED_APPROVAL_REQUIRED</code>).</p>
+<p><strong>Según el país</strong>, el botón fiscal cambia: <strong>Firmar, enviar y consultar en CPE</strong> en Perú, <strong>Ir al flujo fiscal ARCA</strong> en Argentina y <strong>Crear Nota Crédito DIAN 91</strong> en Colombia. Una empresa de demostración no puede emitir la nota DIAN 91. <strong>Gestionar aplicación o reembolso</strong> lleva al saldo a favor.</p>
+<p>Una línea de servicio o sin stock no genera recepción física (el sistema la clasifica como SERVICIO).</p>
 <h2 id="p0-11-punto-de-venta">11. Punto de venta</h2>
 <h3>Preparar la venta</h3>
 <p>Ingrese con permiso de POS y una sesión de caja abierta. La caja determina el establecimiento y almacén. Compruebe el contexto, productos, cantidades, precios y receptor antes de cobrar.</p>
@@ -785,6 +1392,42 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 <p>En el contrato peruano documentado, una venta en PEN pagada íntegramente en efectivo puede redondear a favor del consumidor al <strong>décimo inferior</strong>. El ajuste de cada venta está entre <strong>0,01 y 0,09</strong>, cuando corresponde; el importe documental y el efectivo físico siguen distinguiéndose. No se aplica a pagos mixtos, tarjeta, otras monedas ni otros países.</p>
 <p><strong>Ejemplo del flujo:</strong> un ticket de 0,52 puede representar 0,50 de efectivo físico y 0,02 de ajuste documentado. Un total inferior a 0,10 puede llegar a 0,00 de efectivo físico sin borrar la venta ni su importe documental. Consulte el ajuste registrado por el producto; no lo escriba como descuento o pago inventado. Varias ventas pueden acumular más de 0,09 de redondeo durante una sesión.
 &lt;!-- revision-omisiones-fin --&gt;</p>
+<h3>Detalle del punto de venta</h3>
+<p>Pantalla: <code>/dashboard/pos</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Entrar y consultar productos, clientes y sesión</td>
+<td><code>pos.read</code></td>
+</tr>
+<tr>
+<td>Vender o reintentar la facturación</td>
+<td><code>pos.vender</code></td>
+</tr>
+<tr>
+<td>Canjear un ticket por comprobante</td>
+<td><code>pos.ticket.canjear</code></td>
+</tr>
+<tr>
+<td>Abrir o cerrar caja desde el POS</td>
+<td><code>pos.caja.write</code></td>
+</tr>
+<tr>
+<td>Configurar el certificado del POS</td>
+<td><code>pos.configuracion.write</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Recorrido en pantalla:</strong> <strong>Abrir Caja Registradora</strong> → agregar productos → <strong>Descuento</strong>, en porcentaje o monto fijo → elegir receptor y documento → <strong>Agregar otro pago</strong> si hay varios medios → <strong>Confirmar</strong> → <strong>Ver CPE</strong> o <strong>Continuar vendiendo</strong>.</p>
+<p><strong>Estados de la venta:</strong> EN_PROGRESO, PENDIENTE_PAGO, PAGADA, CANCELADA y DEVUELTA. <strong>De la sesión:</strong> ABIERTA y CERRADA.</p>
+<p><strong>Documento:</strong> TICKET interno, BOLETA o FACTURA. Si la empresa no está lista, la pantalla ofrece <strong>Completar configuración</strong>: no se puede emitir hasta terminarla.</p>
+<p>Una venta hecha desde el POS con emisión pendiente se recupera con el reintento de facturación, sin volver a cobrar ni descontar stock.</p>
 <h2 id="p0-12-cajas-arqueos-turnos-y-cortes">12. Cajas, arqueos, turnos y cortes</h2>
 <h3>Crear cajas y abrir una sesión</h3>
 <p>Un administrador autorizado vincula la caja a establecimiento y almacén. Puede editar una caja sin sesión cuando su estado lo permita. Para comenzar la jornada, el cajero registra el conteo inicial y confirma la apertura. Dos solicitudes concurrentes no deben producir dos sesiones abiertas de la misma caja.</p>
@@ -854,6 +1497,90 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 <p><strong>Cinco fallos</strong> bloquean la credencial durante <strong>quince minutos</strong>. Mientras el bloqueo esté vigente, el supervisor no aparece como elegible; al vencer vuelve a ser elegible si conserva las demás condiciones. El supervisor debe ser distinto tanto del actor que ejecuta el cierre como del cajero responsable. Incluso una selección de supervisor aparentemente innecesaria debe ser válida.</p>
 <p>Un faltante pequeño no se convierte automáticamente en redondeo. La excepción requiere que la diferencia negativa coincida con los ajustes de efectivo documentados. Un sobrante o un faltante sin esa evidencia conserva el control de autorización que corresponda.
 &lt;!-- revision-omisiones-fin --&gt;</p>
+<h3>Detalle de cajas, retiros, turnos y cortes</h3>
+<p>Pantalla: <code>/dashboard/cajas</code>, con <strong>Nueva caja</strong>, <strong>Abrir Nueva Caja</strong> y <strong>Confirmar Arqueo</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ver cajas, crear o editar</td>
+<td><code>cajas.ver</code>, <code>cajas.crear</code>, <code>cajas.editar</code></td>
+</tr>
+<tr>
+<td>Abrir o cerrar sesión</td>
+<td><code>cajas.apertura</code>, <code>cajas.cierre</code></td>
+</tr>
+<tr>
+<td>Ver sesiones y movimientos</td>
+<td><code>cajas.sesiones.ver</code></td>
+</tr>
+<tr>
+<td>Ver precierre y saldo esperado</td>
+<td><code>cajas.precierre.ver</code>, <code>cajas.saldo_esperado.ver</code></td>
+</tr>
+<tr>
+<td>Movimiento manual de ingreso o gasto</td>
+<td><code>cajas.movimientos.manual</code></td>
+</tr>
+<tr>
+<td>Crear o conciliar un retiro</td>
+<td><code>cajas.retiros.crear</code>, <code>cajas.retiros.conciliar</code></td>
+</tr>
+<tr>
+<td>Iniciar, completar, cancelar o ver un cambio de turno</td>
+<td><code>cajas.cambios_turno.iniciar</code>, <code>cajas.cambios_turno.completar</code>, <code>cajas.cambios_turno.cancelar</code>, <code>cajas.cambios_turno.ver</code></td>
+</tr>
+<tr>
+<td>Cierre administrativo</td>
+<td><code>cajas.cierre_administrativo</code></td>
+</tr>
+<tr>
+<td>Ver cortes o exportar</td>
+<td><code>cajas.cortes.ver</code>, <code>cajas.cortes.exportar_pdf</code>, <code>cajas.cortes.exportar_csv</code></td>
+</tr>
+<tr>
+<td>Ver el corte Z</td>
+<td><code>cajas.corte_z.ver</code></td>
+</tr>
+<tr>
+<td>Gestionar el PIN de supervisores</td>
+<td><code>users.manage</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Pasos del cierre:</strong> validar, contar, revisar, justificar y confirmar. <strong>Resultado:</strong> CUADRADO, SOBRANTE o FALTANTE. El redondeo de efectivo legal se registra aparte como REDONDEO_EFECTIVO_LEGAL.</p>
+<p><strong>Estados:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Elemento</th>
+<th>Estados</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sesión</td>
+<td>ABIERTA, CERRADA, CONGELADA</td>
+</tr>
+<tr>
+<td>Retiro</td>
+<td>PENDIENTE, CONCILIADO, RECHAZADO; destino DEPOSITO_BANCARIO, COMPRA_EMERGENCIA o BOVEDA</td>
+</tr>
+<tr>
+<td>Cambio de turno</td>
+<td>EN_PROCESO, COMPLETADO, CANCELADO</td>
+</tr>
+<tr>
+<td>PIN de supervisor</td>
+<td>Sin PIN o BLOQUEADO si falló repetidamente</td>
+</tr>
+</tbody>
+</table>
 <h2 id="p0-13-compras-cotización-y-orden">13. Compras: cotización y orden</h2>
 <h3>Qué cubre y qué no</h3>
 <p>El recorrido parte de la cotización o de la orden de compra. El producto no tiene una pantalla de requisición interna previa: si su organización exige una solicitud anterior, debe llevarla aparte y no presentarla como parte del sistema.</p>
@@ -941,6 +1668,11 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 <td>CERRADA</td>
 <td>Terminada</td>
 <td>Consultar</td>
+</tr>
+<tr>
+<td>RECHAZADA</td>
+<td>Decisión negativa</td>
+<td>Consultar actor y motivo</td>
 </tr>
 <tr>
 <td>ANULADA</td>
@@ -1228,6 +1960,107 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 <p>La representación PDF del ERP utiliza <strong>A4, 210 × 297 mm</strong>. Para imprimir ese archivo seleccione papel A4 y escala <strong>100 %</strong>, sin la opción «ajustar a página». Revise todas sus páginas y compruebe que líneas, totales y QR permanezcan completos y legibles. Esta es la salida física elegida por el producto; no significa que la autoridad imponga ese formato único de papel.</p>
 <p>Use el PDF generado por el backend como representación del comprobante y la vista HTML para revisarlo cuando el visor nativo no esté disponible. Una impresión cortada exige corregir la salida o reimprimir el archivo correcto, no emitir otro comprobante. La impresión no cambia el estado fiscal ni fabrica una aceptación.
 &lt;!-- revision-omisiones-fin --&gt;</p>
+<h3>Detalle del comprobante electrónico</h3>
+<p>Pantalla principal: <code>/dashboard/cpe</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Listar o ver</td>
+<td><code>cpe.comprobantes.listar</code>, <code>cpe.comprobantes.ver</code></td>
+</tr>
+<tr>
+<td>Emitir comprobantes y notas referenciadas</td>
+<td><code>cpe.comprobantes.emitir</code></td>
+</tr>
+<tr>
+<td>Enviar a la autoridad</td>
+<td><code>cpe.comprobantes.enviar</code></td>
+</tr>
+<tr>
+<td>Consultar estado</td>
+<td><code>cpe.comprobantes.consultar</code></td>
+</tr>
+<tr>
+<td>Reenviar</td>
+<td><code>cpe.comprobantes.reenviar</code></td>
+</tr>
+<tr>
+<td>Anular o dar de baja</td>
+<td><code>cpe.comprobantes.anular</code></td>
+</tr>
+<tr>
+<td>Descargar PDF o XML</td>
+<td><code>cpe.comprobantes.descargar_pdf</code>, <code>cpe.comprobantes.descargar_xml</code></td>
+</tr>
+<tr>
+<td>Ver indicadores</td>
+<td><code>cpe.reportes.ver</code></td>
+</tr>
+<tr>
+<td>Vincular una CxC o revertir un cobro</td>
+<td><code>finanzas.cxc.cobros.write</code>, <code>finanzas.cxc.cobros.revertir</code></td>
+</tr>
+<tr>
+<td>Eventos DIAN y facturas recibidas (Colombia)</td>
+<td><code>cpe.dian.eventos_034.emitir</code>, <code>cpe.dian.facturas_recibidas.ver</code>, <code>cpe.dian.facturas_recibidas.gestionar</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estados fiscales:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Estado</th>
+<th>Qué significa</th>
+<th>Qué hacer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>BORRADOR</td>
+<td>Sin firmar</td>
+<td>Completar y emitir</td>
+</tr>
+<tr>
+<td>FIRMADO</td>
+<td>Firmado, sin enviar</td>
+<td>Enviar</td>
+</tr>
+<tr>
+<td>ENVIADO, PENDIENTE</td>
+<td>Enviado, esperando respuesta</td>
+<td>Consultar; <strong>no reenviar a ciegas</strong></td>
+</tr>
+<tr>
+<td>ACEPTADO</td>
+<td>Aceptado por la autoridad</td>
+<td>Conservar evidencia</td>
+</tr>
+<tr>
+<td>RECHAZADO</td>
+<td>Rechazado</td>
+<td>Corregir el motivo con un documento correcto</td>
+</tr>
+<tr>
+<td>ERROR</td>
+<td>Falló técnicamente</td>
+<td>Revisar y reintentar</td>
+</tr>
+<tr>
+<td>ANULADO</td>
+<td>Dado de baja</td>
+<td>Consultar</td>
+</tr>
+</tbody>
+</table>
+<p>Un documento marcado MUESTRA_LOCAL o SIMULATED es de demostración, y uno MIGRADO viene del sistema anterior: ninguno representa una aceptación obtenida aquí.</p>
+<p><strong>PDF:</strong> <strong>Verificar vista A4</strong>, <strong>Descargar A4</strong> y <strong>Abrir PDF / imprimir</strong>. Si falla la vista, <strong>Reintentar vista A4</strong>.</p>
 <h2 id="p0-16-guías-de-remisión-y-traslado">16. Guías de remisión y traslado</h2>
 <h3>Preparar una GRE</h3>
 <p>El flujo permite alta manual o desde un pedido/despacho. Revise emisor, destinatario, motivo de traslado, origen, destino, productos, cantidades, peso y datos de transporte que correspondan a la modalidad pública o privada.</p>
@@ -1286,6 +2119,49 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </ol>
 <p><strong>Ejemplo:</strong> una guía preparada para un producto no habilita trasladar otro. Si una parte de su capacidad ya está aplicada, utilice el saldo permitido; no asuma que el total del PDF sigue disponible.</p>
 <p><strong>Resultado esperado:</strong> la guía mantiene su vínculo y tratamiento fiscal propios. Anular la guía o consultar su estado no sustituye la cancelación o reversa del movimiento físico relacionado.</p>
+<h3>Detalle de la guía de remisión</h3>
+<p>Pantalla: <code>/dashboard/gre</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ver guías, estado y PDF</td>
+<td><code>gre.guias.ver</code></td>
+</tr>
+<tr>
+<td>Crear, firmar o anular</td>
+<td><code>gre.guias.emitir</code></td>
+</tr>
+<tr>
+<td>Enviar o reenviar</td>
+<td><code>gre.guias.enviar</code>, <code>gre.guias.reenviar</code></td>
+</tr>
+<tr>
+<td>Consultar a la autoridad</td>
+<td><code>gre.guias.consultar</code></td>
+</tr>
+<tr>
+<td>Descargar XML</td>
+<td><code>gre.guias.descargar_xml</code></td>
+</tr>
+<tr>
+<td>Reporte e indicadores</td>
+<td><code>gre.reportes.ver</code></td>
+</tr>
+<tr>
+<td>Ver o cambiar la creación automática</td>
+<td><code>gre.configuracion.ver</code>, <code>gre.configuracion.actualizar</code>, <code>gre.configuracion.evaluar</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estados:</strong> BORRADOR, FIRMADO, EMITIDO, ENVIADO, PENDIENTE, ACEPTADO, RECHAZADO, ERROR y ANULADO.</p>
+<p><strong>Transporte:</strong> TRANSPORTE_PUBLICO o TRANSPORTE_PRIVADO, cada uno con sus datos obligatorios.</p>
+<p><strong>Descargar reporte CSV</strong> incluye todas las guías del filtro, no solo la página. Una guía creada desde un pedido queda vinculada a él.</p>
 <h2 id="p0-17-centro-de-documentos-archivos-y-bajas-ra-rc">17. Centro de documentos, archivos y bajas RA/RC</h2>
 <h3>Encontrar y revisar documentos</h3>
 <p>Use los filtros de período, estado o contexto que ofrezca cada listado. Abra el detalle para comprobar emisor, receptor, moneda, líneas y relaciones. El panel documental y sus indicadores deben reconocer cuando una fuente está incompleta.</p>
@@ -1340,6 +2216,56 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 <p>La <strong>RA de facturas</strong> y la <strong>RC con operación de baja de boletas</strong> trabajan sobre comprobantes elegibles que el flujo previo dejó anulados, con su reversa comercial confirmada. No son el botón para anular por primera vez una venta vigente ni un mecanismo para borrar deuda, stock o ingreso.</p>
 <p>Si el documento no aparece en la selección, revise tipo, empresa, estado y evidencia de la anulación de origen. No cree un lote manual alternativo para eludir la elegibilidad. Crear o firmar el lote tampoco equivale a su aceptación: revise envío, ticket y resultado con CDR. Un resultado terminal se recupera sobre el mismo lote, sin producir otra reversa comercial.
 &lt;!-- revision-omisiones-fin --&gt;</p>
+<h3>Detalle del centro de documentos</h3>
+<p>Pantalla: <code>/dashboard/documentos</code>. La gestión fiscal se hace con <strong>Gestionar en Centro CPE</strong> (capítulo 15).</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ver lista, detalle o indicadores</td>
+<td><code>documentos.read</code>, <code>documentos.stats.read</code></td>
+</tr>
+<tr>
+<td>Crear o editar</td>
+<td><code>documentos.create</code>, <code>documentos.update</code></td>
+</tr>
+<tr>
+<td>Generar XML</td>
+<td><code>documentos.generate_xml</code></td>
+</tr>
+<tr>
+<td>Enviar a la autoridad</td>
+<td><code>documentos.enviar_sunat</code></td>
+</tr>
+<tr>
+<td>Descargar</td>
+<td><code>documentos.download</code></td>
+</tr>
+<tr>
+<td>Anular</td>
+<td><code>documentos.cancel</code></td>
+</tr>
+<tr>
+<td>Ver auditoría</td>
+<td><code>documentos.audit.read</code></td>
+</tr>
+<tr>
+<td>Ver o crear series</td>
+<td><code>documentos.series.read</code>, <code>documentos.series.write</code></td>
+</tr>
+<tr>
+<td>Validar documento de identidad</td>
+<td><code>documentos.validations.run</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estados:</strong> BORRADOR, EMITIDO, ENVIADO_SUNAT, ACEPTADO, RECHAZADO y ANULADO. <strong>Tipos:</strong> FACTURA, BOLETA, NOTA_CREDITO, NOTA_DEBITO y CONTRATO.</p>
+<p>Las bajas RA y RC usan <code>cpe.comprobantes.anular</code> para crear y <code>cpe.comprobantes.enviar</code> y <code>cpe.comprobantes.consultar</code> para enviar y consultar. <strong>Limpiar</strong> retira los filtros y <strong>Reintentar</strong> recupera una lista o estadística que no cargó.</p>
 <h2 id="p0-18-cuentas-por-cobrar-y-recuperación-de-cartera">18. Cuentas por cobrar y recuperación de cartera</h2>
 <h3>Consultar deuda</h3>
 <p>Abra <strong>Finanzas &gt; Cuentas por cobrar</strong> y revise cliente, documento, moneda, fecha, vencimiento y saldo. Use los filtros y la consulta de historial antes de decidir un cobro, nota o reprogramación.</p>
@@ -1397,6 +2323,33 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </ol>
 <p><strong>Ejemplo aritmético:</strong> una deuda de 100,00 con un cobro confirmado de 30,00 deja 70,00, si no existen otros movimientos. Una aplicación de saldo a favor debe identificarse como tal; no se registra además como efectivo recibido.</p>
 <p><strong>Revisión de cartera:</strong> el aging responde a una fecha de corte. Un cobro posterior no debe reescribir la mora de un corte anterior. Si una fuente de reconstrucción no es confiable, revise su advertencia antes de usar el total.</p>
+<h3>Detalle de cuentas por cobrar</h3>
+<p>Pantalla: <code>/dashboard/finanzas/cxc</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Consultar cuentas y su detalle</td>
+<td><code>finanzas.cxc.read</code></td>
+</tr>
+<tr>
+<td>Registrar un cobro, una nota de crédito o reprogramar</td>
+<td><code>finanzas.cxc.cobros.write</code></td>
+</tr>
+<tr>
+<td>Revertir un cobro o ajuste vinculado a un comprobante</td>
+<td><code>finanzas.cxc.cobros.revertir</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estados:</strong> PENDIENTE, PARCIAL, CANCELADO (ya cobrada) y VENCIDO. Tenga en cuenta que CANCELADO aquí significa <strong>pagada</strong>, no anulada.</p>
+<p><strong>Operaciones pendientes:</strong> si se interrumpió un cobro o ajuste, use <strong>Releer cobros pendientes</strong> o <strong>Releer ajustes pendientes</strong>. Esa acción consulta el original y nunca lo reenvía sola. <strong>Reintentar consulta</strong> recupera una lista que falló. <strong>Exportar</strong> descarga el listado.</p>
+<p><strong>Saldos de apertura migrados:</strong> conservan su número original, también alfanumérico.</p>
 <h2 id="p0-19-facturas-de-proveedor-y-cuentas-por-pagar">19. Facturas de proveedor y cuentas por pagar</h2>
 <h3>Registrar la factura recibida</h3>
 <p>Seleccione proveedor, tipo y número de documento, fechas, moneda, impuestos y origen de compra o recepción cuando corresponda. Revise el destino del crédito fiscal, tipo de cambio documental y ajustes iniciales.</p>
@@ -1458,6 +2411,67 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </ol>
 <p><strong>Ejemplo:</strong> recibir un servicio acredita su cumplimiento; la obligación financiera nace al registrar la factura real en su flujo. No cree una segunda factura para solucionar un fallo del historial de pagos.</p>
 <p><strong>Recuperación:</strong> una respuesta incompleta de alta o pago mantiene el intento. Cambiar importes, moneda o ajustes fiscales no constituye un reintento exacto; revise y resuelva la intención anterior antes de preparar otra solicitud.</p>
+<h3>Detalle de cuentas por pagar</h3>
+<p>Pantalla: <code>/dashboard/finanzas/cxp</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Consultar, antigüedad, vencimientos y tasas</td>
+<td><code>finanzas.cxp.ver</code></td>
+</tr>
+<tr>
+<td>Registrar, editar, pagar, usar crédito o anular</td>
+<td><code>finanzas.cxp.gestionar</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estados:</strong> PENDIENTE, PARCIAL, PAGADA, VENCIDA y ANULADA.</p>
+<p><strong>Tipos de documento:</strong> FACTURA, BOLETA, NOTA_CREDITO, NOTA_DEBITO y RECIBO_HONORARIOS. <strong>Destino del crédito fiscal:</strong> GRAVADAS, NO_GRAVADAS o COMUN.</p>
+<p><strong>Comparación con la recepción:</strong> OK, DESVIACION_CANTIDAD o DESVIACION_PRECIO. Una desviación debe explicarse antes de pagar.</p>
+<table>
+<thead>
+<tr>
+<th>Mensaje</th>
+<th>Qué hacer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&quot;Consulta los catálogos y confirma el proveedor y la recepción antes de registrar.&quot;</td>
+<td>Espere o reintente la carga de catálogos</td>
+</tr>
+<tr>
+<td>&quot;El total debe ser mayor a cero&quot;</td>
+<td>Corrija el importe</td>
+</tr>
+<tr>
+<td>&quot;El vencimiento no puede ser anterior a la emisión&quot;</td>
+<td>Corrija las fechas</td>
+</tr>
+<tr>
+<td>&quot;Ingrese el tipo de cambio&quot;</td>
+<td>Es obligatorio en otra moneda</td>
+</tr>
+<tr>
+<td>&quot;Seleccione la devolución emitida que sustenta la nota de crédito&quot;</td>
+<td>Una nota de crédito nace de la devolución (capítulo 14)</td>
+</tr>
+<tr>
+<td>&quot;Seleccione el comprobante original y la contrapartida contable&quot;</td>
+<td>Son obligatorios en una nota</td>
+</tr>
+<tr>
+<td>&quot;El importe debe estar dentro del crédito disponible&quot;</td>
+<td>Reduzca el importe aplicado</td>
+</tr>
+</tbody>
+</table>
 <h2 id="p0-20-anticipos-y-ajustes-fiscales-financieros">20. Anticipos y ajustes fiscales financieros</h2>
 <h3>Registrar y aplicar un anticipo</h3>
 <p>Primero registre el anticipo de cliente o proveedor con el origen o destino de dinero explícito. Después aplíquelo a una obligación. Escribir una cantidad en el campo anticipo de una factura no crea por sí solo dinero disponible.</p>
@@ -1505,6 +2519,31 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </ol>
 <p><strong>Ejemplo aritmético:</strong> aplicar 20,00 de un anticipo disponible de 50,00 deja 30,00 por aplicar. Esa aplicación no representa una segunda entrada de 20,00 al banco.</p>
 <p><strong>Resultado esperado:</strong> saldo, anticipo y eventual depósito conservan su relación. La reversa de un ajuste documental no debe interpretarse como devolución de efectivo si su flujo no genera caja ni banco.</p>
+<h3>Detalle de anticipos y ajustes fiscales</h3>
+<p>Pantalla: <code>/dashboard/finanzas/ajustes-fiscales</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Calcular y consultar</td>
+<td><code>finanzas.read</code></td>
+</tr>
+<tr>
+<td>Registrar anticipos o ajustes, depositar detracción o revertir un ajuste de CxC</td>
+<td><code>finanzas.write</code></td>
+</tr>
+<tr>
+<td>Revertir una detracción de proveedor</td>
+<td><code>finanzas.cxp.gestionar</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estados del ajuste:</strong> APLICADO, PENDIENTE_TESORERIA y ANULADO. Uno en PENDIENTE_TESORERIA todavía requiere el movimiento financiero: no lo dé por pagado.</p>
 <h2 id="p0-21-bancos-y-conciliación">21. Bancos y conciliación</h2>
 <h3>Preparar cuentas</h3>
 <p>Configure la cuenta bancaria, moneda y su cuenta contable de movimiento. Registre capital o movimientos manuales con categoría, contracuenta y referencia. Compruebe que el importe corresponde a la moneda de la cuenta.</p>
@@ -1568,6 +2607,37 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 <p>El producto utiliza activo como valor predeterminado para nuevos movimientos bancarios cuando la operación no declara otro estado. <strong>Eso no reactiva ni reclasifica movimientos históricos inactivos</strong> y tampoco cambia un registro marcado explícitamente inactivo.</p>
 <p>Si un movimiento antiguo no participa en una consulta o conciliación, revise su estado y evidencia de origen antes de atribuirle un saldo o darlo por reparado. Un estado histórico puede reflejar una decisión válida o una condición anterior que necesita investigación. La actualización del producto no permite distinguir ambas por sí sola. Cualquier regularización debe seguir su procedimiento autorizado y conservar la historia; no se documenta como un efecto automático de esta versión.
 &lt;!-- revision-omisiones-fin --&gt;</p>
+<h3>Detalle de bancos y conciliación</h3>
+<p>Pantallas: <code>/dashboard/finanzas/bancos</code> y <code>/dashboard/finanzas/conciliacion</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ver cuentas, saldos y movimientos</td>
+<td><code>finanzas.bancos.ver</code></td>
+</tr>
+<tr>
+<td>Crear cuentas, movimientos y transferencias</td>
+<td><code>finanzas.bancos.gestionar</code></td>
+</tr>
+<tr>
+<td>Ver conciliaciones y diferencias</td>
+<td><code>finanzas.conciliacion.ver</code></td>
+</tr>
+<tr>
+<td>Importar CSV, emparejar y cerrar</td>
+<td><code>finanzas.conciliacion.gestionar</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tipos de cuenta:</strong> CORRIENTE, AHORROS, DETRACCION y PLAZO_FIJO. <strong>Movimientos:</strong> ABONO y CARGO.</p>
+<p><strong>Estados de la conciliación:</strong> ABIERTA, EN_PROCESO y CERRADA.</p>
+<p><strong>Conciliar:</strong> cree la conciliación → importe el CSV con una plantilla guardada → ejecute el emparejamiento automático → marque manualmente o por lote lo que falte → compare <strong>Saldo Libro</strong>, <strong>Saldo Banco</strong> y <strong>Diferencia</strong> → <strong>Cerrar Conciliación</strong>.</p>
 <h2 id="p0-22-tesorería-y-programación-de-pagos">22. Tesorería y programación de pagos</h2>
 <h3>Planificar</h3>
 <p>Desde tesorería consulte las obligaciones y vencimientos. Aplique el horizonte que ofrezca la vista —por ejemplo, 30, 60, 90 o 180 días— y la moneda. Una fecha futura sin obligaciones puede mostrar un vacío válido; una fuente fallida no significa que no haya pagos que atender.</p>
@@ -1620,6 +2690,29 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </ol>
 <p><strong>Ejemplo:</strong> pagar 1,18 de una deuda de 2,36 deja 1,18 pendiente. Un lote posterior puede pagar ese saldo; recuperar la confirmación del primero no debe volver a cargarlo.</p>
 <p><strong>Si falla la lectura:</strong> retire la conclusión sobre totales y espere la recuperación. Si falla la confirmación, conserve el mismo intento. Una proyección con bancos inaccesibles no se interpreta como falta de fondos confirmada ni como saldo cero fiable.</p>
+<h3>Detalle de tesorería</h3>
+<p>Pantalla: <code>/dashboard/finanzas/tesoreria</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ver pagos, programación y flujo</td>
+<td><code>finanzas.tesoreria.ver</code></td>
+</tr>
+<tr>
+<td>Registrar un pago o un lote</td>
+<td><code>finanzas.tesoreria.gestionar</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Prioridad de los pagos:</strong> VENCIDA, URGENTE, PROXIMA y NORMAL. <strong>SALDO_NEGATIVO</strong> avisa de una proyección con saldo negativo.</p>
+<p><strong>Pago masivo:</strong> en <strong>Programación de pagos</strong> marque las cuentas y use <strong>Pagar Seleccionados</strong>. Después, <strong>Ver Historial de Pagos</strong>, o <strong>Procesar Nuevo Lote</strong> para continuar. Vea <strong>Resumen por moneda</strong>: los importes no se convierten entre monedas.</p>
+<p><strong>Proyecciones:</strong> flujo a 30 días y próximos pagos a 15 días. Son una proyección, no un saldo real.</p>
 <h2 id="p0-23-contabilidad-asientos-partidas-y-plantillas">23. Contabilidad: asientos, partidas y plantillas</h2>
 <h3>Orígenes y diario</h3>
 <p>El diario recibe asientos de ventas, compras, POS, caja, bancos, recursos humanos, activos y operaciones manuales. Los módulos originan sus efectos; no se deben recrear manualmente porque la proyección tarde en actualizar.</p>
@@ -1682,6 +2775,49 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </ol>
 <p><strong>Ejemplo:</strong> debe 100,00 y haber 99,99 requieren corregir el descuadre; un formulario con ambos totales en cero no acredita un asiento válido.</p>
 <p><strong>Correcciones:</strong> edite o elimine únicamente un borrador elegible. Un confirmado se corrige mediante el contra-asiento enlazado. Conciliar partidas modifica su emparejamiento, no reescribe el importe histórico del asiento.</p>
+<h3>Detalle de asientos, partidas y plantillas</h3>
+<p>Pantallas: <code>/dashboard/contabilidad/asientos</code>, <code>/dashboard/contabilidad/partidas</code> y <code>/dashboard/contabilidad/plantillas</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Consultar asientos</td>
+<td><code>contabilidad.asientos.read</code></td>
+</tr>
+<tr>
+<td>Editar un borrador</td>
+<td><code>contabilidad.asientos.actualizar</code></td>
+</tr>
+<tr>
+<td>Eliminar un borrador</td>
+<td><code>contabilidad.asientos.eliminar</code></td>
+</tr>
+<tr>
+<td>Confirmar</td>
+<td><code>contabilidad.asientos.confirmar</code></td>
+</tr>
+<tr>
+<td>Anular</td>
+<td><code>contabilidad.asientos.anular</code></td>
+</tr>
+<tr>
+<td>Reversar</td>
+<td><code>contabilidad.asientos.reversar</code></td>
+</tr>
+<tr>
+<td>Ver el plan de cuentas</td>
+<td><code>contabilidad.reportes.read</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estados del asiento:</strong> BORRADOR, CONFIRMADO y ANULADO. <strong>Origen:</strong> AUTOMATICO, generado por una operación, o MANUAL.</p>
+<p><strong>Plantillas recurrentes:</strong> periodicidad MENSUAL, BIMESTRAL, TRIMESTRAL, SEMESTRAL o ANUAL; se definen con <strong>Guardar plantilla</strong>.</p>
+<p><strong>Corregir:</strong> un asiento confirmado no se edita; se anula o se reversa. Un asiento automático se corrige desde su operación de origen o por su recuperación, no duplicándolo a mano.</p>
 <h2 id="p0-24-períodos-y-cierre-contable">24. Períodos y cierre contable</h2>
 <h3>Crear y consultar períodos</h3>
 <p>Use <strong>Contabilidad &gt; Períodos</strong> para crear explícitamente el período necesario para operaciones manuales. Revise el estado y los datos de la empresa. Una consulta fallida debe impedir interpretar el período como abierto o ausente.</p>
@@ -1733,6 +2869,47 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </ol>
 <p><strong>Ejemplo:</strong> un período cerrado que rechaza un asiento nuevo no se resuelve moviendo artificialmente la fecha a otro mes. La corrección exige tratar el período de acuerdo con su autorización.</p>
 <p><strong>Resultado esperado:</strong> no quedan dos cierres activos para la misma secuencia. Reabrir y recerrar conserva la historia y genera su tratamiento de cierre nuevo; no borra el cierre anterior como si nunca hubiera existido.</p>
+<h3>Detalle de períodos y cierre</h3>
+<p>Pantalla: <code>/dashboard/contabilidad/periodos</code>, con <strong>Calendario contable</strong> y <strong>Estimación de cuentas de cobranza dudosa</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ver períodos</td>
+<td><code>contabilidad.periodos.read</code></td>
+</tr>
+<tr>
+<td>Crear</td>
+<td><code>contabilidad.periodos.crear</code></td>
+</tr>
+<tr>
+<td>Validar el cierre</td>
+<td><code>contabilidad.periodos.validar</code></td>
+</tr>
+<tr>
+<td>Cerrar</td>
+<td><code>contabilidad.periodos.cerrar</code></td>
+</tr>
+<tr>
+<td>Reabrir</td>
+<td><code>contabilidad.periodos.reabrir</code></td>
+</tr>
+<tr>
+<td>Bloquear</td>
+<td><code>contabilidad.periodos.bloquear</code></td>
+</tr>
+<tr>
+<td>Registrar la provisión de cobranza dudosa</td>
+<td><code>contabilidad.asientos.crear</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estados:</strong> ABIERTO, CERRADO y BLOQUEADO. <strong>Orden:</strong> validar → resolver bloqueos → cerrar. Reabrir es una decisión con su propio permiso y queda registrada.</p>
 <h2 id="p0-25-centros-de-costo-presupuestos-y-alertas">25. Centros de costo, presupuestos y alertas</h2>
 <h3>Crear el presupuesto</h3>
 <p>Configure el centro de costo y seleccione período, cuenta, importe y demás clasificaciones habilitadas. Los catálogos deben cargarse completos antes de guardar. Una selección antigua no suple un catálogo fallido.</p>
@@ -1787,6 +2964,39 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 <p><strong>Conflictos:</strong> si otra ventana modificó el presupuesto, conserve su solicitud y concilie el resultado. Un fallo al obtener el bloqueo o un recibo incompleto no confirma la baja ni autoriza eliminar el pendiente local.</p>
 <h3>Confirmar la baja de un presupuesto</h3>
 <p>Cancelar la confirmación conserva el presupuesto. Al confirmar, un recibo vacío o perteneciente a otro presupuesto no acredita la baja. Conserve la intención, recupere su resultado y recargue el listado. No interprete una respuesta HTTP exitosa por sí sola como ausencia confirmada del presupuesto.</p>
+<h3>Detalle de centros de costo y presupuestos</h3>
+<p>Pantallas: <code>/dashboard/contabilidad/centros-costo</code> y <code>/dashboard/contabilidad/presupuestos</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ver, crear o editar centros de costo</td>
+<td><code>contabilidad.centros_costo.read</code>, <code>contabilidad.centros_costo.crear</code>, <code>contabilidad.centros_costo.actualizar</code></td>
+</tr>
+<tr>
+<td>Ver el reporte de gastos</td>
+<td><code>contabilidad.reportes.read</code></td>
+</tr>
+<tr>
+<td>Ver presupuestos y alertas</td>
+<td><code>contabilidad.presupuestos.read</code></td>
+</tr>
+<tr>
+<td>Crear, editar o eliminar</td>
+<td><code>contabilidad.presupuestos.crear</code>, <code>contabilidad.presupuestos.actualizar</code>, <code>contabilidad.presupuestos.eliminar</code></td>
+</tr>
+<tr>
+<td>Actualizar la ejecución</td>
+<td><code>contabilidad.presupuestos.ejecucion</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Niveles de alerta:</strong> NORMAL, ADVERTENCIA, CRITICO y SOBREGIRO. Se comparan en <strong>Presupuesto vs real</strong> y <strong>Gastos por cuenta</strong>.</p>
 <h2 id="p0-26-activos-fijos">26. Activos fijos</h2>
 <h3>Dar de alta y consultar</h3>
 <p>Registre descripción, adquisición, costo, valor residual, vida o método y centro cuando corresponda. Revise las fechas civiles iniciales y conserve la fecha manual válida si modifica el formulario. Una adquisición guardada debe aparecer con su identidad y cronograma correctos.</p>
@@ -1842,6 +3052,41 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 <p>Después de guardar, el alta sólo queda confirmada cuando el recibo corresponde al activo, empresa, usuario y solicitud originales. Una respuesta incompleta conserva el intento pendiente. Consulte o recupere ese mismo intento antes de crear otro activo.</p>
 <h3>Seleccionar el lote completo de depreciación</h3>
 <p>Revise el período y los candidatos cargados por completo. Una página ausente o una lectura fallida no representa un lote vacío ni autoriza depreciar una selección parcial como si fuera completa. Recupere la consulta; después confirme el lote y conserve su recibo original.</p>
+<h3>Detalle de activos fijos</h3>
+<p>Pantalla: <code>/dashboard/contabilidad/activos-fijos</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ver activos y cronograma</td>
+<td><code>contabilidad.activos.read</code></td>
+</tr>
+<tr>
+<td>Dar de alta</td>
+<td><code>contabilidad.activos.crear</code></td>
+</tr>
+<tr>
+<td>Editar</td>
+<td><code>contabilidad.activos.actualizar</code></td>
+</tr>
+<tr>
+<td>Depreciar</td>
+<td><code>contabilidad.activos.depreciar</code></td>
+</tr>
+<tr>
+<td>Dar de baja</td>
+<td><code>contabilidad.activos.baja</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estados:</strong> ACTIVO, DEPRECIADO y VENDIDO.</p>
+<p><strong>Cambiar la vida útil o el valor residual</strong> recalcula hacia adelante: no toca cuotas pasadas. Si la vida útil ya se agotó y queda saldo por depreciar, el sistema lo rechaza con <code>ASSET_USEFUL_LIFE_EXHAUSTED</code>. Cambiar el nombre o el centro de costo no reinicia la cuota.</p>
+<p><strong>Revisar operación original</strong> consulta el resultado de una operación interrumpida antes de repetirla.</p>
 <h2 id="p0-27-ingresos-y-gastos-diferidos">27. Ingresos y gastos diferidos</h2>
 <h3>Registrar el diferido</h3>
 <p>Seleccione tipo, importe, moneda, cuentas, centro y calendario que solicite el formulario. Compruebe que las fuentes estén completas. Guardar crea el registro y su programa; no equivale a haber devengado todos los períodos.</p>
@@ -1887,6 +3132,35 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </ol>
 <p><strong>Ejemplo aritmético:</strong> distribuir 100,00 en tres cuotas puede exigir absorber un céntimo de redondeo en la última. La suma del calendario debe coincidir con el importe original; no cree un devengo manual adicional para compensar un residuo ya tratado por el programa.</p>
 <p><strong>Concurrencia:</strong> si otro usuario devenga mientras se intenta cancelar, recupere el estado vigente antes de decidir. La recuperación de la cuota original no inicia una cuota nueva ni borra las anteriores.</p>
+<h3>Detalle de diferidos</h3>
+<p>Pantalla: <code>/dashboard/contabilidad/diferidos</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Consultar</td>
+<td><code>contabilidad.diferidos.read</code></td>
+</tr>
+<tr>
+<td>Registrar</td>
+<td><code>contabilidad.diferidos.crear</code></td>
+</tr>
+<tr>
+<td>Devengar</td>
+<td><code>contabilidad.diferidos.devengar</code></td>
+</tr>
+<tr>
+<td>Cancelar</td>
+<td><code>contabilidad.diferidos.cancelar</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tipos:</strong> INGRESO y GASTO. <strong>Estados:</strong> VIGENTE, DEVENGADO y CANCELADO. Se registra con <strong>Guardar diferido</strong> y se reconoce con <strong>Devengar período</strong>.</p>
 <h2 id="p0-28-consignaciones">28. Consignaciones</h2>
 <h3>Entregar</h3>
 <p>Seleccione los productos, cantidades, moneda y destinatario. Revise el total calculado por el sistema y confirme. Una entrega con respuesta perdida debe recuperarse con su intención original.</p>
@@ -1931,6 +3205,35 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </ol>
 <p><strong>Ejemplo aritmético:</strong> diez unidades entregadas, tres vendidas y dos devueltas dejan cinco por resolver, si no existen otros movimientos. Ese saldo debe explicarse por la misma consignación, no por otra entrega del destinatario.</p>
 <p><strong>Identidad de operación:</strong> recuperar una entrega confirmada conserva su registro. Una entrega nueva, aunque repita destinatario y productos, es otro hecho empresarial y debe iniciar su propia operación. No reutilice una confirmación antigua para justificar una salida física nueva.</p>
+<h3>Detalle de consignaciones</h3>
+<p>Pantalla: <code>/dashboard/contabilidad/consignaciones</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Consultar el registro</td>
+<td><code>contabilidad.reportes.read</code></td>
+</tr>
+<tr>
+<td>Elegir productos</td>
+<td><code>inventario.productos.read</code></td>
+</tr>
+<tr>
+<td>Registrar una entrega</td>
+<td><code>contabilidad.consignaciones.crear</code></td>
+</tr>
+<tr>
+<td>Cambiar su estado</td>
+<td><code>contabilidad.consignaciones.actualizar</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estados:</strong> PENDIENTE, VENDIDA, DEVUELTA, CERRADA y ANULADA.</p>
 <h2 id="p0-29-monedas-tipos-de-cambio-y-revaluación">29. Monedas, tipos de cambio y revaluación</h2>
 <h3>Mantener cotizaciones</h3>
 <p>Registre fecha, moneda, clase y factor admitidos. Respete la precisión del formulario. Un cambio A→B→A sigue siendo una edición nueva cuando ya se confirmó el estado intermedio; no debe confundirse con una respuesta antigua del primer valor.</p>
@@ -1976,6 +3279,39 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 <p><strong>Si falta una tasa:</strong> recupere o complete la fuente autorizada. No utilice 1,00 como reemplazo de un dato desconocido ni sume directamente deudas PEN y USD para presentar un total.</p>
 <h3>Recuperar una revaluación registrada</h3>
 <p>La simulación y el registro son pasos distintos. Después de registrar, el resultado recuperado debe corresponder a la fecha, simulación, solicitud y asiento originales. Una lectura actual del tipo de cambio no sustituye esa fotografía. Si falta la confirmación, recupere el original antes de registrar otra revaluación.</p>
+<h3>Detalle de tipos de cambio y revaluación</h3>
+<p>Pantallas: <code>/dashboard/contabilidad/tipos-cambio</code> y <code>/dashboard/contabilidad/revaluacion</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Consultar cotizaciones</td>
+<td><code>contabilidad.tipos_cambio.read</code></td>
+</tr>
+<tr>
+<td>Registrar o importar</td>
+<td><code>contabilidad.tipos_cambio.crear</code></td>
+</tr>
+<tr>
+<td>Eliminar</td>
+<td><code>contabilidad.tipos_cambio.eliminar</code></td>
+</tr>
+<tr>
+<td>Simular la revaluación</td>
+<td><code>contabilidad.revaluacion.simular</code></td>
+</tr>
+<tr>
+<td>Ejecutarla</td>
+<td><code>contabilidad.revaluacion.ejecutar</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Orden:</strong> primero <strong>Simular</strong>, después ejecutar. <strong>Revisar registro conservado</strong> consulta una ejecución previa antes de intentarlo de nuevo. Tras revaluar un período, las cotizaciones y saldos que lo sustentan quedan protegidos frente a cambios que invalidarían el resultado.</p>
 <h2 id="p0-30-consolidación-y-reportes-configurables">30. Consolidación y reportes configurables</h2>
 <h3>Formar un grupo</h3>
 <p>Cree el grupo con su empresa controladora, invite a las empresas y registre los porcentajes. Cada miembro acepta o rechaza desde su propio contexto autorizado. Una invitación no aceptada no concede acceso a sus libros ni los incorpora como si ya hubiera consentimiento.</p>
@@ -2030,6 +3366,28 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </ol>
 <p><strong>Ejemplo:</strong> una línea de ingresos del mes y otra de saldo acumulado no responden a la misma base temporal. Revise su definición antes de sumarlas en una fórmula.</p>
 <p><strong>Resultado esperado:</strong> el reporte puede explicarse por miembros, cuentas, período y tasas. Sus eliminaciones no alteran los libros legales individuales. Una invitación pendiente o una tasa ausente no se resuelven omitiendo silenciosamente la empresa.</p>
+<h3>Detalle de consolidación y reportes configurables</h3>
+<p>Pantallas: <code>/dashboard/contabilidad/consolidacion</code> y <code>/dashboard/finanzas/reportes</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ver grupos y generar reportes</td>
+<td><code>contabilidad.reportes.read</code></td>
+</tr>
+<tr>
+<td>Crear grupos, invitar, responder, cargar tasas, mapeos y ajustes, o definir reportes</td>
+<td><code>contabilidad.reportes.actualizar</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Miembros:</strong> PENDIENTE, ACTIVO o RECHAZADO. <strong>Tasa:</strong> CIERRE, PROMEDIO o HISTORICA.</p>
+<p><strong>Registrar sin tocar libros</strong> deja claro lo esencial: los ajustes y eliminaciones del consolidado <strong>no modifican los libros de cada empresa</strong>. <strong>Guardar definición atómica</strong> guarda completa la definición de un reporte; no quedan definiciones a medias.</p>
 <h2 id="p0-31-libros-estados-financieros-y-reportes-operativos">31. Libros, estados financieros y reportes operativos</h2>
 <h3>Estados financieros</h3>
 <p>La consulta contable incluye balance de comprobación, resultados, situación financiera, flujo indirecto e indicadores. Seleccione período y moneda y recupere la carga antes de exportar. La comparación actual/anterior se publica como un conjunto; enero debe comparar con diciembre del ejercicio anterior cuando ése sea el alcance elegido.</p>
@@ -2089,6 +3447,31 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </ol>
 <p><strong>Ejemplo:</strong> un estado de situación al cierre conserva cuentas con saldo aunque no tengan movimiento en el mes. Un reporte de movimiento mensual puede mostrar otro conjunto sin que ello autorice a comparar ambos totales como si fueran equivalentes.</p>
 <p><strong>Incidencias:</strong> si cambia período y falla la consulta, no distribuya las filas del período anterior. Un porcentaje sin base se interpreta como no aplicable. Los TXT PLE descargados siguen siendo insumos de validación, no constancias de presentación.</p>
+<h3>Detalle de estados financieros y reportes</h3>
+<p>Pantallas: <code>/dashboard/contabilidad/estados</code> y <code>/dashboard/contabilidad/monitoreo</code> (<strong>Monitoreo de Eventos Contables</strong>).</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Balance de comprobación, estado de resultados y balance general</td>
+<td><code>contabilidad.reportes.read</code></td>
+</tr>
+<tr>
+<td>Refrescar los estados</td>
+<td><code>contabilidad.reportes.actualizar</code></td>
+</tr>
+<tr>
+<td>Reportes de suministro y su exportación</td>
+<td><code>reports.suministro.read</code>, <code>reports.suministro.export</code></td>
+</tr>
+</tbody>
+</table>
+<p>Si una operación no se refleja en contabilidad, revise su evento en el monitoreo antes de registrar nada a mano: suele bastar con recuperarlo.</p>
 <h2 id="p0-32-impuestos-y-sire">32. Impuestos y SIRE</h2>
 <h3>Borrador tributario mensual</h3>
 <p>En <strong>Contabilidad &gt; Impuestos Perú</strong>, seleccione período y régimen. Revise ventas, compras, créditos y saldo previo; complete los ajustes manuales que correspondan al papel de trabajo.</p>
@@ -2147,6 +3530,36 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 <p>GRE y SIRE pueden compartir credenciales de API SUNAT, pero <strong>activar o configurar GRE no activa por sí solo SIRE</strong>. La aceptación de una propuesta oficial exige la activación SIRE y las condiciones reales del contribuyente y entorno autorizado. Una demo o una comparación local no acreditan una aceptación oficial.</p>
 <p>Recibir un número de ticket deja el reporte <strong>pendiente</strong>. Consulte ese ticket hasta que la respuesta oficial y su persistencia confirmen el resultado; el código <strong>06, Terminado</strong>, es el que permite reconocer la finalización del trabajo correspondiente. No lo deduzca de una descarga disponible ni de una respuesta HTTP exitosa. La generación final del registro continúa en SUNAT Operaciones en Línea. Si falla la consulta, conserve ticket e intención y recupere la misma operación.
 &lt;!-- revision-omisiones-fin --&gt;</p>
+<h3>Detalle de impuestos y SIRE</h3>
+<p>Pantallas: <code>/dashboard/contabilidad/impuestos</code> y <code>/dashboard/sire</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ver y calcular impuestos mensuales y anuales</td>
+<td><code>contabilidad.reportes.read</code></td>
+</tr>
+<tr>
+<td>Guardar versiones y registrar constancias</td>
+<td><code>contabilidad.reportes.actualizar</code></td>
+</tr>
+<tr>
+<td>Ver reportes SIRE</td>
+<td><code>sire.read</code></td>
+</tr>
+<tr>
+<td>Generar, enviar y consultar el ticket</td>
+<td><code>sire.emitir</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Declaración:</strong> BORRADOR, PRESENTADA, RECTIFICADA o ANULADA. <strong>Reporte SIRE:</strong> GENERANDO, GENERADO, PENDIENTE, ENVIADO o ERROR, de tipo REGISTRO_VENTAS o REGISTRO_COMPRAS.</p>
+<p><strong>Importante:</strong> <strong>Registrar constancia</strong> guarda la constancia de una presentación hecha ante SUNAT; el ERP no presenta la declaración por usted. <strong>Guardar nueva versión</strong> conserva la anterior en <strong>Historial de versiones</strong>. Revise <strong>Advertencias y controles</strong> y <strong>Revisión obligatoria</strong> antes de usar la cifra.</p>
 <h2 id="p0-33-recursos-humanos-personas-contratos-y-solicitudes">33. Recursos humanos: personas, contratos y solicitudes</h2>
 <h3>Estructura y reclutamiento</h3>
 <p>Configure áreas o departamentos y vacantes antes de relacionarlos con candidatos o empleados. En selección registre los datos disponibles, experiencia y estado; no complete automáticamente información personal ausente.</p>
@@ -2221,6 +3634,33 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 &lt;!-- revision-omisiones-fin --&gt;</p>
 <h3>Vacaciones y permisos con decisión persistida</h3>
 <p>Registre el tipo de solicitud y sus fechas, revise los días y envíe la decisión con el permiso correspondiente. Después de aprobar o rechazar, recargue y consulte el estado persistido. Una solicitud rechazada no se trata como vacaciones aprobadas. El registro de otra empresa no debe aparecer al cambiar de sesión.</p>
+<h3>Detalle de personal, contratos y solicitudes</h3>
+<p>Pantallas: <code>/dashboard/rrhh</code>, <code>/dashboard/rrhh/contratos</code>, <code>/dashboard/rrhh/solicitudes</code>, <code>/dashboard/rrhh/asistencia</code> y <code>/dashboard/rrhh/candidatos</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Empleados, áreas, contratos, solicitudes, asistencia y candidatos</td>
+<td><code>rrhh.access</code></td>
+</tr>
+<tr>
+<td>Boleta de pago</td>
+<td><code>rrhh.planillas.read</code></td>
+</tr>
+<tr>
+<td>Calcular una liquidación desde el empleado</td>
+<td><code>rrhh.liquidaciones.calculate</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tenga presente:</strong> <code>rrhh.access</code> es un único permiso que abre todos esos datos de personal. Concédalo solo a quien deba verlos.</p>
+<p><strong>Pensión (Perú):</strong> AFP INTEGRA, PRIMA, HABITAT o PROFUTURO, o SIN_REGIMEN. Colombia usa PENSION_COLOMBIA.</p>
+<p><strong>Botones habituales:</strong> <strong>Crear contrato</strong>, <strong>Renovar</strong>, <strong>Finalizar</strong>, <strong>Generar PDF</strong>, <strong>Registrar solicitud</strong>, <strong>Marcar Entrada</strong> y <strong>Marcar Salida</strong>.</p>
 <h2 id="p0-34-planilla-vacaciones-remuneradas-y-eps">34. Planilla, vacaciones remuneradas y EPS</h2>
 <h3>Preparar las fuentes</h3>
 <p>Antes del cálculo deben estar disponibles empresa, empleados, contratos del período, conceptos, normativa efectiva, solicitudes y las fuentes especiales que correspondan. Un sueldo desconocido o una lectura fallida de vacaciones no se sustituye por cero.</p>
@@ -2316,6 +3756,50 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 <p>Al seleccionar una planilla para una operación relacionada, compruebe empresa y período y espere el catálogo completo. Una lectura fallida no acredita que la planilla no exista ni habilita crear otra. Recupere la consulta y vuelva a revisar el vínculo antes de aplicar un beneficio o crédito.</p>
 <h3>Usar las vacaciones aprobadas completas</h3>
 <p>El cálculo consume las solicitudes aprobadas pertinentes al período. Compruebe todas las páginas y fechas; una consulta fallida no equivale a cero vacaciones. Los solapamientos se revisan por fechas únicas y la liquidación limita las fechas al cese. Registrar o aprobar la solicitud no constituye por sí mismo el pago de vacaciones.</p>
+<h3>Detalle de la planilla</h3>
+<p>Pantallas: <code>/dashboard/rrhh/planillas</code> y <code>/dashboard/rrhh/pagos</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Etapa</th>
+<th>Botón</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Crear, editar o eliminar</td>
+<td><strong>Crear Nueva Planilla</strong></td>
+<td><code>rrhh.planillas.create</code></td>
+</tr>
+<tr>
+<td>Calcular</td>
+<td><strong>Calcular planilla detallada</strong></td>
+<td><code>rrhh.planillas.calculate</code></td>
+</tr>
+<tr>
+<td>Aprobar</td>
+<td><strong>Aprobar planilla</strong></td>
+<td><code>rrhh.planillas.approve</code></td>
+</tr>
+<tr>
+<td>Pagar</td>
+<td><strong>Pagar planilla</strong></td>
+<td><code>rrhh.planillas.pay</code></td>
+</tr>
+<tr>
+<td>Generar asientos</td>
+<td>-</td>
+<td><code>rrhh.planillas.accounting</code></td>
+</tr>
+<tr>
+<td>Consultar detalle, pagos y comprobante</td>
+<td><strong>Ver detalle completo</strong>, <strong>Descargar Comprobante</strong></td>
+<td><code>rrhh.planillas.read</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Recuperación:</strong> <strong>Reintentar recuperación del cálculo</strong> y <strong>Reintentar recuperación del pago</strong> consultan el intento original. Úselos antes de volver a calcular o pagar.</p>
 <h2 id="p0-35-cts-y-liquidaciones">35. CTS y liquidaciones</h2>
 <h3>CTS</h3>
 <p>Seleccione período, empleados y base computable según el flujo. Revise la gratificación de origen cuando deba formar parte del cálculo. Una fuente externa declarada conserva su procedencia; no se presenta como un pago registrado automáticamente por la planilla.</p>
@@ -2377,6 +3861,46 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 <p><strong>Correcciones:</strong> un depósito realizado no se reabre por recalcular. La reversa de un pago conserva el original como revertido y restablece su obligación según el flujo. Un nuevo pago después de una reversa es otra operación, no el reintento de la transferencia antigua.</p>
 <h3>Liquidación con historia de beneficios verificable</h3>
 <p>Indique la fecha de cese y revise CTS, gratificaciones y vacaciones con sus fuentes históricas. Si falta la historia necesaria, el conflicto conserva la revisión y no autoriza a suponer un beneficio pagado. El resultado depende de esas fechas y fuentes; los importes de una prueba antigua no son una fórmula ni un saldo aplicable a otro trabajador.</p>
+<h3>Detalle de CTS y liquidaciones</h3>
+<p>Pantalla: <code>/dashboard/rrhh/liquidaciones</code>, con <strong>Liquidaciones</strong> y <strong>Depósitos semestrales de CTS</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Consultar</td>
+<td><code>rrhh.planillas.read</code></td>
+</tr>
+<tr>
+<td>Calcular una liquidación</td>
+<td><code>rrhh.liquidaciones.calculate</code></td>
+</tr>
+<tr>
+<td>Confirmarla</td>
+<td><code>rrhh.liquidaciones.approve</code></td>
+</tr>
+<tr>
+<td><strong>Registrar pago</strong></td>
+<td><code>rrhh.liquidaciones.pay</code></td>
+</tr>
+<tr>
+<td><strong>Revertir pago</strong></td>
+<td><code>rrhh.liquidaciones.reverse</code></td>
+</tr>
+<tr>
+<td><strong>Calcular período</strong> de CTS</td>
+<td><code>rrhh.cts.calculate</code></td>
+</tr>
+<tr>
+<td>Depositar la CTS</td>
+<td><code>rrhh.cts.deposit</code></td>
+</tr>
+</tbody>
+</table>
 <h2 id="p0-36-plame-t-registro-y-contexto-por-país">36. PLAME, T-Registro y contexto por país</h2>
 <h3>Preparar el paquete peruano</h3>
 <p>Complete RUC, identidad, contratos, códigos paramétricos, jornada y las fuentes de la planilla. Una jornada manual debe ser explícita y auditable; la ausencia de asistencia no se resuelve inventando horas ordinarias.</p>
@@ -2437,6 +3961,31 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </ol>
 <p><strong>Distinción práctica:</strong> el ZIP de trabajo del ERP no es por sí mismo el ZIP validado de carga. Una constancia PLAME y un CIR registral acreditan cosas distintas.</p>
 <p><strong>Cambios posteriores:</strong> si cambia la fuente de un trabajador, revise su novedad registral y la versión nueva. No reutilice una evidencia anterior para afirmar que una modificación posterior ya fue presentada.</p>
+<h3>Detalle de planilla electrónica y país</h3>
+<p>Pantallas: <code>/dashboard/rrhh/planilla-electronica</code> y <code>/dashboard/rrhh/fichas-sunat</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Vista previa, historial y descarga del paquete</td>
+<td><code>rrhh.planilla_electronica.read</code></td>
+</tr>
+<tr>
+<td>Fichas, jornada, generar paquete y registrar evidencia</td>
+<td><code>rrhh.planilla_electronica.write</code></td>
+</tr>
+<tr>
+<td>Ver o cambiar la configuración de país del usuario</td>
+<td><code>paises.usuario.read</code>, <code>paises.usuario.update</code></td>
+</tr>
+</tbody>
+</table>
+<p>El paquete es un archivo de trabajo. Su validación se hace en PVS o T-Registro, y la evidencia oficial se registra después, por versión.</p>
 <h2 id="p0-37-auditoría-notificaciones-y-ayuda">37. Auditoría, notificaciones y ayuda</h2>
 <h3>Auditoría</h3>
 <p>Con permiso de auditoría consulte fechas, actor, operación, recurso y resultado. Use los filtros y paginación disponibles. El historial puede combinar varias fuentes; una fuente incompleta debe avisarse, no ocultarse como historial vacío.</p>
@@ -2492,6 +4041,35 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </ol>
 <p><strong>Ejemplo:</strong> recibir una notificación de una operación no garantiza que su consulta posterior haya terminado de cargar. Abra el recurso y compruebe su estado; no repita la operación desde la notificación.</p>
 <p><strong>Integraciones:</strong> una prueba de conexión satisfactoria no acredita la entrega o aceptación de cada documento. Consulte la bitácora y evidencia del envío concreto cuando se investigue una transmisión.</p>
+<h3>Detalle de auditoría, notificaciones y ayuda</h3>
+<p>Pantallas: <code>/dashboard/audit-logs</code> y <code>/dashboard/ayuda</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Acción</th>
+<th>Permiso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Consultar auditoría, actores e integraciones</td>
+<td><code>security.audit.read</code></td>
+</tr>
+<tr>
+<td>Panel de seguridad</td>
+<td><code>security.audit.read</code></td>
+</tr>
+<tr>
+<td>Ver y marcar sus notificaciones</td>
+<td>Basta con su sesión</td>
+</tr>
+<tr>
+<td>Crear o eliminar notificaciones</td>
+<td><code>notifications.create</code>, <code>notifications.delete</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Ayuda</strong> incluye el <strong>Ciclo de suministro por función</strong>, con enlaces a la pantalla de cada paso.</p>
 <h2 id="p0-38-lecturas-borradores-y-operaciones-interrumpidas">38. Lecturas, borradores y operaciones interrumpidas</h2>
 <h3>Tres situaciones que no deben confundirse</h3>
 <table>
@@ -2631,6 +4209,9 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </ol>
 <p><strong>Ejemplo:</strong> una edición de cliente compatible puede quedar en cola; un pago de planilla no se considera realizado por estar conservado localmente. Cada uno se recupera con su mecanismo.</p>
 <p><strong>Si cambia de usuario:</strong> el nuevo actor no adquiere acceso al pendiente privado del anterior. El propietario debe recuperar su contexto; compartir el perfil no sustituye la autorización.</p>
+<h3>Detalle de la cola sin conexión</h3>
+<p>Pantalla: <code>/dashboard/offline</code>. <strong>Estados de una solicitud local:</strong> <code>pending</code> (pendiente), <code>failed</code> (falló) y <code>synced</code> (sincronizada).</p>
+<p><strong>Nunca entran a la cola:</strong> inicio de sesión y configuración con credenciales, importaciones, operaciones de contratos de suministro, y la generación de comprobantes desde un pedido. Esas requieren conexión.</p>
 <h2 id="p0-40-recorridos-completos-de-trabajo">40. Recorridos completos de trabajo</h2>
 <h3>Venta a crédito hasta el cobro</h3>
 <ol>
@@ -2841,6 +4422,63 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 <p><strong>Protección de información:</strong> excluya contraseñas, PIN, tokens y claves privadas. Si soporte necesita una corrección empresarial, debe quedar diferenciada de la mera consulta del incidente.</p>
 <h3>Distinguir consulta de modificación durante soporte</h3>
 <p>Una investigación de soporte debe declarar cualquier cambio que haya producido y conservar la evidencia anterior y posterior. Una prueba que modificó existencias no puede presentarse como consulta de sólo lectura. Para revisar un resultado use recibos y lecturas; una corrección del stock requiere su propia operación autorizada y trazable.</p>
+<h3>Mensajes de bloqueo más frecuentes</h3>
+<table>
+<thead>
+<tr>
+<th>Mensaje o código</th>
+<th>Dónde aparece</th>
+<th>Qué hacer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&quot;Cuenta bloqueada temporalmente&quot;</td>
+<td>Acceso</td>
+<td>Esperar 15 minutos; capítulo 02</td>
+</tr>
+<tr>
+<td><code>ADMIN_LAST_SUPERADMIN</code></td>
+<td>Usuarios</td>
+<td>Crear otro antes; capítulo 03</td>
+</tr>
+<tr>
+<td><code>RMA_SEGREGATED_APPROVAL_REQUIRED</code></td>
+<td>Devoluciones</td>
+<td>Otra persona aprueba; capítulo 10</td>
+</tr>
+<tr>
+<td><code>PENALTY_SEGREGATION_REQUIRED</code></td>
+<td>Penalidades</td>
+<td>Otra persona aprueba; capítulo 43</td>
+</tr>
+<tr>
+<td><code>SUPPLIER_CREDIT_NOTE_USE_RETURN_WRITER</code></td>
+<td>CxP</td>
+<td>Registrar la nota desde la devolución; capítulo 14</td>
+</tr>
+<tr>
+<td><code>ASSET_USEFUL_LIFE_EXHAUSTED</code></td>
+<td>Activos</td>
+<td>Revisar la vida útil; capítulo 26</td>
+</tr>
+<tr>
+<td><code>CASH_MASTER_OPEN_SESSION_BLOCKS_CRITICAL_CHANGE</code></td>
+<td>Cajas</td>
+<td>Cerrar la sesión abierta antes del cambio; capítulo 12</td>
+</tr>
+<tr>
+<td><code>CASH_WAREHOUSE_BRANCH_MISMATCH</code></td>
+<td>Cajas</td>
+<td>Almacén y sucursal deben coincidir; capítulo 12</td>
+</tr>
+<tr>
+<td><code>MIGRATION_SOURCE_NAME_INVALID</code></td>
+<td>Migración</td>
+<td>Corregir el nombre del sistema de origen; capítulo 45</td>
+</tr>
+</tbody>
+</table>
 <h2 id="p0-42-glosario-y-alcance-de-esta-edición">42. Glosario y alcance de esta edición</h2>
 <table>
 <thead>
@@ -3948,7 +5586,7 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/activos-fijos</code></td>
-<td>23</td>
+<td>26</td>
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/asientos</code></td>
@@ -3968,47 +5606,47 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/centros-costo</code></td>
-<td>23</td>
+<td>25</td>
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/centros-costo/[id]</code></td>
-<td>23</td>
+<td>25</td>
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/centros-costo/[id]/editar</code></td>
-<td>23</td>
+<td>25</td>
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/centros-costo/nuevo</code></td>
-<td>23</td>
+<td>25</td>
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/consignaciones</code></td>
-<td>23</td>
+<td>28</td>
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/consolidacion</code></td>
-<td>23</td>
+<td>30</td>
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/diferidos</code></td>
-<td>23</td>
+<td>27</td>
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/estados</code></td>
-<td>23</td>
+<td>31</td>
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/impuestos</code></td>
-<td>23</td>
+<td>32</td>
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/impuestos/anual</code></td>
-<td>23</td>
+<td>32</td>
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/monitoreo</code></td>
-<td>23</td>
+<td>31</td>
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/partidas</code></td>
@@ -4016,15 +5654,15 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/periodos</code></td>
-<td>23</td>
+<td>24</td>
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/periodos/[id]</code></td>
-<td>23</td>
+<td>24</td>
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/periodos/nuevo</code></td>
-<td>23</td>
+<td>24</td>
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/plantillas</code></td>
@@ -4032,35 +5670,35 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/presupuestos</code></td>
-<td>23</td>
+<td>25</td>
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/presupuestos/[id]</code></td>
-<td>23</td>
+<td>25</td>
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/presupuestos/alertas</code></td>
-<td>23</td>
+<td>25</td>
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/presupuestos/comparacion</code></td>
-<td>23</td>
+<td>25</td>
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/presupuestos/lista</code></td>
-<td>23</td>
+<td>25</td>
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/presupuestos/nuevo</code></td>
-<td>23</td>
+<td>25</td>
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/revaluacion</code></td>
-<td>23</td>
+<td>29</td>
 </tr>
 <tr>
 <td><code>/dashboard/contabilidad/tipos-cambio</code></td>
-<td>23</td>
+<td>29</td>
 </tr>
 <tr>
 <td><code>/dashboard/cpe</code></td>
@@ -4084,7 +5722,7 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </tr>
 <tr>
 <td><code>/dashboard/finanzas/ajustes-fiscales</code></td>
-<td>22</td>
+<td>20</td>
 </tr>
 <tr>
 <td><code>/dashboard/finanzas/bancos</code></td>
@@ -4128,7 +5766,7 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </tr>
 <tr>
 <td><code>/dashboard/finanzas/reportes</code></td>
-<td>22</td>
+<td>30</td>
 </tr>
 <tr>
 <td><code>/dashboard/finanzas/tesoreria</code></td>
@@ -4232,19 +5870,19 @@ code{font:.88em ui-monospace,Consolas,monospace;background:var(--franja);padding
 </tr>
 <tr>
 <td><code>/dashboard/rrhh/fichas-sunat</code></td>
-<td>33</td>
+<td>36</td>
 </tr>
 <tr>
 <td><code>/dashboard/rrhh/liquidaciones</code></td>
-<td>33</td>
+<td>35</td>
 </tr>
 <tr>
 <td><code>/dashboard/rrhh/pagos</code></td>
-<td>33</td>
+<td>34</td>
 </tr>
 <tr>
 <td><code>/dashboard/rrhh/planilla-electronica</code></td>
-<td>33</td>
+<td>36</td>
 </tr>
 <tr>
 <td><code>/dashboard/rrhh/planillas</code></td>
