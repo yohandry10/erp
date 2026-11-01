@@ -402,10 +402,10 @@ describe('NotificationsService', () => {
             const marked = mockClient.rpc.mock.calls
                 .filter(([, params]: any[]) => params?.p_operacion === 'MARK_READ')
                 .map(([, params]: any[]) => params.p_payload.notification_id);
-            expect(marked).toEqual(['own', 'global']);
+            expect(marked).toEqual(['own']);
         });
 
-        it('should leave shared notifications unread without notifications.update', async () => {
+        it('should mark shared notifications only for the reader', async () => {
             mockDbResponse = {
                 data: [
                     { ...mockNotificationData, id: 'own', usuario_id: 'user-123' },
@@ -414,20 +414,40 @@ describe('NotificationsService', () => {
                 error: null,
             };
 
-            const result = await service.markAllAsRead('tenant-123', 'user-123', { id: 'user-123' }, false);
+            const result = await service.markAllAsRead('tenant-123', 'user-123', { id: 'user-123' });
 
-            expect(result).toBe(1);
-            const marked = mockClient.rpc.mock.calls
+            expect(result).toBe(2);
+            const personal = mockClient.rpc.mock.calls
                 .filter(([, params]: any[]) => params?.p_operacion === 'MARK_READ')
                 .map(([, params]: any[]) => params.p_payload.notification_id);
-            expect(marked).toEqual(['own']);
+            expect(personal).toEqual(['own']);
+            const shared = mockClient.rpc.mock.calls
+                .filter(([name]: any[]) => name === 'marcar_aviso_compartido_leido_tx')
+                .map(([, params]: any[]) => [params.p_notificacion_id, params.p_usuario_id]);
+            expect(shared).toEqual([['global', 'user-123']]);
         });
 
-        it('should refuse to mark a shared notification without notifications.update', async () => {
-            mockClient.single.mockResolvedValueOnce({ data: { usuario_id: null, roles_destinatarios: [] }, error: null });
+        it('a shared notification read by this user is no longer unread for them', async () => {
+            const rows = [{ ...mockNotificationData, id: 'global', usuario_id: null, roles_destinatarios: [], leida: false }];
+            const lecturas = [{ notificacion_id: 'global', leida_at: '2026-11-01T00:00:00Z' }];
+            mockClient.from.mockImplementation((tabla: string) => {
+                mockDbResponse = { data: tabla === 'notificaciones_lecturas' ? lecturas : rows, error: null };
+                return mockClient;
+            });
 
-            await expect(service.markAsRead('tenant-123', 'global', { id: 'user-123' }, false))
-                .rejects.toBeInstanceOf(ForbiddenException);
+            expect(await service.getNotifications('tenant-123', { leida: false }, { id: 'user-123' })).toEqual([]);
+            const [leida] = await service.getNotifications('tenant-123', { leida: true }, { id: 'user-123' });
+            expect(leida.id).toBe('global');
+            expect(leida.leida).toBe(true);
+        });
+
+        it('should not turn off a shared notification for everyone', async () => {
+            mockClient.single.mockResolvedValueOnce({ data: { ...mockNotificationData, id: 'global', usuario_id: null, roles_destinatarios: [] }, error: null });
+
+            const leida = await service.markAsRead('tenant-123', 'global', { id: 'user-123' });
+
+            expect(leida.leida).toBe(true);
+            expect(mockClient.rpc).toHaveBeenCalledWith('marcar_aviso_compartido_leido_tx', expect.objectContaining({ p_usuario_id: 'user-123' }));
             expect(mockClient.rpc).not.toHaveBeenCalledWith('gestionar_notificacion_tx', expect.objectContaining({ p_operacion: 'MARK_READ' }));
         });
 

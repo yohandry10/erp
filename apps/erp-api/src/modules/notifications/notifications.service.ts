@@ -53,11 +53,11 @@ export class NotificationsService {
     notificationId: string,
     user: AuthenticatedUser | undefined,
     operation: string,
-  ): Promise<{ usuario_id?: string | null; roles_destinatarios?: string[] | null }> {
+  ): Promise<any> {
     const { data: notification, error } = await this.supabaseService
       .getClient()
       .from('notificaciones')
-      .select('usuario_id, roles_destinatarios')
+      .select('*')
       .eq('id', notificationId)
       .eq('tenant_id', tenantId)
       .single();
@@ -72,18 +72,6 @@ export class NotificationsService {
       throw new NotFoundException('Notificación no encontrada');
     }
     return notification;
-  }
-
-  // El estado leído es una columna por aviso: marcar uno global o de rol lo
-  // marca para toda la empresa. Sin notifications.update sólo se marcan los
-  // personales; el estado por usuario exige una migración pendiente.
-  private assertCanMarkShared(
-    notification: { usuario_id?: string | null },
-    user: AuthenticatedUser | undefined,
-    canMarkShared: boolean,
-  ): void {
-    if (notification.usuario_id || user?.is_super_admin || canMarkShared) return;
-    throw new ForbiddenException('Este aviso es compartido con la empresa: sólo un responsable con permiso de notificaciones puede marcarlo como leído');
   }
 
   private async withTenantContext<T>(
@@ -250,12 +238,11 @@ export class NotificationsService {
 
         if (filters?.type) query = query.eq('tipo', filters.type);
         if (filters?.severity) query = query.eq('severidad', filters.severity);
-        if (filters?.leida !== undefined) query = query.eq('leida', filters.leida);
         if (filters?.usuario_id) query = query.eq('usuario_id', filters.usuario_id);
 
         const { data, error } = await query;
         if (error) this.unavailable('lista', error);
-        return (data || []).map(item => this.mapToNotification(item));
+        return this.withOwnReadState(tenantId, user?.id, data || [], filters?.leida);
       }
 
       // Para usuarios normales: filtrar por usuario_id, roles, o globales
@@ -278,7 +265,6 @@ export class NotificationsService {
 
       if (filters?.type) query = query.eq('tipo', filters.type);
       if (filters?.severity) query = query.eq('severidad', filters.severity);
-      if (filters?.leida !== undefined) query = query.eq('leida', filters.leida);
 
       const { data, error } = await query;
       if (error) this.unavailable('lista', error);
@@ -311,8 +297,35 @@ export class NotificationsService {
         return false;
       });
 
-      return filteredData.map(item => this.mapToNotification(item));
+      return this.withOwnReadState(tenantId, userId, filteredData, filters?.leida);
     });
+  }
+
+  // Un aviso compartido está leído si este usuario lo marcó, o si ya se había
+  // marcado para todos antes de que la lectura fuera por usuario (592).
+  private async withOwnReadState(
+    tenantId: string,
+    userId: string | undefined,
+    rows: any[],
+    leida: boolean | undefined,
+  ): Promise<Notification[]> {
+    const lecturas = new Map<string, string>();
+    if (userId && rows.some(row => !row.usuario_id && !row.leida)) {
+      const { data, error } = await this.supabaseService
+        .getClient()
+        .from('notificaciones_lecturas')
+        .select('notificacion_id, leida_at')
+        .eq('tenant_id', tenantId)
+        .eq('usuario_id', userId);
+      if (error) this.unavailable('lista', error);
+      for (const lectura of (data || []) as any[]) lecturas.set(lectura.notificacion_id, lectura.leida_at);
+    }
+    return rows
+      .map(row => {
+        const leidaAt = row.usuario_id ? undefined : lecturas.get(row.id);
+        return this.mapToNotification(leidaAt ? { ...row, leida: true, leida_at: leidaAt } : row);
+      })
+      .filter(notification => leida === undefined || Boolean(notification.leida) === leida);
   }
 
   async getUnreadCount(
@@ -330,14 +343,26 @@ export class NotificationsService {
     tenantId: string,
     notificationId: string,
     user?: AuthenticatedUser,
-    canMarkShared = true,
   ): Promise<Notification> {
     return this.withTenantContext(tenantId, user, async () => {
       // Propia, global o de un rol del usuario; super admin, cualquiera del tenant.
       const notification = await this.findOwnedNotification(tenantId, notificationId, user, 'MARK_READ');
-      this.assertCanMarkShared(notification, user, canMarkShared);
-      return this.markReadUnchecked(tenantId, notificationId, user);
+      if (notification.usuario_id) return this.markReadUnchecked(tenantId, notificationId, user);
+      const leidaAt = await this.markSharedRead(tenantId, notificationId, user);
+      return this.mapToNotification({ ...notification, leida: true, leida_at: leidaAt });
     });
+  }
+
+  private async markSharedRead(tenantId: string, notificationId: string, user?: AuthenticatedUser): Promise<string> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .rpc('marcar_aviso_compartido_leido_tx', {
+        p_tenant_id: tenantId,
+        p_usuario_id: user?.id ?? null,
+        p_notificacion_id: notificationId,
+      });
+    if (error) this.writerError('MARK_READ', error);
+    return data as string;
   }
 
   private async markReadUnchecked(tenantId: string, notificationId: string, user?: AuthenticatedUser): Promise<Notification> {
@@ -358,20 +383,19 @@ export class NotificationsService {
     tenantId: string,
     usuarioId?: string,
     user?: AuthenticatedUser,
-    canMarkShared = true,
   ): Promise<number> {
     const effectiveUser = user ?? { id: usuarioId };
     // MARK_ALL_READ sólo tocaba las de usuario_id: las globales y las del rol
-    // seguían pendientes y volvían a la campana al recargar. Se marca cada
-    // aviso visible que el usuario puede marcar (los compartidos, sólo con
-    // notifications.update); un reintento continúa con los que falten.
-    const unread = (await this.getNotifications(tenantId, { leida: false, usuario_id: usuarioId }, effectiveUser))
-      .filter(notification => notification.usuario_id || effectiveUser.is_super_admin || canMarkShared);
+    // seguían pendientes y volvían a la campana al recargar. Se marca cada aviso
+    // visible, los compartidos sólo para este usuario; un reintento continúa con
+    // los que falten.
+    const unread = await this.getNotifications(tenantId, { leida: false, usuario_id: usuarioId }, effectiveUser);
     return this.withTenantContext(tenantId, effectiveUser, async () => {
       let count = 0;
       for (const notification of unread) {
         try {
-          await this.markReadUnchecked(tenantId, notification.id, effectiveUser);
+          if (notification.usuario_id) await this.markReadUnchecked(tenantId, notification.id, effectiveUser);
+          else await this.markSharedRead(tenantId, notification.id, effectiveUser);
           count++;
         } catch (error) {
           // Borrada por otro usuario entre la lectura y el marcado: ya no está pendiente.

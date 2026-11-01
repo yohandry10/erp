@@ -24,7 +24,8 @@ import { ConfigService } from '@nestjs/config';
 import {
   RequestPasswordResetDto,
   ValidatePasswordResetDto,
-  ResetPasswordDto
+  ResetPasswordDto,
+  ChangePasswordDto
 } from './dto';
 
 @ApiTags('Autenticación')
@@ -219,6 +220,21 @@ export class AuthController {
     }
 
     return { valid: true };
+  }
+
+  @Post('password/change')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Cambiar la contraseña propia',
+    description: 'Exige la contraseña actual. Revoca todas las sesiones del usuario, incluida la actual.'
+  })
+  @ApiResponse({ status: 200, description: 'Contraseña cambiada. Hay que iniciar sesión de nuevo.' })
+  @ApiResponse({ status: 400, description: 'Contraseña actual incorrecta o nueva no válida' })
+  async changePassword(@Body() dto: ChangePasswordDto, @Request() req) {
+    await this.authService.changeOwnPassword(req.user.id, dto.currentPassword, dto.newPassword);
+    return { message: 'Contraseña actualizada. Inicia sesión de nuevo.' };
   }
 
   @Post('password-reset/confirm')

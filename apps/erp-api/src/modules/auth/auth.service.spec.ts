@@ -183,6 +183,54 @@ describe('AuthService', () => {
             expect(mockClient.eq).toHaveBeenCalledWith('success', false);
         });
 
+        describe('changeOwnPassword', () => {
+            const usuario = async () => ({ id: 'u1', email: 'a@b.test', password_hash: await bcrypt.hash('Actual-1234!', 4) });
+            const preparar = async (rpc: any) => {
+                jest.spyOn(service, 'findUserById').mockResolvedValue(await usuario());
+                const admin = { rpc: jest.fn().mockResolvedValue(rpc) };
+                jest.spyOn(supabaseService, 'getAdminClient').mockReturnValue(admin as any);
+                return admin;
+            };
+
+            it('rechaza una contraseña actual incorrecta sin tocar la base', async () => {
+                const admin = await preparar({ data: true, error: null });
+                await expect(service.changeOwnPassword('u1', 'Mala-1234!', 'Nueva-1234!')).rejects.toThrow('actual no es correcta');
+                expect(admin.rpc).not.toHaveBeenCalled();
+            });
+
+            it('rechaza repetir la contraseña actual', async () => {
+                await preparar({ data: true, error: null });
+                await expect(service.changeOwnPassword('u1', 'Actual-1234!', 'Actual-1234!')).rejects.toThrow('distinta');
+            });
+
+            it('guarda un hash y nunca la contraseña en claro', async () => {
+                const admin = await preparar({ data: true, error: null });
+                await service.changeOwnPassword('u1', 'Actual-1234!', 'Nueva-1234!');
+                const [nombre, params] = admin.rpc.mock.calls[0];
+                expect(nombre).toBe('cambiar_password_propio_auth_tx');
+                expect(params.p_new_password_hash).not.toContain('Nueva-1234!');
+                expect(await bcrypt.compare('Nueva-1234!', params.p_new_password_hash)).toBe(true);
+            });
+
+            it('si otro cambio ganó la carrera no finge éxito', async () => {
+                await preparar({ data: false, error: null });
+                await expect(service.changeOwnPassword('u1', 'Actual-1234!', 'Nueva-1234!')).rejects.toThrow('actual no es correcta');
+            });
+
+            it('una caída de la base responde 503', async () => {
+                await preparar({ data: null, error: { message: 'caída' } });
+                await expect(service.changeOwnPassword('u1', 'Actual-1234!', 'Nueva-1234!')).rejects.toThrow('No se pudo cambiar');
+            });
+        });
+
+        it('si no se puede leer el conteo de intentos, el login falla cerrado', async () => {
+            const mockClient = supabaseService.getPublicClient() as any;
+            mockClient.gte.mockResolvedValueOnce({ data: null, error: { message: 'caída' } });
+
+            await expect((service as any).checkFailedAttemptsLimit('test@example.com', '127.0.0.1', 'jest-agent'))
+                .rejects.toThrow('temporalmente no disponible');
+        });
+
         it('login con contraseña correcta no debe quedar bloqueado por intentos fallidos previos del mismo cliente', async () => {
             jest.spyOn(service as any, 'checkFailedAttemptsLimit').mockResolvedValue(true);
             jest.spyOn(service, 'validateUser').mockResolvedValue(mockUser);

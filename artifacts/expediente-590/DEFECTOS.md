@@ -8,13 +8,9 @@ quien integró; el responsable del producto puede cambiarla.
 
 | ID | Sev. | Qué pasa | Por qué sigue abierto | Dónde se decide |
 | --- | --- | --- | --- | --- |
-| A-01 | A | El alcance por sucursal pasa a acceso total si falla su lectura | Cambia el comportamiento ante fallos; pide decisión | Auth y permisos |
-| A-02 | A | El límite de intentos de login no se aplica si falla su consulta | Elegir entre bloquear a todos o dejar pasar | Auth |
 | A-03 | M | `rrhh.access` es un único permiso amplio | Dividirlo cambia roles existentes | Permisos |
-| A-04 | B | 143 tablas conservan permiso de escritura para `anon`; RLS forzado las frena y no es explotable hoy | Requiere migración con barrido | Seguridad de BD |
 | A-05 | M | La cola de eventos de PROD tiene 7 en `cola_muerta`, anteriores a esta versión | Sin investigar | Operación |
-| A-06 | M | El estado leído de una notificación es por aviso, no por usuario | Requiere lecturas por usuario | Notificaciones |
-| A-07 | M | No hay "cambiar mi contraseña"; sin correo productivo no se recupera una cuenta | Falta función y correo real | Usuarios |
+| A-07 | M | Sin correo productivo no se recupera una contraseña olvidada | Falta configurar correo real | Usuarios |
 | A-08 | B | Reprogramar una entrega sin `destino` por la RPC directa da el error crudo de NOT NULL; la API lo exige | Sólo por llamada directa | Suministro |
 | A-09 | B | GRE SOAP beta rechaza con `2112`; la ruta prevista es GRE REST | Depende de SUNAT | GRE |
 | A-10 | M | La CI integral falla si corre en las primeras 5 horas UTC de cada mes: los datos de prueba toman el mes UTC y el negocio la fecha de Lima. Afecta sólo a pruebas; 8 scripts de `scripts/ci` usan fechas así | Reintentar después de las 00:05 de Lima funciona | CI |
@@ -36,6 +32,16 @@ quien integró; el responsable del producto puede cambiarla.
 | C-09 | B | Rutas locales con el nombre de un cliente en el PDF del manual y en un manifiesto | Limpiadas; `check-manual` lo vigila en el PDF | Búsqueda sin coincidencias en la rama |
 | C-10 | B | La prueba del dashboard dependía del mes UTC | Calcula el mes en hora de Lima | Con `TZ=UTC` y `America/Lima` |
 | C-11 | B | La prueba de compra daba 5 s a una pantalla que seguía cargando, y falló una vez en CI | Plazo de 20 s, igual al resto de la prueba | CI del PR 150 |
+
+## Corregidos después de 590, pendientes de promover (591–593)
+
+| ID | Sev. | Qué pasaba | Corrección |
+| --- | --- | --- | --- |
+| A-01 | A | El alcance por sucursal pasaba a total si fallaba su lectura | Responde 503 |
+| A-02 | A | El límite de login no se aplicaba si fallaba su consulta | Responde 503 |
+| A-04 | B | 143 tablas conservaban escritura para `anon` | Migración 591, también para tablas futuras |
+| A-06 | M | Marcar un aviso compartido lo apagaba para todos, y por eso exigía permiso | Migración 592: lectura por usuario |
+| A-07 | M | No había "cambiar mi contraseña" | Migración 593 y opción en el menú lateral |
 
 ## Corregidos con reserva
 
