@@ -2,7 +2,7 @@
   "completedAt": "2026-10-31T09:57:12.672Z",
   "project": "wypnbcptofqdmoynlonq",
   "remoteWrites": false,
-  "archive": "artifacts/db-backups/C:\\Users\\PC\\Desktop\\erp\\.claude\\worktrees\\alkhofar-supply\\artifacts\\db-backups\\prod-pre-peru-552-20261031095115326.dump",
+  "archive": "artifacts/db-backups/prod-pre-peru-552-20261031095115326.dump",
   "schemas": [
     "public",
     "app",
