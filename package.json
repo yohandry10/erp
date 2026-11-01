@@ -17,6 +17,7 @@
     "test": "turbo run test",
     "test:cov": "turbo run test:cov",
     "check-docs": "node scripts/check-docs-contract.mjs",
+    "check-manual": "node scripts/manual/verificar-manual.mjs",
     "lint": "turbo run lint",
     "clean": "turbo run clean",
     "type-check": "turbo run type-check",

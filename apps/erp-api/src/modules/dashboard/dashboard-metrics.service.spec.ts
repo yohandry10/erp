@@ -114,9 +114,11 @@ describe('DashboardMetricsService', () => {
   );
 
   it('calcula métricas reales por tenant y periodo con columnas runtime', async () => {
-    const now = new Date();
-    const currentMonth = new Date(now.getFullYear(), now.getMonth(), 10).toISOString();
-    const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 10).toISOString();
+    // El servicio calcula el mes en la hora del país (Lima, UTC-5), no en la del servidor:
+    // las primeras horas de cada mes en UTC todavía son el mes anterior allí.
+    const lima = new Date(Date.now() - 5 * 60 * 60 * 1000);
+    const currentMonth = new Date(Date.UTC(lima.getUTCFullYear(), lima.getUTCMonth(), 10, 12)).toISOString();
+    const previousMonth = new Date(Date.UTC(lima.getUTCFullYear(), lima.getUTCMonth() - 1, 10, 12)).toISOString();
 
     const service = createService({
       cpe: [

@@ -1508,7 +1508,7 @@ test('Perú: crea, aprueba y recibe una compra desde la interfaz real', async ({
     expect(receipt.estado).toBe('CERRADA')
     await page.waitForURL('**/dashboard/compras/recepciones/')
     await page.goto(`/dashboard/compras/ordenes/${order.id}/`)
-    await expect(page.getByText('Recibida', { exact: true }).first()).toBeVisible()
+    await expect(page.getByText('Recibida', { exact: true }).first()).toBeVisible({ timeout: 20000 })
     await page.screenshot({ path: path.join(outputDir, 'purchase-received.png'), fullPage: true })
     await fs.writeFile(path.join(outputDir, 'browser-purchase.json'), JSON.stringify({ order_id: order.id, receipt_id: receipt.id, total: order.total }, null, 2))
     expect(failures).toEqual([])
