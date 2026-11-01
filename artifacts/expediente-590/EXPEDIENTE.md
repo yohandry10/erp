@@ -122,18 +122,19 @@ su huella. Son 140.840 archivos y 16,4 GB que quedan en 4 GB comprimidos y cifra
 | Copia | Lugar | SHA-256 del cifrado | Verificada el |
 | --- | --- | --- | --- |
 | 1 | Publicación `v590` del repositorio privado `yohandry10/erp-evidencia`, en tres partes | `a5057589e493d4cc82bccdf8a43f7eaaef9a0cea045d8a7b711b72a38980a592` | 2026-11-01, descargada y comparada |
-| 2 | _pendiente_ | | |
+| 2 | Google Drive de la cuenta del responsable (declarada por él, sin comprobar desde aquí) | el mismo | 2026-11-01 |
 
 Para recuperarlo: `cat parte-* > evidencia-590.tar.gz.gpg` y descifrar con la clave. La clave no
 está en Git ni en la publicación: **sin ella el paquete es irrecuperable.**
 
 El paquete deja fuera binarios (`.exe`, `.dll`), credenciales de prueba, variables de entorno,
-certificados y respaldos de PROD. El binario Windows que cita el certificado no está incluido:
-sólo su huella. Parte de las rutas internas del paquete incluye el nombre de un cliente; por eso
+certificados y respaldos de PROD. El binario Windows que cita el certificado está aparte en la
+misma publicación, igual que el código sin commit de las copias de UAT
+(`fuentes-sin-commit-590.tar.gz.gpg`, 428 archivos). Parte de las rutas internas del paquete incluye el nombre de un cliente; por eso
 no se publica sin cifrar.
 
-La copia local no se borra hasta que las dos filas estén llenas y la clave esté guardada fuera
-de esta máquina.
+Los 2.626 archivos que cita la matriz se cotejaron contra la lista del paquete antes de borrar la
+copia local, el 2026-11-01. Sus rutas siguen en `HUELLAS_EVIDENCIA.csv`.
 
 ## Estado anterior
 
