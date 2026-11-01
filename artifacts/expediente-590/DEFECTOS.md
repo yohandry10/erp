@@ -8,12 +8,12 @@ quien integró; el responsable del producto puede cambiarla.
 
 | ID | Sev. | Qué pasa | Por qué sigue abierto | Dónde se decide |
 | --- | --- | --- | --- | --- |
-| A-03 | M | `rrhh.access` es un único permiso amplio | Dividirlo cambia roles existentes | Permisos |
-| A-05 | M | La cola de eventos de PROD tiene 7 en `cola_muerta`, anteriores a esta versión | Sin investigar | Operación |
+| A-03 | M | `rrhh.access` es un único permiso amplio | Los escritores SQL de 475 también lo exigen: dividirlo es migración, roles y pantallas. Conviene hacerlo con los roles reales del piloto | Permisos |
+| A-05 | B | 7 eventos en `cola_muerta`, de agosto de 2026 y todos `configuracion.empresa.actualizada`: no tenían manejador. Ya no se generan, porque el evento está en `eventos-sin-suscriptor.ts`. Ocupan 7 del límite de 100 de `/health/ready` | Limpiarlos es borrado en PROD; no aportan riesgo | Operación |
 | A-07 | M | Sin correo productivo no se recupera una contraseña olvidada | Falta configurar correo real | Usuarios |
 | A-08 | B | Reprogramar una entrega sin `destino` por la RPC directa da el error crudo de NOT NULL; la API lo exige | Sólo por llamada directa | Suministro |
 | A-09 | B | GRE SOAP beta rechaza con `2112`; la ruta prevista es GRE REST | Depende de SUNAT | GRE |
-| A-10 | M | La CI integral falla si corre en las primeras 5 horas UTC de cada mes: los datos de prueba toman el mes UTC y el negocio la fecha de Lima. Afecta sólo a pruebas; 8 scripts de `scripts/ci` usan fechas así | Reintentar después de las 00:05 de Lima funciona | CI |
+| A-10 | M | La CI integral falla si corre en las primeras 5 horas UTC de cada mes: los datos de prueba toman el mes UTC y el negocio la fecha de Lima. Afecta sólo a pruebas; 8 scripts de `scripts/ci` usan fechas así | Reintentar después de las 00:05 de Lima funciona, y sólo se reproduce en esa ventana | CI |
 | A-11 | B | El nombre de un cliente sigue en la historia de Git: un mensaje de commit y un manifiesto de respaldo antiguo | Reescribir la historia de `main` es destructivo; no se hizo | Responsable del repositorio |
 | A-12 | M | La mayoría de los 988 requisitos no tiene regresión identificable por nombre (ver `EXPEDIENTE.md`) | Trabajo de varias semanas; conviene por módulos de más riesgo | Calidad |
 
