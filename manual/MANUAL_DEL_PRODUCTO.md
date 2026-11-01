@@ -60,6 +60,23 @@ Antes de actuar, identifique cuatro datos: empresa, documento de origen, etapa d
 
 **Resultado de esta revisión:** debe poder explicar qué etapa está confirmada, cuál está pendiente y quién puede continuarla. Si sólo se conoce un importe agregado, abra su detalle antes de modificar datos.
 
+### Dónde está cada cosa
+
+Pantalla inicial: `/dashboard`. El menú lateral solo muestra lo que su usuario puede usar; si falta un módulo, revise sus permisos antes de suponer que no existe.
+
+| Necesito | Módulo | Capítulo |
+|---|---|---|
+| Vender con cotización y pedido | Ventas | 08–10 |
+| Vender en mostrador | Punto de venta y cajas | 11–12 |
+| Vender por contrato | Contratos de suministro | 43 |
+| Comprar y recibir | Compras | 13–14 |
+| Controlar stock y lotes | Inventario | 06–07, 44 |
+| Emitir comprobantes y guías | CPE y GRE | 15–17 |
+| Cobrar y pagar | Finanzas | 18–22 |
+| Cerrar el período | Contabilidad | 23–24, 31 |
+| Pagar al personal | Recursos humanos | 33–36 |
+| Pasar desde otro sistema | Migración | 45 |
+
 ## 02. Primer acceso y preparación de la empresa
 
 ### Iniciar sesión
@@ -109,6 +126,33 @@ Tenga disponibles los datos legales de la empresa, su país, la moneda que corre
 5. Salga y vuelva a ingresar para comprobar el acceso y la configuración persistidos.
 
 **Criterio de finalización:** el servidor confirma el cierre del asistente y la empresa conserva los datos al volver. Un paso visible en pantalla o un archivo seleccionado todavía no guardado no cumplen ese criterio. Un reinicio de configuración exige revisar su confirmación y recuperar cualquier resultado incierto antes de volver a solicitarlo.
+
+### Detalle del acceso y del asistente
+
+**Acceso.** En `/login` están **Iniciar Sesión**, **¿Olvidaste tu contraseña?** y **Acceso Demo**. Tras **5 intentos fallidos en 15 minutos** con el mismo correo, la cuenta queda bloqueada temporalmente con el mensaje "Cuenta bloqueada temporalmente. Intente más tarde.". El límite se cuenta por correo: cambiar de equipo o de red no lo evita.
+
+**Pasos del asistente** (`/dashboard/wizard`), en orden: bienvenida, tipo de empresa, identificación fiscal, configuración fiscal, conexión con la autoridad, certificado, validación, resumen y fin. Algunos cambian de título según el país. Se avanza con **Siguiente**, se vuelve con **Anterior**, y al terminar aparecen **Validar Nuevamente** e **Ir al Dashboard**.
+
+| Acción | Permiso |
+|---|---|
+| Ver el progreso | `configuracion.read` |
+| Guardar un paso, validar el certificado, terminar o reiniciar | `configuracion.write` |
+
+**Autoridad y modo según el país:**
+
+| País | Conexión | Ambientes |
+|---|---|---|
+| Perú | SUNAT directa u OSE | Homologación y producción |
+| Argentina | ARCA | Homologación y producción |
+| Colombia | DIAN | Habilitación y producción |
+
+**Excepciones:**
+
+| Situación | Qué hacer |
+|---|---|
+| Cuenta bloqueada | Espere y reintente pasados los 15 minutos; no cree otra cuenta. |
+| Un paso no guarda | Use **Reintentar** y compruebe el progreso; no reinicie el asistente. |
+| El certificado no valida | Revise archivo y contraseña. Validarlo no equivale a estar habilitado ante la autoridad. |
 
 ## 03. Usuarios, roles, permisos y sesiones
 
@@ -170,6 +214,24 @@ El administrador prepara la cuenta; el responsable de área define las tareas qu
 **Ejemplo:** un lector contable puede consultar un registro sin recibir autorización para vender un activo o pagar una planilla. Que un menú sea visible no prueba que pueda ejecutar su acción.
 
 **Resultado esperado:** los permisos efectivos coinciden con el puesto y los datos de otro usuario o empresa no permanecen visibles tras el cambio de sesión. Una denegación se resuelve revisando la asignación; no compartiendo la contraseña del administrador.
+
+### Detalle de usuarios y roles
+
+Pantalla: `/dashboard/usuarios`, con usuarios y sección de roles. Administrar usuarios y roles exige `users.manage`. Quien no lo tenga ve **Acceso denegado** o no ve el botón **Nuevo rol**.
+
+**Estados del usuario:** ACTIVO, INACTIVO y SUSPENDIDO. Se filtran por **Todos los estados** y **Todos los roles**.
+
+**Crear un rol:** **Nuevo rol** → nombre y descripción → **Permisos operativos** → crear. Si el catálogo falla, use **Reintentar permisos** antes de guardar, para no crear un rol incompleto.
+
+**Permisos especiales:** cambiar de empresa exige `tenants.manage`. Consultar sucursales de un usuario y asignárselas exige `configuracion.sucursales.assign`.
+
+| Rechazo del sistema | Qué significa | Qué hacer |
+|---|---|---|
+| `ADMIN_LAST_SUPERADMIN` | Es el último superadministrador | Cree otro antes de retirarle el acceso |
+| `ADMIN_ACTIVE_USER_REQUIRES_ROLE` | Un usuario activo debe tener rol | Asigne otro rol o desactívelo primero |
+| `ADMIN_ROLE_INACTIVE` | El rol está inactivo | Actívelo o elija otro |
+| `ADMIN_DEMO_USER_LIMIT` | La demostración llegó a su límite de usuarios | Convierta la cuenta o retire un usuario |
+| `ADMIN_PERMISSION_INVALID_CROSS_TENANT_OR_RESTRICTED` | El permiso es de otra empresa o restringido | Elija uno del catálogo de su empresa |
 
 ## 04. Identidad, parámetros, sucursales y series
 
@@ -242,6 +304,24 @@ El logo admite PNG o JPEG de hasta **2 MiB**, con un máximo de **4.096 píxeles
 Estos límites son distintos de los de la fotografía de producto, que admite también WebP en su flujo de inventario. Si la carga del logo se rechaza, corrija el archivo y vuelva a cargarlo desde Configuración. No lo sustituya por una dirección web arbitraria ni pegue una imagen codificada en los campos de empresa. El logo es opcional y no acredita habilitación fiscal.
 <!-- revision-omisiones-fin -->
 
+### Detalle de empresa, sucursales y series
+
+Pantallas: `/dashboard/configuracion`, `/dashboard/configuracion/empresa` y `/dashboard/configuracion/sucursales`.
+
+| Acción | Permiso |
+|---|---|
+| Ver configuración y empresa | `configuracion.read` |
+| Modificar empresa, logo, umbrales GRE y parámetros | `configuracion.write` |
+| Ver sucursales | `configuracion.sucursales.read` |
+| Crear una sucursal | `configuracion.sucursales.create` |
+| Editarla o crear series | `configuracion.sucursales.update` |
+| Eliminarla | `configuracion.sucursales.delete` |
+| Asignar sucursales a un usuario | `configuracion.sucursales.assign` |
+
+**Datos de la sucursal:** nombre de hasta 160 caracteres, código de establecimiento de 1 a 4 dígitos y ubigeo de 6 dígitos.
+
+**Antes de asignar sucursales a un usuario**, tenga presente que una sola asignación lo restringe a esa sucursal y quitarlas todas le devuelve el alcance total dentro de la empresa. Para bloquear a alguien, desactive el usuario; no le quite las sucursales.
+
 ## 05. Clientes, proveedores e importaciones
 
 ### Alta y mantenimiento individual
@@ -300,6 +380,31 @@ Cada campo del CSV admite como máximo **4.096 caracteres**. El límite se aplic
 Si el error afecta una descripción o dirección extensa, revise el contenido y prepare una corrección consciente. No divida una celda mediante comas sin conservar el formato CSV, porque desplazaría las columnas restantes. Mantenga la identificación del registro para verificar luego la fila corregida.
 <!-- revision-omisiones-fin -->
 
+### Detalle de clientes y proveedores
+
+Pantallas: `/dashboard/ventas/clientes` y `/dashboard/compras/proveedores`.
+
+| Acción | Clientes | Proveedores |
+|---|---|---|
+| Ver | `ventas.clientes.ver` | `compras.proveedores.ver` |
+| Crear | `ventas.clientes.crear` | `compras.proveedores.crear` |
+| Editar | `ventas.clientes.editar` | `compras.proveedores.editar` |
+| Eliminar o desactivar | `ventas.clientes.eliminar` | `compras.proveedores.eliminar` |
+| Validar RUC | `ventas.clientes.validar_ruc` | Búsqueda por RUC con `compras.proveedores.ver` |
+| Importar CSV | `migration.clientes.import` | `migration.proveedores.import` |
+
+**Estados:** ACTIVO e INACTIVO. **Desactivar** retira al tercero de las operaciones nuevas y conserva sus documentos históricos.
+
+**Importar CSV:** **Importar** → plantilla → vista previa sin escritura → **Revisar y sincronizar**. Admite hasta 5 MiB y cada campo hasta 4096 caracteres. Un reintento no duplica, porque cada fila conserva su `external_id`. Los errores indican el número de registro, contando el encabezado como 1, que no siempre coincide con la línea física si un campo tiene saltos de línea. El importador masivo valida documentos peruanos; en otros países se usa el alta individual.
+
+**Exportar página (CSV)** descarga solo lo visible en la página, no todo el catálogo.
+
+| Situación | Qué hacer |
+|---|---|
+| Un listado no carga | Use **Reintentar**. Un error no significa que no haya registros. |
+| Una columna no se alinea | Se rechaza antes de escribir: corrija el archivo, nada se truncó. |
+| Un importador no aparece | Requiere el permiso `migration.*` correspondiente. |
+
 ## 06. Productos, servicios y maestros de inventario
 
 ### Clasificación del catálogo
@@ -356,6 +461,29 @@ La persona responsable del catálogo debe acordar con compras, ventas y almacén
 **Ejemplo:** recibir 0,75 de un servicio no crea 0,75 unidades de mercadería. La unidad y el control de stock deben reflejar esa naturaleza desde el maestro.
 
 **Resultado esperado:** el catálogo persiste sin duplicados y los cambios de marca o precio afectan operaciones futuras, conservando las fotografías de ventas ya confirmadas.
+
+### Detalle de productos, categorías y almacenes
+
+Pantallas: `/dashboard/inventario/productos`, `/dashboard/inventario/categorias` y `/dashboard/inventario/almacenes`.
+
+| Acción | Permiso |
+|---|---|
+| Ver productos y categorías | `inventario.productos.read` |
+| Crear | `inventario.productos.create` |
+| Editar, incluida la imagen | `inventario.productos.update` |
+| **Dar de baja** | `inventario.productos.delete` |
+| Ver, crear, editar o eliminar almacenes | `inventario.almacenes.read`, `inventario.almacenes.create`, `inventario.almacenes.update`, `inventario.almacenes.delete` |
+| Ver, crear, editar o eliminar ubicaciones | `inventario.ubicaciones.read`, `inventario.ubicaciones.create`, `inventario.ubicaciones.update`, `inventario.ubicaciones.delete` |
+| Consultar o gestionar lotes | `inventario.lotes.read`, `inventario.lotes.manage` (capítulo 44) |
+
+**Estados del producto:** ACTIVO e INACTIVO. **Dar de baja** no borra su historia. Un producto con control de lote sigue además las reglas del capítulo 44.
+
+**Ubicaciones:** se definen dentro de cada almacén, con **Guardar ubicación**. Con lotes activos, una ubicación con saldo está protegida frente a cambios de estado que la dejarían inconsistente.
+
+| Situación | Qué hacer |
+|---|---|
+| El detalle no carga | **Reintentar producto y categorías**; no cree otro producto para seguir. |
+| Costo vacío o en cero en productos antiguos | Toma el costo promedio del kardex cuando existe. Ningún costo previo distinto de cero se alteró. |
 
 ## 07. Existencias, kardex, ajustes y transferencias
 
@@ -436,6 +564,25 @@ La consulta manual del recibo original no repite el ajuste ni la transferencia y
 
 Compruebe empresa, sucursal y almacén antes de interpretar disponibilidad o precio. Las fuentes deben terminar de cargar todas sus páginas; no extrapole el stock de una primera página ni reutilice datos de otra sucursal. Si cambia el alcance, espere la nueva consulta y descarte la respuesta del alcance anterior.
 
+### Detalle de movimientos y kardex
+
+Pantallas: `/dashboard/inventario`, `/dashboard/inventario/operaciones` y `/dashboard/inventario/kardex`.
+
+| Acción | Permiso |
+|---|---|
+| Consultar el kardex | `inventario.kardex.read` |
+| Consultar movimientos | `inventario.movimientos.read` |
+| Registrar ajustes y transferencias, o consultar su resultado | `inventario.movimientos.create` |
+| Consultar recepciones de almacén | `inventario.ingresos.write` |
+
+**Tipos de movimiento:** ENTRADA, SALIDA, AJUSTE y DEVOLUCION.
+
+**Estados de una recepción de almacén:** BORRADOR, PENDIENTE, CONFIRMADA, PARCIAL, COMPLETADA y ANULADA. Si aparece **PENDIENTE_COSTO**, falta confirmar el costo; no la dé por valorizada.
+
+**Ajuste:** indique producto, almacén, diferencia y motivo. Si el producto controla lotes, también lote y vencimiento. Un intento interrumpido queda consultable y puede marcarse como **abandonado**: use primero la consulta del original, porque pudo haberse confirmado.
+
+**Filtros del kardex:** **Aplicar filtros** y **Limpiar**. Si falla, **Reintentar kardex** o **Reintentar catálogos**. Una lista que no cargó no significa que no haya movimientos.
+
 ## 08. Gestión comercial: precios, comisiones y cotizaciones
 
 ### Listas de precios
@@ -487,6 +634,37 @@ Ventas prepara la propuesta y el aprobador toma la decisión que permita su rol.
 **Ejemplo:** una regla para producto exacto prevalece sobre una regla por marca cuando ése sea el alcance aplicable. Al convertir una cotización, el pedido conserva la fotografía de precios de origen; editar hoy el catálogo no revaloriza la propuesta histórica.
 
 **Comprobación final:** propuesta, decisión y pedido corresponden al mismo cliente y moneda. Las comisiones se consultan desde las ventas que realmente las devengan; aprobar una cotización por sí solo no equivale a cobrar ni a devengar una comisión de venta confirmada.
+
+### Detalle de precios, comisiones y cotizaciones
+
+Pantallas: `/dashboard/ventas/cotizaciones`, `/dashboard/ventas/comercial` y `/dashboard/ventas/aprobaciones`.
+
+| Acción | Permiso |
+|---|---|
+| Ver, crear, editar o enviar cotizaciones | `ventas.cotizaciones.ver`, `ventas.cotizaciones.crear`, `ventas.cotizaciones.editar` |
+| Eliminar una cotización | `ventas.cotizaciones.eliminar` |
+| Aprobarla o rechazarla | `ventas.cotizaciones.approve` |
+| Convertirla en pedido | `ventas.cotizaciones.convertir_pedido` |
+| Ver listas de precios o resolver un precio | `ventas.precios.ver` |
+| Crear listas o cambiar su estado | `ventas.precios.gestionar` |
+| Ver o gestionar comisiones | `ventas.comisiones.ver`, `ventas.comisiones.gestionar` |
+| Ver o crear consolidados de venta | `ventas.consolidados.ver`, `ventas.consolidados.crear` |
+
+**Estados de la cotización:**
+
+| Estado | Qué significa |
+|---|---|
+| BORRADOR | En preparación |
+| ENVIADA | Enviada al cliente |
+| APROBADA o RECHAZADA | Con decisión registrada |
+| CONVERTIDA | Ya generó un pedido |
+| VENCIDA | Pasó su vigencia |
+
+**Precios:** el producto exacto prevalece sobre la marca. Desactivar una lista conserva los precios ya congelados en documentos.
+
+**Comisiones:** el devengo nace solo de una venta o factura válida, no de aprobar una propuesta. El libro solo agrega movimientos de devengo, reversa y reintegro: no se reescribe.
+
+**Consolidados:** **Seleccionar primeras 10** o elija hasta diez ventas y use **Cerrar bloque**. El reporte congela cabeceras y líneas, y un bloque emitido no se edita ni se elimina.
 
 ## 09. Pedidos, reservas, preparación y entrega
 
@@ -540,6 +718,40 @@ Coordine ventas y almacén sobre las cantidades disponibles. Un pedido confirmad
 
 **Si no permite continuar:** distinga una excepción comercial pendiente, un bloqueo crediticio, falta de stock o un estado incompatible. Cada situación tiene su resolución propia. No cambie una cantidad o fecha para ocultar el motivo ni utilice un evento manual para fingir una entrega.
 
+### Detalle del pedido y su despacho
+
+Pantallas: `/dashboard/ventas/pedidos`, `/dashboard/inventario/logistica/ordenes-pendientes` y `/dashboard/inventario/logistica/listo-despacho`.
+
+| Acción | Permiso |
+|---|---|
+| Ver, crear o editar | `ventas.pedidos.ver`, `ventas.pedidos.crear`, `ventas.pedidos.editar` |
+| Confirmar o cancelar | `ventas.pedidos.confirmar`, `ventas.pedidos.cancelar` |
+| Ver o resolver aprobaciones | `ventas.pedidos_aprobaciones.ver`, `ventas.pedidos_aprobaciones.resolver` |
+| Generar el comprobante | `ventas.pedidos.generar_factura` |
+| Ver historial o guías | `ventas.pedidos.ver_historial`, `ventas.pedidos.ver_gre` |
+| Ver logística | `inventario.logistica.ver` |
+| Preparar o marcar listo | `inventario.logistica.preparar` |
+| Despachar, reprogramar pendientes, registrar entrega y seguimiento | `inventario.logistica.despachar` |
+
+**Estados del pedido:**
+
+| Estado | Qué significa | Siguiente paso |
+|---|---|---|
+| PENDIENTE | Registrado | Confirmar |
+| PENDIENTE_APROBACION | Detenido por una excepción | Resolver la aprobación |
+| CONFIRMADO | Aceptado | Preparar |
+| EN_PREPARACION | En almacén | Marcar listo |
+| LISTO_DESPACHO | Preparado | Confirmar despacho |
+| DESPACHO_PARCIAL | Salió una parte | Despachar o reprogramar lo pendiente |
+| LISTO_FACTURAR | Listo para comprobante | Generar comprobante |
+| FACTURADO | Con comprobante | Entrega y cobro |
+| COMPLETADO, COMPLETADO_CON_GRE | Terminado | Consultar |
+| CANCELADO | Cancelado | Consultar; no se reactiva |
+
+**Estado de crédito:** SIN_EVALUAR, APROBADO, APROBADO_MANUAL o BLOQUEADO. Es distinto del estado del pedido: un bloqueo de crédito se resuelve por su aprobación, no editando el pedido.
+
+Un pedido vinculado a un contrato sigue además las reglas del capítulo 43. Si no ve las pantallas de preparación, puede que la logística no esté activada en la empresa: la pantalla lo indica.
+
 ## 10. Devoluciones de clientes, notas y saldo a favor
 
 ### Tramitar una devolución
@@ -583,6 +795,28 @@ El responsable comercial identifica el documento y motivo; almacén confirma los
 **Comprobación final:** la cantidad devuelta no supera la elegible, la factura original sigue identificada y la deuda no queda negativa por absorber el excedente. El crédito disponible debe poder explicarse por sus movimientos.
 
 **Recuperación:** si falla el reembolso, conserve su destino y referencia originales y consulte el historial. No emita otra nota para resolver un pago incierto ni repita una recepción para recuperar la nota ya creada.
+
+### Detalle de la devolución de cliente
+
+Pantalla: `/dashboard/ventas/rma`.
+
+| Acción | Permiso |
+|---|---|
+| Ver devoluciones y saldos a favor | `ventas.rma.ver` |
+| Crear | `ventas.rma.crear` |
+| Aprobar | `ventas.rma.aprobar` |
+| Recibir o revertir la recepción | `ventas.rma.recepcionar` |
+| Generar la nota de crédito o aplicar el saldo | `ventas.rma.generar_nota_credito` |
+| Reembolsar | `ventas.rma.reembolsar` |
+| Revertir un reembolso | `ventas.rma.revertir_reembolso` |
+
+**Estados de la devolución:** CREADA, APROBADA, PARCIAL, RECIBIDA, CERRADA y RECHAZADA. **Saldo a favor:** DISPONIBLE o AGOTADO.
+
+**Aprobación segregada:** quien crea la devolución no puede aprobarla (`RMA_SEGREGATED_APPROVAL_REQUIRED`).
+
+**Según el país**, el botón fiscal cambia: **Firmar, enviar y consultar en CPE** en Perú, **Ir al flujo fiscal ARCA** en Argentina y **Crear Nota Crédito DIAN 91** en Colombia. Una empresa de demostración no puede emitir la nota DIAN 91. **Gestionar aplicación o reembolso** lleva al saldo a favor.
+
+Una línea de servicio o sin stock no genera recepción física (el sistema la clasifica como SERVICIO).
 
 ## 11. Punto de venta
 
@@ -638,6 +872,26 @@ En el contrato peruano documentado, una venta en PEN pagada íntegramente en efe
 
 **Ejemplo del flujo:** un ticket de 0,52 puede representar 0,50 de efectivo físico y 0,02 de ajuste documentado. Un total inferior a 0,10 puede llegar a 0,00 de efectivo físico sin borrar la venta ni su importe documental. Consulte el ajuste registrado por el producto; no lo escriba como descuento o pago inventado. Varias ventas pueden acumular más de 0,09 de redondeo durante una sesión.
 <!-- revision-omisiones-fin -->
+
+### Detalle del punto de venta
+
+Pantalla: `/dashboard/pos`.
+
+| Acción | Permiso |
+|---|---|
+| Entrar y consultar productos, clientes y sesión | `pos.read` |
+| Vender o reintentar la facturación | `pos.vender` |
+| Canjear un ticket por comprobante | `pos.ticket.canjear` |
+| Abrir o cerrar caja desde el POS | `pos.caja.write` |
+| Configurar el certificado del POS | `pos.configuracion.write` |
+
+**Recorrido en pantalla:** **Abrir Caja Registradora** → agregar productos → **Descuento**, en porcentaje o monto fijo → elegir receptor y documento → **Agregar otro pago** si hay varios medios → **Confirmar** → **Ver CPE** o **Continuar vendiendo**.
+
+**Estados de la venta:** EN_PROGRESO, PENDIENTE_PAGO, PAGADA, CANCELADA y DEVUELTA. **De la sesión:** ABIERTA y CERRADA.
+
+**Documento:** TICKET interno, BOLETA o FACTURA. Si la empresa no está lista, la pantalla ofrece **Completar configuración**: no se puede emitir hasta terminarla.
+
+Una venta hecha desde el POS con emisión pendiente se recupera con el reintento de facturación, sin volver a cobrar ni descontar stock.
 
 ## 12. Cajas, arqueos, turnos y cortes
 
@@ -706,6 +960,35 @@ El PIN de supervisor contiene exactamente **seis dígitos**. Su alta o rotación
 Un faltante pequeño no se convierte automáticamente en redondeo. La excepción requiere que la diferencia negativa coincida con los ajustes de efectivo documentados. Un sobrante o un faltante sin esa evidencia conserva el control de autorización que corresponda.
 <!-- revision-omisiones-fin -->
 
+### Detalle de cajas, retiros, turnos y cortes
+
+Pantalla: `/dashboard/cajas`, con **Nueva caja**, **Abrir Nueva Caja** y **Confirmar Arqueo**.
+
+| Acción | Permiso |
+|---|---|
+| Ver cajas, crear o editar | `cajas.ver`, `cajas.crear`, `cajas.editar` |
+| Abrir o cerrar sesión | `cajas.apertura`, `cajas.cierre` |
+| Ver sesiones y movimientos | `cajas.sesiones.ver` |
+| Ver precierre y saldo esperado | `cajas.precierre.ver`, `cajas.saldo_esperado.ver` |
+| Movimiento manual de ingreso o gasto | `cajas.movimientos.manual` |
+| Crear o conciliar un retiro | `cajas.retiros.crear`, `cajas.retiros.conciliar` |
+| Iniciar, completar, cancelar o ver un cambio de turno | `cajas.cambios_turno.iniciar`, `cajas.cambios_turno.completar`, `cajas.cambios_turno.cancelar`, `cajas.cambios_turno.ver` |
+| Cierre administrativo | `cajas.cierre_administrativo` |
+| Ver cortes o exportar | `cajas.cortes.ver`, `cajas.cortes.exportar_pdf`, `cajas.cortes.exportar_csv` |
+| Ver el corte Z | `cajas.corte_z.ver` |
+| Gestionar el PIN de supervisores | `users.manage` |
+
+**Pasos del cierre:** validar, contar, revisar, justificar y confirmar. **Resultado:** CUADRADO, SOBRANTE o FALTANTE. El redondeo de efectivo legal se registra aparte como REDONDEO_EFECTIVO_LEGAL.
+
+**Estados:**
+
+| Elemento | Estados |
+|---|---|
+| Sesión | ABIERTA, CERRADA, CONGELADA |
+| Retiro | PENDIENTE, CONCILIADO, RECHAZADO; destino DEPOSITO_BANCARIO, COMPRA_EMERGENCIA o BOVEDA |
+| Cambio de turno | EN_PROCESO, COMPLETADO, CANCELADO |
+| PIN de supervisor | Sin PIN o BLOQUEADO si falló repetidamente |
+
 ## 13. Compras: cotización y orden
 
 ### Qué cubre y qué no
@@ -739,6 +1022,7 @@ La decisión conserva la segregación respecto de quien creó el documento: tene
 | PARCIAL | Recibida en parte | **Crear Recepción** por lo pendiente; **Ver Recepciones** |
 | RECIBIDA | Sin pendiente | Consultar progreso y recepciones; ya no ofrece otra recepción |
 | CERRADA | Terminada | Consultar |
+| RECHAZADA | Decisión negativa | Consultar actor y motivo |
 | ANULADA | Cancelada o retirada | Consultar el historial y el motivo |
 
 El historial de aprobaciones sigue consultable después de aprobar, recibir o anular. Recibir la orden no habilita nuevas decisiones de aprobación.
@@ -910,6 +1194,39 @@ La representación PDF del ERP utiliza **A4, 210 × 297 mm**. Para imprimir ese 
 Use el PDF generado por el backend como representación del comprobante y la vista HTML para revisarlo cuando el visor nativo no esté disponible. Una impresión cortada exige corregir la salida o reimprimir el archivo correcto, no emitir otro comprobante. La impresión no cambia el estado fiscal ni fabrica una aceptación.
 <!-- revision-omisiones-fin -->
 
+### Detalle del comprobante electrónico
+
+Pantalla principal: `/dashboard/cpe`.
+
+| Acción | Permiso |
+|---|---|
+| Listar o ver | `cpe.comprobantes.listar`, `cpe.comprobantes.ver` |
+| Emitir comprobantes y notas referenciadas | `cpe.comprobantes.emitir` |
+| Enviar a la autoridad | `cpe.comprobantes.enviar` |
+| Consultar estado | `cpe.comprobantes.consultar` |
+| Reenviar | `cpe.comprobantes.reenviar` |
+| Anular o dar de baja | `cpe.comprobantes.anular` |
+| Descargar PDF o XML | `cpe.comprobantes.descargar_pdf`, `cpe.comprobantes.descargar_xml` |
+| Ver indicadores | `cpe.reportes.ver` |
+| Vincular una CxC o revertir un cobro | `finanzas.cxc.cobros.write`, `finanzas.cxc.cobros.revertir` |
+| Eventos DIAN y facturas recibidas (Colombia) | `cpe.dian.eventos_034.emitir`, `cpe.dian.facturas_recibidas.ver`, `cpe.dian.facturas_recibidas.gestionar` |
+
+**Estados fiscales:**
+
+| Estado | Qué significa | Qué hacer |
+|---|---|---|
+| BORRADOR | Sin firmar | Completar y emitir |
+| FIRMADO | Firmado, sin enviar | Enviar |
+| ENVIADO, PENDIENTE | Enviado, esperando respuesta | Consultar; **no reenviar a ciegas** |
+| ACEPTADO | Aceptado por la autoridad | Conservar evidencia |
+| RECHAZADO | Rechazado | Corregir el motivo con un documento correcto |
+| ERROR | Falló técnicamente | Revisar y reintentar |
+| ANULADO | Dado de baja | Consultar |
+
+Un documento marcado MUESTRA_LOCAL o SIMULATED es de demostración, y uno MIGRADO viene del sistema anterior: ninguno representa una aceptación obtenida aquí.
+
+**PDF:** **Verificar vista A4**, **Descargar A4** y **Abrir PDF / imprimir**. Si falla la vista, **Reintentar vista A4**.
+
 ## 16. Guías de remisión y traslado
 
 ### Preparar una GRE
@@ -957,6 +1274,26 @@ Logística verifica el origen y destino físicos; el emisor autorizado prepara l
 **Ejemplo:** una guía preparada para un producto no habilita trasladar otro. Si una parte de su capacidad ya está aplicada, utilice el saldo permitido; no asuma que el total del PDF sigue disponible.
 
 **Resultado esperado:** la guía mantiene su vínculo y tratamiento fiscal propios. Anular la guía o consultar su estado no sustituye la cancelación o reversa del movimiento físico relacionado.
+
+### Detalle de la guía de remisión
+
+Pantalla: `/dashboard/gre`.
+
+| Acción | Permiso |
+|---|---|
+| Ver guías, estado y PDF | `gre.guias.ver` |
+| Crear, firmar o anular | `gre.guias.emitir` |
+| Enviar o reenviar | `gre.guias.enviar`, `gre.guias.reenviar` |
+| Consultar a la autoridad | `gre.guias.consultar` |
+| Descargar XML | `gre.guias.descargar_xml` |
+| Reporte e indicadores | `gre.reportes.ver` |
+| Ver o cambiar la creación automática | `gre.configuracion.ver`, `gre.configuracion.actualizar`, `gre.configuracion.evaluar` |
+
+**Estados:** BORRADOR, FIRMADO, EMITIDO, ENVIADO, PENDIENTE, ACEPTADO, RECHAZADO, ERROR y ANULADO.
+
+**Transporte:** TRANSPORTE_PUBLICO o TRANSPORTE_PRIVADO, cada uno con sus datos obligatorios.
+
+**Descargar reporte CSV** incluye todas las guías del filtro, no solo la página. Una guía creada desde un pedido queda vinculada a él.
 
 ## 17. Centro de documentos, archivos y bajas RA/RC
 
@@ -1011,6 +1348,26 @@ La **RA de facturas** y la **RC con operación de baja de boletas** trabajan sob
 Si el documento no aparece en la selección, revise tipo, empresa, estado y evidencia de la anulación de origen. No cree un lote manual alternativo para eludir la elegibilidad. Crear o firmar el lote tampoco equivale a su aceptación: revise envío, ticket y resultado con CDR. Un resultado terminal se recupera sobre el mismo lote, sin producir otra reversa comercial.
 <!-- revision-omisiones-fin -->
 
+### Detalle del centro de documentos
+
+Pantalla: `/dashboard/documentos`. La gestión fiscal se hace con **Gestionar en Centro CPE** (capítulo 15).
+
+| Acción | Permiso |
+|---|---|
+| Ver lista, detalle o indicadores | `documentos.read`, `documentos.stats.read` |
+| Crear o editar | `documentos.create`, `documentos.update` |
+| Generar XML | `documentos.generate_xml` |
+| Enviar a la autoridad | `documentos.enviar_sunat` |
+| Descargar | `documentos.download` |
+| Anular | `documentos.cancel` |
+| Ver auditoría | `documentos.audit.read` |
+| Ver o crear series | `documentos.series.read`, `documentos.series.write` |
+| Validar documento de identidad | `documentos.validations.run` |
+
+**Estados:** BORRADOR, EMITIDO, ENVIADO_SUNAT, ACEPTADO, RECHAZADO y ANULADO. **Tipos:** FACTURA, BOLETA, NOTA_CREDITO, NOTA_DEBITO y CONTRATO.
+
+Las bajas RA y RC usan `cpe.comprobantes.anular` para crear y `cpe.comprobantes.enviar` y `cpe.comprobantes.consultar` para enviar y consultar. **Limpiar** retira los filtros y **Reintentar** recupera una lista o estadística que no cargó.
+
 ## 18. Cuentas por cobrar y recuperación de cartera
 
 ### Consultar deuda
@@ -1063,6 +1420,22 @@ El cobrador necesita el permiso financiero, la deuda correcta y el destino del d
 **Ejemplo aritmético:** una deuda de 100,00 con un cobro confirmado de 30,00 deja 70,00, si no existen otros movimientos. Una aplicación de saldo a favor debe identificarse como tal; no se registra además como efectivo recibido.
 
 **Revisión de cartera:** el aging responde a una fecha de corte. Un cobro posterior no debe reescribir la mora de un corte anterior. Si una fuente de reconstrucción no es confiable, revise su advertencia antes de usar el total.
+
+### Detalle de cuentas por cobrar
+
+Pantalla: `/dashboard/finanzas/cxc`.
+
+| Acción | Permiso |
+|---|---|
+| Consultar cuentas y su detalle | `finanzas.cxc.read` |
+| Registrar un cobro, una nota de crédito o reprogramar | `finanzas.cxc.cobros.write` |
+| Revertir un cobro o ajuste vinculado a un comprobante | `finanzas.cxc.cobros.revertir` |
+
+**Estados:** PENDIENTE, PARCIAL, CANCELADO (ya cobrada) y VENCIDO. Tenga en cuenta que CANCELADO aquí significa **pagada**, no anulada.
+
+**Operaciones pendientes:** si se interrumpió un cobro o ajuste, use **Releer cobros pendientes** o **Releer ajustes pendientes**. Esa acción consulta el original y nunca lo reenvía sola. **Reintentar consulta** recupera una lista que falló. **Exportar** descarga el listado.
+
+**Saldos de apertura migrados:** conservan su número original, también alfanumérico.
 
 ## 19. Facturas de proveedor y cuentas por pagar
 
@@ -1119,6 +1492,31 @@ Compras o contabilidad incorpora la factura real; tesorería paga la deuda confi
 
 **Recuperación:** una respuesta incompleta de alta o pago mantiene el intento. Cambiar importes, moneda o ajustes fiscales no constituye un reintento exacto; revise y resuelva la intención anterior antes de preparar otra solicitud.
 
+### Detalle de cuentas por pagar
+
+Pantalla: `/dashboard/finanzas/cxp`.
+
+| Acción | Permiso |
+|---|---|
+| Consultar, antigüedad, vencimientos y tasas | `finanzas.cxp.ver` |
+| Registrar, editar, pagar, usar crédito o anular | `finanzas.cxp.gestionar` |
+
+**Estados:** PENDIENTE, PARCIAL, PAGADA, VENCIDA y ANULADA.
+
+**Tipos de documento:** FACTURA, BOLETA, NOTA_CREDITO, NOTA_DEBITO y RECIBO_HONORARIOS. **Destino del crédito fiscal:** GRAVADAS, NO_GRAVADAS o COMUN.
+
+**Comparación con la recepción:** OK, DESVIACION_CANTIDAD o DESVIACION_PRECIO. Una desviación debe explicarse antes de pagar.
+
+| Mensaje | Qué hacer |
+|---|---|
+| "Consulta los catálogos y confirma el proveedor y la recepción antes de registrar." | Espere o reintente la carga de catálogos |
+| "El total debe ser mayor a cero" | Corrija el importe |
+| "El vencimiento no puede ser anterior a la emisión" | Corrija las fechas |
+| "Ingrese el tipo de cambio" | Es obligatorio en otra moneda |
+| "Seleccione la devolución emitida que sustenta la nota de crédito" | Una nota de crédito nace de la devolución (capítulo 14) |
+| "Seleccione el comprobante original y la contrapartida contable" | Son obligatorios en una nota |
+| "El importe debe estar dentro del crédito disponible" | Reduzca el importe aplicado |
+
 ## 20. Anticipos y ajustes fiscales financieros
 
 ### Registrar y aplicar un anticipo
@@ -1159,6 +1557,18 @@ El responsable financiero identifica el ajuste aplicable y su sustento. Antes de
 **Ejemplo aritmético:** aplicar 20,00 de un anticipo disponible de 50,00 deja 30,00 por aplicar. Esa aplicación no representa una segunda entrada de 20,00 al banco.
 
 **Resultado esperado:** saldo, anticipo y eventual depósito conservan su relación. La reversa de un ajuste documental no debe interpretarse como devolución de efectivo si su flujo no genera caja ni banco.
+
+### Detalle de anticipos y ajustes fiscales
+
+Pantalla: `/dashboard/finanzas/ajustes-fiscales`.
+
+| Acción | Permiso |
+|---|---|
+| Calcular y consultar | `finanzas.read` |
+| Registrar anticipos o ajustes, depositar detracción o revertir un ajuste de CxC | `finanzas.write` |
+| Revertir una detracción de proveedor | `finanzas.cxp.gestionar` |
+
+**Estados del ajuste:** APLICADO, PENDIENTE_TESORERIA y ANULADO. Uno en PENDIENTE_TESORERIA todavía requiere el movimiento financiero: no lo dé por pagado.
 
 ## 21. Bancos y conciliación
 
@@ -1216,6 +1626,23 @@ El producto utiliza activo como valor predeterminado para nuevos movimientos ban
 Si un movimiento antiguo no participa en una consulta o conciliación, revise su estado y evidencia de origen antes de atribuirle un saldo o darlo por reparado. Un estado histórico puede reflejar una decisión válida o una condición anterior que necesita investigación. La actualización del producto no permite distinguir ambas por sí sola. Cualquier regularización debe seguir su procedimiento autorizado y conservar la historia; no se documenta como un efecto automático de esta versión.
 <!-- revision-omisiones-fin -->
 
+### Detalle de bancos y conciliación
+
+Pantallas: `/dashboard/finanzas/bancos` y `/dashboard/finanzas/conciliacion`.
+
+| Acción | Permiso |
+|---|---|
+| Ver cuentas, saldos y movimientos | `finanzas.bancos.ver` |
+| Crear cuentas, movimientos y transferencias | `finanzas.bancos.gestionar` |
+| Ver conciliaciones y diferencias | `finanzas.conciliacion.ver` |
+| Importar CSV, emparejar y cerrar | `finanzas.conciliacion.gestionar` |
+
+**Tipos de cuenta:** CORRIENTE, AHORROS, DETRACCION y PLAZO_FIJO. **Movimientos:** ABONO y CARGO.
+
+**Estados de la conciliación:** ABIERTA, EN_PROCESO y CERRADA.
+
+**Conciliar:** cree la conciliación → importe el CSV con una plantilla guardada → ejecute el emparejamiento automático → marque manualmente o por lote lo que falte → compare **Saldo Libro**, **Saldo Banco** y **Diferencia** → **Cerrar Conciliación**.
+
 ## 22. Tesorería y programación de pagos
 
 ### Planificar
@@ -1258,6 +1685,21 @@ El pagador revisa las obligaciones y los destinos disponibles. La programación 
 **Ejemplo:** pagar 1,18 de una deuda de 2,36 deja 1,18 pendiente. Un lote posterior puede pagar ese saldo; recuperar la confirmación del primero no debe volver a cargarlo.
 
 **Si falla la lectura:** retire la conclusión sobre totales y espere la recuperación. Si falla la confirmación, conserve el mismo intento. Una proyección con bancos inaccesibles no se interpreta como falta de fondos confirmada ni como saldo cero fiable.
+
+### Detalle de tesorería
+
+Pantalla: `/dashboard/finanzas/tesoreria`.
+
+| Acción | Permiso |
+|---|---|
+| Ver pagos, programación y flujo | `finanzas.tesoreria.ver` |
+| Registrar un pago o un lote | `finanzas.tesoreria.gestionar` |
+
+**Prioridad de los pagos:** VENCIDA, URGENTE, PROXIMA y NORMAL. **SALDO_NEGATIVO** avisa de una proyección con saldo negativo.
+
+**Pago masivo:** en **Programación de pagos** marque las cuentas y use **Pagar Seleccionados**. Después, **Ver Historial de Pagos**, o **Procesar Nuevo Lote** para continuar. Vea **Resumen por moneda**: los importes no se convierten entre monedas.
+
+**Proyecciones:** flujo a 30 días y próximos pagos a 15 días. Son una proyección, no un saldo real.
 
 ## 23. Contabilidad: asientos, partidas y plantillas
 
@@ -1315,6 +1757,26 @@ El contador necesita permiso de escritura, cuentas aptas y un período explícit
 
 **Correcciones:** edite o elimine únicamente un borrador elegible. Un confirmado se corrige mediante el contra-asiento enlazado. Conciliar partidas modifica su emparejamiento, no reescribe el importe histórico del asiento.
 
+### Detalle de asientos, partidas y plantillas
+
+Pantallas: `/dashboard/contabilidad/asientos`, `/dashboard/contabilidad/partidas` y `/dashboard/contabilidad/plantillas`.
+
+| Acción | Permiso |
+|---|---|
+| Consultar asientos | `contabilidad.asientos.read` |
+| Editar un borrador | `contabilidad.asientos.actualizar` |
+| Eliminar un borrador | `contabilidad.asientos.eliminar` |
+| Confirmar | `contabilidad.asientos.confirmar` |
+| Anular | `contabilidad.asientos.anular` |
+| Reversar | `contabilidad.asientos.reversar` |
+| Ver el plan de cuentas | `contabilidad.reportes.read` |
+
+**Estados del asiento:** BORRADOR, CONFIRMADO y ANULADO. **Origen:** AUTOMATICO, generado por una operación, o MANUAL.
+
+**Plantillas recurrentes:** periodicidad MENSUAL, BIMESTRAL, TRIMESTRAL, SEMESTRAL o ANUAL; se definen con **Guardar plantilla**.
+
+**Corregir:** un asiento confirmado no se edita; se anula o se reversa. Un asiento automático se corrige desde su operación de origen o por su recuperación, no duplicándolo a mano.
+
 ## 24. Períodos y cierre contable
 
 ### Crear y consultar períodos
@@ -1356,6 +1818,22 @@ El responsable contable revisa integridad, operaciones pendientes y resultados a
 **Ejemplo:** un período cerrado que rechaza un asiento nuevo no se resuelve moviendo artificialmente la fecha a otro mes. La corrección exige tratar el período de acuerdo con su autorización.
 
 **Resultado esperado:** no quedan dos cierres activos para la misma secuencia. Reabrir y recerrar conserva la historia y genera su tratamiento de cierre nuevo; no borra el cierre anterior como si nunca hubiera existido.
+
+### Detalle de períodos y cierre
+
+Pantalla: `/dashboard/contabilidad/periodos`, con **Calendario contable** y **Estimación de cuentas de cobranza dudosa**.
+
+| Acción | Permiso |
+|---|---|
+| Ver períodos | `contabilidad.periodos.read` |
+| Crear | `contabilidad.periodos.crear` |
+| Validar el cierre | `contabilidad.periodos.validar` |
+| Cerrar | `contabilidad.periodos.cerrar` |
+| Reabrir | `contabilidad.periodos.reabrir` |
+| Bloquear | `contabilidad.periodos.bloquear` |
+| Registrar la provisión de cobranza dudosa | `contabilidad.asientos.crear` |
+
+**Estados:** ABIERTO, CERRADO y BLOQUEADO. **Orden:** validar → resolver bloqueos → cerrar. Reabrir es una decisión con su propio permiso y queda registrada.
 
 ## 25. Centros de costo, presupuestos y alertas
 
@@ -1408,6 +1886,20 @@ El responsable del área define el presupuesto; contabilidad valida centro, cuen
 ### Confirmar la baja de un presupuesto
 
 Cancelar la confirmación conserva el presupuesto. Al confirmar, un recibo vacío o perteneciente a otro presupuesto no acredita la baja. Conserve la intención, recupere su resultado y recargue el listado. No interprete una respuesta HTTP exitosa por sí sola como ausencia confirmada del presupuesto.
+
+### Detalle de centros de costo y presupuestos
+
+Pantallas: `/dashboard/contabilidad/centros-costo` y `/dashboard/contabilidad/presupuestos`.
+
+| Acción | Permiso |
+|---|---|
+| Ver, crear o editar centros de costo | `contabilidad.centros_costo.read`, `contabilidad.centros_costo.crear`, `contabilidad.centros_costo.actualizar` |
+| Ver el reporte de gastos | `contabilidad.reportes.read` |
+| Ver presupuestos y alertas | `contabilidad.presupuestos.read` |
+| Crear, editar o eliminar | `contabilidad.presupuestos.crear`, `contabilidad.presupuestos.actualizar`, `contabilidad.presupuestos.eliminar` |
+| Actualizar la ejecución | `contabilidad.presupuestos.ejecucion` |
+
+**Niveles de alerta:** NORMAL, ADVERTENCIA, CRITICO y SOBREGIRO. Se comparan en **Presupuesto vs real** y **Gastos por cuenta**.
 
 ## 26. Activos fijos
 
@@ -1463,6 +1955,24 @@ Después de guardar, el alta sólo queda confirmada cuando el recibo corresponde
 
 Revise el período y los candidatos cargados por completo. Una página ausente o una lectura fallida no representa un lote vacío ni autoriza depreciar una selección parcial como si fuera completa. Recupere la consulta; después confirme el lote y conserve su recibo original.
 
+### Detalle de activos fijos
+
+Pantalla: `/dashboard/contabilidad/activos-fijos`.
+
+| Acción | Permiso |
+|---|---|
+| Ver activos y cronograma | `contabilidad.activos.read` |
+| Dar de alta | `contabilidad.activos.crear` |
+| Editar | `contabilidad.activos.actualizar` |
+| Depreciar | `contabilidad.activos.depreciar` |
+| Dar de baja | `contabilidad.activos.baja` |
+
+**Estados:** ACTIVO, DEPRECIADO y VENDIDO.
+
+**Cambiar la vida útil o el valor residual** recalcula hacia adelante: no toca cuotas pasadas. Si la vida útil ya se agotó y queda saldo por depreciar, el sistema lo rechaza con `ASSET_USEFUL_LIFE_EXHAUSTED`. Cambiar el nombre o el centro de costo no reinicia la cuota.
+
+**Revisar operación original** consulta el resultado de una operación interrumpida antes de repetirla.
+
 ## 27. Ingresos y gastos diferidos
 
 ### Registrar el diferido
@@ -1500,6 +2010,19 @@ Contabilidad define la naturaleza del diferido, las cuentas y los períodos. Pre
 
 **Concurrencia:** si otro usuario devenga mientras se intenta cancelar, recupere el estado vigente antes de decidir. La recuperación de la cuota original no inicia una cuota nueva ni borra las anteriores.
 
+### Detalle de diferidos
+
+Pantalla: `/dashboard/contabilidad/diferidos`.
+
+| Acción | Permiso |
+|---|---|
+| Consultar | `contabilidad.diferidos.read` |
+| Registrar | `contabilidad.diferidos.crear` |
+| Devengar | `contabilidad.diferidos.devengar` |
+| Cancelar | `contabilidad.diferidos.cancelar` |
+
+**Tipos:** INGRESO y GASTO. **Estados:** VIGENTE, DEVENGADO y CANCELADO. Se registra con **Guardar diferido** y se reconoce con **Devengar período**.
+
 ## 28. Consignaciones
 
 ### Entregar
@@ -1534,6 +2057,19 @@ El responsable de consignaciones identifica destinatario y artículos. Las canti
 **Ejemplo aritmético:** diez unidades entregadas, tres vendidas y dos devueltas dejan cinco por resolver, si no existen otros movimientos. Ese saldo debe explicarse por la misma consignación, no por otra entrega del destinatario.
 
 **Identidad de operación:** recuperar una entrega confirmada conserva su registro. Una entrega nueva, aunque repita destinatario y productos, es otro hecho empresarial y debe iniciar su propia operación. No reutilice una confirmación antigua para justificar una salida física nueva.
+
+### Detalle de consignaciones
+
+Pantalla: `/dashboard/contabilidad/consignaciones`.
+
+| Acción | Permiso |
+|---|---|
+| Consultar el registro | `contabilidad.reportes.read` |
+| Elegir productos | `inventario.productos.read` |
+| Registrar una entrega | `contabilidad.consignaciones.crear` |
+| Cambiar su estado | `contabilidad.consignaciones.actualizar` |
+
+**Estados:** PENDIENTE, VENDIDA, DEVUELTA, CERRADA y ANULADA.
 
 ## 29. Monedas, tipos de cambio y revaluación
 
@@ -1583,6 +2119,20 @@ El responsable financiero debe distinguir la cotización documental, la de liqui
 
 La simulación y el registro son pasos distintos. Después de registrar, el resultado recuperado debe corresponder a la fecha, simulación, solicitud y asiento originales. Una lectura actual del tipo de cambio no sustituye esa fotografía. Si falta la confirmación, recupere el original antes de registrar otra revaluación.
 
+### Detalle de tipos de cambio y revaluación
+
+Pantallas: `/dashboard/contabilidad/tipos-cambio` y `/dashboard/contabilidad/revaluacion`.
+
+| Acción | Permiso |
+|---|---|
+| Consultar cotizaciones | `contabilidad.tipos_cambio.read` |
+| Registrar o importar | `contabilidad.tipos_cambio.crear` |
+| Eliminar | `contabilidad.tipos_cambio.eliminar` |
+| Simular la revaluación | `contabilidad.revaluacion.simular` |
+| Ejecutarla | `contabilidad.revaluacion.ejecutar` |
+
+**Orden:** primero **Simular**, después ejecutar. **Revisar registro conservado** consulta una ejecución previa antes de intentarlo de nuevo. Tras revaluar un período, las cotizaciones y saldos que lo sustentan quedan protegidos frente a cambios que invalidarían el resultado.
+
 ## 30. Consolidación y reportes configurables
 
 ### Formar un grupo
@@ -1630,6 +2180,19 @@ La controladora prepara la definición y cada empresa miembro autoriza su partic
 **Ejemplo:** una línea de ingresos del mes y otra de saldo acumulado no responden a la misma base temporal. Revise su definición antes de sumarlas en una fórmula.
 
 **Resultado esperado:** el reporte puede explicarse por miembros, cuentas, período y tasas. Sus eliminaciones no alteran los libros legales individuales. Una invitación pendiente o una tasa ausente no se resuelven omitiendo silenciosamente la empresa.
+
+### Detalle de consolidación y reportes configurables
+
+Pantallas: `/dashboard/contabilidad/consolidacion` y `/dashboard/finanzas/reportes`.
+
+| Acción | Permiso |
+|---|---|
+| Ver grupos y generar reportes | `contabilidad.reportes.read` |
+| Crear grupos, invitar, responder, cargar tasas, mapeos y ajustes, o definir reportes | `contabilidad.reportes.actualizar` |
+
+**Miembros:** PENDIENTE, ACTIVO o RECHAZADO. **Tasa:** CIERRE, PROMEDIO o HISTORICA.
+
+**Registrar sin tocar libros** deja claro lo esencial: los ajustes y eliminaciones del consolidado **no modifican los libros de cada empresa**. **Guardar definición atómica** guarda completa la definición de un reporte; no quedan definiciones a medias.
 
 ## 31. Libros, estados financieros y reportes operativos
 
@@ -1689,6 +2252,18 @@ Quien prepara el reporte define la pregunta y el corte; quien lo recibe debe pod
 
 **Incidencias:** si cambia período y falla la consulta, no distribuya las filas del período anterior. Un porcentaje sin base se interpreta como no aplicable. Los TXT PLE descargados siguen siendo insumos de validación, no constancias de presentación.
 
+### Detalle de estados financieros y reportes
+
+Pantallas: `/dashboard/contabilidad/estados` y `/dashboard/contabilidad/monitoreo` (**Monitoreo de Eventos Contables**).
+
+| Acción | Permiso |
+|---|---|
+| Balance de comprobación, estado de resultados y balance general | `contabilidad.reportes.read` |
+| Refrescar los estados | `contabilidad.reportes.actualizar` |
+| Reportes de suministro y su exportación | `reports.suministro.read`, `reports.suministro.export` |
+
+Si una operación no se refleja en contabilidad, revise su evento en el monitoreo antes de registrar nada a mano: suele bastar con recuperarlo.
+
 ## 32. Impuestos y SIRE
 
 ### Borrador tributario mensual
@@ -1742,6 +2317,21 @@ GRE y SIRE pueden compartir credenciales de API SUNAT, pero **activar o configur
 
 Recibir un número de ticket deja el reporte **pendiente**. Consulte ese ticket hasta que la respuesta oficial y su persistencia confirmen el resultado; el código **06, Terminado**, es el que permite reconocer la finalización del trabajo correspondiente. No lo deduzca de una descarga disponible ni de una respuesta HTTP exitosa. La generación final del registro continúa en SUNAT Operaciones en Línea. Si falla la consulta, conserve ticket e intención y recupere la misma operación.
 <!-- revision-omisiones-fin -->
+
+### Detalle de impuestos y SIRE
+
+Pantallas: `/dashboard/contabilidad/impuestos` y `/dashboard/sire`.
+
+| Acción | Permiso |
+|---|---|
+| Ver y calcular impuestos mensuales y anuales | `contabilidad.reportes.read` |
+| Guardar versiones y registrar constancias | `contabilidad.reportes.actualizar` |
+| Ver reportes SIRE | `sire.read` |
+| Generar, enviar y consultar el ticket | `sire.emitir` |
+
+**Declaración:** BORRADOR, PRESENTADA, RECTIFICADA o ANULADA. **Reporte SIRE:** GENERANDO, GENERADO, PENDIENTE, ENVIADO o ERROR, de tipo REGISTRO_VENTAS o REGISTRO_COMPRAS.
+
+**Importante:** **Registrar constancia** guarda la constancia de una presentación hecha ante SUNAT; el ERP no presenta la declaración por usted. **Guardar nueva versión** conserva la anterior en **Historial de versiones**. Revise **Advertencias y controles** y **Revisión obligatoria** antes de usar la cifra.
 
 ## 33. Recursos humanos: personas, contratos y solicitudes
 
@@ -1822,6 +2412,22 @@ Al editar, verifique después de recargar que la vacante y los datos personales 
 ### Vacaciones y permisos con decisión persistida
 
 Registre el tipo de solicitud y sus fechas, revise los días y envíe la decisión con el permiso correspondiente. Después de aprobar o rechazar, recargue y consulte el estado persistido. Una solicitud rechazada no se trata como vacaciones aprobadas. El registro de otra empresa no debe aparecer al cambiar de sesión.
+
+### Detalle de personal, contratos y solicitudes
+
+Pantallas: `/dashboard/rrhh`, `/dashboard/rrhh/contratos`, `/dashboard/rrhh/solicitudes`, `/dashboard/rrhh/asistencia` y `/dashboard/rrhh/candidatos`.
+
+| Acción | Permiso |
+|---|---|
+| Empleados, áreas, contratos, solicitudes, asistencia y candidatos | `rrhh.access` |
+| Boleta de pago | `rrhh.planillas.read` |
+| Calcular una liquidación desde el empleado | `rrhh.liquidaciones.calculate` |
+
+**Tenga presente:** `rrhh.access` es un único permiso que abre todos esos datos de personal. Concédalo solo a quien deba verlos.
+
+**Pensión (Perú):** AFP INTEGRA, PRIMA, HABITAT o PROFUTURO, o SIN_REGIMEN. Colombia usa PENSION_COLOMBIA.
+
+**Botones habituales:** **Crear contrato**, **Renovar**, **Finalizar**, **Generar PDF**, **Registrar solicitud**, **Marcar Entrada** y **Marcar Salida**.
 
 ## 34. Planilla, vacaciones remuneradas y EPS
 
@@ -1945,6 +2551,21 @@ Al seleccionar una planilla para una operación relacionada, compruebe empresa y
 
 El cálculo consume las solicitudes aprobadas pertinentes al período. Compruebe todas las páginas y fechas; una consulta fallida no equivale a cero vacaciones. Los solapamientos se revisan por fechas únicas y la liquidación limita las fechas al cese. Registrar o aprobar la solicitud no constituye por sí mismo el pago de vacaciones.
 
+### Detalle de la planilla
+
+Pantallas: `/dashboard/rrhh/planillas` y `/dashboard/rrhh/pagos`.
+
+| Etapa | Botón | Permiso |
+|---|---|---|
+| Crear, editar o eliminar | **Crear Nueva Planilla** | `rrhh.planillas.create` |
+| Calcular | **Calcular planilla detallada** | `rrhh.planillas.calculate` |
+| Aprobar | **Aprobar planilla** | `rrhh.planillas.approve` |
+| Pagar | **Pagar planilla** | `rrhh.planillas.pay` |
+| Generar asientos | - | `rrhh.planillas.accounting` |
+| Consultar detalle, pagos y comprobante | **Ver detalle completo**, **Descargar Comprobante** | `rrhh.planillas.read` |
+
+**Recuperación:** **Reintentar recuperación del cálculo** y **Reintentar recuperación del pago** consultan el intento original. Úselos antes de volver a calcular o pagar.
+
 ## 35. CTS y liquidaciones
 
 ### CTS
@@ -2002,6 +2623,20 @@ Recursos humanos valida fechas y fuentes históricas; el confirmador aplica la d
 
 Indique la fecha de cese y revise CTS, gratificaciones y vacaciones con sus fuentes históricas. Si falta la historia necesaria, el conflicto conserva la revisión y no autoriza a suponer un beneficio pagado. El resultado depende de esas fechas y fuentes; los importes de una prueba antigua no son una fórmula ni un saldo aplicable a otro trabajador.
 
+### Detalle de CTS y liquidaciones
+
+Pantalla: `/dashboard/rrhh/liquidaciones`, con **Liquidaciones** y **Depósitos semestrales de CTS**.
+
+| Acción | Permiso |
+|---|---|
+| Consultar | `rrhh.planillas.read` |
+| Calcular una liquidación | `rrhh.liquidaciones.calculate` |
+| Confirmarla | `rrhh.liquidaciones.approve` |
+| **Registrar pago** | `rrhh.liquidaciones.pay` |
+| **Revertir pago** | `rrhh.liquidaciones.reverse` |
+| **Calcular período** de CTS | `rrhh.cts.calculate` |
+| Depositar la CTS | `rrhh.cts.deposit` |
+
 ## 36. PLAME, T-Registro y contexto por país
 
 ### Preparar el paquete peruano
@@ -2052,6 +2687,18 @@ El responsable laboral prepara las fuentes y el usuario autorizado realiza la va
 
 **Cambios posteriores:** si cambia la fuente de un trabajador, revise su novedad registral y la versión nueva. No reutilice una evidencia anterior para afirmar que una modificación posterior ya fue presentada.
 
+### Detalle de planilla electrónica y país
+
+Pantallas: `/dashboard/rrhh/planilla-electronica` y `/dashboard/rrhh/fichas-sunat`.
+
+| Acción | Permiso |
+|---|---|
+| Vista previa, historial y descarga del paquete | `rrhh.planilla_electronica.read` |
+| Fichas, jornada, generar paquete y registrar evidencia | `rrhh.planilla_electronica.write` |
+| Ver o cambiar la configuración de país del usuario | `paises.usuario.read`, `paises.usuario.update` |
+
+El paquete es un archivo de trabajo. Su validación se hace en PVS o T-Registro, y la evidencia oficial se registra después, por versión.
+
 ## 37. Auditoría, notificaciones y ayuda
 
 ### Auditoría
@@ -2101,6 +2748,19 @@ El responsable autorizado consulta auditoría para reconstruir quién hizo qué,
 **Ejemplo:** recibir una notificación de una operación no garantiza que su consulta posterior haya terminado de cargar. Abra el recurso y compruebe su estado; no repita la operación desde la notificación.
 
 **Integraciones:** una prueba de conexión satisfactoria no acredita la entrega o aceptación de cada documento. Consulte la bitácora y evidencia del envío concreto cuando se investigue una transmisión.
+
+### Detalle de auditoría, notificaciones y ayuda
+
+Pantallas: `/dashboard/audit-logs` y `/dashboard/ayuda`.
+
+| Acción | Permiso |
+|---|---|
+| Consultar auditoría, actores e integraciones | `security.audit.read` |
+| Panel de seguridad | `security.audit.read` |
+| Ver y marcar sus notificaciones | Basta con su sesión |
+| Crear o eliminar notificaciones | `notifications.create`, `notifications.delete` |
+
+**Ayuda** incluye el **Ciclo de suministro por función**, con enlaces a la pantalla de cada paso.
 
 ## 38. Lecturas, borradores y operaciones interrumpidas
 
@@ -2203,6 +2863,12 @@ El usuario conserva su perfil y opera únicamente las capacidades compatibles co
 **Ejemplo:** una edición de cliente compatible puede quedar en cola; un pago de planilla no se considera realizado por estar conservado localmente. Cada uno se recupera con su mecanismo.
 
 **Si cambia de usuario:** el nuevo actor no adquiere acceso al pendiente privado del anterior. El propietario debe recuperar su contexto; compartir el perfil no sustituye la autorización.
+
+### Detalle de la cola sin conexión
+
+Pantalla: `/dashboard/offline`. **Estados de una solicitud local:** `pending` (pendiente), `failed` (falló) y `synced` (sincronizada).
+
+**Nunca entran a la cola:** inicio de sesión y configuración con credenciales, importaciones, operaciones de contratos de suministro, y la generación de comprobantes desde un pedido. Esas requieren conexión.
 
 ## 40. Recorridos completos de trabajo
 
@@ -2332,6 +2998,20 @@ Recopile el contexto visible sin repetir operaciones sensibles para reproducir e
 ### Distinguir consulta de modificación durante soporte
 
 Una investigación de soporte debe declarar cualquier cambio que haya producido y conservar la evidencia anterior y posterior. Una prueba que modificó existencias no puede presentarse como consulta de sólo lectura. Para revisar un resultado use recibos y lecturas; una corrección del stock requiere su propia operación autorizada y trazable.
+
+### Mensajes de bloqueo más frecuentes
+
+| Mensaje o código | Dónde aparece | Qué hacer |
+|---|---|---|
+| "Cuenta bloqueada temporalmente" | Acceso | Esperar 15 minutos; capítulo 02 |
+| `ADMIN_LAST_SUPERADMIN` | Usuarios | Crear otro antes; capítulo 03 |
+| `RMA_SEGREGATED_APPROVAL_REQUIRED` | Devoluciones | Otra persona aprueba; capítulo 10 |
+| `PENALTY_SEGREGATION_REQUIRED` | Penalidades | Otra persona aprueba; capítulo 43 |
+| `SUPPLIER_CREDIT_NOTE_USE_RETURN_WRITER` | CxP | Registrar la nota desde la devolución; capítulo 14 |
+| `ASSET_USEFUL_LIFE_EXHAUSTED` | Activos | Revisar la vida útil; capítulo 26 |
+| `CASH_MASTER_OPEN_SESSION_BLOCKS_CRITICAL_CHANGE` | Cajas | Cerrar la sesión abierta antes del cambio; capítulo 12 |
+| `CASH_WAREHOUSE_BRANCH_MISMATCH` | Cajas | Almacén y sucursal deben coincidir; capítulo 12 |
+| `MIGRATION_SOURCE_NAME_INVALID` | Migración | Corregir el nombre del sistema de origen; capítulo 45 |
 
 ## 42. Glosario y alcance de esta edición
 
