@@ -1,0 +1,15 @@
+{
+  "origen": {
+    "modo": "PROD",
+    "proyecto": "wypnbcptofqdmoynlonq"
+  },
+  "salida": "artifacts/storage-backups\\20261031095714849",
+  "sha256_manifiesto": "56c47390990c98409d2118df8724c75bc22c87f729844a7f16e863c90508f87a",
+  "totales": {
+    "buckets": 2,
+    "objetos": 0,
+    "bytes": 0
+  },
+  "duracion_ms": 1399,
+  "alcance": "Objetos y configuración de buckets de Storage. La base se respalda con backup-peru-prod.mjs."
+}
