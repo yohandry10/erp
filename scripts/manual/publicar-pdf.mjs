@@ -10,6 +10,12 @@ const navegador = await chromium.launch();
 try {
   const pagina = await navegador.newPage();
   await pagina.goto(pathToFileURL(path.join(carpeta, 'MANUAL_DEL_PRODUCTO.html')).href);
+  // Un enlace a otro archivo quedaría en el PDF con la ruta local de quien lo genera.
+  await pagina.evaluate(() => {
+    for (const a of document.querySelectorAll('a[href]')) {
+      if (!a.getAttribute('href').startsWith('#')) a.removeAttribute('href');
+    }
+  });
   await pagina.pdf({
     path: path.join(carpeta, 'MANUAL_DEL_PRODUCTO.pdf'), format: 'A4', printBackground: true, displayHeaderFooter: true,
     headerTemplate: '<span></span>',

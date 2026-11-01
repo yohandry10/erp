@@ -58,6 +58,12 @@ for (const [f, t] of Object.entries(textos)) {
   }
 }
 
+// El PDF publicado no debe arrastrar rutas locales de quien lo generó.
+const pdf = path.join(manual, 'publicado/MANUAL_DEL_PRODUCTO.pdf');
+if (fs.existsSync(pdf) && /file:\/\/|worktrees|Users[\\/]/.test(fs.readFileSync(pdf, 'latin1'))) {
+  errores.push('El PDF publicado contiene rutas locales');
+}
+
 if (errores.length) {
   console.error(errores.join('\n'));
   process.exit(1);
