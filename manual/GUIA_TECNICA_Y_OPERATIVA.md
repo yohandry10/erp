@@ -35,7 +35,7 @@ Para mantener una operación:
 
 Las operaciones del API con su permiso están en [REFERENCIA_API_Y_PERMISOS.md](REFERENCIA_API_Y_PERMISOS.md), generada desde el código. El permiso declarado no es lo único que se exige.
 
-**Alcance por sucursal:** un usuario sin asignaciones tiene alcance total dentro de su empresa. Si falla la lectura de sus asignaciones, el sistema registra el error y **continúa con alcance total**: es una decisión de diseño (`apps/erp-api/src/shared/tenant/sucursal-scope.service.ts`). La frontera entre empresas no depende de esto.
+**Alcance por sucursal:** un usuario sin asignaciones tiene alcance total dentro de su empresa. Si falla la lectura de sus asignaciones, la petición responde 503: un fallo nunca ensancha el alcance (`apps/erp-api/src/shared/tenant/sucursal-scope.service.ts`). La frontera entre empresas no depende de esto.
 
 ## Entorno y configuración
 
