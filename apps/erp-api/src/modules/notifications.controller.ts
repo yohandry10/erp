@@ -7,7 +7,6 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../common/guards/permission.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
-import { PermissionService } from './permissions/permission.service';
 
 // Los errores ya no se envuelven en 200 con success:false: el servicio responde
 // 404 (ajena o inexistente), 400, 403 o 503 y la campana no confunde un fallo
@@ -19,19 +18,7 @@ import { PermissionService } from './permissions/permission.service';
 export class NotificationsController {
   constructor(
     private readonly notificationsService: NotificationsService,
-    private readonly permissionService: PermissionService,
   ) {}
-
-  // Marcar un aviso compartido lo marca para toda la empresa (estado por aviso):
-  // eso sigue reservado a notifications.update. Ante la duda, no se permite.
-  private async canMarkShared(user: any, tenantId: string): Promise<boolean> {
-    if (user?.is_super_admin) return true;
-    try {
-      return await this.permissionService.checkUserPermission(user?.id, tenantId, 'notifications', 'update', '__global__');
-    } catch {
-      return false;
-    }
-  }
 
   // Cada usuario lee sólo sus avisos, los globales y los de sus roles (lo filtra
   // el servicio). La campana (/unread) nunca exigió permiso: exigirlo aquí dejaba
@@ -90,8 +77,7 @@ export class NotificationsController {
     return { success: true, data: await this.notificationsService.createNotification(tenantId, notificationData, user) };
   }
 
-  // Los avisos personales los marca su destinatario sin permiso extra; los
-  // compartidos (globales o de rol) exigen notifications.update (403).
+  // Quien ve un aviso puede marcarlo: el compartido sólo queda leído para él.
   @Put(':id/read')
   @ApiOperation({ summary: 'Mark notification as read' })
   @ApiResponse({ status: 200, description: 'Notification marked as read' })
@@ -102,8 +88,7 @@ export class NotificationsController {
     @Req() req: Request
   ) {
     const user = req.user as any;
-    const canMarkShared = await this.canMarkShared(user, tenantId);
-    return { success: true, data: await this.notificationsService.markAsRead(tenantId, id, user, canMarkShared) };
+    return { success: true, data: await this.notificationsService.markAsRead(tenantId, id, user) };
   }
 
   @Put('mark-all-read')
@@ -111,7 +96,7 @@ export class NotificationsController {
   @ApiResponse({ status: 200, description: 'All notifications marked as read' })
   async markAllAsRead(@CurrentTenant() tenantId: string, @Req() req: Request) {
     const user = req.user as any;
-    const count = await this.notificationsService.markAllAsRead(tenantId, user?.id, user, await this.canMarkShared(user, tenantId));
+    const count = await this.notificationsService.markAllAsRead(tenantId, user?.id, user);
     return { success: true, data: { updated_count: count } };
   }
 

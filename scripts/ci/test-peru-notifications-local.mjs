@@ -73,16 +73,14 @@ try{
   assert.deepEqual(statuses,{otherUser:404,otherTenant:404,missing:404,malformed:400},JSON.stringify(statuses));
   assert.equal(sql(`SELECT count(*) FROM notificaciones WHERE id IN (${q(n.sellerOwn)},${q(n.foreign)}) AND leida;`),'0','Se marcó una ajena');
  });
- await check('Notificaciones: marcar todas marca lo personal; lo compartido sólo con notifications.update',async()=>{
-  // El estado leído es por aviso: un vendedor no puede marcar por toda la empresa.
+ await check('Notificaciones: marcar todas deja lo compartido leído sólo para quien lo marca',async()=>{
   await call('notifications/mark-all-read',{},200,seller,'PUT');
   assert.equal(sql(`SELECT leida FROM notificaciones WHERE id=${q(n.sellerOwn)};`),'t','No marcó el aviso personal');
-  assert.equal(sql(`SELECT count(*) FROM notificaciones WHERE id IN (${q(n.global)},${q(n.role)}) AND leida;`),'0','Un vendedor marcó avisos compartidos');
-  assert.deepEqual((await call('notifications/unread',undefined,200,seller)).map(item=>item.title).sort(),['Global de la empresa','Para vendedores']);
-  assert.equal((await raw('notifications/'+n.global+'/read',{},seller,'PUT')).status,403,'Vendedor marcó un aviso global');
-  assert.equal(sql(`SELECT leida FROM notificaciones WHERE id=${q(n.global)};`),'f');
+  assert.equal(sql(`SELECT count(*) FROM notificaciones WHERE id IN (${q(n.global)},${q(n.role)}) AND leida;`),'0','Un vendedor apagó avisos para todos');
+  assert.deepEqual(await call('notifications/unread',undefined,200,seller),[],'Siguen pendientes del vendedor');
+  assert.equal((await raw('notifications/'+n.global+'/read',{},seller,'PUT')).status,200,'Repetir la lectura no debe fallar');
+  assert.ok((await call('notifications/unread',undefined,200,admin)).some(item=>item.id===n.global),'La lectura del vendedor apagó el aviso del administrador');
   await call('notifications/mark-all-read',{},200,admin,'PUT');
-  assert.equal(sql(`SELECT leida FROM notificaciones WHERE id=${q(n.global)};`),'t','El administrador no marcó el global');
   assert.deepEqual(await call('notifications/unread',undefined,200,admin),[],'Siguen pendientes del administrador');
   assert.equal(sql(`SELECT leida FROM notificaciones WHERE id=${q(n.foreign)};`),'f','Marcó una de otra empresa');
  });

@@ -48,13 +48,13 @@ describe('AppController runtime contract', () => {
       }),
     }));
     expect(rpc).toHaveBeenCalledWith('outbox_runtime_health_492', expect.objectContaining({
-      p_required_schema_version: 590,
+      p_required_schema_version: 593,
     }));
     expect(rpc).not.toHaveBeenCalledWith('pgrst_reload_schema', expect.anything());
     expect(cache.getRuntimeHealth).toHaveBeenCalledTimes(1);
   });
 
-  it.each([{ configured: '558', expected: 590 }, { configured: '576', expected: 590 }, { configured: '582', expected: 590 }, { configured: '589', expected: 590 }])('respeta el piso contractual con despliegue $configured', async ({ configured, expected }) => {
+  it.each([{ configured: '558', expected: 593 }, { configured: '576', expected: 593 }, { configured: '582', expected: 593 }, { configured: '589', expected: 593 }])('respeta el piso contractual con despliegue $configured', async ({ configured, expected }) => {
     const { controller, rpc } = build();
     (controller as any).configService.get.mockImplementation((key: string) => (
       key === 'REQUIRED_DATABASE_SCHEMA_VERSION' ? configured : {

@@ -43,8 +43,8 @@ Revisión del 31 de octubre de 2026 sobre la versión `ba9493a2`. **Aún no es u
 | Regla | Resultado |
 |---|---|
 | Sin sucursales asignadas se alcanza toda la empresa | Correcta (`sucursal-scope.service.ts`) |
-| Si falla la lectura de asignaciones | El manual no lo decía: continúa con **alcance total** y registra el error. Decisión de diseño a revisar |
-| Bloqueo de acceso: 5 intentos en 15 minutos por correo | Correcta. Si falla la consulta de intentos, **no bloquea**: misma clase de decisión, a revisar |
+| Si falla la lectura de asignaciones | Responde 503: un fallo no ensancha el alcance |
+| Bloqueo de acceso: 5 intentos en 15 minutos por correo | Correcta. Si falla la consulta de intentos, responde 503 |
 | Logo de hasta 2 MiB | Correcta (`company-logo.service.ts`) |
 | Campo CSV de hasta 4096 caracteres | Correcta según `docs/MODULES.md` |
 | Movimiento bancario activo por defecto | Correcta (migración 590) |
@@ -53,7 +53,6 @@ Revisión del 31 de octubre de 2026 sobre la versión `ba9493a2`. **Aún no es u
 ## Hallazgos para decidir
 
 - `rrhh.access` es un único permiso para empleados, contratos, solicitudes, asistencia y candidatos: no permite separar quién ve qué.
-- Dos controles dejan pasar si falla su propia consulta: el alcance por sucursal y el límite de intentos de acceso.
 
 ## Límites conocidos
 

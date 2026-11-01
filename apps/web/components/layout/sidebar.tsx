@@ -30,6 +30,7 @@ import {
   WifiOff
 } from 'lucide-react'
 import { useCountryContext } from '@/hooks/use-country-context'
+import CambiarContrasenaModal from '@/components/modals/CambiarContrasenaModal'
 
 interface MenuItem {
   title: string
@@ -772,6 +773,7 @@ export default function Sidebar() {
   )
 
   const [isOpen, setIsOpen] = useState(false)
+  const [cambiarContrasena, setCambiarContrasena] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isTablet, setIsTablet] = useState(false)
 
@@ -934,6 +936,14 @@ export default function Sidebar() {
             <div className={cn('truncate whitespace-nowrap font-medium text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground', isTablet ? 'text-xs' : 'text-[0.8rem]')}>{user?.email || ''}</div>
           </div>
 
+          <button
+            type="button"
+            onClick={() => setCambiarContrasena(true)}
+            className="min-h-11 w-full cursor-pointer truncate rounded-xl text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Cambiar contraseña
+          </button>
+
           {/* Logout Button */}
           <button
             onClick={handleLogout}
@@ -944,6 +954,16 @@ export default function Sidebar() {
           </button>
         </div>
       </aside>
+
+      <CambiarContrasenaModal
+        open={cambiarContrasena}
+        onOpenChange={setCambiarContrasena}
+        onChanged={async () => {
+          // El servidor ya revocó las sesiones: sólo queda limpiar esta.
+          await signOut().catch(() => undefined)
+          window.location.replace('/login/')
+        }}
+      />
 
       {/* Mobile overlay */}
       {isMobile && isOpen && (
