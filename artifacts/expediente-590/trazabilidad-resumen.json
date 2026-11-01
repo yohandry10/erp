@@ -1,0 +1,16 @@
+{
+  "matrizSha256": "5bb364da313486eb48d3ea77e47d54816b62998c70211546ef1396b22209caa5",
+  "requisitos": 988,
+  "criterios": 19598,
+  "requisitosConAlgunPasoEnPruebasDelRepo": 22,
+  "pasosEnPruebasDelRepo": 29,
+  "evidenciasCitadas": 2626,
+  "evidenciasNoEncontradas": 0,
+  "bytesEvidenciaCitada": 42598271,
+  "modulosSinCodigoAsignado": [],
+  "modulosSinCapitulo": [
+    "administracion",
+    "fiscal"
+  ],
+  "primerasNoEncontradas": []
+}
