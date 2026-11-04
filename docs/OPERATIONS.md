@@ -19,6 +19,10 @@ pnpm build
 Para pruebas con escritura se usa el runner aislado
 `node scripts/ci/run-peru-integrated-local.mjs --browser`, que crea y elimina
 únicamente su infraestructura efímera y no carga secretos productivos.
+La CI integral añade `--production-web`: compila una web nueva en el directorio
+propio del ensayo, verifica que `/backend` apunte a la API loopback y ejecuta
+`next start` en los recorridos, barridos y recuperación. Evita reinicios por
+memoria de `next dev`; no cambia destinos, datos, aserciones ni los gates.
 El UAT570 conservado usa web3310/API3311 y
 `artifacts/peru-uat-stack-570.mjs resume|restart-api|restart-web`; no se resetea
 su contenedor con operaciones de aceptación. Las pruebas de escritorio usan

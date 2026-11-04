@@ -29,7 +29,7 @@ test('RRHH Perú: doce solicitudes alimentan cálculo, aprobación segregada y p
   const calculated=page.waitForResponse(r=>/\/rrhh\/planillas\/[0-9a-f-]{36}\/calcular-personalizada\/?$/.test(new URL(r.url()).pathname)&&r.request().method()==='POST').then(r=>r.status())
   await submit.click();expect(await created).toBe(201);expect(await calculated).toBe(201)
   const id=readLocalSql(`SELECT id FROM planillas WHERE tenant_id='${f.tenant}' AND periodo='${f.period}' AND estado='calculada';`);expect(id).toMatch(/^[0-9a-f-]{36}$/i);proof.payrollId=id
-  const row=()=>page.getByRole('row').filter({hasText:f.period});await expect(row()).toContainText('Calculada')
+  const row=()=>page.getByRole('row').filter({hasText:f.period});await expect(row()).toContainText('Calculada',{timeout:30000})
   const economics=()=>JSON.parse(readLocalSql(`SELECT jsonb_agg(jsonb_build_object('employee',coalesce(ep.empleado_id::text,ep.id_empleado::text),'gross',ep.total_ingresos,'discount',ep.total_descuentos,'net',ep.neto_pagar,'vacational',(SELECT coalesce(sum(pc.monto),0) FROM empleado_planilla_conceptos pc JOIN conceptos_planilla c ON c.id::text=coalesce(pc.concepto_id::text,pc.id_concepto::text) AND c.tenant_id=pc.tenant_id WHERE coalesce(pc.empleado_planilla_id::text,pc.id_empleado_planilla::text)=ep.id::text AND pc.tenant_id=ep.tenant_id AND c.codigo='008'),'working',(SELECT coalesce(sum(pc.monto),0) FROM empleado_planilla_conceptos pc JOIN conceptos_planilla c ON c.id::text=coalesce(pc.concepto_id::text,pc.id_concepto::text) AND c.tenant_id=pc.tenant_id WHERE coalesce(pc.empleado_planilla_id::text,pc.id_empleado_planilla::text)=ep.id::text AND pc.tenant_id=ep.tenant_id AND c.codigo='001')) ORDER BY ep.id) FROM empleado_planilla ep WHERE ep.tenant_id='${f.tenant}' AND coalesce(ep.planilla_id::text,ep.id_planilla::text)='${id}';`))
   const amounts=economics();expect(amounts).toHaveLength(3)
   for(const employee of f.employees){const actual=amounts.find((r:any)=>r.employee===employee.id);expect(actual).toEqual({employee:employee.id,gross:1800,discount:234,net:1566,vacational:employee.vacationDays*60,working:1800-employee.vacationDays*60})}
@@ -41,12 +41,14 @@ test('RRHH Perú: doce solicitudes alimentan cálculo, aprobación segregada y p
   expect(approved.status()).toBe(201);await expect(approver.getByRole('heading',{name:'Aprobar planilla '+f.period,exact:true})).toHaveCount(0)
   expect(readLocalSql(`SELECT estado FROM planillas WHERE id='${id}' AND tenant_id='${f.tenant}';`)).toBe('aprobada');await consumeLocalAccounting('vacation-payroll-accrual')
   record('different_actor_approves_current_calculation_and_accrual')
-  await page.reload({waitUntil:'domcontentloaded'});await expect(row()).toContainText('Aprobada');await row().getByTitle('Pagar planilla',{exact:true}).click()
+  // La recarga termina antes de la consulta de nómina: esperar la fila real,
+  // manteniendo el estado aprobado y todas las comprobaciones SQL siguientes.
+  await page.reload({waitUntil:'domcontentloaded'});await expect(row()).toContainText('Aprobada',{timeout:30000});await row().getByTitle('Pagar planilla',{exact:true}).click()
   await page.getByLabel('Método de pago',{exact:true}).selectOption('transferencia');await page.getByLabel('Cuenta bancaria',{exact:true}).selectOption(f.bankId);await page.getByLabel('Referencia / operación',{exact:true}).fill('UAT-VAC-12-ORIGINAL')
   const pay=page.getByRole('button',{name:/^Pagar planilla completa/});await expect(pay).toBeEnabled()
   const [paid]=await Promise.all([page.waitForResponse(r=>new URL(r.url()).pathname.replace(/\/$/,'').endsWith('/rrhh/planillas/'+id+'/pagar')&&r.request().method()==='POST'),pay.click()]);expect(paid.status()).toBe(201)
   const paymentResponse=await paid.json();proof.paymentReceiptDate=paymentResponse.data?.fechaPago;proof.paymentResponseSuccess=paymentResponse.success;proof.paymentReceiptSuccess=paymentResponse.data?.success
-  await expect(row()).toContainText('Pagada');await page.reload({waitUntil:'domcontentloaded'});await expect(row()).toContainText('Pagada')
+  await expect(row()).toContainText('Pagada',{timeout:30000});await page.reload({waitUntil:'domcontentloaded'});await expect(row()).toContainText('Pagada',{timeout:30000})
   expect(readLocalSql(`SELECT count(*) FROM historial_pagos_planilla WHERE planilla_id='${id}' AND tenant_id='${f.tenant}';`)).toBe('1');expect(economics()).toEqual(amounts);expect(requestsDigest()).toBe(sourceDigest)
   await consumeLocalAccounting('vacation-payroll-payment')
   const journals=JSON.parse(readLocalSql(`SELECT coalesce(jsonb_agg(jsonb_build_object('event',e.event_id,'journal',a.id,'state',a.estado,'debit',a.total_debe,'credit',a.total_haber)),'[]') FROM outbox_events e JOIN asientos_contables a ON a.source_event_id=e.event_id AND a.tenant_id=e.tenant_id WHERE e.tenant_id='${f.tenant}' AND e.event_type='planilla.pagada';`));expect(journals).toHaveLength(1);expect(journals[0]).toMatchObject({state:'CONFIRMADO',debit:4698,credit:4698})
