@@ -213,6 +213,15 @@ export class RrhhService {
       if (tenantError) throw tenantError;
       if (globalError) throw globalError;
       const normativa = tenantNormativa || globalNormativa;
+      // La planilla rechaza calcular la prima AFP sin este tope
+      // (calcularPrimaSeguroAfp); declarar lista la configuración sin él es
+      // anunciar una planilla que no se puede calcular.
+      const topeAfp = Number(normativa?.afp_remuneracion_max_asegurable);
+      const missing = !normativa
+        ? ['normativa peruana vigente por período']
+        : !(Number.isFinite(topeAfp) && topeAfp > 0)
+          ? [`remuneración máxima asegurable AFP de ${normativa.periodo || periodo}`]
+          : [];
       return {
         success: true,
         data: {
@@ -222,11 +231,11 @@ export class RrhhService {
           conceptos: ['AFP', 'ONP', 'EsSalud', 'quinta categoría', 'gratificaciones', 'CTS'],
           normativa,
           readiness: {
-            ready: Boolean(normativa),
+            ready: missing.length === 0,
             periodo: normativa?.periodo || periodo,
-            missing: normativa ? [] : ['normativa peruana vigente por período'],
+            missing,
           },
-          ready: Boolean(normativa),
+          ready: missing.length === 0,
         },
       };
     }
@@ -1100,6 +1109,10 @@ export class RrhhService {
     if (solicitudData.dias !== undefined && solicitudData.dias !== dias) {
       throw new BadRequestException('Los días de la solicitud deben coincidir con su rango de fechas inclusivo');
     }
+    await this.assertSolicitudSinCruce(
+      currentTenantId, solicitudData.id_empleado, solicitudData.fecha_inicio, solicitudData.fecha_fin,
+      ['pendiente', 'aprobada'],
+    );
 
     const data = await this.ejecutarOperacionRrhh(
       'REQUEST_CREATE', { ...solicitudData, dias }, currentTenantId, actorId, idempotencyKey,
@@ -1121,11 +1134,60 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
+    const { data: solicitud, error } = await this.supabaseService.getClient()
+      .from('solicitudes')
+      .select('id,id_empleado,fecha_inicio,fecha_fin')
+      .eq('tenant_id', currentTenantId)
+      .eq('id', solicitudId)
+      .maybeSingle();
+    if (error) throw lecturaRrhhFallida('la solicitud');
+    if (solicitud) {
+      await this.assertSolicitudSinCruce(
+        currentTenantId, solicitud.id_empleado, solicitud.fecha_inicio, solicitud.fecha_fin,
+        ['aprobada'], solicitud.id,
+      );
+    }
+
     const data = await this.ejecutarOperacionRrhh(
       'REQUEST_DECIDE', { id: solicitudId, decision: 'aprobada', observaciones },
       currentTenantId, actorId, idempotencyKey,
     );
     return { success: true, data };
+  }
+
+  /**
+   * Un colaborador no puede tener dos ausencias vigentes en el mismo día: dos
+   * vacaciones aprobadas que se cruzan descuentan dos veces el mismo saldo.
+   * Al crear se compara contra pendientes y aprobadas; al aprobar, sólo contra
+   * aprobadas (otra pendiente aún puede rechazarse).
+   */
+  private async assertSolicitudSinCruce(
+    tenantId: string,
+    empleadoId: string,
+    fechaInicio: string,
+    fechaFin: string,
+    estados: string[],
+    excluirId?: string,
+  ) {
+    if (!empleadoId || !fechaInicio || !fechaFin) return;
+    const { data, error } = await this.supabaseService.getClient()
+      .from('solicitudes')
+      .select('id,tipo,estado,fecha_inicio,fecha_fin,activo')
+      .eq('tenant_id', tenantId)
+      .eq('id_empleado', empleadoId)
+      .lte('fecha_inicio', String(fechaFin).slice(0, 10))
+      .gte('fecha_fin', String(fechaInicio).slice(0, 10));
+    if (error) throw lecturaRrhhFallida('las solicitudes del colaborador');
+    const cruce = (data || []).find((row: any) => row.id !== excluirId
+      && row.activo !== false
+      && estados.includes(String(row.estado || '').toLowerCase()));
+    if (cruce) {
+      const fecha = (valor: string) => String(valor).slice(0, 10).split('-').reverse().join('/');
+      throw new ConflictException(
+        `El colaborador ya tiene una solicitud ${String(cruce.estado).toLowerCase()} de ${cruce.tipo || 'ausencia'} `
+        + `del ${fecha(cruce.fecha_inicio)} al ${fecha(cruce.fecha_fin)} que se cruza con estas fechas`,
+      );
+    }
   }
 
   async rechazarSolicitud(

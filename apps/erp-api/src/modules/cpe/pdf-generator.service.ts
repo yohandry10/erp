@@ -18,6 +18,7 @@ import { resolveDianPrintedFiscalInfo, type DianPrintedFiscalInfo } from './dian
 import { resolveArcaPrintedFiscalInfo, type ArcaPrintedFiscalInfo } from './arca-print.util';
 import { resolveHistoricalCpeCountry } from './historical-cpe-country.util';
 import { categoriaDeAfectacion } from '../../shared/utils/igv-afectacion.util';
+import { zonaHorariaDePais } from '../../shared/utils/fecha-peru.util';
 
 export const CPE_PDF_PRINT_FORMAT = {
   size: 'A4' as const,
@@ -1337,7 +1338,7 @@ export class PdfGeneratorService {
     doc.fontSize(7).font('Helvetica')
       .text(
         `Estado ${pendingAcceptance ? 'técnico' : authority}: ${status} | ` +
-        `Generado: ${new Date().toLocaleString(locale)}`,
+        `Generado: ${new Date().toLocaleString(locale, { timeZone: zonaHorariaDePais(countryCode) })}`,
         50, footerY,
         { width: 495, align: 'center', lineBreak: false }
       );

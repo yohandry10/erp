@@ -36,6 +36,23 @@ describe('Normativa mensual propia Perú',()=>{
     await expect(service.getNormativaPeruPeriodo('tenant-own','2025-12')).rejects.toBeInstanceOf(ServiceUnavailableException);
     await expect(service.getNormativaPeruPeriodo('tenant-own','2025-13')).rejects.toBeInstanceOf(BadRequestException);
   });
+  it.each([
+    [null,false,['remuneración máxima asegurable AFP de 2026-11']],
+    [0,false,['remuneración máxima asegurable AFP de 2026-11']],
+    [12178.56,true,[]],
+  ])('la preparación exige el tope AFP que la planilla necesita (tope %p)',async(tope,ready,missing)=>{
+    const client={from:jest.fn((table:string)=>{
+      const q:any={};for(const m of ['select','eq','is','in','order','limit'])q[m]=jest.fn(()=>q);
+      q.maybeSingle=jest.fn(async()=>table==='empresa_config'
+        ?{data:{pais:'PE'},error:null}
+        :{data:{periodo:'2026-11',uit:5350,afp_remuneracion_max_asegurable:tope},error:null});
+      return q;
+    })};
+    const service=new RrhhService({getClient:()=>client} as any);
+    const result:any=await service.getConfiguracionLaboral(`tenant-afp-${String(tope)}`);
+    expect(result.data.readiness).toEqual({ready,periodo:'2026-11',missing});
+    expect(result.data.ready).toBe(ready);
+  });
   it('usa actor/empresa autenticados y la misma intención explícita; rechaza conflictos clasificados',async()=>{
     const rpc=jest.fn().mockResolvedValue({data:{success:true,data:{id:'version-1'}},error:null});
     const service=new RrhhService({getClient:()=>({rpc})} as any);

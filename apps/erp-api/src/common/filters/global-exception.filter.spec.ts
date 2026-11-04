@@ -87,6 +87,17 @@ describe('GlobalExceptionFilter API contract', () => {
     expect(legible.response.json).toHaveBeenCalledWith(expect.objectContaining({ message: 'Pedido no encontrado' }));
   });
 
+  it('explica el motivo de un código que el usuario puede corregir y conserva code', () => {
+    const filter = new GlobalExceptionFilter();
+    const { host, response } = createHost();
+    filter.catch(new BadRequestException('BANK_STATEMENT_OPENING_BALANCE_MISMATCH_REQUIRES_PRIOR_PERIOD'), host);
+    expect(response.json).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 400,
+      message: expect.stringContaining('saldo inicial del extracto no coincide'),
+      code: 'BANK_STATEMENT_OPENING_BALANCE_MISMATCH_REQUIRES_PRIOR_PERIOD',
+    }));
+  });
+
   describe('en producción', () => {
     const previous = process.env.NODE_ENV;
     beforeEach(() => { process.env.NODE_ENV = 'production'; });

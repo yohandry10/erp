@@ -68,6 +68,18 @@ Detalle: `docs/RELEASE.md`.
 Defectos abiertos y severidad: `artifacts/expediente-590/DEFECTOS.md`. Los que piden decisión
 de producto: `rrhh.access` único (A-03). Los 7 eventos en `cola_muerta` son residuos sin riesgo (A-05).
 
+Validación de usuario del 4-nov-2026 (rama `claude/uat-defectos-20261104`, sin desplegar): corregidos
+cruce de ausencias RRHH (validado en el API), preparación RRHH Perú sin tope AFP, monto CPE con NC,
+compras del mes y su filtro, motivos de conciliación e inventario, hora del pie del PDF, saldo
+inicial bancario y correlativo F001 de la demo. Quedan:
+
+- Restricción en base contra ausencias solapadas (hoy sólo la impide el API): requiere migración.
+- Tope AFP 2026-11 sin cargar en la normativa global de PROD: sin él no se calcula planilla AFP.
+- Cotización semilla `COT-DEMO-001` con líneas en `items` y no en `cotizacion_detalles`; el cambio
+  de país de la demo (`hydrate_demo_foundation_464`) también omite `saldo_inicial`. Ambos son SQL.
+- NC desde CxC sobre la factura semilla: falta reproducir el código que llega como texto genérico.
+- La demo no puede registrar normativa (sin `configuracion.write` global); decidir si debe.
+
 ## Advertencias operativas
 
 - `autoDeployTrigger: checksPass` no garantiza que Render espere a toda la CI: promover el

@@ -56,6 +56,17 @@ describe('CPE reporting · integridad de las fuentes', () => {
     const pages = Array.from({ length: 6 }, (_, index) => ({ data: rows.slice(index * 200, index * 200 + 200), count: 1001 }));
     await expect(service({ cpe: [{ count: 1 }, { count: 1001 }, ...pages, { count: 0 }] }).getStatsFromDatabase('tenant-1')).resolves.toMatchObject({ data: { cpeEmitidosHoy: 1, cpeDelMes: 1001, montoFacturado: 100.10, rechazados: 0 } });
   });
+  it('resta las notas de crédito y excluye rechazados y anulados del monto facturado', async () => {
+    const rows = [
+      { id: 'f1', tipo_documento: 'FACTURA', estado: 'ACEPTADO', total_venta: '179.80' },
+      { id: 'f2', tipo_documento: '01', estado: 'FIRMADO', total_venta: '212.16' },
+      { id: 'nc', tipo_documento: '07', estado: 'FIRMADO', total_venta: '106.08' },
+      { id: 'rx', tipo_documento: '01', estado: 'RECHAZADO', total_venta: '50.00' },
+      { id: 'an', tipo_documento: '03', estado: 'ANULADO', total_venta: '20.00' },
+    ];
+    await expect(service({ cpe: [{ count: 0 }, { count: 5 }, { data: rows, count: 5 }, { count: 1 }] }).getStatsFromDatabase('tenant-1'))
+      .resolves.toMatchObject({ data: { cpeDelMes: 5, montoFacturado: 285.88, rechazados: 1 } });
+  });
   it.each([
     [{ count: null }], [{ count: 0 }, { count: null }],
     [{ count: 0 }, { count: 1 }, { data: null, count: 1 }],

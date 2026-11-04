@@ -20,6 +20,20 @@ interface ErrorResponse {
   requestId?: string;
 }
 
+/**
+ * Códigos internos cuyo motivo el usuario necesita para poder corregir algo.
+ * El resto se reemplaza por un texto genérico según el estado HTTP.
+ */
+const MENSAJES_POR_CODIGO: Record<string, string> = {
+  BANK_STATEMENT_OPENING_BALANCE_MISMATCH_REQUIRES_PRIOR_PERIOD:
+    'El saldo inicial del extracto no coincide con el saldo de apertura que el sistema calcula para este período '
+    + '(saldo inicial de la cuenta más los movimientos anteriores). Revisa el saldo inicial de la cuenta bancaria '
+    + 'o concilia primero el período anterior.',
+  BANK_STATEMENT_ALREADY_IMPORTED: 'Este período ya tiene un extracto importado.',
+  BANK_RECONCILIATION_DIFFERENCE_REQUIRES_EXPLICIT_ACCOUNTED_ADJUSTMENT:
+    'Los saldos del banco y del sistema no cuadran; registra el ajuste contable antes de cerrar la conciliación.',
+};
+
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name);
@@ -154,7 +168,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     // Un código interno (p. ej. INVENTORY_MASTER_PRODUCT_NOT_FOUND) no es un texto
     // para el usuario: se reemplaza según el estado y se conserva en `code`.
-    if (this.internalCode(message)) {
+    const internalCode = this.internalCode(message);
+    if (internalCode && MENSAJES_POR_CODIGO[internalCode]) {
+      return MENSAJES_POR_CODIGO[internalCode];
+    }
+    if (internalCode) {
       if (statusCode === 404) return 'No se encontró el registro solicitado';
       if (statusCode === 409) return 'La operación no es compatible con el estado actual del registro';
       if (statusCode === 403) return 'No tienes permiso para realizar esta operación';

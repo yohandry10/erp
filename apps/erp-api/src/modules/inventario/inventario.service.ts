@@ -82,8 +82,13 @@ interface KardexValorizadoFiltros {
 }
 
 // El código de la base trae UUIDs que no le dicen nada a quien opera.
+const stockInsuficiente = (message: string) => {
+  const match = /^INVENTORY_AVAILABLE_STOCK_INSUFFICIENT: disponible=([-\d.]+) solicitado=([-\d.]+)/.exec(message);
+  return match ? `el stock disponible es ${Number(match[1])} y se solicitó retirar ${Number(match[2])}` : null;
+};
+
 const detalleInventario = (message: string) =>
-  message.startsWith('INVENTORY_EXISTENCE_REQUIRED')
+  stockInsuficiente(message) ?? (message.startsWith('INVENTORY_EXISTENCE_REQUIRED')
     ? 'el producto no tiene existencias registradas en ese almacén'
     : message.startsWith('INVENTORY_TRANSFER_GRE_PRODUCT_MISMATCH')
       ? 'la guía debe incluir el mismo producto de inventario y su unidad de medida'
@@ -93,7 +98,7 @@ const detalleInventario = (message: string) =>
       ? 'selecciona una guía firmada de esta empresa con los mismos establecimientos de origen y destino'
       : message.startsWith('INVENTORY_TRANSFER_REQUIRES_GRE')
         ? 'registra y selecciona la guía de remisión antes del traslado entre establecimientos'
-        : message;
+        : message);
 
 function rechazoOperacionInventario(error: { code?: string; message: string }, message: string) {
   if (error.code === '40001' && error.message.startsWith('INVENTORY_RESOLUTION570_')) {

@@ -283,10 +283,14 @@ export default function ComprasPage() {
               <span className={labelClass}>Estado</span>
               <select className={inputClass} value={filters.estado} onChange={(e) => setFilters({ ...filters, estado: e.target.value })}>
                 <option value="">Todos los estados</option>
+                <option value="BORRADOR">Borrador</option>
                 <option value="PENDIENTE">Pendiente</option>
-                <option value="ENTREGADO">Entregado</option>
-                <option value="FACTURADO">Facturado</option>
-                <option value="CANCELADO">Cancelado</option>
+                <option value="APROBACION">En aprobación</option>
+                <option value="APROBADA">Aprobada</option>
+                <option value="PARCIAL">Parcial</option>
+                <option value="RECIBIDA">Recibida</option>
+                <option value="RECHAZADA">Rechazada</option>
+                <option value="ANULADA">Anulada</option>
               </select>
             </label>
             <label className="space-y-2">

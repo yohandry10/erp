@@ -2,7 +2,7 @@ import { BadRequestException, HttpException, ServiceUnavailableException } from 
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { CpeXmlBuilder } from './cpe-xml.builder';
 import { paisDelTenant, rangoDelDiaDelTenant } from '../../shared/utils/fecha-tenant.util';
-import { fechaDeDocumentoEnPais, zonaHorariaDePais } from '../../shared/utils/fecha-peru.util';
+import { fechaDeDocumentoEnPais, rangoDelDiaEnPais, zonaHorariaDePais } from '../../shared/utils/fecha-peru.util';
 import { isFiscalDemoRepresentation } from './historical-cpe-country.util';
 import Decimal from 'decimal.js';
 
@@ -288,7 +288,11 @@ async getStatsFromDatabase(tenantId?: string) {
       // «Hoy» es el día del contribuyente, no el de UTC: con el servidor en UTC la
       // ventana empezaba a las 19:00 de la víspera en Lima y en Bogotá.
       const { desde: inicioDia, hasta: finDia } = await rangoDelDiaDelTenant(client, tenantId);
-      const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+      // El mes también es el del contribuyente: con el servidor en UTC, el mes
+      // empezaba a las 19:00 del último día del mes anterior en Lima.
+      const pais = await paisDelTenant(client, tenantId);
+      const hoyLocal = new Date().toLocaleDateString('en-CA', { timeZone: zonaHorariaDePais(pais) });
+      const inicioMes = rangoDelDiaEnPais(pais, new Date(`${hoyLocal.slice(0, 7)}-01T12:00:00Z`)).desde;
 
       // CPE emitidos hoy
       let queryHoy = client
@@ -321,7 +325,7 @@ async getStatsFromDatabase(tenantId?: string) {
       let montoFacturado = new Decimal(0);
       const idsMonto = new Set<string>();
       for (let offset = 0; offset < cpeMes || offset === 0; offset += 200) {
-        let queryMonto = client.from('cpe').select('id,total_venta', { count: 'exact' })
+        let queryMonto = client.from('cpe').select('id,total_venta,tipo_documento,estado', { count: 'exact' })
           .gte('created_at', inicioMes).order('id', { ascending: true }).range(offset, offset + 199);
         if (tenantId) queryMonto = queryMonto.eq('tenant_id', tenantId);
         const { data: montoData, error: errorMonto, count: montoCount } = await queryMonto;
@@ -330,7 +334,13 @@ async getStatsFromDatabase(tenantId?: string) {
           if (!cpe.id || idsMonto.has(cpe.id) || cpe.total_venta == null) throw new Error('Monto mensual incompleto');
           const amount = new Decimal(cpe.total_venta);
           if (!amount.isFinite() || amount.isNegative()) throw new Error('Monto mensual inválido');
-          idsMonto.add(cpe.id); montoFacturado = montoFacturado.plus(amount);
+          idsMonto.add(cpe.id);
+          // Un rechazado o anulado no factura; una nota de crédito reduce lo
+          // facturado (antes se sumaba como si fuera una venta más).
+          const estado = String(cpe.estado || '').toUpperCase();
+          if (estado === 'RECHAZADO' || estado === 'ANULADO') continue;
+          const tipo = this.normalizeTipoDocumentoSunat(cpe.tipo_documento, false) || String(cpe.tipo_documento || '');
+          montoFacturado = ['07', '91'].includes(tipo) ? montoFacturado.minus(amount) : montoFacturado.plus(amount);
         }
       }
 

@@ -196,6 +196,21 @@ export default function OperacionesInventarioPage() {
       }
     } catch (cause: any) {
       if (generation !== operationGeneration.current || activeScope.current !== requestScope) return
+      // El servidor sólo marca INVENTORY_NOT_APPLIED cuando la base rechazó la
+      // transacción: no hubo commit, así que no hay recibo que recuperar y el
+      // intento puede liberarse para corregir los datos.
+      if (!readOnly && cause?.status === 400 && cause?.data?.error === 'INVENTORY_NOT_APPLIED') {
+        let liberado = false
+        try {
+          if (localStorage.getItem(storageKey) === raw) localStorage.removeItem(storageKey)
+          liberado = localStorage.getItem(storageKey) === null
+        } catch { /* si no se puede retirar, el pendiente sigue visible y recuperable */ }
+        if (liberado) {
+          setIntentState({ scope: requestScope, intent: null, error: null })
+          setError(`${cause.data.message || cause.message}. No se aplicó ningún cambio; corrige los datos y vuelve a enviar.`)
+          return
+        }
+      }
       setError('No se pudo confirmar el resultado original completo. Sus datos se conservan para recuperar el recibo; no se enviará una operación con otra clave.')
     } finally {
       if (generation === operationGeneration.current && activeScope.current === requestScope) { submittingRef.current = false; setSubmitting(false) }
