@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
+import { loginDestination } from '@/lib/login-destination'
 import { Building2, Loader2, Globe, Lock, Mail } from 'lucide-react'
 import {
   ACTIVE_COUNTRIES,
@@ -31,7 +32,9 @@ export default function LoginPage() {
   const redirectOnce = useCallback((isSuperAdmin: boolean) => {
     if (redirecting.current) return
     redirecting.current = true
-    window.location.replace(isSuperAdmin ? '/superadmin/dashboard/' : '/dashboard/')
+    window.location.replace(loginDestination(
+      new URLSearchParams(window.location.search).get('redirect'), isSuperAdmin,
+    ))
   }, [])
   const canInteract = clientReady && !authLoading && !loading && !session && !redirecting.current
 

@@ -673,6 +673,11 @@ Código principal: `apps/erp-api/src/modules/pos`,
 
 ## Fiscal: CPE, GRE y SIRE
 
+El QR de representaciones PE admite los alias históricos FACTURA, BOLETA,
+NOTA_CREDITO y NOTA_DEBITO y emite sus códigos 01, 03, 07 y 08. La traducción es
+de lectura: no modifica el comprobante persistido ni omite la validación de RUC,
+receptor, serie, fecha e importes. Los tipos desconocidos siguen rechazándose.
+
 Centro de Documentos y Descargas distinguen lecturas fallidas de resultados vacíos
 válidos. Validan identidad, tipo, serie/número, fecha, receptor, moneda, estado e
 importe; retiran filas/acciones y ofrecenretry. Las métricas del centro tienen
@@ -1138,6 +1143,10 @@ Código principal: `apps/erp-api/src/modules/cpe`,
 `apps/erp-api/src/modules/ose`.
 
 ## Compras
+
+El contador de órdenes activas incluye BORRADOR, APROBACION, APROBADA y PARCIAL,
+además de los estados históricos PENDIENTE y ENTREGADO. Excluye las órdenes
+RECIBIDA, ANULADA y RECHAZADA; una recepción parcial permanece activa.
 
 El historial de aprobaciones de una orden permanece consultable en APROBACION,
 APROBADA, PARCIAL, RECIBIDA y ANULADA, sujeto a sus permisos y a una lectura viva
@@ -3579,6 +3588,11 @@ detalle de planilla aplica la misma comprobación del padre.
 Código principal: `apps/erp-api/src/modules/rrhh`.
 
 ## Administración, auth y configuración
+
+Al iniciar sesión se conserva el destino `redirect` dentro del espacio autorizado
+del actor: `/dashboard` o `/superadmin`. Se mantienen filtros y anclas, mientras
+que destinos externos, rutas de otro espacio y caracteres de control vuelven al
+dashboard correspondiente. La navegación completa mantiene la cookie HttpOnly.
 
 El reinicio confirmado del asistente descarta sus claves anteriores de pasos,
 cierre y logo. Una respuesta fallida conserva la intención de reinicio para

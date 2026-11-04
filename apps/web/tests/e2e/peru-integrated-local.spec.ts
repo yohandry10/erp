@@ -1049,7 +1049,7 @@ test('Perú: primer administrador recupera asiento manual perdido, edita, confir
   expect(replay.status()).toBe(201)
   expect(replay.request().headers()['idempotency-key']).toBe(intent)
   expect((await replay.json()).data.id).toBe(committed.id)
-  await page.waitForURL(`**/contabilidad/asientos/${committed.id}/`)
+  await page.waitForURL(`**/contabilidad/asientos/${committed.id}/`, { waitUntil: 'domcontentloaded', timeout: 30000 })
   await page.reload()
   await page.getByRole('button', { name: 'Editar', exact: true }).click()
   await page.waitForURL(`**/contabilidad/asientos/${committed.id}/editar/`, { timeout: 25000 })
@@ -1391,8 +1391,7 @@ test('Perú: login y POS usan la API y base efímera reales', async ({ page, con
   await page.screenshot({ path: testInfo.outputPath('login-submitted.png') })
   await page.waitForURL('**/dashboard/**', { timeout: 30000 })
   await page.waitForLoadState('networkidle')
-  await page.goto('/dashboard/pos/')
-  await page.waitForLoadState('networkidle')
+  await page.goto('/dashboard/pos/', { waitUntil: 'domcontentloaded' })
   // El recorrido HTTP deja la caja cerrada. Esperar la pantalla hidratada:
   // networkidle por sí solo puede terminar antes de que React muestre el botón.
   const openCash = page.getByRole('button', { name: 'Abrir Caja Registradora', exact: true })

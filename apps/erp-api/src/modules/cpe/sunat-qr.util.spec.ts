@@ -7,6 +7,16 @@ jest.mock('qrcode', () => ({
 }));
 
 describe('sunat-qr.util', () => {
+  it.each([['FACTURA', '01'], ['BOLETA', '03'], ['NOTA_CREDITO', '07'], ['NOTA_DEBITO', '08']])(
+    'representa el tipo histórico %s con su código SUNAT %s sin cambiar el comprobante', (legacyType, code) => {
+      const persisted = { ruc_emisor: '20123456786', tipo_documento: legacyType, serie: 'F001', numero: '00000001',
+        total_igv: 18, total_venta: 118, fecha_emision: '2026-11-04',
+        tipo_documento_receptor: '6', documento_receptor: '20600000013' };
+      expect(buildSunatQrContent(persisted).split('|')[1]).toBe(code);
+      expect(persisted.tipo_documento).toBe(legacyType);
+      expect(() => buildSunatQrContent({ ...persisted, ruc_emisor: 'invalido' })).toThrow('RUC del emisor inválido');
+    },
+  );
   it('conserva pasaporte en QR de exportación y exige RUC cuando la misma factura es interna', () => {
     const exportInvoice = { ruc_emisor: '20616053575', tipo_documento: '01', serie: 'F001', numero: 44,
       total_igv: 0, total_venta: 20, fecha_emision: '2026-10-08',
