@@ -124,11 +124,20 @@ function validateSunatQrIdentity(data: SunatQrInput): void {
 }
 
 export function buildSunatQrContent(data: SunatQrInput): string {
-  validateSunatQrIdentity(data);
+  // Las muestras e importaciones históricas conservan nombres de documento.
+  // Traducir sólo estos cuatro alias para representar el QR no modifica la
+  // fila ni omite las validaciones fiscales de identidad, serie e importes.
+  const legacyTypes: Record<string, string> = {
+    FACTURA: '01', BOLETA: '03', NOTA_CREDITO: '07', NOTA_DEBITO: '08',
+  };
+  const storedType = clean(data.tipo_documento);
+  const documentType = Object.prototype.hasOwnProperty.call(legacyTypes, storedType)
+    ? legacyTypes[storedType] : storedType;
+  validateSunatQrIdentity({ ...data, tipo_documento: documentType });
 
   return [
     clean(data.ruc_emisor),
-    clean(data.tipo_documento),
+    documentType,
     clean(data.serie).toUpperCase(),
     clean(data.numero),
     formatAmount(data.total_igv, 'IGV'),

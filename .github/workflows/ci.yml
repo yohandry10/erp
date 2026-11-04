@@ -309,7 +309,9 @@ jobs:
           python -m pip install playwright==1.56.0
           python -m playwright install --with-deps chromium
       - name: Verify integrated Peru flows and recovery
-        run: node scripts/ci/run-peru-integrated-local.mjs --survey --records
+        # No compilar rutas bajo Next dev durante los recorridos: el servidor
+        # se reiniciaba por memoria y cortaba navegaciones válidas.
+        run: node scripts/ci/run-peru-integrated-local.mjs --survey --records --production-web
       - name: Preserve local test evidence
         if: always()
         uses: actions/upload-artifact@v4

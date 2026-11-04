@@ -10,13 +10,17 @@ import { onlyGeneratedRouteReference } from './local-generated-web-metadata.mjs'
 // No toma URLs de Supabase ni carga dotenv. Crea recursos nuevos sin volúmenes
 // y sólo detiene los procesos/contenedores cuyo identificador obtuvo al crearlos.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const productionWebBuild = readLocalProductionWebBuild(root, process.env.LOCAL_PRODUCTION_WEB_BUILD_GATE);
+let productionWebBuild = readLocalProductionWebBuild(root, process.env.LOCAL_PRODUCTION_WEB_BUILD_GATE);
+const buildProductionWeb = process.argv.includes('--production-web');
 const withSurvey = process.argv.includes('--survey');
 const withNative = process.argv.includes('--native');
 if (withNative && (process.platform !== 'win32' || !process.env.LOCAL_NATIVE_CARGO_TARGET_DIR)) throw new Error('--native exige Windows y LOCAL_NATIVE_CARGO_TARGET_DIR explícito');
 const recordsOnly = process.argv.includes('--records-only');
 const withRecords = process.argv.includes('--records') || recordsOnly;
 const withBrowser = process.argv.includes('--browser') || withSurvey || withRecords || withNative;
+if (buildProductionWeb && (!withBrowser || productionWebBuild)) {
+  throw new Error('--production-web exige navegador y no admite otro build previo');
+}
 const focusOnboarding = process.argv.includes('--focus-onboarding');
 const focusReports = process.argv.includes('--focus-reports');
 const focusCash = process.argv.includes('--focus-cash');
@@ -49,7 +53,7 @@ if (focusAssets && (!withBrowser || withSurvey || withRecords || focusOnboarding
 if (focusOnboarding && (withSurvey || withRecords)) throw new Error('El foco de onboarding no acredita el recorrido general de pantallas');
 if (focusReports && (withBrowser || focusOnboarding)) throw new Error('--focus-reports sólo acredita la fase API/SQL aislada de reportes/consolidación');
 if (focusCash && (withBrowser || focusOnboarding || focusReports)) throw new Error('--focus-cash sólo acredita POS/caja API/SQL aislados');
-if (process.argv.slice(2).some(arg => !['--browser', '--survey', '--records', '--native', '--focus-onboarding', '--focus-reports', '--focus-cash', '--focus-assets', '--focus-browser-recovery', '--focus-customer-recovery', '--focus-review-corrections', '--focus-print-corrections', '--focus-native-concurrency', '--focus-imported-recovery', '--focus-surveys', '--focus-documents', '--focus-vacations','--focus-inventory-masters','--focus-auxiliary','--focus-security', '--records-only'].includes(arg))) throw new Error('Uso: node scripts/ci/run-peru-integrated-local.mjs [--browser] [--survey] [--records] [--native] [--focus-onboarding] [--focus-reports] [--focus-cash] [--focus-assets] [--focus-browser-recovery] [--focus-customer-recovery --browser] [--focus-native-concurrency] [--focus-imported-recovery] [--focus-surveys --survey --records] [--focus-documents --browser] [--focus-vacations --browser] [--records-only]');
+if (process.argv.slice(2).some(arg => !['--browser', '--production-web', '--survey', '--records', '--native', '--focus-onboarding', '--focus-reports', '--focus-cash', '--focus-assets', '--focus-browser-recovery', '--focus-customer-recovery', '--focus-review-corrections', '--focus-print-corrections', '--focus-native-concurrency', '--focus-imported-recovery', '--focus-surveys', '--focus-documents', '--focus-vacations','--focus-inventory-masters','--focus-auxiliary','--focus-security', '--records-only'].includes(arg))) throw new Error('Uso: node scripts/ci/run-peru-integrated-local.mjs [--browser] [--production-web] [--survey] [--records] [--native] [--focus-onboarding] [--focus-reports] [--focus-cash] [--focus-assets] [--focus-browser-recovery] [--focus-customer-recovery --browser] [--focus-native-concurrency] [--focus-imported-recovery] [--focus-surveys --survey --records] [--focus-documents --browser] [--focus-vacations --browser] [--records-only]');
 const runId = new Date().toISOString().replace(/[^0-9]/g, '') + '-' + process.pid;
 const output = path.join(root, 'artifacts', `peru-integrated-${runId}`);
 mkdirSync(output, { recursive: true });
@@ -108,9 +112,9 @@ function launch(label, executable, args, cwd = root, overrides = {}) {
   children.push(child);
   return child;
 }
-async function run(label, executable, args, cwd) {
+async function run(label, executable, args, cwd, overrides = {}) {
   console.log(`[peru-integrated] ${label}`);
-  const child = launch(label, executable, args, cwd);
+  const child = launch(label, executable, args, cwd, overrides);
   await new Promise((resolve, reject) => {
     child.once('error', reject);
     child.once('exit', code => code === 0 ? resolve() : reject(new Error(`${label} terminó con ${code}; revisar ${output}`)));
@@ -213,6 +217,24 @@ try {
   // aquí hace al runner autosuficiente, también fuera de GitHub Actions.
   for (const library of ['dtos', 'crypto']) {
     await run(`build-${library}`, process.execPath, [apiRequire.resolve('typescript/bin/tsc'), '--project', 'tsconfig.json'], path.join(root, 'libs', library));
+  }
+  if (buildProductionWeb) {
+    // Next dev recompila rutas y puede reiniciarse por memoria a mitad de un
+    // recorrido. CI prueba el mismo modo de ejecución que la web publicada,
+    // con un build nuevo, directorio propio y destinos exclusivamente locales.
+    await run('web-production-build', process.execPath,
+      [webRequire.resolve('next/dist/bin/next'), 'build'], webDirectory,
+      { NODE_ENV: 'production', TAURI_BUILD: '', SUPABASE_URL: 'http://127.0.0.1:9',
+        NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:9',
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: 'local-build-only-no-service-role' });
+    const buildId = readFileSync(path.join(webDirectory, distDir, 'BUILD_ID'), 'utf8').trim();
+    const routes = JSON.parse(readFileSync(path.join(webDirectory, distDir, 'routes-manifest.json'), 'utf8'));
+    const proxy = routes.rewrites?.afterFiles;
+    if (!buildId || proxy?.length !== 1 || proxy[0].source !== '/backend/:path*'
+      || proxy[0].destination !== `${apiUrl}/:path*`) {
+      throw new Error('El build de prueba no conserva el proxy a su API local');
+    }
+    productionWebBuild = { buildDirectory: distDir, buildId, source: 'built-in-this-run' };
   }
   // El certificado desechable pertenece sólo a esta ejecución. No depender
   // de un PFX local previo ni omitir las validaciones fiscales de la demo.
