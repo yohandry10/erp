@@ -7,6 +7,25 @@ jest.mock('qrcode', () => ({
 }));
 
 describe('sunat-qr.util', () => {
+  it('representa el RUC completo de la factura histórica sin inventar identidad ni modificarla', () => {
+    const historical = { ruc_emisor: '20123456786', tipo_documento: 'FACTURA',
+      serie: 'F001', numero: '00000001', total_igv: 27.43, total_venta: 179.8,
+      fecha_emision: '2026-11-03', documento_receptor: '20600000013' };
+    expect(buildSunatQrContent(historical))
+      .toBe('20123456786|01|F001|00000001|27.43|179.80|2026-11-03|6|20600000013|');
+    expect(historical).not.toHaveProperty('tipo_documento_receptor');
+    for (const override of [
+      { tipo_documento: '01' },
+      { tipo_documento: 'BOLETA', serie: 'B001' },
+      { documento_receptor: '12345678' },
+      { documento_receptor: '' },
+      { tipo_documento_receptor: '1' },
+      { metadata: { sunat_tipo_operacion: '0200' } },
+    ]) {
+      expect(() => buildSunatQrContent({ ...historical, ...override })).toThrow();
+    }
+  });
+
   it.each([['FACTURA', '01'], ['BOLETA', '03'], ['NOTA_CREDITO', '07'], ['NOTA_DEBITO', '08']])(
     'representa el tipo histórico %s con su código SUNAT %s sin cambiar el comprobante', (legacyType, code) => {
       const persisted = { ruc_emisor: '20123456786', tipo_documento: legacyType, serie: 'F001', numero: '00000001',

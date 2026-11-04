@@ -608,6 +608,9 @@ Apertura -> Venta -> Pago -> Ticket/CPE -> Movimiento de caja -> Cierre
   Cinco fallos bloquean la credencial durante quince minutos: un bloqueo vigente
   oculta al supervisor del selector y uno vencido lo reactiva automáticamente.
   El selector de cierre también excluye al actor y al cajero responsable.
+  El POS consulta el selector con el identificador de la sesión de caja. Una
+  lectura fallida muestra un error recuperable; no se presenta como una lista
+  válida sin supervisores con PIN.
 - Un ticket interno puro no es un CPE pendiente y no bloquea el cierre; un canje
   fiscal reservado sí debe finalizar. No se cierra con CPE pendiente, venta
   incompleta, outbox/CxC inconsistente ni
@@ -681,6 +684,10 @@ El QR de representaciones PE admite los alias históricos FACTURA, BOLETA,
 NOTA_CREDITO y NOTA_DEBITO y emite sus códigos 01, 03, 07 y 08. La traducción es
 de lectura: no modifica el comprobante persistido ni omite la validación de RUC,
 receptor, serie, fecha e importes. Los tipos desconocidos siguen rechazándose.
+Sólo la factura histórica con alias FACTURA, serie F y RUC receptor completo de
+once dígitos permite representar el código de receptor 6 cuando fue omitido.
+No se infiere identidad ni se modifica el documento. Facturas nuevas, boletas
+ambiguas y exportaciones mantienen el rechazo si falta ese código.
 
 Centro de Documentos y Descargas distinguen lecturas fallidas de resultados vacíos
 válidos. Validan identidad, tipo, serie/número, fecha, receptor, moneda, estado e

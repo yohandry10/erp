@@ -291,6 +291,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
   // del tenant; antes el POS sólo enviaba monto y notas, así que una caja
   // descuadrada no tenía forma de cerrarse desde aquí.
   const [supervisoresCierre, setSupervisoresCierre] = useState<Array<{ id: string; nombre: string }>>([])
+  const [errorSupervisoresCierre, setErrorSupervisoresCierre] = useState<string | null>(null)
   const [supervisorCierreId, setSupervisorCierreId] = useState('')
   const [codigoSupervisorCierre, setCodigoSupervisorCierre] = useState('')
   const [isLoading, setIsLoading] = useState(true);
@@ -1795,13 +1796,19 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
 
       // La lista de supervisores se pide aqui y no al montar la pantalla: solo
       // hace falta si el cajero llega a cerrar, y evita una consulta por sesion.
+      setErrorSupervisoresCierre(null)
       try {
-        const supervisoresResp = await cashCloseApi.get('/cajas/supervisores-autorizados')
+        const supervisoresResp = await cashCloseApi.get(
+          `/cajas/supervisores-autorizados/${encodeURIComponent(sesionCajaId)}`,
+        )
         const lista = (supervisoresResp?.data ?? supervisoresResp) as unknown
-        setSupervisoresCierre(Array.isArray(lista) ? lista as Array<{ id: string; nombre: string }> : [])
+        if (!Array.isArray(lista)) throw new Error('Respuesta incompleta de supervisores')
+        setSupervisoresCierre(lista as Array<{ id: string; nombre: string }>)
       } catch {
-        // Sin lista, el cierre cuadrado sigue funcionando; el descuadrado avisara.
         setSupervisoresCierre([])
+        setErrorSupervisoresCierre(
+          'No se pudo consultar a los supervisores habilitados. Cancela y vuelve a abrir el cierre para reintentar.',
+        )
       }
       setSupervisorCierreId('')
       setCodigoSupervisorCierre('')
@@ -3223,7 +3230,9 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                         <option key={supervisor.id} value={supervisor.id}>{supervisor.nombre}</option>
                       ))}
                     </select>
-                    {supervisoresCierre.length === 0 ? (
+                    {errorSupervisoresCierre ? (
+                      <p role="alert" className="text-xs text-destructive">{errorSupervisoresCierre}</p>
+                    ) : supervisoresCierre.length === 0 ? (
                       <p className="text-xs text-muted-foreground">
                         No hay supervisores con PIN registrado. Aún puede confirmar si la diferencia
                         está dentro de tolerancia o corresponde a redondeo legal.

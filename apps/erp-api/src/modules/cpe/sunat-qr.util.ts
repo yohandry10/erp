@@ -133,7 +133,17 @@ export function buildSunatQrContent(data: SunatQrInput): string {
   const storedType = clean(data.tipo_documento);
   const documentType = Object.prototype.hasOwnProperty.call(legacyTypes, storedType)
     ? legacyTypes[storedType] : storedType;
-  validateSunatQrIdentity({ ...data, tipo_documento: documentType });
+  // La factura histórica de la demo guarda el RUC, pero omite su código 6.
+  // Sólo ese alias interno inequívoco permite reconstruir la clasificación;
+  // documentos nuevos, exportaciones e identidades ambiguas siguen fallando.
+  const receiverType = clean(data.tipo_documento_receptor) || (
+    storedType === 'FACTURA'
+      && clean(data.serie).toUpperCase().startsWith('F')
+      && /^\d{11}$/.test(clean(data.documento_receptor))
+      && sunatOperation(data) !== '0200'
+      ? '6' : ''
+  );
+  validateSunatQrIdentity({ ...data, tipo_documento: documentType, tipo_documento_receptor: receiverType });
 
   return [
     clean(data.ruc_emisor),
@@ -143,7 +153,7 @@ export function buildSunatQrContent(data: SunatQrInput): string {
     formatAmount(data.total_igv, 'IGV'),
     formatAmount(data.total_venta, 'importe total'),
     formatIssueDate(data.fecha_emision, data.created_at),
-    clean(data.tipo_documento_receptor),
+    receiverType,
     clean(data.documento_receptor),
     resolveSummaryValue(data),
   ].join('|');
