@@ -195,6 +195,37 @@ describe('CpeDeliveryService - datos de la vista A4', () => {
     }
   });
 
+  it('devuelve el IGV de línea en centavos sin modificar el CPE histórico', () => {
+    const service = new CpeDeliveryService(
+      {} as any, {} as any, {} as any, {} as any,
+    );
+    const historical = {
+      tipo_documento: '01', moneda: 'PEN', total_gravadas: 179.8,
+      total_igv: 32.36, total_venta: 212.16,
+      items: [{ codigo: 'DEMO-004', cantidad: 2, precio_unitario: 89.9,
+        valor_venta: 179.8, precio_venta: 106.082, igv: 32.364000000000004 }],
+    };
+
+    const result = service.mapToDto(historical) as any;
+
+    expect(result.items[0]).toMatchObject({
+      cantidad: 2, precio_unitario: 89.9, valor_venta: 179.8,
+      precio_venta: 106.082, igv: 32.36,
+    });
+    expect(result.items.reduce((sum: number, item: any) => sum + item.igv, 0))
+      .toBe(result.total_igv);
+    expect(result.total_venta).toBe(212.16);
+    expect(historical.items[0].igv).toBe(32.364000000000004);
+  });
+
+  it.each([-0.004, Number.NaN, undefined])('no sustituye un impuesto inválido %s por cero', (igv) => {
+    const service = new CpeDeliveryService(
+      {} as any, {} as any, {} as any, {} as any,
+    );
+    const result = service.mapToDto({ items: [{ igv }] }) as any;
+    expect(result.items[0].igv).toBe(igv);
+  });
+
   it('expone el contrato QR fiscal genérico para Colombia sin alias SUNAT', async () => {
     (perfilPaisDelTenant as jest.Mock).mockResolvedValueOnce({ codigo: 'CO' });
     const cpeChain: any = {

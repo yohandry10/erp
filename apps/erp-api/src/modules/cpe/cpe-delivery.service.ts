@@ -2065,7 +2065,17 @@ private isTechnicalError(codigoRespuesta: string, descripcionRespuesta: string):
   }
 
   private mapToPublicRecord(cpeData: any): Record<string, any> {
-    const items = sanitizePublicCpeItems(cpeData?.items);
+    const items = sanitizePublicCpeItems(cpeData?.items).map((item) => {
+      // El XML/PDF expresa el impuesto de línea en centavos. Los CPE históricos
+      // de pedidos conservan el cálculo intermedio (p. ej. 179.80 * .18 =
+      // 32.364): exponerlo así impide confirmar una factura ya persistida cuya
+      // cabecera sí contiene 32.36. Normalizar sólo la proyección de lectura;
+      // conservar valores inválidos para que el consumidor no los acepte como 0.
+      const igv = item.igv;
+      return typeof igv === 'number' && Number.isFinite(igv) && igv >= 0
+        ? { ...item, igv: Math.round((igv + Number.EPSILON) * 100) / 100 }
+        : item;
+    });
     const itemIsc = items.reduce((sum, item) => {
       const value = Number(
         item.impuesto_isc ?? item.impuesto_inc ?? item.impuestoInc ?? item.inc ?? 0,

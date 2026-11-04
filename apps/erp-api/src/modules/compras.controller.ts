@@ -66,7 +66,8 @@ export class ComprasController {
       }, 0) || 0;
 
       const cantidadCompras = todasLasCompras?.length || 0;
-      const ordenesActivas = todasLasCompras?.filter(o => ['PENDIENTE', 'ENTREGADO'].includes(o.estado)).length || 0;
+      const estadosActivos = ['BORRADOR', 'APROBACION', 'APROBADA', 'PARCIAL', 'PENDIENTE', 'ENTREGADO'];
+      const ordenesActivas = todasLasCompras?.filter(o => estadosActivos.includes(o.estado)).length || 0;
       const ordenesVencidas = todasLasCompras?.filter(o => o.estado === 'PENDIENTE' && new Date(o.fecha_entrega) < new Date()).length || 0;
 
       // Obtener proveedores activos de forma simple
