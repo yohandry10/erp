@@ -94,7 +94,7 @@ export async function middleware(request: NextRequest) {
   if (isPrefetch) {
     if (protectedRoute && !request.cookies.has('access_token')) {
       const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('redirect', normalizedPathname);
+      loginUrl.searchParams.set('redirect', normalizedPathname + request.nextUrl.search);
       return NextResponse.redirect(loginUrl);
     }
     return NextResponse.next();
@@ -104,7 +104,8 @@ export async function middleware(request: NextRequest) {
 
   if (validation === 'invalid' && protectedRoute) {
     const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('redirect', normalizedPathname);
+    loginUrl.searchParams.set('redirect', normalizedPathname + request.nextUrl.search);
+    if (request.cookies.has('access_token')) loginUrl.searchParams.set('reason', 'session-ended');
     return NextResponse.redirect(loginUrl);
   }
 

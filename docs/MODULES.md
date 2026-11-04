@@ -3604,6 +3604,10 @@ Al iniciar sesión se conserva el destino `redirect` dentro del espacio autoriza
 del actor: `/dashboard` o `/superadmin`. Se mantienen filtros y anclas, mientras
 que destinos externos, rutas de otro espacio y caracteres de control vuelven al
 dashboard correspondiente. La navegación completa mantiene la cookie HttpOnly.
+Si una petición recibe 401 y el perfil confirma la pérdida de sesión, el retorno
+conserva pantalla, filtros y ancla; el login explica que la sesión finalizó y no
+afirma haber guardado cambios sin confirmar. Un 401 con perfil válido no cierra
+la sesión completa. El middleware también conserva los filtros de la URL.
 
 El reinicio confirmado del asistente descarta sus claves anteriores de pasos,
 cierre y logo. Una respuesta fallida conserva la intención de reinicio para

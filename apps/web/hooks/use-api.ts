@@ -8,6 +8,7 @@ import { apiSucceeded, getApiErrorMessage, unwrapApiArray, unwrapApiData, unwrap
 import { buildApiUrl, normalizeApiEndpoint, withTrailingSlash } from '@/lib/api-url'
 import { fetchWithOfflineSupport, isOfflineCachedResponse, isOfflineQueuedResponse } from '@/lib/offline-store'
 import { INITIAL_ACTIVE_COUNTRY_ID, isActiveCountryId } from '@/lib/initial-country'
+import { sessionEndedLoginUrl } from '@/lib/login-destination'
 
 interface ApiResponse<T> {
   data?: T
@@ -210,10 +211,11 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
             }
 
             if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+              const returnUrl = sessionEndedLoginUrl(window.location, resolvedSession?.user?.is_super_admin === true)
               await customAuth.signOut()
-              window.location.href = '/login'
+              window.location.href = returnUrl
             }
-            throw Object.assign(new Error('Unauthorized - Session expired'), { status: 401 })
+            throw Object.assign(new Error('Tu sesión finalizó. Inicia sesión para continuar.'), { status: 401 })
           }
 
           // Handle 403 Forbidden - show permission error

@@ -14,3 +14,9 @@ export function loginDestination(requested: string | null, isSuperAdmin: boolean
     return fallback
   }
 }
+
+/** Reauthenticate without losing the screen or claiming that unsaved work was saved. */
+export function sessionEndedLoginUrl(location: { pathname: string; search?: string; hash?: string }, isSuperAdmin: boolean): string {
+  const destination = loginDestination(location.pathname + (location.search || '') + (location.hash || ''), isSuperAdmin)
+  return `/login/?reason=session-ended&redirect=${encodeURIComponent(destination)}`
+}

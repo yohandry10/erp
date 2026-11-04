@@ -23,6 +23,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [clientReady, setClientReady] = useState(false)
+  const [sessionEnded, setSessionEnded] = useState(false)
   const redirecting = useRef(false)
   const [selectedCountryId, setSelectedCountryId] = useState(INITIAL_ACTIVE_COUNTRY_ID)
   const router = useRouter()
@@ -46,6 +47,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      setSessionEnded(new URLSearchParams(window.location.search).get('reason') === 'session-ended')
       const stored = window.localStorage.getItem('selectedCountry')
       const browserLooksArgentinian =
         navigator.language.toLowerCase() === 'es-ar' ||
@@ -146,6 +148,12 @@ export default function LoginPage() {
           </CardHeader>
 
           <CardContent className="px-6 pb-6 sm:px-10">
+            {sessionEnded && (
+              <p role="status" className="mb-5 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                Tu sesión finalizó. Inicia sesión para volver a la pantalla anterior.
+                Los cambios que no hayas confirmado pueden requerir que los introduzcas de nuevo.
+              </p>
+            )}
             <form onSubmit={handleLogin} className="space-y-5">
               {/* Selector de País */}
               <div className="space-y-2">
