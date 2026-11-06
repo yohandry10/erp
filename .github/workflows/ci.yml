@@ -1,16 +1,12 @@
 name: CI
 
 on:
-  # Solo con main y develop, ninguna rama de trabajo pasaba por CI: se llegaba a
-  # la PR con el pipeline sin haberse ejecutado una sola vez.
+  # Las ramas de trabajo se verifican en PR (también en borrador). Ejecutar
+  # además por push duplicaba los mismos jobs y consumía el cupo gratuito.
   push:
     branches:
       - main
       - develop
-      - "codex/**"
-      - "feat/**"
-      - "fix/**"
-      - "chore/**"
   pull_request:
     branches: [main, develop]
 

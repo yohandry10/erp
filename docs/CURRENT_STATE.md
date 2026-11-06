@@ -6,18 +6,26 @@ Actualizado: 2026-11-06. Una página: si algo no cabe aquí, va a su documento d
 
 - **Candidato publicado para revisión:** rama `codex/go-prod-candidate-20261106`,
   [PR153 en borrador](https://github.com/yohandry10/erp/pull/153), sin merge ni
-  despliegue. CI del corte608/e3dd749e pasa5735pruebas/395suites, tipos, lint,
-  cadenaSQL, contratoDIAN yStorage; integración Perú aún en curso. D42 corrige
-  el `main` anidado que falló en E2E; requiere repetir ese check sobre el nuevo
-  commit. CodeQL sigue bloqueado: GitHub muestra que Advanced Security sólo
+  despliegue. CI del corte608/0a3083aa pasa5753pruebas/396suites, tipos, lint,
+  cadenaSQL, contratoDIAN yStorage. IntegraciónPerú encontró una preparación
+  que exigía vacaciones solapadas y recibía409: se conservan5/10/0días con
+  rangos válidos y se exige el rechazo sin guardar; falta nuevaCI. D42 corrige
+  el `main` anidado que falló en E2E. El check posterior encontró D44: título
+  blanco sobre fondo claro. Corregido con `foreground`; navegador mide17.71:1
+  claro/17.54:1oscuro y un solo`main`. Requiere nuevaCI. CodeQL sigue bloqueado:
+  GitHub muestra que Advanced Security sólo
   está disponible para organizaciones y el repositorio privado pertenece a
-  una cuenta personal. No se contrataron planes ni se desactivó el check.
+  una cuenta personal. Presupuesto nuevo0: no contratar ni trasladar. Actions
+  conserva su límite existente de gasto0. Escaneo comunitario local sobre0a:
+  1545archivos,213coincidencias por revisar y tres avisos de análisis parcial;
+  no son vulnerabilidades confirmadas ni equivalen a CodeQL. No se desactivó
+  el check.
 - **Nueva aceptación local608:** sieteNC desdeUI conservanUSD0.07/PEN0.27 y
   deuda0. Otro circuitoUI con preparaciónAPI completa siete cobros, pago,
   NC, siete reembolsos y pago final: banco/crédito/deudas0 y21asientos únicos
   balanceados. D41 añade moneda y paginación comprobada al CSV bancario:
-  30pruebas dirigidas y lectura real de16movimientos pasan; nueva descargaUI
-  pendiente por fallo del control de navegador. D43 permanece abierto:
+  30pruebas dirigidas, lectura real de16movimientos y descargasUI completas/
+  filtradas idénticas al servidor pasan. D43 permanece abierto:
   Analytics suma179.80PEN y0.07USD como179.87PEN. SigueNO_GO.
 - **Último corte público observado:** 5-nov, 06:29 UTC; API `8cb0b0d0`, esquema
   requerido/aplicado 593, DB y Redis listos. El SHA de la web no se verificó en esta ronda.

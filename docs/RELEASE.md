@@ -25,6 +25,13 @@ Debe cumplirse:
 
 Estado actual y pendientes: `docs/CURRENT_STATE.md`.
 
+CI y E2E verifican las ramas de trabajo al abrir o actualizar un PR, incluidos
+los borradores. No duplican ese mismo análisis por cada push de la rama;
+`main` y `develop` conservan la validación por push y E2E el despacho manual.
+Los jobs y requisitos de release no se reducen. Los límites de gasto de la
+cuenta se conservan; un servicio de análisis sin licencia no se declara aprobado
+ni se sustituye por un informe comunitario sin revisar sus límites y hallazgos.
+
 El release Perú del 21 de septiembre está integrado por el PR
 [#109](https://github.com/yohandry10/erp/pull/109), merge `841ab738`.
 Los checks de `b6fc060e` pasaron antes de promover 537..553; el script canónico
