@@ -102,7 +102,7 @@ export default function SuperAdminDashboard() {
   // Show loading state
   if (tenantLoading || !user) {
     return (
-      <PageShell title="Super Admin" description="Validando sesión y privilegios globales.">
+      <PageShell as="main" title="Super Admin" description="Validando sesión y privilegios globales.">
         <div className="grid min-h-[360px] place-items-center rounded-3xl border border-cyan-400/20 bg-card/60 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground/85">
           <div className="text-center">
             <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-cyan-300/20 border-t-cyan-300 group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:border-t-blue-600" />
@@ -120,6 +120,7 @@ export default function SuperAdminDashboard() {
 
   return (
     <PageShell
+      as="main"
       title="Super Admin Dashboard"
       description="Gestión global de tenants, seguridad y configuración del sistema."
       actions={

@@ -2033,6 +2033,11 @@ y los estados desconocidos siguen invalidando la respuesta completa.
   del país para la hora de registro. Todas las celdas escapan comillas y
   separadores; las fórmulas de hoja de cálculo se neutralizan también en
   descripciones, referencias y nombres. Los filtros de conciliación se conservan.
+  Incluye la moneda inmutable de la cuenta junto a cada importe. Recorre las
+  páginas con conteo exacto y orden estable; un conteo cambiante, duplicado,
+  lectura incompleta o movimiento de otra empresa/cuenta impide la descarga.
+  Cobros/pagos sin copia de moneda usan la de su cuenta; una moneda explícita
+  contradictoria se rechaza. No convierte importes ni modifica los movimientos.
   El historial de la cuenta y su CSV muestran sólo movimientos del sistema;
   las filas de extracto se consultan en conciliación y no duplican la tesorería.
 - La conciliación opera por RPCs reservadas al servicio: período mensual único,
@@ -4102,7 +4107,11 @@ globalNO_GO.
 
 
 
-- Analytics consume métricas tenant-scoped.
+- Analytics consume métricas tenant-scoped. Permanece abierto el defecto de
+  agregación multimoneda: ventas179.80PEN y0.07USD aparecen como179.87PEN en
+  Analytics Financiero. No usar ese consolidado ni sus indicadores derivados
+  como aceptación financiera; requiere separación por moneda o valuación
+  verificable. El dashboard operativo sí conserva importes separados.
 - Reportes exportan sin duplicar reglas de negocio.
 - Auditoría registra actor, tenant, acción, entidad, resultado y correlación.
 - La evidencia complementaria de auditoría e integraciones usa el append

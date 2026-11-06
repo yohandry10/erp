@@ -523,7 +523,7 @@ export class BancosService {
     // Verificar que la cuenta bancaria existe y pertenece al tenant
     const { data: cuenta, error: errorCuenta } = await client
       .from('cuentas_bancarias')
-      .select('id, nombre, banco, numero_cuenta, moneda')
+      .select('id, tenant_id, nombre, banco, numero_cuenta, moneda')
       .eq('tenant_id', tenantId)
       .eq('id', cuentaBancariaId)
       .maybeSingle();
@@ -537,59 +537,54 @@ export class BancosService {
       throw new NotFoundException(`Cuenta bancaria con ID ${cuentaBancariaId} no encontrada`);
     }
 
-    // Construir query base (sin paginación para exportar todo)
-    let queryBuilder = client
-      .from('movimientos_bancarios')
-      .select('*, proveedores(id, razon_social, ruc)')
-      .eq('tenant_id', tenantId)
-      .eq('cuenta_bancaria_id', cuentaBancariaId);
-
-    // Aplicar filtros opcionales
-    if (query.fecha_desde) {
-      queryBuilder = queryBuilder.gte('fecha', query.fecha_desde);
+    if (cuenta.id !== cuentaBancariaId || cuenta.tenant_id !== tenantId
+      || typeof cuenta.moneda !== 'string' || !/^[A-Z]{3}$/.test(cuenta.moneda)) {
+      throw lecturaFinancieraFallida('la identidad y moneda de la cuenta bancaria');
     }
 
-    if (query.fecha_hasta) {
-      queryBuilder = queryBuilder.lte('fecha', query.fecha_hasta);
-    }
-
-    if (query.tipo) {
-      queryBuilder = queryBuilder.eq('tipo', query.tipo);
-    }
-
-    if (query.conciliado !== undefined) {
-      queryBuilder = this.applyConciliadoFilter(queryBuilder, query.conciliado);
-    }
-
-    const esExtracto = this.toRuntimeBoolean(query.es_extracto);
-    if (esExtracto !== undefined) {
-      queryBuilder = queryBuilder.eq('es_extracto', esExtracto);
-    }
-
-    if (query.conciliacion_id) {
-      queryBuilder = queryBuilder.eq('conciliacion_id', query.conciliacion_id);
-    }
-
-    // Ordenar por fecha
-    queryBuilder = queryBuilder
-      .order('fecha', { ascending: false })
-      .order('created_at', { ascending: false });
-
-    const { data: movimientos, error } = await queryBuilder;
-
-    if (error) {
-      console.error('Error obteniendo movimientos para exportar:', error);
+    // Una consulta sin range puede quedar limitada por PostgREST. Confirmar el
+    // conteo completo y la identidad de cada página antes de construir el CSV.
+    let movimientos: any[];
+    try {
+      movimientos = await readCompleteCatalog(
+        client, 'movimientos_bancarios', '*, proveedores(id, razon_social, ruc)',
+        builder => {
+          let filtered = builder.eq('tenant_id', tenantId).eq('cuenta_bancaria_id', cuentaBancariaId);
+          if (query.fecha_desde) filtered = filtered.gte('fecha', query.fecha_desde);
+          if (query.fecha_hasta) filtered = filtered.lte('fecha', query.fecha_hasta);
+          if (query.tipo) filtered = filtered.eq('tipo', query.tipo);
+          if (query.conciliado !== undefined) filtered = this.applyConciliadoFilter(filtered, query.conciliado);
+          const esExtracto = this.toRuntimeBoolean(query.es_extracto);
+          if (esExtracto !== undefined) filtered = filtered.eq('es_extracto', esExtracto);
+          if (query.conciliacion_id) filtered = filtered.eq('conciliacion_id', query.conciliacion_id);
+          return filtered;
+        },
+        row => {
+          // Cobros/pagos históricos no rellenan moneda en el movimiento. Su
+          // monto está expresado en la moneda de la cuenta, que el writer de
+          // maestros no permite cambiar. Una moneda explícita debe coincidir.
+          if (row.tenant_id !== tenantId || row.cuenta_bancaria_id !== cuentaBancariaId
+            || (row.moneda != null && row.moneda !== cuenta.moneda) || !['ABONO', 'CARGO'].includes(row.tipo)
+            || !['string', 'number'].includes(typeof row.monto)) return false;
+          try {
+            const amount = new Decimal(row.monto);
+            return amount.isFinite() && !amount.isNegative() && amount.decimalPlaces() <= 2;
+          } catch { return false; }
+        },
+        [['fecha', false], ['created_at', false], ['id', false]],
+      );
+    } catch {
       throw lecturaFinancieraFallida('los movimientos para exportar');
     }
 
     const country = await paisDelTenant(client, tenantId);
     const timeZone = zonaHorariaDePais(country);
     const headers = ['Fecha', 'Tipo', 'Descripción', 'Proveedor', 'RUC', 'Referencia',
-      'Monto', 'Conciliado', 'Fecha Registro'];
-    const rows = (movimientos || []).map(mov => [
+      'Moneda', 'Monto', 'Conciliado', 'Fecha Registro'];
+    const rows = movimientos.map(mov => [
       this.formatDate(mov.fecha, timeZone), mov.tipo, mov.descripcion,
       mov.proveedores?.razon_social ?? '', mov.proveedores?.ruc ?? '', mov.referencia ?? '',
-      Number(mov.monto).toFixed(2), mov.conciliado ? 'Sí' : 'No',
+      cuenta.moneda, new Decimal(mov.monto).toFixed(2), mov.conciliado ? 'Sí' : 'No',
       this.formatDateTime(mov.created_at, timeZone),
     ]);
     const csvContent = [headers, ...rows]

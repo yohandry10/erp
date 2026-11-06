@@ -233,6 +233,9 @@ orquestan; servicios y generadores contienen reglas. Todo asiento debe:
   parámetros fiscales conservan sus flujos propios.
 
 - Stack visual: Tailwind CSS 3.4 + shadcn/ui/Radix.
+- El layout de dashboard es propietario del único landmark `main`. `PageShell`
+  usa `div` por defecto para no anidarlo; el dashboard de superadmin, cuyo
+  layout carece de `main`, lo solicita explícitamente mediante `as="main"`.
 - `globals.css` contiene únicamente Tailwind, tokens y base.
 - El tema vive en `<html>` y usa tokens semánticos.
 - Dialog y AlertDialog usan primitivas accesibles, no overlays manuales.

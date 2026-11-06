@@ -3,6 +3,7 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 type PageShellProps = {
+  as?: "div" | "main"
   title: React.ReactNode
   description?: React.ReactNode
   actions?: React.ReactNode
@@ -11,6 +12,7 @@ type PageShellProps = {
 }
 
 export function PageShell({
+  as: Root = "div",
   title,
   description,
   actions,
@@ -18,7 +20,7 @@ export function PageShell({
   className,
 }: PageShellProps) {
   return (
-    <main
+    <Root
       className={cn(
         "mx-auto w-full max-w-[1600px] space-y-5 p-4 text-foreground group-data-[erp-theme=light]/dashboard:text-foreground md:p-6",
         className,
@@ -40,6 +42,6 @@ export function PageShell({
         </div>
       </header>
       {children}
-    </main>
+    </Root>
   )
 }
