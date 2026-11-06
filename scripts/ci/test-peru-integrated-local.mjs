@@ -82,11 +82,37 @@ async function main() {
   results.push({ scenario: 'login real con sesión persistida', passed: true, tenant_id: auth.user.tenant_id });
   const dashboard = await request('dashboard/stats');
   const dashboardStats = dashboard.data ?? dashboard;
-  const expectedSales = Number(sql(`SELECT round(coalesce((SELECT sum(CASE WHEN tipo_documento IN('07','NOTA_CREDITO') THEN -1 ELSE 1 END*coalesce(total_venta,total)) FROM cpe WHERE tenant_id=${uuid(auth.user.tenant_id)} AND created_at>=date_trunc('month',CURRENT_TIMESTAMP) AND created_at<date_trunc('month',CURRENT_TIMESTAMP)+interval '1 month' AND lower(estado) NOT IN('borrador','anulado','cancelado','rechazado','error') AND moneda='PEN'),0)+coalesce((SELECT sum(total) FROM ventas_pos WHERE tenant_id=${uuid(auth.user.tenant_id)} AND created_at>=date_trunc('month',CURRENT_TIMESTAMP) AND created_at<date_trunc('month',CURRENT_TIMESTAMP)+interval '1 month' AND estado<>'ANULADA' AND cpe_id IS NULL AND moneda='PEN'),0),2);`));
+  // La factura demo conserva BORRADOR fiscal pero su documento EMITIDO ya
+  // tiene efecto operativo. Conciliar ambas fuentes, sin tratar cualquier
+  // borrador como venta ni contar dos veces un POS que emitió CPE.
+  const salesReconciliation = JSON.parse(sql(`
+    WITH period AS (
+      SELECT date_trunc('month', CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima') AT TIME ZONE 'America/Lima' AS starts,
+        (date_trunc('month', CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima') + interval '1 month') AT TIME ZONE 'America/Lima' AS ends
+    ), eligible_cpe AS (
+      SELECT c.tipo_documento, coalesce(c.total_venta,c.total) AS amount
+      FROM cpe c CROSS JOIN period p
+      WHERE c.tenant_id=${uuid(auth.user.tenant_id)} AND c.moneda='PEN'
+        AND c.created_at>=p.starts AND c.created_at<p.ends
+        AND coalesce(c.metadata->>'financial_effect_status','') NOT IN('PENDING_FISCAL_ACCEPTANCE','REJECTED_NO_FINANCIAL_EFFECT')
+        AND (lower(c.estado) NOT IN('borrador','anulado','cancelado','rechazado','error')
+          OR (lower(c.estado)='borrador' AND c.simulated_origin IS TRUE AND EXISTS (
+            SELECT 1 FROM documentos d WHERE d.id=c.documento_id AND d.tenant_id=c.tenant_id
+              AND upper(d.estado) IN('EMITIDO','ACEPTADO') AND d.moneda=c.moneda AND d.total=coalesce(c.total_venta,c.total)
+              AND coalesce(d.metadata->>'financial_effect_status','') NOT IN('PENDING_FISCAL_ACCEPTANCE','REJECTED_NO_FINANCIAL_EFFECT')
+          )))
+    ), sources AS (
+      SELECT coalesce((SELECT sum(CASE WHEN tipo_documento IN('07','NOTA_CREDITO') THEN -amount ELSE amount END) FROM eligible_cpe),0) AS cpe,
+        coalesce((SELECT sum(v.total) FROM ventas_pos v CROSS JOIN period p
+          WHERE v.tenant_id=${uuid(auth.user.tenant_id)} AND v.moneda='PEN'
+            AND v.created_at>=p.starts AND v.created_at<p.ends AND v.estado<>'ANULADA' AND v.cpe_id IS NULL),0) AS pos
+    ) SELECT jsonb_build_object('cpe',cpe,'pos_without_cpe',pos,'total',round(cpe+pos,2)) FROM sources;
+  `));
+  const expectedSales = Number(salesReconciliation.total);
   assert.equal(dashboardStats.ventasMes,expectedSales);
   const activities = await request('dashboard/activities');
   assert.ok(Array.isArray(activities.data ?? activities));
-  results.push({ scenario:'dashboard real acepta tipos persistidos y concuerda con ventas SQL sin duplicar POS',passed:true,ventas_mes:expectedSales });
+  results.push({ scenario:'dashboard real acepta tipos persistidos y concuerda con ventas SQL sin duplicar POS',passed:true,ventas_mes:expectedSales,sources:salesReconciliation });
   if (process.env.LOCAL_INTEGRATED_FOCUS === 'onboarding') {
     await testPeruOnboarding({ request, sql, uuid, results, setToken: value => { token = value; }, primaryToken: token, processAccounting });
     return;
