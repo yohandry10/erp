@@ -64,6 +64,7 @@ jobs:
           pnpm --filter @erp-suite/web test:asiento-balance
           pnpm --filter @erp-suite/web test:contrato
           pnpm --filter @erp-suite/web test:barra-final
+          node apps/web/tests/analytics/verify-native-view.mjs
 
       - name: Install Chromium
         run: pnpm --filter @erp-suite/web exec playwright install --with-deps chromium

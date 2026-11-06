@@ -359,6 +359,11 @@ Ensayos locales:
 - `pnpm test:storage-backup` levanta dos Storage efímeros en Docker, respalda,
   rechaza un respaldo alterado, restaura una empresa y luego todo, verifica
   cada objeto por SHA-256 y rechaza destinos remotos.
+  Docker asigna los puertos HTTP libres exclusivamente en loopback; PostgreSQL
+  y PostgREST sólo se exponen dentro de la red propia del ensayo.
+  Si el pool local de Docker está agotado, `STORAGE_BACKUP_TEST_SUBNET` permite
+  indicar una subred privada /24 previamente comprobada libre; Docker rechaza
+  solapamientos. No modifica las redes existentes ni la configuración del motor.
   `scripts/datos/restaurar-storage.mjs` sólo escribe en Storage local:
   recuperar PROD sigue el procedimiento de operaciones destructivas.
 - `pnpm test:tenant-export` (base efímera) exporta una empresa y comprueba que

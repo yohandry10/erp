@@ -1,292 +1,110 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { AnalyticsController } from './analytics.controller';
 
-function createSupabaseMock(rows: any[]) {
+const tenant = 'tenant-analytics';
+const row = (id: string, fields: any = {}) => ({ id, tenant_id: tenant, moneda: 'PEN', ...fields });
+const doc = (id: string, total: number, moneda = 'PEN', fecha_emision = '2026-11-06') => row(id, { total, moneda, fecha_emision, tipo_documento: 'FACTURA', estado: 'EMITIDO' });
+const range = { fecha_desde: '2026-11-01', fecha_hasta: '2026-11-06' };
+
+function setup(tables: Record<string, any[]> = {}, faults: { noCount?: boolean; errorTable?: string; bypassScope?: boolean } = {}) {
   const calls: any[] = [];
-  return {
-    calls,
-    service: {
-      getClient: () => ({
-        from: (table: string) => {
-          const call = { table, columns: '', filters: [] as any[] };
-          calls.push(call);
-          const builder: any = {
-            select(columns: string) {
-              call.columns = columns;
-              return builder;
-            },
-            eq(column: string, value: any) {
-              call.filters.push(['eq', column, value]);
-              return builder;
-            },
-            gte(column: string, value: any) {
-              call.filters.push(['gte', column, value]);
-              return builder;
-            },
-            lte(column: string, value: any) {
-              call.filters.push(['lte', column, value]);
-              return builder;
-            },
-            in(column: string, values: any[]) {
-              call.filters.push(['in', column, values]);
-              return builder;
-            },
-            not(column: string, op: string, value: any) {
-              call.filters.push(['not', column, op, value]);
-              return builder;
-            },
-            order() {
-              return builder;
-            },
-            then(resolve: (value: any) => void) {
-              resolve({ data: rows, error: null });
-            },
-          };
-          return builder;
-        },
-      }),
-    },
-  };
+  const data = { empresa_config: [row('config', { pais: 'PE' })], ...tables };
+  const service = { getClient: () => ({ from: (table: string) => {
+    let records = [...(data[table] ?? [])];
+    const call = { table, columns: '', filters: [] as any[], page: [] as number[] }; calls.push(call);
+    const query: any = {
+      select(columns: string) { call.columns = columns; return query; },
+      eq(field: string, value: any) { call.filters.push(['eq', field, value]); if (!(faults.bypassScope && field === 'tenant_id')) records = records.filter(record => record[field] === value); return query; },
+      in(field: string, values: any[]) { records = records.filter(record => values.includes(record[field])); return query; },
+      not(field: string, _: string, value: string) { const excluded = JSON.parse(`[${value.slice(1, -1)}]`); records = records.filter(record => !excluded.includes(record[field])); return query; },
+      gte(field: string, value: string) { call.filters.push(['gte', field, value]); records = records.filter(record => String(record[field]).slice(0, 10) >= value.slice(0, 10)); return query; },
+      lte(field: string, value: string) { call.filters.push(['lte', field, value]); records = records.filter(record => String(record[field]).slice(0, 10) <= value.slice(0, 10)); return query; },
+      order(field: string, { ascending }: any) { records.sort((a, b) => String(a[field]).localeCompare(String(b[field])) * (ascending ? 1 : -1)); return query; },
+      range(from: number, to: number) { call.page = [from, to]; return Promise.resolve({ data: records.slice(from, to + 1), count: faults.noCount ? null : records.length, error: faults.errorTable === table ? { message: 'read failed' } : null }); },
+    };
+    return query;
+  } }) };
+  return { controller: new AnalyticsController(service as any, {} as any), calls };
 }
 
-describe('AnalyticsController', () => {
-  it('rechaza filtros de fecha inválidos con 400 explícito', async () => {
-    const supabase = createSupabaseMock([]);
-    const controller = new AnalyticsController(supabase.service as any, {} as any);
+describe('Analytics — lectura nativa completa por moneda', () => {
+  beforeEach(() => { jest.useFakeTimers(); jest.setSystemTime(new Date('2026-11-06T12:00:00Z')); });
+  afterEach(() => jest.useRealTimers());
 
-    await expect(controller.getVentasTiempo('tenant-1', { fecha_desde: '2026-99-99', fecha_hasta: '2026-05-13' }))
-      .rejects.toBeInstanceOf(BadRequestException);
-    await expect(controller.getVentasTiempo('tenant-1', { periodo: 'decorativo' }))
-      .rejects.toBeInstanceOf(BadRequestException);
+  it('separa PEN179.80 y USD0.07 sin publicar el falso total179.87', async () => {
+    const response = await setup({ documentos: [doc('pen', 179.8), doc('usd', 0.07, 'USD')] }).controller.getVentasTiempo(tenant, range);
+    expect(response.data.porMoneda.map((item: any) => [item.moneda, item.totales.ventasActuales])).toEqual([['PEN', 179.8], ['USD', 0.07]]);
+    expect(response.data.totales).toBeUndefined();
   });
-
-  it('aplica tenant y rango de fechas real al endpoint de ventas en el tiempo', async () => {
-    // Las ventas reales se leen de `documentos` (comprobantes emitidos), no de la
-    // tabla legacy `ventas`. El helper mapea fecha_emision → fecha.
-    const supabase = createSupabaseMock([
-      { fecha_emision: '2026-05-13T12:00:00.000Z', total: 120 },
-      { fecha_emision: '2026-05-13T15:00:00.000Z', total: 30 },
-    ]);
-    const controller = new AnalyticsController(supabase.service as any, {} as any);
-
-    const response = await controller.getVentasTiempo('tenant-analytics', {
-      fecha_desde: '2026-05-01',
-      fecha_hasta: '2026-05-31',
-    });
-
-    expect(response.success).toBe(true);
-    expect(response.data.totales.ventasActuales).toBe(150);
-    expect(supabase.calls[0]).toMatchObject({ table: 'documentos' });
-    expect(supabase.calls[0].filters).toEqual(expect.arrayContaining([
-      ['eq', 'tenant_id', 'tenant-analytics'],
-      ['in', 'tipo_documento', ['FACTURA', 'BOLETA']],
-      ['gte', 'fecha_emision', '2026-05-01T00:00:00.000Z'],
-      ['lte', 'fecha_emision', '2026-05-31T23:59:59.999Z'],
-    ]));
+  it('conserva ventas simples, tenant y rango y excluye borradores y otras empresas', async () => {
+    const { controller, calls } = setup({ documentos: [doc('a', 120), doc('b', 30), { ...doc('draft', 999), estado: 'BORRADOR' }, { ...doc('foreign', 999), tenant_id: 'other' }] });
+    const response = await controller.getVentasTiempo(tenant, range);
+    expect(response.data.totales.ventasActuales).toBe(150); expect(response.data.moneda).toBe('PEN');
+    expect(calls[0].filters).toEqual(expect.arrayContaining([['eq', 'tenant_id', tenant], ['gte', 'fecha_emision', '2026-11-01T00:00:00.000Z'], ['lte', 'fecha_emision', '2026-11-06T23:59:59.999Z']]));
   });
-
-  it('calcula ventas por categoría con importes vendidos y no con conteo de productos', async () => {
-    const rowsByTable: Record<string, any[]> = {
-      documentos: [{ id: 'doc-1' }, { id: 'doc-2' }],
-      documento_detalles: [
-        { producto_id: 'prod-1', total_item: 118, valor_venta: 100 },
-        { producto_id: 'prod-2', total_item: 59, valor_venta: 50 },
-        { producto_id: 'prod-1', total_item: 23.6, valor_venta: 20 },
-      ],
-      productos: [
-        { id: 'prod-1', categoria: 'Alimentos' },
-        { id: 'prod-2', categoria: 'Oficina' },
-      ],
-    };
-    const from = jest.fn((table: string) => {
-      const builder: any = {
-        select: jest.fn(() => builder),
-        eq: jest.fn(() => builder),
-        neq: jest.fn(() => builder),
-        in: jest.fn(() => builder),
-        then: (resolve: (value: any) => void) =>
-          resolve({ data: rowsByTable[table] ?? [], error: null }),
-      };
-      return builder;
-    });
-    const controller = new AnalyticsController({ getClient: () => ({ from }) } as any, {} as any);
-
-    const response = await controller.getVentasCategoria('tenant-analytics');
-
-    expect(response).toMatchObject({
-      success: true,
-      data: {
-        graficoPie: {
-          labels: ['Alimentos', 'Oficina'],
-          data: [141.6, 59],
-        },
-      },
-    });
-    expect(from).toHaveBeenCalledWith('documento_detalles');
+  it('compara el crecimiento sólo en la misma moneda', async () => {
+    const response = await setup({ documentos: [doc('a', 20), doc('b', 10, 'PEN', '2026-10-29'), doc('c', 5, 'USD', '2026-10-29')] }).controller.getVentasTiempo(tenant, range);
+    expect(response.data.porMoneda[0].totales).toMatchObject({ ventasActuales: 20, ventasAnterior: 10, crecimiento: '100.0%' });
+    expect(response.data.porMoneda[1].totales).toMatchObject({ ventasActuales: 0, ventasAnterior: 5, crecimiento: '-100.0%' });
   });
-});
-
-/**
- * Regresión del aging de cuentas por cobrar.
- *
- * El gráfico sólo clasificaba las cuentas ya vencidas, así que una cartera sana
- * salía entera en cero mientras el total por cobrar mostraba saldo. Esa es la
- * contradicción que se veía en pantalla: cifras de deuda junto a «sin saldos
- * pendientes».
- */
-describe('AnalyticsController — aging de cuentas por cobrar', () => {
-  const dias = (n: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() + n);
-    return d.toISOString().slice(0, 10);
-  };
-
-  const aging = async (rows: any[]) => {
-    const supabase = createSupabaseMock(rows);
-    const controller = new AnalyticsController(supabase.service as any, {} as any);
-    const r: any = await controller.getDeudasClientes('tenant-aging', {});
-    const { labels, data } = r.data.graficoEdadSaldos;
-    const porTramo: Record<string, number> = {};
-    labels.forEach((l: string, i: number) => { porTramo[l] = data[i]; });
-    return { porTramo, totales: r.data.totales };
-  };
-
-  it('clasifica una cuenta vigente en «Por vencer» en vez de descartarla', async () => {
-    const { porTramo, totales } = await aging([
-      { saldo: 500, fecha_vencimiento: dias(15), numero: 'F001-1' },
-    ]);
-
-    expect(porTramo['Por vencer']).toBe(500);
-    expect(totales.totalPorCobrar).toBe(500);
-    expect(totales.vencido).toBe(0);
+  it('lee1001ventas en dos páginas y suma los centavos exactamente', async () => {
+    const { controller, calls } = setup({ documentos: Array.from({ length: 1001 }, (_, i) => doc(`d${String(i).padStart(4, '0')}`, 0.01)) });
+    expect((await controller.getVentasTiempo(tenant, range)).data.totales.ventasActuales).toBe(10.01);
+    expect(calls.some(call => call.page[0] === 1000)).toBe(true);
   });
-
-  it('la suma de los tramos iguala el total por cobrar', async () => {
-    const { porTramo, totales } = await aging([
-      { saldo: 100, fecha_vencimiento: dias(20), numero: 'vigente' },
-      { saldo: 200, fecha_vencimiento: dias(-10), numero: 'vencida-corta' },
-      { saldo: 300, fecha_vencimiento: dias(-45), numero: 'vencida-media' },
-      { saldo: 400, fecha_vencimiento: dias(-120), numero: 'vencida-larga' },
-    ]);
-
-    const suma = Object.values(porTramo).reduce((a, b) => a + b, 0);
-    expect(suma).toBe(1000);
-    expect(totales.totalPorCobrar).toBe(1000);
-    // Antes la suma de los tramos era 900 y no cuadraba con el total.
-    expect(totales.vencido).toBe(900);
+  it.each([null, '', 'usd'])('rechaza moneda desconocida %s sin fabricar cero', async moneda => {
+    await expect(setup({ documentos: [{ ...doc('a', 1), moneda }] }).controller.getVentasTiempo(tenant, range)).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
-
-  it('ubica cada cuenta vencida en su tramo de antigüedad', async () => {
-    const { porTramo } = await aging([
-      { saldo: 200, fecha_vencimiento: dias(-10), numero: 'a' },
-      { saldo: 300, fecha_vencimiento: dias(-45), numero: 'b' },
-      { saldo: 400, fecha_vencimiento: dias(-75), numero: 'c' },
-      { saldo: 500, fecha_vencimiento: dias(-120), numero: 'd' },
-    ]);
-
-    expect(porTramo['0-30 días']).toBe(200);
-    expect(porTramo['31-60 días']).toBe(300);
-    expect(porTramo['61-90 días']).toBe(400);
-    expect(porTramo['90+ días']).toBe(500);
+  it.each([null, 'NaN', '', 0.001])('rechaza importe no verificable %s', async total => {
+    await expect(setup({ documentos: [{ ...doc('a', 1), total }] }).controller.getVentasTiempo(tenant, range)).rejects.toThrow();
   });
-
-  it('expone un color por tramo, incluido el nuevo', async () => {
-    const supabase = createSupabaseMock([]);
-    const controller = new AnalyticsController(supabase.service as any, {} as any);
-    const r: any = await controller.getDeudasClientes('tenant-aging', {});
-    const { labels, backgroundColor } = r.data.graficoEdadSaldos;
-    expect(labels).toHaveLength(5);
-    expect(backgroundColor).toHaveLength(5);
+  it.each([{ noCount: true }, { errorTable: 'documentos' }, { bypassScope: true }])('rechaza lecturas incompletas o ajenas %j', async faults => {
+    await expect(setup({ documentos: [{ ...doc('other', 1), tenant_id: 'other' }] }, faults).controller.getVentasTiempo(tenant, range)).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
-});
-
-/**
- * Regresión de los indicadores gerenciales.
- *
- * «Liquidez» se calculaba como (ventas del mes + CxC) / CxP, que no es un ratio de
- * liquidez: las ventas no son un activo, y las que fueron a crédito ya estaban
- * dentro de CxC, así que se contaban dos veces. «Rentabilidad» descontaba los
- * gastos pero no el costo de ventas, así que marcaba cerca de 100 % y lo daba por
- * OK: se comprobó en producción con `rentabilidad: {valor: 100, estado: "OK"}`.
- */
-describe('AnalyticsController — indicadores contables estándar', () => {
-  const construir = (porTabla: Record<string, any[]>) => {
-    const from = jest.fn((tabla: string) => {
-      const builder: any = {
-        select: () => builder,
-        eq: () => builder,
-        in: () => builder,
-        not: () => builder,
-        gte: () => builder,
-        lte: () => builder,
-        lt: () => builder,
-        order: () => builder,
-        then: (resolve: (v: any) => void) => resolve({ data: porTabla[tabla] ?? [], error: null }),
-      };
-      return builder;
-    });
-    return new AnalyticsController({ getClient: () => ({ from }) } as any, {} as any);
-  };
-
-  it('liquidez es la razón corriente: activo corriente entre pasivo corriente', async () => {
-    const controller = construir({
-      documentos: [{ id: 'd1', fecha_emision: '2026-08-01', total: 1000 }],
-      documento_detalles: [{ producto_id: 'p1', cantidad: 2 }],
-      productos: [{ id: 'p1', costo: 100, stock_actual: 10, precio_compra: 100 }],
-      gastos: [{ monto: 50 }],
-      cuentas_por_cobrar: [{ saldo: 400 }],
-      cuentas_por_pagar: [{ saldo: 500 }],
-      cuentas_bancarias: [{ saldo_actual: 600 }],
-    });
-
-    const r: any = await controller.getKpisVisuales('tenant-kpi');
-
-    // activo corriente = bancos 600 + CxC 400 + inventario (10 x 100) = 2000
-    // pasivo corriente = 500  ->  razón corriente = 4.0
-    expect(r.data.liquidez.valor).toBeCloseTo(4, 1);
+  it('rechaza IDs repetidos', async () => {
+    await expect(setup({ documentos: [doc('same', 1), doc('same', 1)] }).controller.getVentasTiempo(tenant, range)).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
-
-  it('rentabilidad descuenta el costo de ventas y ya no marca 100 %', async () => {
-    const controller = construir({
-      documentos: [{ id: 'd1', fecha_emision: '2026-08-01', total: 1000 }],
-      documento_detalles: [{ producto_id: 'p1', cantidad: 2 }],
-      productos: [{ id: 'p1', costo: 300, stock_actual: 0, precio_compra: 300 }],
-      gastos: [{ monto: 100 }],
-      cuentas_por_cobrar: [],
-      cuentas_por_pagar: [],
-      cuentas_bancarias: [],
-    });
-
-    const r: any = await controller.getKpisVisuales('tenant-kpi');
-
-    // ventas 1000 - costo (2 x 300 = 600) - gastos 100 = 300  ->  30 %
-    expect(r.data.rentabilidad.valor).toBeCloseTo(30, 1);
-    expect(r.data.rentabilidad.valor).toBeLessThan(100);
+  it.each([{ fecha_desde: '2026-02-30', fecha_hasta: '2026-03-02' }, { fecha_desde: '2026-11-01' }, { periodo: 'decorativo' }])('rechaza fechas y períodos inválidos %j', async filters => {
+    await expect(setup().controller.getVentasTiempo(tenant, filters)).rejects.toBeInstanceOf(BadRequestException);
   });
-
-  it('sin costo ni gastos el margen es total, pero por dato y no por omisión', async () => {
-    const controller = construir({
-      documentos: [{ id: 'd1', fecha_emision: '2026-08-01', total: 500 }],
-      documento_detalles: [],
-      productos: [],
-      gastos: [],
-      cuentas_por_cobrar: [],
-      cuentas_por_pagar: [],
-      cuentas_bancarias: [],
-    });
-
-    const r: any = await controller.getKpisVisuales('tenant-kpi');
-    expect(r.data.rentabilidad.valor).toBeCloseTo(100, 1);
+  it.each([false, true])('aging conserva vigentes y cada tramo, sin sumar divisas (CxP=%s)', async payable => {
+    const dates = ['2026-11-20', '2026-10-27', '2026-09-22', '2026-08-23', '2026-07-09'];
+    const { controller } = setup({ [payable ? 'cuentas_por_pagar' : 'cuentas_por_cobrar']: [...dates.map((date, index) => row(String(index), { saldo: (index + 1) * 100, fecha_vencimiento: date })), row('usd', { saldo: 7, moneda: 'USD', fecha_vencimiento: '2026-10-27' })] });
+    const response = payable ? await controller.getDeudasProveedores(tenant, {}) : await controller.getDeudasClientes(tenant, {});
+    const pen = response.data.porMoneda[0], usd = response.data.porMoneda[1];
+    expect(pen.graficoEdadSaldos.data).toEqual([100, 200, 300, 400, 500]); expect(pen.graficoEdadSaldos.backgroundColor).toHaveLength(5);
+    expect(pen.totales[payable ? 'totalPorPagar' : 'totalPorCobrar']).toBe(1500); expect(pen.totales.vencido).toBe(1400);
+    expect(usd.graficoEdadSaldos.data).toEqual([0, 7, 0, 0, 0]);
   });
-
-  it('sin ventas no inventa rentabilidad', async () => {
-    const controller = construir({
-      documentos: [], documento_detalles: [], productos: [],
-      gastos: [], cuentas_por_cobrar: [], cuentas_por_pagar: [], cuentas_bancarias: [],
-    });
-
-    const r: any = await controller.getKpisVisuales('tenant-kpi');
-    expect(r.data.rentabilidad.valor).toBe(0);
-    expect(r.data.liquidez.valor).toBe(0);
+  it('no presenta como cartera vacía un fallo de CxP', async () => {
+    await expect(setup({}, { errorTable: 'cuentas_por_pagar' }).controller.getDeudasProveedores(tenant, {})).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+  it('las categorías usan importes de líneas, moneda del documento y período', async () => {
+    const { controller } = setup({ documentos: [doc('pen1', 141.6), doc('pen2', 59), doc('usd', 0.07, 'USD'), doc('old', 999, 'USD', '2025-01-01')],
+      documento_detalles: [row('l1', { documento_id: 'pen1', producto_id: 'p1', total_item: 141.6 }), row('l2', { documento_id: 'pen2', producto_id: 'p2', total_item: 59 }), row('l3', { documento_id: 'usd', producto_id: null, total_item: 0.07 }), row('old-line', { documento_id: 'old', total_item: 999 })], productos: [row('p1', { categoria: 'Alimentos' }), row('p2', { categoria: 'Oficina' })] });
+    const result = (await controller.getVentasCategoria(tenant, range)).data.porMoneda;
+    expect(result[0].graficoPie).toMatchObject({ labels: ['Alimentos', 'Oficina'], data: [141.6, 59] }); expect(result[1].graficoPie).toMatchObject({ labels: ['Sin categoría'], data: [0.07] });
+  });
+  it('no calcula ratios nominales entre divisas ni usa inventarioPEN comoUSD', async () => {
+    expect((await setup({ documentos: [doc('a', 100), doc('b', 0.07, 'USD')] }).controller.getKpisVisuales(tenant)).data).toMatchObject({ moneda: 'PEN', disponible: false, liquidez: null, rentabilidad: null });
+  });
+  it('usa saldo bancario real y conserva razón corriente y margen aproximado en una moneda', async () => {
+    const { controller, calls } = setup({ documentos: [doc('d', 1000)], gastos: [row('g', { monto: 100, fecha: '2026-11-01' })], cuentas_por_cobrar: [row('ar', { saldo: 400 })], cuentas_por_pagar: [row('ap', { saldo: 500 })], cuentas_bancarias: [row('bank', { saldo: 600, activo: true })], productos: [row('p', { costo: 300, stock_actual: 10, activo: true })], documento_detalles: [row('l', { documento_id: 'd', producto_id: 'p', cantidad: 2 })] });
+    const response = await controller.getKpisVisuales(tenant);
+    expect(response.data.liquidez.valor).toBe(8); expect(response.data.rentabilidad.valor).toBe(30);
+    expect(calls.find(call => call.table === 'cuentas_bancarias').columns).toContain('saldo,moneda');
+  });
+  it('sin costo ni gastos confirmados cero conserva el margen100%', async () => {
+    expect((await setup({ documentos: [doc('a', 500)], documento_detalles: [row('line', { documento_id: 'a', producto_id: 'p', cantidad: 1 })], productos: [row('p', { costo: 0, stock_actual: 0, activo: true })] }).controller.getKpisVisuales(tenant)).data.rentabilidad.valor).toBe(100);
+  });
+  it('un documento sin costo comprobado no fabrica margen100%', async () => {
+    expect((await setup({ documentos: [doc('a', 500)] }).controller.getKpisVisuales(tenant)).data.rentabilidad.valor).toBeNull();
+  });
+  it('no inventa razón999 ni rentabilidad0 sin base de cálculo', async () => {
+    const result = (await setup().controller.getKpisVisuales(tenant)).data;
+    expect(result.liquidez.valor).toBeNull(); expect(result.rentabilidad.valor).toBeNull();
+  });
+  it('no publica KPI0 cuando falla la fuente', async () => {
+    await expect(setup({}, { errorTable: 'gastos' }).controller.getKpisVisuales(tenant)).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 });

@@ -4107,11 +4107,23 @@ globalNO_GO.
 
 
 
-- Analytics consume métricas tenant-scoped. Permanece abierto el defecto de
-  agregación multimoneda: ventas179.80PEN y0.07USD aparecen como179.87PEN en
-  Analytics Financiero. No usar ese consolidado ni sus indicadores derivados
-  como aceptación financiera; requiere separación por moneda o valuación
-  verificable. El dashboard operativo sí conserva importes separados.
+- Analytics Financiero lee ventas, categorías y cartera completas por empresa,
+  con conteo estable e IDs únicos, y conserva importes originales por moneda.
+  El contrato v2 publica `porMoneda`; sólo una moneda permite además los campos
+  planos compatibles. Nunca publica un total nominal multimoneda. El selector
+  y CSV usan la moneda confirmada; ventas/categorías comparten el rango elegido,
+  mientras la cartera corresponde a la fecha actual del país. El aging incluye
+  saldos por vencer tanto en CxC como en CxP.
+  Los indicadores de los últimos30días no suman divisas con inventario local:
+  si requieren una valuación común quedan no disponibles. En una sola moneda
+  del país, el margen sigue siendo aproximado, con costo actual del catálogo;
+  un costo desconocido no se trata como cero ni equivale al estado de resultados.
+  El saldo bancario se lee de `saldo`. Los errores de fuentes retiran cifras y
+  bloquean su exportación; la falta de indicadores se declara por separado y
+  el CSV los marca no disponibles. Sin caché financiera antigua, cola offline,
+  conversión implícita ni ampliación de permisos. La aceptación de este cambio
+  no cubre los endpoints avanzados legacy de rentabilidad por producto, punto
+  de equilibrio y escenarios, que requieren revisión propia antes de GO.
 - Reportes exportan sin duplicar reglas de negocio.
 - Auditoría registra actor, tenant, acción, entidad, resultado y correlación.
 - La evidencia complementaria de auditoría e integraciones usa el append
