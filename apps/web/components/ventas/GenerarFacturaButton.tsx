@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermission } from "@/hooks/use-permission";
 import { invoiceIntentKey, readInvoiceIntent, newInvoiceIntent, readInvoiceOrder, invoiceOrderCanGenerate, sameInvoiceSnapshot, readInvoiceGenerationReceipt, confirmInvoiceFromOrder, type InvoiceIntent, type InvoiceScope, type InvoiceOrder, type InvoiceGenerationReceipt } from "@/lib/ventas/invoice-generation-operation";
+import { archiveCancelledInvoiceIntent } from '@/lib/ventas/invoice-generation-operation';
 import { useApi } from "@/hooks/use-api";
 import { Button } from "@/components/ui/button";
 import { FileText } from "lucide-react";
@@ -63,6 +64,7 @@ export default function GenerarFacturaButton({
   const [pending, setPending] = useState<InvoiceIntent | null>(null);
   const [intentReady, setIntentReady] = useState('');
   const [operationError, setOperationError] = useState<string | null>(null);
+  const [terminalMessage, setTerminalMessage] = useState<string | null>(null);
   const [recoveryBlocked, setRecoveryBlocked] = useState(false);
   const [recoveredConfirmation, setRecoveredConfirmation] = useState(false);
   const router = useRouter();
@@ -79,7 +81,7 @@ export default function GenerarFacturaButton({
 
   useEffect(() => {
     epoch.current += 1; busy.current = false; storedRaw.current = null; feedbackEpoch.current = -1;
-    setPending(null); setIntentReady(''); setOperationError(null); setRecoveryBlocked(false);
+    setPending(null); setIntentReady(''); setOperationError(null); setTerminalMessage(null); setRecoveryBlocked(false);
     setGenerating(false); setShowConfirmation(false); setShowGREModal(false); setGenerationFeedback(null); setRecoveredConfirmation(false);
     if (!tenantId || !actorId || !pedidoId) return;
     try {
@@ -194,6 +196,11 @@ export default function GenerarFacturaButton({
       if (intent) {
         if (!sameInvoiceSnapshot(intent.snapshot, order.snapshot)) throw new Error('El pedido cambió desde la generación pendiente. Se conserva; revise la consulta antes de continuar.');
         if (order.invoiceId) { await finish(intent, order); return; }
+        if (archiveCancelledInvoiceIntent(window.localStorage, intent, order)) {
+          storedRaw.current = null; setPending(null); setOperationError(null);
+          setTerminalMessage('El pedido está cancelado y no tiene factura. Se archivó la intención pendiente sin generar otro comprobante.');
+          await onSuccess(); if (current()) router.refresh(); return;
+        }
         if (!invoiceOrderCanGenerate(order, intent.logistics)) throw new Error('El pedido no permite generar este comprobante. Se conserva la operación pendiente.');
         if (intent.stage === 'VERIFY') {
           persist({ ...intent, stage: 'GENERATE' }, raw);
@@ -233,9 +240,10 @@ export default function GenerarFacturaButton({
     setShowConfirmation(true);
   };
 
-  if (intentReady !== scopeIdentity || !hasPermission || permissionLoading || (!canGenerate && !visiblePending && !operationError)) return null;
+  if (intentReady !== scopeIdentity || !hasPermission || permissionLoading || (!canGenerate && !visiblePending && !operationError && !terminalMessage)) return null;
   return (
     <>
+      {terminalMessage && <p role="status" className="w-full text-sm text-muted-foreground">{terminalMessage}</p>}
       {operationError && <div role="alert" className="w-full rounded-lg border border-destructive/40 p-4 text-sm">{operationError}</div>}
       {visiblePending && <section data-testid="invoice-generation-pending" className="w-full rounded-lg border border-amber-400/40 bg-amber-50/5 p-4">
         <h3 className="font-semibold">Generación pendiente de confirmación</h3>
@@ -243,7 +251,7 @@ export default function GenerarFacturaButton({
         <ul className="mt-2 text-sm">{visiblePending.snapshot.lines.map(line => <li key={line.id}>{line.description} · {line.quantity} × {line.price.toFixed(2)}</li>)}</ul>
         <p className="mt-2 text-sm">Consulte el resultado para recuperar el comprobante vinculado sin volver a generarlo.</p>
         <Button className="mt-3" onClick={() => void handleGenerate()} disabled={generating || recoveryBlocked}>
-          {generating ? 'Consultando...' : visiblePending.stage === 'VERIFY' ? 'Verificar factura pendiente' : 'Reintentar generación pendiente'}
+          {generating ? 'Consultando...' : !canGenerate ? 'Consultar estado pendiente' : visiblePending.stage === 'VERIFY' ? 'Verificar factura pendiente' : 'Reintentar generación pendiente'}
         </Button>
       </section>}
       {!visiblePending && canGenerate && <Button

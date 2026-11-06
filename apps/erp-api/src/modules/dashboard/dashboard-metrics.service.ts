@@ -87,7 +87,7 @@ export class DashboardMetricsService implements OnModuleDestroy {
     const hoy = new Date();
     const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
     const periodoKey = periodo || `${inicioMes.getFullYear()}-${inicioMes.getMonth()}`;
-    return `dashboard:stats:${tenantId}:${periodoKey}:v3`;
+    return `dashboard:stats:${tenantId}:${periodoKey}:v5`;
   }
 
   /**
@@ -177,7 +177,7 @@ export class DashboardMetricsService implements OnModuleDestroy {
   /**
    * Obtiene estadísticas del dashboard con cache
    */
-  async getStats(tenantId: string): Promise<DashboardStats> {
+  async getStats(tenantId: string, forceRefresh = false): Promise<DashboardStats> {
     const client = this.supabase.getClient();
 
     // El resto del dashboard admite un snapshot breve, pero inventario es un
@@ -187,7 +187,7 @@ export class DashboardMetricsService implements OnModuleDestroy {
     // /inventario/stats.
     // La lectura viva y la del snapshot pueden resolverse en paralelo.
     const [cached, inventario, monedaBase] = await Promise.all([
-      this.getStatsFromCache(tenantId),
+      forceRefresh ? Promise.resolve(null) : this.getStatsFromCache(tenantId),
       this.getInventarioActual(client, tenantId),
       this.getMonedaBase(client, tenantId),
     ]);
@@ -224,13 +224,13 @@ export class DashboardMetricsService implements OnModuleDestroy {
       ventasPosResult
     ] = await Promise.allSettled([
       client.from('cpe')
-        .select('total_venta, total, moneda, tipo_documento, estado, created_at, tenant_id')
+        .select('total_venta, total, moneda, tipo_documento, estado, created_at, tenant_id, documento_id, simulated_origin, metadata')
         .eq('tenant_id', tenantId)
         .gte('created_at', inicioMes.toISOString())
         .lte('created_at', finMes.toISOString())
         .order('created_at', { ascending: false }),
       client.from('cpe')
-        .select('total_venta, total, moneda, tipo_documento, estado')
+        .select('total_venta, total, moneda, tipo_documento, estado, documento_id, simulated_origin, metadata')
         .eq('tenant_id', tenantId)
         .gte('created_at', inicioHoy.toISOString()),
       client.from('gre_guias')
@@ -238,7 +238,7 @@ export class DashboardMetricsService implements OnModuleDestroy {
         .eq('tenant_id', tenantId)
         .gte('created_at', inicioMes.toISOString()),
       client.from('ordenes_compra')
-        .select('total, moneda, estado, fecha_orden, created_at')
+        .select('total, moneda, estado, fecha_orden, created_at, detalles:orden_compra_detalles!fk_orden_compra_detalles_orden_id(cantidad,cantidad_recibida)')
         .eq('tenant_id', tenantId)
         .gte('created_at', inicioMes.toISOString())
         .lte('created_at', finMes.toISOString())
@@ -291,6 +291,7 @@ export class DashboardMetricsService implements OnModuleDestroy {
     const ventasPosSinCpeHoy = ventasPosSinCpe.filter(
       (v) => new Date(v.created_at) >= inicioHoy,
     );
+    await this.confirmarEfectosDemo(client, tenantId, [...cpeData, ...cpeHoyData]);
     // Sumar por moneda original: no existe una conversión implícita a moneda base.
     // La nota de crédito resta; una orden anulada/rechazada no es inversión vigente.
     const importesPorMoneda = this.agruparImportes(monedaBase, cpeData || [], cpeHoyData || [], ventasPosSinCpe, ventasPosSinCpeHoy, comprasData || []);
@@ -298,7 +299,13 @@ export class DashboardMetricsService implements OnModuleDestroy {
     const ingresosMes = base.ventasMes;
     const ingresosHoy = base.ventasHoy;
     const inversionCompras = base.comprasMes;
-    const comprasPendientes = comprasData?.filter(c => this.estadoNormalizado(c.estado) === 'pendiente').length || 0;
+    const comprasPendientes = comprasData?.filter(c => {
+      if (!['pendiente', 'aprobada', 'parcial'].includes(this.estadoNormalizado(c.estado))) return false;
+      // El estado puede tardar en reflejar el último recibo. Una orden sin
+      // cantidades pendientes ya no debe pedir otra recepción.
+      return !Array.isArray(c.detalles) || c.detalles.length === 0 || c.detalles.some((line: any) =>
+        Number(line.cantidad) > Number(line.cantidad_recibida ?? 0));
+    }).length || 0;
 
     // Calcular tasa de conversión de cotizaciones
     const totalCotizaciones = cotizacionesData?.length || 0;
@@ -342,9 +349,9 @@ export class DashboardMetricsService implements OnModuleDestroy {
   /**
    * Obtiene actividades recientes con cache
    */
-  async getActivities(tenantId: string): Promise<Activity[]> {
+  async getActivities(tenantId: string, forceRefresh = false): Promise<Activity[]> {
     // Intentar obtener del cache
-    const cached = await this.getActivitiesFromCache(tenantId);
+    const cached = forceRefresh ? null : await this.getActivitiesFromCache(tenantId);
     if (cached) {
       return cached;
     }
@@ -505,7 +512,9 @@ export class DashboardMetricsService implements OnModuleDestroy {
         const estado = this.estadoNormalizado(row.estado);
         const tipoDocumento = this.cpeDocumentType(row.tipo_documento);
         if (!estado) throw new ServiceUnavailableException('Comprobante del dashboard incompleto; reintente');
-        if (!['borrador', 'anulado', 'cancelado', 'rechazado', 'error'].includes(estado)) {
+        const blockedEffect = ['PENDING_FISCAL_ACCEPTANCE', 'REJECTED_NO_FINANCIAL_EFFECT'].includes(row.metadata?.financial_effect_status);
+        if (!blockedEffect && (!['borrador', 'anulado', 'cancelado', 'rechazado', 'error'].includes(estado)
+          || estado === 'borrador' && row.demoEffectConfirmed === true)) {
           dest[field] = dest[field].plus(amount.times(tipoDocumento === '07' ? -1 : 1));
         }
       }
@@ -519,6 +528,26 @@ export class DashboardMetricsService implements OnModuleDestroy {
       if (!['anulada', 'cancelada', 'rechazada'].includes(estado)) dest.comprasMes = dest.comprasMes.plus(amount);
     }
     return [...buckets.values()].sort((a,b) => a.moneda.localeCompare(b.moneda)).map(row => ({ moneda:row.moneda, ventasMes:row.ventasMes.toDecimalPlaces(2).toNumber(), ventasHoy:row.ventasHoy.toDecimalPlaces(2).toNumber(), comprasMes:row.comprasMes.toDecimalPlaces(2).toNumber() }));
+  }
+
+  private async confirmarEfectosDemo(client: any, tenantId: string, rows: any[]) {
+    const drafts = rows.filter(row => this.estadoNormalizado(row.estado) === 'borrador' && row.simulated_origin === true && row.documento_id);
+    const ids = [...new Set(drafts.map(row => row.documento_id))];
+    if (!ids.length) return;
+    const result = await client.from('documentos').select('id, tenant_id, estado, total, moneda, metadata')
+      .eq('tenant_id', tenantId).in('id', ids);
+    if (result.error || !Array.isArray(result.data) || new Set(result.data.map((row: any) => row.id)).size !== result.data.length) {
+      throw new ServiceUnavailableException('No se pudo verificar el efecto operativo de los comprobantes demo; reintente');
+    }
+    const documents = new Map<string, any>(result.data.map((row: any) => [row.id, row]));
+    for (const row of drafts) {
+      const document = documents.get(row.documento_id);
+      if (!document || document.tenant_id !== tenantId) throw new ServiceUnavailableException('Documento demo incompleto; reintente');
+      row.demoEffectConfirmed = ['EMITIDO', 'ACEPTADO'].includes(String(document.estado).toUpperCase())
+        && this.moneda(document.moneda) === this.moneda(row.moneda)
+        && this.importe(document.total).equals(this.importe(row.total_venta ?? row.total))
+        && !['PENDING_FISCAL_ACCEPTANCE', 'REJECTED_NO_FINANCIAL_EFFECT'].includes(document.metadata?.financial_effect_status);
+    }
   }
 
   private async getInventarioActual(client: any, tenantId: string): Promise<InventarioMetrics> {

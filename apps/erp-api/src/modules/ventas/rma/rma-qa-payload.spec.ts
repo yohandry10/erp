@@ -6,12 +6,14 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { RmaService } from './rma.service';
+import { CacheInvalidationService } from '../../../shared/cache/cache-invalidation.service';
 
 describe('RmaService - guards de aplicación 456', () => {
   const build = async (rpc: jest.Mock) => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RmaService,
+        { provide: CacheInvalidationService, useValue: { onCpeCreated: jest.fn().mockResolvedValue(undefined) } },
         { provide: SupabaseService, useValue: { getClient: () => ({ rpc }) } },
       ],
     }).compile();

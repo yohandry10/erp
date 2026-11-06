@@ -399,11 +399,11 @@ export default function CotizacionForm({
                     </label>
                     <Input aria-label="Cantidad"
                       type="number"
-                      min="1"
-                      step="1"
-                      value={item.cantidad}
+                      min="0.01"
+                      step="0.01"
+                      value={item.cantidad || ''}
                       onChange={(e) =>
-                        handleCantidadChange(index, Math.max(1, parseInt(e.target.value || '0', 10)))
+                        handleCantidadChange(index, Number(e.target.value))
                       }
                       disabled={disabled}
                     />

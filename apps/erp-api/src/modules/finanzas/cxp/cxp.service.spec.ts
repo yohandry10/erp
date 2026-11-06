@@ -80,6 +80,19 @@ describe('CxpService', () => {
     const tenantId = 'tenant-123';
     const userId = 'user-456';
 
+    it('B-09 conserva el rechazo transaccional por período cerrado con código accionable', async () => {
+      mockSupabaseClient.single.mockResolvedValueOnce({ data: { id: 'prov-001' }, error: null });
+      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
+      mockSupabaseClient.rpc.mockResolvedValueOnce({ data: null, error: {
+        code: '55000', message: 'ACCOUNTING_PERIOD_NOT_OPEN:2026-11:CERRADO',
+      } });
+      await expect(service.crearCuentaPorPagar(tenantId, {
+        proveedor_id: 'prov-001', numero_documento: 'B09-118', fecha_emision: '2026-11-05',
+        subtotal: 1, igv: 0.18, total: 1.18,
+      }, userId)).rejects.toThrow('SUPPLIER_INVOICE_PERIOD_NOT_OPEN');
+      expect(eventBusService.emitFacturaProveedorRegistrada).not.toHaveBeenCalled();
+    });
+
     it('impide que una NC sin ajuste soportado cree otra deuda de proveedor', async () => {
       await expect(service.crearCuentaPorPagar(tenantId, {
         proveedor_id: 'prov-001', numero_documento: 'FC01-20', fecha_emision: '2026-10-07',

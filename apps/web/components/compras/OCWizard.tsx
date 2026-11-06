@@ -12,6 +12,7 @@ import { Proveedor } from '@/types/compras'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 import { cn } from '@/lib/utils'
 import { parseDateLocal } from '@/lib/date-utils'
+import { fiscalDateForCountry } from '@/lib/fiscal-date'
 import { multiplicarMoneda, redondearMoneda } from '@/lib/format-utils'
 import { isPurchaseQuantity, isPurchaseUnitPrice } from '@/lib/compras/quantity'
 import type { PurchaseOrderCreateExpectation, PurchaseOrderCreatePayload } from '@/lib/compras/purchase-order-create-operation'
@@ -85,7 +86,7 @@ export function OCWizard({
     defaultValues: {
       numero: `OC-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,
       proveedor_id: '',
-      fecha_orden: new Date().toISOString().split('T')[0],
+      fecha_orden: fiscalDateForCountry(country.paisCodigo),
       fecha_entrega_esperada: '',
       condiciones_pago: '',
       dias_credito: 0,

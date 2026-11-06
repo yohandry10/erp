@@ -8,6 +8,7 @@ import { usePermission } from '@/hooks/use-permission'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { useAuth } from '@/contexts/AuthContext'
 import { sameInventoryOperationReceipt } from '@/lib/inventory-operation-identity'
+import { archiveInventoryConfirmation, readInventoryArchivedReceipt } from '@/lib/inventory-operation-archive'
 import { inventoryOriginalResolutionEndpoint, inventoryOriginalResolutionRequest, readInventoryOriginalResolution, sameInventoryOriginalResolution } from '@/lib/inventory-operation-resolution'
 import { readInventoryProducts, readInventoryWarehouses, readInventoryGuides, readInventoryIntent, inventoryOriginalReceiptEndpoint, readAdjustmentConfirmation, readTransferConfirmation, type InventoryProduct, type InventoryWarehouse, type InventoryIntent, type AdjustmentIntent, type TransferIntent } from '@/lib/inventory-operation-contract'
 
@@ -118,6 +119,32 @@ export default function OperacionesInventarioPage() {
     return () => { operationGeneration.current += 1 }
   }, [scope, authLoading])
 
+  useEffect(() => {
+    if (!scope || !pending) return
+    const owner = { tenantId: session?.user?.tenant_id || '', actorId: session?.user?.id || '' }
+    const generation = operationGeneration.current
+    let disposed = false
+    const reconcile = async () => {
+      try {
+        if (activeScope.current !== scope || localStorage.getItem(`erp.inventory-operation-intent.${scope}`) !== null) return
+        const archived = readInventoryArchivedReceipt(localStorage, pending, owner)
+        if (!archived) return
+        const response = await get(inventoryOriginalReceiptEndpoint(pending))
+        const confirmed = pending.mode === 'ajuste' ? readAdjustmentConfirmation(response, pending.payload, owner) : readTransferConfirmation(response, pending.payload, owner)
+        if (disposed || !confirmed.idempotent || !sameInventoryOperationReceipt(archived, confirmed)
+          || operationGeneration.current !== generation || activeScope.current !== scope
+          || localStorage.getItem(`erp.inventory-operation-intent.${scope}`) !== null) return
+        setIntentState({ scope, intent: null, error: null })
+        setError(null)
+        setSuccess('La operación fue confirmada en otra pestaña. Su recibo original quedó conservado.')
+      } catch { /* Un archivo incompleto o ajeno nunca libera la intención. */ }
+    }
+    const onStorage = () => { void reconcile() }
+    window.addEventListener('storage', onStorage)
+    void reconcile()
+    return () => { disposed = true; window.removeEventListener('storage', onStorage) }
+  }, [scope, pending, get, session?.user?.tenant_id, session?.user?.id])
+
   const cargarCatalogos = useCallback(async () => {
     const generation = ++catalogGeneration.current
     setCatalog({ scope, productos: [], almacenes: [], loading: true, error: null })
@@ -156,9 +183,13 @@ export default function OperacionesInventarioPage() {
     const raw=JSON.stringify(intent)
     try {
       const previous=localStorage.getItem(storageKey)
-      if((readOnly && previous!==raw) || (previous!==null && previous!==raw))throw new Error('El intento original cambió')
-      localStorage.setItem(storageKey,raw)
-      if(localStorage.getItem(storageKey)!==raw)throw new Error('No se conservó el intento original')
+      if(previous!==null && previous!==raw)throw new Error('El intento original cambió')
+      // Consultar un recibo no recrea el pendiente que otra pestaña ya resolvió.
+      if (!readOnly && previous === null && pending && readInventoryArchivedReceipt(localStorage, intent, requestOwner)) readOnly = true
+      if (!readOnly) {
+        localStorage.setItem(storageKey,raw)
+        if(localStorage.getItem(storageKey)!==raw)throw new Error('No se conservó el intento original')
+      }
     }
     catch { setError('No se pudo conservar el intento. Reintenta antes de confirmar.'); return }
     submittingRef.current = true
@@ -171,19 +202,7 @@ export default function OperacionesInventarioPage() {
       const result = intent.mode === 'ajuste' ? readAdjustmentConfirmation(response, intent.payload,requestOwner) : readTransferConfirmation(response, intent.payload,requestOwner)
       if(readOnly && result.idempotent!==true)throw new Error('La consulta no confirmó el recibo original recuperado')
       if (generation !== operationGeneration.current || activeScope.current !== requestScope) return
-      if(localStorage.getItem(storageKey)!==raw)throw new Error('El intento cambió durante la confirmación')
-      const archiveKey=`erp.inventory-operation-resolved.${requestScope}.${intent.payload.idempotency_key}`
-      const archive=JSON.stringify({version:1,scope:requestScope,intent,receipt:result}),previous=localStorage.getItem(archiveKey)
-      if(previous!==null){
-        const saved=JSON.parse(previous)
-        if(intent.mode==='ajuste')readAdjustmentConfirmation({success:true,data:saved.receipt},intent.payload,requestOwner)
-        else readTransferConfirmation({success:true,data:saved.receipt},intent.payload,requestOwner)
-        if(saved.version!==1 || saved.scope!==requestScope || JSON.stringify(saved.intent)!==raw || !sameInventoryOperationReceipt(saved.receipt,result))throw new Error('El archivo del recibo no coincide')
-      }else localStorage.setItem(archiveKey,archive)
-      if(localStorage.getItem(archiveKey)!==(previous??archive))throw new Error('No se conservó el recibo completo')
-      if(generation!==operationGeneration.current || activeScope.current!==requestScope || localStorage.getItem(storageKey)!==raw)return
-      localStorage.removeItem(storageKey)
-      if(localStorage.getItem(storageKey)!==null)throw new Error('No se retiró el intento confirmado')
+      archiveInventoryConfirmation(localStorage, intent, result, requestOwner)
       setIntentState({ scope: requestScope, intent: null, error: null })
       if (intent.mode === 'ajuste') {
         const row = result as ReturnType<typeof readAdjustmentConfirmation>

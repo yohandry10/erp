@@ -30,7 +30,8 @@ Object.assign(process.env, {
   AUTH_SIGNATURE_SECRET: 'local-api-signature-key-20260905-never-production',
   REDIS_REQUIRED: 'false', BACKGROUND_JOBS_ENABLED: 'false',
   OUTBOX_WORKER_CRON_ENABLED: 'false', ACCOUNTING_OUTBOX_WORKER_CRON_ENABLED: process.argv.includes('--automatic-accounting') ? 'true' : 'false',
-  DEMO_API_ENABLED: 'false', LOG_LEVEL: 'warn',
+  // Opt-in exclusivo del arnés efímero, ya protegido por loopback y bloqueo de transporte externo.
+  DEMO_API_ENABLED: process.argv.includes('--demo-api') ? 'true' : 'false', LOG_LEVEL: 'warn',
 });
 // Con un buzón SMTP local (scripts/ci/peru-local-smtp-sink.mjs) el correo queda
 // activo como en el runtime: EMAIL_DISABLED sin definir y sin TLS ni AUTH.
@@ -131,9 +132,14 @@ async function main() {
         const outbox = moduleRef.get(OutboxEventsService);
         const claim = outbox.reclamarEventosContables.bind(outbox);
         let claimed = -1;
+        const claimedIds = new Map<string, string>();
         // Observa los claims reales; no cambia el límite ni devuelve eventos ficticios.
         outbox.reclamarEventosContables = async (...args) => {
           const events = await claim(...args);
+          for (const event of events) {
+            if (!event.tenant_id) throw new Error('Claim contable local sin empresa');
+            claimedIds.set(event.id, event.tenant_id);
+          }
           claimed = events.length;
           process.stdout.write(`LOCAL_ACCOUNTING_CLAIMED ${claimed}\n`);
           return events;
@@ -145,6 +151,22 @@ async function main() {
           if (claimed < 0) throw new Error('No se pudo observar un claim contable local');
           if (batch === 19) throw new Error('La cola contable local superó veinte lotes reales');
         }
+        // No claimable puede significar fallido con reintento futuro. El éxito
+        // exige que todo lo reclamado en esta ejecución esté realmente procesado.
+        for (const tenantId of new Set(claimedIds.values())) {
+          const ids = [...claimedIds].filter(([, tenant]) => tenant === tenantId).map(([id]) => id);
+          for (let offset = 0; offset < ids.length; offset += 100) {
+            const batch = ids.slice(offset, offset + 100);
+            const { data, error } = await moduleRef.get(TenantContextService).run({ tenantId }, async () =>
+              await moduleRef.get(SupabaseService).getClient().from('outbox_events')
+                .select('id,status,processed_at').eq('tenant_id', tenantId).in('id', batch));
+            if (error || data?.length !== batch.length
+              || data.some(event => event.status !== 'completed' || !event.processed_at)) {
+              throw new Error('El lote contable local contiene eventos sin procesar o no verificables');
+            }
+          }
+        }
+        process.stdout.write(`LOCAL_ACCOUNTING_COMPLETED_VERIFIED ${claimedIds.size}\n`);
       } else {
         await accounting.procesarEventosPendientes();
       }

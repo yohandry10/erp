@@ -179,6 +179,10 @@ BEGIN
   SELECT id INTO v_cxp_bank FROM public.cuentas_por_pagar WHERE tenant_id=v_tenant AND numero_documento='FP-452-BANK';
   SELECT id INTO v_cxp_cash FROM public.cuentas_por_pagar WHERE tenant_id=v_tenant AND numero_documento='FP-452-CASH';
   SELECT id INTO v_cxp_fx FROM public.cuentas_por_pagar WHERE tenant_id=v_tenant AND numero_documento='FP-452-FX';
+  -- Este saldo unitario se inserta sin factura/evento: apertura explícita.
+  -- Conserva importes, TC y expectativas del contrato452; no fabrica un origen.
+  UPDATE public.cuentas_por_pagar SET metadata=coalesce(metadata,'{}'::jsonb)||jsonb_build_object('origen','migracion_apertura')
+  WHERE tenant_id=v_tenant AND id=v_cxp_fx;
   SELECT id INTO v_cxp_batch_1 FROM public.cuentas_por_pagar WHERE tenant_id=v_tenant AND numero_documento='FP-452-B1';
   SELECT id INTO v_cxp_batch_2 FROM public.cuentas_por_pagar WHERE tenant_id=v_tenant AND numero_documento='FP-452-B2';
   SELECT id INTO v_cxp_batch_bad FROM public.cuentas_por_pagar WHERE tenant_id=v_tenant AND numero_documento='FP-452-BAD';

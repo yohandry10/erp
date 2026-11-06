@@ -6,6 +6,7 @@ import { useApi } from '@/hooks/use-api'
 import { useToast } from '@/components/ui/use-toast'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { multiplicarMoneda } from '@/lib/format-utils'
+import { fiscalDateForCountry } from '@/lib/fiscal-date'
 
 interface OrdenCompraModalProps {
   isOpen: boolean
@@ -52,7 +53,7 @@ export default function OrdenCompraModal({
   const [formData, setFormData] = useState({
     numero: '',
     proveedor_id: '',
-    fecha_orden: new Date().toISOString().split('T')[0],
+    fecha_orden: fiscalDateForCountry(country.paisCodigo),
     fecha_entrega: '',
     moneda: defaultCurrency,
     subtotal: 0,
@@ -199,7 +200,7 @@ export default function OrdenCompraModal({
       if (orden) {
         loadOrdenData()
       } else {
-        setFormData({ numero: '', proveedor_id: '', fecha_orden: new Date().toISOString().split('T')[0], fecha_entrega: '', moneda: defaultCurrency, subtotal: 0, igv: 0, total: 0, estado: 'PENDIENTE', observaciones: '' })
+        setFormData({ numero: '', proveedor_id: '', fecha_orden: fiscalDateForCountry(country.paisCodigo), fecha_entrega: '', moneda: defaultCurrency, subtotal: 0, igv: 0, total: 0, estado: 'PENDIENTE', observaciones: '' })
         setItems([])
         addItem()
         generateNumeroOrden()
@@ -306,7 +307,7 @@ export default function OrdenCompraModal({
     setFormData({
       numero: '',
       proveedor_id: '',
-      fecha_orden: new Date().toISOString().split('T')[0],
+      fecha_orden: fiscalDateForCountry(country.paisCodigo),
       fecha_entrega: '',
       moneda: defaultCurrency,
       subtotal: 0,
@@ -322,7 +323,7 @@ export default function OrdenCompraModal({
 
   return (
     <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] flex items-center justify-center z-[1100]">
-      <div className="bg-card rounded-xl p-8 w-[95%] max-w-[1200px] max-h-[90dvh] overflow-auto shadow">
+      <div className="min-w-0 bg-card rounded-xl p-4 sm:p-8 w-[95%] max-w-[1200px] max-h-[90dvh] overflow-y-auto shadow">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-semibold text-foreground">
             {orden ? 'Editar Orden de Compra' : 'Nueva Orden de Compra'}
@@ -343,7 +344,7 @@ export default function OrdenCompraModal({
         <form onSubmit={handleSubmit}>
           {submitError && <div ref={submitErrorRef} role="alert" className="mb-4 rounded-md border border-red-500/50 bg-red-500/10 p-3 text-sm">{submitError}</div>}
           {/* Información básica */}
-          <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4 mb-6">
+          <div className="grid min-w-0 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0 gap-4 mb-6">
             <div>
               <label htmlFor="orden-compra-modal-numero" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Número de Orden
@@ -359,11 +360,11 @@ export default function OrdenCompraModal({
               <label htmlFor="orden-compra-modal-proveedor-id" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Proveedor *
               </label>
-              <div className="flex gap-2">
+              <div className="flex min-w-0 gap-2">
                 <select id="orden-compra-modal-proveedor-id"
                   value={formData.proveedor_id}
                   onChange={(e) => setFormData({...formData, proveedor_id: e.target.value})}
-                  required className="flex-[1] p-2 border rounded-md bg-card"
+                  required className="min-w-0 w-0 flex-1 p-2 border rounded-md bg-card"
                 >
                   <option value="">Seleccionar proveedor</option>
                   {proveedores.map((proveedor: any) => (
@@ -443,8 +444,8 @@ export default function OrdenCompraModal({
               </button>
             </div>
 
-            <div className="border rounded-lg overflow-hidden">
-              <table className="w-[100%]">
+            <div className="max-w-full overflow-x-auto rounded-lg border" role="region" aria-label="Productos de la orden, tabla desplazable" tabIndex={0}>
+              <table className="w-full min-w-[720px]">
                 <thead className="bg-muted">
                   <tr>
                     <th className="p-3 text-left text-[0.875rem] font-medium text-foreground/85">Producto</th>
@@ -570,7 +571,7 @@ export default function OrdenCompraModal({
           </div>
 
           {/* Botones */}
-          <div className="flex justify-end gap-3 pt-6 border-t">
+          <div className="flex flex-wrap justify-end gap-3 pt-6 border-t [&>button]:min-h-11">
             <button
               type="button"
               onClick={onClose} className="py-2 px-4 border rounded-md bg-card text-foreground/85 cursor-pointer text-[0.875rem] font-medium"

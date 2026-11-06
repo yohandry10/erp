@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { parseDateLocal } from '@/lib/date-utils'
 import { DistribucionAnaliticaPanel } from '@/components/contabilidad/DistribucionAnaliticaPanel'
+import { journalPrintContext } from '@/lib/contabilidad/journal-print-context'
 
 interface DetalleAsiento {
   id: string
@@ -58,6 +59,7 @@ export default function AsientoDetallePage() {
   const router = useRouter()
   const params = useParams()
   const { get, post, del } = useApi()
+  const { get: getPrintContext } = useApi({ requireLive: true, throwOnError: true, showErrorToast: false, retries: 0 })
   const country = useCountryContext()
   const asientoId = params.id as string | undefined
 
@@ -130,36 +132,54 @@ export default function AsientoDetallePage() {
 
   const descargarPdf = async () => {
     if (!asiento) return
+    setAccionEnCurso('pdf')
+    setAccionError(null)
+    try {
+      const context = journalPrintContext(await getPrintContext('/api/configuration/context/country'), asiento.tenant_id)
+      const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable'),
+      ])
+      const doc = new jsPDF()
+      const companyLines = doc.setFontSize(11).splitTextToSize(context.company, 180)
+      doc.text(companyLines, 14, 16)
+      const headerEnd = 16 + companyLines.length * 5
+      doc.setFontSize(9)
+      doc.text(`Moneda: ${context.currency}${context.demo ? ' | MUESTRA DEMO - SIN VALIDEZ FISCAL' : ''}`, 14, headerEnd)
+      const titleY = headerEnd + 10
+      doc.setFontSize(16)
+      doc.text(`Asiento contable ${asiento.numero_asiento}`, 14, titleY)
+      doc.setFontSize(10)
+      doc.text(`Fecha: ${formatDate(asiento.fecha)}`, 14, titleY + 9)
+      doc.text(`Estado: ${asiento.estado}`, 14, titleY + 15)
+      const conceptLines = doc.splitTextToSize(`Concepto: ${asiento.concepto || '-'}`, 180)
+      doc.text(conceptLines, 14, titleY + 21)
+      let tableY = titleY + 26 + conceptLines.length * 5
+      if (asiento.referencia) {
+        const referenceLines = doc.splitTextToSize(`Referencia: ${asiento.referencia}`, 180)
+        doc.text(referenceLines, 14, tableY)
+        tableY += referenceLines.length * 5 + 4
+      }
 
-    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
-      import('jspdf'),
-      import('jspdf-autotable'),
-    ])
-    const doc = new jsPDF()
-    doc.setFontSize(16)
-    doc.text(`Asiento contable ${asiento.numero_asiento}`, 14, 18)
-    doc.setFontSize(10)
-    doc.text(`Fecha: ${formatDate(asiento.fecha)}`, 14, 27)
-    doc.text(`Estado: ${asiento.estado}`, 14, 33)
-    doc.text(`Concepto: ${asiento.concepto || '-'}`, 14, 39, { maxWidth: 180 })
-    if (asiento.referencia) doc.text(`Referencia: ${asiento.referencia}`, 14, 49)
+      autoTable(doc, {
+        startY: tableY,
+        head: [['Cuenta', 'Nombre', 'Concepto', 'Debe', 'Haber']],
+        body: (asiento.detalles || []).map((detalle) => [
+          detalle.cuenta_codigo,
+          detalle.cuenta_nombre,
+          detalle.concepto || '',
+          Number(detalle.debe || 0).toFixed(2),
+          Number(detalle.haber || 0).toFixed(2),
+        ]),
+        foot: [['', '', 'Totales', Number(asiento.total_debe || 0).toFixed(2), Number(asiento.total_haber || 0).toFixed(2)]],
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [37, 99, 235] },
+      })
 
-    autoTable(doc, {
-      startY: asiento.referencia ? 56 : 49,
-      head: [['Cuenta', 'Nombre', 'Concepto', 'Debe', 'Haber']],
-      body: (asiento.detalles || []).map((detalle) => [
-        detalle.cuenta_codigo,
-        detalle.cuenta_nombre,
-        detalle.concepto || '',
-        Number(detalle.debe || 0).toFixed(2),
-        Number(detalle.haber || 0).toFixed(2),
-      ]),
-      foot: [['', '', 'Totales', Number(asiento.total_debe || 0).toFixed(2), Number(asiento.total_haber || 0).toFixed(2)]],
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [37, 99, 235] },
-    })
-
-    doc.save(`asiento-${String(asiento.numero_asiento).replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`)
+      doc.save(`asiento-${String(asiento.numero_asiento).replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`)
+    } catch (cause) {
+      setAccionError(cause instanceof Error ? cause.message : 'No se pudo generar el PDF del asiento. Reintenta la descarga.')
+    } finally { setAccionEnCurso(null) }
   }
 
   const cerrarPanelAccion = () => {
@@ -382,6 +402,7 @@ export default function AsientoDetallePage() {
               <Button
                 type="button"
                 onClick={descargarPdf}
+                disabled={accionEnCurso !== null}
                 className="gap-2 bg-blue-600 text-white hover:bg-blue-500"
               >
                 <Download className="h-4 w-4" />

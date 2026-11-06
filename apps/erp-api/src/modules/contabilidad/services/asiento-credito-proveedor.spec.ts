@@ -39,6 +39,32 @@ describe('Crédito proveedor: distribución financiera y valor en libros', () =>
     assertBalanced();
   });
 
+  const note607 = {
+    ...base, tipoEvento: 'nota_credito.proveedor.registrada', tipoCambio: 3.8,
+    subtotal: .01, igv: 0, total: .01, deudaReducida: 0, creditoCreado: .01,
+    noteValuationVersion: 607, monedaLocal: 'PEN', subtotalLocal: .03, igvLocal: 0,
+    totalLocal: .03, deudaReducidaLocal: 0, creditoCreadoLocal: .03,
+  };
+
+  it('D39 contabiliza el céntimo asignado desde el origen sin reconvertir la nota', async () => {
+    await service.generarAsientoCreditoProveedor(note607);
+    expect(lines()).toEqual([
+      expect.objectContaining({ cuenta_id: 'pc-422', debe: .03, haber: 0 }),
+      expect.objectContaining({ cuenta_id: 'pc-63', debe: 0, haber: .03 }),
+    ]);
+    assertBalanced();
+  });
+
+  it.each([
+    { subtotalLocal: undefined }, { creditoCreadoLocal: .04 }, { igvLocal: -.01 },
+    { totalLocal: .035 }, { deudaReducidaLocal: Infinity }, { noteValuationVersion: 999 },
+    { monedaLocal: undefined }, { subtotalLocal: '0.03' },
+    { creditoCreado: .02 }, { subtotal: .015 },
+  ])('rechaza NC607 con snapshot incompleto o alterado: %j', async change => {
+    await expect(service.generarAsientoCreditoProveedor({ ...note607, ...change })).rejects.toThrow('Snapshot');
+    expect(write).not.toHaveBeenCalled();
+  });
+
   it.each([[3.9, 'pc-776', 0, 10], [3.7, 'pc-676', 10, 0]])(
     'aplica crédito con TC original 3.8 y factura TC %s, contabilizando sólo su diferencia',
     async (targetRate, fxAccount, debit, credit) => {
@@ -51,6 +77,35 @@ describe('Crédito proveedor: distribución financiera y valor en libros', () =>
       assertBalanced();
     },
   );
+
+  it('D38 conserva el último céntimo del crédito y la CxP según el snapshot606', async () => {
+    await service.generarAsientoCreditoProveedor({ ...base, tipoEvento: 'credito.proveedor.aplicado',
+      monto: .01, tipoCambioCredito: 3.8, tipoCambioFactura: 3.8, creditValuationVersion: 606,
+      montoCreditoLocal: .03, montoDestinoLocal: .03 });
+    expect(lines()).toEqual([
+      expect.objectContaining({ cuenta_id: 'pc-42', debe: .03, haber: 0 }),
+      expect.objectContaining({ cuenta_id: 'pc-422', debe: 0, haber: .03 }),
+    ]);
+    assertBalanced();
+  });
+
+  it('D38 ajusta liquidación0.04 contra el último valor0.03 reembolsado', async () => {
+    await service.generarAsientoCreditoProveedor({ ...base, tipoEvento: 'credito.proveedor.reembolsado',
+      monto: .01, tipoCambioCredito: 3.8, tipoCambioLiquidacion: 3.8, creditValuationVersion: 606,
+      montoCreditoLocal: .03, montoDestinoLocal: .04 });
+    expect(lines()).toEqual([
+      expect.objectContaining({ cuenta_id: 'pc-422', debe: .01, haber: 0 }),
+      expect.objectContaining({ cuenta_id: 'pc-776', debe: 0, haber: .01 }),
+    ]);
+    assertBalanced();
+  });
+
+  it.each([undefined, -.01, Infinity, .005])('rechaza snapshot606 incompleto o inválido: %s', async value => {
+    await expect(service.generarAsientoCreditoProveedor({ ...base, tipoEvento: 'credito.proveedor.aplicado',
+      monto: .01, creditValuationVersion: 606, montoCreditoLocal: value, montoDestinoLocal: .03 }))
+      .rejects.toThrow('Snapshot');
+    expect(write).not.toHaveBeenCalled();
+  });
 
   it('reembolso sin diferencia deja banco/422 exclusivamente al evento bancario existente', async () => {
     expect(await service.generarAsientoCreditoProveedor({ ...base, tipoEvento: 'credito.proveedor.reembolsado',

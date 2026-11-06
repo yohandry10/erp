@@ -28,7 +28,7 @@ function StatusPill({ children, active = false }: { children: React.ReactNode; a
 export const renderRegistroCompras = (registroCompras: any, loading: boolean, formatearMoneda: Function, formatearFecha: Function, exportarExcel: Function) => {
   if (loading) return <LoadingPanel label="Cargando Registro de Compras..." />
 
-  if (!registroCompras || !registroCompras.compras.length) {
+  if (!registroCompras) {
     return <div className={emptyClass}>No hay compras registradas en el periodo seleccionado.</div>
   }
 
@@ -48,6 +48,8 @@ export const renderRegistroCompras = (registroCompras: any, loading: boolean, fo
           Exportar Excel
         </button>
       </div>
+
+      {!registroCompras.compras.length && <p className="mb-5 text-sm text-muted-foreground">No hay compras registradas en el periodo seleccionado. Puedes exportar el registro con sus encabezados.</p>}
 
       {!moneda && (registroCompras.resumenPorMoneda || []).map((resumen: any) => (
         <p key={resumen.moneda} className="mb-3 text-sm text-foreground">

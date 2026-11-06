@@ -241,6 +241,13 @@ La proyección pública del CPE entrega el IGV de cada línea en centavos, igual
 que XML/PDF, también para comprobantes históricos que conservan el cálculo
 intermedio con más decimales. No reescribe el documento ni sus importes contables;
 la interfaz sigue contrastando suma de líneas, cabecera y pedido antes de confirmar.
+En nuevas facturas de pedidos Perú, los centavos del IGV comercial de cabecera
+se distribuyen entre las líneas gravadas por mayor resto, con desempate por el
+orden del snapshot. No se cobra impuesto a líneas exoneradas, inafectas ni de
+exportación. Si el total impide mantener el importe positivo exigido por SUNAT3111,
+se rechaza antes de emitir. La tasa persiste por línea y la vista A4 usa esa tasa
+o el perfil histórico del país, nunca el cociente de importes ya redondeados.
+No se reescriben CPE anteriores. La aceptación fiscal externa sigue siendo un gate propio.
 El POST no entra a la cola genérica JS/Rust. El servidor deriva su propia clave;
 el CPE público no expone sus claves/huellas/vínculos internos, por lo que la UI
 no acredita una comprobación criptográfica. La emisión fiscal sigue dependiendo
@@ -509,6 +516,29 @@ Cotización -> Pedido -> Reserva -> Despacho -> Documento/CPE -> Cobro -> Asient
 - La nota de crédito reduce la cuenta por cobrar hasta cero y lleva el exceso a
   saldo a favor del cliente (cuenta 122). Ese pasivo puede aplicarse a una CxC
   futura o reembolsarse por una caja/sesión o cuenta bancaria explícita.
+- En Perú, las nuevas NC RMA distribuyen por línea el importe acumulado de las
+  cantidades devueltas, descontando lo acreditado. La suma de base, IGV, ISC y
+  total no puede superar la línea original. El lock del documento origen
+  serializa distintas RMA; las notas previas incoherentes y las facturas cuya
+  cabecera no concilia con sus líneas exigen revisión, sin reescritura histórica.
+  La596 valida importes en moneda documental. La597 distribuye la conversión
+  acumulada por mayor resto, con límites de las partidas70/40 del asiento original;
+  una valuación histórica que no concilia exige revisión. La CxC conserva su
+  conversión acumulada al tipo de origen y el resto va al saldo a favor durable.
+  Los importes funcionales de ese saldo se usan en su liquidación completa.
+- El asiento de NC omite componentes monetarios cero y sólo consulta las cuentas
+  correspondientes a sus componentes positivos. Una NC sin IGV o sin base puede
+  contabilizarse sin enviar detalles debe0/haber0 al writer transaccional.
+- `factura.emitida` de `cpe.api.atomic` congela importes documentales y tipoCambio.
+  Contabilidad los convierte a moneda funcional con decimales exactos y asigna el
+  residuo entre base e impuesto, conservando el total convertido. El costo de
+  inventario ya está valorado en moneda funcional y no vuelve a convertirse.
+  Un snapshot de moneda/tipo/importes no verificable falla antes de generar asiento.
+  Retención, percepción, detracción, anticipo y deuda se convierten con el mismo
+  tipo congelado. Si sus importes redondeados no cuadran, la emisión atómica PE
+  responde400 antes del writer; el replay tampoco crea un asiento incompatible.
+  No se añade una diferencia cambiaria inventada para absorber el descuadre.
+  Una factura cubierta por anticipo omite el detalle de clientes cero.
 - `nota_credito.emitida`, `saldo_favor.aplicado` y
   `saldo_favor.reembolsado` son los únicos dueños contables de esas operaciones;
   la recepción física no vuelve a contabilizar el inventario.
@@ -1774,10 +1804,83 @@ y los estados desconocidos siguen invalidando la respuesta completa.
   propios; sin PVS/SUNAT ni aceptación global.
 
 - CxC y CxP gestionan saldo, vencimiento, pagos y estados.
+- En CxP, los pagos en divisa consumen el valor de origen acumulado del pasivo.
+  La601 contrasta factura, snapshot y pagos anteriores bancarios/de efectivo;
+  una traza incompatible exige revisión antes de mover deuda o tesorería.
+  Puede proyectar un origen todavía pendiente de asiento desde su snapshot
+  validado. Conserva liquidación y diferencia cambiaria sin reescribir históricos.
+  Las aperturas marcadas conservan importe/TC originales; cambios no reconocidos
+  de deuda por crédito, ajustes u otras historias mantienen revisión propia.
+- En CxC, los cobros en divisa consumen el valor contable acumulado del origen,
+  compartiendo los céntimos con los ajustes y las NC RMA. Cancelar la deuda no
+  deja residuo en clientes por redondear cada pago de forma independiente.
+  Se contrasta la traza documental/contable; una historia incompatible o sin
+  evidencia reconocida se rechaza antes de mover deuda o tesorería. No se
+  reescriben cobros históricos. El contrato de apertura conserva su importe y
+  tipo originales, sin fabricar un CPE ni un asiento de origen.
+  Mientras la factura atómica sigue pendiente en outbox se utiliza su snapshot
+  verificado, sin exigir que el consumidor haya terminado; un asiento existente
+  incompatible nunca se sustituye por esa proyección.
+- Las aplicaciones de saldo a favor consumen el valor acumulado de la CxC de
+  destino, compartido con cobros y NC. La603 contrasta movimiento, operación,
+  evento durable y asiento confirmado o pendiente; conserva por separado el
+  pasivo del crédito y su diferencia de cambio. Un cobro posterior reconoce
+  esas aplicaciones previas. Historias incompatibles exigen revisión, sin
+  backfill. La604 aplica el valor proporcional verificable del banco a cada
+  reembolso en divisa, mantiene liquidación/tasa y pasivo separados y revierte
+  el valor originalmente registrado. Exige traza de crédito/operación/evento y
+  asiento confirmado o snapshot pendiente compatible. Caja tiene aceptación
+  propia pendiente; no reconstruye bancos históricos ni aperturas desconocidas.
 - Las consultas de CxP, bancos y tesorería responden 503 cuando no pueden leer,
   nunca 400. Editar o anular una CxP inexistente o de otra empresa responde 404;
   una regla del writer (pagada, anulada, con pagos) responde 400. El pago en
   lote se aplica una vez por llave y rechaza el exceso sin tocar la deuda.
+- La moneda contable de tesorería sigue el país de la empresa: PE/PEN, AR/ARS
+  y CO/COP. Cambiar la moneda comercial predeterminada no cambia ese perfil
+  ni revaloriza documentos, cobros o pagos anteriores. La599 alinea el helper
+  SQL con este contrato; no migra históricos ni certifica cambios de país con cartera.
+- Al agotar un banco extranjero con un pago de proveedor, se consume su valor
+  contable verificable además de registrar la liquidación y su diferencia de cambio.
+  No se permite dejar valor en el mayor de una cuenta con saldo nativo cero.
+  La600 conserva la traza atómica aun si los cobros siguen pendientes de asiento.
+  Aperturas no demostradas, mayores compartidos u otros movimientos sin traza
+  compatible requieren revisión antes del pago; no se reescribe su historia.
+- El cobro efectivo explícito en Perú usa Caja10111. La reversa CxC canónica
+  toma la cuenta del asiento original confirmado, incluida una cuenta histórica
+  distinta; sin asiento verificable espera revisión, sin reinterpretar el cobro.
+  La602 consume el valor demostrable de la sesión al agotarse el efectivo en
+  divisa con un pago de proveedor. Conserva liquidación, pasivo y diferencias
+  de cambio por separado; no consume el valor de otra caja que comparte el mayor.
+  Requiere apertura cero y traza atómica CxC/CxP, con snapshots pendientes o
+  asientos confirmados conciliados. Aperturas, POS u otros escritores dentro
+  de esa sesión e historias incompatibles requieren revisión antes del pago.
+  Sin backfill ni aceptación completa de las reversas fiscales por esta corrección.
+- La605 conserva cuenta operativa y valor proporcional de la sesión en reembolsos
+  de saldo a favor por caja. La reversa de esos eventos repone el valor original
+  en la misma sesión; exige la traza de crédito, operación, evento y asiento o
+  snapshot pendiente. Los eventos anteriores conservan su contrato contable.
+  El valor de otras sesiones no se consume. Aperturas desconocidas, POS dentro
+  de la misma sesión u otros escritores sin traza compatible requieren revisión.
+- La606 conserva el valor acumulado al aplicar o reembolsar crédito de proveedor.
+  Comparte la reducción de CxP con pagos anteriores/posteriores. Movimiento,
+  solicitud, huella, recibo, evento y asiento o snapshot pendiente deben conciliar;
+  el registro de crédito permanece inmutable. Liquidación bancaria y ajuste del
+  crédito se contabilizan por separado sin duplicar banco. No se reescriben
+  consumos históricos.
+- La607 distribuye las NC de proveedor en divisa desde el valor de la factura,
+  compartiendo la reducción de deuda con pagos anteriores y posteriores. Congela
+  base, impuesto, deuda y crédito en el evento; exige solicitud, recibo y asiento
+  o snapshot pendiente verificables. Los créditos nuevos consumen su valor
+  asignado de forma proporcional, multiplicando antes de dividir. La moneda
+  funcional conserva importes nativos y ajustes tributarios. Ajustes fiscales
+  posteriores en divisa, devoluciones vinculadas y otras historias sin traza
+  aceptada requieren revisión. No se reescriben documentos ni asientos históricos.
+- La608 admite reembolsos de proveedor al reconstruir el valor de un banco en
+  divisa. Exige movimiento de crédito606, solicitud y recibo bancario457,
+  huellas, actor, cuenta y evento compatibles; valida el asiento o snapshot
+  pendiente. Conserva las restricciones de apertura cero, mayor exclusivo y
+  fuentes conocidas. No modifica metadatos históricos ni admite abonos manuales
+  genéricos sin la traza de reembolso.
 - El alta de factura de proveedor conserva destino del crédito fiscal, código
   de detracción y tipo de cambio de origen dentro de la transacción de deuda y
   outbox. Repetir la misma intención devuelve la factura existente; cambiar
@@ -2506,6 +2609,8 @@ variantes. NO_GO global.
   una referencia ausente o ajena bloquea la descarga.
   Los borradores de venta se excluyen antes de resolver referencias y calcular
   importes; crear una solicitud NC todavía no rectifica el documento emitido.
+- Un Registro de Compras consultado correctamente sin compras conserva la exportación
+  Excel con sus encabezados, sin filas ficticias. Una consulta fallida no habilita esa salida.
 - El Registro de Compras de la pantalla contable toma los comprobantes de CxP,
   no las órdenes. Conserva el importe fiscal original tras devoluciones o
   descuentos y muestra cada nota de crédito con signo negativo y referencia.
@@ -3872,6 +3977,12 @@ Evidencia: `queue-company-editor-postconditions.json`.
   generación y firma fiscal de prueba, GRE/SIRE y flujo logístico habilitado;
   ningún envío ni aceptación SUNAT/OSE se simula. El PCGE inicial se
   inserta por código sin duplicar cuentas ya existentes.
+  La fábrica SQL canónica reserva el número de la factura semilla antes de
+  declarar la demo lista; la primera factura posterior usa F001-00000002.
+  La cotización de muestra concilia una línea de4×87,50 con subtotal350,
+  IGV63 y total413. La apertura bancaria50000 coincide con sus saldos.
+  La595 corrige únicamente nuevas hidrataciones, sin renumerar documentos,
+  modificar muestras históricas ni conceder aceptación fiscal.
 - La conversión de demo a cuenta real exige que el cliente defina y confirme
   un correo de acceso y una contraseña permanente antes de elegir si conserva
   o reinicia sus datos. La activación sustituye atómicamente las credenciales

@@ -26,6 +26,7 @@ export class CacheInvalidationService {
 
       // Invalidar actividades del dashboard
       const activitiesKey = `dashboard:activities:${tenantId}`;
+      await this.cacheService.delPattern(`${activitiesKey}:*`);
       await this.cacheService.del(activitiesKey);
 
       if (statsDeleted > 0) {

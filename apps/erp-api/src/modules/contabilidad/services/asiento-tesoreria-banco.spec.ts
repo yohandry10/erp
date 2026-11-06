@@ -23,7 +23,7 @@ describe('AsientosGeneratorService — cuenta contable del banco', () => {
     const query: any = {
       select: jest.fn(() => query),
       eq: jest.fn((columna: string, valor: unknown) => { filtros.push([columna, valor]); return query; }),
-      maybeSingle: jest.fn(async () => ({ data: { cuenta_contable_id: 'pc-1041' }, error: null })),
+      maybeSingle: jest.fn(async () => ({ data: { cuenta_contable_id: 'pc-1041', pais: 'PE' }, error: null })),
     };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -34,6 +34,7 @@ describe('AsientosGeneratorService — cuenta contable del banco', () => {
           useValue: {
             obtenerCuentasPorCodigos: jest.fn(async () => cuentas),
             obtenerCuentaPorId: jest.fn(async () => cuentaDelBanco),
+            obtenerCuentaPorCodigo: jest.fn(async () => ({ id: 'cuenta-10111', codigo: '10111', acepta_movimiento: true })),
           },
         },
         { provide: PeriodosService, useValue: { validarPeriodoAbierto: jest.fn() } },
@@ -44,6 +45,12 @@ describe('AsientosGeneratorService — cuenta contable del banco', () => {
   });
 
   const lineas = () => generarAsiento.mock.calls[0][3] as any[];
+
+  it('usa la caja operativa PE para un cobro efectivo explícito', async () => {
+    await service.generarAsientoCobro({ tenant_id: 'tenant-1', fecha: '2026-11-06', monto: .04, metodo_pago: 'EFECTIVO' });
+    expect(lineas()[0]).toMatchObject({ cuenta_id: 'cuenta-10111', debe: .04, haber: 0 });
+    expect(filtros).toEqual([['tenant_id', 'tenant-1']]);
+  });
 
   it('debita la cuenta contable del banco del cobro y no la 10 de resumen', async () => {
     await service.generarAsientoCobro({

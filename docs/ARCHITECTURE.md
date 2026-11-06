@@ -47,6 +47,10 @@ sin datos de clientes.
 ## Autenticación y autorización
 
 - Web mantiene sesión mediante cookie HttpOnly.
+- Las consultas de perfil comparten un vuelo sólo dentro de la misma revisión
+  de sesión. Login, instalación de sesión y logout invalidan el vuelo anterior;
+  un perfil tardío, incluso 401, no reinstala ni elimina la identidad nueva.
+  La regresión determinista está en `tests/auth/verify-session-profile-races.mjs`.
 - El login mantiene sus controles deshabilitados hasta hidratar y resolver la
   sesión inicial. Así no pierde valores escritos antes de activar los handlers.
   La confirmación y el efecto de sesión comparten una única redirección completa,

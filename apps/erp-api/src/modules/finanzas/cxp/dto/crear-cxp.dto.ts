@@ -6,7 +6,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
-  Min,
+  Min, Max,
   ValidateNested, IsIn, MaxLength} from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -98,10 +98,12 @@ export class CrearCxpDto {
 
   @IsNumber({ maxDecimalPlaces: 2 }, { message: 'El subtotal debe ser numérico' })
   @Min(0, { message: 'El subtotal no puede ser negativo' })
+  @Max(999_999_999_999.99, { message: 'SUPPLIER_INVOICE_AMOUNT_OUT_OF_RANGE' })
   subtotal!: number;
 
   @IsNumber({ maxDecimalPlaces: 2 }, { message: 'El IGV debe ser numérico' })
   @Min(0, { message: 'El IGV no puede ser negativo' })
+  @Max(999_999_999_999.99, { message: 'SUPPLIER_INVOICE_AMOUNT_OUT_OF_RANGE' })
   igv!: number;
 
   /**
@@ -132,6 +134,7 @@ export class CrearCxpDto {
 
   @IsNumber({ maxDecimalPlaces: 2 }, { message: 'El total debe ser numérico' })
   @Min(0.01, { message: 'El total debe ser mayor a cero' })
+  @Max(999_999_999_999.99, { message: 'SUPPLIER_INVOICE_AMOUNT_OUT_OF_RANGE' })
   total!: number;
 
   @IsOptional()

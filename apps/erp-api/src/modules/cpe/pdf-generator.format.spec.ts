@@ -15,6 +15,29 @@ import { PdfFormatHelperService, normalizeFiscalDocumentType } from './pdf-forma
 const pdfFormatHelper = new PdfFormatHelperService();
 
 describe('representación impresa CPE', () => {
+  it.each([
+    ['2026-11-04T04:31:42.468476+00:00', 'PE', '03/11/2026'],
+    ['2026-11-04', 'PE', '04/11/2026'],
+    ['2026-11-04T00:00:00+00:00', 'PE', '04/11/2026'],
+    ['2026-11-04T05:00:00Z', 'PE', '04/11/2026'],
+    ['2026-11-04T02:59:59Z', 'AR', '03/11/2026'],
+  ])('D-16 mantiene fecha civil y convierte instantes fiscales %s %s', (value, country, expected) => {
+    const service = new PdfGeneratorService({} as any, pdfFormatHelper) as any;
+    expect(service.formatDate(value, country)).toBe(expected);
+  });
+
+  it('D-16 recupera el vencimiento legado sólo del documento y empresa del CPE', async () => {
+    const filters: unknown[] = [];
+    const from = jest.fn((table: string) => {
+      const chain: any = { select: () => chain, eq: (key: string, value: string) => { filters.push([table, key, value]); return chain; },
+        single: async () => ({ data: { id: 'cpe-1', documento_id: 'doc-1', tipo_documento: 'FACTURA', items: [{ descripcion: 'Demo' }] }, error: null }),
+        maybeSingle: async () => ({ data: { fecha_vencimiento: '2026-12-04' }, error: null }) };
+      return chain;
+    });
+    const service = new PdfGeneratorService({ getClient: () => ({ from }) } as any, pdfFormatHelper) as any;
+    expect((await service.getCpeData('cpe-1', 'tenant-1')).fecha_vencimiento).toBe('2026-12-04');
+    expect(filters).toEqual(expect.arrayContaining([['cuentas_por_cobrar', 'tenant_id', 'tenant-1'], ['cuentas_por_cobrar', 'documento_id', 'doc-1']]));
+  });
   it('READY y estados incompletos sin CDR no anuncian aceptación SUNAT en el PDF', () => {
     const signed = { simulated_origin: false, estado: 'FIRMADO', sunat_status: 'READY', cdr_sunat: null };
     for (const cpe of [signed, { ...signed, estado: 'ACEPTADO', sunat_status: 'ACCEPTED' },

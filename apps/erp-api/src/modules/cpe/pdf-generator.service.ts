@@ -18,7 +18,7 @@ import { resolveDianPrintedFiscalInfo, type DianPrintedFiscalInfo } from './dian
 import { resolveArcaPrintedFiscalInfo, type ArcaPrintedFiscalInfo } from './arca-print.util';
 import { resolveHistoricalCpeCountry } from './historical-cpe-country.util';
 import { categoriaDeAfectacion } from '../../shared/utils/igv-afectacion.util';
-import { zonaHorariaDePais } from '../../shared/utils/fecha-peru.util';
+import { fechaDeDocumentoEnPais, zonaHorariaDePais } from '../../shared/utils/fecha-peru.util';
 
 export const CPE_PDF_PRINT_FORMAT = {
   size: 'A4' as const,
@@ -407,7 +407,13 @@ export class PdfGeneratorService {
     if (error && error.code !== 'PGRST116') throw new ServiceUnavailableException('No se pudo consultar el CPE para PDF');
     if (!data) throw new NotFoundException('CPE no encontrado');
 
-    const cpeData = data as any;
+    const cpeData = { ...data } as any;
+    if (!cpeData.fecha_vencimiento && cpeData.documento_id && ['01', '03', 'FACTURA', 'BOLETA'].includes(cpeData.tipo_documento)) {
+      const cuenta = await this.supabaseService.getClient().from('cuentas_por_cobrar')
+        .select('fecha_vencimiento').eq('tenant_id', tenantId).eq('documento_id', cpeData.documento_id).maybeSingle();
+      if (cuenta.error) throw new ServiceUnavailableException('No se pudo consultar el vencimiento del CPE para PDF');
+      if (cuenta.data?.fecha_vencimiento) cpeData.fecha_vencimiento = cuenta.data.fecha_vencimiento;
+    }
     const persistedItems = Array.isArray(cpeData.items)
       ? cpeData.items.filter((item: unknown) => item && typeof item === 'object')
       : [];
@@ -1429,17 +1435,12 @@ export class PdfGeneratorService {
 
   private formatDate(dateString: string, countryCode: string = 'PE'): string {
     if (!dateString) return 'N/A';
-    const dateOnly = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(dateString));
+    const calendarDate = fechaDeDocumentoEnPais(dateString, zonaHorariaDePais(countryCode));
+    const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(calendarDate);
     if (dateOnly) {
       return `${dateOnly[3]}/${dateOnly[2]}/${dateOnly[1]}`;
     }
-    const date = new Date(dateString);
-    const locale = countryCode === 'AR' ? 'es-AR' : countryCode === 'CO' ? 'es-CO' : 'es-PE';
-    return date.toLocaleDateString(locale, {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    });
+    throw new Error('Fecha del comprobante no representable');
   }
 
   private formatMoney(amount: number): string {

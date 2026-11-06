@@ -133,10 +133,14 @@ class AuthService {
     // round-trips redundantes contra el API remoto. Sin TTL → cero staleness: solo
     // se deduplica el vuelo activo; llamadas posteriores vuelven a consultar.
     if (this.profileInFlight) return this.profileInFlight;
-    this.profileInFlight = this.doFetchProfile().finally(() => {
-      this.profileInFlight = null;
-    });
-    return this.profileInFlight;
+    const pending = this.doFetchProfile();
+    this.profileInFlight = pending;
+    try {
+      return await pending;
+    } finally {
+      // Otro login puede haber iniciado un vuelo nuevo mientras éste termina.
+      if (this.profileInFlight === pending) this.profileInFlight = null;
+    }
   }
 
   private async doFetchProfile(): Promise<User | null> {
@@ -203,6 +207,7 @@ class AuthService {
 
   private clearSession() {
     this.sessionRevision += 1;
+    this.profileInFlight = null;
     this.session = null;
     this.accessToken = null;
     void queueDesktopTokenMutation(clearDesktopAccessToken).catch(() => undefined);
@@ -227,6 +232,7 @@ class AuthService {
     error: Error | null;
   }> {
     this.sessionRevision += 1;
+    this.profileInFlight = null;
     try {
       const response = await fetch(buildApiUrl('/api/auth/login/'), {
         method: 'POST',
@@ -258,6 +264,10 @@ class AuthService {
       // usuario puede haber perdido permisos desde su sesión anterior.
       await clearCachedApiResponses(loginUser.id, loginUser.tenant_id);
       this.accessToken = loginData.access_token;
+      // Las lecturas iniciadas con la cookie/token anterior no pueden hidratar
+      // la identidad del nuevo acceso ni compartir su respuesta de perfil.
+      this.sessionRevision += 1;
+      this.profileInFlight = null;
 
       // Refrescar desde cookie/token para obtener el payload canónico del usuario.
       const profileUser = await this.fetchProfile().catch(() => null);
@@ -343,9 +353,13 @@ class AuthService {
   }
 
   async getSession(): Promise<{ data: { session: Session | null }; error: Error | null }> {
+    const revision = this.sessionRevision;
     let storedSession: Session | null = null;
 
     await this.getRequestSession();
+    if (revision !== this.sessionRevision) {
+      return { data: { session: this.session }, error: null };
+    }
 
     if (!this.session && typeof window !== 'undefined') {
       try {
@@ -364,6 +378,9 @@ class AuthService {
         const user = (await this.isOfflineAuthMode())
           ? (this.session?.user ?? storedSession?.user ?? null)
           : await this.fetchProfile();
+        if (revision !== this.sessionRevision) {
+          return { data: { session: this.session }, error: null };
+        }
         if (user) {
           this.saveSession({ user, access_token: this.accessToken || undefined });
         } else {
@@ -372,7 +389,7 @@ class AuthService {
           this.clearSession();
         }
       } catch {
-        if (!this.session) {
+        if (revision === this.sessionRevision && !this.session) {
           this.clearSession();
         }
       }
@@ -416,6 +433,8 @@ class AuthService {
         access_token: session.access_token,
       };
       this.accessToken = session.access_token;
+      this.sessionRevision += 1;
+      this.profileInFlight = null;
 
       this.saveSession(newSession);
       if (isDesktopRuntime()) await desktopTokenMutation;

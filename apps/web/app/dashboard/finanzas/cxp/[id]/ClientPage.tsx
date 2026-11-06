@@ -82,7 +82,7 @@ export default function CxpDetallePage() {
           <XCircle size={48} className="text-red-500" />
           <div role="alert" data-testid="cxp-detail-error">
             <p>{detail.error || 'No se pudo consultar la cuenta por pagar.'}</p>
-            <button type="button" onClick={() => void loadCxp()} className="mt-2 text-primary underline">Reintentar cuenta</button>
+            {detail.retryable && <button type="button" onClick={() => void loadCxp()} className="mt-2 text-primary underline">Reintentar cuenta</button>}
           </div>
           <button
             onClick={() => router.push('/dashboard/finanzas/cxp')}
@@ -244,7 +244,7 @@ export default function CxpDetallePage() {
                   </div>
                   <div className="text-[0.875rem] font-medium">
                     {cxp.condiciones_pago}
-                    {cxp.dias_credito && ` (${cxp.dias_credito} días)`}
+                    {Number(cxp.dias_credito) > 0 && ` (${cxp.dias_credito} días)`}
                   </div>
                 </div>
               )}
@@ -320,7 +320,7 @@ export default function CxpDetallePage() {
           ) : pagosError ? (
             <div role="alert" className="p-6 text-red-500">
               <p>{pagosError}</p>
-              <button type="button" onClick={() => void loadPagos()} className="mt-2 text-primary underline">Reintentar historial</button>
+              {history.retryable && <button type="button" onClick={() => void loadPagos()} className="mt-2 text-primary underline">Reintentar historial</button>}
             </div>
           ) : pagos.length === 0 ? (
             <div className="text-center p-8 text-muted-foreground">

@@ -8,7 +8,7 @@ import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 import { useApi } from '@/hooks/use-api'
 import { useCountryContext } from '@/hooks/use-country-context'
 
-type RecepcionEstado = 'BORRADOR' | 'PENDIENTE' | 'CONFIRMADA' | 'PARCIAL' | 'COMPLETADA' | 'ANULADA'
+type RecepcionEstado = 'BORRADOR' | 'PENDIENTE' | 'CONFIRMADA' | 'PARCIAL' | 'CERRADA' | 'ANULADA'
 
 type Recepcion = {
   id: string
@@ -66,7 +66,7 @@ const ESTADOS: Array<{ value: RecepcionFilters['estado']; label: string }> = [
   { value: 'PENDIENTE', label: 'Pendiente' },
   { value: 'PARCIAL', label: 'Recepción parcial' },
   { value: 'CONFIRMADA', label: 'Confirmada' },
-  { value: 'COMPLETADA', label: 'Completada' },
+  { value: 'CERRADA', label: 'Completada' },
   { value: 'ANULADA', label: 'Anulada' },
 ]
 

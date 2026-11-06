@@ -7,6 +7,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { CacheInvalidationService } from '../../../shared/cache/cache-invalidation.service';
 import {
   AplicarSaldoFavorDto,
   AprobarRmaDto,
@@ -27,7 +28,10 @@ import {
  */
 @Injectable()
 export class RmaService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly cacheInvalidation: CacheInvalidationService,
+  ) {}
 
   async listar(tenantId: string, estado?: string) {
     const query = this.supabase
@@ -470,7 +474,7 @@ export class RmaService {
             'La demo Colombia permite probar la devolución física, pero no puede aceptar ni emitir una Nota Crédito DIAN 91 real. Convierte la cuenta y completa la habilitación DIAN para continuar.',
         });
       }
-      return this.rpc('emitir_nota_credito_rma_tx', {
+      const note = await this.rpc('emitir_nota_credito_rma_tx', {
         p_tenant_id: tenantId,
         p_actor_id: this.requireActor(userId),
         p_rma_id: rmaId,
@@ -479,6 +483,8 @@ export class RmaService {
         }),
         p_idempotency_key: this.requireIdempotencyKey(idempotencyKey),
       });
+      await this.cacheInvalidation.onCpeCreated(tenantId);
+      return note;
     }
     if (fiscalCountry === 'AR') {
       throw new BadRequestException({
@@ -488,13 +494,17 @@ export class RmaService {
       });
     }
 
-    return this.rpc('emitir_nota_credito_rma_tx', {
+    const note = await this.rpc('emitir_nota_credito_rma_tx', {
       p_tenant_id: tenantId,
       p_actor_id: this.requireActor(userId),
       p_rma_id: rmaId,
       p_payload: this.normalizePayload(dto),
       p_idempotency_key: this.requireIdempotencyKey(idempotencyKey),
     });
+    // La RPC ya confirmó CxC, stock y nota. Publicar el snapshot anterior
+    // ocultaba la devolución incluso al pulsar Actualizar en el dashboard.
+    await this.cacheInvalidation.onCpeCreated(tenantId);
+    return note;
   }
 
   aplicarSaldoFavor(
@@ -601,6 +611,9 @@ export class RmaService {
 
   private throwRpcError(error: any, operation: string): never {
     const message = String(error?.message ?? error ?? 'error desconocido');
+    if (/^(RMA_CREDIT_NOTE_PRIOR_ROUNDING_REVIEW_REQUIRED|RMA_SOURCE_LINE_TOTALS_INCONSISTENT|RMA_CREDIT_NOTE_SOURCE_AMOUNTS_INVALID|RMA_FX_CREDIT_REVIEW_REQUIRED|CXC_FX_BOOK_REVIEW_REQUIRED)$/.test(message)) {
+      throw new BadRequestException(message);
+    }
     if (/RMA_DIAN_FISCAL_LINE_BALANCE_(?:EXCEEDED|UNVERIFIABLE)/i.test(message)) {
       throw new BadRequestException(
         'La factura ya tiene una nota de crédito que consume total o parcialmente las líneas seleccionadas. Recarga la venta y elige sólo cantidades con saldo fiscal disponible.',

@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleInit } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { cuadranImportes } from '../../../shared/utils/cuadre-contable.util';
+import { cpeAccountingAmounts } from '../../../shared/utils/cpe-accounting-currency.util';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { AsientosGeneratorService } from '../services/asientos-generator.service';
 import { OutboxEventsService, OutboxEvent } from '../services/outbox-events.service';
@@ -1234,13 +1235,31 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
         return;
       }
 
-      const total = Number(eventData.total ?? 0);
-      const baseImponible = Number(eventData.subtotal ?? eventData.base_imponible ?? 0);
-      const igv = Number(
+      let total = Number(eventData.total ?? 0);
+      let baseImponible = Number(eventData.subtotal ?? eventData.base_imponible ?? 0);
+      let igv = Number(
         eventData.impuestos ??
           eventData.igv ??
           (baseImponible > 0 ? Math.max(total - baseImponible, 0) : 0),
       );
+
+      let ajustes: Record<string, number> | undefined;
+      let montoPendiente: number | undefined;
+      // El writer443 congela importes en moneda documental y el tipo de origen.
+      // El costo del inventario ya está en moneda funcional y no se reconvierte.
+      if (eventData.source === 'cpe.api.atomic') {
+        const amounts = cpeAccountingAmounts({
+          moneda: eventData.moneda, tipoCambio: eventData.tipoCambio,
+          subtotal: eventData.subtotal ?? eventData.base_imponible,
+          impuestos: eventData.impuestos ?? eventData.igv, total: eventData.total,
+          ajustes: eventData.ajustes,
+        });
+        baseImponible = amounts.base_imponible;
+        igv = amounts.igv;
+        total = amounts.total;
+        ajustes = amounts.ajustes;
+        montoPendiente = amounts.monto_pendiente;
+      }
 
       const ventaData = {
         tenant_id: tenantId,
@@ -1248,6 +1267,7 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
         total,
         base_imponible: baseImponible,
         igv,
+        ...(ajustes ? { ajustes, monto_pendiente: montoPendiente } : {}),
         costo_ventas: Number(eventData.costoVentas ?? eventData.costo_ventas ?? 0),
         centro_costo_id: eventData.centro_costo_id,
         referencia,
@@ -1299,6 +1319,7 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
         monto: eventData.monto,
         tipoMovimiento: eventData.tipoMovimiento ?? eventData.tipo_movimiento ?? eventData.tipo,
         medio: eventData.medio ?? eventData.metodo_pago,
+        metodo_pago: eventData.metodoPago ?? eventData.metodo_pago ?? eventData.medio,
         // La RPC de tesorería valúa la cuenta por cobrar al tipo de cambio de
         // origen y el ingreso a caja/banco al tipo de liquidación. Mantener los
         // tres importes evita que contabilidad vuelva a consultar un TC mutable.
@@ -1350,6 +1371,8 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
         montoLiquidacion: eventData.montoLiquidacion ?? eventData.monto_liquidacion,
         diferenciaCambio: eventData.diferenciaCambio ?? eventData.diferencia_cambio,
         medio: eventData.medio ?? eventData.metodoPago ?? eventData.metodo_pago,
+        cobroOriginalId: eventData.source === 'public.revertir_cobro_cxc_anulacion_tx'
+          ? eventData.cobroId : undefined,
         cuenta_bancaria_id: eventData.cuentaBancariaId ?? eventData.cuenta_bancaria_id,
         referencia: eventData.referencia ?? eventData.cobroId ?? eventData.cobro_id,
         event_id: evento.event_id || eventData.eventId,
@@ -1592,6 +1615,8 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
       montoTesoreria: eventData.montoTesoreria ?? eventData.monto_tesoreria,
       diferenciaCambio: eventData.diferenciaCambio ?? eventData.diferencia_cambio,
       medio: eventData.medio,
+      metodo_pago: eventData.refundValuationVersion === 605 && eventData.medio === 'CAJA'
+        ? 'EFECTIVO' : undefined,
       cuenta_bancaria_id: eventData.cuentaBancariaId ?? eventData.cuenta_bancaria_id,
       referencia: eventData.referencia ?? eventData.saldoFavorId,
       event_id: evento.event_id || eventData.eventId,
@@ -1621,6 +1646,8 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
       montoTesoreria: eventData.montoTesoreria ?? eventData.monto_tesoreria,
       diferenciaCambio: eventData.diferenciaCambio ?? eventData.diferencia_cambio,
       medio: eventData.medio,
+      metodo_pago: eventData.refundValuationVersion === 605 && eventData.medio === 'CAJA'
+        ? 'EFECTIVO' : undefined,
       cuenta_bancaria_id: eventData.cuentaBancariaId ?? eventData.cuenta_bancaria_id,
       referencia: eventData.referencia ?? eventData.saldoFavorId,
       event_id: evento.event_id || eventData.eventId,
@@ -1851,6 +1878,17 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
         montoContabilizado: eventData.montoContabilizado,
         montoLiquidacion: eventData.montoLiquidacion,
         diferenciaCambio: eventData.diferenciaCambio,
+        montoContableBanco: eventData.montoContableBanco,
+        ajusteValorBanco: eventData.ajusteValorBanco,
+        bankValuationVersion: eventData.bankValuationVersion,
+        montoContableCaja: eventData.montoContableCaja,
+        ajusteValorCaja: eventData.ajusteValorCaja,
+        cashValuationVersion: eventData.cashValuationVersion,
+        saldoCajaNuevo: eventData.saldoCajaNuevo,
+        sesionCajaId: eventData.sesionCajaId,
+        cuentaSaldoNuevo: eventData.cuentaSaldoNuevo,
+        moneda: eventData.moneda,
+        monedaLocal: eventData.monedaLocal,
         // Conservar el medio: un egreso de caja no usa la cuenta de resumen10.
         metodo_pago: eventData.metodoPago ?? eventData.metodo_pago,
         // El egreso sale de la cuenta contable del banco elegido en el pago.

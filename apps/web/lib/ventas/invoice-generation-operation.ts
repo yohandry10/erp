@@ -68,6 +68,22 @@ export function invoiceOrderCanGenerate(o: InvoiceOrder, logistics: boolean): bo
     o.billed.every(q => q === 0) && (!logistics || o.dispatched.every((q, n) => q === o.snapshot.lines[n].quantity))
 }
 export function sameInvoiceSnapshot(a: InvoiceSnapshot, b: InvoiceSnapshot): boolean { return JSON.stringify(a) === JSON.stringify(b) }
+/** El writer serializa cancelación y facturación por pedido: CANCELADO sin factura es terminal. */
+export function archiveCancelledInvoiceIntent(storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>, intent: InvoiceIntent, order: InvoiceOrder): boolean {
+  if (order.state !== 'CANCELADO' || order.invoiceId !== null || order.billed.some(q => q !== 0) || !sameInvoiceSnapshot(intent.snapshot, order.snapshot)) return false
+  const scope: InvoiceScope = intent
+  const key = invoiceIntentKey(scope), raw = JSON.stringify(intent)
+  readInvoiceIntent(raw, scope)
+  if (storage.getItem(key) !== raw) throw new Error('La generación pendiente cambió en otra ventana. Se conserva sin retirarla.')
+  const archiveKey = `${key}.cancelled`, archive = JSON.stringify({ version: 1, intent, order, resolution: 'ORDER_CANCELLED_NO_INVOICE' })
+  const previous = storage.getItem(archiveKey)
+  if (previous !== null && previous !== archive) throw new Error('La cancelación archivada no coincide con el pedido consultado.')
+  storage.setItem(archiveKey, archive)
+  if (storage.getItem(archiveKey) !== archive || storage.getItem(key) !== raw) throw new Error('No se pudo conservar la resolución del pedido. El pendiente permanece.')
+  storage.removeItem(key)
+  if (storage.getItem(key) !== null) throw new Error('No se pudo retirar la generación pendiente resuelta.')
+  return true
+}
 export function newInvoiceIntent(o: InvoiceOrder, s: InvoiceScope, documentType: '01' | '03', logistics: boolean): InvoiceIntent {
   if (!validScope(s) || !validSnapshot(o.snapshot, s) || !invoiceOrderCanGenerate(o, logistics)) throw new Error('El pedido ya no está listo para generar este comprobante. Actualice la consulta.')
   return { version: 1, ...s, createdAt: new Date().toISOString(), stage: 'GENERATE', fiscalKey: invoiceFiscalKey(s), body: '{}', documentType, logistics, snapshot: o.snapshot }

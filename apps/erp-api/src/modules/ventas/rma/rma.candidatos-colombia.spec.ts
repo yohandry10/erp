@@ -24,7 +24,7 @@ function buildService(fixtures: Record<string, QueryResponse>) {
       return query(fixture);
     }),
   };
-  return new RmaService({ getClient: () => client } as any);
+  return new RmaService({ getClient: () => client } as any, { onCpeCreated: jest.fn() } as any);
 }
 
 const pedido = {

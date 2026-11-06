@@ -25,6 +25,43 @@ function createHost() {
 }
 
 describe('GlobalExceptionFilter API contract', () => {
+  it.each([
+    ['CXP_FX_BOOK_REVIEW_REQUIRED', /proveedor.*moneda extranjera.*No se aplicó.*contable/i],
+    ['SUPPLIER_CREDIT_FX_BOOK_REVIEW_REQUIRED', /crédito del proveedor.*No se aplicó.*contable/i],
+    ['SUPPLIER_NOTE_FX_BOOK_REVIEW_REQUIRED', /nota del proveedor.*No se registró.*contable/i],
+    ['BANK_FX_BOOK_REVIEW_REQUIRED', /banco.*moneda extranjera.*No se aplicó.*contable/i],
+    ['CXC_FX_BOOK_REVIEW_REQUIRED', /moneda extranjera.*No se aplicó.*contable/i],
+    ['CPE_ACCOUNTING_CURRENCY_REVIEW_REQUIRED', /factura.*redondeo.*No se emitió.*contable/i],
+    ['CPE_ACCOUNTING_CURRENCY_SNAPSHOT_INVALID', /tipo de cambio.*No se emitió.*Revisa/i],
+    ['RMA_FX_CREDIT_REVIEW_REQUIRED', /conversión.*No se emitió.*tipo de cambio/i],
+    ['RMA_CREDIT_NOTE_PRIOR_ROUNDING_REVIEW_REQUIRED', /notas.*anteriores.*No se emitió.*responsable contable/i],
+    ['RMA_SOURCE_LINE_TOTALS_INCONSISTENT', /factura original.*cabecera.*No se emitió/i],
+    ['RMA_CREDIT_NOTE_SOURCE_AMOUNTS_INVALID', /cantidades.*importes.*No se emitió/i],
+  ])('D25 explica %s sin ocultar su código', (code, expected) => {
+    const { host, response } = createHost();
+    new GlobalExceptionFilter().catch(new BadRequestException(code), host);
+    expect(response.json).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 400, code, message: expect.stringMatching(expected),
+    }));
+  });
+  it('B-09 explica el rechazo de factura por período cerrado y la acción siguiente', () => {
+    const { host, response } = createHost();
+    new GlobalExceptionFilter().catch(new BadRequestException('SUPPLIER_INVOICE_PERIOD_NOT_OPEN'), host);
+    expect(response.json).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 400, code: 'SUPPLIER_INVOICE_PERIOD_NOT_OPEN',
+      message: expect.stringMatching(/período contable.*abierto.*fecha.*abierto/i),
+    }));
+  });
+  it('D-13 conserva el código repetido de validación monetaria y explica cómo corregirlo', () => {
+    const { host, response } = createHost();
+    new GlobalExceptionFilter().catch(new BadRequestException([
+      'SUPPLIER_INVOICE_AMOUNT_OUT_OF_RANGE', 'SUPPLIER_INVOICE_AMOUNT_OUT_OF_RANGE',
+    ]), host);
+    expect(response.json).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 400, code: 'SUPPLIER_INVOICE_AMOUNT_OUT_OF_RANGE',
+      message: expect.stringContaining('999.999.999.999,99'),
+    }));
+  });
   it('preserva 409 para conflictos de dominio', () => {
     const filter = new GlobalExceptionFilter();
     const { host, response } = createHost();
@@ -99,6 +136,14 @@ describe('GlobalExceptionFilter API contract', () => {
   });
 
   describe('en producción', () => {
+    it('explica la revisión de caja en divisa y conserva su código', () => {
+      const filter = new GlobalExceptionFilter();
+      const { host, response } = createHost();
+      filter.catch(new BadRequestException('CASH_FX_BOOK_REVIEW_REQUIRED'), host);
+      expect(response.json).toHaveBeenCalledWith(expect.objectContaining({
+        statusCode: 400, code: 'CASH_FX_BOOK_REVIEW_REQUIRED', message: expect.stringContaining('No se aplicó el pago'),
+      }));
+    });
     const previous = process.env.NODE_ENV;
     beforeEach(() => { process.env.NODE_ENV = 'production'; });
     afterEach(() => { process.env.NODE_ENV = previous; });

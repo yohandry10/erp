@@ -67,7 +67,7 @@ function createQueryBuilder(rows: any[]) {
 
 function project(row: any, selected: string) {
   if (selected === '*' || selected.includes('*')) return row;
-  const columns = selected.split(',').map((column) => column.trim().split(' ')[0]);
+  const columns = selected.split(/,(?![^()]*\))/).map((column) => column.trim().split(' ')[0].split(':')[0]);
   return columns.reduce((acc, column) => {
     acc[column] = row[column];
     return acc;
@@ -93,6 +93,13 @@ describe('DashboardMetricsService', () => {
     return service;
   }
 
+  it('D19 una actualización explícita lee las ventas actuales aunque exista snapshot previo', async () => {
+    const service = createService({}, { monedaBase: 'PEN', importesPorMoneda: [], ventasMes: 466.54, ventasHoy: 466.54 });
+    const actual = await service.getStats(tenantId, true);
+    expect(actual.ventasMes).toBe(0);
+    expect(actual.ventasHoy).toBe(0);
+  });
+
   it.each(['cpe', 'gre_guias', 'ordenes_compra', 'usuarios_sistema', 'cotizaciones', 'sire_files', 'ventas_pos'])(
     'no publica ni cachea métricas cuando falla %s', async (table) => {
       for (const mode of ['error', 'rejected', 'incomplete']) {
@@ -112,6 +119,42 @@ describe('DashboardMetricsService', () => {
       }
     },
   );
+
+  it('D-02 incluye órdenes aprobadas y parciales con recepción pendiente, no las agotadas', async () => {
+    const created_at = new Date().toISOString();
+    const service = createService({ ordenes_compra: [
+      { tenant_id: tenantId, total: 354, estado: 'APROBADA', detalles: [{ cantidad: 5, cantidad_recibida: 0 }], created_at },
+      { tenant_id: tenantId, total: 354, estado: 'PARCIAL', detalles: [{ cantidad: 5, cantidad_recibida: 2 }], created_at },
+      { tenant_id: tenantId, total: 354, estado: 'PARCIAL', detalles: [{ cantidad: 5, cantidad_recibida: 5 }], created_at },
+      { tenant_id: tenantId, total: 354, estado: 'RECIBIDA', detalles: [{ cantidad: 5, cantidad_recibida: 5 }], created_at },
+      { tenant_id: tenantId, total: 354, estado: 'ANULADA', detalles: [{ cantidad: 5, cantidad_recibida: 0 }], created_at },
+    ] });
+    expect((await service.getStats(tenantId)).ordenesCompraPendientes).toBe(2);
+  });
+
+  it('D-01 suma la factura demo aplicada y resta la NC RMA aplicada, sin contar borradores pendientes', async () => {
+    const created_at = new Date().toISOString();
+    const cpe = (documento_id: string, total_venta: number, tipo_documento = '01', changes = {}) =>
+      ({ tenant_id: tenantId, documento_id, total_venta, tipo_documento, estado: 'BORRADOR', simulated_origin: true, created_at, ...changes });
+    const service = createService({
+      cpe: [cpe('seed', 179.80), cpe('rma', 106.08, '07'), cpe('draft', 500),
+        cpe('pending', 20, '07', { metadata: { financial_effect_status: 'PENDING_FISCAL_ACCEPTANCE' } }),
+        cpe('real', 1000, '01', { simulated_origin: false })],
+      documentos: [
+        ...[['seed', 179.80], ['rma', 106.08], ['pending', 20]].map(([id, total]) => ({ id, total, tenant_id: tenantId, moneda: 'PEN', estado: 'EMITIDO' })),
+        { id: 'draft', tenant_id: tenantId, total: 500, moneda: 'PEN', estado: 'BORRADOR' },
+      ],
+    });
+    const stats = await service.getStats(tenantId);
+    expect(stats.ventasMes).toBe(73.72);
+    expect(stats.ventasHoy).toBe(73.72);
+  });
+
+  it('D-01 una fuente de efecto demo caída no se convierte en cifras parciales cacheadas', async () => {
+    const service = createService({ cpe: [{ tenant_id: tenantId, documento_id: 'seed', total_venta: 179.80, estado: 'BORRADOR', simulated_origin: true, created_at: new Date().toISOString() }] }, null, { documentos: 'error' });
+    await expect(service.getStats(tenantId)).rejects.toMatchObject({ status: 503 });
+    expect((service as any).cacheService.set).not.toHaveBeenCalled();
+  });
 
   it('calcula métricas reales por tenant y periodo con columnas runtime', async () => {
     // El servicio calcula el mes en la hora del país (Lima, UTC-5), no en la del servidor:
@@ -153,7 +196,7 @@ describe('DashboardMetricsService', () => {
     expect(stats.totalCpe).toBe(2);
     expect(stats.comprasMes).toBe(300);
     expect(stats.totalCompras).toBe(2);
-    expect(stats.ordenesCompraPendientes).toBe(1);
+    expect(stats.ordenesCompraPendientes).toBe(2);
     expect(stats.totalInventario).toBe(2);
     expect(stats.valorInventario).toBe(377);
     expect(stats.productosConStockBajo).toBe(1);

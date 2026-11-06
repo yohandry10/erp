@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 
 const image = process.argv[2];
+const apiSchema = process.argv[3] == null ? null : Number(process.argv[3]);
+if (apiSchema !== null && (!Number.isSafeInteger(apiSchema) || apiSchema <= 0)) {
+  throw new Error('El esquema anunciado por el API debe ser un entero positivo');
+}
 if (!image || !/^erp-peru-worker-validation:[a-z0-9.-]+$/.test(image)) {
   throw new Error('Indique una imagen local erp-peru-worker-validation:<tag>');
 }
@@ -52,12 +56,14 @@ const startupProbe = `
   const { MINIMUM_WORKER_SCHEMA_VERSION } = require('/app/apps/worker/dist/runtime-config.js');
   let jobs = 0;
   let healthy = true;
+  const advertisedSchema = ${apiSchema ?? 'MINIMUM_WORKER_SCHEMA_VERSION'};
+  let appliedSchema = advertisedSchema;
   const server = http.createServer((req, res) => {
     assert.equal(req.url, '/api/health/ready');
     res.writeHead(healthy ? 200 : 503, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ status: 'ready', checks: {
-      database: { ready: true, contract: { required_schema_version: MINIMUM_WORKER_SCHEMA_VERSION,
-        schema_version: MINIMUM_WORKER_SCHEMA_VERSION, required_schema_applied: true,
+      database: { ready: true, contract: { required_schema_version: advertisedSchema,
+        schema_version: appliedSchema, required_schema_applied: true,
         service_role_reads: true, outbox_rpcs: true } }, redis: { ready: true },
     } }));
   });
@@ -65,6 +71,9 @@ const startupProbe = `
     const config = { apiBase: 'http://127.0.0.1:3051/api', requiredSchemaVersion: MINIMUM_WORKER_SCHEMA_VERSION };
     try {
       await startWorkerAfterReadiness(config, async () => { jobs++; });
+      appliedSchema = advertisedSchema - 1;
+      await assert.rejects(startWorkerAfterReadiness(config, async () => { jobs++; }));
+      appliedSchema = advertisedSchema;
       healthy = false;
       await assert.rejects(startWorkerAfterReadiness(config, async () => { jobs++; }));
       assert.equal(jobs, 1);

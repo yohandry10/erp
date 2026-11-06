@@ -632,7 +632,7 @@ export class AsientosGeneratorService {
              cuentas.get('12')!)
           : cuentas.get('12')!;
 
-        detalles.push({
+        if (montoPendiente > 0) detalles.push({
           cuenta_id: cuentaCobro.id,
           debe: montoPendiente,
           haber: 0,
@@ -668,7 +668,7 @@ export class AsientosGeneratorService {
         });
       }
 
-      detalles.push({
+      if (base > 0) detalles.push({
         cuenta_id: cuentas.get('70')!.id,
         debe: 0,
         haber: base,
@@ -1000,26 +1000,31 @@ export class AsientosGeneratorService {
         }
       }
 
-      const codigos = ['12', '70', '40'];
+      const codigos = ['12'];
+      if (baseAbs > 0) codigos.push('70');
+      if (igvAbs > 0 || ajustes.percepcion > 0) codigos.push('40');
       if (saldoFavorCliente > 0) codigos.push('122');
       if (costoAbs > 0) codigos.push('69', '20');
       const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(tenant_id, codigos);
 
-      const detalles: DetalleAsiento[] = [
-        {
+      const detalles: DetalleAsiento[] = [];
+      if (baseAbs > 0) {
+        detalles.push({
           cuenta_id: cuentas.get('70')!.id,
           debe: baseAbs,
           haber: 0,
           concepto: 'Reversión de ingresos',
           centro_costo_id,
-        },
-        {
+        });
+      }
+      if (igvAbs > 0) {
+        detalles.push({
           cuenta_id: cuentas.get('40')!.id,
           debe: igvAbs,
           haber: 0,
           concepto: 'Reversión IGV por pagar',
-        },
-      ];
+        });
+      }
 
       if (ajustes.percepcion > 0) {
         detalles.push({
@@ -1488,8 +1493,28 @@ export class AsientosGeneratorService {
     }
   }
 
+  private async cuentaDelCobroOriginal(tenantId: string, cobroId: string, liquidacion: number): Promise<string> {
+    const client = this.supabaseService.getClient();
+    const pago = await client.from('cxc_pagos').select('event_id')
+      .eq('tenant_id', tenantId).eq('id', cobroId).maybeSingle();
+    if (pago.error || !pago.data?.event_id) throw new Error('El cobro original requiere revisión contable');
+    const asiento = await client.from('asientos_contables').select('estado,detalle_asientos(cuenta_id,debe,haber,concepto)')
+      .eq('tenant_id', tenantId).eq('source_event_id', pago.data.event_id).maybeSingle();
+    const rows = asiento.data?.detalle_asientos;
+    if (asiento.error || asiento.data?.estado !== 'CONFIRMADO' || !Array.isArray(rows)) {
+      throw new Error('El asiento del cobro original aún no es verificable');
+    }
+    const cash = rows.filter(row => row.concepto === 'Bancos/Caja');
+    if (cash.length !== 1 || !cash[0].cuenta_id || Number(cash[0].debe) !== liquidacion
+        || Number(cash[0].haber) !== 0
+        || this.round2(rows.reduce((sum,row) => sum + Number(row.debe) - Number(row.haber), 0)) !== 0) {
+      throw new Error('La cuenta del cobro original requiere revisión contable');
+    }
+    return cash[0].cuenta_id;
+  }
+
   /**
-   * Inversa exacta del cobro: Dr 12 / Cr 10. La diferencia de cambio usa la
+   * Inversa exacta del cobro: conserva su cuenta registrada. La diferencia usa la
    * misma valuación durable del cobro original, pero con naturaleza opuesta.
    */
   async generarAsientoReversaCobro(evento: any): Promise<AsientoContable> {
@@ -1521,6 +1546,9 @@ export class AsientosGeneratorService {
       const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
         tenant_id, codigos,
       );
+      const cuentaOriginal = evento.cobroOriginalId
+        ? await this.cuentaDelCobroOriginal(tenant_id, evento.cobroOriginalId, montoLiquidacion)
+        : (await this.cuentaTesoreria(tenant_id, evento, cuentas.get('10')!)).id;
       const detalles: DetalleAsiento[] = [
         {
           cuenta_id: cuentas.get('12')!.id,
@@ -1530,7 +1558,7 @@ export class AsientosGeneratorService {
           centro_costo_id,
         },
         {
-          cuenta_id: (await this.cuentaTesoreria(tenant_id, evento, cuentas.get('10')!)).id,
+          cuenta_id: cuentaOriginal,
           debe: 0,
           haber: montoLiquidacion,
           concepto: 'Reembolso por caja/banco',
@@ -2222,12 +2250,39 @@ export class AsientosGeneratorService {
       const diferenciaCambio = this.round2(
         Number(evento.diferenciaCambio ?? evento.diferencia_cambio ?? 0)
       );
+      const montoBanco = this.round2(Number(evento.montoContableBanco ?? montoLiquidacion));
+      const ajusteBanco = this.round2(Number(evento.ajusteValorBanco ?? 0));
+      const montoCaja = this.round2(Number(evento.montoContableCaja ?? montoLiquidacion));
+      const ajusteCaja = this.round2(Number(evento.ajusteValorCaja ?? 0));
+      if (![montoCaja, ajusteCaja].every(Number.isFinite) || montoCaja <= 0
+          || this.round2(montoCaja - montoLiquidacion) !== ajusteCaja) {
+        throw new Error('La valuación del pago o de la caja no concilia');
+      }
+      if (evento.montoContableCaja != null && (evento.cashValuationVersion !== 602
+          || !evento.sesionCajaId || evento.saldoCajaNuevo !== 0
+          || evento.montoContableBanco != null || evento.cuentaBancariaId || evento.cuenta_bancaria_id
+          || !evento.monedaLocal || !evento.moneda || evento.monedaLocal === evento.moneda
+          || String(evento.metodoPago ?? evento.metodo_pago).toUpperCase() !== 'EFECTIVO')) {
+        throw new Error('El consumo del valor de caja exige una salida total verificable en divisa');
+      }
+      if (![montoContabilizado, montoLiquidacion, diferenciaCambio, montoBanco, ajusteBanco].every(Number.isFinite)
+          || montoContabilizado <= 0 || montoLiquidacion <= 0 || montoBanco <= 0
+          || this.round2(montoContabilizado - montoLiquidacion) !== diferenciaCambio
+          || this.round2(montoBanco - montoLiquidacion) !== ajusteBanco) {
+        throw new Error('La valuación del pago o del banco no concilia');
+      }
+      if (evento.montoContableBanco != null && (evento.bankValuationVersion !== 600
+          || !(evento.cuentaBancariaId ?? evento.cuenta_bancaria_id) || evento.cuentaSaldoNuevo !== 0
+          || !evento.monedaLocal || !evento.moneda || evento.monedaLocal === evento.moneda
+          || String(evento.metodoPago ?? evento.metodo_pago).toUpperCase() === 'EFECTIVO')) {
+        throw new Error('El consumo del valor bancario exige una salida total verificable en divisa');
+      }
 
       // Solo se piden las cuentas de resultado si hay diferencia que registrar:
       // pedirlas siempre las crearía en tenants que nunca operan en divisa.
       const codigos = ['42', '10'];
-      if (diferenciaCambio < 0) codigos.push('676');
-      if (diferenciaCambio > 0) codigos.push('776');
+      if (diferenciaCambio < 0 || ajusteBanco > 0 || ajusteCaja > 0) codigos.push('676');
+      if (diferenciaCambio > 0 || ajusteBanco < 0 || ajusteCaja < 0) codigos.push('776');
 
       const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
         tenant_id,
@@ -2237,10 +2292,23 @@ export class AsientosGeneratorService {
       // Se cancela el pasivo por su valor contabilizado y se acredita el banco
       // por lo efectivamente desembolsado. La brecha entre ambos es el
       // resultado por diferencia de cambio.
+      const banco = await this.cuentaTesoreria(tenant_id, evento, cuentas.get('10')!);
       const detalles: DetalleAsiento[] = [
         { cuenta_id: cuentas.get('42')!.id, debe: montoContabilizado, haber: 0, concepto: 'Proveedores', centro_costo_id },
-        { cuenta_id: (await this.cuentaTesoreria(tenant_id, evento, cuentas.get('10')!)).id, debe: 0, haber: montoLiquidacion, concepto: String(evento.metodo_pago ?? evento.metodoPago ?? '').toUpperCase() === 'EFECTIVO' ? 'Caja' : 'Bancos', centro_costo_id }
+        { cuenta_id: banco.id, debe: 0, haber: montoLiquidacion, concepto: String(evento.metodo_pago ?? evento.metodoPago ?? '').toUpperCase() === 'EFECTIVO' ? 'Caja' : 'Bancos', centro_costo_id }
       ];
+      if (ajusteBanco !== 0) {
+        detalles.push(
+          { cuenta_id: banco.id, debe: ajusteBanco < 0 ? -ajusteBanco : 0, haber: ajusteBanco > 0 ? ajusteBanco : 0, concepto: 'Consumo del valor contable bancario', centro_costo_id },
+          { cuenta_id: cuentas.get(ajusteBanco > 0 ? '676' : '776')!.id, debe: ajusteBanco > 0 ? ajusteBanco : 0, haber: ajusteBanco < 0 ? -ajusteBanco : 0, concepto: 'Diferencia por valor contable del banco', centro_costo_id },
+        );
+      }
+      if (ajusteCaja !== 0) {
+        detalles.push(
+          { cuenta_id: banco.id, debe: ajusteCaja < 0 ? -ajusteCaja : 0, haber: ajusteCaja > 0 ? ajusteCaja : 0, concepto: 'Consumo del valor contable de caja', centro_costo_id },
+          { cuenta_id: cuentas.get(ajusteCaja > 0 ? '676' : '776')!.id, debe: ajusteCaja > 0 ? ajusteCaja : 0, haber: ajusteCaja < 0 ? -ajusteCaja : 0, concepto: 'Diferencia por valor contable de caja', centro_costo_id },
+        );
+      }
 
       if (diferenciaCambio < 0) {
         detalles.push({
@@ -2892,8 +2960,19 @@ export class AsientosGeneratorService {
     } else if (!['credito.proveedor.aplicado', 'credito.proveedor.reembolsado'].includes(tipo)) {
       throw new Error('Tipo de evento de crédito proveedor inválido');
     }
-    const localCredit = this.round2(amount * creditRate);
-    const localTarget = this.round2(amount * targetRate);
+    let localCredit = this.round2(amount * creditRate);
+    let localTarget = this.round2(amount * targetRate);
+    if (tipo !== 'nota_credito.proveedor.registrada' && evento.creditValuationVersion != null) {
+      const validBook = (value: unknown): value is number => typeof value === 'number'
+        && Number.isFinite(value) && value >= 0 && this.round2(value) === value;
+      if (evento.creditValuationVersion !== 606 || !validBook(evento.montoCreditoLocal)
+        || !validBook(evento.montoDestinoLocal)
+        || evento.montoCreditoLocal + evento.montoDestinoLocal === 0) {
+        throw new Error('Snapshot de crédito proveedor606 inválido o incompleto');
+      }
+      localCredit = evento.montoCreditoLocal;
+      localTarget = evento.montoDestinoLocal;
+    }
     const difference = this.round2(localTarget - localCredit);
     if (tipo !== 'nota_credito.proveedor.registrada' && difference !== 0) codigos.push(difference > 0 ? '776' : '676');
     if (tipo === 'credito.proveedor.reembolsado' && difference === 0) return null;
@@ -2921,12 +3000,33 @@ export class AsientosGeneratorService {
         || (tax > 0 && cuentas.get('40')?.id !== evento.cuentaIgvId)) {
         throw new Error('Contrapartida de NC proveedor no disponible');
       }
-      const debtLocal = this.round2(debt * creditRate);
-      const creditLocal = this.round2(credit * creditRate);
-      const taxLocal = this.round2(tax * creditRate);
+      let debtLocal = this.round2(debt * creditRate);
+      let creditLocal = this.round2(credit * creditRate);
+      let taxLocal = this.round2(tax * creditRate);
+      let baseLocal = this.round2(debtLocal + creditLocal - taxLocal);
+      if (evento.noteValuationVersion != null) {
+        const validBook = (value: unknown): value is number => typeof value === 'number'
+          && Number.isFinite(value) && value >= 0 && this.round2(value) === value;
+        if (evento.noteValuationVersion !== 607 || !/^[A-Z]{3}$/.test(String(evento.monedaLocal ?? ''))
+          || ![base, tax, amount, debt, credit].every(validBook)
+          || this.round2(base + tax) !== amount || this.round2(debt + credit) !== amount
+          || ![evento.subtotalLocal, evento.igvLocal, evento.totalLocal,
+            evento.deudaReducidaLocal, evento.creditoCreadoLocal].every(validBook)
+          || evento.totalLocal <= 0
+          || this.round2(evento.subtotalLocal + evento.igvLocal) !== evento.totalLocal
+          || this.round2(evento.deudaReducidaLocal + evento.creditoCreadoLocal) !== evento.totalLocal
+          || (base === 0 && evento.subtotalLocal !== 0) || (tax === 0 && evento.igvLocal !== 0)
+          || (debt === 0 && evento.deudaReducidaLocal !== 0) || (credit === 0 && evento.creditoCreadoLocal !== 0)) {
+          throw new Error('Snapshot de nota de crédito proveedor607 inválido o incompleto');
+        }
+        debtLocal = evento.deudaReducidaLocal;
+        creditLocal = evento.creditoCreadoLocal;
+        taxLocal = evento.igvLocal;
+        baseLocal = evento.subtotalLocal;
+      }
       add(cuentas.get('42')!.id, debtLocal, 0, 'Reducción de deuda al proveedor');
       add(cuentas.get('422')!.id, creditLocal, 0, 'Crédito disponible del proveedor');
-      add(counter.id, 0, this.round2(debtLocal + creditLocal - taxLocal), 'Ajuste de compra por nota recibida');
+      add(counter.id, 0, baseLocal, 'Ajuste de compra por nota recibida');
       if (taxLocal > 0) add(cuentas.get('40')!.id, 0, taxLocal, 'Reversión de crédito fiscal de la compra');
     } else if (tipo === 'credito.proveedor.aplicado') {
       add(cuentas.get('42')!.id, localTarget, 0, 'Aplicación a deuda del proveedor');

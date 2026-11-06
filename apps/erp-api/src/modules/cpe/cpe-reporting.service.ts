@@ -82,11 +82,20 @@ async getComprobantesFromDatabase(filters: any = {}, tenantId?: string) {
       }
 
       if (filters.fechaDesde) {
-        query = query.gte(dateColumn, `${filters.fechaDesde}T00:00:00${paisTenant === 'PE' ? '+00:00' : ''}`);
+        if (paisTenant === 'PE') {
+          // Una medianoche UTC representa una fecha civil; el resto son instantes
+          // y se presentan en Lima. El filtro debe respetar ambas formas legadas.
+          query = query.or(`fecha_emision.gte.${filters.fechaDesde}T05:00:00Z,fecha_emision.eq.${filters.fechaDesde}T00:00:00Z`);
+        } else query = query.gte(dateColumn, `${filters.fechaDesde}T00:00:00`);
       }
 
       if (filters.fechaHasta) {
-        query = query.lte(dateColumn, `${filters.fechaHasta}T23:59:59${paisTenant === 'PE' ? '.999999+00:00' : ''}`);
+        if (paisTenant === 'PE') {
+          const next = new Date(`${filters.fechaHasta}T00:00:00Z`);
+          next.setUTCDate(next.getUTCDate() + 1);
+          const nextDay = next.toISOString().slice(0, 10);
+          query = query.lt(dateColumn, `${nextDay}T05:00:00Z`).neq(dateColumn, `${nextDay}T00:00:00Z`);
+        } else query = query.lte(dateColumn, `${filters.fechaHasta}T23:59:59`);
       }
 
       if (filters.cliente) {

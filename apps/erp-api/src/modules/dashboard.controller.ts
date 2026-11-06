@@ -1,5 +1,5 @@
-import { Controller, Get, Post, UseGuards, HttpException, InternalServerErrorException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Post, Query, UseGuards, HttpException, InternalServerErrorException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
 import { PermissionGuard } from '../common/guards/permission.guard';
@@ -16,12 +16,15 @@ export class DashboardController {
   ) {}
   
   @Get('stats')
+  @ApiQuery({ name: 'refresh', required: false, type: Boolean })
   @ApiOperation({ summary: 'Obtener estadísticas generales del dashboard' })
   @ApiResponse({ status: 200, description: 'Estadísticas obtenidas exitosamente' })
-  async getStats(@CurrentTenant() tenantId: string) {
+  async getStats(@CurrentTenant() tenantId: string, @Query('refresh') refresh?: string) {
     try {
       // Usar servicio con cache
-      const estadisticas = await this.dashboardMetrics.getStats(tenantId);
+      const estadisticas = refresh === 'true'
+        ? await this.dashboardMetrics.getStats(tenantId, true)
+        : await this.dashboardMetrics.getStats(tenantId);
 
       return {
         success: true,
@@ -36,12 +39,15 @@ export class DashboardController {
   }
 
   @Get('activities')
+  @ApiQuery({ name: 'refresh', required: false, type: Boolean })
   @ApiOperation({ summary: 'Obtener actividades recientes' })
   @ApiResponse({ status: 200, description: 'Actividades obtenidas exitosamente' })
-  async getActivities(@CurrentTenant() tenantId: string) {
+  async getActivities(@CurrentTenant() tenantId: string, @Query('refresh') refresh?: string) {
     try {
       // Usar servicio con cache
-      const actividades = await this.dashboardMetrics.getActivities(tenantId);
+      const actividades = refresh === 'true'
+        ? await this.dashboardMetrics.getActivities(tenantId, true)
+        : await this.dashboardMetrics.getActivities(tenantId);
 
       return {
         success: true,

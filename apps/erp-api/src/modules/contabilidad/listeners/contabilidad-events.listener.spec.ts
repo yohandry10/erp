@@ -827,6 +827,27 @@ describe("ContabilidadEventsListener", () => {
       },
     );
 
+    it.each(['metodoPago','metodo_pago','medio'])('traslada el efectivo desde %s al resolvedor de cuenta', async field => {
+      asientosGenerator.generarAsientoCobro.mockResolvedValue({ id: 'asiento-efectivo' } as any);
+      await (listener as any).handleCobroRegistrado({ event_data: {
+        tenantId: 'tenant-001', monto: .01, [field]: 'EFECTIVO',
+      } });
+      expect(asientosGenerator.generarAsientoCobro).toHaveBeenCalledWith(expect.objectContaining({ metodo_pago: 'EFECTIVO' }));
+    });
+
+    it('traslada la valuación de caja sin mezclarla con la bancaria', async () => {
+      asientosGenerator.generarAsientoPago.mockResolvedValue({ id: 'asiento-caja' } as any);
+      await (listener as any).handlePagoProveedor({ event_data: {
+        tenantId: 'tenant-001', monto: .04, metodoPago: 'EFECTIVO',
+        montoContableCaja: .17, ajusteValorCaja: .02, cashValuationVersion: 602,
+        sesionCajaId: 'sesion', saldoCajaNuevo: 0,
+      } });
+      expect(asientosGenerator.generarAsientoPago).toHaveBeenCalledWith(expect.objectContaining({
+        montoContableCaja: .17, ajusteValorCaja: .02, cashValuationVersion: 602,
+        sesionCajaId: 'sesion', saldoCajaNuevo: 0, metodo_pago: 'EFECTIVO',
+      }));
+    });
+
     it("should handle cobro registrado event", async () => {
       const mockEventos: OutboxEvent[] = [
         {
@@ -1157,6 +1178,9 @@ describe("ContabilidadEventsListener", () => {
             fechaPago: "2025-01-15",
             monto: 100,
             numeroDocumento: "PAG-001",
+            montoContabilizado: 380, montoLiquidacion: 380, diferenciaCambio: 0,
+            montoContableBanco: 380.01, ajusteValorBanco: .01, bankValuationVersion: 600,
+            cuentaSaldoNuevo: 0, cuentaBancariaId: 'bank-001', moneda: 'USD', monedaLocal: 'PEN',
           },
           event_version: 1,
           created_at: "2025-01-15T10:00:00Z",
@@ -1189,6 +1213,9 @@ describe("ContabilidadEventsListener", () => {
           tenant_id: "tenant-001",
           monto: 100,
           event_id: "evt-005",
+          montoContabilizado: 380, montoLiquidacion: 380, diferenciaCambio: 0,
+          montoContableBanco: 380.01, ajusteValorBanco: .01, bankValuationVersion: 600,
+          cuentaSaldoNuevo: 0, cuenta_bancaria_id: 'bank-001', moneda: 'USD', monedaLocal: 'PEN',
         }),
       );
     });
@@ -1718,6 +1745,26 @@ describe("ContabilidadEventsListener", () => {
       expect(asientosGenerator.generarAsientoReembolsoSaldoFavor).toHaveBeenCalledWith(
         expect.objectContaining({ medio: 'BANCO', event_id: 'evt-saldo-refund' }),
       );
+    });
+
+    it.each([
+      ['handleSaldoFavorReembolsado', 'generarAsientoReembolsoSaldoFavor'],
+      ['handleSaldoFavorReembolsoRevertido', 'generarAsientoReversaReembolsoSaldoFavor'],
+    ])('D37 conserva la cuenta de efectivo605 y el contrato anterior en %s', async (handler, generator) => {
+      (asientosGenerator as any)[generator].mockResolvedValue({ id: 'asiento-refund-cash' });
+      for (const [medio, version, expected] of [
+        ['CAJA', 605, 'EFECTIVO'], ['CAJA', 604, undefined],
+        ['CAJA', undefined, undefined], ['BANCO', 605, undefined],
+      ]) {
+        await (listener as any)[handler]({ event_id: 'evt-cash-605', event_data: {
+          tenantId: 'tenant-001', fecha: '2026-11-06', monto: .01,
+          montoPasivo: .03, montoTesoreria: .03, diferenciaCambio: 0,
+          medio, refundValuationVersion: version,
+        } });
+        expect((asientosGenerator as any)[generator]).toHaveBeenLastCalledWith(
+          expect.objectContaining({ metodo_pago: expected, montoTesoreria: .03 }),
+        );
+      }
     });
 
     it('revierte el cobro por handler propio sin duplicar la nota de crédito', async () => {
