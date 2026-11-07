@@ -100,6 +100,12 @@ Los esquemas de configuración en código son la fuente exacta. Categorías:
 - Supabase: URL, anon key, service-role key y conexión PostgreSQL.
 - Redis/worker: host, puerto, credenciales y flags de jobs.
 - Auth: secretos JWT, cookies y expiraciones.
+- PII: `PII_ENCRYPTION_KEY` o, en su ausencia, `ENCRYPTION_KEY`; rotación con
+  `PII_ENCRYPTION_KEY_OLD`. Las claves declaradas requieren32caracteres como
+  mínimo. Sin clave no se ejecuta cifradoPII, aunque una configuración sólo
+  de certificados siga siendo válida para otros módulos. La búsqueda requiere
+  `PII_SEARCH_SALT` explícito de al menos32caracteres; nunca se reemplaza por
+  un valor público ni se regeneran hashes existentes automáticamente.
 - SUNAT/OSE: ambiente, SOL, certificado, RUC esperado y GRE REST.
 - ARCA: ambiente, certificado y punto de venta. WSAA/WSFE se derivan del
   ambiente y sólo admiten las URLs oficiales exactas: homologación usa
@@ -281,6 +287,14 @@ Esos artefactos son forenses; pueden estar superados. Deben contrastarse con
 `supabase/migrations/`, código actual y `docs/CURRENT_STATE.md`.
 
 ## Ensayo local de recuperación
+
+El corte609 añade sólo `registrar_asistencia_actual_tx`, con EXECUTE para
+`service_role` y el writer/ledger475 intactos. El ensayo local compara definición
+del writer y ACL/RLS de tablas antes/después, retira la función nueva, reaplica
+dos veces y ejecuta el verificador609 con rollback de todos sus fixtures. No hay
+backfill ni recifrado. Un rollback de binario debe preceder a retirar esta
+función: el runtime609 exige ese piso. El registro local de historia no promueve
+la migración remota ni acredita readiness si existen eventos antiguos pendientes.
 
 `node scripts/ci/run-peru-integrated-local.mjs --browser` reconstruye PostgreSQL
 16 efímero, verifica SQL y flujos HTTP y toma un respaldo con snapshot exportado.

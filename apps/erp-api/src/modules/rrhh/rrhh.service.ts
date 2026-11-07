@@ -31,6 +31,7 @@ import { fechaHoyDelTenant } from '../../shared/utils/fecha-tenant.util';
 import { fechaHoyEnPeru, rangoDelDiaEnPais } from '../../shared/utils/fecha-peru.util';
 import { lecturaRrhhFallida, relanzarLecturaRrhh } from './rrhh-errors';
 import { readCompleteCatalog } from '../../shared/utils/complete-catalog-read';
+import { escapeHtml } from '../../shared/email/templates/sanitize';
 import type { GratificacionPreviaDto, GratificacionPreviaEmpleadoDto, RemuneracionGratificacionPreviaDto, RemuneracionPreviaEmpleadoDto } from './dto/rrhh-acciones.dto';
 import { TIPOS_SOLICITUD_RRHH } from './dto/rrhh-operaciones.dto';
 import type { NormativaPeruPeriodoDto } from './dto/normativa-peru.dto';
@@ -80,6 +81,10 @@ export class RrhhService {
     );
     if (!error && data) return data;
 
+    this.rechazarOperacionRrhh(error);
+  }
+
+  private rechazarOperacionRrhh(error: { code?: string; message?: string } | null): never {
     const message = String(error?.message || 'No se pudo completar la operación de RRHH');
     if (error?.code === '42501') throw new ForbiddenException(message);
     if (error?.code === 'P0002') throw new NotFoundException(message);
@@ -952,33 +957,42 @@ export class RrhhService {
     actorId?: string,
     idempotencyKey?: string,
   ) {
-    // ✅ MULTI-TENANT: Agregar tenant_id
-    if (!tenantId) {
-      throw new Error('Tenant requerido para RRHH');
+    if (!tenantId) throw new BadRequestException('Tenant requerido para RRHH');
+    if (!actorId) throw new ForbiddenException('Actor autenticado requerido para modificar RRHH');
+    if (!empleadoId || !['entrada', 'salida'].includes(tipo)) {
+      throw new BadRequestException('Empleado y tipo de asistencia válidos son obligatorios');
     }
-    const currentTenantId = tenantId;
-
-    // La marca de asistencia se persiste con esta fecha. En UTC, quien fichaba
-    // pasadas las 19:00 de Lima quedaba registrado al día siguiente, con lo que el
-    // día trabajado y la tardanza caían en la jornada equivocada.
-    const hoy = await fechaHoyDelTenant(this.supabaseService.getClient(), currentTenantId);
-    const horaActual = new Date().toTimeString().split(' ')[0];
-    const data = await this.ejecutarOperacionRrhh(
-      'ATTENDANCE_MARK',
-      { empleado_id: empleadoId, fecha: hoy, tipo, hora: horaActual },
-      currentTenantId,
-      actorId,
-      idempotencyKey,
+    const key = String(idempotencyKey || '').trim() || `rrhh-compat-attendance_mark-${randomUUID()}`;
+    if (key.length < 8 || key.length > 200) {
+      throw new BadRequestException('Idempotency-Key debe tener entre 8 y 200 caracteres');
+    }
+    // La DB captura el reloj civil del país una sola vez y confirma el replay
+    // bajo el mismo lock/recibo475. Un reintento no genera otra hora ni evento.
+    const { data: result, error } = await this.supabaseService.getClient().rpc(
+      'registrar_asistencia_actual_tx', {
+        p_tenant_id: tenantId, p_actor_id: actorId, p_empleado_id: empleadoId,
+        p_tipo: tipo, p_idempotency_key: key,
+      },
     );
+    if (error) this.rechazarOperacionRrhh(error);
+    const data = result?.data;
+    const time = /^([01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,6})?$/;
+    if (typeof result?.replayed !== 'boolean' || !data || typeof data.id !== 'string' || !data.id
+      || data.tenant_id !== tenantId || data.id_empleado !== empleadoId || data.empleado_id !== empleadoId
+      || data.marcado_por !== actorId || !/^\d{4}-\d{2}-\d{2}$/.test(data.fecha || '')
+      || !time.test(data.hora_entrada || '') || (tipo === 'salida' && !time.test(data.hora_salida || ''))) {
+      throw lecturaRrhhFallida('el resultado confirmado de asistencia');
+    }
+    const hoy = data.fecha;
 
     if (tipo === 'entrada') {
 
       // 🎯 EMITIR EVENTO DE ASISTENCIA (si eventBus está disponible)
-      if (this.eventBus) {
+      if (this.eventBus && !result.replayed) {
         this.eventBus.emitEmpleadoAsistencia({
           empleadoId: empleadoId,
           fecha: hoy,
-          horaEntrada: horaActual,
+          horaEntrada: data.hora_entrada,
           horasExtras: 0,
           tipoTurno: 'REGULAR',
           estado: 'PRESENTE',
@@ -993,12 +1007,12 @@ export class RrhhService {
       const horasTrabajadas = Number(data?.horas_trabajadas || 0);
       const horasExtras = Math.max(0, horasTrabajadas - 8);
 
-      if (this.eventBus) {
+      if (this.eventBus && !result.replayed) {
         this.eventBus.emitEmpleadoAsistencia({
           empleadoId: empleadoId,
           fecha: hoy,
           horaEntrada: data?.hora_entrada,
-          horaSalida: horaActual,
+          horaSalida: data.hora_salida,
           horasExtras: horasExtras,
           tipoTurno: 'REGULAR',
           estado: 'PRESENTE',
@@ -2412,30 +2426,30 @@ export class RrhhService {
     <html>
     <head>
         <meta charset="UTF-8">
-        <title>${titulo} - ${empleado.nombres} ${empleado.apellidos}</title>
+        <title>${titulo} - ${escapeHtml(empleado.nombres)} ${escapeHtml(empleado.apellidos)}</title>
     </head>
     <body>
         <div class="boleta">
             <div class="header">
                 <div class="company">NEON SYSTEM</div>
                 <div class="title">${titulo}</div>
-                <div class="periodo">Período: ${totales.mes}</div>
+                <div class="periodo">Período: ${escapeHtml(totales.mes)}</div>
             </div>
 
             <div class="empleado-info">
                 <div class="info-section">
                     <div class="info-label">Empleado:</div>
-                    <div class="info-value">${empleado.nombres} ${empleado.apellidos}</div>
+                    <div class="info-value">${escapeHtml(empleado.nombres)} ${escapeHtml(empleado.apellidos)}</div>
                     <div class="info-label">Documento:</div>
-                    <div class="info-value">${empleado.numero_documento || 'N/A'}</div>
+                    <div class="info-value">${escapeHtml(empleado.numero_documento || 'N/A')}</div>
                     <div class="info-label">Email:</div>
-                    <div class="info-value">${empleado.email || 'N/A'}</div>
+                    <div class="info-value">${escapeHtml(empleado.email || 'N/A')}</div>
                 </div>
                 <div class="info-section">
                     <div class="info-label">Puesto:</div>
-                    <div class="info-value">${empleado.puesto || 'N/A'}</div>
+                    <div class="info-value">${escapeHtml(empleado.puesto || 'N/A')}</div>
                     <div class="info-label">Departamento:</div>
-                    <div class="info-value">${empleado.departamento || 'N/A'}</div>
+                    <div class="info-value">${escapeHtml(empleado.departamento || 'N/A')}</div>
                     <div class="info-label">Fecha de Ingreso:</div>
                     <div class="info-value">${empleado.fecha_ingreso ? new Date(empleado.fecha_ingreso).toLocaleDateString('es-PE') : 'N/A'}</div>
                 </div>
@@ -2478,7 +2492,7 @@ export class RrhhService {
                                 <td class="numero">${this.formatearMonedaLaboral(parseFloat(
               pago.monto_neto || 0,
             ), totales.moneda)}</td>
-                                <td>${pago.estado}</td>
+                                <td>${escapeHtml(pago.estado)}</td>
                             </tr>
                         `;
         })
@@ -2515,7 +2529,7 @@ export class RrhhService {
             </div>
 
             <div class="footer">
-                <p>Este documento certifica los pagos realizados al empleado durante el período ${totales.mes
+                <p>Este documento certifica los pagos realizados al empleado durante el período ${escapeHtml(totales.mes)
       }</p>
                 <p>Sistema ERP - Generado automáticamente el ${new Date().toLocaleDateString(
         locale,

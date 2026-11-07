@@ -4,26 +4,35 @@ Actualizado: 2026-11-06. Una página: si algo no cabe aquí, va a su documento d
 
 ## Dónde está
 
-- **Candidato publicado para revisión:** rama `codex/go-prod-candidate-20261106`,
+- **Candidato para revisión:** rama `codex/go-prod-candidate-20261106`,
   [PR153 en borrador](https://github.com/yohandry10/erp/pull/153), sin merge ni
-  despliegue. CI608/8653948f pasa5753pruebas/396suites, tipos, lint,
-  cadenaSQL ycontratoDIAN; E2E termina147aprobadas y2tras reintento. Storage
-  encontró una colisión del puerto fijo55632 después del logo aprobado:
-  puertos locales asignados porDocker pasan la restauración con los cuatro
-  antiguos ocupados; falta nuevaCI. IntegraciónPerú encontró una preparación
-  que exigía vacaciones solapadas y recibía409: se conservan5/10/0días con
-  rangos válidos y se exige el rechazo sin guardar; nueva integración en curso. D42 corrige
-  el `main` anidado que falló en E2E. El check posterior encontró D44: título
-  blanco sobre fondo claro. Corregido con `foreground`; navegador mide17.71:1
-  claro/17.54:1oscuro y un solo`main`. El nuevo E2E conserva dos casos inestables.
-  CodeQL sigue bloqueado:
-  GitHub muestra que Advanced Security sólo
-  está disponible para organizaciones y el repositorio privado pertenece a
-  una cuenta personal. Presupuesto nuevo0: no contratar ni trasladar. Actions
-  conserva su límite existente de gasto0. Escaneo comunitario local sobre0a:
-  1545archivos,213coincidencias por revisar y tres avisos de análisis parcial;
-  no son vulnerabilidades confirmadas ni equivalen a CodeQL. No se desactivó
-  el check.
+  promoción productiva. CI608/df28c49b pasa lint, tipos, SQL, DIAN yStorage,
+  incluida la restauración corregida con puertos libres. La suite5770 detecta
+  un usoUTC en Analytics: corregido con fecha civil y extremos locales (D47),
+  sin ampliar excepciones; regresionesPE/CO/AR pasan. La preparación de
+  vacaciones sí pasaAPI en865:12solicitudes/7aprobadas, días5/10/0 y409sin
+  guardar un solapamiento. El E2E865 terminó147aprobadas/2tras reintento.
+  La integracióndf28 falló al reintentar asistencia: D49 conserva el recibo
+  original y el reloj civil PE/CO/AR. API local concurrente deja una asistencia,
+  dos recibos y dos auditorías; rollback/doble reaplicación y cadena nueva
+  605migraciones/118verificadores pasan. El E2Edf28 agotó20min tras reinicio
+  de Next dev por memoria: D48 compila un build aislado de producción y valida
+  sus fuentes, perfil y proxy loopback;149casos descubiertos, ejecución remota
+  pendiente, sin aumentar timeout ni retirar casos. D42/D44 conservan un main y
+  contraste17.71/17.54 en claro/oscuro.
+- **Seguridad:** D46 rechaza tagsPII truncados, base64 inválido y claves/salt
+  por defecto. Mantiene el formato y las claves válidas actual/anterior, sin
+  reescribir datos; proveedor sin clave no cifra.48pruebasPII/configuración
+  pasan; suite local final5827pruebas/399suites con cobertura, tipos, buildAPI
+  y lint sin errores. HelpersPII legacy requieren revisión.
+  CodeQL sigue no disponible para este repositorio privado personal; no se
+  contrata, traslada ni expone. Presupuesto nuevo0 y límiteActions0 conservados.
+  CE local sin cuenta/red/envío: baseline0a1545archivos/213coincidencias/3avisos,
+  revisión incompleta; deltaD46/D47 de5archivos sin hallazgos. El deltaD48/D49
+  señala dos templates de boleta: D50 escapa sus campos textuales con ocho
+  regresiones, sin suprimir alertas ni recertificar los demás reportes. La
+  prueba HTTP adicional quedó sin fixture de pagos y no se cuenta aprobada.
+  No equivale a CodeQL ni se desactiva el check.
 - **Nueva aceptación local608:** sieteNC desdeUI conservanUSD0.07/PEN0.27 y
   deuda0. Otro circuitoUI con preparaciónAPI completa siete cobros, pago,
   NC, siete reembolsos y pago final: banco/crédito/deudas0 y21asientos únicos
@@ -31,7 +40,7 @@ Actualizado: 2026-11-06. Una página: si algo no cabe aquí, va a su documento d
   30pruebas dirigidas, lectura real de16movimientos y descargasUI completas/
   filtradas idénticas al servidor pasan. D43 separa los agregados de Analytics
   por moneda: lectura real confirma179.80PEN y0.07USD, sin total179.87.
-  28pruebasAPI, UI yCSV cotejados conSQL pasan, con fallo/reintento seguro y
+  32pruebasAPI dirigidas, UI yCSV cotejados conSQL pasan, con fallo/reintento seguro y
   ancho390px en ambos temas. Ratios con divisas quedan
   no disponibles hasta tener valuación común. La consulta de gastos denegada
   conserva sus permisos; no se fabrica KPI0. Endpoints avanzados legacy aún
@@ -142,8 +151,9 @@ Actualizado: 2026-11-06. Una página: si algo no cabe aquí, va a su documento d
 | `606` | Crédito proveedor acumulado compartido con CxP: diez circuitos, ocho guardas, API400 atómico,5723pruebas, rollback y cadena limpia pasan. EmisiónNC cubierta por607. Sin promoción |
 | `607` | EmisiónNC proveedor acumulada y consumo del valor asignado: diez circuitos, diez guardas, dos rechazos inmutables, API400 y rollback pasan.5735pruebas, tipos, imagen y cadena limpia pasan; continuidad bancaria cubierta por608. Sin promoción |
 | `608` | Traza explícita de reembolso proveedor en banco extranjero. Rollback exacto, doble reaplicación,152pruebas dirigidas, tipos e imagen pasan. Seis circuitos API/SQL, diez guardas, dos rechazos inmutables, API400 y cadena604migraciones/117verificadores pasan. Sin promoción |
+| `609` | Asistencia automática: wrapper sobre writer475, reloj civil PE/CO/AR y replay del recibo original bajo el mismo lock. Sin backfill ni cambio de ACL/RLS de tablas. Rollback, doble reaplicación, API concurrente y cadena605/118 pasan; sin promoción |
 
-Próxima libre: `609`. El candidato local exige608; PROD observado sigue en593. Comprobar prefijos duplicados antes de añadir una.
+Próxima libre: `610`. El candidato local exige609; PROD observado sigue en593. Comprobar prefijos duplicados antes de añadir una.
 
 **591–593:** el corte público del 5-nov exige y encuentra 593. El ensayo previo consta en
 `artifacts/promocion-ensayo-591-593-20261101082811/informe.json`; no volver a promover por rutina.

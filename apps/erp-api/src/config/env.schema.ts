@@ -18,6 +18,9 @@ export interface AppEnvironment {
   JWT_SECRET: string;
   JWT_REFRESH_SECRET: string;
   ENCRYPTION_KEY?: string;
+  PII_ENCRYPTION_KEY?: string;
+  PII_ENCRYPTION_KEY_OLD?: string;
+  PII_SEARCH_SALT?: string;
   DB_ENCRYPTION_KEY?: string;
   CERT_ENCRYPTION_KEY?: string;
   CERT_ENCRYPTION_KEY_OLD?: string;
@@ -132,6 +135,9 @@ export const envSchema = Joi.object({
     Joi.string().min(32),
   ),
   ENCRYPTION_KEY: Joi.string().min(32).optional(),
+  PII_ENCRYPTION_KEY: Joi.string().allow('').min(32).optional(),
+  PII_ENCRYPTION_KEY_OLD: Joi.string().allow('').min(32).optional(),
+  PII_SEARCH_SALT: Joi.string().allow('').min(32).optional(),
   DB_ENCRYPTION_KEY: requiredInProduction(Joi.string().min(32)),
   CERT_ENCRYPTION_KEY: Joi.string().allow('').min(32).optional(),
   CERT_ENCRYPTION_KEY_OLD: Joi.string().allow('').min(32).optional(),

@@ -3481,6 +3481,16 @@ detalle de planilla aplica la misma comprobación del padre.
   ficha PLAME convergen en un writer operativo con actor, permiso, huella e
   idempotencia. El job de ausencias exige un actor técnico explícito y falla
   cerrado si no está configurado.
+- La entrada/salida automática usa `registrar_asistencia_actual_tx` (609): la
+  primera intención captura fecha y hora civil PE/CO/AR dentro de la DB; un
+  reintento devuelve el recibo475 original, aunque cambie el reloj o ya exista
+  una salida. Cambiar empleado, tipo o actor conserva el rechazo. La API valida
+  el recibo completo y sólo emite el evento en la primera confirmación. No se
+  garantiza entrega durable del bus ante una caída entre commit y emisión.
+  La marca manual conserva su writer con fecha/hora explícitas. Sin backfill.
+- El HTML mensual de boleta escapa texto de empleado, período y estado de pago
+  con el helper compartido. Conserva los importes y la moneda; no se interpreta
+  una etiqueta incluida en esos datos como marcado HTML (D50).
 - El alta y edición de empleados recuperan la intención en el writer antes de
   comprobar duplicados; la unicidad documental permanece en la transacción y
   el índice de base de datos. Un reintento del alta devuelve el mismo empleado.
@@ -4114,6 +4124,10 @@ globalNO_GO.
   y CSV usan la moneda confirmada; ventas/categorías comparten el rango elegido,
   mientras la cartera corresponde a la fecha actual del país. El aging incluye
   saldos por vencer tanto en CxC como en CxP.
+  Los períodos móviles parten del día civil del país. Las fechas de documentos
+  a medianoche y los instantes siguen el normalizador fiscal existente, con
+  lectura completa de una envolvente y selección civil posterior, conservando
+  los extremos locales y la duración inclusiva del período.
   Los indicadores de los últimos30días no suman divisas con inventario local:
   si requieren una valuación común quedan no disponibles. En una sola moneda
   del país, el margen sigue siendo aproximado, con costo actual del catálogo;

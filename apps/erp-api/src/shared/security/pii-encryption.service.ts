@@ -15,28 +15,44 @@ import * as crypto from 'crypto';
 export class PiiEncryptionService {
   private readonly logger = new Logger(PiiEncryptionService.name);
   private readonly algorithm = 'aes-256-gcm';
-  private readonly encryptionKey: Buffer;
+  private readonly encryptionKey?: Buffer;
   private readonly previousKey?: Buffer; // Para rotación de claves
 
   constructor(private readonly configService: ConfigService) {
     const keyString = this.configService.get<string>('PII_ENCRYPTION_KEY') 
       || this.configService.get<string>('ENCRYPTION_KEY');
     
-    if (!keyString || keyString.length < 32) {
-      this.logger.warn('⚠️ PII_ENCRYPTION_KEY no configurada o muy corta. Usando ENCRYPTION_KEY.');
+    if (keyString) {
+      this.encryptionKey = crypto.createHash('sha256')
+        .update(this.requireSecret(keyString, 'PII_ENCRYPTION_KEY o ENCRYPTION_KEY'))
+        .digest();
+    } else {
+      // CERT_ENCRYPTION_KEY por sí sola permite otros módulos. PII queda sin
+      // operaciones criptográficas hasta configurar su clave; nunca usa una pública.
+      this.logger.warn('Cifrado PII no configurado: requiere PII_ENCRYPTION_KEY o ENCRYPTION_KEY.');
     }
-
-    this.encryptionKey = crypto.createHash('sha256')
-      .update(keyString || 'default-key-change-in-production')
-      .digest();
 
     // Clave anterior para rotación
     const previousKeyString = this.configService.get<string>('PII_ENCRYPTION_KEY_OLD');
     if (previousKeyString) {
-      this.previousKey = crypto.createHash('sha256').update(previousKeyString).digest();
+      this.previousKey = crypto.createHash('sha256')
+        .update(this.requireSecret(previousKeyString, 'PII_ENCRYPTION_KEY_OLD')).digest();
     }
 
     this.logger.log('🔐 PiiEncryptionService inicializado');
+  }
+
+  private requireSecret(value: unknown, name: string): string {
+    if (typeof value !== 'string' || value.length < 32 || !value.trim()) {
+      throw new Error(`${name} debe estar configurada con al menos 32 caracteres.`);
+    }
+    // No recortar ni derivar de otra clave: preserva los cifrados/hashes existentes.
+    return value;
+  }
+
+  private requireEncryptionKey(): Buffer {
+    if (!this.encryptionKey) throw new Error('Cifrado PII no configurado: falta una clave explícita.');
+    return this.encryptionKey;
   }
 
   /**
@@ -45,10 +61,11 @@ export class PiiEncryptionService {
    */
   encrypt(plaintext: string): string {
     if (!plaintext) return plaintext;
+    const key = this.requireEncryptionKey();
 
     try {
       const iv = crypto.randomBytes(12);
-      const cipher = crypto.createCipheriv(this.algorithm, this.encryptionKey, iv);
+      const cipher = crypto.createCipheriv(this.algorithm, key, iv, { authTagLength: 16 });
       
       let encrypted = cipher.update(plaintext, 'utf8', 'base64');
       encrypted += cipher.final('base64');
@@ -71,10 +88,11 @@ export class PiiEncryptionService {
     if (!encryptedText || !encryptedText.includes(':')) {
       return encryptedText; // No está encriptado
     }
+    const key = this.requireEncryptionKey();
 
     // Intentar con clave actual
     try {
-      return this.decryptWithKey(encryptedText, this.encryptionKey);
+      return this.decryptWithKey(encryptedText, key);
     } catch (error) {
       // Si falla y hay clave anterior, intentar con ella
       if (this.previousKey) {
@@ -100,8 +118,12 @@ export class PiiEncryptionService {
     const [ivBase64, authTagBase64, encrypted] = parts;
     const iv = Buffer.from(ivBase64, 'base64');
     const authTag = Buffer.from(authTagBase64, 'base64');
+    if (iv.length !== 12 || authTag.length !== 16 || iv.toString('base64') !== ivBase64 ||
+        authTag.toString('base64') !== authTagBase64 || Buffer.from(encrypted, 'base64').toString('base64') !== encrypted) {
+      throw new Error('IV, tag o base64 de PII inválidos');
+    }
     
-    const decipher = crypto.createDecipheriv(this.algorithm, key, iv);
+    const decipher = crypto.createDecipheriv(this.algorithm, key, iv, { authTagLength: 16 });
     decipher.setAuthTag(authTag);
     
     let decrypted = decipher.update(encrypted, 'base64', 'utf8');
@@ -121,7 +143,7 @@ export class PiiEncryptionService {
     const normalized = value.toLowerCase().trim();
     
     // Generar hash con salt fijo (para búsquedas consistentes)
-    const salt = this.configService.get<string>('PII_SEARCH_SALT') || 'pii-search-salt';
+    const salt = this.requireSecret(this.configService.get<string>('PII_SEARCH_SALT'), 'PII_SEARCH_SALT');
     
     return crypto.createHmac('sha256', salt)
       .update(normalized)

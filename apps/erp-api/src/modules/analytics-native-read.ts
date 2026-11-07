@@ -1,11 +1,17 @@
 import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { readCompleteCatalog } from '../shared/utils/complete-catalog-read';
-import { fechaHoyEnPais } from '../shared/utils/fecha-peru.util';
+import { fechaDeDocumentoEnPais, fechaHoyEnPais, zonaHorariaDePais } from '../shared/utils/fecha-peru.util';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#7c2d12'];
 const STATES_WITHOUT_SALE = ['ANULADO', 'ANULADA', 'CANCELADO', 'CANCELADA', 'BORRADOR', 'RECHAZADO', 'ERROR'];
 const fail = () => new ServiceUnavailableException('No se pudo verificar la lectura financiera completa. Reintente la consulta.');
+// Representación UTC de una fecha civil; nunca obtiene «hoy» del reloj UTC.
+const calendarDate = (value: unknown): Date | null => {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split('-').map(Number), date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(date.getTime()) && date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.getUTCDate() === day ? date : null;
+};
 const amount = (value: unknown): Decimal => {
   if (!['number', 'string'].includes(typeof value) || String(value).trim() === '') throw fail();
   const result = new Decimal(value as string | number);
@@ -39,13 +45,12 @@ export class AnalyticsNativeRead {
     return { country: rows[0].pais, book: book[rows[0].pais] };
   }
 
-  range(filters: any = {}): { start: Date; end: Date } {
+  private range(filters: any, country: string): { start: Date; end: Date } {
     const from = filters.fecha_desde ?? filters.fechaDesde;
     const to = filters.fecha_hasta ?? filters.fechaHasta;
     const parse = (value: unknown) => {
-      if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new BadRequestException('Fecha inválida. Use YYYY-MM-DD.');
-      const date = new Date(`${value}T00:00:00.000Z`);
-      if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) throw new BadRequestException('Fecha inválida.');
+      const date = calendarDate(value);
+      if (!date) throw new BadRequestException('Fecha inválida. Use YYYY-MM-DD.');
       return date;
     };
     if (from || to) {
@@ -57,35 +62,44 @@ export class AnalyticsNativeRead {
     }
     const days = { semanal: 7, mensual: 30, trimestral: 90, anual: 365 }[filters.periodo ?? 'mensual'];
     if (!days) throw new BadRequestException('Periodo inválido.');
-    const end = new Date(), start = new Date(end);
-    start.setUTCDate(start.getUTCDate() - days);
-    start.setUTCHours(0, 0, 0, 0);
+    const end = calendarDate(fechaHoyEnPais(country));
+    if (!end) throw fail();
+    const start = new Date(end);
+    start.setUTCDate(start.getUTCDate() - (days - 1));
     end.setUTCHours(23, 59, 59, 999);
     return { start, end };
   }
 
-  private async documents(tenant: string, start: Date, end: Date) {
+  private async documents(tenant: string, start: Date, end: Date, country: string) {
+    // documentos.fecha_emision es timestamptz: la fuente contiene fechas civiles
+    // a medianoche y también instantes. Se lee una envolvente amplia completa y
+    // se aplica el contrato fiscal existente a cada fila, antes de agrupar.
     const rows = await this.read(tenant, 'documentos', 'fecha_emision,total,moneda,tipo_documento,estado', query => query
       .in('tipo_documento', ['FACTURA', 'BOLETA']).not('estado', 'in', `(${STATES_WITHOUT_SALE.map(value => `"${value}"`).join(',')})`)
-      .gte('fecha_emision', start.toISOString()).lte('fecha_emision', end.toISOString()));
+      .gte('fecha_emision', new Date(start.getTime() - 86400000).toISOString()).lte('fecha_emision', new Date(end.getTime() + 86400000).toISOString()));
+    const selected: any[] = [];
     for (const row of rows) {
+      const day = fechaDeDocumentoEnPais(row.fecha_emision, zonaHorariaDePais(country)), date = calendarDate(day);
+      if (!date) throw fail();
+      if (date < start || date > end) continue;
       currency(row); amount(row.total);
-      if (!['FACTURA', 'BOLETA'].includes(row.tipo_documento) || !row.estado || STATES_WITHOUT_SALE.includes(row.estado) ||
-          typeof row.fecha_emision !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(row.fecha_emision)) throw fail();
+      if (!['FACTURA', 'BOLETA'].includes(row.tipo_documento) || !row.estado || STATES_WITHOUT_SALE.includes(row.estado)) throw fail();
+      selected.push({ ...row, fecha_emision: day });
     }
-    return rows;
+    return selected;
   }
 
   async sales(tenant: string, filters: any = {}) {
-    const { start, end } = this.range(filters);
+    const { country } = await this.country(tenant);
+    const { start, end } = this.range(filters, country);
     const previousEnd = new Date(start.getTime() - 1);
     const previousStart = new Date(start.getTime() - (end.getTime() - start.getTime() + 1));
-    const [rows, previous] = await Promise.all([this.documents(tenant, start, end), this.documents(tenant, previousStart, previousEnd)]);
+    const [rows, previous] = await Promise.all([this.documents(tenant, start, end, country), this.documents(tenant, previousStart, previousEnd, country)]);
     const porMoneda = currencies(rows, previous).map(moneda => {
       const selected = rows.filter(row => row.moneda === moneda);
       const days = new Map<string, Decimal>();
       for (const row of selected) {
-        const day = row.fecha_emision.slice(0, 10);
+        const day = row.fecha_emision;
         days.set(day, (days.get(day) ?? new Decimal(0)).plus(amount(row.total)));
       }
       const labels = [...days.keys()].sort();
@@ -108,8 +122,8 @@ export class AnalyticsNativeRead {
         const value = amount(row.saldo);
         if (value.isNegative()) throw fail();
         if (value.isZero()) continue;
-        const due = typeof row.fecha_vencimiento === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(row.fecha_vencimiento) ? Date.parse(`${row.fecha_vencimiento}T00:00:00Z`) : NaN;
-        if (!Number.isFinite(due) || new Date(due).toISOString().slice(0, 10) !== row.fecha_vencimiento) throw fail();
+        const due = calendarDate(row.fecha_vencimiento)?.getTime();
+        if (due === undefined) throw fail();
         const days = Math.floor((today - due) / 86400000);
         const index = days <= 0 ? 0 : days <= 30 ? 1 : days <= 60 ? 2 : days <= 90 ? 3 : 4;
         amounts[index] = amounts[index].plus(value);
@@ -123,7 +137,8 @@ export class AnalyticsNativeRead {
   }
 
   async categories(tenant: string, filters: any = {}) {
-    const { start, end } = this.range(filters), docs = await this.documents(tenant, start, end);
+    const { country } = await this.country(tenant);
+    const { start, end } = this.range(filters, country), docs = await this.documents(tenant, start, end, country);
     const byId = new Map(docs.map(row => [row.id, row]));
     // Leer completo evita truncar un IN grande o la segunda página de líneas.
     const details = docs.length ? (await this.read(tenant, 'documento_detalles', 'documento_id,producto_id,total_item')).filter(row => byId.has(row.documento_id)) : [];
@@ -144,10 +159,10 @@ export class AnalyticsNativeRead {
   }
 
   async kpis(tenant: string) {
-    const { book } = await this.country(tenant);
-    const { start, end } = this.range();
+    const { country, book } = await this.country(tenant);
+    const { start, end } = this.range({}, country);
     const [docs, receivables, payables, banks] = await Promise.all([
-      this.documents(tenant, start, end),
+      this.documents(tenant, start, end, country),
       this.read(tenant, 'cuentas_por_cobrar', 'saldo,moneda'), this.read(tenant, 'cuentas_por_pagar', 'saldo,moneda'),
       this.read(tenant, 'cuentas_bancarias', 'saldo,moneda', query => query.eq('activo', true)),
     ]);

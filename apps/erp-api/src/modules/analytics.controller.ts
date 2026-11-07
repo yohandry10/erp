@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AnalyticsNativeRead } from './analytics-native-read';
 import { SupabaseService } from '../shared/supabase/supabase.service';
@@ -28,13 +28,13 @@ export class AnalyticsController {
 
   @Get('deudas-clientes')
   @RequirePermission('analytics.cobranza.read')
-  async getDeudasClientes(@CurrentTenant() tenantId: string, @Query() filtros: any): Promise<any> {
+  async getDeudasClientes(@CurrentTenant() tenantId: string, @Query() _filtros: any): Promise<any> {
     return new AnalyticsNativeRead(this.supabase.getClient()).debt(tenantId, false);
   }
 
   @Get('deudas-proveedores')
   @RequirePermission('analytics.cobranza.read')
-  async getDeudasProveedores(@CurrentTenant() tenantId: string, @Query() filtros: any): Promise<any> {
+  async getDeudasProveedores(@CurrentTenant() tenantId: string, @Query() _filtros: any): Promise<any> {
     return new AnalyticsNativeRead(this.supabase.getClient()).debt(tenantId, true);
   }
 

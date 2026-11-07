@@ -40,7 +40,7 @@ describe('Analytics — lectura nativa completa por moneda', () => {
     const { controller, calls } = setup({ documentos: [doc('a', 120), doc('b', 30), { ...doc('draft', 999), estado: 'BORRADOR' }, { ...doc('foreign', 999), tenant_id: 'other' }] });
     const response = await controller.getVentasTiempo(tenant, range);
     expect(response.data.totales.ventasActuales).toBe(150); expect(response.data.moneda).toBe('PEN');
-    expect(calls[0].filters).toEqual(expect.arrayContaining([['eq', 'tenant_id', tenant], ['gte', 'fecha_emision', '2026-11-01T00:00:00.000Z'], ['lte', 'fecha_emision', '2026-11-06T23:59:59.999Z']]));
+    expect(calls.find(call => call.table === 'documentos').filters).toEqual(expect.arrayContaining([['eq', 'tenant_id', tenant], ['gte', 'fecha_emision', '2026-10-31T00:00:00.000Z'], ['lte', 'fecha_emision', '2026-11-07T23:59:59.999Z']]));
   });
   it('compara el crecimiento sólo en la misma moneda', async () => {
     const response = await setup({ documentos: [doc('a', 20), doc('b', 10, 'PEN', '2026-10-29'), doc('c', 5, 'USD', '2026-10-29')] }).controller.getVentasTiempo(tenant, range);
@@ -51,6 +51,22 @@ describe('Analytics — lectura nativa completa por moneda', () => {
     const { controller, calls } = setup({ documentos: Array.from({ length: 1001 }, (_, i) => doc(`d${String(i).padStart(4, '0')}`, 0.01)) });
     expect((await controller.getVentasTiempo(tenant, range)).data.totales.ventasActuales).toBe(10.01);
     expect(calls.some(call => call.page[0] === 1000)).toBe(true);
+  });
+  it.each([['PE', 'PEN'], ['CO', 'COP'], ['AR', 'ARS']])('el período de30días usa el día civil de%s después del cambio UTC', async (pais, moneda) => {
+    jest.setSystemTime(new Date('2026-11-07T02:00:00Z'));
+    const { controller } = setup({ empresa_config: [row('config', { pais })], documentos: [
+      doc('late', 3, moneda, '2026-11-07T02:00:00.000Z'), doc('calendar', 5, moneda, '2026-11-06T00:00:00.000Z'),
+      doc('first-day', 2, moneda, '2026-10-08'), doc('too-old', 999, moneda, '2026-10-07'), doc('future-calendar', 999, moneda, '2026-11-07T00:00:00.000Z'),
+    ] });
+    const result = (await controller.getVentasTiempo(tenant, { periodo: 'mensual' })).data;
+    expect(result.totales.ventasActuales).toBe(10);
+    expect(result.labels).toEqual(['2026-10-08', '2026-11-06']);
+  });
+  it('un rango civil incluye el último instante local y distingue las fechas guardadas a medianoche', async () => {
+    const { controller } = setup({ documentos: [doc('late', 3, 'PEN', '2026-11-07T04:59:59.999Z'), doc('calendar', 5, 'PEN', '2026-11-06T00:00:00.000Z'),
+      doc('before', 999, 'PEN', '2026-11-06T01:00:00.000Z'), doc('next', 999, 'PEN', '2026-11-07T05:00:00.000Z')] });
+    const result = (await controller.getVentasTiempo(tenant, { fecha_desde: '2026-11-06', fecha_hasta: '2026-11-06' })).data;
+    expect(result.totales.ventasActuales).toBe(8); expect(result.labels).toEqual(['2026-11-06']);
   });
   it.each([null, '', 'usd'])('rechaza moneda desconocida %s sin fabricar cero', async moneda => {
     await expect(setup({ documentos: [{ ...doc('a', 1), moneda }] }).controller.getVentasTiempo(tenant, range)).rejects.toBeInstanceOf(ServiceUnavailableException);

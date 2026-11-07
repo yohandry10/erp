@@ -67,6 +67,16 @@ sin datos de clientes.
   sin autenticar al usuario.
 - Los passwords, JWT, service-role keys y headers de autorización no entran en
   localStorage, sessionStorage, logs ni outbox.
+- PII usa AES-GCM con IV de12bytes, tag de16bytes y base64 canónico. La longitud
+  se fija también al crear cipher/decipher; se rechaza un tag truncado aun si
+  coincide su prefijo, como indica el [contrato de Node](https://nodejs.org/docs/latest-v24.x/api/crypto.html#deciphersetauthtagbuffer-encoding).
+  No hay clave ni salt públicos de respaldo. Si falta clavePII/ENCRYPTION_KEY,
+  el proveedor puede iniciar para otros módulos, pero no cifrar/descifrar
+  ciphertext. Un salt de búsqueda ausente impide generar hashes. Se preservan
+  derivación, formato y lectura con claves válidas actuales/anteriores; no se
+  recifran datos ni reescriben hashes. Los helpers legacy que toleran texto
+  plano y errores por campo requieren revisión propia; esto no certifica su
+  uso general ni permite migrar PII productiva sin procedimiento autorizado.
 - Los controllers aplican autenticación, tenant actual y permisos por recurso.
 - La matriz exacta de permisos se deriva de decorators, guards y pruebas; no se
   mantiene una segunda tabla manual en documentación.

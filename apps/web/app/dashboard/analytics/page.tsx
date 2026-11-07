@@ -947,6 +947,7 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     // Los snapshots financieros antiguos no verificaban moneda ni fechas.
+    window.localStorage.removeItem('erp-analytics-dashboard-snapshot')
     if (user?.tenant_id) window.localStorage.removeItem('erp-analytics-dashboard-snapshot:' + user.tenant_id)
     cargarDatos()
     return () => { requestId.current += 1 }

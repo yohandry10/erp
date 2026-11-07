@@ -1,9 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { assertIsolatedProductionBuild } from './scripts/build-isolated-web.cjs';
 
 const usesEphemeralLocalDatabase = process.env.E2E_EPHEMERAL_LOCAL_DB === "1";
 const usesIsolatedBrowserMocks = process.env.E2E_ISOLATED_BROWSER === "1";
+const usesProductionWeb = process.env.PLAYWRIGHT_PRODUCTION_WEB === "1";
 
 if (!usesEphemeralLocalDatabase && !usesIsolatedBrowserMocks) {
   throw new Error(
@@ -73,6 +75,7 @@ for (const url of configuredLocalUrls.filter(Boolean) as string[]) {
 const baseURL = process.env.BASE_URL || "http://localhost:3001";
 const webPort = new URL(baseURL).port || "3001";
 const skipGlobalAuth = process.env.PLAYWRIGHT_SKIP_GLOBAL_AUTH === "1";
+if (usesProductionWeb) assertIsolatedProductionBuild();
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -110,7 +113,9 @@ export default defineConfig({
   webServer: process.env.PLAYWRIGHT_SKIP_WEBSERVER
     ? undefined
     : {
-        command: `pnpm exec next dev -p ${webPort}`,
+        command: usesProductionWeb
+          ? `pnpm exec next start -p ${webPort} --hostname 127.0.0.1`
+          : `pnpm exec next dev -p ${webPort}`,
         url: baseURL,
         reuseExistingServer: !process.env.CI,
         timeout: 120 * 1000,

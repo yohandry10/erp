@@ -206,7 +206,7 @@ jobs:
       - name: Resumen de CI
         if: always()
         run: |
-          echo "## CI: Tests ✅" >> $GITHUB_STEP_SUMMARY
+          echo "## CI: Tests — ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
           echo "- pnpm test:cov (falla si la cobertura baja del suelo)" >> $GITHUB_STEP_SUMMARY
           if [ -f apps/erp-api/coverage/coverage-summary.json ]; then
             node -e "const t=require('./apps/erp-api/coverage/coverage-summary.json').total; for (const k of ['statements','branches','functions','lines']) console.log('- '+k+': '+t[k].pct+'%');" >> $GITHUB_STEP_SUMMARY
@@ -233,7 +233,7 @@ jobs:
           --health-retries 20
     env:
       E2E_EPHEMERAL_LOCAL_DB: "1"
-      REQUIRED_DATABASE_SCHEMA_VERSION: "608"
+      REQUIRED_DATABASE_SCHEMA_VERSION: "609"
       PGPASSWORD: postgres
       PGHOST: 127.0.0.1
       PGPORT: 5442

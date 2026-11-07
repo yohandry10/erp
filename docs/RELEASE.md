@@ -31,6 +31,14 @@ los borradores. No duplican ese mismo análisis por cada push de la rama;
 Los jobs y requisitos de release no se reducen. Los límites de gasto de la
 cuenta se conservan; un servicio de análisis sin licencia no se declara aprobado
 ni se sustituye por un informe comunitario sin revisar sus límites y hallazgos.
+El resumen del job de pruebas muestra su estado real incluso si falla; una
+cobertura generada no convierte una suite fallida en un check aprobado.
+
+El E2E aislado de CI usa `PLAYWRIGHT_PRODUCTION_WEB=1` junto con los flags
+aislados y sin autenticación global: compila Next antes de ejecutar los mismos
+casos. El gate vincula fuentes, BUILD_ID, URLs públicas y proxy loopback; cambiar
+uno invalida el build. No admite archivos de entorno ni otros destinos. La
+reducción de recompilaciones no amplía el timeout ni acredita integración real.
 
 El release Perú del 21 de septiembre está integrado por el PR
 [#109](https://github.com/yohandry10/erp/pull/109), merge `841ab738`.
