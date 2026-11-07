@@ -42,7 +42,7 @@ describe('Solicitudes laborales desde la UI', () => {
     await expect(service.createSolicitud(solicitud, 'tenant', 'actor', 'solicitud-1')).rejects
       .toThrow('El colaborador ya tiene una solicitud aprobada de vacaciones del 01/03/2026 al 03/03/2026 que se cruza con estas fechas');
     await expect(service.aprobarSolicitud('s1', 'actor', undefined, 'tenant', 'actor', 'decision-1')).rejects
-      .toBeInstanceOf(ConflictException);
+      .toMatchObject({ response: { statusCode: 409, error: 'RRHH_REQUEST_OVERLAP' } });
   });
 
   it('un reintento exacto llega al writer idempotente sin leer solicitudes antes', async () => {

@@ -41,3 +41,17 @@ describe('ComprasController · compras del mes', () => {
     expect(result.data).toMatchObject({ comprasDelMes: 2, montoTotalMes: 371.7 });
   });
 });
+
+describe('ComprasController · proveedores activos', () => {
+  it('un fallo al leer proveedores es indisponibilidad, no un número inventado', async () => {
+    const orderQuery: any = { select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(),
+      order: jest.fn().mockResolvedValue({ data: [], error: null }) };
+    const failing: any = { select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({ data: { pais: 'PE' }, error: null }),
+      then: (resolve: any) => Promise.resolve({ data: null, error: { code: 'PGRST000', message: 'caída' } }).then(resolve) };
+    const from = jest.fn((table: string) => table === 'ordenes_compra' ? orderQuery : failing);
+    const controller = new ComprasController({ getClient: () => ({ from }) } as any,
+      { getTenantId: () => 'tenant-prov' } as any);
+    await expect(controller.getStats({})).rejects.toMatchObject({ status: 503 });
+  });
+});

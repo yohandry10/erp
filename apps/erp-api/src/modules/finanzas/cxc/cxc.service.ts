@@ -941,6 +941,9 @@ export class CxcService {
     if (/SOURCE_NOT_FISCALLY_ACCEPTED|ACCEPTED_SOURCE/.test(message)) {
       return new ConflictException('La factura origen todavía no tiene aceptación de SUNAT (CDR): la nota de crédito sólo se emite sobre comprobantes aceptados.');
     }
+    if (message.includes('REFERENCED_NOTE_SOURCE_CPE_INVALID')) {
+      return new ConflictException('La factura origen no tiene un comprobante electrónico que admita la nota: está en borrador, rechazada o anulada, ya tiene una nota, o su cliente o moneda no coinciden con la cuenta.');
+    }
     if (message.includes('IDEMPOTENCY_CONFLICT')) {
       return new ConflictException('Esta nota ya se registró con otros datos; vuelve a abrir el formulario.');
     }

@@ -83,19 +83,15 @@ export class ComprasController {
       const ordenesActivas = todasLasCompras?.filter(o => estadosActivos.includes(o.estado)).length || 0;
       const ordenesVencidas = todasLasCompras?.filter(o => o.estado === 'PENDIENTE' && new Date(o.fecha_entrega) < new Date()).length || 0;
 
-      // Obtener proveedores activos de forma simple
-      let proveedoresActivos = 0;
-      try {
-        const { data: proveedores } = await supabase
-          .from('proveedores')
-          .select('id')
-          .eq('tenant_id', tenantId) // ✅ Filtro de tenant
-          .eq('activo', true);
-        proveedoresActivos = proveedores?.length || 0;
-      } catch (error) {
-        console.warn('⚠️ [Compras Stats] No se pudo obtener proveedores:', error);
-        proveedoresActivos = 2; // Valor por defecto basado en los logs
-      }
+      // Proveedores activos. Un fallo de lectura no es una empresa sin proveedores
+      // ni con un número inventado: lo trata el catch del método como indisponible.
+      const { data: proveedores, error: proveedoresError } = await supabase
+        .from('proveedores')
+        .select('id')
+        .eq('tenant_id', tenantId) // ✅ Filtro de tenant
+        .eq('activo', true);
+      if (proveedoresError || !Array.isArray(proveedores)) throw proveedoresError || new Error('Proveedores no disponibles');
+      const proveedoresActivos = proveedores.length;
 
       const estadisticas = {
         comprasDelMes: comprasDelMes.length,

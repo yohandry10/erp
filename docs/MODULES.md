@@ -3485,6 +3485,13 @@ detalle de planilla aplica la misma comprobación del padre.
   ficha PLAME convergen en un writer operativo con actor, permiso, huella e
   idempotencia. El job de ausencias exige un actor técnico explícito y falla
   cerrado si no está configurado.
+- Ausencias sin cruce (610): un colaborador no puede tener dos solicitudes
+  vigentes en el mismo día. Al crear se compara contra pendientes y aprobadas; al
+  aprobar, sólo contra aprobadas; rechazar nunca se bloquea. La regla es un
+  trigger con lock por colaborador, así que un replay exacto del writer475 no
+  choca consigo mismo y dos altas concurrentes dejan una. El API responde 409 con
+  `error: RRHH_REQUEST_OVERLAP`; la UI libera la operación pendiente y conserva
+  el formulario. Los permisos del mismo día también cuentan como cruce.
 - La entrada/salida automática usa `registrar_asistencia_actual_tx` (609): la
   primera intención captura fecha y hora civil PE/CO/AR dentro de la DB; un
   reintento devuelve el recibo475 original, aunque cambie el reloj o ya exista

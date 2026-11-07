@@ -92,8 +92,13 @@ export class RrhhService {
     const cruce = /^RRHH_REQUEST_OVERLAP: estado=(\w+) tipo=(\w+) desde=(\d{4}-\d{2}-\d{2}) hasta=(\d{4}-\d{2}-\d{2})/.exec(message);
     if (cruce) {
       const fecha = (valor: string) => valor.split('-').reverse().join('/');
-      throw new ConflictException(`El colaborador ya tiene una solicitud ${cruce[1]} de ${cruce[2]} `
-        + `del ${fecha(cruce[3])} al ${fecha(cruce[4])} que se cruza con estas fechas`);
+      // `error` marca un rechazo definitivo de la base (sin commit): la UI puede
+      // liberar la operación pendiente en vez de ofrecer un reintento inútil.
+      throw new ConflictException({
+        statusCode: 409, error: 'RRHH_REQUEST_OVERLAP',
+        message: `El colaborador ya tiene una solicitud ${cruce[1]} de ${cruce[2]} `
+          + `del ${fecha(cruce[3])} al ${fecha(cruce[4])} que se cruza con estas fechas`,
+      });
     }
     if (error?.code === '23505') throw new ConflictException(
       message.includes('RRHH_EMPLOYEE_DOCUMENT_DUPLICATE')

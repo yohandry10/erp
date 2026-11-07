@@ -217,7 +217,7 @@ Detalle: `docs/RELEASE.md`.
 - **Diez arreglos locales anteriores:** `claude/uat-defectos-20261104` / `8aded64c`, sin
   despliegue acreditado; se excluyen de D-01..D-17. El cruce de ausencias pasa a la base
   en 610. El máximo AFP 2026-11 ausente sigue bloqueando planilla; no se cambió normativa.
-- **Cinco pendientes conocidos:** NC semilla rechaza `REFERENCED_NOTE_SOURCE_CPE_INVALID`;
+- **Cinco pendientes conocidos:** NC semilla rechaza `REFERENCED_NOTE_SOURCE_CPE_INVALID` porque la semilla guarda el CPE como `FACTURA` y el writer exige `01`/`03` (el mensaje ya explica el motivo; corregir la semilla exige SQL);
   cotización sin detalles confirmada; omisión bancaria al cambiar país confirmada sólo en
   código (flujo no ejecutable); normativa demo restringida intencionalmente. De los eventos
   globales sólo se observó un agregado de 15: los 7 clasificados históricamente no clasifican

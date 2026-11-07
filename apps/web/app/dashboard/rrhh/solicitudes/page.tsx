@@ -106,10 +106,11 @@ export default function SolicitudesRrhhPage() {
     const epoch = operationEpoch.current
     const current = () => submittedScope === activeScope.current && epoch === operationEpoch.current
     writing.current = epoch; setBusy(true); setWriteError('')
+    const storageKey = requestIntentKey({ tenantId, actorId })
+    let serialized = ''
     try {
-      const storageKey = requestIntentKey({ tenantId, actorId })
       const intent = readRequestIntent(JSON.stringify(candidate), { tenantId, actorId })!
-      const serialized = JSON.stringify(intent)
+      serialized = JSON.stringify(intent)
       const stored = localStorage.getItem(storageKey)
       if (stored !== null && stored !== serialized) throw new Error('La operación pendiente cambió. Se conserva para revisar su resultado.')
       // Intención durable: datos de negocio e ids de empresa y usuario, sin token ni contraseña.
@@ -132,7 +133,25 @@ export default function SolicitudesRrhhPage() {
       await queryClient.invalidateQueries({ queryKey })
       if (!current()) return
       toast({ title: intent.kind === 'create' ? 'Solicitud registrada' : intent.action === 'aprobar' ? 'Solicitud aprobada' : 'Solicitud rechazada' })
-    } catch (error: any) { if (current()) setWriteError(error?.message || 'No se pudo confirmar la operación. Sus datos se conservan.') }
+    } catch (error: any) {
+      if (!current()) return
+      // Un cruce de fechas lo rechaza la base sin guardar nada: no hay recibo que
+      // recuperar, así que se libera la operación y se conservan los datos del
+      // formulario para corregirlos. Cualquier otro error sigue pendiente.
+      if (error?.status === 409 && error?.data?.error === 'RRHH_REQUEST_OVERLAP' && serialized) {
+        let liberada = false
+        try {
+          if (localStorage.getItem(storageKey) === serialized) localStorage.removeItem(storageKey)
+          liberada = localStorage.getItem(storageKey) === null
+        } catch { /* si no se puede retirar, la operación sigue visible y recuperable */ }
+        if (liberada) {
+          setPendingIntent(null)
+          setWriteError(`${error.data.message || error.message}. No se registró nada: cambia las fechas o rechaza la otra solicitud.`)
+          return
+        }
+      }
+      setWriteError(error?.message || 'No se pudo confirmar la operación. Sus datos se conservan.')
+    }
     finally { if (writing.current === epoch) writing.current = null; if (current()) setBusy(false) }
   }
   const create = async (event: React.FormEvent) => {

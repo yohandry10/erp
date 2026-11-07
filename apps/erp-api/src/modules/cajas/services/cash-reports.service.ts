@@ -6,7 +6,8 @@ import PDFDocument from 'pdfkit';
 import * as crypto from 'crypto';
 import Decimal from 'decimal.js';
 
-import { fechaHoyDelTenant } from '../../../shared/utils/fecha-tenant.util';
+import { fechaHoyDelTenant, paisDelTenant } from '../../../shared/utils/fecha-tenant.util';
+import { zonaHorariaDePais } from '../../../shared/utils/fecha-peru.util';
 export interface ResumenFiscal {
     base_imponible: number;
     igv: number;
@@ -407,6 +408,9 @@ export class CashReportsService {
         const datos = await this.obtenerDatosReporteCierre(sesionId, tenantId);
         const lineas: string[] = [];
         const fiscal = this.currencyContext(datos.sesion.moneda);
+        // Horas en la zona del país: el servidor corre en UTC y una apertura a
+        // las 08:00 de Lima salía impresa como 13:00.
+        const enZona = { timeZone: zonaHorariaDePais(await paisDelTenant(this.supabase.getClient(), tenantId)) };
 
         // Encabezado
         lineas.push('='.repeat(48));
@@ -422,9 +426,9 @@ export class CashReportsService {
         lineas.push('');
 
         // Fechas
-        lineas.push(`Apertura: ${new Date(datos.sesion.hora_apertura).toLocaleString(fiscal.locale)}`);
+        lineas.push(`Apertura: ${new Date(datos.sesion.hora_apertura).toLocaleString(fiscal.locale, enZona)}`);
         if (datos.sesion.hora_cierre) {
-            lineas.push(`Cierre: ${new Date(datos.sesion.hora_cierre).toLocaleString(fiscal.locale)}`);
+            lineas.push(`Cierre: ${new Date(datos.sesion.hora_cierre).toLocaleString(fiscal.locale, enZona)}`);
         }
         lineas.push('');
 
@@ -527,7 +531,7 @@ export class CashReportsService {
         }
 
         lineas.push('');
-        lineas.push(`Generado: ${new Date().toLocaleString('es-PE')}`);
+        lineas.push(`Generado: ${new Date().toLocaleString(fiscal.locale, enZona)}`);
         lineas.push('='.repeat(48));
 
         return lineas.join('\n');
@@ -593,6 +597,9 @@ export class CashReportsService {
 
         const datos = await this.obtenerDatosReporteCierre(sesionId, tenantId);
         const fiscal = this.currencyContext(datos.sesion.moneda);
+        // Horas en la zona del país: el servidor corre en UTC y una apertura a
+        // las 08:00 de Lima salía impresa como 13:00.
+        const enZona = { timeZone: zonaHorariaDePais(await paisDelTenant(this.supabase.getClient(), tenantId)) };
 
         return new Promise((resolve, reject) => {
             try {
@@ -643,12 +650,12 @@ export class CashReportsService {
 
                 // Ambas columnas tienen ancho fijo y comparten la altura final.
                 const columnWidth = (doc.page.width - 100 - 20) / 2;
-                doc.text(`Apertura: ${new Date(datos.sesion.hora_apertura).toLocaleString(fiscal.locale)}`, 50, infoY, { width: columnWidth });
+                doc.text(`Apertura: ${new Date(datos.sesion.hora_apertura).toLocaleString(fiscal.locale, enZona)}`, 50, infoY, { width: columnWidth });
                 doc.text(`Cajero apertura: ${datos.sesion.abierto_por || 'N/A'}`, 50, doc.y, { width: columnWidth });
                 doc.text(`Monto inicial: ${fiscal.currency} ${datos.sesion.monto_inicio?.toFixed(2) || '0.00'}`, 50, doc.y, { width: columnWidth });
                 const leftBottom = doc.y;
                 const rightX = 50 + columnWidth + 20;
-                doc.text(`Cierre: ${datos.sesion.hora_cierre ? new Date(datos.sesion.hora_cierre).toLocaleString(fiscal.locale) : 'En curso'}`, rightX, infoY, { width: columnWidth });
+                doc.text(`Cierre: ${datos.sesion.hora_cierre ? new Date(datos.sesion.hora_cierre).toLocaleString(fiscal.locale, enZona) : 'En curso'}`, rightX, infoY, { width: columnWidth });
                 doc.text(`Cajero cierre: ${datos.sesion.cerrado_por || 'N/A'}`, rightX, doc.y, { width: columnWidth });
                 doc.text(`Dispositivo: ${datos.sesion.dispositivo || 'N/A'}`, rightX, doc.y, { width: columnWidth });
                 doc.y = Math.max(leftBottom, doc.y);
@@ -759,7 +766,7 @@ export class CashReportsService {
                 doc.text(`Código de verificación: ${qrData.substring(0, 32)}...`, { width: doc.page.width - 100, align: 'center' });
 
                 doc.moveDown(0.5);
-                doc.text(`Generado: ${new Date().toLocaleString('es-PE')} | ERP Suite v1.0`, { width: doc.page.width - 100, align: 'center' });
+                doc.text(`Generado: ${new Date().toLocaleString(fiscal.locale, enZona)} | ERP Suite v1.0`, { width: doc.page.width - 100, align: 'center' });
 
                 doc.end();
             } catch (error) {

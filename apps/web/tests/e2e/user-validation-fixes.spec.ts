@@ -120,3 +120,47 @@ test('RRHH Perú no se declara lista sin el tope AFP del período', async ({ con
   await expect(page.getByText('Normativa general disponible')).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('rrhh-falta-tope-afp.png'), fullPage: true })
 })
+
+for (const caso of ['cruce', 'incierto'] as const) {
+  test(`solicitud RRHH: un ${caso === 'cruce' ? 'cruce rechazado libera el formulario' : 'resultado incierto conserva el pendiente'}`, async ({ context, page }) => {
+    await installSession(context, page)
+    const empleado = '59400000-0000-4000-8000-000000000005'
+    const persona = { id: empleado, tenant_id: user.tenant_id, nombres: 'María', apellidos: 'Demo', numero_documento: '45678912', estado: 'activo', activo: true }
+    const aprobada = { id: '59400000-0000-4000-8000-000000000006', tenant_id: user.tenant_id, id_empleado: empleado, tipo: 'vacaciones',
+      fecha_inicio: '2026-12-14', fecha_fin: '2026-12-16', dias: 3, estado: 'aprobada', motivo: 'Vacaciones de fin de año',
+      aprobado_por: user.id, fecha_aprobacion: '2026-11-04T15:00:00.000Z', observaciones_aprobacion: null }
+    let posts = 0
+    await mockApi(page, {
+      '/rrhh/empleados': { success: true, data: [persona] },
+      '/rrhh/solicitudes': { success: true, data: [aprobada] },
+    }, async (endpoint, route) => {
+      if (endpoint !== '/rrhh/solicitudes' || route.request().method() !== 'POST') return false
+      posts++
+      await route.fulfill(caso === 'cruce'
+        ? { status: 409, contentType: 'application/json', body: JSON.stringify({ statusCode: 409, error: 'RRHH_REQUEST_OVERLAP',
+            message: 'El colaborador ya tiene una solicitud aprobada de vacaciones del 14/12/2026 al 16/12/2026 que se cruza con estas fechas' }) }
+        : { status: 503, contentType: 'application/json', body: JSON.stringify({ statusCode: 503, message: 'Servicio no disponible' }) })
+      return true
+    })
+    await page.goto('/dashboard/rrhh/solicitudes/')
+    await page.getByLabel('Empleado', { exact: true }).selectOption(empleado)
+    await page.getByLabel('Tipo de solicitud', { exact: true }).selectOption('vacaciones')
+    await page.getByLabel('Fecha inicial', { exact: true }).fill('2026-12-15')
+    await page.getByLabel('Fecha final', { exact: true }).fill('2026-12-17')
+    await page.getByLabel('Motivo', { exact: true }).fill('Segundo bloque')
+    await page.getByRole('button', { name: 'Registrar solicitud', exact: true }).click()
+    await expect.poll(() => posts).toBe(1)
+    const pendiente = page.getByRole('button', { name: 'Reintentar operación pendiente', exact: true })
+    const clave = `erp.rrhh-request.pending.v1.${user.tenant_id}:${user.id}`
+    if (caso === 'cruce') {
+      await expect(page.getByRole('alert').filter({ hasText: 'del 14/12/2026 al 16/12/2026' })).toContainText('No se registró nada')
+      await expect(pendiente).toHaveCount(0)
+      await expect(page.getByRole('button', { name: 'Registrar solicitud', exact: true })).toBeEnabled()
+      await expect(page.getByLabel('Motivo', { exact: true })).toHaveValue('Segundo bloque')
+      expect(await page.evaluate(k => localStorage.getItem(k), clave)).toBeNull()
+    } else {
+      await expect(pendiente).toBeVisible()
+      expect(await page.evaluate(k => localStorage.getItem(k), clave)).not.toBeNull()
+    }
+  })
+}
