@@ -88,6 +88,13 @@ export class RrhhService {
     const message = String(error?.message || 'No se pudo completar la operación de RRHH');
     if (error?.code === '42501') throw new ForbiddenException(message);
     if (error?.code === 'P0002') throw new NotFoundException(message);
+    // 610: el trigger de solicitudes rechaza ausencias vigentes que se cruzan.
+    const cruce = /^RRHH_REQUEST_OVERLAP: estado=(\w+) tipo=(\w+) desde=(\d{4}-\d{2}-\d{2}) hasta=(\d{4}-\d{2}-\d{2})/.exec(message);
+    if (cruce) {
+      const fecha = (valor: string) => valor.split('-').reverse().join('/');
+      throw new ConflictException(`El colaborador ya tiene una solicitud ${cruce[1]} de ${cruce[2]} `
+        + `del ${fecha(cruce[3])} al ${fecha(cruce[4])} que se cruza con estas fechas`);
+    }
     if (error?.code === '23505') throw new ConflictException(
       message.includes('RRHH_EMPLOYEE_DOCUMENT_DUPLICATE')
         ? 'Ya existe un empleado con el mismo documento de identidad' : message,
@@ -1123,11 +1130,6 @@ export class RrhhService {
     if (solicitudData.dias !== undefined && solicitudData.dias !== dias) {
       throw new BadRequestException('Los días de la solicitud deben coincidir con su rango de fechas inclusivo');
     }
-    await this.assertSolicitudSinCruce(
-      currentTenantId, solicitudData.id_empleado, solicitudData.fecha_inicio, solicitudData.fecha_fin,
-      ['pendiente', 'aprobada'],
-    );
-
     const data = await this.ejecutarOperacionRrhh(
       'REQUEST_CREATE', { ...solicitudData, dias }, currentTenantId, actorId, idempotencyKey,
     );
@@ -1148,60 +1150,11 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
-    const { data: solicitud, error } = await this.supabaseService.getClient()
-      .from('solicitudes')
-      .select('id,id_empleado,fecha_inicio,fecha_fin')
-      .eq('tenant_id', currentTenantId)
-      .eq('id', solicitudId)
-      .maybeSingle();
-    if (error) throw lecturaRrhhFallida('la solicitud');
-    if (solicitud) {
-      await this.assertSolicitudSinCruce(
-        currentTenantId, solicitud.id_empleado, solicitud.fecha_inicio, solicitud.fecha_fin,
-        ['aprobada'], solicitud.id,
-      );
-    }
-
     const data = await this.ejecutarOperacionRrhh(
       'REQUEST_DECIDE', { id: solicitudId, decision: 'aprobada', observaciones },
       currentTenantId, actorId, idempotencyKey,
     );
     return { success: true, data };
-  }
-
-  /**
-   * Un colaborador no puede tener dos ausencias vigentes en el mismo día: dos
-   * vacaciones aprobadas que se cruzan descuentan dos veces el mismo saldo.
-   * Al crear se compara contra pendientes y aprobadas; al aprobar, sólo contra
-   * aprobadas (otra pendiente aún puede rechazarse).
-   */
-  private async assertSolicitudSinCruce(
-    tenantId: string,
-    empleadoId: string,
-    fechaInicio: string,
-    fechaFin: string,
-    estados: string[],
-    excluirId?: string,
-  ) {
-    if (!empleadoId || !fechaInicio || !fechaFin) return;
-    const { data, error } = await this.supabaseService.getClient()
-      .from('solicitudes')
-      .select('id,tipo,estado,fecha_inicio,fecha_fin,activo')
-      .eq('tenant_id', tenantId)
-      .eq('id_empleado', empleadoId)
-      .lte('fecha_inicio', String(fechaFin).slice(0, 10))
-      .gte('fecha_fin', String(fechaInicio).slice(0, 10));
-    if (error) throw lecturaRrhhFallida('las solicitudes del colaborador');
-    const cruce = (data || []).find((row: any) => row.id !== excluirId
-      && row.activo !== false
-      && estados.includes(String(row.estado || '').toLowerCase()));
-    if (cruce) {
-      const fecha = (valor: string) => String(valor).slice(0, 10).split('-').reverse().join('/');
-      throw new ConflictException(
-        `El colaborador ya tiene una solicitud ${String(cruce.estado).toLowerCase()} de ${cruce.tipo || 'ausencia'} `
-        + `del ${fecha(cruce.fecha_inicio)} al ${fecha(cruce.fecha_fin)} que se cruza con estas fechas`,
-      );
-    }
   }
 
   async rechazarSolicitud(

@@ -157,8 +157,9 @@ Actualizado: 2026-11-06. Una página: si algo no cabe aquí, va a su documento d
 | `607` | EmisiónNC proveedor acumulada y consumo del valor asignado: diez circuitos, diez guardas, dos rechazos inmutables, API400 y rollback pasan.5735pruebas, tipos, imagen y cadena limpia pasan; continuidad bancaria cubierta por608. Sin promoción |
 | `608` | Traza explícita de reembolso proveedor en banco extranjero. Rollback exacto, doble reaplicación,152pruebas dirigidas, tipos e imagen pasan. Seis circuitos API/SQL, diez guardas, dos rechazos inmutables, API400 y cadena604migraciones/117verificadores pasan. Sin promoción |
 | `609` | Asistencia automática: wrapper sobre writer475, reloj civil PE/CO/AR y replay del recibo original bajo el mismo lock. Sin backfill ni cambio de ACL/RLS de tablas. Rollback, doble reaplicación, API concurrente y cadena605/118 pasan. Restauración local299tablas/234472filas conserva historia609, ACL/RLS/políticas y función; no acredita respaldoPROD ni RTO. Sin promoción |
+| `610` | Ausencias sin cruce: trigger AFTER sobre `solicitudes` con lock por colaborador; al crear compara pendientes y aprobadas, al aprobar sólo aprobadas; rechazar no se bloquea y no revalida historia. Sustituye la prevalidación del API, que rompía el replay exacto del writer475 (409 en la integración de `808e4075`). Cadena 606/119 y 67 históricos, rollback, doble reaplicación y 5/5 altas concurrentes pasan en local. Sin promoción |
 
-Próxima libre: `610`. El candidato local exige609; PROD observado sigue en593. Comprobar prefijos duplicados antes de añadir una.
+Próxima libre: `611`. El candidato local exige610; PROD observado sigue en593. Comprobar prefijos duplicados antes de añadir una.
 
 **591–593:** el corte público del 5-nov exige y encuentra 593. El ensayo previo consta en
 `artifacts/promocion-ensayo-591-593-20261101082811/informe.json`; no volver a promover por rutina.
@@ -214,8 +215,8 @@ Detalle: `docs/RELEASE.md`.
   Evidencia, pasos y cifras: [informe manual](../artifacts/uat-new-defects-20261104/INFORME.md);
   alcance por requisito: [matriz A–J](../artifacts/uat-new-defects-20261104/COBERTURA.md).
 - **Diez arreglos locales anteriores:** `claude/uat-defectos-20261104` / `8aded64c`, sin
-  despliegue acreditado; se excluyen de D-01..D-17. Falta la restricción SQL de ausencias
-  solapadas. El máximo AFP 2026-11 ausente sigue bloqueando planilla; no se cambió normativa.
+  despliegue acreditado; se excluyen de D-01..D-17. El cruce de ausencias pasa a la base
+  en 610. El máximo AFP 2026-11 ausente sigue bloqueando planilla; no se cambió normativa.
 - **Cinco pendientes conocidos:** NC semilla rechaza `REFERENCED_NOTE_SOURCE_CPE_INVALID`;
   cotización sin detalles confirmada; omisión bancaria al cambiar país confirmada sólo en
   código (flujo no ejecutable); normativa demo restringida intencionalmente. De los eventos
