@@ -2586,6 +2586,10 @@ variantes. NO_GO global.
   0.000001). Denominadores sin base positiva devuelven0 según el contrato actual.
   Las fórmulas se contrastaron con el diario al corte131; siguen siendo
   estimaciones gerenciales y no EBITDA auditado ni certificación financiera.
+- El selector PLE sólo ejecuta exportadores declarados como propiedades propias;
+  `constructor`, `__proto__` y demás nombres heredados responden libro desconocido,
+  sin inventar un archivo ni resolver métodos de Object (D51). Conserva los cinco
+  libros soportados y la advertencia de fallos parciales del lote `todos`.
 - La descarga PLE de Diario y Mayor filtra exclusivamente asientos
   `CONFIRMADO`. El Balance de Comprobación electrónico es el formato SUNAT 3.17
   (`031700`), con período `AAAAMMDD` al cierre y 19 campos posicionales; el

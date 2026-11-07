@@ -11,19 +11,24 @@ Actualizado: 2026-11-06. Una página: si algo no cabe aquí, va a su documento d
   un usoUTC en Analytics: corregido con fecha civil y extremos locales (D47),
   sin ampliar excepciones; regresionesPE/CO/AR pasan. La preparación de
   vacaciones sí pasaAPI en865:12solicitudes/7aprobadas, días5/10/0 y409sin
-  guardar un solapamiento. El E2E865 terminó147aprobadas/2tras reintento.
+  guardar un solapamiento. El E2E808 pasa149casos, API5827/399 yStorage,
+  tipos/lint/SQL/DIAN pasan enGitHub; la integración ya superóRRHH y sigue
+  ejecutándose. No se cuenta como aprobada toda la corrida.
+  D51 corrige el selectorPLE que resolvía propiedades heredadas e inventaba un
+  éxito vacío:41pruebas dirigidas, HTTP real sin cambio financiero, tipos y
+  suite local5839/400 pasan; pendiente CI del candidato actualizado.
   La integracióndf28 falló al reintentar asistencia: D49 conserva el recibo
   original y el reloj civil PE/CO/AR. API local concurrente deja una asistencia,
   dos recibos y dos auditorías; rollback/doble reaplicación y cadena nueva
   605migraciones/118verificadores pasan. El E2Edf28 agotó20min tras reinicio
   de Next dev por memoria: D48 compila un build aislado de producción y valida
-  sus fuentes, perfil y proxy loopback;149casos descubiertos, ejecución remota
-  pendiente, sin aumentar timeout ni retirar casos. D42/D44 conservan un main y
+  sus fuentes, perfil y proxy loopback;149casos ejecutados en808, sin aumentar
+  timeout ni retirar casos. D42/D44 conservan un main y
   contraste17.71/17.54 en claro/oscuro.
 - **Seguridad:** D46 rechaza tagsPII truncados, base64 inválido y claves/salt
   por defecto. Mantiene el formato y las claves válidas actual/anterior, sin
   reescribir datos; proveedor sin clave no cifra.48pruebasPII/configuración
-  pasan; suite local final5827pruebas/399suites con cobertura, tipos, buildAPI
+  pasan; suite local final5839pruebas/400suites con cobertura, tipos, buildAPI
   y lint sin errores. HelpersPII legacy requieren revisión.
   CodeQL sigue no disponible para este repositorio privado personal; no se
   contrata, traslada ni expone. Presupuesto nuevo0 y límiteActions0 conservados.
@@ -151,7 +156,7 @@ Actualizado: 2026-11-06. Una página: si algo no cabe aquí, va a su documento d
 | `606` | Crédito proveedor acumulado compartido con CxP: diez circuitos, ocho guardas, API400 atómico,5723pruebas, rollback y cadena limpia pasan. EmisiónNC cubierta por607. Sin promoción |
 | `607` | EmisiónNC proveedor acumulada y consumo del valor asignado: diez circuitos, diez guardas, dos rechazos inmutables, API400 y rollback pasan.5735pruebas, tipos, imagen y cadena limpia pasan; continuidad bancaria cubierta por608. Sin promoción |
 | `608` | Traza explícita de reembolso proveedor en banco extranjero. Rollback exacto, doble reaplicación,152pruebas dirigidas, tipos e imagen pasan. Seis circuitos API/SQL, diez guardas, dos rechazos inmutables, API400 y cadena604migraciones/117verificadores pasan. Sin promoción |
-| `609` | Asistencia automática: wrapper sobre writer475, reloj civil PE/CO/AR y replay del recibo original bajo el mismo lock. Sin backfill ni cambio de ACL/RLS de tablas. Rollback, doble reaplicación, API concurrente y cadena605/118 pasan; sin promoción |
+| `609` | Asistencia automática: wrapper sobre writer475, reloj civil PE/CO/AR y replay del recibo original bajo el mismo lock. Sin backfill ni cambio de ACL/RLS de tablas. Rollback, doble reaplicación, API concurrente y cadena605/118 pasan. Restauración local299tablas/234472filas conserva historia609, ACL/RLS/políticas y función; no acredita respaldoPROD ni RTO. Sin promoción |
 
 Próxima libre: `610`. El candidato local exige609; PROD observado sigue en593. Comprobar prefijos duplicados antes de añadir una.
 
