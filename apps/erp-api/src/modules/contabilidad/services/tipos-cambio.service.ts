@@ -7,7 +7,7 @@ import {
   LadoTipoCambio
 } from '@erp-suite/dtos';
 import { getActiveCountryByCode, ACTIVE_COUNTRY_PROFILES } from '../../paises/initial-country';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 
 @Injectable()
 export class TiposCambioService {
@@ -94,7 +94,7 @@ export class TiposCambioService {
     const monedaDestinoValidada=dto.moneda_destino.toUpperCase();
     if(monedaOrigenValidada===monedaDestinoValidada) throw new BadRequestException('La moneda de origen y la de destino no pueden ser la misma.');
     if(dto.compra===undefined&&dto.venta===undefined) throw new BadRequestException('Debe informar al menos una cotización: compra o venta.');
-    const key=idempotencyKey?.trim()||`fx-upsert:${createHash('sha256').update(JSON.stringify({tenantId,userId,dto})).digest('hex')}`;
+    const key=idempotencyKey?.trim()||`fx-upsert:${randomUUID()}`;
     const {data:rpcData,error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_maestro_contable_tx',{
       p_tenant_id:tenantId,p_actor_id:userId,p_entity:'FX',p_action:'CREATE',p_record_id:null,p_payload:dto,p_idempotency_key:key,
     });

@@ -1,7 +1,27 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CreatePresupuestoDto, UpdatePresupuestoDto, EstadoPresupuesto } from '@erp-suite/dtos';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
+import { lecturaContableFallida } from '../contabilidad-errors';
+
+/**
+ * Errores del RPC 480 con texto para el contador. Antes todo salía como 400 con
+ * el código interno («BUDGET_NOT_FOUND») o en inglés para el duplicado.
+ */
+function errorPresupuesto(error: { code?: string; message?: string }, accion: string): Error {
+  const motivo = String(error?.message ?? '');
+  if (motivo.includes('BUDGET_NOT_FOUND')) return new NotFoundException('Presupuesto no encontrado');
+  if (error?.code === '23505' || /duplicate key|DUPLICATE/i.test(motivo)) {
+    return new ConflictException('Ya existe un presupuesto para ese centro de costo, cuenta y período');
+  }
+  if (motivo.includes('BUDGET_IDEMPOTENCY_CONFLICT')) return new ConflictException('Esta operación ya se registró con otros datos; recarga e inténtalo de nuevo');
+  if (motivo.includes('BUDGET_PERIOD_NOT_OPEN')) return new ConflictException('El período contable no está abierto');
+  if (motivo.includes('BUDGET_AMOUNT_INVALID') || motivo.includes('BUDGET_VALUES_INVALID') || motivo.includes('BUDGET_REQUEST_INVALID')) {
+    return new BadRequestException('Revisa los datos del presupuesto: el monto debe ser mayor a cero y la cuenta, el centro y el período deben existir');
+  }
+  if (['22023', '23503', '23514', '22P02'].includes(String(error?.code))) return new BadRequestException(`No se pudo ${accion} el presupuesto: datos inválidos`);
+  return new ServiceUnavailableException(`No se pudo ${accion} el presupuesto; reintenta`);
+}
 
 export interface Presupuesto {
   id: string;
@@ -45,11 +65,13 @@ export class PresupuestosService {
   ): Promise<Presupuesto> {
     if(!userId) throw new BadRequestException('Se requiere un usuario autenticado');
     if(createPresupuestoDto.monto_presupuestado<=0) throw new BadRequestException('El monto presupuestado debe ser mayor a cero');
-    const key=idempotencyKey?.trim()||`budget-create:${createHash('sha256').update(JSON.stringify({tenantId,userId,createPresupuestoDto})).digest('hex')}`;
+    // Sin Idempotency-Key cada petición es una intención nueva: derivarla del
+    // contenido hacía que recrear un presupuesto borrado devolviera el borrado.
+    const key=idempotencyKey?.trim()||`budget-create:${randomUUID()}`;
     const {data:rpcData,error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_presupuesto_tx',{
       p_tenant_id:tenantId,p_actor_id:userId,p_action:'CREATE',p_presupuesto_id:null,p_payload:createPresupuestoDto,p_idempotency_key:key,
     });
-    if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo crear el presupuesto');
+    if(rpcError) throw errorPresupuesto(rpcError,'crear');
     const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData;
     return result.record as Presupuesto;
   }
@@ -103,7 +125,7 @@ export class PresupuestosService {
 
     if (error) {
       console.error('❌ [Presupuestos] Error obteniendo presupuestos:', error);
-      throw new Error(`Error obteniendo presupuestos: ${error.message}`);
+      throw lecturaContableFallida(error, 'los presupuestos');
     }
 
     console.log(`✅ [Presupuestos] ${data.length} presupuestos encontrados`);
@@ -134,7 +156,7 @@ export class PresupuestosService {
 
     if (error) {
       console.error('❌ [Presupuestos] Error obteniendo presupuesto:', error);
-      throw new Error(`Error obteniendo presupuesto: ${error.message}`);
+      throw lecturaContableFallida(error, 'el presupuesto');
     }
 
     if (!data) {
@@ -164,11 +186,12 @@ export class PresupuestosService {
     idempotencyKey?: string,
   ): Promise<Presupuesto> {
     if(!userId) throw new BadRequestException('Se requiere un usuario autenticado');
-    const key=idempotencyKey?.trim()||`budget-update:${createHash('sha256').update(JSON.stringify({tenantId,presupuestoId,userId,updatePresupuestoDto})).digest('hex')}`;
+    // Volver a un monto ya usado (A→B→A) sin clave no debe reproducir la primera edición.
+    const key=idempotencyKey?.trim()||`budget-update:${randomUUID()}`;
     const {data:rpcData,error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_presupuesto_tx',{
       p_tenant_id:tenantId,p_actor_id:userId,p_action:'UPDATE',p_presupuesto_id:presupuestoId,p_payload:updatePresupuestoDto,p_idempotency_key:key,
     });
-    if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo actualizar el presupuesto');
+    if(rpcError) throw errorPresupuesto(rpcError,'actualizar');
     const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData;
     return result.record as Presupuesto;
   }
@@ -192,7 +215,7 @@ export class PresupuestosService {
     const {data:rpcData,error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_presupuesto_tx',{
       p_tenant_id:tenantId,p_actor_id:userId,p_action:'DELETE',p_presupuesto_id:presupuestoId,p_payload:{},p_idempotency_key:key,
     });
-    if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo eliminar el presupuesto');
+    if(rpcError) throw errorPresupuesto(rpcError,'eliminar');
     const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData;
     return result.record as Presupuesto;
   }
@@ -310,7 +333,7 @@ export class PresupuestosService {
 
     if (error) {
       console.error('❌ [Presupuestos] Error obteniendo presupuestos:', error);
-      throw new Error(`Error obteniendo presupuestos: ${error.message}`);
+      throw lecturaContableFallida(error, 'los presupuestos');
     }
 
     if (!presupuestos || presupuestos.length === 0) {
@@ -472,9 +495,8 @@ export class PresupuestosService {
       .eq('tenant_id', tenantId)
       .maybeSingle();
 
-    if (errorPeriodo || !periodo) {
-      throw new Error('Período contable no encontrado o no pertenece a su organización');
-    }
+    if (errorPeriodo) throw lecturaContableFallida(errorPeriodo, 'el período contable');
+    if (!periodo) throw new NotFoundException('Período contable no encontrado o no pertenece a su organización');
 
     // Obtener todos los presupuestos del período con información de centros y cuentas
     const { data: presupuestos, error: errorPresupuestos } = await this.supabaseService
@@ -501,7 +523,7 @@ export class PresupuestosService {
 
     if (errorPresupuestos) {
       console.error('❌ [Presupuestos] Error obteniendo presupuestos:', errorPresupuestos);
-      throw new Error(`Error obteniendo presupuestos: ${errorPresupuestos.message}`);
+      throw lecturaContableFallida(errorPresupuestos, 'los presupuestos');
     }
 
     if (!presupuestos || presupuestos.length === 0) {
@@ -750,7 +772,7 @@ export class PresupuestosService {
 
     if (error) {
       console.error('❌ [Presupuestos] Error obteniendo presupuestos:', error);
-      throw new Error(`Error obteniendo presupuestos: ${error.message}`);
+      throw lecturaContableFallida(error, 'los presupuestos');
     }
 
     if (!presupuestos || presupuestos.length === 0) {

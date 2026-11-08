@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { PresupuestosService } from './presupuestos.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CreatePresupuestoDto, UpdatePresupuestoDto, EstadoPresupuesto } from '@erp-suite/dtos';
@@ -72,10 +72,10 @@ describe('PresupuestosService', () => {
       mockSupabaseClient.rpc.mockResolvedValue({ data: null, error: { message: 'duplicate key value violates unique constraint' } });
 
       await expect(service.crearPresupuesto(tenantId, createDto, userId)).rejects.toThrow(
-        BadRequestException
+        ConflictException
       );
       await expect(service.crearPresupuesto(tenantId, createDto, userId)).rejects.toThrow(
-        'duplicate key value'
+        'Ya existe un presupuesto para ese centro de costo, cuenta y período'
       );
       expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('gestionar_presupuesto_tx', expect.objectContaining({
         p_action: 'CREATE', p_actor_id: userId,

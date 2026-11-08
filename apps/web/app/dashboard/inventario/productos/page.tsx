@@ -39,6 +39,8 @@ type Filters = {
 export default function ProductosPage() {
   const router = useRouter();
   const { get, del } = useApi();
+  const { get: getProductos } = useApi({ throwOnError: true, showErrorToast: false });
+  const [loadError, setLoadError] = useState<string | null>(null);
   const country = useCountryContext();
   const formatMoney = (value: number) =>
     new Intl.NumberFormat(country.locale || "es-PE", {
@@ -57,17 +59,20 @@ export default function ProductosPage() {
   const loadProductos = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await get("/inventario/productos");
+      const response = await getProductos("/inventario/productos");
       if (response?.success && Array.isArray(response.data)) {
         setProductos(response.data);
       }
+      setLoadError(null);
     } catch (error) {
+      // Una carga fallida no es un catálogo vacío: antes se veía «No se
+      // encontraron productos».
       console.error("Error cargando productos:", error);
-      alert("Error al cargar productos");
+      setLoadError(error instanceof Error && error.message ? error.message : "Inténtalo nuevamente en unos minutos.");
     } finally {
       setLoading(false);
     }
-  }, [get]);
+  }, [getProductos]);
 
   useEffect(() => {
     loadProductos();
@@ -235,6 +240,11 @@ export default function ProductosPage() {
           <div className="flex min-h-48 items-center justify-center">
             <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
             <p>Cargando productos...</p>
+          </div>
+        ) : loadError ? (
+          <div id="productos-load-error" role="alert" className="m-6 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <strong className="block font-semibold">No se pudieron cargar los productos.</strong>
+            <span>{loadError}</span>
           </div>
         ) : productosFiltrados.length === 0 ? (
           <div className="text-center p-12 text-[var(--primary-500)]">

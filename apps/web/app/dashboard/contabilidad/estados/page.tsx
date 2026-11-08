@@ -46,7 +46,8 @@ export default function EstadosFinancierosPage() {
   const handleRefresh = async () => {
     setLoading(true)
     try {
-      await post(`/api/contabilidad/estados/refrescar?anio=${anio}&mes=${mes}`, {})
+      // El API lee el periodo del cuerpo: en la URL cada clic terminaba en 400.
+      await post('/api/contabilidad/estados/refrescar', { anio, mes })
       setRefreshKey((prev) => prev + 1)
     } catch (error) {
       console.error('Error refrescando estados financieros:', error)

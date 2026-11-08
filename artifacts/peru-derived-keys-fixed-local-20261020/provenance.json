@@ -1,0 +1,17 @@
+{
+  "capturedAt": "2026-10-20T08:54:26.798Z",
+  "capture": "Before launch",
+  "source_hashes": {
+    "artifacts/peru-block-runner-20261019.mjs": "54d1792353713565a78366eff4a28ecbf3b4f6e82598ae7c6f4b1e4f150a7ee1",
+    "scripts/ci/test-peru-derived-keys-local.mjs": "2b794dc1fac89063263bb044b4f220f87ace09039788505b7cf802161cc09684",
+    "scripts/ci/peru-local-smtp-sink.mjs": "af601f15f5beb86aabc65046663fe33779b3b37c18c18365b514f84d056347ff",
+    "scripts/ci/prepare-peru-first-client-local.mjs": "d8216e7826944a55bf605fd3b49c6c15579219266850819e0e2885fd671f6698",
+    "apps/erp-api/tests/e2e/helpers/local-api-harness.ts": "b1c4d7c61c10a2b5b0c28c367c8790196d667dd8d03bdd65058bf982efc3e968",
+    "apps/erp-api/src/modules/contabilidad/services/tipos-cambio.service.ts": "3e5126622814d1e71486e98a40b1327fc0432cb81709c1e976689e870c74d160",
+    "apps/erp-api/src/modules/contabilidad/services/centros-costo.service.ts": "2811462ee4ee12d1dd7ed3ef2d7e3cf72123769a9f6c516fa6e24c0bbfbe54e9",
+    "apps/erp-api/src/modules/finanzas/cxp/cxp.service.ts": "aa0d9abf2cdad287da8822ac152044d7cbc0e0c2606a8b06407811cde712357e",
+    "apps/web/tests/e2e/peru-derived-keys-local.spec.ts": null
+  },
+  "complete_acceptance": false,
+  "remoteWrites": false
+}

@@ -6,7 +6,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import {
   CrearAjusteConsolidacionDto,
   CrearGrupoConsolidacionDto,
@@ -226,7 +226,7 @@ export class ConsolidacionReportesService {
     dto: RegistrarTasaConsolidacionDto,
     idempotencyKey?: string,
   ) {
-    const key=idempotencyKey?.trim()||`consolidation-rate:${createHash('sha256').update(JSON.stringify({tenantId,userId,grupoId,dto})).digest('hex')}`;
+    const key=idempotencyKey?.trim()||`consolidation-rate:${randomUUID()}`;
     const {data,error}=await this.client.rpc('gestionar_consolidacion_tx',{
       p_tenant_id:tenantId,p_actor_id:userId,p_grupo_id:grupoId,p_accion:'RATE',p_payload:dto,p_idempotency_key:key,
     });
@@ -294,7 +294,7 @@ export class ConsolidacionReportesService {
     if (!cuentaDestino) {
       throw new NotFoundException(`La cuenta destino ${dto.cuenta_codigo_destino.trim()} no existe en la controladora.`);
     }
-    const key=idempotencyKey?.trim()||`consolidation-map:${createHash('sha256').update(JSON.stringify({tenantId,userId,grupoId,dto})).digest('hex')}`;
+    const key=idempotencyKey?.trim()||`consolidation-map:${randomUUID()}`;
     const {data,error}=await this.client.rpc('gestionar_consolidacion_tx',{
       p_tenant_id:tenantId,p_actor_id:userId,p_grupo_id:grupoId,p_accion:'ACCOUNT_MAP',p_payload:dto,p_idempotency_key:key,
     });
