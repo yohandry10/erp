@@ -45,4 +45,3 @@ export function privateSentryError(event: ErrorEvent): ErrorEvent | null {
     environment: event.environment && /^[a-z0-9._-]{1,40}$/.test(event.environment) ? event.environment : undefined,
   }
 }
-

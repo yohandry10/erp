@@ -67,5 +67,7 @@ local; producción conserva su versión y configuración anteriores. El próximo
 análisis debe comprobar la cabeza que incluya estos SDK.
 
 Las huellas y pruebas resumidas están en[validacion.json](validacion.json). Las
+dos líneas finales vacías retiradas después de las pruebas producen JavaScript
+idéntico; las huellas anterior/posterior se conservan en esa validación. Las
 credenciales locales, logs, JSON completos y capturas permanecen en el expediente
 privado. No se ejecutó SQL remoto, operaciones de clientes ni promoción.

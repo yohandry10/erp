@@ -139,7 +139,7 @@
     "apps/erp-api/src/config/env.schema.ts": "3ad7c9fc3282c06af08bf2963c72a71be779400c9eb055998c60ebc22a47a88b",
     "apps/erp-api/src/main.ts": "c3609b69a3f3c03ea4070b552e6f36245f92e251b721c7a40beca60e5d0f3c99",
     "apps/erp-api/src/shared/observability/sentry-privacy.spec.ts": "d3c19496ea0ffbefb23c28337152f7fc35778ca76109918e782a57d9dd9e3e84",
-    "apps/erp-api/src/shared/observability/sentry-privacy.ts": "a704c94534616581c6a16ebae0577edc29e350ebef4a3db3dabc783a3fc681fb",
+    "apps/erp-api/src/shared/observability/sentry-privacy.ts": "575064d7fe247553012cc5c46098da3904a893c668dade659b7de407f5822cbb",
     "apps/erp-api/src/shared/observability/sentry-process.spec.ts": "c83e8ecfb11c0a2f5f1c5169896d3cda92adf14963b756d915cf6a91c46d0922",
     "apps/erp-api/src/shared/observability/sentry.ts": "547796b92d119cff31b1a07a303a0cadc0f0c4d6dcb0de9fdf3063426a26b090",
     "apps/web/components/error/ErrorBoundary.tsx": "d8a95edf4feff6095f8ed47299a68aae91b719435c328db3455d832aca56be0b",
@@ -147,7 +147,7 @@
     "apps/web/package.json": "36b36b546dea349f86543d51f317dbb9f5bbd72ef5cb575dc377a82282f27797",
     "apps/web/instrumentation-client.ts": "3354aa444e9d0e7e7513aeb4a82b5321e4f371282ab7cb3030143094c5edd9dd",
     "apps/web/instrumentation.ts": "25f1a6f6fcff3794fac9f27e329143b1d16e2f4e24cb66ab36a2fe485f25ef4f",
-    "apps/web/lib/observability/sentry-privacy.ts": "4bb207b9fb98c97424ba1a749f76bd1f5a79ebf8c300554aeaa0415d79bd06fa",
+    "apps/web/lib/observability/sentry-privacy.ts": "34844ae265be43c28b0a53b86e4a7114d6da04a04d5ac1a1e85da0e169fc7fd4",
     "apps/web/sentry.server.config.ts": "37662eaca114f8d522ee631e2c06a499650174d5fc826879135a2e7213536aef",
     "apps/web/tests/observability/verify-sentry-privacy.mjs": "7b3748a4ab61ad6645f7b32ab644089eeae5526c4f3ab7e1f7b0a037ddaacc9f",
     "pnpm-lock.yaml": "a2d5e1a84e24cea0f9c9f03413e10bac049dca181b2b76b7d60faddcb221a1e4"
@@ -155,5 +155,21 @@
   "merge": false,
   "productionDeploy": false,
   "remoteBusinessWrites": false,
-  "newSpending": 0
+  "newSpending": 0,
+  "afterValidation": {
+    "onlyFinalBlankLineRemoved": true,
+    "identicalEmittedJavascript": true,
+    "changes": [
+      {
+        "path": "apps/erp-api/src/shared/observability/sentry-privacy.ts",
+        "before": "a704c94534616581c6a16ebae0577edc29e350ebef4a3db3dabc783a3fc681fb",
+        "after": "575064d7fe247553012cc5c46098da3904a893c668dade659b7de407f5822cbb"
+      },
+      {
+        "path": "apps/web/lib/observability/sentry-privacy.ts",
+        "before": "4bb207b9fb98c97424ba1a749f76bd1f5a79ebf8c300554aeaa0415d79bd06fa",
+        "after": "34844ae265be43c28b0a53b86e4a7114d6da04a04d5ac1a1e85da0e169fc7fd4"
+      }
+    ]
+  }
 }
