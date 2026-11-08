@@ -1,0 +1,272 @@
+{
+  "at": "2026-11-08T17:25:31.495Z",
+  "pass": true,
+  "parentCommit": "2961b2d5cf0e29b39494a33c3634af9074622a82",
+  "branch": "codex/linked-inventory-reversals-20261108",
+  "published": false,
+  "productionGo": false,
+  "hashBasis": "tested working-copy bytes; Git may normalize CRLF to LF",
+  "files": [
+    {
+      "name": ".github/workflows/ci.yml",
+      "sha256": "105e57c34b7479dc8957893fbfdb8e5e1148025af3b177136a11e79c860850fe"
+    },
+    {
+      "name": "apps/erp-api/src/app.controller.runtime.spec.ts",
+      "sha256": "6d8178ebe4a0ad3f4cecc7e3ba957cfa296514c9ee530fed6919be6eee590656"
+    },
+    {
+      "name": "apps/erp-api/src/config/database-schema-version.ts",
+      "sha256": "fe97c4a0e5c07d9fc9a13e52e4655348e54e913c51d81eceeec2d56fbfad6ef4"
+    },
+    {
+      "name": "apps/erp-api/src/config/env.schema.spec.ts",
+      "sha256": "2f79cb82cb0a02ed194d21ec179d2396c2c999eb1805b29b44d1925a11eaadc7"
+    },
+    {
+      "name": "apps/erp-api/src/modules/compras/controllers/recepciones.controller.ts",
+      "sha256": "fc3d4b6d7dc82d084e85a9ecff664b00f0362631d6690f7f812f44ec740a3615"
+    },
+    {
+      "name": "apps/erp-api/src/modules/compras/dto/receipt-reversal.dto.ts",
+      "sha256": "27711e3c28d4e7ebc582617fedeaa2e5527cbcdabd6a24563d044fa40f63b215"
+    },
+    {
+      "name": "apps/erp-api/src/modules/compras/services/receipt-reversal-http.spec.ts",
+      "sha256": "84dd5e5dc40599f2954075ac323bdbccd7d7af4db4676ccbff5120dccf87a9eb"
+    },
+    {
+      "name": "apps/erp-api/src/modules/compras/services/receipt-reversal-receipt.spec.ts",
+      "sha256": "2cbf420f959cfde3f54eaa882d81b7b1b99045e9c6c7e19d26ea5d11a4d1af20"
+    },
+    {
+      "name": "apps/erp-api/src/modules/compras/services/receipt-reversal-receipt.ts",
+      "sha256": "cda6dc6db96991b76c1f344e850edd6e217d990b77ad54376e0a4f974d23ac30"
+    },
+    {
+      "name": "apps/erp-api/src/modules/compras/services/receipt-reversal.fixture.json",
+      "sha256": "e4edad48fb88159d143469421c288a6bb689bd77887a5656ccf8548db3809036"
+    },
+    {
+      "name": "apps/erp-api/src/modules/compras/services/recepciones.service.ts",
+      "sha256": "41cd6a138e2675e0e0b345b6b69f24c02e26f8c8c5d67194545008c8a75b782c"
+    },
+    {
+      "name": "apps/erp-api/src/modules/contabilidad/listeners/contabilidad-events.listener.ts",
+      "sha256": "875fd399548f3c285e497a55b3335807916a9215184d6fecdfff425c0c8ec03d"
+    },
+    {
+      "name": "apps/erp-api/src/modules/contabilidad/listeners/receipt-accounting.fixture.json",
+      "sha256": "5fca1c53a41b6133a9429cc21259c6da7f72a39ed3ff2fcd8acd5b6a1423211a"
+    },
+    {
+      "name": "apps/erp-api/src/modules/contabilidad/listeners/receipt-reversal-accounting.spec.ts",
+      "sha256": "76b584555e773d20e0d1e89985a61a6907a8aa2c394d767b667a37506543e66e"
+    },
+    {
+      "name": "apps/erp-api/src/modules/inventario/dto/transfer-reversal.dto.ts",
+      "sha256": "3da01302ee50f7e8b2132b3a92d1c62d0351c17921580cad46a1b53d97f0c024"
+    },
+    {
+      "name": "apps/erp-api/src/modules/inventario/inventario.controller.ts",
+      "sha256": "1923c98f08a1e41b6be437a09d6930e2823303ef7667b744c0fba83d72760caf"
+    },
+    {
+      "name": "apps/erp-api/src/modules/inventario/inventario.service.ts",
+      "sha256": "cf547d72dac7ea3ea952ba594ef7ee4ede34c923f45616bc06ec1239ef057f88"
+    },
+    {
+      "name": "apps/erp-api/src/modules/inventario/transfer-reversal-http.spec.ts",
+      "sha256": "0063090eebbfa4ca47d0a0ec38d1e9cdce69d5c5ed1e547b9528928d58d55879"
+    },
+    {
+      "name": "apps/erp-api/src/modules/inventario/transfer-reversal-receipt.spec.ts",
+      "sha256": "6b7be8b31042fd2a436f58312294d439edb761e7df195d4c1b0097b5706cf061"
+    },
+    {
+      "name": "apps/erp-api/src/modules/inventario/transfer-reversal-receipt.ts",
+      "sha256": "a39581806c34c3b1a51af685ea8ce20d30bbec3c01963f4b989acfe5e6207d92"
+    },
+    {
+      "name": "apps/erp-api/src/modules/inventario/transfer-reversal-request.spec.ts",
+      "sha256": "18ccd3c1380ecc1a28b8f55fab20e4deca8bca7db26ff0e678e3963628aa852e"
+    },
+    {
+      "name": "apps/erp-api/src/modules/inventario/transfer-reversal-resolution.fixture.json",
+      "sha256": "6526a8a116ce41685da9190a4b7f8664ed34747e75308268a5d8789d2ccdf211"
+    },
+    {
+      "name": "apps/erp-api/src/modules/inventario/transfer-reversal.fixture.json",
+      "sha256": "ea844414512050a6e370607d08e552c2055322dc448d71bb2ecb0a1699db83d6"
+    },
+    {
+      "name": "apps/erp-api/src/shared/outbox/accounting-event-types.ts",
+      "sha256": "5c192322810d32b252dd04d5c620714e993c89f8039e97ea7b6a6c0a7ffbd256"
+    },
+    {
+      "name": "apps/web/app/dashboard/compras/recepciones/[id]/ClientPage.tsx",
+      "sha256": "1650852f52a917b6137a497ed2b3ce809a0d3aef7a0f510be1e15bb5adf0f99e"
+    },
+    {
+      "name": "apps/web/components/compras/ReceiptReversalPanel.tsx",
+      "sha256": "a06509b5aa14da86827eb82f8bc450c530b06c2787c5f450803511c84a3a334e"
+    },
+    {
+      "name": "apps/web/lib/compras/receipt-reversal-operation.ts",
+      "sha256": "ab5eb1b3775745bc46106178503ac4bdf4b3c7345a9ea09ee3409b60a5af967b"
+    },
+    {
+      "name": "apps/web/lib/offline-store.ts",
+      "sha256": "2adccbe936583f5fdc4632a5c1af5d8ecaa72bc1d0d60eaa40146e529c19320c"
+    },
+    {
+      "name": "apps/web/src-tauri/src/lib.rs",
+      "sha256": "a10f969cab3863b136d2de9dc4a92fffe3718855bf8725ddb8fedad63c4b932f"
+    },
+    {
+      "name": "apps/web/tests/compras/receipt-reversal-abandon.fixture.json",
+      "sha256": "82b6bce6bd297d990c226632825bc33d913443be4cb457372402fbbdef2ceeae"
+    },
+    {
+      "name": "apps/web/tests/compras/receipt-reversal.fixture.json",
+      "sha256": "011ca36dcd0b1f23ba5dc93cafebb01a4980d5e4388aa0c309bd75e42ebb8972"
+    },
+    {
+      "name": "apps/web/tests/compras/verify-receipt-reversal-operation.mjs",
+      "sha256": "e26cbf1f34f29cd0cd637e30ec2d0722bd82e2f62a43fbeab1761f30ac2d839e"
+    },
+    {
+      "name": "apps/web/tests/offline/verify-offline-store.mjs",
+      "sha256": "89a0b53c5319b32a35ae91fabbc16a29536f90bec6ad54d7ce1deda9f525eef9"
+    },
+    {
+      "name": "docs/CURRENT_STATE.md",
+      "sha256": "f32814a79dbd0ed2f4f9918708eb1efcf7d0990b279d289512b5953d3c287e85"
+    },
+    {
+      "name": "docs/MODULES.md",
+      "sha256": "2d3d0200e3d7f90a5a60c1cff9bbd215b288d9b24ac2edc9ffdeae5dd3507c0a"
+    },
+    {
+      "name": "render.yaml",
+      "sha256": "34b05edfd1462f64dc3fade106601001d4dc6bdd44739a8f2a0791ff8ec0e5d0"
+    },
+    {
+      "name": "supabase/migrations/613__linked_inventory_business_reversals.sql",
+      "sha256": "03aa50ef4a94eeb0899ccb147df9e843efac6268cc19600978f219073252a510"
+    },
+    {
+      "name": "supabase/migrations/614__purchase_receipt_invoice_serialization.sql",
+      "sha256": "9402211d9188fd2d6f4d6cc1cf278511ead0b2f0ffb5290f118676fd0ccbcf89"
+    },
+    {
+      "name": "supabase/migrations/615__linked_purchase_receipt_business_reversal.sql",
+      "sha256": "7faba47b1ef5d069993f33eef7d97c44e269d5d58754990ce4f0ea7d79846644"
+    },
+    {
+      "name": "supabase/migrations/616__purchase_receipt_reversal_recovery.sql",
+      "sha256": "8b1eed6b17c62040263ea86d74c68e6fcc406f65f184b7ff29e8890db8305acb"
+    },
+    {
+      "name": "supabase/verify/613__linked_inventory_business_reversals.sql",
+      "sha256": "bc5f7cf386ecea1876fb1cfae1cc5d8463ac056ce69bcd7c7ce0c5a8d74d1e2f"
+    },
+    {
+      "name": "supabase/verify/614__purchase_receipt_invoice_serialization.sql",
+      "sha256": "5629f60b5b7f3004193e790e01c99ccad2ff0da9ff2d75ea785526c194719881"
+    },
+    {
+      "name": "supabase/verify/615__linked_purchase_receipt_business_reversal.sql",
+      "sha256": "fc7fbddcea06e4262b888c62dcab2755ec95aa99d160ac8f09e9d30eea892728"
+    },
+    {
+      "name": "supabase/verify/616__purchase_receipt_reversal_recovery.sql",
+      "sha256": "d94df5b5545d81eacf554a60ca134661673c87006992ee47af51a38ff1cfb79f"
+    }
+  ],
+  "schema": 616,
+  "nextMigration": 617,
+  "api": {
+    "tests": 6066,
+    "suites": 408,
+    "timezone": "UTC",
+    "fullSuite": true,
+    "coverage": true,
+    "sourceVerified": true,
+    "controllerNormalizedLfOnlyAfterSuite": true,
+    "controllerHttpRechecked": 37
+  },
+  "fresh": {
+    "migrationCount": 612,
+    "latest": 616,
+    "verifiers": 125,
+    "historicalVerifiers": 67
+  },
+  "web": {
+    "productionBuild": true,
+    "sourceCount": 918,
+    "types": true,
+    "newUiLintWarnings": 0,
+    "contractChecks": 98
+  },
+  "native": {
+    "tests": 48,
+    "offline": true,
+    "legacyRequestsPreserved": true
+  },
+  "apiLint": {
+    "errors": 0,
+    "warnings": 97
+  },
+  "sqlRaces": {
+    "transfer613": 7,
+    "receipt615": 9,
+    "receiptRecovery616": 3
+  },
+  "integration": {
+    "realLoginJwtSessions": true,
+    "realPermissionGuard": true,
+    "realPostgrest": true,
+    "originalAndCounterNodeWorkers": true,
+    "zeroWithoutFakeJournal": true,
+    "lostAckAfterCommitRecovered": true,
+    "transferRecoveryAndAbandonment": true
+  },
+  "browser": {
+    "ownUiReceipts": 3,
+    "periodRejectionReloadFenceAndNewIntent": true,
+    "themes": [
+      "dark",
+      "light"
+    ],
+    "emulatedWidth": 390,
+    "observedClientWidth": 375,
+    "metricsRestored": true,
+    "finalFeedbackPersists": true
+  },
+  "retained": {
+    "schema": 612,
+    "businessTables": 21,
+    "identical": true,
+    "newReversalTablesAbsent": true
+  },
+  "support": {
+    "ticket": 4972573,
+    "checkedDuringThisCut": true,
+    "state": "OPEN",
+    "ownerComments": 1,
+    "purgeNotVerified": true
+  },
+  "pending": [
+    "transfer UI and durable intent",
+    "FX matrix",
+    "natural session expiry with pending form",
+    "release restore and rollback rehearsal",
+    "remaining A–J and production gates",
+    "CodeQL and full SAST triage"
+  ],
+  "remoteSql": false,
+  "merge": false,
+  "deploy": false,
+  "spending": 0
+}

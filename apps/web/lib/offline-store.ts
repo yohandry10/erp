@@ -434,7 +434,7 @@ function isPurchaseOrderCreateOfflineRequest(input: Pick<OfflineRequestInput, 'e
 
 function isPurchaseReceiptOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
   return input.method.trim().toUpperCase() === 'POST' && [input.endpoint,input.url].some(endpoint =>
-    /^\/(?:backend\/)?(?:api\/)?compras\/recepciones\/(?:ordenes\/[^/]+|[^/]+\/cerrar)$/.test(offlineEndpointPath(endpoint)))
+    /^\/(?:backend\/)?(?:api\/)?compras\/recepciones\/(?:ordenes\/[^/]+|[^/]+\/(?:cerrar|anular(?:\/(?:recibo|resolver))?))$/.test(offlineEndpointPath(endpoint)))
 }
 
 function isProductCreateOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
@@ -540,7 +540,12 @@ function isCashOperationOfflineRequest(input: Pick<OfflineRequestInput, 'endpoin
 
 function isInventoryOperationOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
   if (['GET', 'HEAD', 'OPTIONS'].includes(input.method.trim().toUpperCase())) return false
-  return [input.endpoint, input.url].some(endpoint => /^\/(?:api\/)?inventario\/(?:movimientos|transferencias)(?:\/resolver)?$/.test(offlineEndpointPath(endpoint).replace(/^\/backend(?=\/|$)/, '')))
+  return [input.endpoint, input.url].some(endpoint => /^\/(?:api\/)?inventario\/(?:movimientos(?:\/resolver)?|transferencias(?:\/resolver|\/[^/]+\/anular(?:\/(?:recibo|resolver))?)?)$/.test(offlineEndpointPath(endpoint).replace(/^\/backend(?=\/|$)/, '')))
+}
+
+function isLinkedInventoryReversalRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  return input.method.trim().toUpperCase() === 'POST' && [input.endpoint, input.url].some(value =>
+    /^\/(?:backend\/)?(?:api\/)?(?:inventario\/transferencias|compras\/recepciones)\/[^/]+\/anular(?:\/(?:recibo|resolver))?$/.test(offlineEndpointPath(value)))
 }
 
 function isGreOperationOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
@@ -1567,6 +1572,9 @@ export async function syncOfflineQueue(
         : item.endpoint
       const rewrittenUrl = rewriteLocalIdsInEndpoint(item.url, idReplacements)
       const rewrittenBody = backendQueueBody(item, rewriteLocalIdsInBody(item.body, idReplacements))
+      if (isLinkedInventoryReversalRequest(item) || isLinkedInventoryReversalRequest({ ...item, endpoint: rewrittenEndpoint, url: rewrittenUrl })) {
+        throw new Error('La anulación y su resolución requieren confirmación manual en vivo. Se conserva la intención original sin reenviarla automáticamente.')
+      }
       if (isDocumentFiscalManualRequest({ ...item, endpoint: rewrittenEndpoint, url: rewrittenUrl })) throw new Error('La firma o el envío fiscal requiere confirmación manual en vivo. Se conserva la solicitud original sin reenviarla automáticamente.')
       if (isCxcManualConfirmationRequest({ ...item, endpoint: rewrittenEndpoint, url: rewrittenUrl })) throw new Error('El cobro o ajuste CxC requiere confirmación manual del servidor. Se conserva la solicitud original sin reenviarla automáticamente.')
       if(isAssetLifecycleManualRequest({...item,endpoint:rewrittenEndpoint,url:rewrittenUrl}))throw new Error('La edición o baja del activo requiere confirmación manual. Se conserva la solicitud original sin reenviarla automáticamente.')

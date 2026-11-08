@@ -31,6 +31,7 @@ export const ACCOUNTING_EVENT_TYPES = [
   'saldo_favor.reembolso_revertido',
   'recepcion.registrada',
   'RecepcionRegistrada',
+  'recepcion.revertida',
   'factura.proveedor.registrada',
   'FacturaProveedorRegistrada',
   'devolucion.proveedor.registrada',

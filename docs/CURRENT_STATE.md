@@ -27,8 +27,10 @@ Actualizado: 2026-11-08. Una página: si algo no cabe aquí, va a su documento d
   campos textuales de boleta con ocho regresiones; su prueba HTTP adicional sin
   fixture de pagos no se cuenta aprobada. HelpersPII legacy requieren revisión.
   CodeQL requiere hacer público este repositorio personal para usarlo sin coste.
-  El usuario autorizó ese cambio; sigue privado mientras se prepara la limpieza
-  de credenciales históricas, sin reescritura remota aplicada ni revocación probada.
+  El usuario autorizó ese cambio y la limpieza:93 ramas reescritas y verificadas;
+  PR153 sigue en borrador sobre2961b2d5. Support4972573 enviado y abierto para
+  retirar referencias/cachés antiguas conservando conversaciones. Sigue privado,
+  sin purga ni revocación probadas.
   Presupuesto nuevo0 y límiteActions0 conservados; CodeQL aún no ejecutado.
   D54 escapa HTML en la confirmación de contraseña; cuatro regresiones rojas
   pasan después del arreglo. D55 actualiza nodemailer10.1.4/fast-uri4.2.3/qs6.16.1
@@ -164,8 +166,16 @@ Actualizado: 2026-11-08. Una página: si algo no cabe aquí, va a su documento d
 | `610` | Ausencias sin cruce: trigger AFTER sobre `solicitudes` con lock por colaborador; al crear compara pendientes y aprobadas, al aprobar sólo aprobadas; rechazar no se bloquea y no revalida historia. Sustituye la prevalidación del API, que rompía el replay exacto del writer475 (409 en la integración de `808e4075`). Cadena 606/119 y 67 históricos, rollback, doble reaplicación y 5/5 altas concurrentes pasan en local. Sin promoción |
 | `611` | Nuevas muestras PE: CPE01, coreFACTURA y borrador simulado explícito sin evidencia fiscal. Prueba roja sobre610, tres verificaciones, rollback exacto y doble reaplicación pasan; filas históricas, ACL/RLS/políticas y permisos de función intactos. Cadena limpia607/120 y67históricos aprobada. No permite NC desde borrador. Sin promoción |
 | `612` | Lectura explícita del historial de aprobaciones para service_role: corrige503 en replay/conflicto tardío sin depender del proveedor ni del fixture. Prueba roja, tres verificaciones, rollback ACL exacto y doble reaplicación pasan; filas, demás permisos, RLS/políticas, owners y funciones intactos. UI vuelve a409. Cadena nueva608/121 y67históricos aprobada. Sin promoción |
+| `613` | WIP local sobre historial limpio: reversa enlazada de transferencia, dos movimientos opuestos con costo/lotes originales, lectura decimal y resolución de clave. DDL/verificador enROLLBACK y18tablas intactas; servicio y cuatro rutasAPI conectados,37casosHTTP con autenticación/Supabase sustituidos y permisos/validación reales. Inventario/readiness/config532pruebas/21suites, tipos/build/lint pasan; lint97avisos/0errores. Copia local restaurada612+DDL613: siete carreras PostgreSQL reales pasan, incluido replay/abandono y revocación efectiva mientras espera; origen y valor congelado intactos. Sin HTTP contraDB real, UI, fresh/rollback de release ni reversa empresarial de recepción; no publicado ni promovido |
+| `614` | WIP: factura y recepción comparten lock; una nueva factura ligada a recepción debe terminar con origen CERRADA al commit, con tenant/OC/proveedor/referencias coherentes. Sin backfill; pagos y updates del mismo vínculo conservan comportamiento. Respeta cierre diferido de la fábrica demo sin bypass. Prueba roja/verde con21tablas intactas, dos esperasSQL reales cierre/cancelación de borrador y rechazo deCOMMIT con origenBORRADOR/0facturas/0eventos huérfanos pasan.43pruebas config/readiness, tipos/build y plan de contratos pasan. No es reversa empresarial ni aceptación contable; sin publicación/promoción |
 
-Próxima libre: `613`. El candidato local exige612; PROD observado sigue en593. Comprobar prefijos duplicados antes de añadir una.
+| `615` | WIP local: anulación de recepción, cumplimientoOC, stock/costo/lotes originales y outbox inverso atómicos. Worker con claim real crea un único contraasiento enlazado; costo0 probado sin asiento ficticio. SQL/rollback y nueve carreras reales pasan. Integración con JWT/permisos/PostgREST y ambos workersNode reales: físico/servicioPEN con neto0 y cero sinGL. Respuesta perdida tras commit recuperada sin reenviar. Sin promoción |
+| `616` | WIP local: recibo ligado a actor/tenant/origen y resolución durable; tres carreras más verifican commit/abandono/revocación. UI conserva intención/archivo antes de retirar el pendiente; rechazo por período, recarga, resolución y nueva anulación verificados conSQL y worker.98pruebas del contrato web, colaJS y48Rust pasan. SuiteAPI completa6066/408 enUTC, tipos/buildAPI yweb pasan; lintAPI0errores/97avisos, sin avisos en la UI nueva. Cadena fresca612migraciones/125verificadores+67históricos aprobada.21tablas conservadas intactas. UI de transferencia, matrizFX y ensayo de restore/rollback aún pendientes; NO_GO |
+
+Próxima libre: `617`. El binario WIP exige616; el candidato publicado y el stack
+local conservado siguen612, PROD observado593. No arrancar el binario nuevo sobre
+la base conservada sin completar su migración en infraestructura de pruebas propia.
+Comprobar prefijos duplicados antes de añadir una.
 
 **591–593:** el corte público del 5-nov exige y encuentra 593. El ensayo previo consta en
 `artifacts/promocion-ensayo-591-593-20261101082811/informe.json`; no volver a promover por rutina.

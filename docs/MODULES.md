@@ -1412,6 +1412,43 @@ Cotización -> Aprobación -> Orden de compra -> Recepción -> CxP -> Pago
   inventario para bienes físicos con control de stock. La recepción reconoce el
   costo pendiente de factura; la CxP y el crédito fiscal nacen al registrar la
   factura real del proveedor, no al recibir la mercadería o el servicio.
+- Una nueva factura ligada a recepción sólo queda registrada si el origen está
+  CERRADA al confirmar la transacción. Facturar y cambiar el estado de la
+  recepción esperan el mismo bloqueo; se cotejan empresa, OC, proveedor y
+  referencias explícitas/legacy. Borrador, anulación o vínculos contradictorios
+  rechazan la factura completa. La fábrica demo conserva su cierre diferido en
+  el mismo commit; no se alteran deudas históricas ni actualizaciones que
+  conservan el vínculo. La protección614 serializa la factura con la anulación615.
+- La anulación615 conserva la recepción original, revierte cantidades aceptadas
+  de la OC y retira sólo el stock físico original, con su costo, moneda, tasa,
+  lote y ubicación congelados. Factura vinculada, devolución activa, stock/valor
+  insuficiente, evidencia incompleta o período cerrado rechazan el commit completo.
+  Un evento `recepcion.revertida` queda pendiente para el worker contable, que
+  crea un único asiento exactamente opuesto y enlazado al original. Si el origen
+  aún no tiene asiento se reintenta el mismo evento; no se repite el inventario.
+  Costo cero probado completa los eventos sin fabricar asientos cero. Una reversa
+  manual del asiento de recepción no sustituye la anulación empresarial.
+- Los POST `compras/recepciones/:id/anular`, `:id/anular/recibo` y
+  `:id/anular/resolver` exigen permiso vigente de cerrar y el sobre original de
+  empresa, actor, recepción, motivo, fecha contable y clave. Responden sin caché;
+  sólo confirman tras cotejar ledger, ítems y todos los movimientos opuestos.
+  La contabilidad del recibo sigue explícitamente pendiente. Recuperar616 lee sin
+  repetir la escritura; resolver recupera el commit o cierra la clave para impedir
+  una petición tardía. Ausencia/lectura parcial no prueba abandono. Las pruebas
+  HTTP dirigidas sustituyen auth/transporte; además, una integración local usa
+  login/JWT/sesión/permisos/PostgREST y ambos workersNode reales. Bien físico y
+  servicioPEN terminan con asiento/inverso y neto0; cero completa sinGL. Una
+  respuesta perdida tras el commit se recupera sin repetir el writer.
+- El detalle de recepción permite preparar la anulación con motivo, fecha
+  contable y confirmación expresa. Guarda primero la intención original por
+  empresa/actor/recepción, reserva la ventana y conserva el pendiente ante fallos.
+  Consultar no reenvía; resolver recupera el commit o cierra la clave antes de
+  preparar otra solicitud. El archivo se escribe y relee antes de retirar el
+  pendiente. La confirmación sigue visible mientras se refresca el detalle.
+  Web y escritorio rechazan estas operaciones en la cola genérica; las antiguas
+  se conservan para resolución manual. Rechazo por período, recarga y anulación
+  posterior pasan en navegador ySQL local, en ambos temas y ancho móvil. La
+  matrizFX y la aceptación completa de sesión/escritorio siguen pendientes.
 - Devoluciones al proveedor revierten existencia y obligación según estado.
 - Aprobaciones respetan tenant, rol, monto y estado.
 - La configuración de una empresa peruana provisiona las cuentas 4699 y 63
@@ -1581,6 +1618,23 @@ continúan. Ver `product-deactivate-operation-postconditions.json`.
 - Reservar no descuenta físico; despachar/facturar aplica el movimiento
   autoritativo.
 - Ajustes, transferencias, recepciones y POS usan el mismo writer.
+- WIP613 de reversas de transferencia: `GET inventario/transferencias/:id` lee el
+  origen con permiso `inventario.movimientos.read` y muestra bloqueo explícito si
+  la valuación está pendiente, sin presentar importes como confirmados. Los POST
+  `:id/anular`, `:id/anular/recibo` y `:id/anular/resolver` exigen el permiso de
+  creación y el sobre original de empresa/actor/transferencia, cuerpo y clave.
+  Las cuatro rutas responden sin caché. El writer confirma sólo con la lectura
+  atómica del ledger y las dos piernas opuestas; costo/moneda/tasa/lotes conservan
+  el origen. Recuperar nunca mueve stock, y la ausencia de recibo no prueba
+  abandono. Resolver recupera el commit previo o cierra esa clave para impedir
+  un writer tardío. Cambio de scope409; fallos ambiguos503 conservan la intención.
+  PruebasHTTP locales sustituyen autenticación/Supabase y ejercen permisos y
+  validación reales; no acreditan UI ni fiscalidad real. Siete carreras SQL en
+  una copia propia restaurada verifican replay de la misma clave, conflicto de
+  otra clave, resolución contra writer y revocación efectiva durante la espera
+  por clave/origen; sin duplicados y conservando documentos/costo originales. La
+  reversa de recepción615/616 tiene SQL, worker y rutas propias descritas en compras;
+  su interfaz y aceptación integrada siguen pendientes. Sin publicación/PROD.
 - Las ubicaciones de un almacén ajeno responden 404 y las consultas de
   ubicaciones, movimientos y estadísticas responden 503 si no pueden leer,
   nunca 200 vacío ni 500. En logística, eventos y backorders de un pedido

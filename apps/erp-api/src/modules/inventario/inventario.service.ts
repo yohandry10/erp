@@ -7,6 +7,8 @@ import { OutboxEventBuilder } from '../../shared/outbox/outbox-event.interface';
 import { v4 as uuidv4 } from 'uuid';
 import { prepareInventoryReceiptContext, bindInventoryOperationReceipt } from './inventory-operation-receipt';
 import { bindInventoryResolution, inventoryResolutionKind } from './inventory-operation-resolution';
+import { bindTransferPreview, bindTransferReversalReceipt, bindTransferReversalResolution, normalizeTransferIdentity, prepareTransferReversalContext, TransferReversalContext } from './transfer-reversal-receipt';
+import { TransferReversalBodyDto } from './dto/transfer-reversal.dto';
 import {
   RegistrarAjusteInventarioDto,
   TransferirInventarioDto,
@@ -437,6 +439,87 @@ export class InventarioService {
     if (error) throw new ServiceUnavailableException('No se pudo consultar el recibo original de inventario. Conserve sus datos; no se repetirá la operación.');
     // La ausencia no demuestra abandono y no autoriza retirar la intención original.
     return bindInventoryOperationReceipt({ ...operation?.resultado, idempotent: true }, operation, context);
+  }
+
+  /** One RPC attempt only: a transport failure can hide a successful commit. */
+  private async rpcReversaTransferencia(rpc: string, args: Record<string, unknown>, mutation = false): Promise<any> {
+    let response: any;
+    try {
+      response = await this.supabase.getClient().rpc(rpc, args);
+    } catch {
+      throw new ServiceUnavailableException('No se pudo confirmar el resultado. Conserve la intención original para consultarla; no se repetirá automáticamente.');
+    }
+    const error = response?.error;
+    if (!error) return response?.data;
+    if (error.code === '42501') throw new ForbiddenException('Se requiere permiso vigente sobre la transferencia de esta empresa.');
+    if (error.code === 'P0002') throw new NotFoundException('La transferencia original no existe en esta empresa.');
+    if (['23505', '40001'].includes(error.code)) {
+      throw new ConflictException('La clave pertenece a otra intención, ya fue cerrada o la transferencia ya tiene una anulación. Conserve los datos y consulte el resultado original.');
+    }
+    const code = String(error.message || '').split(':')[0].trim();
+    const reasons: Record<string, string> = {
+      INVENTORY_REVERSAL_PAYLOAD_INVALID: 'Revise el motivo y la guía de la intención original.',
+      INVENTORY_REVERSAL_SOURCE_NOT_CONFIRMED: 'La valuación de origen aún no está confirmada.',
+      INVENTORY_TRANSFER_ORIGIN_EVIDENCE_INCOMPLETE: 'El traslado original no tiene evidencia de inventario completa.',
+      INVENTORY_REVERSAL_WAREHOUSE_VALUATION_REQUIRED: 'El almacén ya no conserva la cantidad y el valor necesarios para revertir el traslado.',
+      INVENTORY_REVERSAL_LOT_ALLOCATION_INCOMPLETE: 'El reparto por lotes del traslado original está incompleto.',
+      INVENTORY_REVERSAL_LOT_POLICY_REQUIRED: 'La política actual de lotes no permite revertir el traslado original.',
+      INVENTORY_TRANSFER_ORIGIN_ROUTE_CHANGED: 'Los establecimientos actuales no coinciden con el traslado original.',
+      INVENTORY_TRANSFER_REVERSE_GRE_REQUIRED: 'Seleccione una guía de remisión para el viaje de retorno.',
+      INVENTORY_TRANSFER_REQUIRES_GRE: 'El traslado de retorno requiere una guía de remisión.',
+      INVENTORY_TRANSFER_GRE_INVALID: 'Seleccione una guía firmada con la ruta de retorno correcta.',
+      INVENTORY_TRANSFER_GRE_PRODUCT_MISMATCH: 'La guía debe incluir el producto y su unidad de medida.',
+      INVENTORY_TRANSFER_GRE_QUANTITY_EXCEEDED: 'La cantidad supera el saldo de la guía de retorno.',
+      INVENTORY_AVAILABLE_STOCK_INSUFFICIENT: 'No hay existencias disponibles suficientes para el retorno.',
+      INVENTORY_EXISTENCE_REQUIRED: 'El producto no tiene existencias en el almacén de retorno.',
+      INVENTORY_PRODUCT_NOT_STOCK_CONTROLLED: 'El producto original ya no permite movimientos de stock.',
+      INVENTORY_TRANSFER_WAREHOUSE_INVALID: 'Los almacenes originales no están disponibles en esta empresa.',
+    };
+    const reason = reasons[code] || mensajeErrorLote(error.message);
+    if (mutation && reason && ['22023', '23503', '23514', 'P0001'].includes(error.code)) {
+      throw new BadRequestException({ statusCode: 400, error: 'INVENTORY_NOT_APPLIED', message: reason });
+    }
+    throw new ServiceUnavailableException('No se pudo confirmar el resultado completo. Conserve la intención original para consultar o resolver su estado.');
+  }
+
+  private argumentosReversaTransferencia(context: TransferReversalContext) {
+    return { p_tenant_id: context.tenantId, p_actor_id: context.actorId, p_operacion_id: context.operationId,
+      p_idempotency_key: context.key, p_payload: { motivo: context.payload.motivo, guia_remision_id: context.payload.guia_remision_id } };
+  }
+
+  async consultarTransferencia(tenantId: string, actorId: string, operationId: string) {
+    const context = normalizeTransferIdentity(tenantId, actorId, operationId);
+    const detail = await this.rpcReversaTransferencia('consultar_transferencia_inventario_613', {
+      p_tenant_id: context.tenantId, p_actor_id: context.actorId, p_operacion_id: context.operationId, p_idempotency_key: null,
+    });
+    return bindTransferPreview(detail, context.tenantId, context.operationId);
+  }
+
+  async anularTransferencia(tenantId: string, actorId: string, operationId: string, dto: TransferReversalBodyDto) {
+    const { idempotency_key, ...payload } = dto || {};
+    const context = prepareTransferReversalContext(tenantId, actorId, operationId, idempotency_key, payload);
+    const receipt = await this.rpcReversaTransferencia('revertir_transferencia_inventario_613', this.argumentosReversaTransferencia(context), true);
+    const detail = await this.rpcReversaTransferencia('consultar_transferencia_inventario_613', {
+      p_tenant_id: context.tenantId, p_actor_id: context.actorId, p_operacion_id: context.operationId, p_idempotency_key: context.key,
+    });
+    return bindTransferReversalReceipt(receipt, detail, context);
+  }
+
+  async recuperarAnulacionTransferencia(tenantId: string, actorId: string, operationId: string, dto: TransferReversalBodyDto) {
+    const { idempotency_key, ...payload } = dto || {};
+    const context = prepareTransferReversalContext(tenantId, actorId, operationId, idempotency_key, payload);
+    const detail = await this.rpcReversaTransferencia('consultar_transferencia_inventario_613', {
+      p_tenant_id: context.tenantId, p_actor_id: context.actorId, p_operacion_id: context.operationId, p_idempotency_key: context.key,
+    });
+    // Absence remains unknown. Only the explicit resolver can fence a key.
+    return bindTransferReversalReceipt({ ...detail?.reversa?.resultado, idempotent: true }, detail, context);
+  }
+
+  async resolverAnulacionTransferencia(tenantId: string, actorId: string, operationId: string, dto: TransferReversalBodyDto) {
+    const { idempotency_key, ...payload } = dto || {};
+    const context = prepareTransferReversalContext(tenantId, actorId, operationId, idempotency_key, payload);
+    const resolution = await this.rpcReversaTransferencia('resolver_reversa_transferencia_613', this.argumentosReversaTransferencia(context), true);
+    return bindTransferReversalResolution(resolution, context);
   }
 
   /**

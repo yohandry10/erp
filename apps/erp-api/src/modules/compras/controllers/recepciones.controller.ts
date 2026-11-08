@@ -9,6 +9,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Header,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -18,6 +19,8 @@ import { RecepcionesService } from '../services/recepciones.service';
 import { CreateRecepcionDto, CerrarRecepcionDto, UpdateRecepcionDto } from '../dto';
 import { PermissionGuard } from '../../../common/guards/permission.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
+import { UuidParamPipe } from '../../../common/pipes/uuid-param.pipe';
+import { readReceiptReversalRequest, ReceiptReversalRequestDto } from '../dto/receipt-reversal.dto';
 
 /**
  * RecepcionesController
@@ -30,6 +33,51 @@ import { RequirePermission } from '../../../common/decorators/require-permission
 @UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: recepciones protegidas por permisos.
 export class RecepcionesController {
   constructor(private readonly recepcionesService: RecepcionesService) {}
+
+  @Post(':id/anular')
+  @RequirePermission('compras.recepciones.cerrar')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({ summary: 'Anular una recepción cerrada conservando el origen y su contabilidad enlazada' })
+  async anularRecepcion(
+    @Param('id', UuidParamPipe) receiptId: string,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Body() request: ReceiptReversalRequestDto,
+  ) {
+    const original = readReceiptReversalRequest(request, tenantId, actorId, receiptId);
+    return { success: true, data: await this.recepcionesService.anularRecepcion(tenantId, actorId, receiptId, original) };
+  }
+
+  @Post(':id/anular/recibo')
+  @RequirePermission('compras.recepciones.cerrar')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({ summary: 'Recuperar el recibo original sin repetir la anulación' })
+  async recuperarAnulacionRecepcion(
+    @Param('id', UuidParamPipe) receiptId: string,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Body() request: ReceiptReversalRequestDto,
+  ) {
+    const original = readReceiptReversalRequest(request, tenantId, actorId, receiptId);
+    return { success: true, data: await this.recepcionesService.recuperarAnulacionRecepcion(tenantId, actorId, receiptId, original) };
+  }
+
+  @Post(':id/anular/resolver')
+  @RequirePermission('compras.recepciones.cerrar')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({ summary: 'Recuperar el commit o cerrar la clave original para impedir una anulación tardía' })
+  async resolverAnulacionRecepcion(
+    @Param('id', UuidParamPipe) receiptId: string,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Body() request: ReceiptReversalRequestDto,
+  ) {
+    const original = readReceiptReversalRequest(request, tenantId, actorId, receiptId);
+    return { success: true, data: await this.recepcionesService.resolverAnulacionRecepcion(tenantId, actorId, receiptId, original) };
+  }
 
   /**
    * GET /api/compras/recepciones

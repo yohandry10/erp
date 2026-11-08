@@ -444,6 +444,9 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
           case 'RecepcionRegistrada':
             await this.handleRecepcionRegistrada(evento);
             break;
+          case 'recepcion.revertida':
+            await this.handleRecepcionRevertida(evento);
+            break;
 
           case 'factura.proveedor.registrada':
           case 'FacturaProveedorRegistrada':
@@ -1777,6 +1780,21 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
       const tenantId = this.ensureEventTenant(eventData, 'recepcion.registrada');
       const costoRecepcion =
         eventData.subtotalParcial ?? eventData.subtotal ?? eventData.costo;
+      // Zero is accepted only with a durable SQL proof of the original receipt.
+      // Missing amounts never become a zero-cost acknowledgement.
+      if ((typeof costoRecepcion === 'number' && costoRecepcion === 0)
+        || (typeof costoRecepcion === 'string' && /^0+(?:\.0+)?$/.test(costoRecepcion))) {
+        const eventId = evento.event_id || eventData.eventId;
+        if (!eventId || !evento.claim_token || !eventData.recepcionId) throw new Error('Recepción sin costo requiere identidad y claim originales');
+        const { data, error } = await this.supabaseService.getClient().rpc('verificar_recepcion_sin_efecto_615', {
+          p_tenant_id: tenantId, p_event_id: eventId, p_claim_token: evento.claim_token,
+        });
+        if (error || !this.receiptAccountingProof(data, eventId, eventData.recepcionId) || data.no_monetary_effect !== true
+          || data.asiento_id !== undefined || data.total_debe !== undefined || data.total_haber !== undefined) {
+          throw new Error('No se pudo verificar el origen de la recepción sin efecto monetario');
+        }
+        return;
+      }
       
       const compraData = {
         tenant_id: tenantId,
@@ -1812,6 +1830,42 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
     } catch (error) {
       this.logger.error(`❌ [ContabilidadEventsListener] Error en handleRecepcionRegistrada:`, error);
       throw error;
+    }
+  }
+
+  private receiptAccountingProof(data: any, eventId: string, receiptId: string): boolean {
+    return !!data && typeof data === 'object' && !Array.isArray(data) && data.success === true
+      && data.event_id === eventId && data.recepcion_id === receiptId
+      && ['cached', 'queued', 'offline', 'from_cache'].every(key => data[key] === undefined || data[key] === false);
+  }
+
+  private async handleRecepcionRevertida(evento: OutboxEvent): Promise<void> {
+    const payload = evento.event_data;
+    const tenantId = this.ensureEventTenant(payload, 'recepcion.revertida');
+    const eventId = evento.event_id || payload.eventId;
+    if (!eventId || !evento.claim_token || !payload.recepcionId || !payload.reversaId || !payload.originalEventId) {
+      throw new Error('Anulación de recepción requiere identidad y claim originales');
+    }
+    const { data, error } = await this.supabaseService.getClient().rpc('contabilizar_reversa_recepcion_615', {
+      p_tenant_id: tenantId, p_event_id: eventId, p_claim_token: evento.claim_token,
+    });
+    if (error) throw new Error(error.message || 'No se pudo contabilizar la anulación de recepción');
+    if (!this.receiptAccountingProof(data, eventId, payload.recepcionId)
+      || data.reversa_id !== payload.reversaId || data.original_event_id !== payload.originalEventId
+      || typeof data.no_monetary_effect !== 'boolean') {
+      throw new Error('El recibo contable no corresponde a la anulación original');
+    }
+    if (data.no_monetary_effect) {
+      if (data.asiento_id !== undefined || data.original_asiento_id !== undefined || data.total_debe !== undefined || data.total_haber !== undefined) {
+        throw new Error('Recibo sin efecto monetario contradictorio');
+      }
+      return;
+    }
+    const uuid = (value: any) => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+    if (!uuid(data.asiento_id) || !uuid(data.original_asiento_id) || data.asiento_id === data.original_asiento_id
+      || typeof data.total_debe !== 'string' || !/^\d{1,12}\.\d{2}$/.test(data.total_debe)
+      || /^0+\.00$/.test(data.total_debe) || data.total_debe !== data.total_haber) {
+      throw new Error('El contraasiento de recepción no tiene identidad e importes completos');
     }
   }
 

@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, Logger, Optional } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, ForbiddenException, NotFoundException, ServiceUnavailableException, Logger, Optional } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CreateRecepcionDto, CerrarRecepcionDto, UpdateRecepcionDto } from '../dto';
 import { AuditService } from '../../audit/audit.service';
@@ -6,6 +6,8 @@ import { CacheInvalidationService } from '../../../shared/cache/cache-invalidati
 import { appendIntegrationLog } from '../../../shared/utils/integration-log';
 import { isNotFoundError, readUnavailable } from '../compras-errors';
 import { mensajeErrorLote } from '../../inventario/inventario-errors';
+import { ReceiptReversalBodyDto } from '../dto/receipt-reversal.dto';
+import { bindReceiptReversalReceipt, bindReceiptReversalResolution, prepareReceiptReversalContext, ReceiptReversalContext } from './receipt-reversal-receipt';
 
 @Injectable()
 export class RecepcionesService {
@@ -16,6 +18,79 @@ export class RecepcionesService {
     private readonly auditService: AuditService,
     @Optional() private readonly cacheInvalidation?: CacheInvalidationService,
   ) {}
+
+  /** A lost response may hide a commit. Never retry a writer automatically. */
+  private async reversalRpc(name: string, args: Record<string, unknown>, mutation = false): Promise<any> {
+    let response: any;
+    try { response = await this.supabase.getClient().rpc(name, args); }
+    catch { throw new ServiceUnavailableException('No se pudo confirmar el resultado. Conserve la intención original para consultarla; no se repetirá automáticamente.'); }
+    const error = response?.error;
+    if (!error) return response?.data;
+    if (error.code === '42501') throw new ForbiddenException('Se requiere permiso vigente para anular recepciones de esta empresa.');
+    const code = String(error.message || '').split(':')[0].trim();
+    if (code === 'RECEIPT_REVERSAL_NOT_FOUND' && error.code === 'P0002') throw new NotFoundException('La recepción original no existe en esta empresa.');
+    if (['23505', '40001'].includes(error.code)) throw new ConflictException('La clave está cerrada, pertenece a otra intención o la recepción ya fue anulada. Conserve los datos y consulte el resultado original.');
+    const reasons: Record<string, string> = {
+      RECEIPT_REVERSAL_PAYLOAD_INVALID: 'Revise el motivo y la fecha contable de la intención original.',
+      RECEIPT_REVERSAL_DATE_INVALID: 'La fecha contable no es válida.',
+      RECEIPT_REVERSAL_FUTURE_DATE: 'La fecha contable no puede estar en el futuro.',
+      ACCOUNTING_PERIOD_NOT_OPEN: 'El período contable está cerrado. Seleccione una fecha en un período abierto.',
+      ACCOUNTING_LATER_PERIOD_ALREADY_CLOSED: 'Existe un período posterior cerrado. Revise la fecha contable.',
+      RECEIPT_REVERSAL_SOURCE_NOT_CLOSED: 'Sólo se puede anular una recepción cerrada.',
+      RECEIPT_REVERSAL_ORDER_STATE_INVALID: 'El estado actual de la orden no permite anular esta recepción.',
+      RECEIPT_REVERSAL_INVOICE_EXISTS: 'La recepción tiene una factura de proveedor vinculada. Debe resolver ese documento antes de anularla.',
+      RECEIPT_REVERSAL_SUPPLIER_RETURN_EXISTS: 'La recepción tiene una devolución de proveedor activa. Debe resolverla antes de anularla.',
+      RECEIPT_ORIGINAL_JOURNAL_ALREADY_REVERSED: 'El asiento original ya tiene una reversión. Revise su vínculo antes de anular la recepción.',
+      RECEIPT_ACCOUNTING_SOURCE_REQUIRED: 'La recepción no tiene un evento contable original único y verificable.',
+      RECEIPT_ACCOUNTING_SOURCE_MISMATCH: 'El evento contable original no coincide con la recepción.',
+      RECEIPT_REVERSAL_ITEM_EVIDENCE_REQUIRED: 'Los ítems originales no tienen clasificación verificable.',
+      RECEIPT_REVERSAL_MOVEMENT_EVIDENCE_REQUIRED: 'El inventario original no tiene movimientos y valuación confirmados.',
+      RECEIPT_REVERSAL_FULFILLMENT_INCONSISTENT: 'El cumplimiento de la orden no permite retirar esta recepción.',
+      INVENTORY_REVERSAL_WAREHOUSE_VALUATION_REQUIRED: 'El almacén ya no conserva la cantidad y el valor necesarios para anular la recepción.',
+      INVENTORY_AVAILABLE_STOCK_INSUFFICIENT: 'No hay existencias disponibles suficientes para anular la recepción.',
+    };
+    const reason = reasons[code] || mensajeErrorLote(error.message);
+    if (mutation && reason && ['22023', '22008', '23503', '23514', '55000', 'P0001'].includes(error.code)) {
+      throw new BadRequestException({ statusCode: 400, error: 'RECEIPT_NOT_APPLIED', message: reason });
+    }
+    throw new ServiceUnavailableException('No se pudo confirmar el resultado completo. Conserve la intención original para consultar o resolver su estado.');
+  }
+
+  private reversalContext(tenantId: string, actorId: string, receiptId: string, dto: ReceiptReversalBodyDto) {
+    const { idempotency_key, ...payload } = dto || {};
+    return prepareReceiptReversalContext(tenantId, actorId, receiptId, idempotency_key, payload);
+  }
+
+  private reversalArgs(context: ReceiptReversalContext) {
+    return { p_tenant_id: context.tenantId, p_actor_id: context.actorId, p_recepcion_id: context.receiptId, p_idempotency_key: context.key,
+      p_payload: { motivo: context.payload.motivo, fecha_contable: context.payload.fecha_contable } };
+  }
+
+  private async readReversal(context: ReceiptReversalContext) {
+    const { p_payload: _payload, ...args } = this.reversalArgs(context);
+    return this.reversalRpc('consultar_reversa_recepcion_616', args);
+  }
+
+  async anularRecepcion(tenantId: string, actorId: string, receiptId: string, dto: ReceiptReversalBodyDto) {
+    const context = this.reversalContext(tenantId, actorId, receiptId, dto);
+    const ack = await this.reversalRpc('revertir_recepcion_inventario_615', this.reversalArgs(context), true);
+    const result = bindReceiptReversalReceipt(ack, await this.readReversal(context), context);
+    try { await this.cacheInvalidation?.onInventarioUpdated(context.tenantId); }
+    catch { this.logger.warn('No se pudo invalidar la caché tras la anulación de recepción.'); }
+    return result;
+  }
+
+  async recuperarAnulacionRecepcion(tenantId: string, actorId: string, receiptId: string, dto: ReceiptReversalBodyDto) {
+    const context = this.reversalContext(tenantId, actorId, receiptId, dto);
+    const detail = await this.readReversal(context);
+    // Absence stays unknown; this read neither fences a key nor writes stock.
+    return bindReceiptReversalReceipt({ ...detail?.reversa?.resultado, idempotent: true }, detail, context);
+  }
+
+  async resolverAnulacionRecepcion(tenantId: string, actorId: string, receiptId: string, dto: ReceiptReversalBodyDto) {
+    const context = this.reversalContext(tenantId, actorId, receiptId, dto);
+    return bindReceiptReversalResolution(await this.reversalRpc('resolver_reversa_recepcion_616', this.reversalArgs(context), true), context);
+  }
 
   private async registrarIntegrationLog(entry: {
     tenantId: string;
