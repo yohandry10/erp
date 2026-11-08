@@ -195,7 +195,7 @@ const CandidatosPage = () => {
   if (loadError) {
     return (
       <div className="mx-auto w-full max-w-[1600px] p-4 md:p-6">
-        <h1 className="mb-6 text-2xl font-bold">CVs & Candidatos</h1>
+        <h1 className="mb-6 text-2xl font-bold">CVs &amp; Candidatos</h1>
         <div role="alert" className="rounded-lg border border-destructive p-4">
           <p>No se pudo completar la carga de candidatos y vacantes. Reintente para consultar o editar el reclutamiento.</p>
           <Button type="button" variant="outline" className="mt-3" onClick={loadData}>Reintentar carga</Button>
@@ -209,7 +209,7 @@ const CandidatosPage = () => {
       {/* Header */}
       <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div>
-          <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">CVs & Candidatos</h1>
+          <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">CVs &amp; Candidatos</h1>
           <p className="mt-2 text-base text-muted-foreground">Gestión de reclutamiento y selección</p>
         </div>
         <div className="flex gap-4">

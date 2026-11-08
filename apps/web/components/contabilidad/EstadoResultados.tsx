@@ -174,7 +174,7 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <CardTitle className="text-xl text-foreground">
-            Estado de Resultados (P&L)
+            Estado de Resultados (P&amp;L)
             </CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
               Período: {anio} - {String(mes).padStart(2, '0')}

@@ -1,13 +1,13 @@
 # Estado actual del ERP
 
-Actualizado: 2026-11-07. Una página: si algo no cabe aquí, va a su documento de dominio.
+Actualizado: 2026-11-08. Una página: si algo no cabe aquí, va a su documento de dominio.
 
 ## Dónde está
 
 - **Candidato para revisión:** rama `codex/go-prod-candidate-20261106`,
   [PR153 en borrador](https://github.com/yohandry10/erp/pull/153), candidato612.
   Correcciones611/612 verificadas localmente; sin merge ni promoción. **NO_GO**.
-  Las corridas2030 no arrancaron por facturación/minutos de Actions, según sus
+  Las corridas3ad no arrancaron por facturación/minutos de Actions, según sus
   anotaciones. Presupuesto0; no se relajan gates ni se reintentan sin un cambio.
   El E2E808 pasó149casos, pero su integración falló en replayRRHH y un selector
   de factura. Corregidos en610/2030; aceptación dirigida local5/5. La suite completa
@@ -28,8 +28,16 @@ Actualizado: 2026-11-07. Una página: si algo no cabe aquí, va a su documento d
   fixture de pagos no se cuenta aprobada. HelpersPII legacy requieren revisión.
   CodeQL sigue no disponible para este repositorio privado personal; no se
   contrata, traslada ni expone. Presupuesto nuevo0 y límiteActions0 conservados.
-  SemgrepCE local sin cuenta/red/envío:1545archivos/213coincidencias/3avisos,
-  revisión incompleta; no son213vulnerabilidades confirmadas ni equivale aCodeQL.
+  D54 escapa HTML en la confirmación de contraseña; cuatro regresiones rojas
+  pasan después del arreglo. D55 actualiza nodemailer10.1.4/fast-uri4.2.3/qs6.16.1
+  con regresiones instaladas en el gate existente. AuditPROD sin avisos; árbol
+  completo aún1bajo/5moderados,0altos/críticos. SuiteAPI actual5848/402 con
+  cobertura, tipos/build/lint y buildweb pasan. MIME real en memoria sin envío;
+  navegador confirma tres etiquetas con ampersand, sin operaciones financieras.
+  SemgrepCE local sin cuenta/red/envío:1549archivos/211coincidencias/0errores;
+  ejecución completa con exit1 por hallazgos, revisión incompleta. No son211
+  vulnerabilidades confirmadas ni equivale aCodeQL. Tres avisos de parseo JSX
+  resueltos sin cambiar JavaScript emitido. [Corte D54/D55](../artifacts/go-prod-20261108-security/RESUMEN.md).
   Los deltas D46/D47 y D51 pasan; las dos alertas heurísticas D48/D49 se mantienen
   visibles con revisión acotada D50, sin suprimirlas ni recertificar otros reportes.
 - **Nueva aceptación local608:** sieteNC desdeUI conservanUSD0.07/PEN0.27 y

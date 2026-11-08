@@ -102,6 +102,10 @@ sin datos de clientes.
   `security.audit.read`: sólo recibe identificador, nombre y correo de usuarios
   de la empresa actual, incluidos los históricos inactivos. No exige administrar
   usuarios ni concede ese permiso a un auditor.
+- La confirmación de cambio de contraseña escapa nombre, IP, nombre de la app
+  y contacto de soporte al componer HTML; sus enlaces usan `escapeUrl`.
+  Conserva destinatario, asunto y texto plano. Las regresiones usan transporte
+  simulado; la comprobación MIME local usa transporte en memoria y no envía correo.
 
 ## Fiscal
 
@@ -118,6 +122,14 @@ considerar mitigados esos dos identificadores y versiones exactos. Cualquier
 otro aviso alto o crítico falla. Estos parches deben retirarse al adoptar
 versiones oficiales corregidas; no equivalen a un audit del registro con cero
 hallazgos.
+
+`nodemailer` 10.1.4, `fast-uri` 4.2.3 y `qs` 6.16.1 incorporan correcciones
+oficiales. `verify-security-upgrades.mjs`, invocado por el mismo gate de audit,
+comprueba versiones y regresiones sobre cada copia instalada: destinatario con
+comentarios anidados, esquemas URI codificados y serialización comma con un
+`toString` propio no invocable. No ejecuta transporte de correo ni solicita red.
+El audit del registro mantiene visibles los avisos de herramientas de desarrollo;
+un audit de producción sin avisos no acredita todo el árbol ni sustituye CodeQL.
 
 - El país operativo se resuelve desde `empresa_config.pais_id`; los catálogos,
   moneda, identificación, tasa y autoridad fiscal nunca se infieren desde la
