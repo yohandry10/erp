@@ -1,5 +1,6 @@
 import { ArgumentsHost, BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { GlobalExceptionFilter } from './global-exception.filter';
+import * as monitoring from '../../shared/observability/sentry';
 
 function createHost() {
   const response = {
@@ -25,6 +26,19 @@ function createHost() {
 }
 
 describe('GlobalExceptionFilter API contract', () => {
+  it('reports only server errors without passing request context to monitoring', () => {
+    const capture = jest.spyOn(monitoring, 'captureUnexpectedError').mockImplementation(() => {});
+    try {
+      const bad = createHost();
+      new GlobalExceptionFilter().catch(new BadRequestException('invalid input'), bad.host);
+      expect(capture).not.toHaveBeenCalled();
+      const failed = createHost(); const exception = new Error('private failure');
+      new GlobalExceptionFilter().catch(exception, failed.host);
+      expect(capture).toHaveBeenCalledTimes(1);
+      expect(capture).toHaveBeenCalledWith(exception);
+      expect(failed.response.status).toHaveBeenCalledWith(500);
+    } finally { capture.mockRestore(); }
+  });
   it.each([
     ['CXP_FX_BOOK_REVIEW_REQUIRED', /proveedor.*moneda extranjera.*No se aplicó.*contable/i],
     ['SUPPLIER_CREDIT_FX_BOOK_REVIEW_REQUIRED', /crédito del proveedor.*No se aplicó.*contable/i],

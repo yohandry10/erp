@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { captureUnexpectedError } from '../../shared/observability/sentry';
 
 interface ErrorResponse {
   statusCode: number;
@@ -143,6 +144,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     // Log error with full context
     if (statusCode >= 500) {
+      captureUnexpectedError(exception);
       this.logger.error(
         `${request.method} ${request.url} - ${statusCode} - ${message}`,
         exception instanceof Error ? exception.stack : undefined,

@@ -149,6 +149,7 @@ jobs:
         run: |
           node apps/web/tests/compras/verify-receipt-close-currency.mjs
           node apps/web/tests/compras/verify-receipt-reversal-operation.mjs
+          node apps/web/tests/observability/verify-sentry-privacy.mjs
       - name: Candidate profile contract
         run: pnpm --filter @erp-suite/web test:candidate-profile
       - name: Receivables complete live read contract

@@ -95,4 +95,9 @@ const nextConfig = {
       }),
 }
 
-module.exports = nextConfig
+// Uploads and build telemetry remain disabled; DSNs are injected by deployment.
+module.exports = process.env.NEXT_PUBLIC_SENTRY_DSN || process.env.SENTRY_DSN
+  ? require('@sentry/nextjs/config').withSentryConfig(nextConfig, {
+      silent: true, telemetry: false, sourcemaps: { disable: true },
+    })
+  : nextConfig

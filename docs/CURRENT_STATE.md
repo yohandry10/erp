@@ -5,9 +5,14 @@ Actualizado: 2026-11-08. Una página: si algo no cabe aquí, va a su documento d
 ## Dónde está
 
 - **Candidato para revisión:** rama `codex/go-prod-candidate-20261106`,
-  [PR153 en borrador](https://github.com/yohandry10/erp/pull/153), candidato612.
-  Correcciones611/612 verificadas localmente; sin merge ni promoción. **NO_GO**.
-  Las corridas3ad no arrancaron por facturación/minutos de Actions, según sus
+  [PR153 en borrador](https://github.com/yohandry10/erp/pull/153), candidato617
+  publicado enb20ee727. Correcciones locales613–617 verificadas; sin merge ni
+  promoción. **NO_GO**. CodeQL42511475473 yE2E42511475452 pasan. CI42511475454
+  falla por un caso inestable de reparto analítico:70 pasan y1 pasa al reintento;
+  no se acepta como verde. Sus otros siete jobs pasan; build/audit dependientes
+  quedan omitidos. La captura muestra destino vacío y Guardar deshabilitado
+  después de seleccionar; pendiente de corregir y repetir, sin ampliar timeout.
+  Las corridas anteriores3ad no arrancaron por facturación/minutos de Actions, según sus
   anotaciones. Presupuesto0; no se relajan gates ni se reintentan sin un cambio.
   El E2E808 pasó149casos, pero su integración falló en replayRRHH y un selector
   de factura. Corregidos en610/2030; aceptación dirigida local5/5. La suite completa
@@ -29,13 +34,24 @@ Actualizado: 2026-11-08. Una página: si algo no cabe aquí, va a su documento d
   CodeQL requiere hacer público este repositorio personal para usarlo sin coste.
   El usuario autorizó ese cambio y la limpieza:93 ramas reescritas y verificadas;
   PR153 sigue en borrador sobre2961b2d5. Support4972573 enviado y abierto para
-  retirar referencias/cachés antiguas conservando conversaciones. Sigue privado,
-  sin purga ni revocación probadas.
-  Presupuesto nuevo0 y límiteActions0 conservados; CodeQL aún no ejecutado.
+  retirar referencias/cachés antiguas conservando conversaciones. El propietario
+  autorizó hacerlo público mientras Support sigue pendiente: visibilidadPUBLIC
+  verificada. Sin purga ni revocación probadas; alerta de secreto1 sigue abierta
+  sobre referencias antiguas. Secret scanning/protección de nuevos pushes activos.
+  Presupuesto nuevo0 y límiteActions0 conservados. CodeQL sobre el árbolb20ee727 pasa
+  enJS/TS: una misma alerta108 ya descartada el31oct como falso positivo por IDs
+  de sesión, revisada de nuevo sin almacenar credenciales; no son cero hallazgos.
+  Los resultados anteriores de main no se dan por resueltos mediante este PR.
+  Sentry11.11.0 preparado y probado localmente: API completa6111/412 con coberturaUTC,
+  tipos/buildAPI/web, política de privacidad y auditPROD0 pasan. Captura real de
+  HTTP5xx y navegador recibida en cuentaDeveloper existente sin tarjeta/gasto;
+  IP y geografía retiradas para eventos nuevos mediante reglas del proyecto.
+  Sin configuración/desplieguePROD ni prueba de alarma operativa. El CodeQL de
+  b20ee727 es anterior a estos SDK y no se atribuye a su nuevo delta.
   D54 escapa HTML en la confirmación de contraseña; cuatro regresiones rojas
   pasan después del arreglo. D55 actualiza nodemailer10.1.4/fast-uri4.2.3/qs6.16.1
   con regresiones instaladas en el gate existente. AuditPROD sin avisos; árbol
-  completo aún1bajo/5moderados,0altos/críticos. SuiteAPI actual5848/402 con
+  completo aún1bajo/5moderados,0altos/críticos. SuiteAPI del corteD55:5848/402 con
   cobertura, tipos/build/lint y buildweb pasan. MIME real en memoria sin envío;
   navegador confirma tres etiquetas con ampersand, sin operaciones financieras.
   SemgrepCE local sin cuenta/red/envío:1549archivos/211coincidencias/0errores;
@@ -173,8 +189,8 @@ Actualizado: 2026-11-08. Una página: si algo no cabe aquí, va a su documento d
 | `616` | WIP local: recibo ligado a actor/tenant/origen y resolución durable; tres carreras más verifican commit/abandono/revocación. UI conserva intención/archivo antes de retirar el pendiente; rechazo por período, recarga, resolución y nueva anulación verificados conSQL y worker.98pruebas del contrato web, colaJS y48Rust pasan. SuiteAPI completa6066/408 enUTC, tipos/buildAPI yweb pasan; lintAPI0errores/97avisos, sin avisos en la UI nueva. Cadena fresca612migraciones/125verificadores+67históricos aprobada.21tablas conservadas intactas. UI de transferencia, matrizFX y ensayo de restore/rollback aún pendientes; NO_GO |
 | `617` | WIP local: cierre congela monedaOC, moneda contable del país, tasa decimal y referencia; worker con claim real valida el origen y registra valores base, sin reinterpretar historiaFX. Bien físico/servicio/sin stockUSD5.17→PEN19.13 y reversa exacta neto0; cero sinGL. Cuatro carreras reales y cierreUI USD5.16→PEN19.09 pasan. SuiteAPI6101/410 con coberturaUTC, tipos/build/lintAPI y buildweb pasan. Cadena nueva613migraciones/126verificadores+67históricos aprobada. Sin promoción; NO_GO |
 
-Próxima libre: `618`. El binario WIP exige617; el candidato publicado y el stack
-local conservado siguen612, PROD observado593. No arrancar el binario nuevo sobre
+Próxima libre: `618`. El binario WIP y el candidato publicado exigen617; el stack
+histórico local conservado sigue612, PROD observado593. No arrancar el binario nuevo sobre
 la base conservada sin completar su migración en infraestructura de pruebas propia.
 Comprobar prefijos duplicados antes de añadir una.
 

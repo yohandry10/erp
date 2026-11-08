@@ -10,6 +10,43 @@ no reintroduzcan el historial. Las referencias y vistas antiguas de PR pueden
 requerir intervención de GitHub Support; un push forzado no prueba su eliminación.
 Conservar una copia privada y un plan de actualización con leases antes de aplicar.
 
+## Captura de errores con Sentry
+
+Los SDK11.11.0 son opcionales y sólo se activan con un DSN explícito del
+recolectorHTTPS de Sentry. No hay DSN real ni token de administración en Git.
+
+| Variable | Uso |
+| --- | --- |
+| `SENTRY_DSN` | API y servidorNext; configuración inyectada al arrancar |
+| `NEXT_PUBLIC_SENTRY_DSN` | Captura del navegador; se fija al compilar y su clave permite ingestión, no lectura de errores |
+| `SENTRY_ENVIRONMENT` / `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | Etiqueta de entorno; por defecto `production`, pruebas propias `erp-local-verification` |
+| `APP_COMMIT_SHA` / `NEXT_PUBLIC_APP_COMMIT_SHA` | Release de40hex del binario/build concreto; no sustituirlo por otro candidato |
+
+API captura erroresHTTP5xx mediante el filtro global y errores de proceso no
+manejados después de su inicialización; los4xx de negocio no se envían. Next
+captura errores de servidorNode, no manejados del navegador y del ErrorBoundary
+existente. No acredita todos los jobs que capturan internamente sus excepciones,
+ni la aceptación del cliente nativo.
+
+`dataCollection` desactiva usuario, cookies, headers, cuerpos, consultasURL,
+datosSQL/colas/IA y variables/contexto de código. El último filtro conserva tipo
+de excepción y posición de fuente acotada, sustituye su mensaje por uno genérico
+y retira los demás contextos. No se envían breadcrumbs, logs, métricas, tracing
+ni replay. Las copias de políticaAPI/web tienen prueba de igualdad. Un fallo del
+monitor no debe impedir la respuestaHTTP. No copiar cuerpo, sesión ni contexto
+financiero al capturador.
+
+En Sentry activar también la prevención de almacenarIP y reglas sobre los
+campos de usuario/geografía: el servicio puede inferirlos de la conexión aunque
+el SDK no los haya enviado. Comprobar el evento recibido después del cambio;
+una respuesta200 de ingestión no prueba la anonimización. Las reglas sólo
+afectan eventos nuevos. Conservar las pruebas iniciales y su alcance.
+
+El build desactiva uploads de sourcemaps y telemetría. No requiere autorizar una
+integraciónGitHub, crear tokens ni cambiar el plan gratuito. Las pruebas locales
+no habilitan por sí solas el monitoreo de un desplieguePROD ni acreditan una
+alarma operativa o su notificación.
+
 ## Requisitos
 
 - Node.js 24 LTS, con parche vigente; CI y las tres imágenes Docker usan la rama 24.

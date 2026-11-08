@@ -14,11 +14,14 @@ import helmet from 'helmet';
 import compression from 'compression';
 import { ConfigService } from '@nestjs/config';
 import { migrationBodyParser } from './modules/migration/migration-body-parser';
+import { configureErrorMonitoring } from './shared/observability/sentry';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.use('/api/migration', migrationBodyParser());
   const configService = app.get(ConfigService);
+  configureErrorMonitoring(configService.get<string>('SENTRY_DSN'),
+    configService.get<string>('SENTRY_ENVIRONMENT') || 'production', configService.get<string>('APP_COMMIT_SHA'));
 
   // Definir puerto al inicio
   const port = configService.get<number>('PORT', 3002);
