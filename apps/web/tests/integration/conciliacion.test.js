@@ -34,6 +34,7 @@ async function apiRequest(endpoint, options = {}) {
 
   const response = await fetch(url, {
     ...options,
+    redirect: 'error',
     headers,
   });
 
@@ -51,13 +52,25 @@ async function testConciliacionFlow() {
   console.log('🧪 Iniciando test de conciliación bancaria...\n');
 
   try {
+    const target = new URL(API_BASE_URL);
+    if (!['http:', 'https:'].includes(target.protocol)
+      || !['localhost', '127.0.0.1', '[::1]'].includes(target.hostname)
+      || target.username || target.password
+      || target.pathname !== '/' || target.search || target.hash) {
+      throw new Error('API_URL debe ser el origen de un entorno local aislado.');
+    }
+    const email = process.env.ERP_TEST_ADMIN_EMAIL?.trim();
+    const password = process.env.ERP_TEST_ADMIN_PASSWORD;
+    if (!email || !password) {
+      throw new Error('Configura ERP_TEST_ADMIN_EMAIL y ERP_TEST_ADMIN_PASSWORD para la prueba local.');
+    }
     // 0. Login
     console.log('🔐 Paso 0: Autenticando...');
     const loginResponse = await apiRequest('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({
-        email: 'superadmin@neon.com',
-        password: '[REMOVED]',
+        email,
+        password,
       }),
     });
     

@@ -1,5 +1,15 @@
 # Operación, configuración y base de datos
 
+## Publicación del repositorio
+
+Antes de cambiar la visibilidad, revisar todas las ramas, etiquetas e historial,
+los artefactos y logs de Actions, los respaldos y las credenciales incrustadas.
+Retirar una clave de Git no la revoca: comprobar su revocación o rotación.
+Una reescritura cambia los SHA y exige coordinar los clones anteriores para que
+no reintroduzcan el historial. Las referencias y vistas antiguas de PR pueden
+requerir intervención de GitHub Support; un push forzado no prueba su eliminación.
+Conservar una copia privada y un plan de actualización con leases antes de aplicar.
+
 ## Requisitos
 
 - Node.js 24 LTS, con parche vigente; CI y las tres imágenes Docker usan la rama 24.

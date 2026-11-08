@@ -26,8 +26,10 @@ Actualizado: 2026-11-08. Una página: si algo no cabe aquí, va a su documento d
   civiles por país; D51 rechaza propiedades heredadas en el mapaPLE. D50 escapa
   campos textuales de boleta con ocho regresiones; su prueba HTTP adicional sin
   fixture de pagos no se cuenta aprobada. HelpersPII legacy requieren revisión.
-  CodeQL sigue no disponible para este repositorio privado personal; no se
-  contrata, traslada ni expone. Presupuesto nuevo0 y límiteActions0 conservados.
+  CodeQL requiere hacer público este repositorio personal para usarlo sin coste.
+  El usuario autorizó ese cambio; sigue privado mientras se prepara la limpieza
+  de credenciales históricas, sin reescritura remota aplicada ni revocación probada.
+  Presupuesto nuevo0 y límiteActions0 conservados; CodeQL aún no ejecutado.
   D54 escapa HTML en la confirmación de contraseña; cuatro regresiones rojas
   pasan después del arreglo. D55 actualiza nodemailer10.1.4/fast-uri4.2.3/qs6.16.1
   con regresiones instaladas en el gate existente. AuditPROD sin avisos; árbol

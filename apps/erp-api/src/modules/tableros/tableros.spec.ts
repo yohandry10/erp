@@ -1,6 +1,6 @@
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
-import { createHash } from "crypto";
+import { createHash, createHmac, randomBytes } from "crypto";
 import * as ExcelJS from "exceljs";
 import request from "supertest";
 import { PERMISSION_KEY } from "../../common/decorators/require-permission.decorator";
@@ -12,6 +12,12 @@ import { TablerosService } from "./tableros.service";
 
 const tenant = "57900000-0000-4000-8000-000000000001";
 const actor = "57900000-0000-4000-8000-000000000002";
+const userJwtInput = [
+  Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url"),
+  Buffer.from(JSON.stringify({ sub: actor, tenant_id: tenant, role: "authenticated" })).toString("base64url"),
+].join(".");
+// Exercise the JWT-shaped user boundary without storing a credential.
+const userJwt = `${userJwtInput}.${createHmac("sha256", randomBytes(32)).update(userJwtInput).digest("base64url")}`;
 const corte = "57900000-0000-4000-8000-000000000003";
 const contrato = "57900000-0000-4000-8000-000000000004";
 const credencial = "57900000-0000-4000-8000-000000000005";
@@ -183,7 +189,7 @@ describe("Tablero de suministro y lectura BI: frontera HTTP sin acceso remoto", 
 
   it.each([
     ["sin cabecera", undefined],
-    ["un JWT de usuario", "Bearer [REMOVED]"],
+    ["un JWT de usuario", `Bearer ${userJwt}`],
     ["token truncado", `Bearer ${token.slice(0, -1)}`],
   ])("BI rechaza %s sin consultar la base", async (_, autorizacion) => {
     const req = request(app.getHttpServer()).get("/api/bi/v1/suministro/entregas");
