@@ -45,6 +45,13 @@ aPROD569. No ejecutar el grant por separado enPROD.
 El arranque operativo requiere primero el preflight PROD indicado más abajo;
 después se ejecuta el paquete compilado mediante `pnpm --filter @erp-suite/erp-api start`.
 
+La612 concede explícitamente SELECT de `pedido_aprobaciones` al backend. Su
+ausencia en una reconstrucción convertía un intento incompatible posterior a
+una decisión en503 al consultar el historial, en lugar del409 esperado. No se
+depende de default privileges del proveedor ni de un GRANT en el fixture E2E.
+No cambia filas, RLS/políticas, owner, permisos de clientes ni DML; la decisión
+conserva la RPC441 y el filtrado de tenant/actor del API. Sin promoción remota.
+
 Servicios principales:
 
 - Web: `http://localhost:3001`.

@@ -4009,6 +4009,10 @@ Evidencia: `queue-company-editor-postconditions.json`.
   IGV63 y total413. La apertura bancaria50000 coincide con sus saldos.
   La595 corrige únicamente nuevas hidrataciones, sin renumerar documentos,
   modificar muestras históricas ni conceder aceptación fiscal.
+  Desde611 el CPE de muestra usa el código fiscal01 y el documento comercial
+  conserva FACTURA. La fábrica declara BORRADOR/PENDIENTE/NOT_SENT y origen
+  simulado sin XML, CDR ni evidencia fiscal. No habilita una nota fiscal desde
+  ese borrador ni reescribe muestras anteriores; conserva importes y numeración.
 - La conversión de demo a cuenta real exige que el cliente defina y confirme
   un correo de acceso y una contraseña permanente antes de elegir si conserva
   o reinicia sus datos. La activación sustituye atómicamente las credenciales

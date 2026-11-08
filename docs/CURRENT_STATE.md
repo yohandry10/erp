@@ -1,43 +1,37 @@
 # Estado actual del ERP
 
-Actualizado: 2026-11-06. Una página: si algo no cabe aquí, va a su documento de dominio.
+Actualizado: 2026-11-07. Una página: si algo no cabe aquí, va a su documento de dominio.
 
 ## Dónde está
 
 - **Candidato para revisión:** rama `codex/go-prod-candidate-20261106`,
-  [PR153 en borrador](https://github.com/yohandry10/erp/pull/153), sin merge ni
-  promoción productiva. CI608/df28c49b pasa lint, tipos, SQL, DIAN yStorage,
-  incluida la restauración corregida con puertos libres. La suite5770 detecta
-  un usoUTC en Analytics: corregido con fecha civil y extremos locales (D47),
-  sin ampliar excepciones; regresionesPE/CO/AR pasan. La preparación de
-  vacaciones sí pasaAPI en865:12solicitudes/7aprobadas, días5/10/0 y409sin
-  guardar un solapamiento. El E2E808 pasa149casos, API5827/399 yStorage,
-  tipos/lint/SQL/DIAN pasan enGitHub; la integración ya superóRRHH y sigue
-  ejecutándose. No se cuenta como aprobada toda la corrida.
-  D51 corrige el selectorPLE que resolvía propiedades heredadas e inventaba un
-  éxito vacío:41pruebas dirigidas, HTTP real sin cambio financiero, tipos y
-  suite local5839/400 pasan; pendiente CI del candidato actualizado.
-  La integracióndf28 falló al reintentar asistencia: D49 conserva el recibo
-  original y el reloj civil PE/CO/AR. API local concurrente deja una asistencia,
-  dos recibos y dos auditorías; rollback/doble reaplicación y cadena nueva
-  605migraciones/118verificadores pasan. El E2Edf28 agotó20min tras reinicio
-  de Next dev por memoria: D48 compila un build aislado de producción y valida
-  sus fuentes, perfil y proxy loopback;149casos ejecutados en808, sin aumentar
-  timeout ni retirar casos. D42/D44 conservan un main y
-  contraste17.71/17.54 en claro/oscuro.
-- **Seguridad:** D46 rechaza tagsPII truncados, base64 inválido y claves/salt
-  por defecto. Mantiene el formato y las claves válidas actual/anterior, sin
-  reescribir datos; proveedor sin clave no cifra.48pruebasPII/configuración
-  pasan; suite local final5839pruebas/400suites con cobertura, tipos, buildAPI
-  y lint sin errores. HelpersPII legacy requieren revisión.
+  [PR153 en borrador](https://github.com/yohandry10/erp/pull/153), candidato612.
+  Correcciones611/612 verificadas localmente; sin merge ni promoción. **NO_GO**.
+  Las corridas2030 no arrancaron por facturación/minutos de Actions, según sus
+  anotaciones. Presupuesto0; no se relajan gates ni se reintentan sin un cambio.
+  El E2E808 pasó149casos, pero su integración falló en replayRRHH y un selector
+  de factura. Corregidos en610/2030; aceptación dirigida local5/5. La suite completa
+  sobre611 pasa5843pruebas/402suites; tipos, buildAPI, lint y buildweb pasan.
+  Tres fallos Windows/Nextdev de banco/caja/aprobaciones se reproducen también
+  en808: no basta para atribuirlos al entorno. La aceptación manual en build de
+  producción y demo propia conserva nombre bancario y nombre/descripción de caja
+  tras recargar, con diez tablas financieras intactas. No recertifica esos E2E.
+  En aprobaciones se comprobó403 al creador, aprobación segregada y conflicto
+  tardío. Este último daba503 sin SELECT del historial;612 lo concede sólo al
+  backend y retira el GRANT de los fixtures. El reintento UI da409,
+  explica el motivo y actualiza la bandeja. Cadena nueva608migraciones hasta612,
+  121verificadores y67históricos pasa; deltaAPI61264pruebas/4suites sin sumar
+  a la suite611. Build finalweb/API, tipos, lint y contrato documental pasan.
+- **Seguridad:** D46 valida PII/base64/secretos sin recifrar datos; D47 usa fechas
+  civiles por país; D51 rechaza propiedades heredadas en el mapaPLE. D50 escapa
+  campos textuales de boleta con ocho regresiones; su prueba HTTP adicional sin
+  fixture de pagos no se cuenta aprobada. HelpersPII legacy requieren revisión.
   CodeQL sigue no disponible para este repositorio privado personal; no se
   contrata, traslada ni expone. Presupuesto nuevo0 y límiteActions0 conservados.
-  CE local sin cuenta/red/envío: baseline0a1545archivos/213coincidencias/3avisos,
-  revisión incompleta; deltaD46/D47 de5archivos sin hallazgos. El deltaD48/D49
-  señala dos templates de boleta: D50 escapa sus campos textuales con ocho
-  regresiones, sin suprimir alertas ni recertificar los demás reportes. La
-  prueba HTTP adicional quedó sin fixture de pagos y no se cuenta aprobada.
-  No equivale a CodeQL ni se desactiva el check.
+  SemgrepCE local sin cuenta/red/envío:1545archivos/213coincidencias/3avisos,
+  revisión incompleta; no son213vulnerabilidades confirmadas ni equivale aCodeQL.
+  Los deltas D46/D47 y D51 pasan; las dos alertas heurísticas D48/D49 se mantienen
+  visibles con revisión acotada D50, sin suprimirlas ni recertificar otros reportes.
 - **Nueva aceptación local608:** sieteNC desdeUI conservanUSD0.07/PEN0.27 y
   deuda0. Otro circuitoUI con preparaciónAPI completa siete cobros, pago,
   NC, siete reembolsos y pago final: banco/crédito/deudas0 y21asientos únicos
@@ -158,8 +152,10 @@ Actualizado: 2026-11-06. Una página: si algo no cabe aquí, va a su documento d
 | `608` | Traza explícita de reembolso proveedor en banco extranjero. Rollback exacto, doble reaplicación,152pruebas dirigidas, tipos e imagen pasan. Seis circuitos API/SQL, diez guardas, dos rechazos inmutables, API400 y cadena604migraciones/117verificadores pasan. Sin promoción |
 | `609` | Asistencia automática: wrapper sobre writer475, reloj civil PE/CO/AR y replay del recibo original bajo el mismo lock. Sin backfill ni cambio de ACL/RLS de tablas. Rollback, doble reaplicación, API concurrente y cadena605/118 pasan. Restauración local299tablas/234472filas conserva historia609, ACL/RLS/políticas y función; no acredita respaldoPROD ni RTO. Sin promoción |
 | `610` | Ausencias sin cruce: trigger AFTER sobre `solicitudes` con lock por colaborador; al crear compara pendientes y aprobadas, al aprobar sólo aprobadas; rechazar no se bloquea y no revalida historia. Sustituye la prevalidación del API, que rompía el replay exacto del writer475 (409 en la integración de `808e4075`). Cadena 606/119 y 67 históricos, rollback, doble reaplicación y 5/5 altas concurrentes pasan en local. Sin promoción |
+| `611` | Nuevas muestras PE: CPE01, coreFACTURA y borrador simulado explícito sin evidencia fiscal. Prueba roja sobre610, tres verificaciones, rollback exacto y doble reaplicación pasan; filas históricas, ACL/RLS/políticas y permisos de función intactos. Cadena limpia607/120 y67históricos aprobada. No permite NC desde borrador. Sin promoción |
+| `612` | Lectura explícita del historial de aprobaciones para service_role: corrige503 en replay/conflicto tardío sin depender del proveedor ni del fixture. Prueba roja, tres verificaciones, rollback ACL exacto y doble reaplicación pasan; filas, demás permisos, RLS/políticas, owners y funciones intactos. UI vuelve a409. Cadena nueva608/121 y67históricos aprobada. Sin promoción |
 
-Próxima libre: `611`. El candidato local exige610; PROD observado sigue en593. Comprobar prefijos duplicados antes de añadir una.
+Próxima libre: `613`. El candidato local exige612; PROD observado sigue en593. Comprobar prefijos duplicados antes de añadir una.
 
 **591–593:** el corte público del 5-nov exige y encuentra 593. El ensayo previo consta en
 `artifacts/promocion-ensayo-591-593-20261101082811/informe.json`; no volver a promover por rutina.
@@ -217,7 +213,9 @@ Detalle: `docs/RELEASE.md`.
 - **Diez arreglos locales anteriores:** `claude/uat-defectos-20261104` / `8aded64c`, sin
   despliegue acreditado; se excluyen de D-01..D-17. El cruce de ausencias pasa a la base
   en 610. El máximo AFP 2026-11 ausente sigue bloqueando planilla; no se cambió normativa.
-- **Cinco pendientes conocidos:** NC semilla rechaza `REFERENCED_NOTE_SOURCE_CPE_INVALID` porque la semilla guarda el CPE como `FACTURA` y el writer exige `01`/`03` (el mensaje ya explica el motivo; corregir la semilla exige SQL);
+- **Pendientes conocidos:** el código del CPE de nuevas muestras se corrige en611;
+  siguen como borrador sin evidencia y no son origen elegible para una NC fiscal.
+  El rechazo `REFERENCED_NOTE_SOURCE_CPE_INVALID` conserva su guarda y explicación;
   cotización sin detalles confirmada; omisión bancaria al cambiar país confirmada sólo en
   código (flujo no ejecutable); normativa demo restringida intencionalmente. De los eventos
   globales sólo se observó un agregado de 15: los 7 clasificados históricamente no clasifican
@@ -237,7 +235,7 @@ Detalle: `docs/RELEASE.md`.
   Estado y límites posteriores: [seguimiento GO_PROD](../artifacts/go-prod-20261105/SEGUIMIENTO.md).
   El [dictamen actualizado](../artifacts/go-prod-20261105/DICTAMEN.md) conserva NO_GO y
   enlaza el delta de55puntos y las huellas del candidato sin commit nuevo.
-  Sin publicación ni despliegue. Reversas, planilla AFP y gates externos siguen pendientes.
+  Sin promoción productiva; PR153 sólo en borrador. Reversas, planilla AFP y gates externos siguen pendientes.
 
 ## Advertencias operativas
 

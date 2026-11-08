@@ -41,10 +41,9 @@ try{
  const approverEmail=`aprobador.${randomUUID().slice(0,8)}@example.test`;
  await call('users',{nombre:'Aprobadora',apellido:'Comercial',email:approverEmail,password:'Aprobadora-Local-2026!',roles:[adminRole.id],idempotency_key:randomUUID()});
  approverToken=(await call('auth/login',{email:approverEmail,password:'Aprobadora-Local-2026!'},201,null)).access_token;
- // PROD concede SELECT a service_role por los privilegios por defecto de Supabase
- // (ninguna migración lo revoca en pedido_aprobaciones); la reconstrucción local no
- // los emula. Sólo se replica ese default si falta.
- sql(`DO $$ BEGIN IF NOT has_table_privilege('service_role','public.pedido_aprobaciones','SELECT') THEN GRANT SELECT ON public.pedido_aprobaciones TO service_role; END IF; END $$;`);
+ // La612 debe habilitar esta lectura en la cadena, también al reconstruirla.
+ // El fixture exige el contrato; no concede permisos para reparar el candidato.
+ assert.equal(sql("SELECT has_table_privilege('service_role','public.pedido_aprobaciones','SELECT');"),'t','La cadena612 debe conceder lectura del historial al backend');
  // Umbral de aprobación por monto: estado de configuración del fixture local.
  sql(`UPDATE empresa_config SET monto_maximo_sin_aprobacion=30 WHERE tenant_id=${q(first.tenant)};`);
  const line=(cantidad,precio)=>({producto_id:product.id,descripcion:product.nombre,cantidad,precio_unitario:precio});
