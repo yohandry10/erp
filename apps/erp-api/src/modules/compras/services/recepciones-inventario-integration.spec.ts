@@ -104,7 +104,7 @@ describe('RecepcionesService - Inventario Integration (RPC cerrar_recepcion_tx)'
     await recepcionesService.cerrarRecepcion(mockRecepcionId, mockTenantId, { observaciones: 'Test' }, mockUserId);
 
     expect(mockClient.rpc).toHaveBeenCalledWith(
-      'cerrar_recepcion_tx',
+      'cerrar_recepcion_valuada_617',
       expect.objectContaining({
         p_recepcion_id: mockRecepcionId,
         p_tenant_id: mockTenantId,
@@ -156,11 +156,12 @@ describe('RecepcionesService - Inventario Integration (RPC cerrar_recepcion_tx)'
     await expect(
       recepcionesService.cerrarRecepcion(mockRecepcionId, mockTenantId, {}, mockUserId),
     ).resolves.toEqual(recepcionCerrada);
-    expect(mockClient.rpc).toHaveBeenCalledWith('cerrar_recepcion_tx', {
+    expect(mockClient.rpc).toHaveBeenCalledWith('cerrar_recepcion_valuada_617', {
       p_recepcion_id: mockRecepcionId,
       p_tenant_id: mockTenantId,
       p_user_id: mockUserId,
       p_observaciones: null,
+      p_valuacion: {},
     });
     expect(eventBusService.emitMovimientoStock).not.toHaveBeenCalled();
     expect(eventBusService.emitRecepcionRegistrada).not.toHaveBeenCalled();

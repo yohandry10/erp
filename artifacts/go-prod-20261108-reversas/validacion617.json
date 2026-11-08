@@ -1,0 +1,97 @@
+{
+  "at": "2026-11-08T18:43:19.206Z",
+  "scope": "OWN_LOCAL_617_NOT_PRODUCTION",
+  "verdict": "NO_GO",
+  "parent": "a359e4d453ab8cf1d1e0d96d61a863e9ef3f18ee",
+  "api": {
+    "startedAt": "2026-11-08T18:16:39.533Z",
+    "completedAt": "2026-11-08T18:23:48.520Z",
+    "code": 0,
+    "passed": true,
+    "sourcesUnchanged": true,
+    "sourceCount": 1102,
+    "tests": 6101,
+    "failed": 0,
+    "suites": 410,
+    "tz": "UTC",
+    "coverage": true,
+    "remoteWrites": false
+  },
+  "web": {
+    "passed": true,
+    "productionBuild": true,
+    "sourcesUnchanged": true,
+    "completedAt": "2026-11-08T18:06:40.579Z"
+  },
+  "chain": {
+    "passed": true,
+    "migrations": 613,
+    "verifiers": 126,
+    "historical": 67,
+    "sourcesUnchanged": true,
+    "completedAt": "2026-11-08T18:33:04.892Z"
+  },
+  "races": {
+    "passed": true,
+    "count": 4,
+    "observedWaits": true
+  },
+  "http": {
+    "passed": true,
+    "completedAt": "2026-11-08T18:30:43.324Z",
+    "physicalServiceNoStock": "USD5.17 -> PEN19.13",
+    "counterJournals": "linked, net0 per account",
+    "zero": "completed without journal"
+  },
+  "ui": {
+    "passed": true,
+    "completedAt": "2026-11-08T18:36:53.777Z",
+    "nativeSubtotal": "5.16",
+    "totalBase": "19.09",
+    "eventStatus": "completed",
+    "instantPreserved": true,
+    "lostResponseProvenInBrowser": false
+  },
+  "legacy": {
+    "passed": true,
+    "preserved": true,
+    "cases": 2
+  },
+  "afterTests": {
+    "onlyLineEndingNormalization": true,
+    "proof": "Private cut617-source-verification.json",
+    "webContracts": 120,
+    "docsContract": true
+  },
+  "sources": {
+    ".github/workflows/ci.yml": "7a7cdfaf14a3666013830b827c6f18648c2aae478efa832c81d2edf4d35a1ef7",
+    "apps/erp-api/src/app.controller.runtime.spec.ts": "2d35b09a0b8db7fde72ecbe46cd9dfa0927bb39fa3786bad7c28a10afb34735a",
+    "apps/erp-api/src/config/database-schema-version.ts": "c126215133fcb9effd7eb4e873255a666dee8272cd2a7704494b21771171c0c1",
+    "apps/erp-api/src/config/env.schema.spec.ts": "05bdcfd053897a7a7e237f2fb4a6c7b83c98532cee6d8f061ba27dd508ff21b4",
+    "apps/erp-api/src/modules/compras/controllers/recepciones.controller.ts": "29bd1b2b37915d00288d5a9495aa95e53192825f491cc4318910baa9ff0de3bc",
+    "apps/erp-api/src/modules/compras/dto/cerrar-recepcion.dto.ts": "dca46d1169dfdc5d98b941ef5b26e1f9f5138e790dcbf5d295b63129c4b0bd82",
+    "apps/erp-api/src/modules/compras/services/recepciones-inventario-integration.spec.ts": "a8de46b4121acb2b76194c5dd7f0525da8ac2fe509305e3f07e08b2864bf4efd",
+    "apps/erp-api/src/modules/compras/services/recepciones.service.spec.ts": "11a7037af57c50850bce5ce942435f4ff3bc720724077d0a023f8238fc21ab15",
+    "apps/erp-api/src/modules/compras/services/recepciones.service.ts": "fe9eb269debd8227da13bd748421ec40d3a003dcea4bff798824d42a3e2f3e16",
+    "apps/erp-api/src/modules/contabilidad/listeners/contabilidad-events.listener.spec.ts": "1368f864b90f15f1ae1eacad5fb4f7cba43b2217a2956639609a84beb1ccb98f",
+    "apps/erp-api/src/modules/contabilidad/listeners/contabilidad-events.listener.ts": "257c16730b8dd652b41010eb44920586dc7b2b6728dd5a373679db5fbf2d8275",
+    "apps/erp-api/src/shared/utils/fecha-utc-guard.spec.ts": "27f2496f37bdc893ed2f491abc55263685d6240376af9289055c7166779c2aef",
+    "apps/web/components/compras/RecepcionWizard.tsx": "5fa7f81efe9263dfb29b3b8fe01ec88be7559b1f7b6bad1a19332d39c99ee052",
+    "apps/web/lib/compras/purchase-receipt-operation.ts": "fe18244121f710e7ad56f36833dd99680e1e9bd484e8571204395bdb77d21d17",
+    "render.yaml": "8448eb234b36bb99ec60c84fae82a1b6a71a64f7f5f77d065469c5100b1d23e9",
+    "supabase/verify/440__purchase_receipt_transactional_outbox.sql": "b7793d5701e4aef2709ada1c45f88ffb34203d2b461963aa8b196055e2566535",
+    "supabase/verify/444__purchase_receipt_creation_and_service_items_atomic.sql": "816c1656dfde98112cf99bdde2e220462acfa1c287a987f9588f5b179793526b",
+    "supabase/verify/589__purchase_receipt_explicit_zero_inventory_cost.sql": "94f98154a10ca8e2c5e92d1cb248f0cf660c74889e323d5bd920c1584279102f",
+    "supabase/verify/615__linked_purchase_receipt_business_reversal.sql": "506b71ddcf5076363ec7b7e7fdd871b69104023bf9502b44d9cdc1eb36d9d328",
+    "apps/erp-api/src/modules/compras/dto/cerrar-recepcion.dto.spec.ts": "4df8bdb0d83439634eeb7182f39ec96196d328c41d18e9ae751323d3587b218d",
+    "apps/erp-api/src/modules/contabilidad/listeners/receipt-currency-accounting.spec.ts": "968cbecda1dc4b9af620e058b796a5c819dd316327dd4e8c1ea5a7f2a1a0ada9",
+    "apps/erp-api/src/modules/contabilidad/listeners/receipt-valuation.fixture.json": "792a1041aebd7b61077127b3a3921d9b95184957b2d876ccfd232cdce74c2763",
+    "apps/web/tests/compras/verify-receipt-close-currency.mjs": "57ffe1c1a7cd54cb63066e83e301ad097e850b4167637c125e1c44f1b96fbe79",
+    "supabase/migrations/617__purchase_receipt_frozen_currency_valuation.sql": "12a7995b01fb59ae8ea03022f0182943ee944eca95321a7d1539fb96ad2b6256",
+    "supabase/verify/617__purchase_receipt_frozen_currency_valuation.sql": "ed426dd81664965d880d53bf2adc2c02b1a71d305047bf5ff3f0411620b9cb28"
+  },
+  "remoteWrites": false,
+  "merge": false,
+  "productionDeploy": false,
+  "newSpending": 0
+}

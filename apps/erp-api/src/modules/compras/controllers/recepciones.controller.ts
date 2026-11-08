@@ -172,6 +172,7 @@ export class RecepcionesController {
   @Post(':id/cerrar')
   @RequirePermission('compras.recepciones.cerrar')
   @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
   @ApiOperation({
     summary: 'Cerrar recepción',
     description: 'Cierra una recepción, actualiza el cumplimiento y mueve inventario sólo cuando corresponde',

@@ -1796,36 +1796,32 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
         return;
       }
       
-      const compraData = {
-        tenant_id: tenantId,
-        fecha: eventData.fechaRecepcion || eventData.fecha || new Date().toISOString(),
-        costo: costoRecepcion,
-        mercaderia: eventData.mercaderiaParcial,
-        servicios: eventData.serviciosParcial,
-        no_stock: eventData.noStockParcial,
-        centro_costo_id: eventData.centro_costo_id,
-        referencia: eventData.numeroRecepcion || eventData.numeroOrden,
-        event_id: evento.event_id || eventData.eventId
-      };
-
-      const eventId = compraData.event_id;
-
-      const asientoCreado = await this.asientosGenerator.generarAsientoRecepcion(compraData);
-
-      // 🔴 CRÍTICO FIX: Validar que el asiento se haya creado correctamente
-      if (eventId) {
-        const asientoVerificado = await this.verificarAsientoCreado(
-          tenantId,
-          eventId,
-          compraData.referencia
-        );
-        if (!asientoVerificado) {
-          throw new Error(
-            `Asiento contable de recepción no se pudo verificar después de creación para evento ${eventId}`
-          );
-        }
-      } else if (!asientoCreado?.id) {
-        throw new Error('Asiento contable de recepción no retornó ID válido después de creación');
+      const eventId = evento.event_id || eventData.eventId;
+      if (!eventId || !evento.claim_token || !eventData.recepcionId) {
+        throw new Error('Contabilizar la recepción requiere identidad y claim originales');
+      }
+      // The transaction reads the durable close valuation and original event,
+      // creates or verifies the journal, and binds the write to this claim.
+      const { data, error } = await this.supabaseService.getClient().rpc('contabilizar_recepcion_617', {
+        p_tenant_id: tenantId, p_event_id: eventId, p_claim_token: evento.claim_token,
+      });
+      if (error) throw new Error(error.message || 'No se pudo contabilizar la recepción con su valuación de origen');
+      const b = data?.valuacion;
+      const amount = (v: unknown): v is string => typeof v === 'string' && /^\d{1,12}\.\d{2}$/.test(v);
+      if (!this.receiptAccountingProof(data, eventId, eventData.recepcionId) || data.no_monetary_effect !== false
+        || typeof data.asiento_id !== 'string' || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(data.asiento_id)
+        || !amount(data.total_debe) || data.total_debe !== data.total_haber || /^0+\.00$/.test(data.total_debe)
+        || !b || typeof b !== 'object' || Array.isArray(b) || ![444, 617].includes(b.version)
+        || !/^[A-Z]{3}$/.test(b.moneda) || b.moneda !== eventData.moneda || !/^[A-Z]{3}$/.test(b.moneda_base)
+        || typeof b.tipo_cambio !== 'string' || !/^(0|[1-9][0-9]{0,9})(?:\.\d{1,6})?$/.test(b.tipo_cambio)
+        || !['subtotal_origen', 'mercaderia', 'servicios', 'no_stock', 'total_base'].every(k => amount(b[k]))) {
+        throw new Error('El asiento de recepción no tiene identidad y valuación completas');
+      }
+      if (!new Decimal(b.tipo_cambio).gt(0) || b.moneda === b.moneda_base && !new Decimal(b.tipo_cambio).eq(1)
+        || b.version === 444 && b.moneda !== b.moneda_base
+        || !new Decimal(b.mercaderia).plus(b.servicios).plus(b.no_stock).eq(b.total_base)
+        || b.total_base !== data.total_debe || !new Decimal(String(costoRecepcion)).eq(b.subtotal_origen)) {
+        throw new Error('La valuación contable no coincide con la recepción original');
       }
     } catch (error) {
       this.logger.error(`❌ [ContabilidadEventsListener] Error en handleRecepcionRegistrada:`, error);

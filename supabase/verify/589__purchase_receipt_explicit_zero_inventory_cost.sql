@@ -11,7 +11,15 @@ BEGIN
     WHERE singleton AND environment='DEV' AND project_ref='localerpephemeralqax') THEN
     RAISE EXCEPTION 'VERIFY_576_LOCAL_ONLY';
   END IF;
-  v_def := replace(pg_get_functiondef(v_target),chr(13),'');
+  IF to_regprocedure('app.close_receipt_core_617(uuid,uuid,text,text)') IS NOT NULL THEN
+    v_def := replace(pg_get_functiondef('app.close_receipt_core_617(uuid,uuid,text,text)'::regprocedure),chr(13),'');
+    IF has_function_privilege('service_role','app.close_receipt_core_617(uuid,uuid,text,text)','EXECUTE')
+       OR position('app.close_receipt_617' IN pg_get_functiondef(v_target))=0 THEN
+      RAISE EXCEPTION 'VERIFY589_PRIVATE_CORE_MUST_USE_VALUED_WRAPPER';
+    END IF;
+  ELSE
+    v_def := replace(pg_get_functiondef(v_target),chr(13),'');
+  END IF;
   IF position('''costo_cero_confirmado'', coalesce(v_detalle.precio_unitario = 0, false)' IN v_def)=0
      OR position('''costo_unitario'', coalesce(v_detalle.precio_unitario, 0)' IN v_def)=0 THEN
     RAISE EXCEPTION 'VERIFY_576_EXPLICIT_ZERO_NOT_BOUND_TO_ORDER_PRICE';

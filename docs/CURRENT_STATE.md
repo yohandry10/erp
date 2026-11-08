@@ -171,17 +171,23 @@ Actualizado: 2026-11-08. Una página: si algo no cabe aquí, va a su documento d
 
 | `615` | WIP local: anulación de recepción, cumplimientoOC, stock/costo/lotes originales y outbox inverso atómicos. Worker con claim real crea un único contraasiento enlazado; costo0 probado sin asiento ficticio. SQL/rollback y nueve carreras reales pasan. Integración con JWT/permisos/PostgREST y ambos workersNode reales: físico/servicioPEN con neto0 y cero sinGL. Respuesta perdida tras commit recuperada sin reenviar. Sin promoción |
 | `616` | WIP local: recibo ligado a actor/tenant/origen y resolución durable; tres carreras más verifican commit/abandono/revocación. UI conserva intención/archivo antes de retirar el pendiente; rechazo por período, recarga, resolución y nueva anulación verificados conSQL y worker.98pruebas del contrato web, colaJS y48Rust pasan. SuiteAPI completa6066/408 enUTC, tipos/buildAPI yweb pasan; lintAPI0errores/97avisos, sin avisos en la UI nueva. Cadena fresca612migraciones/125verificadores+67históricos aprobada.21tablas conservadas intactas. UI de transferencia, matrizFX y ensayo de restore/rollback aún pendientes; NO_GO |
+| `617` | WIP local: cierre congela monedaOC, moneda contable del país, tasa decimal y referencia; worker con claim real valida el origen y registra valores base, sin reinterpretar historiaFX. Bien físico/servicio/sin stockUSD5.17→PEN19.13 y reversa exacta neto0; cero sinGL. Cuatro carreras reales y cierreUI USD5.16→PEN19.09 pasan. SuiteAPI6101/410 con coberturaUTC, tipos/build/lintAPI y buildweb pasan. Cadena nueva613migraciones/126verificadores+67históricos aprobada. Sin promoción; NO_GO |
 
-Próxima libre: `617`. El binario WIP exige616; el candidato publicado y el stack
+Próxima libre: `618`. El binario WIP exige617; el candidato publicado y el stack
 local conservado siguen612, PROD observado593. No arrancar el binario nuevo sobre
 la base conservada sin completar su migración en infraestructura de pruebas propia.
 Comprobar prefijos duplicados antes de añadir una.
 
-**D56 abierto:** el worker original contabiliza servicios y bienes sin stockUSD
-sin una conversión congelada. Dos reproducciones locales sobrea5a1dfc terminan
-completed conGL5.17, igual al subtotalUSD5.17 y sin evidenciaFX. La recepción
-física ya rechaza la falta de valuación. No se modificaron tasas ni esos asientos;
-[reproducción y alcance](../artifacts/go-prod-20261108-reversas/D56_FX.md).
+**D56 corregido en el candidato local617:** nuevas recepcionesUSD exigen valuación
+congelada; la contabilización original y la reversa verifican esa autoridad. Los
+dos originales históricos sin evidenciaFX se conservan y se bloquean para nuevas
+operaciones; no se inventa tasa1 ni se corrige su mayor por backfill. No acredita
+la matriz completa recepción→factura→pago en divisa.
+[Revisión617](../artifacts/go-prod-20261108-reversas/REVISION617.md).
+
+**D57 abierto:** Compras mezcla importes nominales en el resumen mensual y rotula
+órdenesUSD como soles. Observado en navegador con datos propios; pendiente de
+corrección y aceptación. No cambia los valores617 ya comprobados enSQL.
 
 **591–593:** el corte público del 5-nov exige y encuentra 593. El ensayo previo consta en
 `artifacts/promocion-ensayo-591-593-20261101082811/informe.json`; no volver a promover por rutina.

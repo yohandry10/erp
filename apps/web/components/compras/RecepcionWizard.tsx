@@ -10,7 +10,8 @@ import { cn } from '@/lib/utils'
 import { parseDateLocal } from '@/lib/date-utils'
 import { useAuth } from '@/contexts/AuthContext'
 import { readPurchaseOrder } from '@/lib/compras/purchase-order-read-contract'
-import { confirmPurchaseReceiptCreated, confirmPurchaseReceiptClosed, purchaseReceiptIntentKey, readPurchaseReceiptIntent, type PurchaseReceiptIntent } from '@/lib/compras/purchase-receipt-operation'
+import { confirmPurchaseReceiptCreated, confirmPurchaseReceiptClosed, isReceiptCloseValuation, purchaseReceiptIntentKey, readPurchaseReceiptIntent, type PurchaseReceiptIntent } from '@/lib/compras/purchase-receipt-operation'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 const fieldLabelClass = 'mb-2 block text-sm font-medium text-foreground/85'
 const fieldClass = 'w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground'
@@ -50,6 +51,7 @@ interface OrdenCompra {
   numero: string
   proveedor_id: string
   estado: string
+  moneda: string
   proveedor?: {
     razon_social: string
     ruc: string
@@ -111,6 +113,12 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
   const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const { get, post } = useApi({ requireLive: true, throwOnError: true, showErrorToast: false, retries: 0 })
   const { session } = useAuth()
+  const country = useCountryContext()
+  const accountingCurrency = !country.loading && !country.error && !country.requiresSetup
+    ? ({ PE: 'PEN', AR: 'ARS', CO: 'COP' } as Record<string,string>)[country.paisCodigo] || '' : ''
+  const foreignCurrency = !!orden && !!accountingCurrency && orden.moneda !== accountingCurrency
+  const [exchangeRate, setExchangeRate] = useState('')
+  const [rateReference, setRateReference] = useState('')
   const tenantId = session?.user?.tenant_id || ''
   const actorId = session?.user?.id || ''
   const scopeIdentity = `${tenantId}:${actorId}:${ordenId}`
@@ -130,6 +138,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
     epoch.current++; inflight.current = false
     setSubmitting(false); setIntentReady(''); setPendingIntent(null)
     setRecoveryError(''); setOperationError(''); setSourceError('')
+    setExchangeRate(''); setRateReference('')
     setOrden(null); setItems([]); setAlmacenes([]); setUbicacionesPorAlmacen({}); setCurrentStep(1); setScannerMode(false)
     if (!tenantId || !actorId) return
     try {
@@ -455,11 +464,15 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
       }
 
       const scope = { tenantId, actorId, orderId: ordenId }
+      const valuation = foreignCurrency ? { moneda: orden!.moneda, moneda_base: accountingCurrency, tipo_cambio: exchangeRate, referencia: rateReference.trim() } : undefined
+      if (!pendingIntent && (!accountingCurrency || !orden || foreignCurrency && !isReceiptCloseValuation(valuation))) {
+        throw new Error('Confirme la moneda contable e indique un tipo de cambio positivo, con hasta 6 decimales, y su referencia de 5 a 200 caracteres.')
+      }
       const key = purchaseReceiptIntentKey(scope)
       const previous = localStorage.getItem(key)
       const stored = readPurchaseReceiptIntent(previous,scope)
       const candidate = pendingIntent || { version: 1 as const, ...scope, createdAt: new Date().toISOString(), stage: 'CREATE' as const,
-        payload: JSON.parse(JSON.stringify(createDto)), closePayload: { observaciones: 'Recepción cerrada automáticamente' },
+        payload: JSON.parse(JSON.stringify(createDto)), closePayload: { observaciones: 'Recepción cerrada automáticamente', ...(valuation ? { valuacion: valuation } : {}) },
         expected: itemsToReceive.map(item => { const d = orden?.detalles?.find(d => d.id === item.detalle_id); return {
           detailId: item.detalle_id, productId: item.producto_id, name: d?.productos?.nombre || item.producto_nombre,
           code: d?.productos?.codigo ?? null, ordered: item.cantidad_pedida, price: d?.precio_unitario,
@@ -524,6 +537,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
   if (visibleIntent) return <div data-testid="purchase-receipt-pending" className="space-y-4 p-4">
     <p role="status">Hay una recepción pendiente de confirmación. Sus datos se conservan para reintentar el mismo registro.</p>
     <p>{visibleIntent.created ? `Recepción ${visibleIntent.created.number}: falta confirmar el cierre.` : 'Falta confirmar la creación de la recepción.'}</p>
+    {visibleIntent.closePayload.valuacion && <p>Tipo de cambio conservado: {visibleIntent.closePayload.valuacion.tipo_cambio} {visibleIntent.closePayload.valuacion.moneda_base} por 1 {visibleIntent.closePayload.valuacion.moneda}. Referencia: {visibleIntent.closePayload.valuacion.referencia}.</p>}
     <ul>{visibleIntent.payload.items.map((item,index) => <li key={item.detalle_id}>{visibleIntent.expected[index].name}: {item.cantidad_recibida} · {item.calidad}{item.lote ? ` · Lote ${item.lote}` : ''}{item.serie ? ` · Serie ${item.serie}` : ''}{item.fecha_expiracion ? ` · Vence ${item.fecha_expiracion}` : ''}{item.observaciones ? ` · ${item.observaciones}` : ''}</li>)}</ul>
     {operationError && <p role="alert" data-testid="purchase-receipt-operation-error">{operationError}</p>}
     <ProtectedComponent modulo="compras" accion="create" recurso="recepciones" fallback={null}><button onClick={handleSubmit} disabled={submitting} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">{submitting ? 'Procesando...' : 'Reintentar recepción pendiente'}</button></ProtectedComponent>
@@ -992,6 +1006,24 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
               Confirmar Recepción
             </h3>
 
+            {!accountingCurrency ? <div role="status" className="mb-6 text-sm text-foreground">
+              {country.loading ? 'Consultando la moneda contable…' : 'No se pudo confirmar la moneda contable de esta empresa.'}
+              {country.retry && <button type="button" onClick={country.retry} disabled={country.retrying} className="ml-2 underline underline-offset-4 focus-visible:outline focus-visible:outline-2">Reintentar consulta</button>}
+            </div> : foreignCurrency && <fieldset disabled={submitting} className="mb-6 space-y-4">
+              <legend className="mb-2 font-medium text-foreground">Conversión de {orden?.moneda} a {accountingCurrency}</legend>
+              <p id="receipt-fx-help" className="max-w-prose text-sm text-muted-foreground">Esta tasa quedará conservada con la recepción para valorar inventario y contabilidad.</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div><label htmlFor="receipt-exchange-rate" className={fieldLabelClass}>Tipo de cambio: {accountingCurrency} por 1 {orden?.moneda}</label>
+                  <input id="receipt-exchange-rate" inputMode="decimal" type="text" autoComplete="off" maxLength={17} value={exchangeRate}
+                    onChange={e => setExchangeRate(e.target.value)} aria-describedby="receipt-fx-help" className={fieldClass} />
+                </div>
+                <div><label htmlFor="receipt-rate-reference" className={fieldLabelClass}>Documento o fuente del tipo de cambio</label>
+                  <input id="receipt-rate-reference" type="text" autoComplete="off" minLength={5} maxLength={200} value={rateReference}
+                    onChange={e => setRateReference(e.target.value)} className={fieldClass} />
+                </div>
+              </div>
+            </fieldset>}
+
             {/* Summary Cards */}
             <div className="mb-6 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
               <div className="rounded-lg border border-blue-400/30 bg-blue-500/15 p-4 group-data-[erp-theme=light]/dashboard:border-blue-300 group-data-[erp-theme=light]/dashboard:bg-blue-50">
@@ -1151,7 +1183,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
           >
             <button
               onClick={handleSubmit}
-              disabled={submitting}
+              disabled={submitting || !accountingCurrency}
               className="flex items-center gap-2 rounded-lg bg-cyan-700 px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitting ? (

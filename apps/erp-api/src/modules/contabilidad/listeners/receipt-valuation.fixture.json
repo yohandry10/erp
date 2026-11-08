@@ -1,0 +1,98 @@
+[
+  {
+    "kind": "LOT",
+    "proof": {
+      "success": true,
+      "event_id": "03364f2b-1ddd-4ac5-8b10-5363c04a2412",
+      "valuacion": {
+        "moneda": "USD",
+        "version": 617,
+        "no_stock": "0.00",
+        "servicios": "0.00",
+        "mercaderia": "19.13",
+        "total_base": "19.13",
+        "moneda_base": "PEN",
+        "tipo_cambio": "3.700000",
+        "subtotal_origen": "5.17"
+      },
+      "asiento_id": "e3723639-4eed-47a8-95b3-811d2db2f9ea",
+      "idempotent": false,
+      "total_debe": "19.13",
+      "total_haber": "19.13",
+      "recepcion_id": "b79d6a8c-7eda-4d99-83ae-6800f5c30c45",
+      "no_monetary_effect": false
+    }
+  },
+  {
+    "kind": "NO_STOCK",
+    "proof": {
+      "success": true,
+      "event_id": "0226e30a-f35e-42ad-927a-4499cc3aa943",
+      "valuacion": {
+        "moneda": "USD",
+        "version": 617,
+        "no_stock": "19.13",
+        "servicios": "0.00",
+        "mercaderia": "0.00",
+        "total_base": "19.13",
+        "moneda_base": "PEN",
+        "tipo_cambio": "3.700000",
+        "subtotal_origen": "5.17"
+      },
+      "asiento_id": "60526bd4-071b-42c2-97a3-894ddf783492",
+      "idempotent": false,
+      "total_debe": "19.13",
+      "total_haber": "19.13",
+      "recepcion_id": "fe658e86-985f-48e1-a8aa-438c669b18c5",
+      "no_monetary_effect": false
+    }
+  },
+  {
+    "kind": "PHYSICAL",
+    "proof": {
+      "success": true,
+      "event_id": "216e15e6-3911-44a0-8486-b4f780d89915",
+      "valuacion": {
+        "moneda": "USD",
+        "version": 617,
+        "no_stock": "0.00",
+        "servicios": "0.00",
+        "mercaderia": "19.13",
+        "total_base": "19.13",
+        "moneda_base": "PEN",
+        "tipo_cambio": "3.700000",
+        "subtotal_origen": "5.17"
+      },
+      "asiento_id": "c3654ae8-b474-4542-ae3a-14f9e270af78",
+      "idempotent": false,
+      "total_debe": "19.13",
+      "total_haber": "19.13",
+      "recepcion_id": "b3a79d8d-4113-41ff-b082-735a90f36810",
+      "no_monetary_effect": false
+    }
+  },
+  {
+    "kind": "SERVICE",
+    "proof": {
+      "success": true,
+      "event_id": "d62a00c4-8c4f-4194-9464-07fc134ad7d2",
+      "valuacion": {
+        "moneda": "USD",
+        "version": 617,
+        "no_stock": "0.00",
+        "servicios": "19.13",
+        "mercaderia": "0.00",
+        "total_base": "19.13",
+        "moneda_base": "PEN",
+        "tipo_cambio": "3.700000",
+        "subtotal_origen": "5.17"
+      },
+      "asiento_id": "73dcda05-3415-4090-b155-2edf819278c3",
+      "idempotent": false,
+      "total_debe": "19.13",
+      "total_haber": "19.13",
+      "recepcion_id": "e4f3c391-f4e4-40ed-a26f-bd64d0d75007",
+      "no_monetary_effect": false
+    }
+  }
+]

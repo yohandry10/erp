@@ -434,12 +434,13 @@ describe('RecepcionesService', () => {
 
       expect(result).toEqual(recepcionCerrada);
       expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
-        'cerrar_recepcion_tx',
+        'cerrar_recepcion_valuada_617',
         {
           p_recepcion_id: 'rec-1',
           p_tenant_id: 'tenant-1',
           p_user_id: 'user-1',
           p_observaciones: 'Recepción completa',
+          p_valuacion: {},
         },
       );
       expect(eventBusService.emitRecepcionRegistrada).not.toHaveBeenCalled();
@@ -447,6 +448,18 @@ describe('RecepcionesService', () => {
       expect(eventBusService.emitMovimientoStock).not.toHaveBeenCalled();
       expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('productos');
       expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('movimientos_almacen');
+    });
+
+    it('conserva la tasa decimal original en SQL y devuelve su snapshot confirmado tras hidratar', async () => {
+      const valuacion = { moneda: 'USD', moneda_base: 'PEN', tipo_cambio: '3.712345', referencia: 'Constancia 617 original' };
+      const frozen = { ...valuacion };
+      jest.spyOn(service, 'obtenerRecepcionPorId').mockResolvedValue({ ...mockRecepcion, estado: 'CERRADA', valuacion_cierre: { tipo_cambio: '1' } } as any);
+      mockSupabaseClient.rpc.mockResolvedValueOnce({ data: { estado: 'CERRADA', idempotent: true, movimientos: [], valuacion_cierre: frozen }, error: null });
+      const result = await service.cerrarRecepcion('rec-1', 'tenant-1', { observaciones: 'Cierre USD', valuacion }, 'user-1');
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('cerrar_recepcion_valuada_617', {
+        p_recepcion_id: 'rec-1', p_tenant_id: 'tenant-1', p_user_id: 'user-1', p_observaciones: 'Cierre USD', p_valuacion: valuacion,
+      });
+      expect(result.valuacion_cierre).toEqual(frozen);
     });
 
     it('reintenta una recepción CERRADA en la RPC y devuelve el mismo cierre idempotente', async () => {
@@ -469,7 +482,7 @@ describe('RecepcionesService', () => {
         service.cerrarRecepcion('rec-1', 'tenant-1', {}, 'user-1'),
       ).resolves.toEqual(recepcionCerrada);
       expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
-        'cerrar_recepcion_tx',
+        'cerrar_recepcion_valuada_617',
         expect.objectContaining({ p_recepcion_id: 'rec-1', p_tenant_id: 'tenant-1' }),
       );
     });

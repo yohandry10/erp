@@ -43,6 +43,8 @@ export class RecepcionesService {
       RECEIPT_ORIGINAL_JOURNAL_ALREADY_REVERSED: 'El asiento original ya tiene una reversión. Revise su vínculo antes de anular la recepción.',
       RECEIPT_ACCOUNTING_SOURCE_REQUIRED: 'La recepción no tiene un evento contable original único y verificable.',
       RECEIPT_ACCOUNTING_SOURCE_MISMATCH: 'El evento contable original no coincide con la recepción.',
+      RECEIPT_HISTORICAL_FX_UNVERIFIABLE: 'La recepción en divisa no conserva una conversión verificable. Requiere revisión contable del origen.',
+      RECEIPT_ORIGINAL_JOURNAL_VALUATION_MISMATCH: 'El asiento original no coincide con la valuación de la recepción. Requiere revisión contable.',
       RECEIPT_REVERSAL_ITEM_EVIDENCE_REQUIRED: 'Los ítems originales no tienen clasificación verificable.',
       RECEIPT_REVERSAL_MOVEMENT_EVIDENCE_REQUIRED: 'El inventario original no tiene movimientos y valuación confirmados.',
       RECEIPT_REVERSAL_FULFILLMENT_INCONSISTENT: 'El cumplimiento de la orden no permite retirar esta recepción.',
@@ -483,16 +485,27 @@ export class RecepcionesService {
       // cierre, de sus movimientos y del evento durable.
       const observaciones = dto.observaciones ?? null;
       const { data: rpcResult, error: rpcError } = await this.supabase.getClient()
-        .rpc('cerrar_recepcion_tx', {
+        .rpc('cerrar_recepcion_valuada_617', {
           p_recepcion_id: recepcionId,
           p_tenant_id: tenantId,
           p_user_id: userId ?? null,
           p_observaciones: observaciones ?? null,
+          p_valuacion: dto.valuacion ?? {},
         });
 
       if (rpcError) {
+        if (rpcError.code === '23505') throw new ConflictException('El cierre confirmado pertenece a otros datos. Conserve la intención original y consulte la recepción.');
+        if (rpcError.code === '42501') throw new ForbiddenException('Se requiere permiso vigente para cerrar recepciones de esta empresa.');
+        const reasons: Record<string, string> = {
+          RECEIPT_FX_REQUIRED: 'Indique el tipo de cambio y el documento que lo sustenta para cerrar esta recepción en divisa.',
+          RECEIPT_VALUATION_INPUT_INVALID: 'Revise la moneda de la orden, la moneda contable, el tipo de cambio y su referencia.',
+          RECEIPT_EXCHANGE_RATE_INVALID: 'El tipo de cambio debe ser positivo; entre monedas iguales debe ser 1.',
+          RECEIPT_VALUE_OUTSIDE_PRECISION: 'Una línea queda sin valor o excede la precisión admitida. Revise su cantidad, precio y tipo de cambio.',
+          RECEIPT_HISTORICAL_VALUATION_UNAVAILABLE: 'El cierre histórico no conserva esa conversión; requiere revisión contable del origen.',
+          RECEIPT_HISTORICAL_FX_UNVERIFIABLE: 'El cierre histórico en divisa no conserva una conversión verificable; requiere revisión contable.',
+        };
         throw new BadRequestException(
-          mensajeErrorLote(rpcError.message) ?? `Error al cerrar recepción: ${rpcError.message}`,
+          reasons[String(rpcError.message || '').split(':')[0]] ?? mensajeErrorLote(rpcError.message) ?? `Error al cerrar recepción: ${rpcError.message}`,
         );
       }
 
@@ -559,12 +572,13 @@ export class RecepcionesService {
         durationMs: Date.now() - startedAt,
       });
 
-      return this.hidratarRecepcionPostCommit(recepcionId, tenantId, {
+      const hydrated = await this.hidratarRecepcionPostCommit(recepcionId, tenantId, {
         id: recepcionId,
         tenant_id: tenantId,
         estado: 'CERRADA',
         ...cierre,
       });
+      return { ...hydrated, valuacion_cierre: cierre?.valuacion_cierre };
     } catch (error) {
       await this.registrarIntegrationLog({
         tenantId,

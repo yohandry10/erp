@@ -198,10 +198,18 @@ BEGIN
  IF debit IS NULL OR credit IS NULL THEN RAISE EXCEPTION 'VERIFY615_LOCAL_ACCOUNTS_REQUIRED';END IF;
  -- Canonical journal RPC, with the exact frozen subtotal of the original
  -- receipt event. This is not a fiscal submission or the Node original worker.
+ IF to_regprocedure('public.contabilizar_recepcion_617(uuid,uuid,uuid)') IS NOT NULL THEN
+  PERFORM * FROM public.claim_outbox_events_tx('verify615-original',100,ARRAY['recepcion.registrada'],NULL,t,3);
+  SELECT id,claim_token INTO source_row,source_token FROM public.outbox_events WHERE tenant_id=t AND event_id=source;
+  EXECUTE 'SELECT public.contabilizar_recepcion_617($1,$2,$3)' INTO j USING t,source,source_token;
+  original:=(j->>'asiento_id')::uuid;
+  PERFORM public.complete_outbox_event_tx(source_row,source_token);
+ ELSE
  j:=public.crear_asiento_con_detalles_tx(t,jsonb_build_object('fecha',day,'concepto','Recepción pendiente de factura','source_event_id',source),
   jsonb_build_array(jsonb_build_object('cuenta_id',debit,'debe',5.17,'haber',0,'concepto','Mercadería original'),
     jsonb_build_object('cuenta_id',credit,'debe',0,'haber',5.17,'concepto','Recibido por facturar')));
  original:=(j->>'id')::uuid;
+ END IF;
  before_state:=pg_temp.state615(t);
  PERFORM pg_temp.reject615(format('SELECT public.crear_asiento_con_detalles_tx(%L,%L,%L)',t,
   jsonb_build_object('fecha',day,'concepto','Reversa manual ajena','reversion_de_asiento_id',original),

@@ -145,6 +145,10 @@ jobs:
 
       - name: Verify complete tenant catalog
         run: pnpm --filter @erp-suite/web test:tenant-catalog
+      - name: Receipt close currency and durable reversal contracts
+        run: |
+          node apps/web/tests/compras/verify-receipt-close-currency.mjs
+          node apps/web/tests/compras/verify-receipt-reversal-operation.mjs
       - name: Candidate profile contract
         run: pnpm --filter @erp-suite/web test:candidate-profile
       - name: Receivables complete live read contract
@@ -233,7 +237,7 @@ jobs:
           --health-retries 20
     env:
       E2E_EPHEMERAL_LOCAL_DB: "1"
-      REQUIRED_DATABASE_SCHEMA_VERSION: "616"
+      REQUIRED_DATABASE_SCHEMA_VERSION: "617"
       PGPASSWORD: postgres
       PGHOST: 127.0.0.1
       PGPORT: 5442

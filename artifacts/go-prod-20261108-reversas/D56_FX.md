@@ -1,6 +1,6 @@
 # D56 · recepción en divisa sin valuación congelada
 
-Estado: abierto, **NO_GO**. Código reproducido: a5a1dfc; sólo infraestructura y
+Estado del corte original: abierto, **NO_GO**. Código reproducido: a5a1dfc; sólo infraestructura y
 fixtures propios. No hubo SQL remoto ni cambios de tasas/normativa global.
 
 Una OCUSD con dos cantidades0.5+0.75 a4.13 genera subtotal parcial5.17. Para
@@ -26,3 +26,10 @@ la original, fabricar una tasa1 ni alterar estos asientos históricos. Restan el
 contrato de captura para divisas y sus pruebas; no se considera corregido.
 
 La reproducción cuantitativa está en[reproduccion-d56.json](reproduccion-d56.json).
+
+Actualización617: corregido para nuevas operaciones en el candidato local. La
+captura durable de cierre y el writer contable con claim real comparten moneda,
+tasa y centavos verificables; los dos originales defectuosos se preservan sin
+backfill y rechazan replay/reversa que intenten reinterpretarlos. El registro
+anterior describe la reproducción original, no el comportamiento corregido.
+Ver [pruebas y límites617](REVISION617.md). El dictamen global sigue **NO_GO**.

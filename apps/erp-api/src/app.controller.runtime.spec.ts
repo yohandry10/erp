@@ -48,13 +48,13 @@ describe('AppController runtime contract', () => {
       }),
     }));
     expect(rpc).toHaveBeenCalledWith('outbox_runtime_health_492', expect.objectContaining({
-      p_required_schema_version: 616,
+      p_required_schema_version: 617,
     }));
     expect(rpc).not.toHaveBeenCalledWith('pgrst_reload_schema', expect.anything());
     expect(cache.getRuntimeHealth).toHaveBeenCalledTimes(1);
   });
 
-  it.each([{ configured: '558', expected: 616 }, { configured: '576', expected: 616 }, { configured: '582', expected: 616 }, { configured: '589', expected: 616 }, { configured: '594', expected: 616 }, { configured: '609', expected: 616 }, { configured: '610', expected: 616 }, { configured: '611', expected: 616 }, { configured: '612', expected: 616 }, { configured: '613', expected: 616 }, { configured: '614', expected: 616 }, { configured: '615', expected: 616 }, { configured: '616', expected: 616 }, { configured: '617', expected: 617 }])('respeta el piso contractual con despliegue $configured', async ({ configured, expected }) => {
+  it.each([{ configured: '558', expected: 617 }, { configured: '576', expected: 617 }, { configured: '582', expected: 617 }, { configured: '589', expected: 617 }, { configured: '594', expected: 617 }, { configured: '609', expected: 617 }, { configured: '610', expected: 617 }, { configured: '611', expected: 617 }, { configured: '612', expected: 617 }, { configured: '613', expected: 617 }, { configured: '614', expected: 617 }, { configured: '615', expected: 617 }, { configured: '616', expected: 617 }, { configured: '617', expected: 617 }, { configured: '618', expected: 618 }])('respeta el piso contractual con despliegue $configured', async ({ configured, expected }) => {
     const { controller, rpc } = build();
     (controller as any).configService.get.mockImplementation((key: string) => (
       key === 'REQUIRED_DATABASE_SCHEMA_VERSION' ? configured : {

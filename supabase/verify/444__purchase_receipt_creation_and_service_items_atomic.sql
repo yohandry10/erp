@@ -291,7 +291,7 @@ BEGIN
   END IF;
 
   v_retry := public.cerrar_recepcion_tx(
-    v_recepcion_id, v_tenant_id, v_user_id::text, NULL
+    v_recepcion_id, v_tenant_id, v_user_id::text, 'Cierre mixto 444'
   );
   IF NOT coalesce((v_retry->>'idempotent')::boolean, false)
      OR (SELECT count(*) FROM public.outbox_events

@@ -1449,13 +1449,22 @@ Cotización -> Aprobación -> Orden de compra -> Recepción -> CxP -> Pago
   se conservan para resolución manual. Rechazo por período, recarga y anulación
   posterior pasan en navegador ySQL local, en ambos temas y ancho móvil. La
   matrizFX y la aceptación completa de sesión/escritorio siguen pendientes.
-- D56 sigue abierto en el reconocimiento original: servicios y bienes sin stock
-  de una OCUSD pueden completar su evento con el mismo subtotal nativo en el
-  mayor, sin tipo de cambio congelado. Reproducido localmente con workerNode real;
-  inventario físico sí bloquea esa falta de valuación. El contraasiento exacto no
-  acredita que el asiento original esté correctamente convertido. Se requiere
-  autoridad de valuación durable antes de aceptar divisas; no hay backfill ni
-  reinterpretación del importe mediante la preferencia comercial actual.
+- El cierre617 congela moneda de la OC, moneda contable del país, tasa positiva
+  de hasta seis decimales y referencia. El wizard exige esa captura para divisas
+  antes de crear la recepción y conserva el cuerpo original en el pendiente.
+  Una moneda comercial preferida no redefine la moneda del mayor. El worker
+  original requiere claim real y evidencia privada inmutable del evento/líneas;
+  valida clasificación, centavos y asiento exacto antes de confirmar o releer.
+  La reversa615 verifica también esa autoridad. Costo cero probado no creaGL;
+  positivo que redondea a cero o excede precisión se rechaza antes del cierre.
+  Bien físico, servicio y sin stockUSD5.17→PEN19.13 con inverso neto0 pasan por
+  HTTP/SQL y workers reales; cierreUI USD5.16→PEN19.09 comprobado. D56 se corrige
+  para nuevas operaciones: originalesFX sin conversión demostrable quedan
+  preservados y bloqueados, sin tasa actual, tasa1 implícita ni backfill.
+  La matriz recepción→factura→pago y aceptación completa de sesión siguen abiertas.
+- D57 pendiente: el resumen mensual de Compras mezcla monedas nominales y algunas
+  listas rotulan órdenesUSD con la moneda local. No usar ese KPI como importe
+  convertido; los contratos de cierre/contabilidad617 conservan su propia prueba.
 - Devoluciones al proveedor revierten existencia y obligación según estado.
 - Aprobaciones respetan tenant, rol, monto y estado.
 - La configuración de una empresa peruana provisiona las cuentas 4699 y 63

@@ -10,9 +10,10 @@ export type PurchaseReceiptExpected = {
   detailId: string; productId: string; name: string; code: string | null; ordered: number; price: number; service: boolean; stock: boolean;
 }
 type CreatedReceipt = { id: string; number: string; createdAt: string; receivedAt: string; fingerprint: string; itemIds: string[] }
+export type ReceiptCloseValuation = { moneda: string; moneda_base: string; tipo_cambio: string; referencia: string }
 export type PurchaseReceiptIntent = PurchaseReceiptScope & {
   version: 1; createdAt: string; stage: 'CREATE' | 'CLOSE'; payload: PurchaseReceiptPayload;
-  expected: PurchaseReceiptExpected[]; closePayload: { observaciones: string }; created?: CreatedReceipt;
+  expected: PurchaseReceiptExpected[]; closePayload: { observaciones: string; valuacion?: ReceiptCloseValuation }; created?: CreatedReceipt;
 }
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const text = (v: unknown): v is string => typeof v === 'string' && !!v.trim()
@@ -23,6 +24,15 @@ const timestamp = (v: unknown): v is string => typeof v === 'string' && civil(v.
 const object = (v: any, keys: string[]) => v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).every(k=>keys.includes(k))
 const live = (v: any) => v && typeof v === 'object' && !Array.isArray(v) && !v.offline && !v.cached && !v.queued && !v.pending
 const fingerprint = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{64}$/i.test(v)
+const rate = (v: unknown): v is string => typeof v === 'string' && /^(0|[1-9][0-9]{0,9})(?:\.\d{1,6})?$/.test(v) && /[1-9]/.test(v)
+const normalizeRate = (v: string) => v.includes('.') ? v.replace(/0+$/,'').replace(/\.$/,'') : v
+export function isReceiptCloseValuation(v: any): v is ReceiptCloseValuation {
+  return object(v,['moneda','moneda_base','tipo_cambio','referencia']) && Object.keys(v).length===4
+    && typeof v.moneda==='string' && /^[A-Z]{3}$/.test(v.moneda)
+    && typeof v.moneda_base==='string' && /^[A-Z]{3}$/.test(v.moneda_base) && rate(v.tipo_cambio)
+    && (v.moneda!==v.moneda_base || normalizeRate(v.tipo_cambio)==='1')
+    && typeof v.referencia==='string' && v.referencia.trim().length>=5 && v.referencia.trim().length<=200
+}
 const fail = (): never => { throw new Error('La recepción no está confirmada. Sus datos se conservan para reintentar con conexión.') }
 export function purchaseReceiptIntentKey(scope: PurchaseReceiptScope): string {
   if (![scope.tenantId,scope.actorId,scope.orderId].every(v=>uuid.test(v))) return fail()
@@ -38,7 +48,8 @@ export function readPurchaseReceiptIntent(raw: string | null, scope: PurchaseRec
     || i.version!==1 || i.tenantId!==scope.tenantId || i.actorId!==scope.actorId || i.orderId!==scope.orderId || !timestamp(i.createdAt)
     || !['CREATE','CLOSE'].includes(i.stage) || !object(p,['orden_id','idempotency_key','observaciones','items'])
     || p.orden_id!==scope.orderId || !text(p.idempotency_key) || p.idempotency_key.length>200 || !text(p.observaciones)
-    || !object(i.closePayload,['observaciones']) || !text(i.closePayload.observaciones)
+    || !object(i.closePayload,['observaciones','valuacion']) || !text(i.closePayload.observaciones)
+    || Object.hasOwn(i.closePayload,'valuacion') && !isReceiptCloseValuation(i.closePayload.valuacion)
     || !Array.isArray(p.items) || p.items.length<1 || p.items.length>999
     || new Set(p.items.map(v=>v?.detalle_id)).size!==p.items.length
     || !p.items.every(v=>object(v,['detalle_id','cantidad_recibida','calidad','almacen_id','ubicacion_id','observaciones','lote','serie','fecha_expiracion'])
@@ -88,6 +99,11 @@ function receipt(response: any, scope: PurchaseReceiptScope, intent: PurchaseRec
   if (closed && (!verified.created || d.id!==verified.created.id || d.numero!==verified.created.number
     || d.created_at!==verified.created.createdAt || d.fecha_recepcion!==verified.created.receivedAt
     || d.create_fingerprint!==verified.created.fingerprint)) return fail()
+  const valuation=verified.closePayload.valuacion
+  if (closed && valuation && (!isReceiptCloseValuation(d.valuacion_cierre)
+    || d.valuacion_cierre.moneda!==valuation.moneda || d.valuacion_cierre.moneda_base!==valuation.moneda_base
+    || normalizeRate(d.valuacion_cierre.tipo_cambio)!==normalizeRate(valuation.tipo_cambio)
+    || d.valuacion_cierre.referencia!==valuation.referencia.trim())) return fail()
   return d
 }
 export function confirmPurchaseReceiptCreated(response: any, scope: PurchaseReceiptScope, intent: PurchaseReceiptIntent): PurchaseReceiptIntent {

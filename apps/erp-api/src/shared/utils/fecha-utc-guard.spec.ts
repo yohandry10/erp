@@ -42,6 +42,10 @@ const PATRON = String.raw`new Date\(.*\)\.toISOString\(\)\.(split\('T'\)\[0\]|sl
  */
 const PERMITIDOS = new Map<string, string>([
   [
+    'modules/compras/services/receipt-reversal-receipt.ts',
+    'valida una fecha civil explícita a medianoche UTC contra sí misma, sin usar el reloj ni decidir la fecha del tenant',
+  ],
+  [
     'modules/contabilidad/services/asset-create-receipt.ts',
     'valida que una fecha civil exista: se construye y se lee en UTC, sin reloj ni zona',
   ],
@@ -143,7 +147,7 @@ describe('fechas UTC en lógica de negocio', () => {
   it('la lista de excepciones no crece sin justificación', () => {
     // Si esto falla es porque se añadió una excepción: cada entrada debe explicar
     // por qué esa fecha no necesita la zona del tenant.
-    expect(PERMITIDOS.size).toBe(16);
+    expect(PERMITIDOS.size).toBe(17);
     for (const [, motivo] of PERMITIDOS) {
       expect(motivo.length).toBeGreaterThan(20);
     }
