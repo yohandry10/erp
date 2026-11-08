@@ -6,12 +6,17 @@ Actualizado: 2026-11-08. Una página: si algo no cabe aquí, va a su documento d
 
 - **Candidato para revisión:** rama `codex/go-prod-candidate-20261106`,
   [PR153 en borrador](https://github.com/yohandry10/erp/pull/153), candidato617
-  publicado enb20ee727. Correcciones locales613–617 verificadas; sin merge ni
-  promoción. **NO_GO**. CodeQL42511475473 yE2E42511475452 pasan. CI42511475454
+  con Sentry. Correcciones locales613–617 verificadas; sin merge ni
+  promoción. **NO_GO**. CodeQL42516304582 yE2E42516304655 pasan sobre esa cabeza;
+  CI42516304492 sigue en curso. El anterior CI42511475454
   falla por un caso inestable de reparto analítico:70 pasan y1 pasa al reintento;
   no se acepta como verde. Sus otros siete jobs pasan; build/audit dependientes
   quedan omitidos. La captura muestra destino vacío y Guardar deshabilitado
-  después de seleccionar; pendiente de corregir y repetir, sin ampliar timeout.
+  después de seleccionar. D58 corregido: ocho regresionesReact reales pasan;
+  seis fallan sobre la versión anterior. En build de producción, guardar,
+  recargar y eliminar el reparto conserva ambas líneas y el borrador12.34/12.34.
+  Falta su CI; sin ampliar timeout ni retirar el gate. La base local conserva
+  cuatro eventos de pruebas envejecidos: readiness503, sin limpiar esa evidencia.
   Las corridas anteriores3ad no arrancaron por facturación/minutos de Actions, según sus
   anotaciones. Presupuesto0; no se relajan gates ni se reintentan sin un cambio.
   El E2E808 pasó149casos, pero su integración falló en replayRRHH y un selector
@@ -31,9 +36,9 @@ Actualizado: 2026-11-08. Una página: si algo no cabe aquí, va a su documento d
   civiles por país; D51 rechaza propiedades heredadas en el mapaPLE. D50 escapa
   campos textuales de boleta con ocho regresiones; su prueba HTTP adicional sin
   fixture de pagos no se cuenta aprobada. HelpersPII legacy requieren revisión.
-  CodeQL requiere hacer público este repositorio personal para usarlo sin coste.
+  CodeQL ya funciona sin coste con el repositorio público.
   El usuario autorizó ese cambio y la limpieza:93 ramas reescritas y verificadas;
-  PR153 sigue en borrador sobre2961b2d5. Support4972573 enviado y abierto para
+  PR153 sigue en borrador. Support4972573 enviado y abierto para
   retirar referencias/cachés antiguas conservando conversaciones. El propietario
   autorizó hacerlo público mientras Support sigue pendiente: visibilidadPUBLIC
   verificada. Sin purga ni revocación probadas; alerta de secreto1 sigue abierta
@@ -46,8 +51,9 @@ Actualizado: 2026-11-08. Una página: si algo no cabe aquí, va a su documento d
   tipos/buildAPI/web, política de privacidad y auditPROD0 pasan. Captura real de
   HTTP5xx y navegador recibida en cuentaDeveloper existente sin tarjeta/gasto;
   IP y geografía retiradas para eventos nuevos mediante reglas del proyecto.
-  Sin configuración/desplieguePROD ni prueba de alarma operativa. El CodeQL de
-  b20ee727 es anterior a estos SDK y no se atribuye a su nuevo delta.
+  Sin configuración/desplieguePROD ni prueba de alarma operativa. CodeQL42516304582
+  también pasa sobre f0066851 con SDK: merge9b4ff745 y cabeza comparten árbol,
+  misma alerta108 descartada; no cubre el trabajo localD58 aún sin publicar.
   D54 escapa HTML en la confirmación de contraseña; cuatro regresiones rojas
   pasan después del arreglo. D55 actualiza nodemailer10.1.4/fast-uri4.2.3/qs6.16.1
   con regresiones instaladas en el gate existente. AuditPROD sin avisos; árbol

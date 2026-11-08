@@ -1,0 +1,146 @@
+{
+  "at": "2026-11-08T20:34:04.720Z",
+  "status": "LOCAL_DIRECTED_PASS_CI_PENDING_NO_GO",
+  "parent": "f00668512e5e34306631383639a6e191b84fd9aa",
+  "regression": {
+    "before": {
+      "head": "f00668512e5e34306631383639a6e191b84fd9aa",
+      "passed": 2,
+      "failed": 6,
+      "names": [
+        "late_superseded_read_preserves_selection_and_one_original_save",
+        "a_late_read_from_another_detail_cannot_replace_the_current_form",
+        "a_late_failed_read_cannot_erase_a_selection_or_show_an_old_error",
+        "failed_read_blocks_the_form_and_retry_restores_the_server_snapshot",
+        "a_late_failed_write_does_not_paint_another_detail_or_leave_it_locked",
+        "a_late_failed_delete_remains_bound_to_its_original_detail"
+      ]
+    },
+    "after": {
+      "passed": true,
+      "baseline": false,
+      "checks": 8,
+      "names": [
+        "late_superseded_read_preserves_selection_and_one_original_save",
+        "a_late_read_from_another_detail_cannot_replace_the_current_form",
+        "a_late_failed_read_cannot_erase_a_selection_or_show_an_old_error",
+        "failed_read_blocks_the_form_and_retry_restores_the_server_snapshot",
+        "a_failed_save_keeps_the_current_selection_for_correction",
+        "a_late_failed_write_does_not_paint_another_detail_or_leave_it_locked",
+        "a_late_failed_delete_remains_bound_to_its_original_detail",
+        "switching_axes_preserves_the_server_distributions_and_saves_the_selected_axis"
+      ],
+      "failures": [],
+      "browser": false,
+      "network": false
+    },
+    "browserDriver": false
+  },
+  "build": {
+    "passed": true,
+    "exitCode": 0,
+    "root": "C:/Users/PC/.codex/worktrees/erp-reversal-clean-20261108",
+    "buildDirectory": ".next-analytic-final-1794169406444",
+    "productionBuild": true,
+    "sourcesUnchanged": true,
+    "sourceCount": 925,
+    "generatedMetadataRestored": true,
+    "localApiDestination": "http://127.0.0.1:3130",
+    "environmentFilesAbsent": true,
+    "onlyOsEnvironmentInherited": true,
+    "remoteWrites": false,
+    "completedAt": "2026-11-08T20:25:30.408Z"
+  },
+  "checks": {
+    "componentEslint": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "webTypeCheck": true,
+    "docsContract": true,
+    "productionDependencyAudit": {
+      "vulnerabilities": 0
+    },
+    "completeAudit": {
+      "info": 0,
+      "low": 1,
+      "moderate": 5,
+      "high": 0,
+      "critical": 0
+    }
+  },
+  "browser": {
+    "engine": "integrated browser",
+    "productionBuild": true,
+    "actions": [
+      "login_own_synthetic_actor",
+      "open_expense_line",
+      "select_destination",
+      "save_100_percent",
+      "reload_and_reopen_saved_destination",
+      "delete_axis"
+    ],
+    "sql": [
+      {
+        "stage": "initial",
+        "money": {
+          "debe": 12.34,
+          "haber": 12.34,
+          "estado": "BORRADOR"
+        },
+        "allocations": 0
+      },
+      {
+        "stage": "saved",
+        "money": {
+          "debe": 12.34,
+          "haber": 12.34,
+          "estado": "BORRADOR"
+        },
+        "allocations": 1
+      },
+      {
+        "stage": "deleted",
+        "money": {
+          "debe": 12.34,
+          "haber": 12.34,
+          "estado": "BORRADOR"
+        },
+        "allocations": 0
+      }
+    ],
+    "detailRowsUnchanged": true,
+    "confirmed": false,
+    "remoteWrites": false
+  },
+  "runtimeLimit": {
+    "ready": false,
+    "httpStatus": 503,
+    "reason": "four preserved old test events exceeded outbox age limit",
+    "claimable": 4,
+    "queueAltered": false
+  },
+  "priorHeadGitHub": {
+    "head": "f00668512e5e34306631383639a6e191b84fd9aa",
+    "securityRun": 42516304582,
+    "isolatedE2ERun": 42516304655,
+    "merge": "9b4ff745eb26025cea62643eb011eb7f6bbb1702",
+    "tree": "6a1b797b9f2d57735b38a79759491f9011b2c050",
+    "analyses": [
+      2122445829,
+      2122444138
+    ],
+    "resultsPerAnalysis": 1,
+    "alert108": "dismissed before this work on 2026-10-31 as false positive",
+    "appliesToThisDelta": false
+  },
+  "sha256": {
+    "apps/web/components/contabilidad/DistribucionAnaliticaPanel.tsx": "ffda39ba2e7cc4f14ecd6a76a1563c2f3b249952f1dc382190c409f88c81f175",
+    "apps/web/tests/contabilidad/verify-analytic-allocation-races.mjs": "c7f104ba1068c76d023416caa6a948c8e408da75366c6de342d737abf957eae0",
+    "apps/web/package.json": "d0178ccb1f630d5d76e335d45c519c5370d87e9515c33b28454d9f62320df2d4",
+    "pnpm-lock.yaml": "9e7f9021d479b7e238c446e1818b36588260954dc36c95587408627231000961",
+    ".github/workflows/ci.yml": "8b305a1abf874da23bb35bb9bf96eb2d6fd2601e66152d43c247bd541545ac0f"
+  },
+  "ciWaiversAdded": false,
+  "productionDeploy": false
+}

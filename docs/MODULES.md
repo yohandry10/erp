@@ -2977,6 +2977,10 @@ variantes. NO_GO global.
   `deferred-live-read-controls-postconditions.json`; recibos/intenciones de los
   otros períodos de devengo, perfiles y variantes requieren sus propios casos.
 - La distribución analítica reparte una línea por varios ejes independientes.
+  El editor sólo permite guardar tras completar las lecturas de la línea actual;
+  ignora respuestas antiguas y los errores de otra línea. La selección se inicializa
+  al recibir el snapshot; no se reinicia en un efecto posterior a la edición.
+  Una lectura fallida bloquea el formulario y ofrece reintentar la consulta.
   Ingresos y gastos diferidos se reconocen por período y la última cuota absorbe
   residuos de redondeo.
 - El detalle del asiento permite registrar y mantener esa distribución
