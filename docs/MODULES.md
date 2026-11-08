@@ -1449,6 +1449,13 @@ Cotización -> Aprobación -> Orden de compra -> Recepción -> CxP -> Pago
   se conservan para resolución manual. Rechazo por período, recarga y anulación
   posterior pasan en navegador ySQL local, en ambos temas y ancho móvil. La
   matrizFX y la aceptación completa de sesión/escritorio siguen pendientes.
+- D56 sigue abierto en el reconocimiento original: servicios y bienes sin stock
+  de una OCUSD pueden completar su evento con el mismo subtotal nativo en el
+  mayor, sin tipo de cambio congelado. Reproducido localmente con workerNode real;
+  inventario físico sí bloquea esa falta de valuación. El contraasiento exacto no
+  acredita que el asiento original esté correctamente convertido. Se requiere
+  autoridad de valuación durable antes de aceptar divisas; no hay backfill ni
+  reinterpretación del importe mediante la preferencia comercial actual.
 - Devoluciones al proveedor revierten existencia y obligación según estado.
 - Aprobaciones respetan tenant, rol, monto y estado.
 - La configuración de una empresa peruana provisiona las cuentas 4699 y 63

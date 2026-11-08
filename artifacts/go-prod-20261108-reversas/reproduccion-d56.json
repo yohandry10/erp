@@ -1,0 +1,58 @@
+{
+  "at": "2026-11-08T17:30:10.219Z",
+  "reproduced": true,
+  "expectedBehavior": "FX_REQUIRED_WITHOUT_FROZEN_CONVERSION",
+  "actualFailClosed": false,
+  "physicalReceiptAlreadyFailsClosed": true,
+  "defect": "D56_RECEIPT_FX_POSTED_WITHOUT_FROZEN_CONVERSION",
+  "sourceCommit": "a5a1dfccabf7451e5c68d0f312b7a9f80b1fb6a6",
+  "businessCountry": "PE",
+  "results": [
+    {
+      "kind": "SERVICE",
+      "receipt": "15e253b2-0b15-4251-b098-f4f3a250a286",
+      "unsafePostingWithoutFrozenFx": true,
+      "eventCurrency": "USD",
+      "nativeSubtotal": "5.17",
+      "payloadHasFx": false,
+      "eventStatus": "completed",
+      "processed": true,
+      "journals": [
+        {
+          "id": "f91d605b-4d21-45bf-b605-b1c395098c15",
+          "debit": "5.17",
+          "state": "CONFIRMADO",
+          "credit": "5.17",
+          "metadata": {}
+        }
+      ],
+      "movementValuation": null
+    },
+    {
+      "kind": "NO_STOCK",
+      "receipt": "ec43a512-cfff-441e-8093-4f84d176bab5",
+      "unsafePostingWithoutFrozenFx": true,
+      "eventCurrency": "USD",
+      "nativeSubtotal": "5.17",
+      "payloadHasFx": false,
+      "eventStatus": "completed",
+      "processed": true,
+      "journals": [
+        {
+          "id": "cab17b8a-980e-4f8c-911d-1909299765ec",
+          "debit": "5.17",
+          "state": "CONFIRMADO",
+          "credit": "5.17",
+          "metadata": {}
+        }
+      ],
+      "movementValuation": null
+    }
+  ],
+  "noRateInvented": true,
+  "noGlobalNormativeDataChanged": true,
+  "originalAndReceiptJournalsPreserved": true,
+  "remoteWrites": false,
+  "retainedDatabaseModified": false,
+  "productionGo": false
+}

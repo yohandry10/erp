@@ -177,6 +177,12 @@ local conservado siguen612, PROD observado593. No arrancar el binario nuevo sobr
 la base conservada sin completar su migración en infraestructura de pruebas propia.
 Comprobar prefijos duplicados antes de añadir una.
 
+**D56 abierto:** el worker original contabiliza servicios y bienes sin stockUSD
+sin una conversión congelada. Dos reproducciones locales sobrea5a1dfc terminan
+completed conGL5.17, igual al subtotalUSD5.17 y sin evidenciaFX. La recepción
+física ya rechaza la falta de valuación. No se modificaron tasas ni esos asientos;
+[reproducción y alcance](../artifacts/go-prod-20261108-reversas/D56_FX.md).
+
 **591–593:** el corte público del 5-nov exige y encuentra 593. El ensayo previo consta en
 `artifacts/promocion-ensayo-591-593-20261101082811/informe.json`; no volver a promover por rutina.
 
