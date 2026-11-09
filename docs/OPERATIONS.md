@@ -648,6 +648,10 @@ otro usuario, recepción, factura y pago bancario con sus asientos; contrasta
 el contexto fiscal persistido y los conflictos al reintentar. `--browser`
 añade login, apertura y cobro desde el POS, además de crear, aprobar y recibir
 una compra desde la interfaz.
+La fase de navegador corre en tres tandas, cada una con un proceso Next dev nuevo,
+porque Next dev retiene cada ruta compilada y un solo proceso agotó el heap a
+mitad de la fase. Se conserva el orden alfabético global y una tanda fallida no
+impide las demás; sus logs son `browser.log`, `browser-2.log` y `browser-3.log`.
 El ejecutor conserva logs/JSON/capturas en `artifacts/peru-integrated-<ejecución>`
 y detiene sólo los recursos que creó. No carga archivos operativos ni cambia
 la lista blanca PROD del runtime; la dependencia Supabase local se inyecta en

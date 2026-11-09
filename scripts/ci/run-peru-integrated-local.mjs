@@ -434,8 +434,30 @@ try {
       return child;
     };
     let web = await startWeb('web');
-    if (!recordsOnly) await run('browser', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-integrated-local.spec.ts', 'tests/e2e/peru-customer-update-recovery-local.spec.ts', 'tests/e2e/peru-cxp-cash-account-local.spec.ts', 'tests/e2e/peru-review-corrections-local.spec.ts', 'tests/e2e/peru-print-corrections-local.spec.ts', 'tests/e2e/peru-assets-original-local.spec.ts', 'tests/e2e/peru-recovery-critical-local.spec.ts', 'tests/e2e/peru-rrhh-financial-local.spec.ts', 'tests/e2e/peru-rrhh-registration-local.spec.ts', 'tests/e2e/peru-vacation-payroll-local.spec.ts', 'tests/e2e/peru-configuration-admin-local.spec.ts', 'tests/e2e/peru-tax-adjustments-local.spec.ts', 'tests/e2e/peru-tax-intents-local.spec.ts', 'tests/e2e/peru-reports-consignations-local.spec.ts', 'tests/e2e/peru-gre-local.spec.ts', 'tests/e2e/peru-pos-local.spec.ts', 'tests/e2e/peru-cpe-local.spec.ts', 'tests/e2e/peru-documents-local.spec.ts', 'tests/e2e/peru-inventory-masters-local.spec.ts', 'tests/e2e/peru-offered-writers-local.spec.ts', 'tests/e2e/peru-supplier-return-cancel-local.spec.ts', 'tests/e2e/peru-cash-local.spec.ts', 'tests/e2e/peru-zz-auxiliary-local.spec.ts', 'tests/e2e/peru-auth-recovery-local.spec.ts', 'tests/e2e/peru-notifications-local.spec.ts', 'tests/e2e/peru-cxc-local.spec.ts', 'tests/e2e/peru-sales-approvals-local.spec.ts', 'tests/e2e/peru-sales-invoice-local.spec.ts', 'tests/e2e/peru-tenant-create-local.spec.ts', 'tests/e2e/peru-dashboard-local.spec.ts', 'tests/e2e/peru-read-faults-local.spec.ts', 'tests/e2e/peru-budgets-local.spec.ts', 'tests/e2e/peru-list-errors-local.spec.ts', 'tests/e2e/peru-statements-refresh-local.spec.ts', 'tests/e2e/peru-security-dashboard-local.spec.ts', '--reporter=list,./tests/e2e/reporters/uat-assertions.ts',
-      ...(focusOnboarding ? ['--grep', 'primer administrador|ajuste con respuesta perdida'] : [])], webDirectory);
+    // Next dev conserva en memoria cada ruta que compila: con todos los archivos
+    // en un solo proceso, el servidor agotó el heap a mitad de la fase (CI de
+    // 0bbd1bc8: 6,5 GB, y las pruebas siguientes encontraron el puerto cerrado).
+    // Se corre en tandas con un proceso web nuevo por tanda, conservando el orden
+    // alfabético global que usa Playwright; una tanda fallida no impide las demás
+    // y el ensayo sigue fallando al final. El foco de onboarding es una sola tanda.
+    if (!recordsOnly) {
+      const playwrightCli = path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js');
+      const browserSpecs = ['tests/e2e/peru-integrated-local.spec.ts','tests/e2e/peru-customer-update-recovery-local.spec.ts','tests/e2e/peru-cxp-cash-account-local.spec.ts','tests/e2e/peru-review-corrections-local.spec.ts','tests/e2e/peru-print-corrections-local.spec.ts','tests/e2e/peru-assets-original-local.spec.ts','tests/e2e/peru-recovery-critical-local.spec.ts','tests/e2e/peru-rrhh-financial-local.spec.ts','tests/e2e/peru-rrhh-registration-local.spec.ts','tests/e2e/peru-vacation-payroll-local.spec.ts','tests/e2e/peru-configuration-admin-local.spec.ts','tests/e2e/peru-tax-adjustments-local.spec.ts','tests/e2e/peru-tax-intents-local.spec.ts','tests/e2e/peru-reports-consignations-local.spec.ts','tests/e2e/peru-gre-local.spec.ts','tests/e2e/peru-pos-local.spec.ts','tests/e2e/peru-cpe-local.spec.ts','tests/e2e/peru-documents-local.spec.ts','tests/e2e/peru-inventory-masters-local.spec.ts','tests/e2e/peru-offered-writers-local.spec.ts','tests/e2e/peru-supplier-return-cancel-local.spec.ts','tests/e2e/peru-cash-local.spec.ts','tests/e2e/peru-zz-auxiliary-local.spec.ts','tests/e2e/peru-auth-recovery-local.spec.ts','tests/e2e/peru-notifications-local.spec.ts','tests/e2e/peru-cxc-local.spec.ts','tests/e2e/peru-sales-approvals-local.spec.ts','tests/e2e/peru-sales-invoice-local.spec.ts','tests/e2e/peru-tenant-create-local.spec.ts','tests/e2e/peru-dashboard-local.spec.ts','tests/e2e/peru-read-faults-local.spec.ts','tests/e2e/peru-budgets-local.spec.ts','tests/e2e/peru-list-errors-local.spec.ts','tests/e2e/peru-statements-refresh-local.spec.ts','tests/e2e/peru-security-dashboard-local.spec.ts'].sort();
+      const batchSize = focusOnboarding ? browserSpecs.length : Math.ceil(browserSpecs.length / 3);
+      const browserFailures = [];
+      for (let start = 0, batch = 1; start < browserSpecs.length; start += batchSize, batch++) {
+        if (batch > 1) {
+          if (web.exitCode === null && web.signalCode === null) await stopWebForNextPhase(web);
+          else browserFailures.push(`Web terminó inesperadamente durante la tanda ${batch - 1}`);
+          web = await startWeb(`web-browser-${batch}`);
+        }
+        try {
+          await run(batch === 1 ? 'browser' : `browser-${batch}`, process.execPath, [playwrightCli, 'test', ...browserSpecs.slice(start, start + batchSize),
+            '--reporter=list,./tests/e2e/reporters/uat-assertions.ts', ...(focusOnboarding ? ['--grep', 'primer administrador|ajuste con respuesta perdida'] : [])], webDirectory);
+        } catch (error) { browserFailures.push(error.message); }
+      }
+      if (browserFailures.length) throw new Error(browserFailures.join('; '));
+    }
     if (!recordsOnly) await run('browser-asset-estimates', process.env.LOCAL_NATIVE_PYTHON_BIN || 'python', ['scripts/ci/test-peru-assets-browser-local.py']);
     if (!recordsOnly) await run('wizard-fiscal-runtime',process.execPath,['scripts/ci/test-peru-wizard-runtime-local.cjs']);
     // Next dev conserva compilaciones en memoria. Cada barrido comienza con
