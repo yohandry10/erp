@@ -107,7 +107,10 @@ test('Perú: inspección de carga de todas las pantallas estáticas con API y ba
     currentErrors = []
     let status: number | null = null
     let recovery: { reason: string; evidence: string } | undefined
-    const webLog = path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'web.log')
+    // Cada fase arranca su propio Next dev y escribe en `web-<fase>.log`; leer
+    // `web.log` (el de la fase de navegador) nunca encontraba el reinicio.
+    const phaseWebLog = path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, `web-${process.env.UAT_ASSERTION_PHASE || 'module-survey'}.log`)
+    const webLog = await fs.access(phaseWebLog).then(() => phaseWebLog, () => path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'web.log'))
     const logBefore = (await fs.readFile(webLog, 'utf8')).length
     try {
       // Cada navegación completa vuelve a consultar el bootstrap fiscal. El
@@ -121,7 +124,9 @@ test('Perú: inspección de carga de todas las pantallas estáticas con API y ba
       const reason = error instanceof Error ? error.message.split('\n')[0] : 'Error de navegación'
       const recentServerLog = (await fs.readFile(webLog, 'utf8')).slice(Math.max(0, logBefore - 1000))
       const restart = 'Server is approaching the used memory threshold, restarting...'
-      if (reason.includes('net::ERR_CONNECTION_RESET') && recentServerLog.includes(restart)) {
+      // Durante el reinicio el puerto corta la conexión abierta (RESET) o aún no
+      // escucha (REFUSED); ambos sólo se recuperan si el servidor lo registró.
+      if (/net::ERR_CONNECTION_(RESET|REFUSED)/.test(reason) && recentServerLog.includes(restart)) {
         // Una sola recuperación de GET, exclusivamente ante el reinicio de Next
         // dev confirmado por el servidor. No reintenta errores HTTP/JS de producto.
         recovery = { reason, evidence: restart }
