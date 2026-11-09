@@ -15,7 +15,7 @@ test('Impresión: reporte HTML real de planilla conserva empleados e importes al
  const f=fixture('payroll-plame'),proof={complete:false,remoteWrites:false,scope:'Actual payroll HTML download rendered by Chromium; no physical printer or PVS acceptance',steps:[] as any[],scriptErrors:[] as string[]}
  page.on('pageerror',e=>proof.scriptErrors.push(e.message));let preview:any
  try{
-  await loginPeruLocal(page,f.email,'Cliente-Local-2026-Only!');await page.goto('/dashboard/rrhh/planillas/',{waitUntil:'domcontentloaded'})
+  await loginPeruLocal(page,f.email,'Cliente-Local-2026-Only!');await page.goto('/dashboard/rrhh/planillas/',{waitUntil:'domcontentloaded',timeout:120000})
   expect(Number(readLocalSql(`SELECT count(*) FROM planillas WHERE tenant_id='${f.tenant}'`))).toBe(1)
   await expect(page.getByRole('button',{name:'Reporte',exact:true})).toHaveCount(1)
   const response=page.waitForResponse(r=>new URL(r.url()).pathname.replace(/\/$/,'').endsWith('/rrhh/planillas/'+f.payroll_id+'/detalle'))
@@ -36,6 +36,7 @@ test('Impresión: reporte HTML real de planilla conserva empleados e importes al
 
 test('Impresión: ranking y flujo financiero PEN/USD usan datos reales y singular de vencimiento',async({page,context})=>{
  test.setTimeout(240000);page.setDefaultTimeout(25000);await localOnly(context)
+  // Cada tanda del ensayo arranca un Next dev nuevo: la primera visita a una ruta compila en fríos (plazo propio de 120 s).
  const f=fixture('finance'),proof={complete:false,remoteWrites:false,scope:'Actual finance UI print media PDFs; new invoices created only in owned local company',steps:[] as any[],scriptErrors:[] as string[]}
  page.on('pageerror',e=>proof.scriptErrors.push(e.message))
  try{
@@ -48,7 +49,7 @@ test('Impresión: ranking y flujo financiero PEN/USD usan datos reales y singula
    await post('finanzas/cxp',{proveedor_id:provider.id,numero_documento:'F001-PRINT-'+currency+'-'+suffix,serie:'F001',tipo_documento:'FACTURA',fecha_emision:date(days-30),fecha_vencimiento:date(days),condiciones_pago:'CREDITO_30',subtotal:amount===35.4?30:10,igv:amount===35.4?5.4:1.8,total:amount,moneda:currency,tipo_cambio:currency==='PEN'?1:3.8,destino_credito_fiscal:'GRAVADAS'})
   }
   await consumeLocalAccounting('print-invoice-accounting')
-  await page.goto('/dashboard/finanzas/reportes/',{waitUntil:'domcontentloaded'})
+  await page.goto('/dashboard/finanzas/reportes/',{waitUntil:'domcontentloaded',timeout:120000})
   await page.getByRole('button',{name:/^Proveedores con Mayor Deuda/}).click();await expect(page.getByRole('button',{name:'Imprimir / PDF',exact:true})).toBeEnabled()
   for(const currency of ['PEN','USD']){
    await page.locator('#proveedores-deuda-moneda').selectOption(currency)
@@ -64,7 +65,7 @@ test('Impresión: ranking y flujo financiero PEN/USD usan datos reales y singula
    proof.steps.push({name:'real_cashflow_print_'+currency,result:'PASS',currency,pdf:'cashflow-current-'+currency+'.pdf'})
   }
   for(const route of ['/dashboard/finanzas/tesoreria/','/dashboard/finanzas/tesoreria/programacion/']){
-   await page.goto(route,{waitUntil:'domcontentloaded'});await expect(page.getByText('Proveedor impresión '+suffix,{exact:false}).first()).toBeVisible();await expect(page.locator('main')).not.toContainText(/\b1 días\b/)
+   await page.goto(route,{waitUntil:'domcontentloaded',timeout:120000});await expect(page.getByText('Proveedor impresión '+suffix,{exact:false}).first()).toBeVisible();await expect(page.locator('main')).not.toContainText(/\b1 días\b/)
   }
   proof.steps.push({name:'treasury_and_payment_schedule_keep_singular_for_one_day',result:'PASS'})
   expect(proof.scriptErrors).toEqual([]);proof.complete=true
