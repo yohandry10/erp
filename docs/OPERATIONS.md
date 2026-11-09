@@ -652,6 +652,9 @@ La fase de navegador corre en tres tandas, cada una con un proceso Next dev nuev
 porque Next dev retiene cada ruta compilada y un solo proceso agotó el heap a
 mitad de la fase. Se conserva el orden alfabético global y una tanda fallida no
 impide las demás; sus logs son `browser.log`, `browser-2.log` y `browser-3.log`.
+El barrido de pantallas (`--survey`) corre igual en tres tramos contiguos
+(`module-survey-1.log` a `module-survey-3.log`); `module-survey/survey.json` combina
+los tramos en el orden global.
 El ejecutor conserva logs/JSON/capturas en `artifacts/peru-integrated-<ejecución>`
 y detiene sólo los recursos que creó. No carga archivos operativos ni cambia
 la lista blanca PROD del runtime; la dependencia Supabase local se inyecta en

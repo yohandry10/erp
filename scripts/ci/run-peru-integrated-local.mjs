@@ -108,9 +108,9 @@ function launch(label, executable, args, cwd = root, overrides = {}) {
   children.push(child);
   return child;
 }
-async function run(label, executable, args, cwd) {
+async function run(label, executable, args, cwd, overrides) {
   console.log(`[peru-integrated] ${label}`);
-  const child = launch(label, executable, args, cwd);
+  const child = launch(label, executable, args, cwd, overrides);
   await new Promise((resolve, reject) => {
     child.once('error', reject);
     child.once('exit', code => code === 0 ? resolve() : reject(new Error(`${label} terminó con ${code}; revisar ${output}`)));
@@ -462,9 +462,23 @@ try {
     if (!recordsOnly) await run('wizard-fiscal-runtime',process.execPath,['scripts/ci/test-peru-wizard-runtime-local.cjs']);
     // Next dev conserva compilaciones en memoria. Cada barrido comienza con
     // un proceso nuevo; un fallo de su fase sigue deteniendo el ensayo.
+    // El barrido de pantallas compila unas cien rutas: en un solo proceso Next
+    // se reinició por memoria cerca de la ruta 97 y los reintentos agotaron el
+    // heap (CI de 083d5c55). Corre en tandas contiguas, cada una con su propio
+    // Next dev; todas se ejecutan y cualquier fallo detiene el ensayo al final.
     if (withSurvey) {
-      await stopWebForNextPhase(web); web = await startWeb('web-module-survey');
-      await run('module-survey', process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-module-survey-local.spec.ts', '--reporter=list,./tests/e2e/reporters/uat-assertions.ts'], webDirectory);
+      const surveyShards = 3;
+      const surveyFailures = [];
+      for (let shard = 1; shard <= surveyShards; shard++) {
+        if (web.exitCode === null && web.signalCode === null) await stopWebForNextPhase(web);
+        else surveyFailures.push(`Web terminó inesperadamente antes de la tanda ${shard} del barrido`);
+        web = await startWeb(`web-module-survey-${shard}`);
+        try {
+          await run(`module-survey-${shard}`, process.execPath, [path.join(path.dirname(webRequire.resolve('@playwright/test/package.json')), 'cli.js'), 'test', 'tests/e2e/peru-module-survey-local.spec.ts', '--reporter=list,./tests/e2e/reporters/uat-assertions.ts'], webDirectory,
+            { MODULE_SURVEY_SHARD: `${shard}/${surveyShards}` });
+        } catch (error) { surveyFailures.push(error.message); }
+      }
+      if (surveyFailures.length) throw new Error(surveyFailures.join('; '));
     }
     if (withRecords) {
       await stopWebForNextPhase(web); web = await startWeb('web-record-survey');

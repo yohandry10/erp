@@ -60,7 +60,14 @@ test('Perú: inspección de carga de todas las pantallas estáticas con API y ba
   expect([200, 403]).toContain(auditAccess.status())
   const auditAllowed = auditAccess.status() === 200
 
-  const routes = (await staticPages(path.resolve('app/dashboard'))).filter(route => !route.startsWith('/dashboard/analytics/'))
+  const allRoutes = (await staticPages(path.resolve('app/dashboard'))).filter(route => !route.startsWith('/dashboard/analytics/'))
+  // El ensayo corre el barrido en tandas `k/N`, cada una con su propio Next dev
+  // (run-peru-integrated-local.mjs); cada tanda toma un tramo contiguo del orden
+  // global y `survey.json` combina las tandas en ese mismo orden.
+  const [shard, shards] = (process.env.MODULE_SURVEY_SHARD || '1/1').split('/').map(Number)
+  if (!(shard >= 1 && shard <= shards)) throw new Error('MODULE_SURVEY_SHARD inválido')
+  const shardSize = Math.ceil(allRoutes.length / shards)
+  const routes = allRoutes.slice((shard - 1) * shardSize, shard * shardSize)
   const findings: Array<{ route: string; finalUrl: string; status: number | null; errors: string[]; text: string; expectedRestriction: boolean; recovery?: { reason: string; evidence: string }; controls: Awaited<ReturnType<typeof visiblePeruActions>> }> = []
   let currentErrors: string[] = []
   const scriptDiagnostics: Array<Record<string, unknown>> = []
@@ -83,7 +90,7 @@ test('Perú: inspección de carga de todas las pantallas estáticas con API y ba
         try {
           await session.send('Debugger.enable')
           const result = await session.send('Debugger.getScriptSource', { scriptId })
-          const filename = `failed-script-${scriptDiagnostics.length}.js`
+          const filename = `failed-script-${shard}-${scriptDiagnostics.length}.js`
           record.source_sha256 = createHash('sha256').update(result.scriptSource).digest('hex')
           record.private_source_file = filename
           await fs.writeFile(path.join(output, filename), result.scriptSource)
@@ -124,9 +131,10 @@ test('Perú: inspección de carga de todas las pantallas estáticas con API y ba
       const reason = error instanceof Error ? error.message.split('\n')[0] : 'Error de navegación'
       const recentServerLog = (await fs.readFile(webLog, 'utf8')).slice(Math.max(0, logBefore - 1000))
       const restart = 'Server is approaching the used memory threshold, restarting...'
-      // Durante el reinicio el puerto corta la conexión abierta (RESET) o aún no
-      // escucha (REFUSED); ambos sólo se recuperan si el servidor lo registró.
-      if (/net::ERR_CONNECTION_(RESET|REFUSED)/.test(reason) && recentServerLog.includes(restart)) {
+      // Durante el reinicio el puerto corta la conexión abierta (RESET o
+      // EMPTY_RESPONSE) o aún no escucha (REFUSED); sólo se recuperan si el
+      // servidor registró el reinicio.
+      if (/net::ERR_(CONNECTION_RESET|CONNECTION_REFUSED|EMPTY_RESPONSE)/.test(reason) && recentServerLog.includes(restart)) {
         // Una sola recuperación de GET, exclusivamente ante el reinicio de Next
         // dev confirmado por el servidor. No reintenta errores HTTP/JS de producto.
         recovery = { reason, evidence: restart }
@@ -160,13 +168,16 @@ test('Perú: inspección de carga de todas las pantallas estáticas con API y ba
     const controls = errors.length ? [] : await visiblePeruActions(page)
     findings.push({ route, finalUrl: new URL(page.url()).pathname, status, errors, text, expectedRestriction, recovery, controls })
     if (errors.length) await page.screenshot({ path: path.join(output, `${findings.length}-failure.png`), fullPage: true }).catch(() => {})
+    await fs.writeFile(path.join(output, `survey-${shard}.json`), JSON.stringify(findings))
+    const combined: typeof findings = []
+    for (let k = 1; k <= shards; k++) combined.push(...await fs.readFile(path.join(output, `survey-${k}.json`), 'utf8').then(JSON.parse, () => []))
     await fs.writeFile(path.join(output, 'survey.json'), JSON.stringify({ remoteWrites: false,
       actor: 'Primer ADMIN Perú no demo, sin privilegio global', excluded: ['Analytics'],
-      scope: 'Carga y controles visibles de pantallas estáticas; no acredita ejecución de acciones ni rutas con identificador. Restricción de auditoría contrastada con permisos reales', routes: findings }, null, 2))
+      scope: 'Carga y controles visibles de pantallas estáticas; no acredita ejecución de acciones ni rutas con identificador. Restricción de auditoría contrastada con permisos reales', routes: combined }, null, 2))
     console.log(`[module-survey] ${route}: ${errors.length ? errors.join('; ') : expectedRestriction ? 'restricción de auditoría comprobada' : 'carga sin errores HTTP/JS'}`)
   }
   await Promise.all(captureTasks)
-  await fs.writeFile(path.join(output, 'script-diagnostics.json'), JSON.stringify({ scope: 'Traza privada de errores; no modifica el resultado ni reintenta fallos JS', entries: scriptDiagnostics }, null, 2))
+  await fs.writeFile(path.join(output, `script-diagnostics-${shard}.json`), JSON.stringify({ scope: 'Traza privada de errores; no modifica el resultado ni reintenta fallos JS', entries: scriptDiagnostics }, null, 2))
   const failed = findings.filter(row => row.errors.length)
   expect(failed.map(row => ({ route: row.route, errors: row.errors })), 'Defectos de carga que requieren corrección').toEqual([])
 })
