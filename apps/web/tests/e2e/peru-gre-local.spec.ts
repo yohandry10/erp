@@ -13,7 +13,7 @@ async function setup(context:BrowserContext,page:Page){
  await page.goto('/dashboard/gre/');await expect(page.getByRole('heading',{name:'Guías de Remisión Electrónica',exact:true})).toBeVisible();
 }
 test('GRE: detalle, descarga PDF e impresión incluyen los bienes persistidos',async({page,context})=>{
- test.setTimeout(180000);page.setDefaultTimeout(25000);
+ test.setTimeout(180000);page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000);
  const proof:Proof={success:false,remoteWrites:false,scope:'Navegador, API, DB reales GRE; impresión a ventana, sin impresora física',checks:[],unexpected_errors:[]};page.on('pageerror',e=>proof.unexpected_errors.push(e.message));
  try{
   await setup(context,page);const row=page.locator('tbody tr').filter({hasText:'GRE-FIRMA-LOCAL'});await expect(row).toHaveCount(1);await row.getByRole('button',{name:'Ver',exact:true}).click();await expect(page.getByText('DESTINATARIO Y TRASLADO',{exact:false})).toBeVisible();
@@ -27,7 +27,7 @@ test('GRE: detalle, descarga PDF e impresión incluyen los bienes persistidos',a
  }finally{fs.writeFileSync(path.join(output,'browser-gre-print.json'),JSON.stringify(proof,null,2));}
 });
 test('GRE: nueva guía manual con emisor configurado puede firmarse desde formulario',async({page,context})=>{
- test.setTimeout(180000);page.setDefaultTimeout(25000);const proof:Proof={success:false,remoteWrites:false,scope:'Creación manual por UI/API/DB con certificado desechable del primer cliente local',checks:[],unexpected_errors:[]};page.on('pageerror',e=>proof.unexpected_errors.push(e.message));
+ test.setTimeout(180000);page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000);const proof:Proof={success:false,remoteWrites:false,scope:'Creación manual por UI/API/DB con certificado desechable del primer cliente local',checks:[],unexpected_errors:[]};page.on('pageerror',e=>proof.unexpected_errors.push(e.message));
  try{
   await setup(context,page);await page.getByRole('button',{name:'Nueva GRE',exact:true}).click();
   for(const [id,value] of [['destinatario','UI-GRE-MANUAL'],['direccion-destino','Destino UI local 789'],['ubigeo-destino','150101'],['peso-total','2'],['placa-vehiculo','ABC123'],['licencia-conducir','Q12345678'],['conductor-documento-numero','12345678'],['conductor-nombres','Conductor'],['conductor-apellidos','Local']]){if(id==='placa-vehiculo')await page.locator('#gre-modal-modalidad').selectOption('TRANSPORTE_PRIVADO');await page.locator('#gre-modal-'+id).fill(value);}
@@ -47,7 +47,7 @@ test('GRE: nueva guía manual con emisor configurado puede firmarse desde formul
 });
 
 test('GRE: alta perdida recupera una guía y nueva intención idéntica crea otra',async({page,context})=>{
- test.setTimeout(180000);page.setDefaultTimeout(25000);const proof:Proof={success:false,remoteWrites:false,scope:'GRE manual con commit real y pérdida de respuesta local',checks:[],unexpected_errors:[]};page.on('pageerror',e=>proof.unexpected_errors.push(e.message));
+ test.setTimeout(180000);page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000);const proof:Proof={success:false,remoteWrites:false,scope:'GRE manual con commit real y pérdida de respuesta local',checks:[],unexpected_errors:[]};page.on('pageerror',e=>proof.unexpected_errors.push(e.message));
  try{
   await setup(context,page);
   const fill=async()=>{

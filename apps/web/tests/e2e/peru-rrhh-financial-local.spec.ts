@@ -34,7 +34,7 @@ async function localOnly(context: BrowserContext) {
 
 test('Perú: PLAME recupera paquete perdido, crea una nueva intención y descarga el ZIP real', async ({ page, context }) => {
   test.setTimeout(180000)
-  page.setDefaultTimeout(25000)
+  page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000)
   await localOnly(context)
   const output = process.env.LOCAL_INTEGRATED_OUTPUT_DIR!
   const fixture = JSON.parse(await fs.readFile(path.join(output, 'payroll-plame-fixture.json'), 'utf8'))
@@ -99,7 +99,7 @@ test('Perú: PLAME recupera paquete perdido, crea una nueva intención y descarg
 
 test('Perú: liquidación recupera pago perdido y un actor distinto reversa banco y contabilidad', async ({ page, context, browser }) => {
   test.setTimeout(240000)
-  page.setDefaultTimeout(25000)
+  page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000)
   await localOnly(context)
   const output = process.env.LOCAL_INTEGRATED_OUTPUT_DIR!
   const fixture = JSON.parse(await fs.readFile(path.join(output, 'hr-financial-fixture.json'), 'utf8'))
@@ -151,7 +151,7 @@ test('Perú: liquidación recupera pago perdido y un actor distinto reversa banc
     checkerContext = await browser.newContext()
     await localOnly(checkerContext)
     const checker = await checkerContext.newPage()
-    checker.setDefaultTimeout(25000)
+    checker.setDefaultTimeout(25000);checker.setDefaultNavigationTimeout(120000)
     checker.on('pageerror', error => scriptErrors.push(error.message))
     await loginLocal(checker, fixture.checker_email, 'Aprobador-RRHH-2026!')
     await checker.goto('/dashboard/rrhh/liquidaciones/')

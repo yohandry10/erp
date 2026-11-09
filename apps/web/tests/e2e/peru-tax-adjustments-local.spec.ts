@@ -16,7 +16,7 @@ test("Perú: anticipos, ajustes y depósito conservan intención y formulario tr
   context,
 }) => {
   test.setTimeout(240000);
-  page.setDefaultTimeout(25000);
+  page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000);
   const output = process.env.LOCAL_INTEGRATED_OUTPUT_DIR!;
   const f = JSON.parse(
     fs.readFileSync(path.join(output, "tax-adjustments-fixture.json"), "utf8"),

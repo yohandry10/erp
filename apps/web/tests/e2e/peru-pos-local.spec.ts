@@ -66,7 +66,7 @@ async function cart(page: Page) {
 }
 
 test('POS: primer ADMIN abre, vende y recupera respuesta perdida sin duplicar', async ({ page, context }) => {
-  test.setTimeout(180000); page.setDefaultTimeout(25000);
+  test.setTimeout(180000); page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000);
   const proof: Proof = { success: false, remoteWrites: false,
     scope: 'POS API/UI/DB locales; ticket térmico representado, sin impresora física ni aceptación SUNAT',
     checks: [], unexpected_errors: [] };
@@ -123,7 +123,7 @@ test('POS: primer ADMIN abre, vende y recupera respuesta perdida sin duplicar', 
 });
 
 test('POS: F8 usa la cantidad vigente y respeta la exigencia de cliente al cambiar el documento', async ({ page, context }) => {
-  test.setTimeout(120000); page.setDefaultTimeout(25000);
+  test.setTimeout(120000); page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000);
   const proof = { complete: false, remoteWrites: false, scope: 'Teclado real y resolver de precios vivo; sin venta ni movimiento de caja', steps: [] as any[], requests: [] as any[], page_errors: [] as string[], unexpectedWriters: [] as string[] };
   const financialState = () => JSON.parse(sql(`BEGIN READ ONLY; SELECT jsonb_build_object(${['ventas_pos', 'asientos_contables', 'movimientos_caja', 'sesiones_caja', 'outbox_events'].map(table => `'${table}',(SELECT md5(coalesce(string_agg(to_jsonb(x)::text,'' ORDER BY to_jsonb(x)::text),'')) FROM ${table} x WHERE tenant_id='${fixture.tenant}')`).join(',')}); ROLLBACK;`));
   const before = financialState();
@@ -169,7 +169,7 @@ test('POS: F8 usa la cantidad vigente y respeta la exigencia de cliente al cambi
 });
 
 test('POS: emisión pendiente muestra el motivo del rechazo y permite reintento manual sin repetir venta',async({page,context})=>{
- test.setTimeout(180000);page.setDefaultTimeout(25000)
+ test.setTimeout(180000);page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000)
  const proof={complete:false,scope:'LOCAL_UI_POS_PENDING_FISCAL_CONTRACT_FIXTURE_BEFORE_API_NO_SALE_OR_AUTHORITY_WRITE',steps:[] as any[],page_errors:[] as string[],remoteWrites:false}
  page.on('pageerror',e=>proof.page_errors.push(e.message))
  const saleId='fa000000-0000-4000-8000-000000000025',requests:any[]=[]

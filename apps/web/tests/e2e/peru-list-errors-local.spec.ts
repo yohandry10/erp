@@ -9,7 +9,7 @@ import { loginPeruLocal } from './helpers/peru-login-local'
 // se muestra como «No hay…». Sólo hosts locales.
 test('Listas: clientes y almacenes con la lectura caída avisan y no se muestran vacías', async ({ page, context }) => {
   test.setTimeout(300000)
-  page.setDefaultTimeout(25000)
+  page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000)
   const output = process.env.LOCAL_INTEGRATED_OUTPUT_DIR!
   assert.equal(process.env.E2E_EPHEMERAL_LOCAL_DB, '1')
   assert.equal(process.env.PGHOST, '127.0.0.1')

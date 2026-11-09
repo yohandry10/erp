@@ -6,7 +6,7 @@ import {loginPeruLocal} from './helpers/peru-login-local'
 import {readLocalSql} from './helpers/peru-local-accounting'
 
 test('Inventario Perú: categorías, almacenes y ubicaciones conservan CRUD y estados reales',async({page,context})=>{
- test.setTimeout(240000);page.setDefaultTimeout(25000)
+ test.setTimeout(240000);page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000)
  expect(process.env.E2E_EPHEMERAL_LOCAL_DB).toBe('1');expect(process.env.PGPORT).toBe('55456')
  const output=process.env.LOCAL_INTEGRATED_OUTPUT_DIR!,owner=JSON.parse(fs.readFileSync(path.join(output,'accounting-first-fixture.json'),'utf8'))
  expect(owner.non_demo).toBe(true);expect(owner.email).toBeTruthy()

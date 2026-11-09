@@ -18,7 +18,7 @@ test('Perú: activos reales recuperan alta, edición, depreciación, baja y vent
   const tenant=`'${fixture.tenant}'::uuid`,suffix=randomUUID().slice(0,8),codes=[`AF-UI-A-${suffix}`,`AF-UI-B-${suffix}`],storedCodes=codes.map(code=>code.toUpperCase())
   const errors:string[]=[],checks:Record<string,unknown>[]=[],requests:{method:string,path:string,status:number}[]=[]
   let success=false
-  page.setDefaultTimeout(30000)
+  page.setDefaultTimeout(30000);page.setDefaultNavigationTimeout(120000)
   page.on('pageerror',e=>errors.push(e.message))
   page.on('dialog',d=>d.accept())
   page.on('response',r=>{const p=new URL(r.url()).pathname;if(p.includes('/api/contabilidad/activos-fijos'))requests.push({method:r.request().method(),path:p,status:r.status()})})

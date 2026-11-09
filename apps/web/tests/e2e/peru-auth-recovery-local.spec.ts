@@ -9,7 +9,7 @@ import { loginPeruLocal } from './helpers/peru-login-local'
 // buzón SMTP local → contraseña nueva → login. Sólo hosts locales.
 test('Recuperación de contraseña: desde el login hasta entrar con la contraseña nueva', async ({ page, context }) => {
   test.setTimeout(240000)
-  page.setDefaultTimeout(25000)
+  page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000)
   const output = process.env.LOCAL_INTEGRATED_OUTPUT_DIR!
   assert.equal(process.env.E2E_EPHEMERAL_LOCAL_DB, '1')
   assert.equal(process.env.PGHOST, '127.0.0.1')

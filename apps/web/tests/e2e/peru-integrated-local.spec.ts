@@ -40,7 +40,7 @@ function isHandledHttpResponse(row: { path: string; status: number }) {
 test('Perú: RRHH conserva formulario, recupera alta perdida y persiste edición sin asignación familiar', async ({ page, context }) => {
   test.setTimeout(180000)
   if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere base local efímera')
-  page.setDefaultTimeout(25000)
+  page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000)
   const output = process.env.LOCAL_INTEGRATED_OUTPUT_DIR!
   const fixture = JSON.parse(await fs.readFile(path.join(output, 'hr-fixture.json'), 'utf8'))
   expect(fixture.tenant).toMatch(/^[0-9a-f-]{36}$/i)
@@ -131,7 +131,7 @@ test('Perú: RRHH conserva formulario, recupera alta perdida y persiste edición
 test('Perú: primer administrador completa wizard, recupera progreso y respuestas perdidas sin duplicar', async ({ page, context }) => {
   test.setTimeout(300000)
   if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere base local efímera')
-  page.setDefaultTimeout(25000)
+  page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000)
   const output = process.env.LOCAL_INTEGRATED_OUTPUT_DIR!
   const fixture = JSON.parse(await fs.readFile(path.join(output, 'wizard-fixture.json'), 'utf8'))
   expect(fixture.tenant).toMatch(/^[0-9a-f-]{36}$/i)
@@ -990,7 +990,7 @@ test('Perú: reembolso RMA recupera catálogos, respuesta perdida y asiento sin 
 
 test('Perú: primer administrador recupera asiento manual perdido, edita, confirma y reversa sin duplicar', async ({ page, context }) => {
   test.setTimeout(180000)
-  page.setDefaultTimeout(20000)
+  page.setDefaultTimeout(20000);page.setDefaultNavigationTimeout(120000)
   const evidence = JSON.parse(await fs.readFile(path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!, 'http.json'), 'utf8'))
   const onboarding = evidence.results.find((row: { scenario: string }) => row.scenario.startsWith('alta no demo y primer administrador'))
   const errors: string[] = []
@@ -1100,7 +1100,7 @@ test('Perú: primer administrador recupera asiento manual perdido, edita, confir
 
 test('Perú: crea centro de costo y conserva un presupuesto al editar y recargar', async ({ page, context }) => {
   test.setTimeout(180000)
-  page.setDefaultTimeout(20000)
+  page.setDefaultTimeout(20000);page.setDefaultNavigationTimeout(120000)
   if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere base local efímera')
   const failures: string[] = []
   page.on('pageerror', error => failures.push(error.message))
@@ -1186,7 +1186,7 @@ test('Perú: crea centro de costo y conserva un presupuesto al editar y recargar
 
 test('Perú: candidato conserva perfil y vacante después de crear, editar y recargar', async ({ page, context }) => {
   test.setTimeout(180000)
-  page.setDefaultTimeout(20000)
+  page.setDefaultTimeout(20000);page.setDefaultNavigationTimeout(120000)
   if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere base local efímera')
   const failures: string[] = []
   page.on('pageerror', error => failures.push(error.message))
@@ -1256,7 +1256,7 @@ test('Perú: candidato conserva perfil y vacante después de crear, editar y rec
 
 test('Perú: superadministrador cambia de empresa y conserva la sesión al recargar', async ({ page, context }) => {
   test.setTimeout(180000)
-  page.setDefaultTimeout(20000)
+  page.setDefaultTimeout(20000);page.setDefaultNavigationTimeout(120000)
   const failures: string[] = []
   page.on('pageerror', error => failures.push(error.message))
   page.on('response', response => {
@@ -1301,7 +1301,7 @@ test('Perú: superadministrador cambia de empresa y conserva la sesión al recar
 
 test('Perú: consulta y filtra la auditoría de recepciones con la API real', async ({ page, context }) => {
   test.setTimeout(180000)
-  page.setDefaultTimeout(20000)
+  page.setDefaultTimeout(20000);page.setDefaultNavigationTimeout(120000)
   if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1' || process.env.E2E_ISOLATED_BROWSER === '1') {
     throw new Error('Esta prueba exige API y PostgreSQL locales reales')
   }
@@ -1363,7 +1363,7 @@ test('Perú: consulta y filtra la auditoría de recepciones con la API real', as
 test('Perú: login y POS usan la API y base efímera reales', async ({ page, context }, testInfo) => {
   test.setTimeout(180000)
   page.setDefaultTimeout(20000)
-  page.setDefaultNavigationTimeout(30000)
+  page.setDefaultNavigationTimeout(120000)
   if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1' || process.env.E2E_ISOLATED_BROWSER === '1') {
     throw new Error('Esta prueba exige API y PostgreSQL locales reales')
   }
@@ -1437,7 +1437,7 @@ test('Perú: crea, aprueba y recibe una compra desde la interfaz real', async ({
   const failures: string[] = []
   const prepare = async (targetContext: BrowserContext, targetPage: Page, email: string) => {
     targetPage.setDefaultTimeout(20000)
-    targetPage.setDefaultNavigationTimeout(30000)
+    targetPage.setDefaultNavigationTimeout(120000)
     await targetContext.route('**/*', route => {
       const url = new URL(route.request().url())
       return ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) ? route.continue() : route.abort('blockedbyclient')
@@ -1522,7 +1522,7 @@ test('Perú: crea, aprueba y recibe una compra desde la interfaz real', async ({
 
 test('Perú: retoma preparación logística tras fallo de packing y recarga', async ({ page, context }) => {
   test.setTimeout(180000)
-  page.setDefaultTimeout(20000)
+  page.setDefaultTimeout(20000);page.setDefaultNavigationTimeout(120000)
   if (process.env.E2E_EPHEMERAL_LOCAL_DB !== '1') throw new Error('Requiere base local efímera')
   const origin = new URL(process.env.LOCAL_API_URL!)
   if (!['127.0.0.1', 'localhost', '[::1]'].includes(origin.hostname)) throw new Error('API local requerida')

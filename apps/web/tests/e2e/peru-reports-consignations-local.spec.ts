@@ -11,7 +11,7 @@ async function setup(context:any,page:any,fixture:any){
  return await loginPeruLocal(page,fixture.email,'Cliente-Local-2026-Only!');
 }
 test('Consignaciones: respuesta perdida recupera entrega y nueva intención idéntica crea otra',async({page,context})=>{
- test.setTimeout(240000);page.setDefaultTimeout(25000);
+ test.setTimeout(240000);page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000);
  const proof:{success:boolean;remoteWrites:boolean;scope:string;checks:Array<{check:string;passed:boolean}>;unexpected_errors:string[]}={success:false,remoteWrites:false,scope:'Navegador/API/PostgreSQL reales locales de consignaciones',checks:[],unexpected_errors:[]};page.on('pageerror',e=>proof.unexpected_errors.push(e.message));
  try{
   await setup(context,page,first);await page.goto('/dashboard/contabilidad/consignaciones/');await expect(page.getByRole('heading',{name:'Mercadería en consignación'})).toBeVisible();
@@ -26,7 +26,7 @@ test('Consignaciones: respuesta perdida recupera entrega y nueva intención idé
  }finally{fs.writeFileSync(path.join(output,'browser-consignations.json'),JSON.stringify(proof,null,2));}
 });
 test('Consolidación: controladora registra su tasa y ambas empresas generan reporte desde UI',async({page,context,browser})=>{
- test.setTimeout(300000);page.setDefaultTimeout(25000);
+ test.setTimeout(300000);page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000);
  const proof:{success:boolean;remoteWrites:boolean;scope:string;checks:Array<{check:string;passed:boolean}>;unexpected_errors:string[]}={success:false,remoteWrites:false,scope:'Navegador/API/PostgreSQL reales locales de consolidación',checks:[],unexpected_errors:[]};page.on('pageerror',e=>proof.unexpected_errors.push(e.message));let invitedContext:any;
  try{
   const auth=await setup(context,page,first);await page.goto('/dashboard/contabilidad/consolidacion/');await expect(page.getByRole('heading',{name:'Consolidación y reportes configurables'})).toBeVisible();

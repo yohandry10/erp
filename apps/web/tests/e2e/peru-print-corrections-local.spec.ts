@@ -11,7 +11,7 @@ const fixture=(name:string)=>JSON.parse(readFileSync(path.join(output,name+'-fix
 const localOnly=(context:BrowserContext)=>context.route('**/*',route=>['127.0.0.1','localhost','[::1]'].includes(new URL(route.request().url()).hostname)?route.continue():route.abort('blockedbyclient'))
 
 test('Impresión: reporte HTML real de planilla conserva empleados e importes al generar PDF',async({page,context})=>{
- test.setTimeout(180000);page.setDefaultTimeout(25000);await localOnly(context)
+ test.setTimeout(180000);page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000);await localOnly(context)
  const f=fixture('payroll-plame'),proof={complete:false,remoteWrites:false,scope:'Actual payroll HTML download rendered by Chromium; no physical printer or PVS acceptance',steps:[] as any[],scriptErrors:[] as string[]}
  page.on('pageerror',e=>proof.scriptErrors.push(e.message));let preview:any
  try{
@@ -35,7 +35,7 @@ test('Impresión: reporte HTML real de planilla conserva empleados e importes al
 })
 
 test('Impresión: ranking y flujo financiero PEN/USD usan datos reales y singular de vencimiento',async({page,context})=>{
- test.setTimeout(240000);page.setDefaultTimeout(25000);await localOnly(context)
+ test.setTimeout(240000);page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000);await localOnly(context)
   // Cada tanda del ensayo arranca un Next dev nuevo: la primera visita a una ruta compila en fríos (plazo propio de 120 s).
  const f=fixture('finance'),proof={complete:false,remoteWrites:false,scope:'Actual finance UI print media PDFs; new invoices created only in owned local company',steps:[] as any[],scriptErrors:[] as string[]}
  page.on('pageerror',e=>proof.scriptErrors.push(e.message))
