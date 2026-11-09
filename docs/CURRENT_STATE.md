@@ -1,21 +1,23 @@
 # Estado actual del ERP
 
-Actualizado: 2026-11-08. Una página: si algo no cabe aquí, va a su documento de dominio.
+Actualizado: 2026-11-09. Una página: si algo no cabe aquí, va a su documento de dominio.
 
 ## Dónde está
 
 - **Candidato para revisión:** rama `codex/go-prod-candidate-20261106`,
   [PR153 en borrador](https://github.com/yohandry10/erp/pull/153), candidato617
-  con Sentry. Correcciones locales613–617 verificadas; sin merge ni
-  promoción. **NO_GO**. CodeQL42516304582 yE2E42516304655 pasan sobre esa cabeza;
-  CI42516304492 sigue en curso. El anterior CI42511475454
-  falla por un caso inestable de reparto analítico:70 pasan y1 pasa al reintento;
-  no se acepta como verde. Sus otros siete jobs pasan; build/audit dependientes
-  quedan omitidos. La captura muestra destino vacío y Guardar deshabilitado
-  después de seleccionar. D58 corregido: ocho regresionesReact reales pasan;
+  con Sentry, D58 y D57. Correcciones613–617 verificadas; sin merge ni
+  promoción. **NO_GO**. La integración de CI dejó de caer por memoria del
+  servidor de pruebas: navegador y barrido de pantallas corren en tres tandas,
+  cada una con un Next dev nuevo, y las navegaciones esperan la compilación en
+  frío (120 s). Sobre083d5c55 las tres tandas de navegador pasan71/71 sin
+  inestables; el fallo de recuperación de actor y el refresco inestable de
+  estados financieros vistos en f0066851 no se repiten. El barrido en tandas
+  (f81599f7) y D57 esperan su CI; no se acepta verde hasta verlo completo.
+  D58 corregido: ocho regresionesReact reales pasan;
   seis fallan sobre la versión anterior. En build de producción, guardar,
   recargar y eliminar el reparto conserva ambas líneas y el borrador12.34/12.34.
-  Falta su CI; sin ampliar timeout ni retirar el gate. La base local conserva
+  Sin retirar el gate. La base local conserva
   cuatro eventos de pruebas envejecidos: readiness503, sin limpiar esa evidencia.
   Las corridas anteriores3ad no arrancaron por facturación/minutos de Actions, según sus
   anotaciones. Presupuesto0; no se relajan gates ni se reintentan sin un cambio.
@@ -41,8 +43,12 @@ Actualizado: 2026-11-08. Una página: si algo no cabe aquí, va a su documento d
   PR153 sigue en borrador. Support4972573 enviado y abierto para
   retirar referencias/cachés antiguas conservando conversaciones. El propietario
   autorizó hacerlo público mientras Support sigue pendiente: visibilidadPUBLIC
-  verificada. Sin purga ni revocación probadas; alerta de secreto1 sigue abierta
-  sobre referencias antiguas. Secret scanning/protección de nuevos pushes activos.
+  verificada. Sin purga probada; alerta de secreto1 sigue abierta sobre
+  referencias antiguas. Clasificada el 9-nov sin exponer el valor: es una clave
+  de servicio de un proyecto Supabase anterior, distinto del único autorizado;
+  su huella no coincide con ninguna clave vigente y el host de ese proyecto ya
+  no resuelve en DNS, mientras el de PROD sí. No se probó la clave contra ningún
+  servicio. Secret scanning/protección de nuevos pushes activos.
   Presupuesto nuevo0 y límiteActions0 conservados. CodeQL sobre el árbolb20ee727 pasa
   enJS/TS: una misma alerta108 ya descartada el31oct como falso positivo por IDs
   de sesión, revisada de nuevo sin almacenar credenciales; no son cero hallazgos.
@@ -207,9 +213,16 @@ operaciones; no se inventa tasa1 ni se corrige su mayor por backfill. No acredit
 la matriz completa recepción→factura→pago en divisa.
 [Revisión617](../artifacts/go-prod-20261108-reversas/REVISION617.md).
 
-**D57 abierto:** Compras mezcla importes nominales en el resumen mensual y rotula
-órdenesUSD como soles. Observado en navegador con datos propios; pendiente de
-corrección y aceptación. No cambia los valores617 ya comprobados enSQL.
+**D57 corregido en el candidato:** el resumen de Compras (contrato v2) separa los
+importes originales por moneda con decimales exactos y sin tasa inferida; las
+listas usan la moneda de cada OC y no sustituyen una moneda ausente por soles.
+Un fallo de lectura deja los indicadores no disponibles, con reintento, en vez
+de un cero. Reproducción: 427,11 mezclado frente a PEN 354,00 y USD 73,11 por
+API y pantalla con datos locales. 24 casos del controlador, 23 del presentador
+y los tres recorridos de navegador (resumen mixto, lista en USD, fallo y
+reintento) pasan; tipos API/web y lint de las pantallas pasan. Suite API local
+6130/6132: los dos fallos son la prueba de zona de caja, que fuerza `TZ=UTC` en
+tiempo de ejecución y Windows no lo aplica; en CI (UTC) pasa. Sin migración.
 
 **591–593:** el corte público del 5-nov exige y encuentra 593. El ensayo previo consta en
 `artifacts/promocion-ensayo-591-593-20261101082811/informe.json`; no volver a promover por rutina.

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { parseDateLocal } from '@/lib/date-utils'
 import { useRouter } from 'next/navigation'
 import { Building2, CheckCircle2, FileText, PackageCheck, Plus, RefreshCw, ShoppingCart, Truck, type LucideIcon } from 'lucide-react'
@@ -9,7 +9,8 @@ import ProveedorModal from '../../../components/modals/ProveedorModal'
 import ConfirmDialog from '../../../components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/use-toast'
 import { useApi } from '@/hooks/use-api'
-import { apiSucceeded, unwrapApiArray, unwrapApiObject } from '@/lib/api-contract'
+import { apiSucceeded, unwrapApiArray } from '@/lib/api-contract'
+import { formatPurchaseMoney, readPurchaseStatsPayload, type PurchaseStats } from '@/lib/purchase-native-view'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useCountryContext } from '@/hooks/use-country-context'
@@ -18,7 +19,8 @@ type AnyRecord = Record<string, any>
 
 type StatCard = {
   label: string
-  value: string | number
+  value: ReactNode
+  description?: string
   icon: LucideIcon
 }
 
@@ -34,18 +36,12 @@ export default function ComprasPage() {
   const { toast } = useToast()
   // throwOnError deja llegar el motivo real del backend al catch; sin esto el
   // hook devuelve null y solo se puede mostrar un texto generico.
-  const { get, post } = useApi({ throwOnError: true, showErrorToast: false })
+  const { get, post } = useApi({ requireLive: true, throwOnError: true, showErrorToast: false })
   const router = useRouter()
 
   const [ordenes, setOrdenes] = useState<any[]>([])
-  const [stats, setStats] = useState({
-    comprasDelMes: 0,
-    totalCompras: 0,
-    montoTotalMes: 0,
-    ordenesActivas: 0,
-    proveedoresActivos: 0,
-    ordenesVencidas: 0,
-  })
+  const [stats, setStats] = useState<PurchaseStats | null>(null)
+  const [statsError, setStatsError] = useState<string | null>(null)
   const [proveedores, setProveedores] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -80,10 +76,12 @@ export default function ComprasPage() {
   const loadData = async () => {
     try {
       setIsLoading(true)
-      await Promise.all([loadStats(), loadOrdenes(), loadProveedores()])
+      const [statsLoaded] = await Promise.all([loadStats(), loadOrdenes(), loadProveedores()])
+      return statsLoaded
     } catch (error) {
       console.error('Error loading data:', error)
       toast({ title: 'Error', description: 'Error al cargar los datos', variant: 'destructive' })
+      return false
     } finally {
       setIsLoading(false)
     }
@@ -92,15 +90,14 @@ export default function ComprasPage() {
   const loadStats = async () => {
     try {
       const data = await get(`/compras/stats?_t=${Date.now()}`)
-      const nextStats = unwrapApiObject(data, stats)
-      if (apiSucceeded(data)) {
-        setStats(nextStats)
-      } else {
-        toast({ title: 'Error', description: 'Error al cargar estadísticas de compras', variant: 'destructive' })
-      }
+      setStats(readPurchaseStatsPayload(data))
+      setStatsError(null)
+      return true
     } catch (error) {
       console.error('Error loading stats:', error)
-      toast({ title: 'Error de conexión', description: 'No se pudo conectar con el servidor', variant: 'destructive' })
+      setStats(null)
+      setStatsError('No se pudo verificar el resumen de compras. Reintenta para consultar los importes actuales.')
+      return false
     }
   }
 
@@ -178,11 +175,7 @@ export default function ComprasPage() {
     toast({ title: 'Proveedor creado', description: 'El proveedor se ha agregado correctamente' })
   }
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat(country.locale || 'es-PE', {
-      style: 'currency',
-      currency: country.moneda || 'PEN',
-    }).format(amount)
+  const formatCurrency = (amount: unknown, moneda: unknown) => formatPurchaseMoney(amount, moneda, country.locale || 'es-PE')
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return '-'
@@ -212,10 +205,10 @@ export default function ComprasPage() {
   }
 
   const statCards: StatCard[] = [
-    { label: 'Compras del mes', value: formatCurrency(stats.montoTotalMes), icon: ShoppingCart },
-    { label: 'Ordenes activas', value: stats.ordenesActivas, icon: FileText },
-    { label: 'Proveedores', value: stats.proveedoresActivos, icon: Building2 },
-    { label: 'Vencidas', value: stats.ordenesVencidas, icon: Truck },
+    { label: 'Compras del mes', value: stats ? stats.porMoneda.length ? stats.porMoneda.map(group => <span key={group.moneda} className="block whitespace-nowrap">{formatPurchaseMoney(group.montoTotalMes, group.moneda, country.locale || 'es-PE', 'code')}</span>) : 'Sin compras este mes' : '—', description: stats?.porMoneda.length ? 'Importes originales por moneda' : undefined, icon: ShoppingCart },
+    { label: 'Ordenes activas', value: stats?.ordenesActivas ?? '—', icon: FileText },
+    { label: 'Proveedores', value: stats?.proveedoresActivos ?? '—', icon: Building2 },
+    { label: 'Vencidas', value: stats?.ordenesVencidas ?? '—', icon: Truck },
   ]
 
   return (
@@ -241,8 +234,7 @@ export default function ComprasPage() {
               <Button
                 type="button"
                 onClick={async () => {
-                  await loadData()
-                  toast({ title: 'Datos actualizados', description: 'Compras sincronizadas correctamente' })
+                  if (await loadData()) toast({ title: 'Datos actualizados', description: 'Resumen de compras actualizado' })
                 }}
                 variant="outline"
                 className="gap-2 border-cyan-400/20 bg-white/10 text-primary hover:bg-white/15 hover:text-foreground"
@@ -259,20 +251,23 @@ export default function ComprasPage() {
         </section>
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {statCards.map(({ label, value, icon: Icon }) => (
-            <Card key={label} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
-              <CardContent className="flex items-start justify-between gap-3 p-4">
-                <div>
+          {statCards.map(({ label, value, description, icon: Icon }) => (
+            <Card key={label} className="min-w-0 border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
+              <CardContent className="min-w-0 p-4">
+                <div className="flex items-start justify-between gap-3">
                   <div className={labelClass}>{label}</div>
-                  <div className="mt-3 text-2xl font-bold text-foreground">{value}</div>
+                  <span className="shrink-0 rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-primary">
+                    <Icon className="h-5 w-5" />
+                  </span>
                 </div>
-                <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-primary">
-                  <Icon className="h-5 w-5" />
-                </span>
+                <div className="mt-3 overflow-x-auto text-2xl font-bold text-foreground">{value}</div>
+                {description && <p className="mt-2 text-sm text-muted-foreground">{description}</p>}
               </CardContent>
             </Card>
           ))}
         </section>
+
+        {statsError && <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"><p>{statsError}</p><Button type="button" variant="outline" className="mt-3" onClick={loadStats}>Reintentar resumen</Button></div>}
 
         <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
@@ -367,7 +362,7 @@ export default function ComprasPage() {
                             <td className="px-4 py-3">{formatDate(orden.fecha_orden)}</td>
                             <td className="px-4 py-3">{formatDate(orden.fecha_entrega)}</td>
                             <td className="px-4 py-3 text-right font-semibold text-foreground">{itemsCount}</td>
-                            <td className="px-4 py-3 text-right font-semibold text-foreground">{formatCurrency(parseFloat(orden.total) || 0)}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-foreground">{formatCurrency(orden.total, orden.moneda)}</td>
                             <td className="px-4 py-3 text-center">{statusBadge(orden.estado)}</td>
                             <td className="px-4 py-3">
                               <div className="flex flex-col items-end gap-2">

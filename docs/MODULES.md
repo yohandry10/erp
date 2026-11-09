@@ -1462,9 +1462,14 @@ Cotización -> Aprobación -> Orden de compra -> Recepción -> CxP -> Pago
   para nuevas operaciones: originalesFX sin conversión demostrable quedan
   preservados y bloqueados, sin tasa actual, tasa1 implícita ni backfill.
   La matriz recepción→factura→pago y aceptación completa de sesión siguen abiertas.
-- D57 pendiente: el resumen mensual de Compras mezcla monedas nominales y algunas
-  listas rotulan órdenesUSD con la moneda local. No usar ese KPI como importe
-  convertido; los contratos de cierre/contabilidad617 conservan su propia prueba.
+- El resumen de Compras usa el contrato v2 de importes originales por moneda:
+  no devuelve un total nominal común ni infiere una tasa. Conserva el mes civil
+  del contribuyente, los estados excluidos y los conteos operativos. Verifica
+  todas las páginas, conteos y pertenencia al tenant antes de publicar cifras.
+  Listas de compras, órdenes y órdenes recepcionables usan la moneda de su OC;
+  una moneda ausente no se sustituye por soles. Un fallo del resumen deja los
+  indicadores no disponibles y ofrece reintentar; no equivale a un cero real.
+  Los contratos de cierre/contabilidad617 conservan su propia prueba.
 - Devoluciones al proveedor revierten existencia y obligación según estado.
 - Aprobaciones respetan tenant, rol, monto y estado.
 - La configuración de una empresa peruana provisiona las cuentas 4699 y 63

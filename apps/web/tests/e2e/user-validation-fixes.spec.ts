@@ -92,12 +92,49 @@ test('un ajuste rechazado por la base libera el formulario y explica el motivo',
 test('el filtro de compras ofrece los estados reales de una orden', async ({ context, page }) => {
   await installSession(context, page)
   await mockApi(page, {
-    '/compras/stats': { success: true, data: { comprasDelMes: 2, totalCompras: 489.7, montoTotalMes: 371.7, ordenesActivas: 2, proveedoresActivos: 1, ordenesVencidas: 0 } },
+    '/compras/stats': { success: true, data: { version: 2, base: 'IMPORTES_ORIGINALES_SIN_CONVERSION', porMoneda: [{ moneda: 'PEN', totalCompras: '489.70', montoTotalMes: '371.70', comprasDelMes: 2 }], comprasDelMes: 2, ordenesActivas: 2, proveedoresActivos: 1, ordenesVencidas: 0 } },
   })
   await page.goto('/dashboard/compras/')
   const estado = page.getByRole('combobox', { name: 'Estado', exact: true })
   await expect(estado.locator('option')).toHaveText(['Todos los estados', 'Borrador', 'Pendiente', 'En aprobación', 'Aprobada', 'Parcial', 'Recibida', 'Rechazada', 'Anulada'])
-  await expect(page.getByText('S/ 371.70', { exact: true })).toBeVisible()
+  await expect(page.getByText(/PEN\s371\.70/, { exact: true })).toBeVisible()
+})
+
+test('Compras conserva los importes originales PEN/USD en el resumen y la lista', async ({ context, page }) => {
+  await installSession(context, page)
+  await mockApi(page, {
+    '/compras/stats': { success: true, data: { version: 2, base: 'IMPORTES_ORIGINALES_SIN_CONVERSION', porMoneda: [
+      { moneda: 'PEN', totalCompras: '472.00', montoTotalMes: '354.00', comprasDelMes: 1 },
+      { moneda: 'USD', totalCompras: '73.11', montoTotalMes: '73.11', comprasDelMes: 3 },
+    ], comprasDelMes: 4, ordenesActivas: 2, proveedoresActivos: 1, ordenesVencidas: 0 } },
+    '/compras/ordenes': { success: true, data: [{ id: 'd57-order', numero: 'OC-USD-D57', moneda: 'USD', total: '24.37', estado: 'APROBADA', fecha_orden: '2026-11-04', proveedor: { razon_social: 'Proveedor D57' } }] },
+  })
+  await page.goto('/dashboard/compras/')
+  await expect(page.getByText(/PEN\s354\.00/, { exact: true })).toBeVisible()
+  await expect(page.getByText(/USD\s73\.11/, { exact: true })).toBeVisible()
+  await expect(page.getByText('Importes originales por moneda', { exact: true })).toBeVisible()
+  await expect(page.getByText(/427\.11/)).toHaveCount(0)
+  const row = page.getByRole('row').filter({ hasText: 'OC-USD-D57' })
+  await expect(row).toContainText(/(?:USD|US\$)\s*24\.37/)
+  await expect(row).not.toContainText('S/ 24.37')
+})
+
+test('Compras muestra resumen no disponible y permite recuperar una lectura verificada', async ({ context, page }) => {
+  await installSession(context, page)
+  let unavailable = true
+  const response = { success: true, data: { version: 2, base: 'IMPORTES_ORIGINALES_SIN_CONVERSION', porMoneda: [{ moneda: 'USD', totalCompras: '73.11', montoTotalMes: '73.11', comprasDelMes: 3 }], comprasDelMes: 3, ordenesActivas: 2, proveedoresActivos: 1, ordenesVencidas: 0 } }
+  await mockApi(page, {}, async (endpoint, route) => {
+    if (endpoint !== '/compras/stats') return false
+    await route.fulfill({ status: unavailable ? 503 : 200, contentType: 'application/json', body: JSON.stringify(unavailable ? { message: 'Consulta no disponible' } : response) })
+    return true
+  })
+  await page.goto('/dashboard/compras/')
+  await expect(page.getByRole('alert').filter({ hasText: 'No se pudo verificar el resumen de compras' })).toBeVisible()
+  await expect(page.getByText(/PEN\s0\.00|USD\s0\.00/, { exact: true })).toHaveCount(0)
+  unavailable = false
+  await page.getByRole('button', { name: 'Reintentar resumen', exact: true }).click()
+  await expect(page.getByText(/USD\s73\.11/, { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Reintentar resumen', exact: true })).toHaveCount(0)
 })
 
 test('RRHH Perú no se declara lista sin el tope AFP del período', async ({ context, page }, testInfo) => {

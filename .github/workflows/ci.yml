@@ -151,6 +151,7 @@ jobs:
           node apps/web/tests/compras/verify-receipt-reversal-operation.mjs
           node apps/web/tests/observability/verify-sentry-privacy.mjs
           node apps/web/tests/contabilidad/verify-analytic-allocation-races.mjs
+          node apps/web/tests/compras/verify-purchase-native-stats.mjs
       - name: Candidate profile contract
         run: pnpm --filter @erp-suite/web test:candidate-profile
       - name: Receivables complete live read contract
