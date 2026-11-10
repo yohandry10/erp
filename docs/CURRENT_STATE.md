@@ -4,10 +4,10 @@ Actualizado: 2026-11-10. Una página: si algo no cabe aquí, va a su documento d
 
 ## Dónde está
 
-- **Candidato para revisión:** rama `codex/go-prod-candidate-20261106`,
-  [PR153 en borrador](https://github.com/yohandry10/erp/pull/153), candidato617
-  con Sentry, D58 y D57. Correcciones613–617 verificadas; sin merge ni
-  promoción. **NO_GO**. La integración de CI dejó de caer por memoria del
+- **Integrado en `main`:** [PR153](https://github.com/yohandry10/erp/pull/153)
+  fusionado el 10-nov como `30957c18`, con Sentry, D58 y D57, después de
+  promover 594–617 a PROD. Lo que sigue describe cómo llegó a verde; los
+  bloqueos de entrega a un cliente no cambian. La integración de CI dejó de caer por memoria del
   servidor de pruebas: navegador y barrido de pantallas corren en tres tandas,
   cada una con un Next dev nuevo, y las navegaciones esperan la compilación en
   frío (120 s). Sobre083d5c55 las tres tandas de navegador pasan71/71 sin
@@ -86,9 +86,12 @@ Actualizado: 2026-11-10. Una página: si algo no cabe aquí, va a su documento d
   no disponibles hasta tener valuación común. La consulta de gastos denegada
   conserva sus permisos; no se fabrica KPI0. Endpoints avanzados legacy aún
   requieren revisión. SigueNO_GO por casos pendientes y gates de release.
-- **Último corte público observado:** 5-nov, 06:29 UTC; API `8cb0b0d0`, esquema
-  requerido/aplicado 593, DB y Redis listos. El SHA de la web no se verificó en esta ronda.
-  La promoción 570–590 del 31-oct fue transaccional: **NO reaplicarla**.
+- **Último corte público observado:** 10-nov, 14:09 UTC; API `30957c18` en Render,
+  esquema requerido/aplicado 617, DB y Redis listos, CORS 204. Vercel registra el
+  despliegue Production del mismo commit y el login público responde 200. Render
+  desplegó antes de que terminara la CI de `main`; ese mismo árbol ya había
+  pasado completo en el PR. Sin prueba funcional con sesión en producción.
+  Las promociones 570–590 y 594–617 fueron transaccionales: **NO reaplicarlas**.
 - **Plan de revisión cerrado:** 89 ejecuciones acumuladas, 18 hallazgos de la ronda y
   10 escenarios bloqueados documentados; 55 puntos dispuestos. [Dictamen NO_GO](../artifacts/uat-go-final-20261105/DICTAMEN.md), sólo demos propias, sin certificación integral.
 - **Objetivo posterior activo:** corregir hasta GO_PROD. La595 repara la fábrica demo
@@ -177,6 +180,7 @@ Actualizado: 2026-11-10. Una página: si algo no cabe aquí, va a su documento d
 | `570..582` | Suministro, lotes y migración desde otro sistema: aplicadas |
 | `583..590` | Correcciones Perú del candidato, que las numeraba 570–577: aplicadas |
 | `591..593` | Aplicadas según readiness del 5-nov; anon sin escritura, avisos por usuario y contraseña propia |
+| `594..617` | Promovidas juntas a PROD el 10-nov-2026 en una transacción. Las filas siguientes conservan el detalle de su verificación local previa; donde dicen «sin promoción» describen ese momento |
 | `594` | Kardex: apertura antes de consumo con timestamp igual; verificada sólo en PostgreSQL local, sin promoción |
 | `595` | Consistencia de nuevas demos: factura semilla reservada, cotización detallada y apertura bancaria; verificación/rollback locales, sin promoción |
 | `596` | NC RMA por importes acumulados de cada línea: límites, cabecera consistente, helper privado; cadena limpia/rollback locales, sin promoción |
@@ -203,8 +207,8 @@ Actualizado: 2026-11-10. Una página: si algo no cabe aquí, va a su documento d
 | `616` | WIP local: recibo ligado a actor/tenant/origen y resolución durable; tres carreras más verifican commit/abandono/revocación. UI conserva intención/archivo antes de retirar el pendiente; rechazo por período, recarga, resolución y nueva anulación verificados conSQL y worker.98pruebas del contrato web, colaJS y48Rust pasan. SuiteAPI completa6066/408 enUTC, tipos/buildAPI yweb pasan; lintAPI0errores/97avisos, sin avisos en la UI nueva. Cadena fresca612migraciones/125verificadores+67históricos aprobada.21tablas conservadas intactas. UI de transferencia, matrizFX y ensayo de restore/rollback aún pendientes; NO_GO |
 | `617` | WIP local: cierre congela monedaOC, moneda contable del país, tasa decimal y referencia; worker con claim real valida el origen y registra valores base, sin reinterpretar historiaFX. Bien físico/servicio/sin stockUSD5.17→PEN19.13 y reversa exacta neto0; cero sinGL. Cuatro carreras reales y cierreUI USD5.16→PEN19.09 pasan. SuiteAPI6101/410 con coberturaUTC, tipos/build/lintAPI y buildweb pasan. Cadena nueva613migraciones/126verificadores+67históricos aprobada. Sin promoción; NO_GO |
 
-Próxima libre: `618`. El binario WIP y el candidato publicado exigen617; el stack
-histórico local conservado sigue612, PROD observado593. No arrancar el binario nuevo sobre
+Próxima libre: `618`. El binario de `main` exige617 y PROD está en617 desde el
+10-nov; el stack histórico local conservado sigue612. No arrancar el binario nuevo sobre
 la base conservada sin completar su migración en infraestructura de pruebas propia.
 Comprobar prefijos duplicados antes de añadir una.
 
@@ -220,10 +224,17 @@ el lote se armaba con los finales de línea del checkout (en Windows, CRLF) y la
 tabla de historial no tuviera las concesiones que el proveedor da por defecto
 (lectura de clientes y DML del backend), que la migración no retira. Ahora
 comprueba lo que la protege: clientes sin escritura, RLS forzado, políticas
-ligadas a la empresa y guarda 441 activa. La promoción real sigue pendiente de
-autorización y exige CI verde sobre el commit que incluye estas correcciones y
-un respaldo de menos de 24 horas.
+ligadas a la empresa y guarda 441 activa.
 [Informe](../artifacts/promocion-ensayo-594-617-20261110042949/informe.json).
+
+**Promoción 594–617 a PROD (10-nov, 14:03 UTC), autorizada por el propietario:**
+con CI verde en `33ba2b47`, ese mismo respaldo (9,6 h) y el lote ensayado
+`0ee1ea39`. Antes: esquema 593 y salud lista. La transacción confirmó en 54 s.
+Después: esquema 617, salud lista, 334 tablas y 227.816 filas existentes sin
+cambios, ninguna tabla ni columna perdida y ningún cambio no visto en el
+ensayo. El API anterior siguió listo sobre 617 hasta el despliegue. **NO
+reaplicarla.** Una corrección posterior se publica hacia adelante.
+[Evidencia](../artifacts/promocion-prod-594-617-20261110135958813.json).
 
 **D56 corregido en el candidato local617:** nuevas recepcionesUSD exigen valuación
 congelada; la contabilización original y la reversa verifican esa autoridad. Los
@@ -321,7 +332,8 @@ Detalle: `docs/RELEASE.md`.
   Estado y límites posteriores: [seguimiento GO_PROD](../artifacts/go-prod-20261105/SEGUIMIENTO.md).
   El [dictamen actualizado](../artifacts/go-prod-20261105/DICTAMEN.md) conserva NO_GO y
   enlaza el delta de55puntos y las huellas del candidato sin commit nuevo.
-  Sin promoción productiva; PR153 sólo en borrador. Reversas, planilla AFP y gates externos siguen pendientes.
+  El 10-nov se promovió 594–617 y se fusionó el PR153. Siguen pendientes la anulación de traslados
+  desde pantalla (API listo), la matriz recepción→factura→pago en divisa, la planilla AFP y los gates externos.
 
 ## Advertencias operativas
 
