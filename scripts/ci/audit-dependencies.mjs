@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { backports, runPnpm, verifySecurityBackports } from './verify-security-backports.mjs';
+import { verifySecurityUpgrades } from './verify-security-upgrades.mjs';
 
 // Registry advisories remain visible. A version-based finding is mitigated only
 // after every installed copy matches the reviewed patch and passes regressions.
 const verified = verifySecurityBackports();
+const verifiedUpgrades = verifySecurityUpgrades();
 let audit;
 for (let attempt = 1; attempt <= 3; attempt++) {
   const result = runPnpm(['audit', '--json']);
@@ -42,7 +44,7 @@ for (const finding of findings) {
   }
 }
 const report = { checkedAt: new Date().toISOString(), success: unresolved.length === 0,
-  registryVulnerabilities: audit.metadata.vulnerabilities, verified, mitigated, unresolved };
+  registryVulnerabilities: audit.metadata.vulnerabilities, verified, verifiedUpgrades, mitigated, unresolved };
 const outputIndex = process.argv.indexOf('--output');
 if (outputIndex >= 0) {
   const target = path.resolve(process.argv[outputIndex + 1]);

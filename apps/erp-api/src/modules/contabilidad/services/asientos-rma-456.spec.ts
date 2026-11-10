@@ -22,6 +22,28 @@ describe('AsientosGeneratorService - RMA 456', () => {
 
   const detalles = (): DetalleAsiento[] => generar.mock.calls[0][3];
 
+  it.each([
+    { base: .02, tax: 0, cost: 0 },
+    { base: 0, tax: .01, cost: 0 },
+    { base: .02, tax: 0, cost: 4.5 },
+    { base: 0, tax: .01, cost: 4.5 },
+  ])('D26 contabiliza una NC de céntimos sin componentes cero: %p', async ({ base, tax, cost }) => {
+    await service.generarAsientoNotaCredito({
+      tenant_id: 'tenant-1', fecha: '2026-11-05', base_imponible: base,
+      igv: tax, total: base + tax, monto_pendiente: base + tax,
+      customerCreditBalance: 0, costo_ventas: cost,
+    });
+    expect(detalles().every(line => (line.debe > 0 && line.haber === 0)
+      || (line.haber > 0 && line.debe === 0))).toBe(true);
+    expect(Math.round(detalles().reduce((sum, line) => sum + line.debe, 0) * 100))
+      .toBe(Math.round((base + tax + cost) * 100));
+    expect(Math.round(detalles().reduce((sum, line) => sum + line.haber, 0) * 100))
+      .toBe(Math.round((base + tax + cost) * 100));
+    const requested = plan.obtenerCuentasPorCodigos.mock.calls[0][1];
+    expect(requested.includes('40')).toBe(tax > 0);
+    expect(requested.includes('70')).toBe(base > 0);
+  });
+
   it('reparte la NC entre CxC y pasivo 122 sin duplicar el total', async () => {
     await service.generarAsientoNotaCredito({
       tenant_id: 'tenant-1', fecha: '2026-08-09', base_imponible: 100,

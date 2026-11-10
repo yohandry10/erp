@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import toast from 'react-hot-toast'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
+import { formatPurchaseMoney } from '@/lib/purchase-native-view'
 
 interface OrdenCompra {
   id: string
@@ -144,15 +145,15 @@ const normalizeOrden = (raw: any): OrdenCompra => ({
   estado: String(raw?.estado || 'BORRADOR').toUpperCase(),
   subtotal: toNumber(raw?.subtotal),
   igv: toNumber(raw?.igv),
-  total: toNumber(raw?.total),
-  moneda: raw?.moneda || 'PEN',
+  total: raw?.total,
+  moneda: typeof raw?.moneda === 'string' ? raw.moneda : '',
   observaciones: raw?.observaciones,
   proveedores: raw?.proveedores || raw?.proveedor,
   detalles: Array.isArray(raw?.detalles) ? raw.detalles : [],
 })
 
 export default function OrdenesCompraPage() {
-  const { formatCurrency: formatLocalizedCurrency, locale, taxIdLabel } = useLocalizedMoney()
+  const { locale, taxIdLabel } = useLocalizedMoney()
   const router = useRouter()
   const { get } = useApi({ throwOnError: true, showErrorToast: false })
 
@@ -256,9 +257,7 @@ export default function OrdenesCompraPage() {
     )
   }
 
-  const formatCurrency = (amount: number | undefined) => {
-    return formatLocalizedCurrency(toNumber(amount))
-  }
+  const formatCurrency = (amount: unknown, moneda: unknown) => formatPurchaseMoney(amount, moneda, locale)
 
   const formatDate = (dateString?: string | null) => {
     if (!dateString) return '-'
@@ -316,7 +315,7 @@ export default function OrdenesCompraPage() {
 
       <div className={`mt-4 rounded-xl border ${config.border} bg-gradient-to-br ${config.panel} p-3`}>
         <div className={labelClass}>Total</div>
-        <div className="mt-1 text-xl font-bold text-primary">{formatCurrency(orden.total)}</div>
+        <div className="mt-1 text-xl font-bold text-primary">{formatCurrency(orden.total, orden.moneda)}</div>
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3 border-t border-cyan-400/10 pt-3 text-xs text-muted-foreground">
@@ -557,7 +556,7 @@ export default function OrdenesCompraPage() {
                           </td>
                           <td className="px-4 py-3 text-muted-foreground">{formatDate(orden.fecha_orden)}</td>
                           <td className="px-4 py-3 text-muted-foreground">{formatDate(orden.fecha_entrega_esperada)}</td>
-                          <td className="px-4 py-3 text-right font-bold text-primary">{formatCurrency(orden.total)}</td>
+                          <td className="px-4 py-3 text-right font-bold text-primary">{formatCurrency(orden.total, orden.moneda)}</td>
                           <td className="px-4 py-3 text-center">{getEstadoBadge(orden.estado)}</td>
                           <td className="px-4 py-3">
                             <div className="flex justify-end gap-2">

@@ -1,0 +1,240 @@
+[
+  {
+    "name": "physical",
+    "intent": {
+      "version": 1,
+      "tenantId": "fea4bb6a-b0d7-460a-afe0-83140fe51c68",
+      "actorId": "26384df4-597c-4464-a437-be08f403e316",
+      "receiptId": "4c67eeea-057e-4ec3-86c2-a3480efbb08b",
+      "receiptNumber": "REC-2026-0001",
+      "createdAt": "2026-11-08T16:51:52.519248+00:00",
+      "key": "http616-reverse-physical",
+      "fingerprint": "fe1d95a1dfc8ac004770de4d81c3a3fb61d92d6c29d87aed20ff9b2584f331e7",
+      "body": {
+        "motivo": "Anulación HTTP local verificada",
+        "fecha_contable": "2026-11-08"
+      }
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "tipo": "RECEPCION_REVERSA",
+        "estado": "ANULADA",
+        "motivo": "Anulación HTTP local verificada",
+        "payload": {
+          "tipo": "RECEPCION",
+          "motivo": "Anulación HTTP local verificada",
+          "actor_id": "26384df4-597c-4464-a437-be08f403e316",
+          "fuente_id": "4c67eeea-057e-4ec3-86c2-a3480efbb08b",
+          "fecha_contable": "2026-11-08"
+        },
+        "success": true,
+        "actor_id": "26384df4-597c-4464-a437-be08f403e316",
+        "orden_id": "e4539665-e9dd-457a-b588-3c78f54680c5",
+        "tenant_id": "fea4bb6a-b0d7-460a-afe0-83140fe51c68",
+        "created_at": "2026-11-08T16:51:52.519248+00:00",
+        "idempotent": true,
+        "reversa_id": "6cad7ab6-3958-4ab4-9be8-1cefa1f6c613",
+        "movimientos": [
+          {
+            "id": "d1819ad1-29e6-4fd9-ab99-85fac4b5020d",
+            "cantidad": "0.500000",
+            "almacen_id": "c6778a7e-ad7d-48b8-bad7-cd8a12fecf86",
+            "producto_id": "7ca966e2-8ba5-41d9-9a8e-6d8768fe0474",
+            "ubicacion_id": null,
+            "source_movement_id": "5c3dc010-d982-4739-bef9-17e22267436d"
+          },
+          {
+            "id": "6f678b65-88bc-492e-a48a-7315e94a445c",
+            "cantidad": "0.750000",
+            "almacen_id": "c6778a7e-ad7d-48b8-bad7-cd8a12fecf86",
+            "producto_id": "7ca966e2-8ba5-41d9-9a8e-6d8768fe0474",
+            "ubicacion_id": null,
+            "source_movement_id": "26da777c-737e-4740-9fda-49693e3db2e5"
+          }
+        ],
+        "contabilidad": {
+          "estado": "PENDIENTE",
+          "event_id": "870422d8-c278-4990-bab6-385ef9ba8f87",
+          "original_event_id": "79258db0-eede-470e-812e-be8d308b4c31"
+        },
+        "orden_estado": "APROBADA",
+        "recepcion_id": "4c67eeea-057e-4ec3-86c2-a3480efbb08b",
+        "fecha_contable": "2026-11-08",
+        "idempotency_key": "http616-reverse-physical",
+        "request_fingerprint": "fe1d95a1dfc8ac004770de4d81c3a3fb61d92d6c29d87aed20ff9b2584f331e7",
+        "operation_identity": {
+          "version": 1,
+          "type": "RECEPCION_REVERSA",
+          "operation_id": "6cad7ab6-3958-4ab4-9be8-1cefa1f6c613",
+          "source_operation_id": "4c67eeea-057e-4ec3-86c2-a3480efbb08b",
+          "tenant_id": "fea4bb6a-b0d7-460a-afe0-83140fe51c68",
+          "actor_id": "26384df4-597c-4464-a437-be08f403e316",
+          "idempotency_key": "http616-reverse-physical",
+          "request_payload": {
+            "tipo": "RECEPCION",
+            "fuente_id": "4c67eeea-057e-4ec3-86c2-a3480efbb08b",
+            "actor_id": "26384df4-597c-4464-a437-be08f403e316",
+            "motivo": "Anulación HTTP local verificada",
+            "fecha_contable": "2026-11-08"
+          },
+          "request_fingerprint": "fe1d95a1dfc8ac004770de4d81c3a3fb61d92d6c29d87aed20ff9b2584f331e7",
+          "confirmed_at": "2026-11-08T16:51:52.519248+00:00"
+        }
+      }
+    }
+  },
+  {
+    "name": "zero",
+    "intent": {
+      "version": 1,
+      "tenantId": "fea4bb6a-b0d7-460a-afe0-83140fe51c68",
+      "actorId": "26384df4-597c-4464-a437-be08f403e316",
+      "receiptId": "723c9c44-5b9b-4c93-bb3d-85524de4185a",
+      "receiptNumber": "REC-2026-0002",
+      "createdAt": "2026-11-08T16:51:52.939886+00:00",
+      "key": "http616-reverse-zero",
+      "fingerprint": "611ededb07160e663ffc763bacd773260a352e544ac501a9b1649d0c92c4b097",
+      "body": {
+        "motivo": "Anulación HTTP local verificada",
+        "fecha_contable": "2026-11-08"
+      }
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "tipo": "RECEPCION_REVERSA",
+        "estado": "ANULADA",
+        "motivo": "Anulación HTTP local verificada",
+        "payload": {
+          "tipo": "RECEPCION",
+          "motivo": "Anulación HTTP local verificada",
+          "actor_id": "26384df4-597c-4464-a437-be08f403e316",
+          "fuente_id": "723c9c44-5b9b-4c93-bb3d-85524de4185a",
+          "fecha_contable": "2026-11-08"
+        },
+        "success": true,
+        "actor_id": "26384df4-597c-4464-a437-be08f403e316",
+        "orden_id": "8714a69f-cdd7-4795-bbc7-5382da906778",
+        "tenant_id": "fea4bb6a-b0d7-460a-afe0-83140fe51c68",
+        "created_at": "2026-11-08T16:51:52.939886+00:00",
+        "idempotent": true,
+        "reversa_id": "5bb07d9e-ebee-4c6b-ada7-377a2cfb7e6d",
+        "movimientos": [
+          {
+            "id": "2c6279df-a83a-4c4c-800b-89c8a778d941",
+            "cantidad": "0.500000",
+            "almacen_id": "c6778a7e-ad7d-48b8-bad7-cd8a12fecf86",
+            "producto_id": "4b863e8b-3804-4fbc-bef2-42e80cb26f03",
+            "ubicacion_id": null,
+            "source_movement_id": "69cc6555-25e0-4b64-a645-34a5a650114f"
+          },
+          {
+            "id": "99080eda-8c18-44b1-a290-b61f377a0dd4",
+            "cantidad": "0.750000",
+            "almacen_id": "c6778a7e-ad7d-48b8-bad7-cd8a12fecf86",
+            "producto_id": "4b863e8b-3804-4fbc-bef2-42e80cb26f03",
+            "ubicacion_id": null,
+            "source_movement_id": "ecd570ba-f131-4c23-a3df-feb5f70db929"
+          }
+        ],
+        "contabilidad": {
+          "estado": "PENDIENTE",
+          "event_id": "32531d75-022e-4b4f-b055-c2ceb86819da",
+          "original_event_id": "580080d2-c67c-4a48-895b-74e9facbcc62"
+        },
+        "orden_estado": "APROBADA",
+        "recepcion_id": "723c9c44-5b9b-4c93-bb3d-85524de4185a",
+        "fecha_contable": "2026-11-08",
+        "idempotency_key": "http616-reverse-zero",
+        "request_fingerprint": "611ededb07160e663ffc763bacd773260a352e544ac501a9b1649d0c92c4b097",
+        "operation_identity": {
+          "version": 1,
+          "type": "RECEPCION_REVERSA",
+          "operation_id": "5bb07d9e-ebee-4c6b-ada7-377a2cfb7e6d",
+          "source_operation_id": "723c9c44-5b9b-4c93-bb3d-85524de4185a",
+          "tenant_id": "fea4bb6a-b0d7-460a-afe0-83140fe51c68",
+          "actor_id": "26384df4-597c-4464-a437-be08f403e316",
+          "idempotency_key": "http616-reverse-zero",
+          "request_payload": {
+            "tipo": "RECEPCION",
+            "fuente_id": "723c9c44-5b9b-4c93-bb3d-85524de4185a",
+            "actor_id": "26384df4-597c-4464-a437-be08f403e316",
+            "motivo": "Anulación HTTP local verificada",
+            "fecha_contable": "2026-11-08"
+          },
+          "request_fingerprint": "611ededb07160e663ffc763bacd773260a352e544ac501a9b1649d0c92c4b097",
+          "confirmed_at": "2026-11-08T16:51:52.939886+00:00"
+        }
+      }
+    }
+  },
+  {
+    "name": "service",
+    "intent": {
+      "version": 1,
+      "tenantId": "fea4bb6a-b0d7-460a-afe0-83140fe51c68",
+      "actorId": "26384df4-597c-4464-a437-be08f403e316",
+      "receiptId": "4ff54b17-0070-4a25-b9e7-06841a3fbf55",
+      "receiptNumber": "REC-2026-0003",
+      "createdAt": "2026-11-08T16:51:53.201687+00:00",
+      "key": "http616-reverse-service",
+      "fingerprint": "c1046ec4765a11f604609defd6b374243a730a20122e6b02d8daf0cdb03b267d",
+      "body": {
+        "motivo": "Anulación HTTP local verificada",
+        "fecha_contable": "2026-11-08"
+      }
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "tipo": "RECEPCION_REVERSA",
+        "estado": "ANULADA",
+        "motivo": "Anulación HTTP local verificada",
+        "payload": {
+          "tipo": "RECEPCION",
+          "motivo": "Anulación HTTP local verificada",
+          "actor_id": "26384df4-597c-4464-a437-be08f403e316",
+          "fuente_id": "4ff54b17-0070-4a25-b9e7-06841a3fbf55",
+          "fecha_contable": "2026-11-08"
+        },
+        "success": true,
+        "actor_id": "26384df4-597c-4464-a437-be08f403e316",
+        "orden_id": "4875b0d7-a141-41f9-a6d2-4f225c021937",
+        "tenant_id": "fea4bb6a-b0d7-460a-afe0-83140fe51c68",
+        "created_at": "2026-11-08T16:51:53.201687+00:00",
+        "idempotent": true,
+        "reversa_id": "2ce53e95-85ef-44da-b583-60b7fe3e0ac2",
+        "movimientos": [],
+        "contabilidad": {
+          "estado": "PENDIENTE",
+          "event_id": "e3dad9de-cc4a-48d5-85c0-03aac22624e9",
+          "original_event_id": "882a30f7-75cd-40dd-9dac-4c1fa25d3881"
+        },
+        "orden_estado": "APROBADA",
+        "recepcion_id": "4ff54b17-0070-4a25-b9e7-06841a3fbf55",
+        "fecha_contable": "2026-11-08",
+        "idempotency_key": "http616-reverse-service",
+        "request_fingerprint": "c1046ec4765a11f604609defd6b374243a730a20122e6b02d8daf0cdb03b267d",
+        "operation_identity": {
+          "version": 1,
+          "type": "RECEPCION_REVERSA",
+          "operation_id": "2ce53e95-85ef-44da-b583-60b7fe3e0ac2",
+          "source_operation_id": "4ff54b17-0070-4a25-b9e7-06841a3fbf55",
+          "tenant_id": "fea4bb6a-b0d7-460a-afe0-83140fe51c68",
+          "actor_id": "26384df4-597c-4464-a437-be08f403e316",
+          "idempotency_key": "http616-reverse-service",
+          "request_payload": {
+            "tipo": "RECEPCION",
+            "fuente_id": "4ff54b17-0070-4a25-b9e7-06841a3fbf55",
+            "actor_id": "26384df4-597c-4464-a437-be08f403e316",
+            "motivo": "Anulación HTTP local verificada",
+            "fecha_contable": "2026-11-08"
+          },
+          "request_fingerprint": "c1046ec4765a11f604609defd6b374243a730a20122e6b02d8daf0cdb03b267d",
+          "confirmed_at": "2026-11-08T16:51:53.201687+00:00"
+        }
+      }
+    }
+  }
+]

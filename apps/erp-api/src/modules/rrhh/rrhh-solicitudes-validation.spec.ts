@@ -1,4 +1,4 @@
-import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ServiceUnavailableException } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { RrhhService } from './rrhh.service';
@@ -31,6 +31,30 @@ describe('Solicitudes laborales desde la UI', () => {
     await expect(service.createSolicitud({ ...solicitud, ...cambio }, 'tenant', 'actor', 'solicitud-1'))
       .rejects.toBeInstanceOf(BadRequestException);
     expect(getClient).not.toHaveBeenCalled();
+  });
+
+  it('traduce el cruce que rechaza la base (610) a un 409 legible', async () => {
+    const rpc = jest.fn().mockResolvedValue({ data: null, error: {
+      code: '23P01', message: 'RRHH_REQUEST_OVERLAP: estado=aprobada tipo=vacaciones desde=2026-03-01 hasta=2026-03-03' } });
+    const service = new RrhhService({ getClient: () => ({ rpc }) } as any);
+    const rechazo = service.createSolicitud(solicitud, 'tenant', 'actor', 'solicitud-1');
+    await expect(rechazo).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.createSolicitud(solicitud, 'tenant', 'actor', 'solicitud-1')).rejects
+      .toThrow('El colaborador ya tiene una solicitud aprobada de vacaciones del 01/03/2026 al 03/03/2026 que se cruza con estas fechas');
+    await expect(service.aprobarSolicitud('s1', 'actor', undefined, 'tenant', 'actor', 'decision-1')).rejects
+      .toMatchObject({ response: { statusCode: 409, error: 'RRHH_REQUEST_OVERLAP' } });
+  });
+
+  it('un reintento exacto llega al writer idempotente sin leer solicitudes antes', async () => {
+    const original = { id: 's1', estado: 'pendiente' };
+    const rpc = jest.fn().mockResolvedValue({ data: original, error: null });
+    const from = jest.fn(() => { throw new Error('No debe leer solicitudes antes del writer'); });
+    const service = new RrhhService({ getClient: () => ({ rpc, from }) } as any);
+    await expect(service.createSolicitud(solicitud, 'tenant', 'actor', 'solicitud-1')).resolves.toEqual({ success: true, data: original });
+    await expect(service.createSolicitud(solicitud, 'tenant', 'actor', 'solicitud-1')).resolves.toEqual({ success: true, data: original });
+    await expect(service.aprobarSolicitud('s1', 'actor', undefined, 'tenant', 'actor', 'decision-1')).resolves.toMatchObject({ success: true });
+    expect(from).not.toHaveBeenCalled();
+    expect(rpc).toHaveBeenCalledTimes(3);
   });
 
   it('una lectura fallida de solicitudes devuelve indisponibilidad', async () => {

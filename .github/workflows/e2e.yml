@@ -9,10 +9,6 @@ on:
     branches:
       - main
       - develop
-      - "codex/**"
-      - "feat/**"
-      - "fix/**"
-      - "chore/**"
   pull_request:
     branches: [main, develop]
 
@@ -29,6 +25,7 @@ jobs:
     env:
       CI: "true"
       E2E_ISOLATED_BROWSER: "1"
+      PLAYWRIGHT_PRODUCTION_WEB: "1"
       PLAYWRIGHT_SKIP_GLOBAL_AUTH: "1"
       BASE_URL: http://127.0.0.1:3001
       NEXT_PUBLIC_API_URL: http://127.0.0.1:3002
@@ -68,6 +65,14 @@ jobs:
           pnpm --filter @erp-suite/web test:asiento-balance
           pnpm --filter @erp-suite/web test:contrato
           pnpm --filter @erp-suite/web test:barra-final
+          node apps/web/tests/analytics/verify-native-view.mjs
+          node apps/web/tests/contrato/verify-isolated-production-build.mjs
+
+      - name: Build production Web for isolated browser contracts
+        run: |
+          pnpm --filter @erp-suite/dtos build
+          pnpm --filter @erp-suite/crypto build
+          node apps/web/scripts/build-isolated-web.cjs
 
       - name: Install Chromium
         run: pnpm --filter @erp-suite/web exec playwright install --with-deps chromium

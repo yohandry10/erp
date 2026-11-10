@@ -13,6 +13,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import { usePermission } from '@/hooks/use-permission'
 import { downloadCsv } from '@/lib/csv-export'
+import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
+import { PageShell } from '@/components/erp/page-shell'
 
 interface CuentaPorPagar {
   id: string
@@ -49,6 +51,24 @@ const inputClass =
 const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-primary/80'
 
 export default function CuentasPorPagarPage() {
+  return (
+    <ProtectedComponent
+      modulo="finanzas"
+      accion="ver"
+      recurso="cxp"
+      loadingFallback={<PageShell title="Cuentas por Pagar" description="Comprobando permisos de consulta.">{null}</PageShell>}
+      fallback={
+        <PageShell title="Cuentas por Pagar" description="Acceso denegado">
+          <p role="alert">No tienes permiso para consultar las cuentas por pagar. Solicita acceso al administrador de tu empresa.</p>
+        </PageShell>
+      }
+    >
+      <CuentasPorPagarContent />
+    </ProtectedComponent>
+  )
+}
+
+function CuentasPorPagarContent() {
   const { currency, locale, formatCurrency: formatLocalizedCurrency, taxIdLabel } = useLocalizedMoney()
   const router = useRouter()
   const { hasPermission: canReadRecepciones } = usePermission('compras', 'ver', 'recepciones')

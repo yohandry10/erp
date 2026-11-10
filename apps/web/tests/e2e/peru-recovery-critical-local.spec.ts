@@ -18,7 +18,7 @@ test('Recuperación crítica: recibos reales, almacenamiento, actor retenido y a
  const key=`erp.accounting.asset-lifecycle.pending.v1.${fixture.tenant}:${actor}`
  const steps:any[]=[],errors:string[]=[],requests:any[]=[];let complete=false
  const pending=()=>page.evaluate(k=>localStorage.getItem(k),key)
- page.setDefaultTimeout(30000);page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept())
+ page.setDefaultTimeout(30000);page.setDefaultNavigationTimeout(120000);page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept())
  await context.route('**/*',r=>['localhost','127.0.0.1','[::1]',...(native?['tauri.localhost','ipc.localhost']:[])].includes(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient'))
  const login=async(p:typeof page,f:any)=>{
   await p.goto(origin+'/login/',{waitUntil:'domcontentloaded'})

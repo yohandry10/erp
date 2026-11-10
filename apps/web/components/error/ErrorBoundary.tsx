@@ -1,6 +1,7 @@
 'use client'
 
 import React, { Component, ReactNode } from 'react'
+import * as Sentry from '@sentry/nextjs'
 
 interface ErrorBoundaryProps {
   children: ReactNode
@@ -50,8 +51,8 @@ export class GlobalErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoun
     console.error('🚨 Error capturado por Error Boundary:', error)
     console.error('📍 Información del error:', errorInfo)
 
-    // Opcional: Enviar error a servicio de monitoreo
-    // Ejemplo: trackError(error, errorInfo)
+    // The SDK sends only the error type and source location through our privacy filter.
+    if (Sentry.isInitialized()) Sentry.captureException(error)
   }
 
   handleReset = () => {

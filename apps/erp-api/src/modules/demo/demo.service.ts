@@ -373,6 +373,7 @@ export class DemoService {
     if (baseReadiness?.ready !== true) {
       throw new Error(`contrato base de demo incompleto: ${JSON.stringify(baseReadiness)}`);
     }
+    await this.reservarCorrelativoFacturaSemilla(tenantId);
 
     const { data: readiness, error: hrSeedError } = await this.adminClient.rpc(
       "hydrate_demo_hr_sample_tx",
@@ -1084,6 +1085,42 @@ export class DemoService {
   }
 
   /**
+   * La semilla empresarial crea la factura F001-00000001 sin pasar por la
+   * numeracion, asi que la serie quedaba en 0: la primera factura real de la
+   * demo volvia a pedir el 00000001 y chocaba con la semilla (409 "El documento
+   * fiscal existente no coincide con el CPE"). Se deja la serie en el ultimo
+   * numero ya usado, sin retroceder una serie que ya avanzo.
+   */
+  private async reservarCorrelativoFacturaSemilla(tenantId: string): Promise<void> {
+    const { data: serie, error } = await this.adminClient
+      .from("documento_series")
+      .select("id, correlativo_actual")
+      .eq("tenant_id", tenantId)
+      .eq("tipo_documento", "FACTURA")
+      .eq("serie", "F001")
+      .maybeSingle();
+    if (error) throw new Error(`documento_series lectura: ${error.message}`);
+    if (serie && Number(serie.correlativo_actual ?? 0) >= 1) return;
+    const { error: writeError } = serie
+      ? await this.adminClient
+          .from("documento_series")
+          .update({ correlativo_actual: 1, updated_at: new Date().toISOString() })
+          .eq("id", serie.id)
+          .eq("tenant_id", tenantId)
+      : await this.adminClient.from("documento_series").insert({
+          tenant_id: tenantId,
+          tipo_documento: "FACTURA",
+          serie: "F001",
+          correlativo_actual: 1,
+          correlativo_maximo: 99999999,
+          longitud_correlativo: 8,
+          activo: true,
+          estado: "ACTIVO",
+        });
+    if (writeError) throw new Error(`documento_series semilla: ${writeError.message}`);
+  }
+
+  /**
    * Sin una cuenta bancaria no hay tesoreria ni conciliacion posibles: la
    * pantalla de pagos no tiene donde cargar el egreso y la conciliacion no
    * tiene contra que cuadrar. Se siembra una en soles.
@@ -1107,8 +1144,11 @@ export class DemoService {
       moneda: country.moneda,
       // Saldo de apertura: sin fondos el control de sobregiro rechaza -con
       // razon- cualquier pago a proveedor, y el circuito de tesoreria queda sin
-      // poder demostrarse.
+      // poder demostrarse. Como no nace de un movimiento, es saldo inicial: la
+      // conciliacion calcula la apertura desde `saldo_inicial` (default 0) y,
+      // sin el, rechazaba cualquier extracto que abriera en 50000.
       saldo: 50000,
+      saldo_inicial: 50000,
       saldo_actual: 50000,
       saldo_contable: 50000,
       permite_sobregiro: false,

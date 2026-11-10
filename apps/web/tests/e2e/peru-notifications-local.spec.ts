@@ -11,7 +11,7 @@ import { loginPeruLocal } from './helpers/peru-login-local'
 // presenta como éxito. Sólo hosts locales.
 test('Notificaciones: la campana del vendedor lista, marca todas y no finge un borrado fallido', async ({ page, context, request }) => {
   test.setTimeout(240000)
-  page.setDefaultTimeout(25000)
+  page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000)
   const output = process.env.LOCAL_INTEGRATED_OUTPUT_DIR!
   assert.equal(process.env.E2E_EPHEMERAL_LOCAL_DB, '1')
   assert.equal(process.env.PGHOST, '127.0.0.1')

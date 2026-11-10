@@ -2595,7 +2595,7 @@ BEGIN
     OR (v_report#>>'{resumen,saldoValorizadoBase}')::numeric<>0 THEN RAISE EXCEPTION 'VERIFY_QUANTITY_REPORT_SUMMARY_ROUNDED'; END IF;
   FOR v_line IN SELECT value FROM jsonb_array_elements(v_report->'data') LOOP
     SELECT saldo INTO v_expected FROM (
-      SELECT movimiento_id,sum(cantidad_firmada) OVER (PARTITION BY producto_id,almacen_id ORDER BY fecha_recepcion,movimiento_id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS saldo
+      SELECT movimiento_id,sum(cantidad_firmada) OVER (PARTITION BY producto_id,almacen_id ORDER BY fecha_recepcion,CASE WHEN upper(referencia_tipo)='PRODUCTO_STOCK_INICIAL' THEN 0 ELSE 1 END,movimiento_id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS saldo
       FROM public.vw_kardex_valorizado WHERE tenant_id=v_t AND producto_id=v_p AND almacen_id=v_wh
     ) exacto WHERE movimiento_id=(v_line->>'id')::uuid;
     IF (v_line->>'saldoCantidadPosterior')::numeric IS DISTINCT FROM v_expected THEN RAISE EXCEPTION 'VERIFY_QUANTITY_REPORT_RUNNING_BALANCE_ROUNDED'; END IF;

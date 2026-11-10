@@ -18,6 +18,9 @@ export interface AppEnvironment {
   JWT_SECRET: string;
   JWT_REFRESH_SECRET: string;
   ENCRYPTION_KEY?: string;
+  PII_ENCRYPTION_KEY?: string;
+  PII_ENCRYPTION_KEY_OLD?: string;
+  PII_SEARCH_SALT?: string;
   DB_ENCRYPTION_KEY?: string;
   CERT_ENCRYPTION_KEY?: string;
   CERT_ENCRYPTION_KEY_OLD?: string;
@@ -50,6 +53,8 @@ export interface AppEnvironment {
   APP_VERSION?: string;
   APP_COMMIT_SHA?: string;
   APP_BUILD_DATE?: string;
+  SENTRY_DSN?: string;
+  SENTRY_ENVIRONMENT?: string;
   PFX_PATH?: string;
   PFX_PASS?: string;
   REQUIRE_REAL_FISCAL_CERTIFICATE?: boolean;
@@ -132,6 +137,9 @@ export const envSchema = Joi.object({
     Joi.string().min(32),
   ),
   ENCRYPTION_KEY: Joi.string().min(32).optional(),
+  PII_ENCRYPTION_KEY: Joi.string().allow('').min(32).optional(),
+  PII_ENCRYPTION_KEY_OLD: Joi.string().allow('').min(32).optional(),
+  PII_SEARCH_SALT: Joi.string().allow('').min(32).optional(),
   DB_ENCRYPTION_KEY: requiredInProduction(Joi.string().min(32)),
   CERT_ENCRYPTION_KEY: Joi.string().allow('').min(32).optional(),
   CERT_ENCRYPTION_KEY_OLD: Joi.string().allow('').min(32).optional(),
@@ -169,6 +177,8 @@ export const envSchema = Joi.object({
   }),
   APP_VERSION: Joi.string().max(100).optional(),
   APP_COMMIT_SHA: Joi.string().max(100).optional(),
+  SENTRY_DSN: Joi.string().pattern(/^https:\/\/[a-f0-9]{32}@o[0-9]+\.ingest(?:\.(?:us|de))?\.sentry\.io\/[0-9]+$/).optional(),
+  SENTRY_ENVIRONMENT: Joi.string().pattern(/^[a-z0-9._-]{1,40}$/).optional(),
   APP_BUILD_DATE: Joi.string().isoDate().optional(),
   PFX_PATH: Joi.string().allow('').optional(),
   PFX_PASS: Joi.string().allow('').min(8).optional(),

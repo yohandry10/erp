@@ -26,7 +26,7 @@ async function start(page: Page, context: BrowserContext, email = 'peru-integrat
   expect(process.env.E2E_EPHEMERAL_LOCAL_DB).toBe('1')
   expect(process.env.PGPORT).toBe('55456')
   expect(sql("SELECT current_database()||'|'||environment||'|'||project_ref FROM app.deployment_environment WHERE singleton")).toBe('erp_e2e|DEV|localerpephemeralqax')
-  page.setDefaultTimeout(30000)
+  page.setDefaultTimeout(30000);page.setDefaultNavigationTimeout(120000)
   page.on('pageerror', error => proof.page_errors.push(error.message))
   await context.route('**/*', route => ['127.0.0.1','localhost','[::1]'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort())
   return loginPeruLocal(page, email, 'Local-Peru-2026-Only!')

@@ -3,6 +3,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useApiCall } from '@/hooks/use-api'
 import { customAuth } from '@/lib/auth-service'
+import { useAuth } from '@/contexts/AuthContext'
+import { AnalyticsData, EMPTY_ANALYTICS_DATA, analyticsCurrencies, selectAnalyticsCurrency, readAnalyticsPayload, analyticsCsv } from '@/lib/analytics-native-view'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -43,17 +45,6 @@ import {
 // DESIGN TOKENS
 // ============================================================================
 
-// La clave del snapshot lleva el tenant. Con una clave global, al cerrar una
-// empresa y entrar a otra en la misma pestaña el panel pintaba las cifras de la
-// anterior hasta que llegaba la respuesta nueva: ventas, deuda de clientes y de
-// proveedores de un tenant mostradas dentro de otro.
-const ANALYTICS_CACHE_PREFIX = 'erp-analytics-dashboard-snapshot'
-
-const analyticsCacheKey = () => {
-  const tenantId = customAuth.getCachedSession().session?.user?.tenant_id
-  return tenantId ? `${ANALYTICS_CACHE_PREFIX}:${tenantId}` : null
-}
-
 const PALETTE = {
   primary: '#22d3ee',     // cyan-400 — ventas / cobrar
   secondary: '#a78bfa',   // violet-400 — comparativos
@@ -84,66 +75,11 @@ const inputClass =
 // TYPES & STORAGE
 // ============================================================================
 
-type AnalyticsData = {
-  ventasTiempo: any
-  deudasClientes: any
-  deudasProveedores: any
-  ventasCategoria: any
-  kpisVisuales: any
-}
-
-const EMPTY_ANALYTICS_DATA: AnalyticsData = {
-  ventasTiempo: null,
-  deudasClientes: null,
-  deudasProveedores: null,
-  ventasCategoria: null,
-  kpisVisuales: null,
-}
-
-const hasAnalyticsData = (data: AnalyticsData) =>
-  Boolean(
-    data.ventasTiempo ||
-      data.deudasClientes ||
-      data.deudasProveedores ||
-      data.ventasCategoria ||
-      data.kpisVisuales,
-  )
-
-const getCachedAnalytics = (): AnalyticsData => {
-  if (typeof window === 'undefined') return EMPTY_ANALYTICS_DATA
-  try {
-    // Sin tenant resuelto no se lee nada: es preferible el panel vacío un instante
-    // a mostrar cifras que podrían ser de otra empresa.
-    const clave = analyticsCacheKey()
-    if (!clave) return EMPTY_ANALYTICS_DATA
-
-    // Se retira el snapshot antiguo sin tenant, que quedó de la clave global.
-    window.localStorage.removeItem(ANALYTICS_CACHE_PREFIX)
-
-    const raw = window.localStorage.getItem(clave)
-    if (!raw) return EMPTY_ANALYTICS_DATA
-    return { ...EMPTY_ANALYTICS_DATA, ...JSON.parse(raw) }
-  } catch {
-    return EMPTY_ANALYTICS_DATA
-  }
-}
-
-const cacheAnalytics = (data: AnalyticsData) => {
-  if (typeof window === 'undefined') return
-  try {
-    const clave = analyticsCacheKey()
-    if (!clave) return
-    window.localStorage.setItem(clave, JSON.stringify(data))
-  } catch {
-    /* ignore */
-  }
-}
-
 // ============================================================================
 // METRIC TILES (top KPI strip — reemplaza las gauges)
 // ============================================================================
 
-type Kpi = { valor?: number; objetivo?: number; estado?: string }
+type Kpi = { valor?: number | null; objetivo?: number; estado?: string }
 
 const estadoMeta = (estado?: string) => {
   const e = (estado || '').toUpperCase()
@@ -207,7 +143,7 @@ function MetricTile({
   const meta = estadoMeta(data?.estado)
   const Icon = meta.icon
   const cls = toneClasses[meta.tone]
-  const noData = !data || data.valor === undefined
+  const noData = !data || data.valor == null || !Number.isFinite(data.valor)
 
   const formatNumber = (n: number) =>
     format === 'percentage' ? `${n.toFixed(1)}%` : n.toFixed(2)
@@ -356,7 +292,9 @@ function ChartEmptyState({
 function SalesEvolutionChart({
   data,
   totales,
+  currency,
 }: {
+  currency: string
   data?: { labels?: string[]; datasets?: any[] }
   totales?: any
 }) {
@@ -364,7 +302,7 @@ function SalesEvolutionChart({
   const money = (value: number) =>
     new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: country.moneda || 'PEN',
+      currency, currencyDisplay: 'code',
     }).format(value)
   const labels = data?.labels || []
   const values: number[] = data?.datasets?.[0]?.data || []
@@ -520,12 +458,12 @@ function StatChip({
 // CATEGORY RANK LIST — reemplaza el donut por barra horizontal rankeable
 // ============================================================================
 
-function CategoryRankList({ data }: { data?: { labels?: string[]; data?: number[] } }) {
+function CategoryRankList({ data, currency }: { currency: string; data?: { labels?: string[]; data?: number[] } }) {
   const country = useCountryContext()
   const money = (value: number) =>
     new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: country.moneda || 'PEN',
+      currency, currencyDisplay: 'code',
     }).format(value)
   const rawLabels = data?.labels || []
   const rawValues = (data?.data || []).map((v: any) => Number(v) || 0)
@@ -647,7 +585,9 @@ function CategoryRankList({ data }: { data?: { labels?: string[]; data?: number[
 function AgingComposite({
   deudasClientes,
   deudasProveedores,
+  currency,
 }: {
+  currency: string
   deudasClientes?: any
   deudasProveedores?: any
 }) {
@@ -655,7 +595,7 @@ function AgingComposite({
   const money = (value: number) =>
     new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: country.moneda || 'PEN',
+      currency, currencyDisplay: 'code',
     }).format(value)
   const arData = deudasClientes?.graficoEdadSaldos
   const apData = deudasProveedores?.graficoEdadSaldos
@@ -924,7 +864,14 @@ export default function AnalyticsPage() {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData>(EMPTY_ANALYTICS_DATA)
   const [hasLoaded, setHasLoaded] = useState(false)
   const [isHydrated, setIsHydrated] = useState(false)
-  const [, setIsRefreshing] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [selectedCurrency, setSelectedCurrency] = useState('')
+  const [loadedScope, setLoadedScope] = useState('')
+  const [loadedQuery, setLoadedQuery] = useState('')
+  const requestId = useRef(0)
+  const { user } = useAuth()
+  const scope = user ? user.tenant_id + ':' + user.id : ''
+  const country = useCountryContext()
   const [periodo, setPeriodo] = useState('mensual')
   const [fechaDesde, setFechaDesde] = useState('')
   const [fechaHasta, setFechaHasta] = useState('')
@@ -933,11 +880,25 @@ export default function AnalyticsPage() {
   const rangoAplicadoRef = useRef({ desde: '', hasta: '' })
   const [error, setError] = useState<string | null>(null)
 
-  const { get } = useApiCall({ throwOnError: true, showErrorToast: false, retries: 1, timeoutMs: 15000 })
-  const { ventasTiempo, deudasClientes, deudasProveedores, ventasCategoria, kpisVisuales } = analyticsData
+  const { get } = useApiCall({ throwOnError: true, requireLive: true, showErrorToast: false, retries: 1, timeoutMs: 15000 })
+  const currencies = analyticsCurrencies(analyticsData)
+  const currency = currencies.includes(selectedCurrency) ? selectedCurrency : currencies.includes(country.moneda) ? country.moneda : currencies[0] || ''
+  const queryKey = [scope, periodo, fechaDesdeAplicada, fechaHastaAplicada].join('|')
+  const isCurrent = loadedScope === scope && loadedQuery === queryKey
+  const visibleData = isCurrent ? selectAnalyticsCurrency(analyticsData, currency) : EMPTY_ANALYTICS_DATA
+  const { ventasTiempo, deudasClientes, deudasProveedores, ventasCategoria, kpisVisuales } = visibleData
+  const ready = hasLoaded && !isRefreshing && !error && isCurrent && Boolean(currency)
 
   const cargarDatos = useCallback(async () => {
+    const currentRequest = ++requestId.current
+    const currentScope = () => {
+      const actor = customAuth.getCachedSession().session?.user
+      return actor ? actor.tenant_id + ':' + actor.id : ''
+    }
+    if (!scope || currentScope() !== scope) return
     setIsRefreshing(true)
+    setHasLoaded(false)
+    setAnalyticsData(EMPTY_ANALYTICS_DATA)
     try {
       setError(null)
       const fechaQuery = fechaDesdeAplicada || fechaHastaAplicada
@@ -954,67 +915,51 @@ export default function AnalyticsPage() {
         get(`/api/analytics/ventas-tiempo?${fechaQuery}`),
         get('/api/analytics/deudas-clientes'),
         get('/api/analytics/deudas-proveedores'),
-        get('/api/analytics/ventas-categoria'),
+        get(`/api/analytics/ventas-categoria?${fechaQuery}`),
         get('/api/analytics/kpis-visuales'),
       ])
 
-      const unwrap = (result: PromiseSettledResult<any>) =>
-        result.status === 'fulfilled' && result.value?.success ? result.value.data ?? null : null
-
+      if (currentRequest !== requestId.current || currentScope() !== scope) return
       const nextData: AnalyticsData = {
-        ventasTiempo: unwrap(ventasResponse),
-        deudasClientes: unwrap(deudasClientesResponse),
-        deudasProveedores: unwrap(deudasProveedoresResponse),
-        ventasCategoria: unwrap(ventasCategoriaResponse),
-        kpisVisuales: unwrap(kpisResponse),
+        ventasTiempo: readAnalyticsPayload(ventasResponse, 'ventasTiempo'),
+        deudasClientes: readAnalyticsPayload(deudasClientesResponse, 'deudasClientes'),
+        deudasProveedores: readAnalyticsPayload(deudasProveedoresResponse, 'deudasProveedores'),
+        ventasCategoria: readAnalyticsPayload(ventasCategoriaResponse, 'ventasCategoria'),
+        kpisVisuales: readAnalyticsPayload(kpisResponse, 'kpisVisuales'),
       }
-
       setAnalyticsData(nextData)
+      setLoadedScope(scope)
+      setLoadedQuery(queryKey)
       setHasLoaded(true)
-      cacheAnalytics(nextData)
     } catch (error) {
+      if (currentRequest !== requestId.current || currentScope() !== scope) return
+      setAnalyticsData(EMPTY_ANALYTICS_DATA)
       setError(error instanceof Error ? error.message : 'Error cargando analytics')
       setHasLoaded(true)
     } finally {
-      setIsRefreshing(false)
+      if (currentRequest === requestId.current && currentScope() === scope) setIsRefreshing(false)
     }
-  }, [get, periodo, fechaDesdeAplicada, fechaHastaAplicada])
+  }, [get, periodo, fechaDesdeAplicada, fechaHastaAplicada, scope, queryKey])
 
   useEffect(() => {
     setIsHydrated(true)
   }, [])
 
   useEffect(() => {
-    const cached = getCachedAnalytics()
-    if (hasAnalyticsData(cached)) {
-      setAnalyticsData(cached)
-      setHasLoaded(true)
-    }
-  }, [])
-
-  useEffect(() => {
+    // Los snapshots financieros antiguos no verificaban moneda ni fechas.
+    window.localStorage.removeItem('erp-analytics-dashboard-snapshot')
+    if (user?.tenant_id) window.localStorage.removeItem('erp-analytics-dashboard-snapshot:' + user.tenant_id)
     cargarDatos()
-  }, [cargarDatos])
+    return () => { requestId.current += 1 }
+  }, [cargarDatos, user?.tenant_id])
 
   const exportarCsv = () => {
     // El usuario puede exportar inmediatamente después de pulsar "Aplicar".
     // El ref se actualiza de forma síncrona y evita leer el render anterior de
     // React (que producía analytics_mensual_actual.csv).
     const { desde, hasta } = rangoAplicadoRef.current
-    const filas = [
-      ['metrica', 'valor'],
-      ['ventas_actuales', analyticsData.ventasTiempo?.totales?.ventasActuales ?? 0],
-      ['ventas_periodo_anterior', ventasTiempo?.totales?.ventasAnterior ?? 0],
-      ['cxc_total', deudasClientes?.totales?.totalPorCobrar ?? 0],
-      ['cxc_vencido', deudasClientes?.totales?.vencido ?? 0],
-      ['cxp_total', deudasProveedores?.totales?.totalPorPagar ?? 0],
-      ['cxp_vencido', deudasProveedores?.totales?.vencido ?? 0],
-      ['liquidez', kpisVisuales?.liquidez?.valor ?? 0],
-      ['rentabilidad', kpisVisuales?.rentabilidad?.valor ?? 0],
-    ]
-    const csv = filas
-      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-      .join('\n')
+    if (!ready || desde !== fechaDesdeAplicada || hasta !== fechaHastaAplicada) return
+    const csv = analyticsCsv(analyticsData, currency)
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -1054,9 +999,13 @@ export default function AnalyticsPage() {
   return (
     <PageShell
       title="Analytics Financiero"
-      description="Indicadores gerenciales, cuentas por cobrar, cuentas por pagar y tendencias del periodo."
+      description="Importes originales separados por moneda, sin conversión. Ventas y categorías usan el período elegido; la cartera es actual y los indicadores cubren los últimos 30 días."
       actions={
         <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 xl:flex xl:w-auto xl:items-center">
+          <select aria-label="Moneda" value={currency} disabled={!ready} onChange={event => setSelectedCurrency(event.target.value)} className={inputClass}>
+            {!currency && <option value="">Moneda</option>}
+            {currencies.map(code => <option key={code} value={code}>{code}</option>)}
+          </select>
           <select aria-label="Periodo"
             disabled={!isHydrated}
             value={periodo}
@@ -1099,7 +1048,7 @@ export default function AnalyticsPage() {
           <Button className="min-w-0" disabled={!isHydrated} variant="secondary" onClick={limpiarFiltrosFecha}>
             Limpiar
           </Button>
-          <Button className="col-span-2 min-w-0 sm:col-span-1" disabled={!isHydrated} onClick={exportarCsv}>
+          <Button className="col-span-2 min-w-0 sm:col-span-1" disabled={!isHydrated || !ready} onClick={exportarCsv}>
             Exportar CSV
           </Button>
         </div>
@@ -1107,10 +1056,14 @@ export default function AnalyticsPage() {
     >
       {error && (
         <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>{error} <Button variant="secondary" onClick={cargarDatos}>Reintentar</Button></AlertDescription>
         </Alert>
       )}
 
+      {!error && (!hasLoaded || Boolean(currency)) && <>
+      {ready && (!kpisVisuales || analyticsData.kpisVisuales?.disponible === false) && (
+        <Alert><AlertDescription>{analyticsData.kpisVisuales?.motivo || 'Los indicadores contables no están disponibles en la moneda seleccionada.'}</AlertDescription></Alert>
+      )}
       {/* ─── KPI STRIP ─────────────────────────────────────────────────── */}
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {!hasLoaded && !kpisVisuales ? (
@@ -1128,10 +1081,10 @@ export default function AnalyticsPage() {
               aviso="Razón corriente: activo corriente (bancos + cuentas por cobrar + inventario valorizado) entre pasivo corriente (cuentas por pagar)."
             />
             <MetricTile
-              label="Rentabilidad"
+              label="Margen aproximado"
               data={kpisVisuales?.rentabilidad}
               format="percentage"
-              aviso="Margen neto: ventas del periodo menos costo de ventas y gastos, sobre ventas. El costo usa el valor actual del producto, no un costeo por capas."
+              aviso="Estimación con ventas brutas del periodo, gastos y costo actual del catálogo en una sola moneda. Requiere líneas con costo verificable; consulte el estado de resultados para el margen contable."
             />
             <MetricTile label="Crecimiento" data={kpisVisuales?.crecimiento} format="percentage" />
             <EfficiencyTile data={kpisVisuales?.eficiencia} />
@@ -1142,30 +1095,32 @@ export default function AnalyticsPage() {
       {/* ─── ROW: SALES EVOLUTION (2/3) + CATEGORY RANK (1/3) ─────────── */}
       <section className="grid gap-3 xl:grid-cols-3">
         <div className="xl:col-span-2">
-          {!hasLoaded ? (
+          {!hasLoaded || !isCurrent ? (
             <ChartCardSkeleton height={440} />
           ) : (
-            <SalesEvolutionChart data={ventasTiempo} totales={ventasTiempo?.totales} />
+            <SalesEvolutionChart data={ventasTiempo} totales={ventasTiempo?.totales} currency={currency} />
           )}
         </div>
         <div>
-          {!hasLoaded ? (
+          {!hasLoaded || !isCurrent ? (
             <ChartCardSkeleton height={440} />
           ) : (
-            <CategoryRankList data={ventasCategoria?.graficoPie} />
+            <CategoryRankList data={ventasCategoria?.graficoPie} currency={currency} />
           )}
         </div>
       </section>
 
       {/* ─── AGING COMPOSITE (full width) ─────────────────────────────── */}
       <section>
-        {!hasLoaded ? (
+        {!hasLoaded || !isCurrent ? (
           <ChartCardSkeleton height={460} />
         ) : (
-          <AgingComposite deudasClientes={deudasClientes} deudasProveedores={deudasProveedores} />
+          <AgingComposite deudasClientes={deudasClientes} deudasProveedores={deudasProveedores} currency={currency} />
         )}
       </section>
 
+      </>}
+      {!error && hasLoaded && !currency && <Alert><AlertDescription>No hay movimientos con una moneda confirmada para mostrar. {analyticsData.kpisVisuales?.motivo}</AlertDescription></Alert>}
       {/* ─── INSIGHTS FOOTER ──────────────────────────────────────────── */}
       <section className="grid gap-3 lg:grid-cols-3">
         <InsightCard

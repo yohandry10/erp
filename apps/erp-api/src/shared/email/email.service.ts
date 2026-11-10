@@ -14,6 +14,7 @@ import {
   generateUserActivationEmail,
   UserActivationTemplateData
 } from './templates/user-activation.template';
+import { escapeHtml, escapeUrl } from './templates/sanitize';
 
 @Injectable()
 export class EmailService {
@@ -302,24 +303,24 @@ export class EmailService {
       <h1>✅ Contraseña Actualizada</h1>
     </div>
     <div class="content">
-      <h2>Hola ${recipientName},</h2>
+      <h2>Hola ${escapeHtml(recipientName)},</h2>
       <div class="success-box">
         <p>✓ Tu contraseña ha sido actualizada exitosamente.</p>
       </div>
-      <p>Tu cuenta de ${appName} ahora está protegida con tu nueva contraseña.</p>
+      <p>Tu cuenta de ${escapeHtml(appName)} ahora está protegida con tu nueva contraseña.</p>
       <p><strong>Detalles del cambio:</strong></p>
       <ul>
         <li>Fecha y hora: ${new Date().toLocaleString('es-ES', { timeZone: 'America/Lima' })}</li>
-        <li>IP del dispositivo: ${clientIp || 'No disponible'}</li>
+        <li>IP del dispositivo: ${escapeHtml(clientIp || 'No disponible')}</li>
       </ul>
       <div class="warning-box">
         <p>⚠️ <strong>¿No fuiste tú?</strong><br>
-        Si no realizaste este cambio, tu cuenta puede haber sido comprometida. Contacta inmediatamente a <a href="mailto:${supportEmail}">${supportEmail}</a></p>
+        Si no realizaste este cambio, tu cuenta puede haber sido comprometida. Contacta inmediatamente a <a href="${escapeUrl(`mailto:${supportEmail}`)}">${escapeHtml(supportEmail)}</a></p>
       </div>
     </div>
     <div class="footer">
-      <p>© ${new Date().getFullYear()} ${appName}. Todos los derechos reservados.</p>
-      <p><a href="${appUrl}">${appUrl}</a></p>
+      <p>© ${new Date().getFullYear()} ${escapeHtml(appName)}. Todos los derechos reservados.</p>
+      <p><a href="${escapeUrl(appUrl)}">${escapeHtml(appUrl)}</a></p>
     </div>
   </div>
 </body>

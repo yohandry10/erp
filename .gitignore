@@ -69,6 +69,9 @@ artifacts/exportaciones/
 artifacts/**/*.local.json
 artifacts/peru-uat-before-*.patch
 backups/*.dump
+backups/**/*.sql
+artifacts/producto/*.zip
+artifacts/repo-publication-*/
 
 # Cobertura y accesos directos locales generados.
 coverage/

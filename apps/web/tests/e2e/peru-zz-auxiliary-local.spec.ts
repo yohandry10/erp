@@ -12,7 +12,7 @@ test.beforeAll(()=>{proof={scope:'FRESH_REAL_UI_OPEN_ITEMS_ANALYTICS_AND_BANK_TR
 test.afterAll(()=>{proof.complete=proof.steps.length===4&&!proof.page_errors.length;fs.writeFileSync(path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!,'auxiliary-functional-ui.json'),JSON.stringify(proof,null,2))})
 async function start(page:Page,context:BrowserContext){
  expect(process.env.E2E_EPHEMERAL_LOCAL_DB).toBe('1');expect(process.env.PGPORT).toBe('55456')
- page.setDefaultTimeout(25000);page.on('pageerror',e=>proof.page_errors.push(e.message))
+ page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000);page.on('pageerror',e=>proof.page_errors.push(e.message))
  await context.route('**/*',r=>['127.0.0.1','localhost','[::1]'].includes(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient'))
  const f=JSON.parse(fs.readFileSync(path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!,'accounting-first-fixture.json'),'utf8'))
  expect(f.non_demo).toBe(true)

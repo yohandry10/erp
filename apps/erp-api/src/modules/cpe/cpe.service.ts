@@ -15,6 +15,7 @@ import { PdfGeneratorService } from './pdf-generator.service';
 import { FiscalAdapterService } from './fiscal-adapter.service';
 import { CpeXmlBuilder } from './cpe-xml.builder';
 import { sunatOperation } from '../../shared/utils/sunat-operation.util';
+import { cpeAccountingAmounts } from '../../shared/utils/cpe-accounting-currency.util';
 import { SucursalesService } from '../sucursales/sucursales.service';
 import { CpeCertificateService } from './cpe-certificate.service';
 import { CpeReportingService } from './cpe-reporting.service';
@@ -2115,6 +2116,17 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
         const tipoCambio = String(createFacturaDto.moneda ?? monedaFuncional).toUpperCase() === monedaFuncional
           ? 1
           : Number((createFacturaDto as any).tipo_cambio ?? 0);
+
+        if (paisCodigo === 'PE') {
+          try {
+            cpeAccountingAmounts({ moneda: createFacturaDto.moneda ?? monedaFuncional,
+              tipoCambio, subtotal, impuestos: this.roundAtomicMoney(totalIgv + totalIsc), total,
+              ajustes: { retencion: cxc?.retencion_total ?? 0, percepcion: cxc?.percepcion_total ?? 0,
+                detraccion: cxc?.detraccion_total ?? 0, anticipo: cxc?.anticipo_total ?? 0 } });
+          } catch (error) {
+            throw new BadRequestException(error.message);
+          }
+        }
 
         const pedidoId = pedidoFiscalOwnerId
           || (paisCodigo === 'CO' ? null : (createFacturaDto as any).pedido_id ?? null);

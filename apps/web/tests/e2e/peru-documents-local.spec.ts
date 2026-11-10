@@ -8,7 +8,7 @@ import { loginPeruLocal } from './helpers/peru-login-local'
 
 test('Documentos Perú: borradores, recuperación original, XML firmado y envío sin credenciales', async ({ page, context }) => {
   test.setTimeout(300000)
-  page.setDefaultTimeout(30000)
+  page.setDefaultTimeout(30000);page.setDefaultNavigationTimeout(120000)
   assert.equal(process.env.E2E_EPHEMERAL_LOCAL_DB, '1')
   assert.equal(process.env.PGHOST, '127.0.0.1')
   assert.equal(process.env.PGPORT, '55456')

@@ -1,4 +1,5 @@
 'use client'
+import { manualJournalError } from '@/lib/contabilidad/manual-journal-error'
 
 import { requestConfirmation } from '@/lib/confirm-action'
 import { useState, useCallback, useEffect, useRef } from 'react'
@@ -93,7 +94,7 @@ export default function NuevoAsientoPage() {
       }
     } catch (err: any) {
       console.error('Error creating asiento:', err)
-      setError(err.message || 'Error al crear el asiento contable')
+      setError(manualJournalError(err))
     } finally {
       setLoading(false)
     }

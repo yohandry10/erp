@@ -3,6 +3,7 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 type PageShellProps = {
+  as?: "div" | "main"
   title: React.ReactNode
   description?: React.ReactNode
   actions?: React.ReactNode
@@ -11,6 +12,7 @@ type PageShellProps = {
 }
 
 export function PageShell({
+  as: Root = "div",
   title,
   description,
   actions,
@@ -18,7 +20,7 @@ export function PageShell({
   className,
 }: PageShellProps) {
   return (
-    <main
+    <Root
       className={cn(
         "mx-auto w-full max-w-[1600px] space-y-5 p-4 text-foreground group-data-[erp-theme=light]/dashboard:text-foreground md:p-6",
         className,
@@ -27,7 +29,7 @@ export function PageShell({
       <header className="rounded-3xl border border-cyan-400/20 bg-card/80 p-5 shadow-2xl shadow-blue-950/30 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-white/90 group-data-[erp-theme=light]/dashboard:shadow-slate-200/70">
         <div className="flex flex-col gap-4">
           <div className="min-w-0">
-            <h1 className="text-2xl font-black tracking-normal text-white group-data-[erp-theme=light]/dashboard:text-foreground md:text-3xl">
+            <h1 className="text-2xl font-black tracking-normal text-foreground md:text-3xl">
               {title}
             </h1>
             {description ? (
@@ -40,6 +42,6 @@ export function PageShell({
         </div>
       </header>
       {children}
-    </main>
+    </Root>
   )
 }

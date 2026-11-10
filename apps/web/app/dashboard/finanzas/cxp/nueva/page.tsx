@@ -8,7 +8,7 @@ import { useApi } from '@/hooks/use-api'
 import { useAuth } from '@/contexts/AuthContext'
 import { readInvoiceReceipts, readInvoiceSuppliers, type InvoiceReceipt as Recepcion, type InvoiceSupplier as Proveedor } from '@/lib/finanzas/supplier-invoice-catalog'
 import { readInvoiceRegistration } from '@/lib/finanzas/supplier-invoice-registration'
-import { readSupplierInvoiceIntent, supplierInvoiceIntentKey, type SupplierInvoiceIntent } from '@/lib/finanzas/supplier-invoice-intent'
+import { readSupplierInvoiceIntent, supplierInvoiceIntentKey, validateSupplierInvoiceAmounts, releaseRejectedSupplierInvoiceIntent, type SupplierInvoiceIntent } from '@/lib/finanzas/supplier-invoice-intent'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -304,6 +304,7 @@ export default function NuevaCuentaPorPagarPage() {
     const submittedScope = activeScope.current
     const submittedEpoch = ++registrationEpoch.current
     const current = () => activeScope.current === submittedScope && registrationEpoch.current === submittedEpoch
+    let submittedIntent = pendingIntent
     try {
       const payload = {
         proveedor_id: form.proveedor_id,
@@ -338,6 +339,7 @@ export default function NuevaCuentaPorPagarPage() {
         } : {}),
       }
       const scope = { tenantId, actorId }
+      if (!pendingIntent) validateSupplierInvoiceAmounts(payload)
       let intent: SupplierInvoiceIntent | null = null
       let storageKey = ''
       if (!esNotaCredito) {
@@ -354,6 +356,7 @@ export default function NuevaCuentaPorPagarPage() {
         setPendingIntent(intent)
       }
       const requestPayload = intent?.payload || payload
+      submittedIntent = intent
       const response = await (esNotaCredito ? post : postInvoice)('/api/finanzas/cxp', requestPayload)
       if (!current()) return
       const receipt = esNotaCredito
@@ -369,8 +372,17 @@ export default function NuevaCuentaPorPagarPage() {
       router.push(`/dashboard/finanzas/cxp/${receipt.id}`)
     } catch (error: any) {
       if (!current()) return
-      setRegistroError(error?.message || 'No se pudo registrar la factura del proveedor')
-      toast.error(error?.message || 'No se pudo registrar la factura del proveedor')
+      if (submittedIntent) {
+        try {
+          if (releaseRejectedSupplierInvoiceIntent(error, submittedIntent, localStorage)) setPendingIntent(null)
+        } catch { /* Si el almacenamiento falla se mantiene el bloqueo y la intención. */ }
+      }
+      const rawMessage = error?.message || 'No se pudo registrar la factura del proveedor'
+      const message = /signal is aborted|failed to fetch|networkerror|load failed|network request failed/i.test(rawMessage)
+        ? 'No se recibió la confirmación del servidor. Se conservan los datos. Usa «Reintentar registro pendiente» para recuperar el mismo documento sin duplicarlo.'
+        : rawMessage
+      setRegistroError(message)
+      toast.error(message)
     } finally {
       if (current()) setSaving(false)
     }

@@ -29,6 +29,7 @@ import type { ActiveCountryCode } from '@/lib/initial-country';
 type DemoCredentials = {
   email: string;
   password: string;
+  aprobador?: { email: string; password: string };
 };
 
 const BUSINESS_SECTORS = [
@@ -174,7 +175,9 @@ export default function DemoPage() {
       await signIn(data.email, data.password);
       window.sessionStorage.removeItem(intentStorageKey);
       localStorage.setItem('selectedCountry', String(selectedCountry.id));
-      setCredentials({ email: data.email, password: data.password });
+      setCredentials({ email: data.email, password: data.password,
+        aprobador: data.aprobador_email && data.aprobador_password
+          ? { email: data.aprobador_email, password: data.aprobador_password } : undefined });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al crear la demo');
     } finally {
@@ -207,9 +210,16 @@ export default function DemoPage() {
             </p>
 
             <div className="mt-8 space-y-4 rounded-lg border border-blue-100 bg-blue-50 p-5">
+              <h2 className="font-semibold text-blue-950">Usuario principal</h2>
               <CredentialRow label="Email" value={credentials.email} onCopy={copyToClipboard} />
               <CredentialRow label="Contrasena" value={credentials.password} onCopy={copyToClipboard} />
             </div>
+            {credentials.aprobador && <div className="mt-4 space-y-4 rounded-lg border border-blue-100 bg-blue-50 p-5">
+              <h2 className="font-semibold text-blue-950">Segundo usuario: aprobador</h2>
+              <p className="text-sm text-blue-950">Para aprobar una orden creada por el usuario principal, cierra su sesión y entra con este acceso. Nadie puede aprobar su propia orden.</p>
+              <CredentialRow label="Email del aprobador" value={credentials.aprobador.email} onCopy={copyToClipboard} />
+              <CredentialRow label="Contraseña del aprobador" value={credentials.aprobador.password} onCopy={copyToClipboard} />
+            </div>}
 
             <button
               onClick={handleContinue}

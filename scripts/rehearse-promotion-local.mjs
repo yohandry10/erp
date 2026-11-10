@@ -49,7 +49,7 @@ const migraciones = fs.readdirSync(dirMigraciones)
   .filter((f) => /^\d+__.*\.sql$/.test(f))
   .map((f) => ({ version: Number(f.split('__')[0]), archivo: f }))
   .sort((a, b) => a.version - b.version);
-const cuerpo = (archivo) => fs.readFileSync(path.join(dirMigraciones, archivo), 'utf8').replace(/^﻿/, '');
+const cuerpo = (archivo) => fs.readFileSync(path.join(dirMigraciones, archivo), 'utf8').replace(/^﻿/, '').replace(/\r\n/g, '\n');
 const sello = ({ version, archivo }) => `INSERT INTO supabase_migrations.schema_migrations(version,statements,name) VALUES('${version}',ARRAY['Ensayo de promoción de ${archivo}'],'${archivo.replace(/^\d+__/, '').replace(/\.sql$/, '')}');`;
 
 const columnasActuales = () => JSON.parse(sql(consultaColumnas));
@@ -156,7 +156,7 @@ try {
   informe.verificadores = [];
   const verificar = (m) => {
     const archivo = fs.readdirSync(dirVerificadores).find((f) => f.startsWith(`${m.version}__`));
-    const r = sqlCrudo(fs.readFileSync(path.join(dirVerificadores, archivo), 'utf8'));
+    const r = sqlCrudo(fs.readFileSync(path.join(dirVerificadores, archivo), 'utf8').replace(/\r\n/g, '\n'));
     return { version: m.version, ok: r.status === 0, error: r.status === 0 ? null : (r.stderr.split('\n').find((l) => /ERROR|FATAL/.test(l)) || r.stderr).slice(0, 300) };
   };
   const delLote = lote.migraciones.map((archivo) => ({ version: Number(archivo.split('__')[0]) }));

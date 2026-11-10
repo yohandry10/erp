@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, ConflictException, ServiceUnavailableException, Logger } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
+import Decimal from 'decimal.js';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CpeService } from '../../cpe/cpe.service';
 import { ValidationService } from '../../validations/validation.service';
@@ -663,6 +664,41 @@ export class CPEIntegrationService {
   }
 
   /**
+   * Conserva el IGV comercial de cabecera al expresarlo en centavos por línea.
+   * Los mayores restos reciben primero el centavo; los empates conservan el
+   * orden del snapshot. Nunca asigna residuo a una operación no gravada.
+   */
+  private distribuirCentavosIgv(items: ItemFacturaDto[], totalIgv: number, tasa: number): void {
+    const target = new Decimal(totalIgv).times(100);
+    const lines = items.map((item, index) => {
+      const exact = esGravado(item.tipo_afectacion_igv)
+        ? new Decimal(item.valor_venta).times(tasa).times(100)
+        : new Decimal(0);
+      if (!exact.isFinite() || exact.isNegative()) {
+        throw new BadRequestException('El pedido contiene una base de IGV inválida; revise sus líneas antes de facturar.');
+      }
+      // SUNAT3111 exige importe positivo cuando la base gravada supera0.06.
+      const cents = esGravado(item.tipo_afectacion_igv) && new Decimal(item.valor_venta).gt('.06')
+        ? Decimal.max(exact.floor(), 1)
+        : exact.floor();
+      return { index, cents, remainder: exact.minus(cents) };
+    });
+    const residue = target.minus(lines.reduce((sum, line) => sum.plus(line.cents), new Decimal(0)));
+    const eligible = lines.filter(line => line.remainder.gt(0))
+      .sort((a, b) => b.remainder.comparedTo(a.remainder) || a.index - b.index);
+    if (!target.isInteger() || !residue.isInteger() || residue.isNegative() || residue.gt(eligible.length)) {
+      throw new BadRequestException('El IGV del pedido no se puede conciliar con sus líneas; revise los importes antes de facturar.');
+    }
+    for (let n = 0; n < residue.toNumber(); n += 1) eligible[n].cents = eligible[n].cents.plus(1);
+    for (const line of lines) {
+      const item = items[line.index];
+      item.igv = line.cents.div(100).toNumber();
+      item.precio_venta = new Decimal(item.valor_venta).plus(item.igv).div(item.cantidad).toNumber();
+      (item as ItemFacturaDto & { tasa_igv: number }).tasa_igv = tasa;
+    }
+  }
+
+  /**
    * Mapea datos del pedido al formato CPE
    * Requirements: 10.2, 15.3
    */
@@ -755,6 +791,10 @@ export class CPEIntegrationService {
       })),
       tasaIgv,
     );
+
+    if (countryCode === 'PE') {
+      this.distribuirCentavosIgv(items, desgloseIgv.igv, tasaIgv);
+    }
 
     const numeroDocumentoCliente = this.resolverDocumentoCliente(cliente);
 

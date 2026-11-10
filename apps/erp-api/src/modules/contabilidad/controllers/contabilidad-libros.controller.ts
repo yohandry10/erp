@@ -719,7 +719,7 @@ export class ContabilidadLibrosController {
         };
       }
 
-      const exportador = exportadores[libro];
+      const exportador = Object.prototype.hasOwnProperty.call(exportadores, libro) ? exportadores[libro] : undefined;
       if (!exportador) {
         return {
           success: false,

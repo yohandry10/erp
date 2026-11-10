@@ -180,6 +180,33 @@ describe('EmailService', () => {
   });
 
   describe('sendPasswordResetConfirmationEmail', () => {
+    it.each([
+      { field: 'recipientName', payload: '<img src=x onerror="alert(1)"> & \'Ana\'', encoded: '&lt;img src=x onerror=&quot;alert(1)&quot;&gt; &amp; &#39;Ana&#39;' },
+      { field: 'clientIp', payload: '</li><script>alert(1)</script>', encoded: '&lt;/li&gt;&lt;script&gt;alert(1)&lt;/script&gt;' },
+      { field: 'APP_NAME', payload: '<svg/onload=alert(1)>', encoded: '&lt;svg/onload=alert(1)&gt;' },
+      { field: 'SUPPORT_EMAIL', payload: 'support@example.invalid" onclick="alert(1)', encoded: 'support@example.invalid&quot; onclick=&quot;alert(1)' },
+    ])('treats $field as text in confirmation HTML and preserves plain text', async ({ field, payload, encoded }) => {
+      mockConfigService.get.mockImplementation((key: string, fallback?: any) =>
+        key === field ? payload : getFromBase(key, fallback));
+      const spy = jest.spyOn(service, 'sendEmail').mockResolvedValue(true);
+
+      await expect(service.sendPasswordResetConfirmationEmail(
+        'recipient@example.invalid',
+        field === 'recipientName' ? payload : 'Ana Pérez',
+        field === 'clientIp' ? payload : '192.0.2.1',
+      )).resolves.toBe(true);
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      const message = spy.mock.calls[0][0];
+      expect(message.to).toBe('recipient@example.invalid');
+      expect(message.html).toContain(encoded);
+      expect(message.html).not.toContain(payload);
+      expect(message.html).not.toMatch(/<(?:img|script|svg)\b/i);
+      expect(message.html).not.toContain(' onclick="');
+      expect(message.html?.match(/<a\b/g)).toHaveLength(2);
+      expect(message.text).toContain(payload);
+    });
+
     it('should send confirmation email with correct info', async () => {
       const spy = jest.spyOn(service, 'sendEmail').mockResolvedValue(true);
 

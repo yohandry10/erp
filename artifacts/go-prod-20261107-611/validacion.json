@@ -1,0 +1,171 @@
+{
+  "schema": 612,
+  "noGo": true,
+  "parentCommit": "2030c6ebe629bc8d95f2a5f5062c7c26795380bc",
+  "scope": "LOCAL_ONLY_DATABASE_AND_RUNTIME_VALIDATION; NO_PROD_PROMOTION",
+  "sourceHashes": {
+    ".github/workflows/ci.yml": "2b16a5c0d5e88f04421353db8ec49a7f350f7d8257619506667e27bc6ee3dcb9",
+    "apps/erp-api/src/app.controller.runtime.spec.ts": "a4943e8fee98f426c8a4e23491fcadcddbf7393f72c4bd712a3002b131c94b4e",
+    "apps/erp-api/src/config/database-schema-version.ts": "bcf0434d1d9b071c4eccde68c1241d1e1ecce1e782880c2660b34104973a5b37",
+    "apps/erp-api/src/config/env.schema.spec.ts": "de8e3ddf405a1146b254193b040efa64c9d5dfd1c7aaecde0a540e72dc1260de",
+    "apps/web/tests/e2e/peru-sales-approvals-local.spec.ts": "26f52a3e5354aded4acf3f2140e234f74342f1e846d8b048361e572c9ad8dbe9",
+    "docs/CURRENT_STATE.md": "96fe661265014d9c2c7855c57937942e0c7a0a1bedbd338cff24b5655172850b",
+    "docs/MODULES.md": "56d1aa3a8a38d9e520b6bbb3ff463f144acf34a8fd390605e5c6df8ce0788ef7",
+    "docs/OPERATIONS.md": "522b22a1c0da8b555537e1b949079a6c30d3a5989e35d26fbe0682f3e3955cd4",
+    "render.yaml": "94b2fede57fb954e61a18dfe9cf419eb5eb5ba20d61b050d32457459a16e780c",
+    "scripts/ci/test-peru-sales-approvals-local.mjs": "c8c14f160599377ee8ff179ac49094c1e9d50f3316511924932e2b4480fdb709",
+    "supabase/migrations/611__demo_cpe_type_and_draft.sql": "8df1008970f3f69ad3748bc38d3cd75f495146f04bada2476e44912cad411ee8",
+    "supabase/migrations/612__sales_approval_history_backend_read.sql": "7e276641cb552ea207d42ce667883484aeba77cb99b8a4bfae8c2cb810f8f3be",
+    "supabase/verify/611__demo_cpe_type_and_draft.sql": "700d3a4de2e90d0c1042a6814ab130d410fafeb45784fb635f838cc5b3eb17aa",
+    "supabase/verify/612__sales_approval_history_backend_read.sql": "4f879bbd21166dd4e52c7b304aa6897104da4206e6b20767ba5baec725aa1383"
+  },
+  "fullApiAt611": {
+    "tests": 5843,
+    "suites": 402,
+    "passed": true,
+    "sourcesUnchanged": true
+  },
+  "deltaApi612": {
+    "tests": 64,
+    "suites": 4,
+    "passed": true
+  },
+  "notSummed": true,
+  "sqlFresh612": {
+    "migrations": 608,
+    "verifiers": 121,
+    "historical": 67,
+    "obsoleteEnumerated": 6,
+    "passed": true
+  },
+  "migration611": {
+    "passed": true,
+    "scope": "OWN_LOCAL_DB_ONLY",
+    "schema": 611,
+    "redBeforeFix": true,
+    "verifierPasses": 3,
+    "rollbackDefinitionExact": true,
+    "reapplyTwice": true,
+    "allAppRowsUnchanged": true,
+    "tableAclRlsPoliciesAndFunctionPermissionsUnchanged": true,
+    "existingSampleUnchanged": true,
+    "changesOnlyFutureSeed": true,
+    "migrationSha256": "8df1008970f3f69ad3748bc38d3cd75f495146f04bada2476e44912cad411ee8",
+    "verifierSha256": "700d3a4de2e90d0c1042a6814ab130d410fafeb45784fb635f838cc5b3eb17aa",
+    "functionBeforeSha256": "222ca74631f80594404573e006722a14baa263ea8f4e7f3ffb22a5aa04ca8db8",
+    "functionAfterSha256": "995a9f207638fd95ad6c88b7f9c73d734e6884bd7134451628277c967314d994",
+    "noFalseFiscalAcceptance": true,
+    "remoteWrites": false
+  },
+  "migration612": {
+    "passed": true,
+    "schema": 612,
+    "scope": "OWN_LOCAL_DB_ONLY",
+    "redBeforeFix": true,
+    "verifierPasses": 3,
+    "rollbackAclExact": true,
+    "doubleReapply": true,
+    "allAppRowsUnchanged": true,
+    "onlyAddedBackendSelectWithoutGrantOption": true,
+    "clientPrivilegesDmlRlsPoliciesOwnersAndFunctionsUnchanged": true,
+    "migrationSha256": "7e276641cb552ea207d42ce667883484aeba77cb99b8a4bfae8c2cb810f8f3be",
+    "verifierSha256": "4f879bbd21166dd4e52c7b304aa6897104da4206e6b20767ba5baec725aa1383",
+    "remoteWrites": false
+  },
+  "productionWeb612": {
+    "passed": true,
+    "sourceCount": 913,
+    "sourcesUnchanged": true,
+    "generatedMetadataRestored": true,
+    "onlyOsEnvironmentInherited": true
+  },
+  "static612": {
+    "passed": true,
+    "phases": [
+      {
+        "name": "api-types",
+        "exitCode": 0
+      },
+      {
+        "name": "api-build",
+        "exitCode": 0
+      },
+      {
+        "name": "api-lint",
+        "exitCode": 0
+      },
+      {
+        "name": "docs",
+        "exitCode": 0
+      }
+    ],
+    "remoteWrites": false,
+    "onlyOsEnvironmentInherited": true,
+    "completedAt": "2026-11-08T03:49:15.846Z"
+  },
+  "manualUi": {
+    "bankAndCash": {
+      "passed": true,
+      "scope": "OWN_LOCAL_DEMO_BUILD_PRODUCTION611",
+      "tenant": "b80d5824-2696-4131-a976-ba7d50b51460",
+      "bankEditPersisted": true,
+      "cashNameAndDescriptionPersisted": true,
+      "cashHasNoSessions": true,
+      "financialTablesUnchanged": {
+        "asientos_contables": "2|66825732e2b3818d030224a9a745fb4b",
+        "asientos_contables_rrhh": "0|d41d8cd98f00b204e9800998ecf8427e",
+        "cpe": "1|1e592a8813111d4ba5a30e4f71aec8f4",
+        "cuentas_por_cobrar": "1|144c9fc2e326d6d3a395e9b88a1df6fa",
+        "cuentas_por_pagar": "1|d123f2bebcfe44c9c530f7c708362f39",
+        "documento_detalles": "1|4dfb0acf9d825bb773dc763dd981861e",
+        "documentos": "2|faebf8a287d30000c4d9463a48810005",
+        "movimientos_bancarios": "0|d41d8cd98f00b204e9800998ecf8427e",
+        "movimientos_caja": "1|10e489317c0b2234b1df87279399cc39",
+        "sesiones_caja": "1|f6c0c08ef03fa160524f5d5f5e304562"
+      },
+      "bankOtherFieldsUnchanged": true,
+      "cashOtherFieldsUnchanged": true,
+      "exactExpectedAuditMetadata": true,
+      "singleCashUpdateReceipt": true,
+      "remoteWrites": false,
+      "checkedAt": "2026-11-08T03:38:46.640Z",
+      "limitation": "Prueba manual dirigida en ADMIN_DEMO; no recertifica las tres pruebas E2E fallidas de primer ADMIN ni el resto de sus escenarios."
+    },
+    "approvals": {
+      "passed": true,
+      "scope": "MANUAL_CUA_OWN_LOCAL_DEMO_PRODUCTION_WEB611_WITH_DB612",
+      "httpBefore": 503,
+      "httpAfter": 409,
+      "creatorDenied403": true,
+      "approvedBySecondUser": true,
+      "lateDecisionExplained": true,
+      "dialogClosedAndInboxRefreshed": true,
+      "states": [
+        {
+          "id": "14f18c07-a32c-4b5e-92aa-857a8249f8d7",
+          "state": "PENDIENTE",
+          "decisions": 1,
+          "segregated": true
+        },
+        {
+          "id": "765ce2e3-c697-41be-9196-74f47f70dd0a",
+          "state": "CANCELADO",
+          "decisions": 1,
+          "segregated": true
+        }
+      ],
+      "ownFixtureThreshold": 30,
+      "globalNormativeChanges": false,
+      "userPrivilegeChanges": false,
+      "remoteWrites": false,
+      "proofScreenshot": "ui-conflicto-corregido612.png",
+      "limitations": "No recertifica el E2E completo con primer ADMIN, mora y carga fallida. El runtime web611 precede al único cambio posterior de su prueba E2E."
+    }
+  },
+  "ci": "2030 jobs did not start: billing/minutes annotation; final commit CI not yet observed",
+  "codeql": "Unavailable entitlement; check unchanged; not equivalent to Semgrep CE",
+  "newSpending": 0,
+  "remoteDatabaseWrites": false,
+  "productionDeployed": false,
+  "checkedAt": "2026-11-08T03:51:34.094Z"
+}

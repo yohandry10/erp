@@ -354,6 +354,12 @@ delete window.__TAURI_INTERNALS__
     '/finanzas/cxc/account-1/notas-credito',
     '/api/inventario/movimientos',
     '/api/inventario/transferencias',
+    '/api/inventario/transferencias/transfer-id/anular',
+    '/backend/api/inventario/transferencias/transfer-id/anular/recibo',
+    '/inventario/transferencias/transfer-id/anular/resolver',
+    '/api/compras/recepciones/receipt-id/anular',
+    '/backend/api/compras/recepciones/receipt-id/anular/recibo',
+    '/compras/recepciones/receipt-id/anular/resolver',
     '/api/gre/guias',
     '/api/gre/guias/guide-1/firmar',
     '/api/gre/guias/guide-1/enviar-sunat',
@@ -1123,6 +1129,17 @@ delete window.__TAURI_INTERNALS__
     const originalQueue=store.get('erp.desktop.offline.outbox');let rejected=false;
     try{await mod.enqueueOfflineRequest({endpoint,url:'http://api.test'+endpoint,method,headers:[],body:originalBody,tenant_id:'tenant-1',user_id:'user-1'})}catch(error){rejected=/confirmación/.test(error.message)}
     assert(rejected&&store.get('erp.desktop.offline.outbox')===originalQueue,'new lifecycle request cannot enter queue or erase original history');
+  }
+  store.set('erp.desktop.offline.outbox',originalQueueBeforeCollection);
+  let reversalAutoSends=0;
+  for(const domain of ['inventario/transferencias','compras/recepciones']) for(const action of ['anular','anular/recibo','anular/resolver']) {
+    const endpoint='/backend/api/'+domain+'/original-id/'+action;
+    const originalBody='{"expected_scope":{"tenant_id":"tenant-1","actor_id":"user-1","source_operation_id":"original-id"},"original":{"idempotency_key":"original-reversal-key","motivo":"Motivo original","fecha_contable":"2026-11-08"}}';
+    store.set('erp.desktop.offline.outbox',JSON.stringify([{id:'legacy-reversal',endpoint,url:'http://api.test'+endpoint,method:'POST',headers:[{name:'Idempotency-Key',value:'original-reversal-key'}],body:originalBody,tenant_id:'tenant-1',user_id:'user-1',status:'pending',attempts:0,created_at:1,updated_at:1}]));
+    globalThis.fetch=async()=>{reversalAutoSends++;return new Response('{"success":true}')};
+    const results=await mod.syncOfflineQueue(undefined,'tenant-1'),saved=JSON.parse(store.get('erp.desktop.offline.outbox'))[0];
+    assert(reversalAutoSends===0&&results.length===1&&!results[0].ok,'reversal and resolution must never automatically replay');
+    assert(saved.body===originalBody&&saved.headers[0].value==='original-reversal-key'&&saved.status==='failed','legacy reversal body, scope and key survive for manual resolution');
   }
   store.set('erp.desktop.offline.outbox',originalQueueBeforeCollection);
   const savedCustomerQueue = store.get('erp.desktop.offline.outbox');

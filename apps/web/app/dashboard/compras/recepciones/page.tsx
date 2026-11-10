@@ -15,6 +15,7 @@ import {
   Eye,
 } from "lucide-react";
 import { useLocalizedMoney } from "@/hooks/use-localized-money";
+import { formatPurchaseMoney } from "@/lib/purchase-native-view";
 
 interface OrdenCompra {
   id: string;
@@ -52,7 +53,7 @@ interface OrdenCompra {
 export default function RecepcionesPage() {
   const router = useRouter();
   const { get } = useApi();
-  const { formatCurrency: formatLocalizedCurrency, locale } = useLocalizedMoney();
+  const { locale } = useLocalizedMoney();
 
   const [ordenesPendientes, setOrdenesPendientes] = useState<OrdenCompra[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,10 +107,7 @@ export default function RecepcionesPage() {
     loadOrdenesPendientes();
   }, [loadOrdenesPendientes]);
 
-  const formatCurrency = (amount: number | undefined) => {
-    if (!amount) return "-";
-    return formatLocalizedCurrency(amount);
-  };
+  const formatCurrency = (amount: unknown, moneda: unknown) => formatPurchaseMoney(amount, moneda, locale);
 
   const formatDate = (dateString: string) => {
     return parseDateLocal(dateString).toLocaleDateString(locale, {
@@ -312,7 +310,7 @@ export default function RecepcionesPage() {
                       Total Orden
                     </div>
                     <div className="text-xl font-bold text-[#10b981]">
-                      {formatCurrency(orden.total)}
+                      {formatCurrency(orden.total, orden.moneda)}
                     </div>
                   </div>
 

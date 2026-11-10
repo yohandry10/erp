@@ -47,6 +47,10 @@ sin datos de clientes.
 ## Autenticación y autorización
 
 - Web mantiene sesión mediante cookie HttpOnly.
+- Las consultas de perfil comparten un vuelo sólo dentro de la misma revisión
+  de sesión. Login, instalación de sesión y logout invalidan el vuelo anterior;
+  un perfil tardío, incluso 401, no reinstala ni elimina la identidad nueva.
+  La regresión determinista está en `tests/auth/verify-session-profile-races.mjs`.
 - El login mantiene sus controles deshabilitados hasta hidratar y resolver la
   sesión inicial. Así no pierde valores escritos antes de activar los handlers.
   La confirmación y el efecto de sesión comparten una única redirección completa,
@@ -63,6 +67,16 @@ sin datos de clientes.
   sin autenticar al usuario.
 - Los passwords, JWT, service-role keys y headers de autorización no entran en
   localStorage, sessionStorage, logs ni outbox.
+- PII usa AES-GCM con IV de12bytes, tag de16bytes y base64 canónico. La longitud
+  se fija también al crear cipher/decipher; se rechaza un tag truncado aun si
+  coincide su prefijo, como indica el [contrato de Node](https://nodejs.org/docs/latest-v24.x/api/crypto.html#deciphersetauthtagbuffer-encoding).
+  No hay clave ni salt públicos de respaldo. Si falta clavePII/ENCRYPTION_KEY,
+  el proveedor puede iniciar para otros módulos, pero no cifrar/descifrar
+  ciphertext. Un salt de búsqueda ausente impide generar hashes. Se preservan
+  derivación, formato y lectura con claves válidas actuales/anteriores; no se
+  recifran datos ni reescriben hashes. Los helpers legacy que toleran texto
+  plano y errores por campo requieren revisión propia; esto no certifica su
+  uso general ni permite migrar PII productiva sin procedimiento autorizado.
 - Los controllers aplican autenticación, tenant actual y permisos por recurso.
 - La matriz exacta de permisos se deriva de decorators, guards y pruebas; no se
   mantiene una segunda tabla manual en documentación.
@@ -88,6 +102,10 @@ sin datos de clientes.
   `security.audit.read`: sólo recibe identificador, nombre y correo de usuarios
   de la empresa actual, incluidos los históricos inactivos. No exige administrar
   usuarios ni concede ese permiso a un auditor.
+- La confirmación de cambio de contraseña escapa nombre, IP, nombre de la app
+  y contacto de soporte al componer HTML; sus enlaces usan `escapeUrl`.
+  Conserva destinatario, asunto y texto plano. Las regresiones usan transporte
+  simulado; la comprobación MIME local usa transporte en memoria y no envía correo.
 
 ## Fiscal
 
@@ -104,6 +122,14 @@ considerar mitigados esos dos identificadores y versiones exactos. Cualquier
 otro aviso alto o crítico falla. Estos parches deben retirarse al adoptar
 versiones oficiales corregidas; no equivalen a un audit del registro con cero
 hallazgos.
+
+`nodemailer` 10.1.4, `fast-uri` 4.2.3 y `qs` 6.16.1 incorporan correcciones
+oficiales. `verify-security-upgrades.mjs`, invocado por el mismo gate de audit,
+comprueba versiones y regresiones sobre cada copia instalada: destinatario con
+comentarios anidados, esquemas URI codificados y serialización comma con un
+`toString` propio no invocable. No ejecuta transporte de correo ni solicita red.
+El audit del registro mantiene visibles los avisos de herramientas de desarrollo;
+un audit de producción sin avisos no acredita todo el árbol ni sustituye CodeQL.
 
 - El país operativo se resuelve desde `empresa_config.pais_id`; los catálogos,
   moneda, identificación, tasa y autoridad fiscal nunca se infieren desde la
@@ -229,6 +255,11 @@ orquestan; servicios y generadores contienen reglas. Todo asiento debe:
   parámetros fiscales conservan sus flujos propios.
 
 - Stack visual: Tailwind CSS 3.4 + shadcn/ui/Radix.
+- El layout de dashboard es propietario del único landmark `main`. `PageShell`
+  usa `div` por defecto para no anidarlo; el dashboard de superadmin, cuyo
+  layout carece de `main`, lo solicita explícitamente mediante `as="main"`.
+  Su título usa el token `foreground` en ambos temas; no depende de una
+  excepción contextual para hacer legible texto blanco sobre una tarjeta clara.
 - `globals.css` contiene únicamente Tailwind, tokens y base.
 - El tema vive en `<html>` y usa tokens semánticos.
 - Dialog y AlertDialog usan primitivas accesibles, no overlays manuales.

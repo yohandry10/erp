@@ -6,7 +6,7 @@ import {loginPeruLocal} from './helpers/peru-login-local'
 import {readLocalSql,consumeLocalAccounting} from './helpers/peru-local-accounting'
 
 test('CxP en efectivo: COMMIT perdido y replay conservan un pago, un retiro y crédito10111',async({page,context})=>{
- test.setTimeout(300000);page.setDefaultTimeout(25000)
+ test.setTimeout(300000);page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000)
  if(process.env.E2E_EPHEMERAL_LOCAL_DB!=='1'||process.env.PGPORT!=='55456'||process.env.LOCAL_API_URL!=='http://127.0.0.1:3126')throw Error('Sólo stack efímero propio')
  const output=process.env.LOCAL_INTEGRATED_OUTPUT_DIR!,fixture=JSON.parse(readFileSync(path.join(output,'cash-browser-fixture.json'),'utf8'))
  const requests:any[]=[],receipts:any[]=[]

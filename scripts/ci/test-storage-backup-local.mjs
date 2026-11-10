@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { createHmac } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
+import { isIP } from 'node:net';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
@@ -17,6 +18,15 @@ import { clienteStorage, sha256 } from '../datos/storage-api.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const runId = new Date().toISOString().replace(/[^0-9]/g, '') + '-' + process.pid;
 const network = `erp-storage-backup-${runId}`;
+const subnet = process.env.STORAGE_BACKUP_TEST_SUBNET;
+if (subnet) {
+  const [ip, mask, extra] = subnet.split('/');
+  const [a, b, , d] = ip.split('.').map(Number);
+  if (isIP(ip) !== 4 || mask !== '24' || extra !== undefined || d !== 0 ||
+      !(a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168))) {
+    throw new Error('STORAGE_BACKUP_TEST_SUBNET debe ser una subred IPv4 privada /24');
+  }
+}
 const SECRET = 'local-storage-backup-key-only-never-production-20261028';
 const IMAGENES = {
   pg: 'postgres:16',
@@ -63,9 +73,9 @@ const PERMISOS = `GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_
 GRANT ALL ON ALL TABLES IN SCHEMA storage TO service_role; GRANT ALL ON ALL FUNCTIONS IN SCHEMA storage TO service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA storage TO service_role;`;
 
-async function entorno(nombre, base) {
+async function entorno(nombre) {
   const pgName = `${network}-${nombre}-pg`;
-  const pg = contenedor(['--name', pgName, '--network', network, '--publish', `127.0.0.1:${base}:5432`,
+  const pg = contenedor(['--name', pgName, '--network', network,
     '--env', 'POSTGRES_DB=storage_local', '--env', 'POSTGRES_HOST_AUTH_METHOD=trust', IMAGENES.pg]);
   await esperar(`PostgreSQL ${nombre}`, () => docker(['exec', pg, 'pg_isready', '-h', '127.0.0.1', '-U', 'postgres', '-d', 'storage_local']).includes('accepting'));
   await esperar(`PostgreSQL ${nombre} listo`, () => docker(['exec', '-i', pg, 'psql', '-U', 'postgres', '-d', 'storage_local', '-qAt', '-c', 'select 1']) === '1');
@@ -73,14 +83,20 @@ async function entorno(nombre, base) {
   contenedor(['--name', `${network}-${nombre}-rest`, '--network', network,
     '--env', `PGRST_DB_URI=postgres://postgres@${pgName}:5432/storage_local`, '--env', 'PGRST_DB_ANON_ROLE=anon',
     '--env', 'PGRST_DB_SCHEMAS=public', '--env', `PGRST_JWT_SECRET=${SECRET}`, IMAGENES.rest]);
-  const puerto = base + 2;
-  contenedor(['--name', `${network}-${nombre}-storage`, '--network', network, '--publish', `127.0.0.1:${puerto}:5000`,
+  // Docker reserva el puerto libre al crear el contenedor; sondearlo antes
+  // dejaría una carrera con otros ensayos y puertos efímeros del runner.
+  const storageId = contenedor(['--name', `${network}-${nombre}-storage`, '--network', network, '--publish', '127.0.0.1::5000',
     '--env', `ANON_KEY=${jwt('anon')}`, '--env', `SERVICE_KEY=${SERVICE_KEY}`, '--env', `AUTH_JWT_SECRET=${SECRET}`,
     '--env', `DATABASE_URL=postgres://postgres@${pgName}:5432/storage_local`, '--env', `POSTGREST_URL=http://${network}-${nombre}-rest:3000`,
     '--env', 'STORAGE_BACKEND=file', '--env', 'FILE_STORAGE_BACKEND_PATH=/var/lib/storage', '--env', 'TENANT_ID=local-backup-only',
     '--env', 'REGION=local', '--env', 'GLOBAL_S3_BUCKET=local-ephemeral', '--env', 'FILE_SIZE_LIMIT=10485760',
     '--env', 'ENABLE_IMAGE_TRANSFORMATION=false', IMAGENES.storage]);
-  const url = `http://127.0.0.1:${puerto}`;
+  const bindings = JSON.parse(docker(['inspect', storageId]))[0].NetworkSettings.Ports['5000/tcp'];
+  if (bindings?.length !== 1 || bindings[0].HostIp !== '127.0.0.1' ||
+      !/^\d+$/.test(bindings[0].HostPort) || Number(bindings[0].HostPort) < 1024 || Number(bindings[0].HostPort) > 65535) {
+    throw new Error('Storage debe publicar un único puerto local asignado por Docker');
+  }
+  const url = `http://127.0.0.1:${bindings[0].HostPort}`;
   await esperar(`Storage ${nombre}`, async () => (await fetch(`${url}/status`, { signal: AbortSignal.timeout(2000) })).ok);
   docker(['exec', '-i', pg, 'psql', '-U', 'postgres', '-d', 'storage_local', '-v', 'ON_ERROR_STOP=1', '-q'], PERMISOS);
   return { url, storage: clienteStorage(url, SERVICE_KEY) };
@@ -98,9 +114,9 @@ async function limpiar() {
 const evidencia = path.join(root, 'artifacts', 'suministro-f09-recuperacion');
 let ok = false;
 try {
-  docker(['network', 'create', '--label', `com.erp.local-test=${runId}`, network]);
+  docker(['network', 'create', ...(subnet ? ['--subnet', subnet] : []), '--label', `com.erp.local-test=${runId}`, network]);
   createdNetwork = true;
-  const [origen, destino] = [await entorno('origen', 55620), await entorno('destino', 55630)];
+  const [origen, destino] = [await entorno('origen'), await entorno('destino')];
 
   const A = '58100000-0000-4000-8000-00000000000a';
   const B = '58100000-0000-4000-8000-00000000000b';
@@ -157,6 +173,7 @@ try {
   const informe = {
     ensayo: 'respaldo y restauración de Storage en contenedores efímeros',
     imagenes: IMAGENES, sha256_manifiesto, totales: manifiesto.totales,
+    origen_local: origen.url, destino_local: destino.url, subred_local: subnet ?? 'automatica',
     restauracion_por_empresa: soloB, restauracion_completa: completa,
     tiempos_ms: { respaldo: tiempoRespaldo, restauracion_y_verificacion: tiempoRestauracion },
     controles: ['respaldo alterado rechazado antes de escribir', 'destino remoto rechazado', 'visibilidad de buckets conservada',

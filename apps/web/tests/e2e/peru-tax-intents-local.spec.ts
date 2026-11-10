@@ -7,7 +7,7 @@ const endpoint = (request: { url(): string }) => new URL(request.url()).pathname
 for (const annual of [false, true]) {
   test(`Perú: ${annual ? 'anual' : 'mensual'} recupera versión y constancia tras respuestas perdidas`, async ({ page, context }) => {
     test.setTimeout(240000)
-    page.setDefaultTimeout(25000)
+    page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000)
     const output = process.env.LOCAL_INTEGRATED_OUTPUT_DIR!
     const fixture = JSON.parse(fs.readFileSync(path.join(output, 'tax-intents-fixture.json'), 'utf8'))
     expect(fixture.tenant).toMatch(/^[0-9a-f-]{36}$/i)

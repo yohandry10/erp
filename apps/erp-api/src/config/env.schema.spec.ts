@@ -61,7 +61,7 @@ describe('env.schema', () => {
     });
 
     expect(result.error).toBeUndefined();
-    expect(result.value.REQUIRED_DATABASE_SCHEMA_VERSION).toBe(593);
+    expect(result.value.REQUIRED_DATABASE_SCHEMA_VERSION).toBe(617);
   });
 
   it('falla con secreto JWT demasiado débil', () => {
@@ -115,6 +115,12 @@ describe('env.schema', () => {
     });
 
     expect(result.error).toBeUndefined();
+  });
+
+  it.each(['PII_ENCRYPTION_KEY', 'PII_ENCRYPTION_KEY_OLD', 'PII_SEARCH_SALT'])('valida %s cuando se declara sin exigir una clavePII global', key => {
+    expect(envSchema.validate({ ...baseConfig, [key]: 'short' }).error).toBeDefined();
+    expect(envSchema.validate({ ...baseConfig, [key]: strongSecret }).error).toBeUndefined();
+    expect(envSchema.validate({ ...baseConfig, [key]: '' }).error).toBeUndefined();
   });
 
   it('requiere PFX_PATH y PFX_PASS en conjunto', () => {

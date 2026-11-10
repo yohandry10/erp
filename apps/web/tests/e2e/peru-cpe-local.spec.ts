@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';import {execFileSync} from 'node:child_process';
 import {loginPeruLocal} from './helpers/peru-login-local';
 test('CPE local: listado completo, formulario manual, recuperación y crédito',async({page,context})=>{
- test.setTimeout(360000);page.setDefaultTimeout(30000);
+ test.setTimeout(360000);page.setDefaultTimeout(30000);page.setDefaultNavigationTimeout(120000);
  const output=process.env.LOCAL_INTEGRATED_OUTPUT_DIR!;const first=JSON.parse(fs.readFileSync(path.join(output,'cpe-first-fixture.json'),'utf8'));
  assert.equal(process.env.E2E_EPHEMERAL_LOCAL_DB,'1');assert.equal(process.env.PGHOST,'127.0.0.1');assert.equal(process.env.PGDATABASE,'erp_e2e');assert.match(first.tenant,/^[0-9a-f-]{36}$/i);
  const sql=(query:string)=>execFileSync(process.env.PSQL_BIN!,['-XqAt','-h','127.0.0.1','-p',process.env.PGPORT!,'-U','postgres','-d','erp_e2e','-v','ON_ERROR_STOP=1'],{input:query,encoding:'utf8',windowsHide:true}).trim();

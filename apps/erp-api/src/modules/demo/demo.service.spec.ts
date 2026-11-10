@@ -70,10 +70,15 @@ describe('DemoService operational seed', () => {
     );
   });
 
-  function buildSeedService(readiness: any = { ready: true }) {
+  function buildSeedService(readiness: any = { ready: true }, serie: any = null) {
     const rpc = jest.fn().mockResolvedValue({ data: readiness, error: null });
+    const series: any = {};
+    for (const m of ['select', 'eq', 'update', 'insert']) series[m] = jest.fn(() => series);
+    series.maybeSingle = jest.fn(async () => ({ data: serie, error: null }));
+    series.then = (resolve: any) => Promise.resolve({ error: null }).then(resolve);
+    const from = jest.fn(() => series);
     const service = new DemoService(
-      { getClient: () => ({ rpc }) } as any,
+      { getClient: () => ({ rpc, from }) } as any,
       {} as any,
       {} as any,
       {} as any,
@@ -101,7 +106,7 @@ describe('DemoService operational seed', () => {
       password: 'temporal',
     });
 
-    return { service, rpc };
+    return { series, from, service, rpc };
   }
 
   it('solo declara lista la demo después del RPC empresarial transaccional', async () => {
@@ -118,6 +123,24 @@ describe('DemoService operational seed', () => {
     });
     expect(rpc).toHaveBeenCalledTimes(2);
     expect(result).toEqual(expect.objectContaining({ aprobadorUserId: 'aprobador-id' }));
+  });
+
+  it('deja la serie F001 en el número de la factura semilla para no repetirlo', async () => {
+    const nueva = buildSeedService({ ready: true });
+    await (nueva.service as any).seedDemoOperationalData('tenant-demo', 'user-demo');
+    expect(nueva.from).toHaveBeenCalledWith('documento_series');
+    expect(nueva.series.insert).toHaveBeenCalledWith(expect.objectContaining({
+      tenant_id: 'tenant-demo', tipo_documento: 'FACTURA', serie: 'F001', correlativo_actual: 1 }));
+
+    const enCero = buildSeedService({ ready: true }, { id: 'serie-1', correlativo_actual: 0 });
+    await (enCero.service as any).seedDemoOperationalData('tenant-demo', 'user-demo');
+    expect(enCero.series.update).toHaveBeenCalledWith(expect.objectContaining({ correlativo_actual: 1 }));
+    expect(enCero.series.insert).not.toHaveBeenCalled();
+
+    const avanzada = buildSeedService({ ready: true }, { id: 'serie-1', correlativo_actual: 7 });
+    await (avanzada.service as any).seedDemoOperationalData('tenant-demo', 'user-demo');
+    expect(avanzada.series.update).not.toHaveBeenCalled();
+    expect(avanzada.series.insert).not.toHaveBeenCalled();
   });
 
   it('falla cerrado y no intenta la semilla empresarial si falta una base requerida', async () => {

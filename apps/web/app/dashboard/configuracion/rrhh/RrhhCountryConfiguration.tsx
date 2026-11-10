@@ -252,7 +252,11 @@ export default function RrhhCountryConfiguration() {
             </div>
             <div className={readyPeru ? 'rounded-full bg-emerald-500/15 px-3 py-2 text-sm font-bold text-emerald-500' : 'rounded-full bg-amber-500/15 px-3 py-2 text-sm font-bold text-amber-500'}>
               {readyPeru ? <CheckCircle2 className="mr-1 inline size-4" /> : <AlertTriangle className="mr-1 inline size-4" />}
-              {readyPeru ? `Lista para operar · ${peruNormativa.periodo}` : 'Falta normativa vigente'}
+              {readyPeru
+                ? `Lista para operar · ${peruNormativa.periodo}`
+                : peruNormativa && Array.isArray(readiness?.missing) && readiness.missing.length
+                  ? `Falta: ${readiness.missing.join(', ')}`
+                  : 'Falta normativa vigente'}
             </div>
           </div>
         </header>

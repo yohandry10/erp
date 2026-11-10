@@ -12,7 +12,7 @@ import { loginPeruLocal } from './helpers/peru-login-local'
 // otro usuario ya resolvió sale de la bandeja. Sólo hosts locales.
 test('Aprobaciones: la bandeja dice por qué no se pudo decidir y no finge estar vacía', async ({ page, browser, request }) => {
   test.setTimeout(420000)
-  page.setDefaultTimeout(25000)
+  page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000)
   const output = process.env.LOCAL_INTEGRATED_OUTPUT_DIR!
   assert.equal(process.env.E2E_EPHEMERAL_LOCAL_DB, '1')
   assert.equal(process.env.PGHOST, '127.0.0.1')
@@ -62,9 +62,9 @@ test('Aprobaciones: la bandeja dice por qué no se pudo decidir y no finge estar
     const approverEmail = `aprobadora.ui.${randomUUID().slice(0, 8)}@example.test`
     await call('users', { nombre: 'Aprobadora', apellido: 'Navegador', email: approverEmail, password: APPROVER_PASSWORD, roles: [adminRole.id], idempotency_key: randomUUID() }, token)
     const approverToken = (await call('auth/login', { email: approverEmail, password: APPROVER_PASSWORD })).access_token
-    // Igual que la sonda API: PROD concede SELECT a service_role por los privilegios
-    // por defecto de Supabase y la reconstrucción local no los emula.
-    sql(`DO $$ BEGIN IF NOT has_table_privilege('service_role','public.pedido_aprobaciones','SELECT') THEN GRANT SELECT ON public.pedido_aprobaciones TO service_role; END IF; END $$;`)
+    // La cadena612 debe incluir esta lectura; un fixture no repara la ACL del
+    // candidato para ocultar un fallo de replay o de conflicto tardío.
+    expect(sql("SELECT has_table_privilege('service_role','public.pedido_aprobaciones','SELECT');")).toBe('t')
     sql(`UPDATE empresa_config SET monto_maximo_sin_aprobacion=30 WHERE tenant_id=${q(fixture.tenant)};`)
     const estado = (id: string) => sql(`SELECT estado FROM pedidos_venta WHERE id=${q(id)};`)
     const pendingOrder = async () => {
@@ -126,7 +126,7 @@ test('Aprobaciones: la bandeja dice por qué no se pudo decidir y no finge estar
 
     approverContext = await browser.newContext()
     const approver = await approverContext.newPage()
-    approver.setDefaultTimeout(25000)
+    approver.setDefaultTimeout(25000);approver.setDefaultNavigationTimeout(120000)
     await localOnly(approver)
     await loginPeruLocal(approver, approverEmail, APPROVER_PASSWORD)
     await approver.goto('/dashboard/ventas/aprobaciones/', { timeout: 120000 })

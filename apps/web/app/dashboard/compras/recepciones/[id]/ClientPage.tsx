@@ -1,10 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
+import { ReceiptReversalPanel } from '@/components/compras/ReceiptReversalPanel'
 import { parseDateLocal } from '@/lib/date-utils'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
-import toast from 'react-hot-toast'
 import {
   ArrowLeft,
   Package,
@@ -21,12 +22,13 @@ import {
 
 interface RecepcionDetalle {
   id: string
+  tenant_id: string
   numero: string
   orden_id: string
   almacen_id: string
   ubicacion_id?: string
   fecha_recepcion: string
-  estado: 'BORRADOR' | 'CERRADA'
+  estado: 'BORRADOR' | 'CERRADA' | 'ANULADA'
   observaciones?: string
   recibido_por?: string
   cerrado_at?: string
@@ -82,40 +84,50 @@ const tableCellClass = 'px-4 py-3 text-sm text-foreground/90'
 export default function RecepcionDetallePage() {
   const router = useRouter()
   const params = useParams()
-  const { get } = useApi()
+  const { get } = useApi({ requireLive: true, throwOnError: true, retries: 0, showErrorToast: false })
+  const { session, loading: authLoading } = useAuth()
   const recepcionId = params.id as string
+  const scope = `${session?.user?.tenant_id || ''}:${session?.user?.id || ''}:${recepcionId}`
+  const activeScope = useRef(scope), generation = useRef(0)
+  activeScope.current = scope
 
   const [recepcion, setRecepcion] = useState<RecepcionDetalle | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
-  const loadRecepcion = useCallback(async () => {
+  const invalidateRead = useCallback(() => { generation.current++ }, [])
+  const loadRecepcion = useCallback(async (background = false) => {
+    const requestScope = scope, requestGeneration = ++generation.current
+    if (authLoading || !session?.user?.tenant_id || !session.user.id) return
+    const current = () => activeScope.current === requestScope && generation.current === requestGeneration
     try {
-      setLoading(true)
+      if (!background) setLoading(true)
+      setLoadError(null)
       const response = await get(`/api/compras/recepciones/${recepcionId}`)
       const recepcionData = response?.data ?? response
-
-      if (recepcionData?.id) {
+      if (!current()) return
+      if (recepcionData?.id === recepcionId && recepcionData.tenant_id === session.user.tenant_id) {
         setRecepcion(recepcionData)
       } else {
-        toast.error('Error al cargar la recepción')
-        router.push('/dashboard/compras/recepciones')
+        throw new Error('No se pudo comprobar el detalle de esta recepción.')
       }
     } catch (error) {
-      console.error('Error loading recepcion:', error)
-      toast.error('Error al cargar la recepción')
-      router.push('/dashboard/compras/recepciones')
+      if (current()) { setRecepcion(null); setLoadError('No se pudo consultar la recepción con conexión. Puede volver a intentarlo; la solicitud de anulación se conserva.') }
     } finally {
-      setLoading(false)
+      if (current()) setLoading(false)
     }
-  }, [get, recepcionId, router])
+  }, [get, recepcionId, scope, authLoading, session?.user?.tenant_id, session?.user?.id])
 
   useEffect(() => {
-    loadRecepcion()
-  }, [loadRecepcion])
+    setRecepcion(null); setLoading(true); setLoadError(null)
+    void loadRecepcion()
+    return invalidateRead
+  }, [loadRecepcion, invalidateRead])
 
   if (loading) {
     return (
       <div className={pageClass}>
+        <ReceiptReversalPanel receiptId={recepcionId} receiptNumber="Recepción seleccionada" canCreate={false} onChanged={() => void loadRecepcion(true)} />
         <div className="flex min-h-[40vh] items-center justify-center">
           <div className="rounded-2xl border border-blue-400/20 bg-card/70 px-8 py-6 text-lg font-semibold text-muted-foreground shadow-xl">
             Cargando recepción...
@@ -128,9 +140,11 @@ export default function RecepcionDetallePage() {
   if (!recepcion) {
     return (
       <div className={pageClass}>
+        <ReceiptReversalPanel receiptId={recepcionId} receiptNumber="Recepción seleccionada" canCreate={false} onChanged={() => void loadRecepcion(true)} />
         <div className="flex min-h-[40vh] items-center justify-center">
           <div className="rounded-2xl border border-slate-500/30 bg-card/70 px-8 py-6 text-lg font-semibold text-muted-foreground shadow-xl">
-            Recepción no encontrada
+            <p role="alert">{loadError || 'Recepción no encontrada'}</p>
+            <button type="button" onClick={() => void loadRecepcion()} className="mt-4 min-h-11 rounded-lg border px-4 py-2 text-sm focus-visible:ring-2 focus-visible:ring-ring">Volver a consultar</button>
           </div>
         </div>
       </div>
@@ -161,8 +175,8 @@ export default function RecepcionDetallePage() {
             <span
               className="inline-flex items-center gap-2 rounded-full bg-blue-500/15 px-4 py-2 text-sm font-semibold text-primary dark:text-blue-200 ring-1 ring-blue-400/30"
             >
-              {estadoCerrada ? <CheckCircle size={16} /> : <Clock size={16} />}
-              {estadoCerrada ? 'Cerrada' : 'Borrador'}
+              {recepcion.estado === 'ANULADA' ? <XCircle size={16} /> : estadoCerrada ? <CheckCircle size={16} /> : <Clock size={16} />}
+              {recepcion.estado === 'ANULADA' ? 'Anulada' : estadoCerrada ? 'Cerrada' : 'Borrador'}
             </span>
           </div>
           <p className="m-0 text-sm text-muted-foreground">
@@ -183,6 +197,7 @@ export default function RecepcionDetallePage() {
       </div>
 
       {/* Summary Cards */}
+      <ReceiptReversalPanel receiptId={recepcionId} receiptNumber={recepcion.numero} canCreate={estadoCerrada} onChanged={() => void loadRecepcion(true)} />
       <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div className={cardClass}>
           <div className="flex items-center justify-between">

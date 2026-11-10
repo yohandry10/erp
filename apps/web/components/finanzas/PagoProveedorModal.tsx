@@ -285,7 +285,7 @@ export default function PagoProveedorModal({
     <Dialog open={open} onOpenChange={(open) => {
       if (!open && !submitting) handleClose();
     }}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="min-w-0 max-w-2xl max-h-[90dvh] overflow-y-auto [&>*]:min-w-0">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <DollarSign className="h-5 w-5 text-emerald-400" />
@@ -314,29 +314,29 @@ export default function PagoProveedorModal({
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <fieldset disabled={frozen} className="space-y-4">
+        <form onSubmit={handleSubmit} className="min-w-0 space-y-4">
+          <fieldset disabled={frozen} className="min-w-0 space-y-4">
           {/* Monto */}
           <div>
             <label htmlFor="cxp-pago-monto" className="block text-sm font-medium text-foreground/85 mb-2">
               <DollarSign className="inline h-4 w-4 mr-1" />
               Monto del Pago *
             </label>
-            <div className="flex gap-2">
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
               <input
                 id="cxp-pago-monto"
                 type="text"
                 value={monto}
                 onChange={(e) => handleMontoChange(e.target.value)}
                 placeholder="0.00"
-                className="flex-1 px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="min-w-0 w-full flex-1 px-4 py-2 text-base border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
               <Button
                 type="button"
                 variant="outline"
                 onClick={setPagoCompleto}
-                className="whitespace-nowrap"
+                className="min-h-11 shrink-0 whitespace-nowrap"
               >
                 Pago Completo
               </Button>

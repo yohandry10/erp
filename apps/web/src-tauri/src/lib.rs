@@ -4462,6 +4462,7 @@ fn migrate_legacy_json_outbox(app: &AppHandle, conn: &Connection) -> Result<(), 
             item.body.as_deref(),
         )
         .is_some() && !is_document_center_fiscal_manual_request(&item.endpoint, &item.url, &item.method)
+            && !is_linked_inventory_reversal_request(&item.endpoint, &item.url, &item.method)
         {
             continue;
         }
@@ -4903,6 +4904,7 @@ fn read_offline_queue_from_conn(conn: &Connection, tenant: Option<&str>, user: O
         if is_cxc_manual_confirmation_request(&item.endpoint, &item.url, &item.method)
             || is_depreciation_batch_manual_request(&item.endpoint, &item.url, &item.method)
             || is_asset_lifecycle_manual_request(&item.endpoint, &item.url, &item.method)
+            || is_linked_inventory_reversal_request(&item.endpoint, &item.url, &item.method)
             || is_document_center_fiscal_manual_request(&item.endpoint, &item.url, &item.method) {
             items.push(item);
             continue;
@@ -5166,6 +5168,18 @@ fn is_depreciation_batch_manual_request(endpoint: &str, url: &str, method: &str)
     })
 }
 
+fn is_linked_inventory_reversal_request(endpoint: &str, url: &str, method: &str) -> bool {
+    method.trim().eq_ignore_ascii_case("POST") && [endpoint, url].iter().any(|value| {
+        let path = offline_endpoint_path(value);
+        let path = path.strip_prefix("/backend").unwrap_or(&path);
+        let path = path.strip_prefix("/api").unwrap_or(path);
+        let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+        (parts.len() == 4 || parts.len() == 5)
+            && ((parts[0] == "inventario" && parts[1] == "transferencias") || (parts[0] == "compras" && parts[1] == "recepciones"))
+            && !parts[2].is_empty() && parts[3] == "anular" && (parts.len() == 4 || matches!(parts[4], "recibo" | "resolver"))
+    })
+}
+
 fn non_queueable_offline_error(
     endpoint: &str,
     url: &str,
@@ -5295,7 +5309,10 @@ fn non_queueable_offline_error(
         let path = offline_endpoint_path(value);
         let path = path.strip_prefix("/backend").unwrap_or(&path);
         let path = path.strip_prefix("/api").unwrap_or(path);
+        let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
         matches!(path, "/inventario/movimientos" | "/inventario/transferencias" | "/inventario/movimientos/resolver" | "/inventario/transferencias/resolver")
+            || ((parts.len() == 4 || parts.len() == 5) && parts[0] == "inventario" && parts[1] == "transferencias"
+                && !parts[2].is_empty() && parts[3] == "anular" && (parts.len() == 4 || matches!(parts[4], "recibo" | "resolver")))
     }) {
         Some("La operación original de inventario requiere confirmación del servidor. Conserva el pendiente y verifica con conexión.")
     } else if is_invoice_generation_offline_request(endpoint, url, method) {
@@ -5343,9 +5360,10 @@ fn non_queueable_offline_error(
             let path = path.strip_prefix("/backend").unwrap_or(&path);
             let path = path.strip_prefix("/api").unwrap_or(path);
             let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
-            parts.len() == 4 && parts[0] == "compras" && parts[1] == "recepciones"
-                && ((parts[2] == "ordenes" && !parts[3].is_empty())
-                    || (!parts[2].is_empty() && parts[3] == "cerrar"))
+            (parts.len() == 4 || parts.len() == 5) && parts[0] == "compras" && parts[1] == "recepciones"
+                && ((parts.len() == 4 && parts[2] == "ordenes" && !parts[3].is_empty())
+                    || (!parts[2].is_empty() && parts.len() == 4 && parts[3] == "cerrar")
+                    || (!parts[2].is_empty() && parts[3] == "anular" && (parts.len() == 4 || matches!(parts[4], "recibo" | "resolver"))))
         })
     {
         Some("La recepción requiere confirmación del servidor. Reintenta la recepción pendiente con conexión.")
@@ -6682,6 +6700,44 @@ mod offline_secret_policy_tests {
             assert!(non_queueable_offline_error(endpoint, endpoint, "PUT", Some("{}")).is_none());
         }
         assert!(non_queueable_offline_error("/api/compras/recepciones/receipt-id", "/api/compras/recepciones/receipt-id", "PUT", Some("{}")).is_none());
+    }
+
+    #[test]
+    fn linked_inventory_reversal_cannot_enter_generic_queue() {
+        for domain in ["inventario/transferencias", "compras/recepciones"] {
+            for action in ["anular", "anular/recibo", "anular/resolver"] {
+                for prefix in ["/", "/api/", "/backend/api/", "https://erp.test/backend/api/"] {
+                    let endpoint = format!("{prefix}{domain}/original-id/{action}/?retry=1#original");
+                    assert!(non_queueable_offline_error(&endpoint, "/unrelated", " post ", Some("{}")).is_some());
+                    assert!(non_queueable_offline_error("/unrelated", &endpoint, "POST", Some("{}")).is_some());
+                    for method in ["GET", "HEAD", "OPTIONS"] {
+                        assert!(non_queueable_offline_error(&endpoint, &endpoint, method, None).is_none());
+                    }
+                }
+            }
+            let extra = format!("/api/{domain}/original-id/anular/extra");
+            assert!(non_queueable_offline_error(&extra, &extra, "POST", Some("{}")).is_none());
+        }
+    }
+
+    #[test]
+    fn linked_inventory_reversal_originals_survive_queue_read() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE offline_requests (id TEXT, endpoint TEXT, method TEXT, url TEXT, headers_json TEXT, body TEXT, tenant_id TEXT, user_id TEXT, status TEXT, attempts INTEGER, created_at INTEGER, updated_at INTEGER, last_error TEXT, response_status INTEGER, response_body TEXT);").unwrap();
+        for domain in ["inventario/transferencias", "compras/recepciones"] {
+            for action in ["anular", "anular/recibo", "anular/resolver"] {
+                let endpoint = format!("/backend/api/{domain}/original-id/{action}");
+                conn.execute("INSERT INTO offline_requests VALUES (?1,?1,'POST',?1,'[{\"name\":\"Idempotency-Key\",\"value\":\"original-reversal-key\"}]','{\"original\":true}','tenant','actor','pending',0,1,1,NULL,NULL,NULL)", rusqlite::params![endpoint]).unwrap();
+            }
+        }
+        let items = super::read_offline_queue_from_conn(&conn, Some("tenant"), Some("actor")).unwrap();
+        assert_eq!(items.len(), 6);
+        for item in items {
+            assert_eq!(item.body.as_deref(), Some("{\"original\":true}"));
+            assert_eq!(item.tenant_id.as_deref(), Some("tenant"));
+            assert_eq!(item.user_id.as_deref(), Some("actor"));
+        }
+        assert_eq!(conn.query_row("SELECT count(*) FROM offline_requests WHERE headers_json LIKE '%original-reversal-key%'", [], |r| r.get::<_, i64>(0)).unwrap(), 6);
     }
 
     #[test]

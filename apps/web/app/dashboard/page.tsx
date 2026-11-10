@@ -821,7 +821,7 @@ export default function Dashboard() {
   const currencySymbol = stats.monedaBase || country.simboloMoneda || 'S/'
   const locale = country.locale || 'es-PE'
 
-  const fetchDashboardData = useCallback(async (_showLoading = false) => {
+  const fetchDashboardData = useCallback(async (forceRefresh = false) => {
     const generation = ++dashboardReadGeneration.current
     setIsRefreshing(true)
     setIsReady(false)
@@ -831,7 +831,8 @@ export default function Dashboard() {
     setError(null)
     try {
       const [statsResponse, activitiesResponse] = await Promise.all([
-        get('/dashboard/stats'), get('/dashboard/activities'),
+        forceRefresh ? get('/dashboard/stats?refresh=true') : get('/dashboard/stats'),
+        forceRefresh ? get('/dashboard/activities?refresh=true') : get('/dashboard/activities'),
       ])
       const nextStats = readDashboardStats(statsResponse) as DashboardStats
       const nextActivities = readDashboardActivities(activitiesResponse) as RecentActivity[]
@@ -892,7 +893,7 @@ export default function Dashboard() {
     }
   }, [fetchDashboardData])
 
-  const handleRefresh = () => fetchDashboardData(false)
+  const handleRefresh = () => fetchDashboardData(true)
 
   // Derived metrics
   const alertasCriticas =

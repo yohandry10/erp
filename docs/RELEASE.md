@@ -25,6 +25,21 @@ Debe cumplirse:
 
 Estado actual y pendientes: `docs/CURRENT_STATE.md`.
 
+CI y E2E verifican las ramas de trabajo al abrir o actualizar un PR, incluidos
+los borradores. No duplican ese mismo análisis por cada push de la rama;
+`main` y `develop` conservan la validación por push y E2E el despacho manual.
+Los jobs y requisitos de release no se reducen. Los límites de gasto de la
+cuenta se conservan; un servicio de análisis sin licencia no se declara aprobado
+ni se sustituye por un informe comunitario sin revisar sus límites y hallazgos.
+El resumen del job de pruebas muestra su estado real incluso si falla; una
+cobertura generada no convierte una suite fallida en un check aprobado.
+
+El E2E aislado de CI usa `PLAYWRIGHT_PRODUCTION_WEB=1` junto con los flags
+aislados y sin autenticación global: compila Next antes de ejecutar los mismos
+casos. El gate vincula fuentes, BUILD_ID, URLs públicas y proxy loopback; cambiar
+uno invalida el build. No admite archivos de entorno ni otros destinos. La
+reducción de recompilaciones no amplía el timeout ni acredita integración real.
+
 El release Perú del 21 de septiembre está integrado por el PR
 [#109](https://github.com/yohandry10/erp/pull/109), merge `841ab738`.
 Los checks de `b6fc060e` pasaron antes de promover 537..553; el script canónico
@@ -323,6 +338,9 @@ Reglas:
    preflight, lote transaccional y readiness 590. El ensayo corre sin red, fuerza
    un rollback, compara cada tabla y ejecuta los verificadores sobre esos datos; es
    lo único que emula los privilegios por defecto de Supabase, que CI no tiene.
+   El lote se arma con los bytes del repositorio (LF) aunque el checkout de
+   Windows entregue CRLF: su huella es la misma en cualquier equipo, y un
+   verificador no puede exigir la ausencia de concesiones que da el proveedor.
    Se aplica con `node scripts/promote-lote-prod.mjs --desde 570 --hasta 590 --pr <n>
    --backup <manifiesto> --rehearsal <informe> --apply --env-file <.env.production>
    --pg-bin <PostgreSQL 17/bin>`; sin `--apply` sólo comprueba las compuertas: respaldo

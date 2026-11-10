@@ -90,6 +90,19 @@ describe('InventarioService', () => {
         });
     });
 
+    it('explica el stock insuficiente con cifras en lugar del código interno', async () => {
+        mockSupabaseClient.rpc.mockResolvedValue({ data: null, error: {
+            code: 'P0001', message: 'INVENTORY_AVAILABLE_STOCK_INSUFFICIENT: disponible=19.000000 solicitado=100.000000' } });
+        const rechazo = service.registrarAjusteAtomico('70000000-0000-4000-8000-000000000001', '70000000-0000-4000-8000-000000000002', {
+            idempotency_key: 'original-key', producto_id: '70000000-0000-4000-8000-000000000003', motivo: 'Faltante inventario',
+            almacen_id: '70000000-0000-4000-8000-000000000004', delta: -100,
+        } as any);
+        await expect(rechazo).rejects.toMatchObject({ response: {
+            error: 'INVENTORY_NOT_APPLIED',
+            message: 'No se pudo registrar el ajuste de inventario: el stock disponible es 19 y se solicitó retirar 100',
+        } });
+    });
+
     describe('getStockDisponible', () => {
         it('debe calcular el stock disponible correctamente', async () => {
             const mockProducto = {

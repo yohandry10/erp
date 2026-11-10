@@ -1,0 +1,63 @@
+[
+  {
+    "name": "original-zero",
+    "eventType": "recepcion.registrada",
+    "eventData": {
+      "tenantId": "b1ac27e9-ad6b-4f46-a7fe-1389cab7b9e3",
+      "recepcionId": "fd4248cc-5c48-48df-9b55-4bf72284eb9a",
+      "reversaId": "71af42d3-74aa-4c2e-b3ef-c67d7152303c",
+      "originalEventId": "f436f535-7477-40b4-8dd9-9a5889eb9628",
+      "eventId": "f436f535-7477-40b4-8dd9-9a5889eb9628",
+      "subtotalParcial": 0
+    },
+    "proof": {
+      "success": true,
+      "event_id": "f436f535-7477-40b4-8dd9-9a5889eb9628",
+      "recepcion_id": "fd4248cc-5c48-48df-9b55-4bf72284eb9a",
+      "no_monetary_effect": true
+    }
+  },
+  {
+    "name": "valued",
+    "eventType": "recepcion.revertida",
+    "eventData": {
+      "tenantId": "b1ac27e9-ad6b-4f46-a7fe-1389cab7b9e3",
+      "recepcionId": "a33e74fb-9a2d-432b-b1d7-057ace39d0f9",
+      "reversaId": "41b6d272-936a-4a90-8efd-b691208288ce",
+      "originalEventId": "e8181925-d106-4588-899e-7bb0b3447ca9",
+      "eventId": "52a8d667-ac7a-49ff-9e6f-963e525735ae"
+    },
+    "proof": {
+      "success": true,
+      "event_id": "52a8d667-ac7a-49ff-9e6f-963e525735ae",
+      "asiento_id": "56840f38-c922-4485-8830-c89d8774e876",
+      "idempotent": false,
+      "reversa_id": "41b6d272-936a-4a90-8efd-b691208288ce",
+      "total_debe": "5.17",
+      "total_haber": "5.17",
+      "recepcion_id": "a33e74fb-9a2d-432b-b1d7-057ace39d0f9",
+      "original_event_id": "e8181925-d106-4588-899e-7bb0b3447ca9",
+      "no_monetary_effect": false,
+      "original_asiento_id": "bb5f0ea4-e8b9-4928-893c-35d8b6e30d44"
+    }
+  },
+  {
+    "name": "zero",
+    "eventType": "recepcion.revertida",
+    "eventData": {
+      "tenantId": "b1ac27e9-ad6b-4f46-a7fe-1389cab7b9e3",
+      "recepcionId": "fd4248cc-5c48-48df-9b55-4bf72284eb9a",
+      "reversaId": "71af42d3-74aa-4c2e-b3ef-c67d7152303c",
+      "originalEventId": "f436f535-7477-40b4-8dd9-9a5889eb9628",
+      "eventId": "7a66f2fc-2fc6-4e87-b6bf-7ba1b96273be"
+    },
+    "proof": {
+      "success": true,
+      "event_id": "7a66f2fc-2fc6-4e87-b6bf-7ba1b96273be",
+      "reversa_id": "71af42d3-74aa-4c2e-b3ef-c67d7152303c",
+      "recepcion_id": "fd4248cc-5c48-48df-9b55-4bf72284eb9a",
+      "original_event_id": "f436f535-7477-40b4-8dd9-9a5889eb9628",
+      "no_monetary_effect": true
+    }
+  }
+]

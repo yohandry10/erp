@@ -87,11 +87,13 @@ try{
  await check('Asistencia: entrada y salida con intención, orden y listado del tenant',async()=>{
   const key=randomUUID();const entrada=await call('rrhh/asistencia/entrada/'+employee.id,{},201,token,'POST',key);
   const again=await raw('rrhh/asistencia/entrada/'+employee.id,{},token,'POST',key);assert.ok([200,201].includes(again.status),'Reintento de entrada '+again.status);
-  assert.equal((again.data?.id??entrada.id),entrada.id,'El reintento creó otra entrada');
+  assert.deepEqual(again.data,entrada,'El reintento cambió la marca confirmada');
   const dup=await raw('rrhh/asistencia/entrada/'+employee.id,{});assert.ok([400,409].includes(dup.status),'Segunda entrada del día '+dup.status);
-  // La salida exige ser posterior a la entrada: el fixture adelanta la entrada una hora.
-  sql(`UPDATE asistencia SET hora_entrada=(hora_entrada::time - interval '1 hour')::time WHERE id=${q(entrada.id)};`);
-  await call('rrhh/asistencia/salida/'+employee.id,{});
+  // Esperar al reloj real: no reescribir la marca que se está verificando.
+  await new Promise(resolve=>setTimeout(resolve,1100));
+  const exitKey=randomUUID();
+  const salida=await call('rrhh/asistencia/salida/'+employee.id,{},201,token,'POST',exitKey);
+  assert.deepEqual(await call('rrhh/asistencia/salida/'+employee.id,{},201,token,'POST',exitKey),salida,'El replay de salida cambió');
   const list=await call('rrhh/asistencia?empleado_id='+employee.id+'&fecha_desde='+today+'&fecha_hasta='+today);assert.ok(JSON.stringify(list).includes(employee.id),'Listado sin la asistencia');
   const foreignEntry=await raw('rrhh/asistencia/entrada/'+employee.id,{},otherToken);assert.ok([400,403,404].includes(foreignEntry.status),'Entrada ajena aceptada '+foreignEntry.status);
   assert.equal(sql(`SELECT count(*) FROM asistencia WHERE id_empleado=${q(employee.id)} AND tenant_id=${q(other.tenant)};`),'0','Entrada ajena persistida');
@@ -120,3 +122,4 @@ try{
 }catch(error){scenarios.push({scenario:'RRHH: preparación o dependencia',passed:false,message:String(error.message).slice(0,900)});}
 finally{fs.writeFileSync(path.join(output,'hr-operations.json'),JSON.stringify({success,remoteWrites:false,scope:'RRHH API/DB local; sin aceptación integral',scenarios,requests},null,2));}
 console.log(JSON.stringify({success,passed:scenarios.filter(s=>s.passed).length,failed:scenarios.filter(s=>!s.passed).map(s=>s.scenario)}));
+process.exitCode=success?0:1;

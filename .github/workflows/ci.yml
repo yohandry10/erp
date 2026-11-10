@@ -1,16 +1,12 @@
 name: CI
 
 on:
-  # Solo con main y develop, ninguna rama de trabajo pasaba por CI: se llegaba a
-  # la PR con el pipeline sin haberse ejecutado una sola vez.
+  # Las ramas de trabajo se verifican en PR (también en borrador). Ejecutar
+  # además por push duplicaba los mismos jobs y consumía el cupo gratuito.
   push:
     branches:
       - main
       - develop
-      - "codex/**"
-      - "feat/**"
-      - "fix/**"
-      - "chore/**"
   pull_request:
     branches: [main, develop]
 
@@ -149,6 +145,13 @@ jobs:
 
       - name: Verify complete tenant catalog
         run: pnpm --filter @erp-suite/web test:tenant-catalog
+      - name: Receipt close currency and durable reversal contracts
+        run: |
+          node apps/web/tests/compras/verify-receipt-close-currency.mjs
+          node apps/web/tests/compras/verify-receipt-reversal-operation.mjs
+          node apps/web/tests/observability/verify-sentry-privacy.mjs
+          node apps/web/tests/contabilidad/verify-analytic-allocation-races.mjs
+          node apps/web/tests/compras/verify-purchase-native-stats.mjs
       - name: Candidate profile contract
         run: pnpm --filter @erp-suite/web test:candidate-profile
       - name: Receivables complete live read contract
@@ -210,7 +213,7 @@ jobs:
       - name: Resumen de CI
         if: always()
         run: |
-          echo "## CI: Tests ✅" >> $GITHUB_STEP_SUMMARY
+          echo "## CI: Tests — ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
           echo "- pnpm test:cov (falla si la cobertura baja del suelo)" >> $GITHUB_STEP_SUMMARY
           if [ -f apps/erp-api/coverage/coverage-summary.json ]; then
             node -e "const t=require('./apps/erp-api/coverage/coverage-summary.json').total; for (const k of ['statements','branches','functions','lines']) console.log('- '+k+': '+t[k].pct+'%');" >> $GITHUB_STEP_SUMMARY
@@ -237,7 +240,7 @@ jobs:
           --health-retries 20
     env:
       E2E_EPHEMERAL_LOCAL_DB: "1"
-      REQUIRED_DATABASE_SCHEMA_VERSION: "593"
+      REQUIRED_DATABASE_SCHEMA_VERSION: "617"
       PGPASSWORD: postgres
       PGHOST: 127.0.0.1
       PGPORT: 5442
@@ -259,6 +262,9 @@ jobs:
             sudo apt-get install -y postgresql-client-16
           fi
           psql --version
+
+      - name: Promotion batch bytes do not depend on checkout line endings
+        run: node scripts/ci/test-lote-promocion.mjs
 
       - name: Rebuild and verify the required database contract
         run: node scripts/ci/verify-database-contracts.mjs

@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleInit } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { cuadranImportes } from '../../../shared/utils/cuadre-contable.util';
+import { cpeAccountingAmounts } from '../../../shared/utils/cpe-accounting-currency.util';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { AsientosGeneratorService } from '../services/asientos-generator.service';
 import { OutboxEventsService, OutboxEvent } from '../services/outbox-events.service';
@@ -442,6 +443,9 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
           case 'recepcion.registrada':
           case 'RecepcionRegistrada':
             await this.handleRecepcionRegistrada(evento);
+            break;
+          case 'recepcion.revertida':
+            await this.handleRecepcionRevertida(evento);
             break;
 
           case 'factura.proveedor.registrada':
@@ -1234,13 +1238,31 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
         return;
       }
 
-      const total = Number(eventData.total ?? 0);
-      const baseImponible = Number(eventData.subtotal ?? eventData.base_imponible ?? 0);
-      const igv = Number(
+      let total = Number(eventData.total ?? 0);
+      let baseImponible = Number(eventData.subtotal ?? eventData.base_imponible ?? 0);
+      let igv = Number(
         eventData.impuestos ??
           eventData.igv ??
           (baseImponible > 0 ? Math.max(total - baseImponible, 0) : 0),
       );
+
+      let ajustes: Record<string, number> | undefined;
+      let montoPendiente: number | undefined;
+      // El writer443 congela importes en moneda documental y el tipo de origen.
+      // El costo del inventario ya está en moneda funcional y no se reconvierte.
+      if (eventData.source === 'cpe.api.atomic') {
+        const amounts = cpeAccountingAmounts({
+          moneda: eventData.moneda, tipoCambio: eventData.tipoCambio,
+          subtotal: eventData.subtotal ?? eventData.base_imponible,
+          impuestos: eventData.impuestos ?? eventData.igv, total: eventData.total,
+          ajustes: eventData.ajustes,
+        });
+        baseImponible = amounts.base_imponible;
+        igv = amounts.igv;
+        total = amounts.total;
+        ajustes = amounts.ajustes;
+        montoPendiente = amounts.monto_pendiente;
+      }
 
       const ventaData = {
         tenant_id: tenantId,
@@ -1248,6 +1270,7 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
         total,
         base_imponible: baseImponible,
         igv,
+        ...(ajustes ? { ajustes, monto_pendiente: montoPendiente } : {}),
         costo_ventas: Number(eventData.costoVentas ?? eventData.costo_ventas ?? 0),
         centro_costo_id: eventData.centro_costo_id,
         referencia,
@@ -1299,6 +1322,7 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
         monto: eventData.monto,
         tipoMovimiento: eventData.tipoMovimiento ?? eventData.tipo_movimiento ?? eventData.tipo,
         medio: eventData.medio ?? eventData.metodo_pago,
+        metodo_pago: eventData.metodoPago ?? eventData.metodo_pago ?? eventData.medio,
         // La RPC de tesorería valúa la cuenta por cobrar al tipo de cambio de
         // origen y el ingreso a caja/banco al tipo de liquidación. Mantener los
         // tres importes evita que contabilidad vuelva a consultar un TC mutable.
@@ -1350,6 +1374,8 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
         montoLiquidacion: eventData.montoLiquidacion ?? eventData.monto_liquidacion,
         diferenciaCambio: eventData.diferenciaCambio ?? eventData.diferencia_cambio,
         medio: eventData.medio ?? eventData.metodoPago ?? eventData.metodo_pago,
+        cobroOriginalId: eventData.source === 'public.revertir_cobro_cxc_anulacion_tx'
+          ? eventData.cobroId : undefined,
         cuenta_bancaria_id: eventData.cuentaBancariaId ?? eventData.cuenta_bancaria_id,
         referencia: eventData.referencia ?? eventData.cobroId ?? eventData.cobro_id,
         event_id: evento.event_id || eventData.eventId,
@@ -1592,6 +1618,8 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
       montoTesoreria: eventData.montoTesoreria ?? eventData.monto_tesoreria,
       diferenciaCambio: eventData.diferenciaCambio ?? eventData.diferencia_cambio,
       medio: eventData.medio,
+      metodo_pago: eventData.refundValuationVersion === 605 && eventData.medio === 'CAJA'
+        ? 'EFECTIVO' : undefined,
       cuenta_bancaria_id: eventData.cuentaBancariaId ?? eventData.cuenta_bancaria_id,
       referencia: eventData.referencia ?? eventData.saldoFavorId,
       event_id: evento.event_id || eventData.eventId,
@@ -1621,6 +1649,8 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
       montoTesoreria: eventData.montoTesoreria ?? eventData.monto_tesoreria,
       diferenciaCambio: eventData.diferenciaCambio ?? eventData.diferencia_cambio,
       medio: eventData.medio,
+      metodo_pago: eventData.refundValuationVersion === 605 && eventData.medio === 'CAJA'
+        ? 'EFECTIVO' : undefined,
       cuenta_bancaria_id: eventData.cuentaBancariaId ?? eventData.cuenta_bancaria_id,
       referencia: eventData.referencia ?? eventData.saldoFavorId,
       event_id: evento.event_id || eventData.eventId,
@@ -1750,41 +1780,88 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
       const tenantId = this.ensureEventTenant(eventData, 'recepcion.registrada');
       const costoRecepcion =
         eventData.subtotalParcial ?? eventData.subtotal ?? eventData.costo;
-      
-      const compraData = {
-        tenant_id: tenantId,
-        fecha: eventData.fechaRecepcion || eventData.fecha || new Date().toISOString(),
-        costo: costoRecepcion,
-        mercaderia: eventData.mercaderiaParcial,
-        servicios: eventData.serviciosParcial,
-        no_stock: eventData.noStockParcial,
-        centro_costo_id: eventData.centro_costo_id,
-        referencia: eventData.numeroRecepcion || eventData.numeroOrden,
-        event_id: evento.event_id || eventData.eventId
-      };
-
-      const eventId = compraData.event_id;
-
-      const asientoCreado = await this.asientosGenerator.generarAsientoRecepcion(compraData);
-
-      // 🔴 CRÍTICO FIX: Validar que el asiento se haya creado correctamente
-      if (eventId) {
-        const asientoVerificado = await this.verificarAsientoCreado(
-          tenantId,
-          eventId,
-          compraData.referencia
-        );
-        if (!asientoVerificado) {
-          throw new Error(
-            `Asiento contable de recepción no se pudo verificar después de creación para evento ${eventId}`
-          );
+      // Zero is accepted only with a durable SQL proof of the original receipt.
+      // Missing amounts never become a zero-cost acknowledgement.
+      if ((typeof costoRecepcion === 'number' && costoRecepcion === 0)
+        || (typeof costoRecepcion === 'string' && /^0+(?:\.0+)?$/.test(costoRecepcion))) {
+        const eventId = evento.event_id || eventData.eventId;
+        if (!eventId || !evento.claim_token || !eventData.recepcionId) throw new Error('Recepción sin costo requiere identidad y claim originales');
+        const { data, error } = await this.supabaseService.getClient().rpc('verificar_recepcion_sin_efecto_615', {
+          p_tenant_id: tenantId, p_event_id: eventId, p_claim_token: evento.claim_token,
+        });
+        if (error || !this.receiptAccountingProof(data, eventId, eventData.recepcionId) || data.no_monetary_effect !== true
+          || data.asiento_id !== undefined || data.total_debe !== undefined || data.total_haber !== undefined) {
+          throw new Error('No se pudo verificar el origen de la recepción sin efecto monetario');
         }
-      } else if (!asientoCreado?.id) {
-        throw new Error('Asiento contable de recepción no retornó ID válido después de creación');
+        return;
+      }
+      
+      const eventId = evento.event_id || eventData.eventId;
+      if (!eventId || !evento.claim_token || !eventData.recepcionId) {
+        throw new Error('Contabilizar la recepción requiere identidad y claim originales');
+      }
+      // The transaction reads the durable close valuation and original event,
+      // creates or verifies the journal, and binds the write to this claim.
+      const { data, error } = await this.supabaseService.getClient().rpc('contabilizar_recepcion_617', {
+        p_tenant_id: tenantId, p_event_id: eventId, p_claim_token: evento.claim_token,
+      });
+      if (error) throw new Error(error.message || 'No se pudo contabilizar la recepción con su valuación de origen');
+      const b = data?.valuacion;
+      const amount = (v: unknown): v is string => typeof v === 'string' && /^\d{1,12}\.\d{2}$/.test(v);
+      if (!this.receiptAccountingProof(data, eventId, eventData.recepcionId) || data.no_monetary_effect !== false
+        || typeof data.asiento_id !== 'string' || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(data.asiento_id)
+        || !amount(data.total_debe) || data.total_debe !== data.total_haber || /^0+\.00$/.test(data.total_debe)
+        || !b || typeof b !== 'object' || Array.isArray(b) || ![444, 617].includes(b.version)
+        || !/^[A-Z]{3}$/.test(b.moneda) || b.moneda !== eventData.moneda || !/^[A-Z]{3}$/.test(b.moneda_base)
+        || typeof b.tipo_cambio !== 'string' || !/^(0|[1-9][0-9]{0,9})(?:\.\d{1,6})?$/.test(b.tipo_cambio)
+        || !['subtotal_origen', 'mercaderia', 'servicios', 'no_stock', 'total_base'].every(k => amount(b[k]))) {
+        throw new Error('El asiento de recepción no tiene identidad y valuación completas');
+      }
+      if (!new Decimal(b.tipo_cambio).gt(0) || b.moneda === b.moneda_base && !new Decimal(b.tipo_cambio).eq(1)
+        || b.version === 444 && b.moneda !== b.moneda_base
+        || !new Decimal(b.mercaderia).plus(b.servicios).plus(b.no_stock).eq(b.total_base)
+        || b.total_base !== data.total_debe || !new Decimal(String(costoRecepcion)).eq(b.subtotal_origen)) {
+        throw new Error('La valuación contable no coincide con la recepción original');
       }
     } catch (error) {
       this.logger.error(`❌ [ContabilidadEventsListener] Error en handleRecepcionRegistrada:`, error);
       throw error;
+    }
+  }
+
+  private receiptAccountingProof(data: any, eventId: string, receiptId: string): boolean {
+    return !!data && typeof data === 'object' && !Array.isArray(data) && data.success === true
+      && data.event_id === eventId && data.recepcion_id === receiptId
+      && ['cached', 'queued', 'offline', 'from_cache'].every(key => data[key] === undefined || data[key] === false);
+  }
+
+  private async handleRecepcionRevertida(evento: OutboxEvent): Promise<void> {
+    const payload = evento.event_data;
+    const tenantId = this.ensureEventTenant(payload, 'recepcion.revertida');
+    const eventId = evento.event_id || payload.eventId;
+    if (!eventId || !evento.claim_token || !payload.recepcionId || !payload.reversaId || !payload.originalEventId) {
+      throw new Error('Anulación de recepción requiere identidad y claim originales');
+    }
+    const { data, error } = await this.supabaseService.getClient().rpc('contabilizar_reversa_recepcion_615', {
+      p_tenant_id: tenantId, p_event_id: eventId, p_claim_token: evento.claim_token,
+    });
+    if (error) throw new Error(error.message || 'No se pudo contabilizar la anulación de recepción');
+    if (!this.receiptAccountingProof(data, eventId, payload.recepcionId)
+      || data.reversa_id !== payload.reversaId || data.original_event_id !== payload.originalEventId
+      || typeof data.no_monetary_effect !== 'boolean') {
+      throw new Error('El recibo contable no corresponde a la anulación original');
+    }
+    if (data.no_monetary_effect) {
+      if (data.asiento_id !== undefined || data.original_asiento_id !== undefined || data.total_debe !== undefined || data.total_haber !== undefined) {
+        throw new Error('Recibo sin efecto monetario contradictorio');
+      }
+      return;
+    }
+    const uuid = (value: any) => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+    if (!uuid(data.asiento_id) || !uuid(data.original_asiento_id) || data.asiento_id === data.original_asiento_id
+      || typeof data.total_debe !== 'string' || !/^\d{1,12}\.\d{2}$/.test(data.total_debe)
+      || /^0+\.00$/.test(data.total_debe) || data.total_debe !== data.total_haber) {
+      throw new Error('El contraasiento de recepción no tiene identidad e importes completos');
     }
   }
 
@@ -1851,6 +1928,17 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
         montoContabilizado: eventData.montoContabilizado,
         montoLiquidacion: eventData.montoLiquidacion,
         diferenciaCambio: eventData.diferenciaCambio,
+        montoContableBanco: eventData.montoContableBanco,
+        ajusteValorBanco: eventData.ajusteValorBanco,
+        bankValuationVersion: eventData.bankValuationVersion,
+        montoContableCaja: eventData.montoContableCaja,
+        ajusteValorCaja: eventData.ajusteValorCaja,
+        cashValuationVersion: eventData.cashValuationVersion,
+        saldoCajaNuevo: eventData.saldoCajaNuevo,
+        sesionCajaId: eventData.sesionCajaId,
+        cuentaSaldoNuevo: eventData.cuentaSaldoNuevo,
+        moneda: eventData.moneda,
+        monedaLocal: eventData.monedaLocal,
         // Conservar el medio: un egreso de caja no usa la cuenta de resumen10.
         metodo_pago: eventData.metodoPago ?? eventData.metodo_pago,
         // El egreso sale de la cuenta contable del banco elegido en el pago.

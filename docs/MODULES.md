@@ -241,6 +241,13 @@ La proyección pública del CPE entrega el IGV de cada línea en centavos, igual
 que XML/PDF, también para comprobantes históricos que conservan el cálculo
 intermedio con más decimales. No reescribe el documento ni sus importes contables;
 la interfaz sigue contrastando suma de líneas, cabecera y pedido antes de confirmar.
+En nuevas facturas de pedidos Perú, los centavos del IGV comercial de cabecera
+se distribuyen entre las líneas gravadas por mayor resto, con desempate por el
+orden del snapshot. No se cobra impuesto a líneas exoneradas, inafectas ni de
+exportación. Si el total impide mantener el importe positivo exigido por SUNAT3111,
+se rechaza antes de emitir. La tasa persiste por línea y la vista A4 usa esa tasa
+o el perfil histórico del país, nunca el cociente de importes ya redondeados.
+No se reescriben CPE anteriores. La aceptación fiscal externa sigue siendo un gate propio.
 El POST no entra a la cola genérica JS/Rust. El servidor deriva su propia clave;
 el CPE público no expone sus claves/huellas/vínculos internos, por lo que la UI
 no acredita una comprobación criptográfica. La emisión fiscal sigue dependiendo
@@ -509,6 +516,29 @@ Cotización -> Pedido -> Reserva -> Despacho -> Documento/CPE -> Cobro -> Asient
 - La nota de crédito reduce la cuenta por cobrar hasta cero y lleva el exceso a
   saldo a favor del cliente (cuenta 122). Ese pasivo puede aplicarse a una CxC
   futura o reembolsarse por una caja/sesión o cuenta bancaria explícita.
+- En Perú, las nuevas NC RMA distribuyen por línea el importe acumulado de las
+  cantidades devueltas, descontando lo acreditado. La suma de base, IGV, ISC y
+  total no puede superar la línea original. El lock del documento origen
+  serializa distintas RMA; las notas previas incoherentes y las facturas cuya
+  cabecera no concilia con sus líneas exigen revisión, sin reescritura histórica.
+  La596 valida importes en moneda documental. La597 distribuye la conversión
+  acumulada por mayor resto, con límites de las partidas70/40 del asiento original;
+  una valuación histórica que no concilia exige revisión. La CxC conserva su
+  conversión acumulada al tipo de origen y el resto va al saldo a favor durable.
+  Los importes funcionales de ese saldo se usan en su liquidación completa.
+- El asiento de NC omite componentes monetarios cero y sólo consulta las cuentas
+  correspondientes a sus componentes positivos. Una NC sin IGV o sin base puede
+  contabilizarse sin enviar detalles debe0/haber0 al writer transaccional.
+- `factura.emitida` de `cpe.api.atomic` congela importes documentales y tipoCambio.
+  Contabilidad los convierte a moneda funcional con decimales exactos y asigna el
+  residuo entre base e impuesto, conservando el total convertido. El costo de
+  inventario ya está valorado en moneda funcional y no vuelve a convertirse.
+  Un snapshot de moneda/tipo/importes no verificable falla antes de generar asiento.
+  Retención, percepción, detracción, anticipo y deuda se convierten con el mismo
+  tipo congelado. Si sus importes redondeados no cuadran, la emisión atómica PE
+  responde400 antes del writer; el replay tampoco crea un asiento incompatible.
+  No se añade una diferencia cambiaria inventada para absorber el descuadre.
+  Una factura cubierta por anticipo omite el detalle de clientes cero.
 - `nota_credito.emitida`, `saldo_favor.aplicado` y
   `saldo_favor.reembolsado` son los únicos dueños contables de esas operaciones;
   la recepción física no vuelve a contabilizar el inventario.
@@ -1382,6 +1412,64 @@ Cotización -> Aprobación -> Orden de compra -> Recepción -> CxP -> Pago
   inventario para bienes físicos con control de stock. La recepción reconoce el
   costo pendiente de factura; la CxP y el crédito fiscal nacen al registrar la
   factura real del proveedor, no al recibir la mercadería o el servicio.
+- Una nueva factura ligada a recepción sólo queda registrada si el origen está
+  CERRADA al confirmar la transacción. Facturar y cambiar el estado de la
+  recepción esperan el mismo bloqueo; se cotejan empresa, OC, proveedor y
+  referencias explícitas/legacy. Borrador, anulación o vínculos contradictorios
+  rechazan la factura completa. La fábrica demo conserva su cierre diferido en
+  el mismo commit; no se alteran deudas históricas ni actualizaciones que
+  conservan el vínculo. La protección614 serializa la factura con la anulación615.
+- La anulación615 conserva la recepción original, revierte cantidades aceptadas
+  de la OC y retira sólo el stock físico original, con su costo, moneda, tasa,
+  lote y ubicación congelados. Factura vinculada, devolución activa, stock/valor
+  insuficiente, evidencia incompleta o período cerrado rechazan el commit completo.
+  Un evento `recepcion.revertida` queda pendiente para el worker contable, que
+  crea un único asiento exactamente opuesto y enlazado al original. Si el origen
+  aún no tiene asiento se reintenta el mismo evento; no se repite el inventario.
+  Costo cero probado completa los eventos sin fabricar asientos cero. Una reversa
+  manual del asiento de recepción no sustituye la anulación empresarial.
+- Los POST `compras/recepciones/:id/anular`, `:id/anular/recibo` y
+  `:id/anular/resolver` exigen permiso vigente de cerrar y el sobre original de
+  empresa, actor, recepción, motivo, fecha contable y clave. Responden sin caché;
+  sólo confirman tras cotejar ledger, ítems y todos los movimientos opuestos.
+  La contabilidad del recibo sigue explícitamente pendiente. Recuperar616 lee sin
+  repetir la escritura; resolver recupera el commit o cierra la clave para impedir
+  una petición tardía. Ausencia/lectura parcial no prueba abandono. Las pruebas
+  HTTP dirigidas sustituyen auth/transporte; además, una integración local usa
+  login/JWT/sesión/permisos/PostgREST y ambos workersNode reales. Bien físico y
+  servicioPEN terminan con asiento/inverso y neto0; cero completa sinGL. Una
+  respuesta perdida tras el commit se recupera sin repetir el writer.
+- El detalle de recepción permite preparar la anulación con motivo, fecha
+  contable y confirmación expresa. Guarda primero la intención original por
+  empresa/actor/recepción, reserva la ventana y conserva el pendiente ante fallos.
+  Consultar no reenvía; resolver recupera el commit o cierra la clave antes de
+  preparar otra solicitud. El archivo se escribe y relee antes de retirar el
+  pendiente. La confirmación sigue visible mientras se refresca el detalle.
+  Web y escritorio rechazan estas operaciones en la cola genérica; las antiguas
+  se conservan para resolución manual. Rechazo por período, recarga y anulación
+  posterior pasan en navegador ySQL local, en ambos temas y ancho móvil. La
+  matrizFX y la aceptación completa de sesión/escritorio siguen pendientes.
+- El cierre617 congela moneda de la OC, moneda contable del país, tasa positiva
+  de hasta seis decimales y referencia. El wizard exige esa captura para divisas
+  antes de crear la recepción y conserva el cuerpo original en el pendiente.
+  Una moneda comercial preferida no redefine la moneda del mayor. El worker
+  original requiere claim real y evidencia privada inmutable del evento/líneas;
+  valida clasificación, centavos y asiento exacto antes de confirmar o releer.
+  La reversa615 verifica también esa autoridad. Costo cero probado no creaGL;
+  positivo que redondea a cero o excede precisión se rechaza antes del cierre.
+  Bien físico, servicio y sin stockUSD5.17→PEN19.13 con inverso neto0 pasan por
+  HTTP/SQL y workers reales; cierreUI USD5.16→PEN19.09 comprobado. D56 se corrige
+  para nuevas operaciones: originalesFX sin conversión demostrable quedan
+  preservados y bloqueados, sin tasa actual, tasa1 implícita ni backfill.
+  La matriz recepción→factura→pago y aceptación completa de sesión siguen abiertas.
+- El resumen de Compras usa el contrato v2 de importes originales por moneda:
+  no devuelve un total nominal común ni infiere una tasa. Conserva el mes civil
+  del contribuyente, los estados excluidos y los conteos operativos. Verifica
+  todas las páginas, conteos y pertenencia al tenant antes de publicar cifras.
+  Listas de compras, órdenes y órdenes recepcionables usan la moneda de su OC;
+  una moneda ausente no se sustituye por soles. Un fallo del resumen deja los
+  indicadores no disponibles y ofrece reintentar; no equivale a un cero real.
+  Los contratos de cierre/contabilidad617 conservan su propia prueba.
 - Devoluciones al proveedor revierten existencia y obligación según estado.
 - Aprobaciones respetan tenant, rol, monto y estado.
 - La configuración de una empresa peruana provisiona las cuentas 4699 y 63
@@ -1551,6 +1639,23 @@ continúan. Ver `product-deactivate-operation-postconditions.json`.
 - Reservar no descuenta físico; despachar/facturar aplica el movimiento
   autoritativo.
 - Ajustes, transferencias, recepciones y POS usan el mismo writer.
+- WIP613 de reversas de transferencia: `GET inventario/transferencias/:id` lee el
+  origen con permiso `inventario.movimientos.read` y muestra bloqueo explícito si
+  la valuación está pendiente, sin presentar importes como confirmados. Los POST
+  `:id/anular`, `:id/anular/recibo` y `:id/anular/resolver` exigen el permiso de
+  creación y el sobre original de empresa/actor/transferencia, cuerpo y clave.
+  Las cuatro rutas responden sin caché. El writer confirma sólo con la lectura
+  atómica del ledger y las dos piernas opuestas; costo/moneda/tasa/lotes conservan
+  el origen. Recuperar nunca mueve stock, y la ausencia de recibo no prueba
+  abandono. Resolver recupera el commit previo o cierra esa clave para impedir
+  un writer tardío. Cambio de scope409; fallos ambiguos503 conservan la intención.
+  PruebasHTTP locales sustituyen autenticación/Supabase y ejercen permisos y
+  validación reales; no acreditan UI ni fiscalidad real. Siete carreras SQL en
+  una copia propia restaurada verifican replay de la misma clave, conflicto de
+  otra clave, resolución contra writer y revocación efectiva durante la espera
+  por clave/origen; sin duplicados y conservando documentos/costo originales. La
+  reversa de recepción615/616 tiene SQL, worker y rutas propias descritas en compras;
+  su interfaz y aceptación integrada siguen pendientes. Sin publicación/PROD.
 - Las ubicaciones de un almacén ajeno responden 404 y las consultas de
   ubicaciones, movimientos y estadísticas responden 503 si no pueden leer,
   nunca 200 vacío ni 500. En logística, eventos y backorders de un pedido
@@ -1774,10 +1879,83 @@ y los estados desconocidos siguen invalidando la respuesta completa.
   propios; sin PVS/SUNAT ni aceptación global.
 
 - CxC y CxP gestionan saldo, vencimiento, pagos y estados.
+- En CxP, los pagos en divisa consumen el valor de origen acumulado del pasivo.
+  La601 contrasta factura, snapshot y pagos anteriores bancarios/de efectivo;
+  una traza incompatible exige revisión antes de mover deuda o tesorería.
+  Puede proyectar un origen todavía pendiente de asiento desde su snapshot
+  validado. Conserva liquidación y diferencia cambiaria sin reescribir históricos.
+  Las aperturas marcadas conservan importe/TC originales; cambios no reconocidos
+  de deuda por crédito, ajustes u otras historias mantienen revisión propia.
+- En CxC, los cobros en divisa consumen el valor contable acumulado del origen,
+  compartiendo los céntimos con los ajustes y las NC RMA. Cancelar la deuda no
+  deja residuo en clientes por redondear cada pago de forma independiente.
+  Se contrasta la traza documental/contable; una historia incompatible o sin
+  evidencia reconocida se rechaza antes de mover deuda o tesorería. No se
+  reescriben cobros históricos. El contrato de apertura conserva su importe y
+  tipo originales, sin fabricar un CPE ni un asiento de origen.
+  Mientras la factura atómica sigue pendiente en outbox se utiliza su snapshot
+  verificado, sin exigir que el consumidor haya terminado; un asiento existente
+  incompatible nunca se sustituye por esa proyección.
+- Las aplicaciones de saldo a favor consumen el valor acumulado de la CxC de
+  destino, compartido con cobros y NC. La603 contrasta movimiento, operación,
+  evento durable y asiento confirmado o pendiente; conserva por separado el
+  pasivo del crédito y su diferencia de cambio. Un cobro posterior reconoce
+  esas aplicaciones previas. Historias incompatibles exigen revisión, sin
+  backfill. La604 aplica el valor proporcional verificable del banco a cada
+  reembolso en divisa, mantiene liquidación/tasa y pasivo separados y revierte
+  el valor originalmente registrado. Exige traza de crédito/operación/evento y
+  asiento confirmado o snapshot pendiente compatible. Caja tiene aceptación
+  propia pendiente; no reconstruye bancos históricos ni aperturas desconocidas.
 - Las consultas de CxP, bancos y tesorería responden 503 cuando no pueden leer,
   nunca 400. Editar o anular una CxP inexistente o de otra empresa responde 404;
   una regla del writer (pagada, anulada, con pagos) responde 400. El pago en
   lote se aplica una vez por llave y rechaza el exceso sin tocar la deuda.
+- La moneda contable de tesorería sigue el país de la empresa: PE/PEN, AR/ARS
+  y CO/COP. Cambiar la moneda comercial predeterminada no cambia ese perfil
+  ni revaloriza documentos, cobros o pagos anteriores. La599 alinea el helper
+  SQL con este contrato; no migra históricos ni certifica cambios de país con cartera.
+- Al agotar un banco extranjero con un pago de proveedor, se consume su valor
+  contable verificable además de registrar la liquidación y su diferencia de cambio.
+  No se permite dejar valor en el mayor de una cuenta con saldo nativo cero.
+  La600 conserva la traza atómica aun si los cobros siguen pendientes de asiento.
+  Aperturas no demostradas, mayores compartidos u otros movimientos sin traza
+  compatible requieren revisión antes del pago; no se reescribe su historia.
+- El cobro efectivo explícito en Perú usa Caja10111. La reversa CxC canónica
+  toma la cuenta del asiento original confirmado, incluida una cuenta histórica
+  distinta; sin asiento verificable espera revisión, sin reinterpretar el cobro.
+  La602 consume el valor demostrable de la sesión al agotarse el efectivo en
+  divisa con un pago de proveedor. Conserva liquidación, pasivo y diferencias
+  de cambio por separado; no consume el valor de otra caja que comparte el mayor.
+  Requiere apertura cero y traza atómica CxC/CxP, con snapshots pendientes o
+  asientos confirmados conciliados. Aperturas, POS u otros escritores dentro
+  de esa sesión e historias incompatibles requieren revisión antes del pago.
+  Sin backfill ni aceptación completa de las reversas fiscales por esta corrección.
+- La605 conserva cuenta operativa y valor proporcional de la sesión en reembolsos
+  de saldo a favor por caja. La reversa de esos eventos repone el valor original
+  en la misma sesión; exige la traza de crédito, operación, evento y asiento o
+  snapshot pendiente. Los eventos anteriores conservan su contrato contable.
+  El valor de otras sesiones no se consume. Aperturas desconocidas, POS dentro
+  de la misma sesión u otros escritores sin traza compatible requieren revisión.
+- La606 conserva el valor acumulado al aplicar o reembolsar crédito de proveedor.
+  Comparte la reducción de CxP con pagos anteriores/posteriores. Movimiento,
+  solicitud, huella, recibo, evento y asiento o snapshot pendiente deben conciliar;
+  el registro de crédito permanece inmutable. Liquidación bancaria y ajuste del
+  crédito se contabilizan por separado sin duplicar banco. No se reescriben
+  consumos históricos.
+- La607 distribuye las NC de proveedor en divisa desde el valor de la factura,
+  compartiendo la reducción de deuda con pagos anteriores y posteriores. Congela
+  base, impuesto, deuda y crédito en el evento; exige solicitud, recibo y asiento
+  o snapshot pendiente verificables. Los créditos nuevos consumen su valor
+  asignado de forma proporcional, multiplicando antes de dividir. La moneda
+  funcional conserva importes nativos y ajustes tributarios. Ajustes fiscales
+  posteriores en divisa, devoluciones vinculadas y otras historias sin traza
+  aceptada requieren revisión. No se reescriben documentos ni asientos históricos.
+- La608 admite reembolsos de proveedor al reconstruir el valor de un banco en
+  divisa. Exige movimiento de crédito606, solicitud y recibo bancario457,
+  huellas, actor, cuenta y evento compatibles; valida el asiento o snapshot
+  pendiente. Conserva las restricciones de apertura cero, mayor exclusivo y
+  fuentes conocidas. No modifica metadatos históricos ni admite abonos manuales
+  genéricos sin la traza de reembolso.
 - El alta de factura de proveedor conserva destino del crédito fiscal, código
   de detracción y tipo de cambio de origen dentro de la transacción de deuda y
   outbox. Repetir la misma intención devuelve la factura existente; cambiar
@@ -1930,6 +2108,11 @@ y los estados desconocidos siguen invalidando la respuesta completa.
   del país para la hora de registro. Todas las celdas escapan comillas y
   separadores; las fórmulas de hoja de cálculo se neutralizan también en
   descripciones, referencias y nombres. Los filtros de conciliación se conservan.
+  Incluye la moneda inmutable de la cuenta junto a cada importe. Recorre las
+  páginas con conteo exacto y orden estable; un conteo cambiante, duplicado,
+  lectura incompleta o movimiento de otra empresa/cuenta impide la descarga.
+  Cobros/pagos sin copia de moneda usan la de su cuenta; una moneda explícita
+  contradictoria se rechaza. No convierte importes ni modifica los movimientos.
   El historial de la cuenta y su CSV muestran sólo movimientos del sistema;
   las filas de extracto se consultan en conciliación y no duplican la tesorería.
 - La conciliación opera por RPCs reservadas al servicio: período mensual único,
@@ -2478,6 +2661,10 @@ variantes. NO_GO global.
   0.000001). Denominadores sin base positiva devuelven0 según el contrato actual.
   Las fórmulas se contrastaron con el diario al corte131; siguen siendo
   estimaciones gerenciales y no EBITDA auditado ni certificación financiera.
+- El selector PLE sólo ejecuta exportadores declarados como propiedades propias;
+  `constructor`, `__proto__` y demás nombres heredados responden libro desconocido,
+  sin inventar un archivo ni resolver métodos de Object (D51). Conserva los cinco
+  libros soportados y la advertencia de fallos parciales del lote `todos`.
 - La descarga PLE de Diario y Mayor filtra exclusivamente asientos
   `CONFIRMADO`. El Balance de Comprobación electrónico es el formato SUNAT 3.17
   (`031700`), con período `AAAAMMDD` al cierre y 19 campos posicionales; el
@@ -2506,6 +2693,8 @@ variantes. NO_GO global.
   una referencia ausente o ajena bloquea la descarga.
   Los borradores de venta se excluyen antes de resolver referencias y calcular
   importes; crear una solicitud NC todavía no rectifica el documento emitido.
+- Un Registro de Compras consultado correctamente sin compras conserva la exportación
+  Excel con sus encabezados, sin filas ficticias. Una consulta fallida no habilita esa salida.
 - El Registro de Compras de la pantalla contable toma los comprobantes de CxP,
   no las órdenes. Conserva el importe fiscal original tras devoluciones o
   descuentos y muestra cada nota de crédito con signo negativo y referencia.
@@ -2793,6 +2982,10 @@ variantes. NO_GO global.
   `deferred-live-read-controls-postconditions.json`; recibos/intenciones de los
   otros períodos de devengo, perfiles y variantes requieren sus propios casos.
 - La distribución analítica reparte una línea por varios ejes independientes.
+  El editor sólo permite guardar tras completar las lecturas de la línea actual;
+  ignora respuestas antiguas y los errores de otra línea. La selección se inicializa
+  al recibir el snapshot; no se reinicia en un efecto posterior a la edición.
+  Una lectura fallida bloquea el formulario y ofrece reintentar la consulta.
   Ingresos y gastos diferidos se reconocen por período y la última cuota absorbe
   residuos de redondeo.
 - El detalle del asiento permite registrar y mantener esa distribución
@@ -3371,6 +3564,23 @@ detalle de planilla aplica la misma comprobación del padre.
   ficha PLAME convergen en un writer operativo con actor, permiso, huella e
   idempotencia. El job de ausencias exige un actor técnico explícito y falla
   cerrado si no está configurado.
+- Ausencias sin cruce (610): un colaborador no puede tener dos solicitudes
+  vigentes en el mismo día. Al crear se compara contra pendientes y aprobadas; al
+  aprobar, sólo contra aprobadas; rechazar nunca se bloquea. La regla es un
+  trigger con lock por colaborador, así que un replay exacto del writer475 no
+  choca consigo mismo y dos altas concurrentes dejan una. El API responde 409 con
+  `error: RRHH_REQUEST_OVERLAP`; la UI libera la operación pendiente y conserva
+  el formulario. Los permisos del mismo día también cuentan como cruce.
+- La entrada/salida automática usa `registrar_asistencia_actual_tx` (609): la
+  primera intención captura fecha y hora civil PE/CO/AR dentro de la DB; un
+  reintento devuelve el recibo475 original, aunque cambie el reloj o ya exista
+  una salida. Cambiar empleado, tipo o actor conserva el rechazo. La API valida
+  el recibo completo y sólo emite el evento en la primera confirmación. No se
+  garantiza entrega durable del bus ante una caída entre commit y emisión.
+  La marca manual conserva su writer con fecha/hora explícitas. Sin backfill.
+- El HTML mensual de boleta escapa texto de empleado, período y estado de pago
+  con el helper compartido. Conserva los importes y la moneda; no se interpreta
+  una etiqueta incluida en esos datos como marcado HTML (D50).
 - El alta y edición de empleados recuperan la intención en el writer antes de
   comprobar duplicados; la unicidad documental permanece en la transacción y
   el índice de base de datos. Un reintento del alta devuelve el mismo empleado.
@@ -3872,6 +4082,16 @@ Evidencia: `queue-company-editor-postconditions.json`.
   generación y firma fiscal de prueba, GRE/SIRE y flujo logístico habilitado;
   ningún envío ni aceptación SUNAT/OSE se simula. El PCGE inicial se
   inserta por código sin duplicar cuentas ya existentes.
+  La fábrica SQL canónica reserva el número de la factura semilla antes de
+  declarar la demo lista; la primera factura posterior usa F001-00000002.
+  La cotización de muestra concilia una línea de4×87,50 con subtotal350,
+  IGV63 y total413. La apertura bancaria50000 coincide con sus saldos.
+  La595 corrige únicamente nuevas hidrataciones, sin renumerar documentos,
+  modificar muestras históricas ni conceder aceptación fiscal.
+  Desde611 el CPE de muestra usa el código fiscal01 y el documento comercial
+  conserva FACTURA. La fábrica declara BORRADOR/PENDIENTE/NOT_SENT y origen
+  simulado sin XML, CDR ni evidencia fiscal. No habilita una nota fiscal desde
+  ese borrador ni reescribe muestras anteriores; conserva importes y numeración.
 - La conversión de demo a cuenta real exige que el cliente defina y confirme
   un correo de acceso y una contraseña permanente antes de elegir si conserva
   o reinicia sus datos. La activación sustituye atómicamente las credenciales
@@ -3991,7 +4211,27 @@ globalNO_GO.
 
 
 
-- Analytics consume métricas tenant-scoped.
+- Analytics Financiero lee ventas, categorías y cartera completas por empresa,
+  con conteo estable e IDs únicos, y conserva importes originales por moneda.
+  El contrato v2 publica `porMoneda`; sólo una moneda permite además los campos
+  planos compatibles. Nunca publica un total nominal multimoneda. El selector
+  y CSV usan la moneda confirmada; ventas/categorías comparten el rango elegido,
+  mientras la cartera corresponde a la fecha actual del país. El aging incluye
+  saldos por vencer tanto en CxC como en CxP.
+  Los períodos móviles parten del día civil del país. Las fechas de documentos
+  a medianoche y los instantes siguen el normalizador fiscal existente, con
+  lectura completa de una envolvente y selección civil posterior, conservando
+  los extremos locales y la duración inclusiva del período.
+  Los indicadores de los últimos30días no suman divisas con inventario local:
+  si requieren una valuación común quedan no disponibles. En una sola moneda
+  del país, el margen sigue siendo aproximado, con costo actual del catálogo;
+  un costo desconocido no se trata como cero ni equivale al estado de resultados.
+  El saldo bancario se lee de `saldo`. Los errores de fuentes retiran cifras y
+  bloquean su exportación; la falta de indicadores se declara por separado y
+  el CSV los marca no disponibles. Sin caché financiera antigua, cola offline,
+  conversión implícita ni ampliación de permisos. La aceptación de este cambio
+  no cubre los endpoints avanzados legacy de rentabilidad por producto, punto
+  de equilibrio y escenarios, que requieren revisión propia antes de GO.
 - Reportes exportan sin duplicar reglas de negocio.
 - Auditoría registra actor, tenant, acción, entidad, resultado y correlación.
 - La evidencia complementaria de auditoría e integraciones usa el append

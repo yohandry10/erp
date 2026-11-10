@@ -7,6 +7,7 @@ import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
 import { PermissionGuard } from '../common/guards/permission.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { TenantContextService } from '../shared/tenant/tenant-context.service';
+import { readPurchaseStats } from './compras/purchase-native-stats';
 
 @ApiTags('compras')
 @Controller('compras')
@@ -37,69 +38,7 @@ export class ComprasController {
 
       console.log(`📊 [Compras Stats] Obteniendo estadísticas de compras para tenant: ${tenantId}`);
 
-      // USAR LA MISMA CONSULTA QUE FUNCIONA EN getOrdenes
-      const { data: todasLasCompras, error: comprasError } = await supabase
-        .from('ordenes_compra')
-        .select('*')
-        .eq('tenant_id', tenantId) // ✅ Filtro de tenant
-        .order('created_at', { ascending: false });
-
-      if (comprasError) {
-        console.error('❌ [Compras Stats] Error en consulta principal:', comprasError);
-        throw comprasError;
-      }
-
-      console.log('🔍 [Compras Stats] DEBUG - Datos obtenidos:', {
-        totalComprasEncontradas: todasLasCompras?.length,
-        primerasTresCompras: todasLasCompras?.slice(0, 3)?.map(c => ({
-          total: c.total,
-          estado: c.estado,
-          fecha: c.fecha_orden
-        }))
-      });
-
-      // Calcular estadísticas directamente de los datos obtenidos
-      const totalComprasMonto = todasLasCompras?.reduce((sum, orden) => {
-        const total = parseFloat(orden.total) || 0;
-        console.log(`💰 Sumando orden ${orden.numero}: ${total}`);
-        return sum + total;
-      }, 0) || 0;
-
-      const cantidadCompras = todasLasCompras?.length || 0;
-      const estadosActivos = ['BORRADOR', 'APROBACION', 'APROBADA', 'PARCIAL', 'PENDIENTE', 'ENTREGADO'];
-      const ordenesActivas = todasLasCompras?.filter(o => estadosActivos.includes(o.estado)).length || 0;
-      const ordenesVencidas = todasLasCompras?.filter(o => o.estado === 'PENDIENTE' && new Date(o.fecha_entrega) < new Date()).length || 0;
-
-      // Obtener proveedores activos de forma simple
-      let proveedoresActivos = 0;
-      try {
-        const { data: proveedores } = await supabase
-          .from('proveedores')
-          .select('id')
-          .eq('tenant_id', tenantId) // ✅ Filtro de tenant
-          .eq('activo', true);
-        proveedoresActivos = proveedores?.length || 0;
-      } catch (error) {
-        console.warn('⚠️ [Compras Stats] No se pudo obtener proveedores:', error);
-        proveedoresActivos = 2; // Valor por defecto basado en los logs
-      }
-
-      const estadisticas = {
-        comprasDelMes: cantidadCompras,
-        totalCompras: totalComprasMonto,
-        montoTotalMes: totalComprasMonto,
-        ordenesActivas: ordenesActivas,
-        proveedoresActivos: proveedoresActivos,
-        ordenesVencidas: ordenesVencidas
-      };
-
-      console.log('✅ [Compras Stats] Estadísticas calculadas:', estadisticas);
-      console.log('💰 [Compras Stats] Total calculado:', totalComprasMonto);
-
-      return {
-        success: true,
-        data: estadisticas
-      };
+      return { success: true, data: await readPurchaseStats(supabase, tenantId) };
     } catch (error) {
       console.error('❌ [Compras Stats] Error completo:', {
         message: error.message,

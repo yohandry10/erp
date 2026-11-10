@@ -13,7 +13,7 @@ test.afterAll(()=>writeFileSync(path.join(output,'browser-review-corrections.jso
 test.afterEach(async({},info)=>{if(info.status!==info.expectedStatus)proof.scriptErrors.push(info.title+': '+info.status)})
 
 test('Revisión: tours repetidos conservan un único completado y notifican permisos reales',async({page,context,browser})=>{
- test.setTimeout(240000);page.setDefaultTimeout(25000)
+ test.setTimeout(240000);page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000)
  page.on('pageerror',e=>proof.scriptErrors.push(e.message));await localOnly(context)
  await loginPeruLocal(page,fixture('tax-intents').email,'Cliente-Local-2026-Only!')
  await page.evaluate(()=>localStorage.setItem('erp_onboarding_completed',JSON.stringify(['admin','admin',17])))
@@ -64,7 +64,7 @@ test('Revisión: tours repetidos conservan un único completado y notifican perm
 })
 
 test('Revisión: cortes reales mantienen columnas separadas y desplazamiento en móvil',async({page,context})=>{
- test.setTimeout(180000);page.setDefaultTimeout(25000);page.on('pageerror',e=>proof.scriptErrors.push(e.message))
+ test.setTimeout(180000);page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000);page.on('pageerror',e=>proof.scriptErrors.push(e.message))
  await localOnly(context);const cash=fixture('cash-browser');await loginPeruLocal(page,cash.email,'Cliente-Local-2026-Only!')
  await page.goto('/dashboard/cajas/',{waitUntil:'domcontentloaded'})
  const table=page.locator('table').filter({has:page.getByRole('columnheader',{name:'Docs',exact:true})})

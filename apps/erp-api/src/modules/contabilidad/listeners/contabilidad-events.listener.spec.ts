@@ -827,6 +827,27 @@ describe("ContabilidadEventsListener", () => {
       },
     );
 
+    it.each(['metodoPago','metodo_pago','medio'])('traslada el efectivo desde %s al resolvedor de cuenta', async field => {
+      asientosGenerator.generarAsientoCobro.mockResolvedValue({ id: 'asiento-efectivo' } as any);
+      await (listener as any).handleCobroRegistrado({ event_data: {
+        tenantId: 'tenant-001', monto: .01, [field]: 'EFECTIVO',
+      } });
+      expect(asientosGenerator.generarAsientoCobro).toHaveBeenCalledWith(expect.objectContaining({ metodo_pago: 'EFECTIVO' }));
+    });
+
+    it('traslada la valuación de caja sin mezclarla con la bancaria', async () => {
+      asientosGenerator.generarAsientoPago.mockResolvedValue({ id: 'asiento-caja' } as any);
+      await (listener as any).handlePagoProveedor({ event_data: {
+        tenantId: 'tenant-001', monto: .04, metodoPago: 'EFECTIVO',
+        montoContableCaja: .17, ajusteValorCaja: .02, cashValuationVersion: 602,
+        sesionCajaId: 'sesion', saldoCajaNuevo: 0,
+      } });
+      expect(asientosGenerator.generarAsientoPago).toHaveBeenCalledWith(expect.objectContaining({
+        montoContableCaja: .17, ajusteValorCaja: .02, cashValuationVersion: 602,
+        sesionCajaId: 'sesion', saldoCajaNuevo: 0, metodo_pago: 'EFECTIVO',
+      }));
+    });
+
     it("should handle cobro registrado event", async () => {
       const mockEventos: OutboxEvent[] = [
         {
@@ -967,180 +988,12 @@ describe("ContabilidadEventsListener", () => {
       expect(asientosGenerator.generarAsientoPago).not.toHaveBeenCalled();
     });
 
-    it("should handle recepcion registrada event", async () => {
-      const mockEventos: OutboxEvent[] = [
-        {
-          id: "1",
-          event_id: "evt-004",
-          correlation_id: "corr-004",
-          aggregate_type: "recepcion",
-          aggregate_id: "recepcion-001",
-          event_type: "recepcion.registrada",
-          event_data: {
-            tenantId: "tenant-001",
-            fechaRecepcion: "2025-01-15",
-            total: 118,
-            subtotal: 100,
-            igv: 18,
-            numeroRecepcion: "REC-001",
-          },
-          event_version: 1,
-          created_at: "2025-01-15T10:00:00Z",
-          processed_at: null,
-          retry_count: 0,
-          status: "PENDING",
-          error_message: null,
-        },
-      ];
-
-      outboxEventsService.reclamarEventosContables.mockResolvedValue(
-        mockEventos,
-      );
-      asientosGenerator.generarAsientoRecepcion.mockResolvedValue({
-        id: "asiento-003",
-        tenant_id: "tenant-001",
-        numero_asiento: 3,
-        codigo: "A-202501-000003",
-        fecha: "2025-01-15",
-        concepto: "Compra de mercadería",
-        total_debe: 118,
-        total_haber: 118,
-        estado: "CONFIRMADO",
-      });
-
-      await listener.procesarEventosPendientes();
-
-      expect(asientosGenerator.generarAsientoRecepcion).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenant_id: "tenant-001",
-          costo: 100,
-          event_id: "evt-004",
-        }),
-      );
-    });
-
-    it("should use partial reception amounts when present", async () => {
-      const mockEventos: OutboxEvent[] = [
-        {
-          id: "1",
-          event_id: "evt-004-partial",
-          correlation_id: "corr-004-partial",
-          aggregate_type: "recepcion",
-          aggregate_id: "recepcion-001",
-          event_type: "recepcion.registrada",
-          event_data: {
-            tenantId: "tenant-001",
-            fechaRecepcion: "2025-01-15",
-            total: 236,
-            subtotal: 200,
-            igv: 36,
-            totalParcial: 118,
-            subtotalParcial: 100,
-            igvParcial: 18,
-            mercaderiaParcial: 60,
-            serviciosParcial: 30,
-            noStockParcial: 10,
-            numeroRecepcion: "REC-001",
-          },
-          event_version: 1,
-          created_at: "2025-01-15T10:00:00Z",
-          processed_at: null,
-          retry_count: 0,
-          status: "PENDING",
-          error_message: null,
-        },
-      ];
-
-      outboxEventsService.reclamarEventosContables.mockResolvedValue(
-        mockEventos,
-      );
-      asientosGenerator.generarAsientoRecepcion.mockResolvedValue({
-        id: "asiento-003",
-        tenant_id: "tenant-001",
-        numero_asiento: 3,
-        codigo: "A-202501-000003",
-        fecha: "2025-01-15",
-        concepto: "Compra de mercadería",
-        total_debe: 118,
-        total_haber: 118,
-        estado: "CONFIRMADO",
-      });
-
-      await listener.procesarEventosPendientes();
-
-      expect(asientosGenerator.generarAsientoRecepcion).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenant_id: "tenant-001",
-          costo: 100,
-          mercaderia: 60,
-          servicios: 30,
-          no_stock: 10,
-          event_id: "evt-004-partial",
-        }),
-      );
-    });
-
-    it("should fail a reception event when accounting idempotency is corrupted by duplicate entries", async () => {
-      const mockEventos: OutboxEvent[] = [
-        {
-          id: "1",
-          event_id: "evt-004-duplicado",
-          correlation_id: "corr-004-duplicado",
-          aggregate_type: "recepcion",
-          aggregate_id: "recepcion-001",
-          event_type: "recepcion.registrada",
-          event_data: {
-            tenantId: "tenant-001",
-            fechaRecepcion: "2025-01-15",
-            total: 118,
-            subtotal: 100,
-            igv: 18,
-            numeroRecepcion: "REC-001",
-          },
-          event_version: 1,
-          created_at: "2025-01-15T10:00:00Z",
-          processed_at: null,
-          retry_count: 0,
-          status: "PENDING",
-          error_message: null,
-        },
-      ];
-
-      outboxEventsService.reclamarEventosContables.mockResolvedValue(
-        mockEventos,
-      );
-      asientosGenerator.generarAsientoRecepcion.mockResolvedValue({
-        id: "asiento-003",
-        tenant_id: "tenant-001",
-        numero_asiento: 3,
-        codigo: "A-202501-000003",
-        fecha: "2025-01-15",
-        concepto: "Compra de mercadería",
-        total_debe: 118,
-        total_haber: 118,
-        estado: "CONFIRMADO",
-      });
-
-      const supabaseClient = (
-        testingModule.get(SupabaseService).getClient as jest.Mock
-      )();
-      supabaseClient.maybeSingle
-        .mockResolvedValueOnce({
-          data: null,
-          error: {
-            code: "PGRST116",
-            details:
-              "Results contain 3 rows, application/vnd.pgrst.object+json requires 1 row",
-            message: "JSON object requested, multiple (or no) rows returned",
-          },
-        });
-
-      await listener.procesarEventosPendientes();
-
-      expect(asientosGenerator.marcarEventoComoFallido).toHaveBeenCalledWith(
-        "evt-004-duplicado",
-        expect.stringContaining("Idempotencia contable corrupta"),
-      );
+    it('rechaza una recepción sin identidad y claim, sin generar un asiento nominal', async () => {
+      await expect((listener as any).procesarEvento({ id: 'receipt-row', event_id: 'receipt-event', event_type: 'recepcion.registrada',
+        event_data: { tenantId: 'tenant-001', moneda: 'USD', subtotalParcial: 5.17 }, retry_count: 0 })).rejects.toThrow('identidad y claim');
+      expect(asientosGenerator.generarAsientoRecepcion).not.toHaveBeenCalled();
+      expect(asientosGenerator.marcarEventoComoProcesado).not.toHaveBeenCalled();
+      expect(asientosGenerator.marcarEventoComoFallido).toHaveBeenCalledWith('receipt-event', expect.stringContaining('identidad y claim'));
     });
 
     it("should handle pago proveedor event", async () => {
@@ -1157,6 +1010,9 @@ describe("ContabilidadEventsListener", () => {
             fechaPago: "2025-01-15",
             monto: 100,
             numeroDocumento: "PAG-001",
+            montoContabilizado: 380, montoLiquidacion: 380, diferenciaCambio: 0,
+            montoContableBanco: 380.01, ajusteValorBanco: .01, bankValuationVersion: 600,
+            cuentaSaldoNuevo: 0, cuentaBancariaId: 'bank-001', moneda: 'USD', monedaLocal: 'PEN',
           },
           event_version: 1,
           created_at: "2025-01-15T10:00:00Z",
@@ -1189,6 +1045,9 @@ describe("ContabilidadEventsListener", () => {
           tenant_id: "tenant-001",
           monto: 100,
           event_id: "evt-005",
+          montoContabilizado: 380, montoLiquidacion: 380, diferenciaCambio: 0,
+          montoContableBanco: 380.01, ajusteValorBanco: .01, bankValuationVersion: 600,
+          cuentaSaldoNuevo: 0, cuenta_bancaria_id: 'bank-001', moneda: 'USD', monedaLocal: 'PEN',
         }),
       );
     });
@@ -1718,6 +1577,26 @@ describe("ContabilidadEventsListener", () => {
       expect(asientosGenerator.generarAsientoReembolsoSaldoFavor).toHaveBeenCalledWith(
         expect.objectContaining({ medio: 'BANCO', event_id: 'evt-saldo-refund' }),
       );
+    });
+
+    it.each([
+      ['handleSaldoFavorReembolsado', 'generarAsientoReembolsoSaldoFavor'],
+      ['handleSaldoFavorReembolsoRevertido', 'generarAsientoReversaReembolsoSaldoFavor'],
+    ])('D37 conserva la cuenta de efectivo605 y el contrato anterior en %s', async (handler, generator) => {
+      (asientosGenerator as any)[generator].mockResolvedValue({ id: 'asiento-refund-cash' });
+      for (const [medio, version, expected] of [
+        ['CAJA', 605, 'EFECTIVO'], ['CAJA', 604, undefined],
+        ['CAJA', undefined, undefined], ['BANCO', 605, undefined],
+      ]) {
+        await (listener as any)[handler]({ event_id: 'evt-cash-605', event_data: {
+          tenantId: 'tenant-001', fecha: '2026-11-06', monto: .01,
+          montoPasivo: .03, montoTesoreria: .03, diferenciaCambio: 0,
+          medio, refundValuationVersion: version,
+        } });
+        expect((asientosGenerator as any)[generator]).toHaveBeenLastCalledWith(
+          expect.objectContaining({ metodo_pago: expected, montoTesoreria: .03 }),
+        );
+      }
     });
 
     it('revierte el cobro por handler propio sin duplicar la nota de crédito', async () => {

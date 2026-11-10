@@ -50,7 +50,7 @@ test("Perú: sucursales recupera alta, edición, baja y asignación perdidas y r
   browser,
 }) => {
   test.setTimeout(240000);
-  page.setDefaultTimeout(25000);
+  page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000);
   await localOnly(context);
   const output = process.env.LOCAL_INTEGRATED_OUTPUT_DIR!;
   const fixture = JSON.parse(

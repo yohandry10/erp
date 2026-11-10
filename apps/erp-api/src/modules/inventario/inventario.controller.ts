@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Post, Put, Body, Param, Query, Header, UseGuards, Delete, Headers, InternalServerErrorException, NotFoundException, Logger, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Post, Put, Body, Param, Query, Header, HttpCode, UseGuards, Delete, Headers, InternalServerErrorException, NotFoundException, Logger, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiConsumes } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -12,6 +12,7 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import { UuidParamPipe } from '../../common/pipes/uuid-param.pipe';
 import { InventarioService } from './inventario.service';
 import { readOriginalInventoryResolutionRequest, ResolverAjusteOriginalDto, ResolverTransferenciaOriginalDto } from './dto/resolver-operacion-inventario.dto';
+import { readTransferReversalRequest, TransferReversalRequestDto } from './dto/transfer-reversal.dto';
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard';
 import { RequireFeatureFlag } from '../../common/decorators/feature-flag.decorator';
 import { TaxCalculatorService } from '../../shared/utils/tax-calculator';
@@ -607,6 +608,63 @@ export class InventarioController {
       transferencia,
     );
     return { success: true, data };
+  }
+
+  @Get('transferencias/:id')
+  @Header('Cache-Control', 'no-store')
+  @RequirePermission('inventario.movimientos.read')
+  @ApiOperation({ summary: 'Consultar el traslado original y el estado de su anulación' })
+  async consultarTransferencia(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Param('id', UuidParamPipe) operationId: string,
+  ) {
+    return { success: true, data: await this.inventarioService.consultarTransferencia(tenantId, actorId, operationId) };
+  }
+
+  @Post('transferencias/:id/anular')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @RequirePermission('inventario.movimientos.create')
+  @ApiOperation({ summary: 'Anular un traslado mediante movimientos opuestos enlazados' })
+  async anularTransferencia(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Param('id', UuidParamPipe) operationId: string,
+    @Body() request: TransferReversalRequestDto,
+  ) {
+    const original = readTransferReversalRequest(request, tenantId, actorId, operationId);
+    return { success: true, data: await this.inventarioService.anularTransferencia(tenantId, actorId, operationId, original) };
+  }
+
+  @Post('transferencias/:id/anular/recibo')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @RequirePermission('inventario.movimientos.create')
+  @ApiOperation({ summary: 'Recuperar la anulación original sin repetir el traslado' })
+  async recuperarAnulacionTransferencia(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Param('id', UuidParamPipe) operationId: string,
+    @Body() request: TransferReversalRequestDto,
+  ) {
+    const original = readTransferReversalRequest(request, tenantId, actorId, operationId);
+    return { success: true, data: await this.inventarioService.recuperarAnulacionTransferencia(tenantId, actorId, operationId, original) };
+  }
+
+  @Post('transferencias/:id/anular/resolver')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @RequirePermission('inventario.movimientos.create')
+  @ApiOperation({ summary: 'Resolver la anulación original o cerrar su clave sin mover stock' })
+  async resolverAnulacionTransferencia(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Param('id', UuidParamPipe) operationId: string,
+    @Body() request: TransferReversalRequestDto,
+  ) {
+    const original = readTransferReversalRequest(request, tenantId, actorId, operationId);
+    return { success: true, data: await this.inventarioService.resolverAnulacionTransferencia(tenantId, actorId, operationId, original) };
   }
 
   /**

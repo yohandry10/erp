@@ -173,7 +173,7 @@ BEGIN
   END IF;
 
   SELECT public.cerrar_recepcion_tx(
-    v_recepcion_id, v_tenant_id, v_user_id::text, NULL
+    v_recepcion_id, v_tenant_id, v_user_id::text, 'Cierre verify 440'
   ) INTO v_result;
   IF NOT coalesce((v_result->>'idempotent')::boolean, false)
      OR (SELECT count(*) FROM public.outbox_events

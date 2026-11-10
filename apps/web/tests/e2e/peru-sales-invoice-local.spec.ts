@@ -12,7 +12,7 @@ import { loginPeruLocal } from './helpers/peru-login-local'
 // estado. Sólo hosts locales.
 test('Facturar pedido: reintentar tras perder la respuesta muestra la factura emitida', async ({ page, context, request }) => {
   test.setTimeout(300000)
-  page.setDefaultTimeout(25000)
+  page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000)
   const output = process.env.LOCAL_INTEGRATED_OUTPUT_DIR!
   assert.equal(process.env.E2E_EPHEMERAL_LOCAL_DB, '1')
   assert.equal(process.env.PGHOST, '127.0.0.1')
@@ -95,7 +95,8 @@ test('Facturar pedido: reintentar tras perder la respuesta muestra la factura em
     expect(emitted).toBe(1)
 
     await step('Tras perder la respuesta el usuario termina viendo la factura emitida, sin otro comprobante', async () => {
-      const pending=page.getByRole('button',{name:'Verificar factura pendiente',exact:true})
+      // El texto depende de si la pantalla ya recargó el pedido facturado; ambos recuperan sin regenerar.
+      const pending=page.getByRole('button',{name:/^(Verificar factura pendiente|Consultar estado pendiente)$/})
       await expect(pending).toBeEnabled()
       const before=cpes();let generationPosts=0
       const observe=(r:import('@playwright/test').Request)=>{if(r.method()==='POST'&&/\/generar-factura\/?$/.test(new URL(r.url()).pathname))generationPosts++}

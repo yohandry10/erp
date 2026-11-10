@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { RmaService } from './rma.service';
+import { CacheInvalidationService } from '../../../shared/cache/cache-invalidation.service';
 
 describe('RmaService - fronteras atómicas 456', () => {
   let service: RmaService;
@@ -16,6 +17,7 @@ describe('RmaService - fronteras atómicas 456', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RmaService,
+        { provide: CacheInvalidationService, useValue: { onCpeCreated: jest.fn().mockResolvedValue(undefined) } },
         {
           provide: SupabaseService,
           useValue: {

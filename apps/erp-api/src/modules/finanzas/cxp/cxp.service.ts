@@ -571,6 +571,16 @@ export class CxpService {
     );
     const cxp = Array.isArray(cxpResult) ? cxpResult[0] : cxpResult;
 
+    if (cxpError?.code === '55000' && cxpError.message?.startsWith('ACCOUNTING_PERIOD_NOT_OPEN:')) {
+      // La RPC abortó toda la transacción: se puede corregir la fecha sin
+      // conservar una intención incierta ni ocultar el motivo del rechazo.
+      throw new BadRequestException('SUPPLIER_INVOICE_PERIOD_NOT_OPEN');
+    }
+    if (cxpError?.code === '22003') {
+      // numeric_value_out_of_range aborta la RPC transaccional: rechazo sin
+      // documento, deuda ni outbox. Nunca clasificar una pérdida de red así.
+      throw new BadRequestException('SUPPLIER_INVOICE_AMOUNT_OUT_OF_RANGE');
+    }
     if (cxpError?.code === '23505') {
       throw new ConflictException('La factura del proveedor ya está registrada con otros datos; revise el documento existente');
     }

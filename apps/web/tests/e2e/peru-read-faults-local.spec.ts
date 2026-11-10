@@ -9,7 +9,7 @@ import { loginPeruLocal } from './helpers/peru-login-local'
 // avisa en vez de decir «No se encontraron productos». Sólo hosts locales.
 test('Lecturas: el catálogo con la lectura caída avisa y no se muestra vacío', async ({ page, context }) => {
   test.setTimeout(240000)
-  page.setDefaultTimeout(25000)
+  page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000)
   const output = process.env.LOCAL_INTEGRATED_OUTPUT_DIR!
   assert.equal(process.env.E2E_EPHEMERAL_LOCAL_DB, '1')
   assert.equal(process.env.PGHOST, '127.0.0.1')

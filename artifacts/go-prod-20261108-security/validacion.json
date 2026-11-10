@@ -1,0 +1,419 @@
+{
+  "checkedAt": "2026-11-08T12:35:06.200Z",
+  "verdict": "NO_GO",
+  "schemaRequired": 612,
+  "newMigrations": 0,
+  "parentCommit": "3ad9a0a709bd7639bc4399772fabcccda559de92",
+  "sourcesUncommittedAtValidation": true,
+  "changes": [
+    {
+      "file": "apps/erp-api/package.json",
+      "sha256": "fb4ad5a7c1c498acca85d6301f63fe8bafd763f08b748bd80d3fdc6a404b0f79"
+    },
+    {
+      "file": "apps/erp-api/src/shared/email/email.service.spec.ts",
+      "sha256": "71eda237d314a8512ac6b76b62e6e0402e276b5ae165e12c062c925b6abfa88a"
+    },
+    {
+      "file": "apps/erp-api/src/shared/email/email.service.ts",
+      "sha256": "cb642bfd90b9419beeed38bf8d236f9dfff0e0efee1347ccba6e80b32c47efeb"
+    },
+    {
+      "file": "apps/web/app/dashboard/rrhh/candidatos/page.tsx",
+      "sha256": "de41afd9a58624be66cf9f8fd68a5503f9ec6cb0a9342e869e785870d5e0f0f5"
+    },
+    {
+      "file": "apps/web/app/dashboard/rrhh/pagos/page.tsx",
+      "sha256": "3b72c57e188e1569c392f5e1105ee443b29bff3281e189d5f9ce3878e7017533"
+    },
+    {
+      "file": "apps/web/components/contabilidad/EstadoResultados.tsx",
+      "sha256": "3a814bfb6ee39c75f61bbbea3bbc3a67e36720ad3b9beb32ba35be78235a7de9"
+    },
+    {
+      "file": "package.json",
+      "sha256": "3768f34eae86d3d80d66bb2bb1992b8769a885941db74a0a721d9b3bb77f4310"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "sha256": "51d60decc3cd45630d4015bc036324dbd2a0760879861c220c521b88c61a6590"
+    },
+    {
+      "file": "scripts/ci/audit-dependencies.mjs",
+      "sha256": "32c7b350b66ea038260c59785e777b2d525f5618b9eb7c803672786629256517"
+    },
+    {
+      "file": "scripts/ci/verify-security-upgrades.mjs",
+      "sha256": "e536edd18c084a0ad1a277c99ba8954495d359b88c47865b9509b0b0fb1d0183"
+    }
+  ],
+  "api": {
+    "passed": true,
+    "exitCode": 0,
+    "tests": 5848,
+    "passedTests": 5848,
+    "failedTests": 0,
+    "suites": 402,
+    "passedSuites": 402,
+    "sourcesUnchanged": true,
+    "sourceCount": 1149,
+    "onlyOsEnvironmentInherited": true,
+    "environmentFilesAbsent": true,
+    "remoteWrites": false,
+    "startedAt": "2026-11-08T12:18:50.044Z",
+    "completedAt": "2026-11-08T12:28:25.941Z"
+  },
+  "web": {
+    "passed": true,
+    "exitCode": 0,
+    "root": "C:/Users/PC/.codex/worktrees/erp-security-deps-20261108",
+    "buildDirectory": ".next-goSecurity-1794140328865",
+    "productionBuild": true,
+    "sourcesUnchanged": true,
+    "sourceCount": 913,
+    "generatedMetadataRestored": true,
+    "localApiDestination": "http://127.0.0.1:3126",
+    "environmentFilesAbsent": true,
+    "onlyOsEnvironmentInherited": true,
+    "remoteWrites": false,
+    "completedAt": "2026-11-08T12:21:53.666Z"
+  },
+  "staticChecks": {
+    "passed": true,
+    "root": "C:/Users/PC/.codex/worktrees/erp-security-deps-20261108",
+    "phases": [
+      {
+        "name": "api-types",
+        "exitCode": 0
+      },
+      {
+        "name": "api-build",
+        "exitCode": 0
+      },
+      {
+        "name": "api-lint",
+        "exitCode": 0
+      },
+      {
+        "name": "docs",
+        "exitCode": 0
+      }
+    ],
+    "remoteWrites": false,
+    "environmentFilesAbsent": true,
+    "onlyOsEnvironmentInherited": true,
+    "completedAt": "2026-11-08T12:29:38.130Z"
+  },
+  "mime": {
+    "passed": true,
+    "nodemailerVersion": "10.1.4",
+    "compiledEmailServiceUsed": true,
+    "realMimeComposition": true,
+    "nestedCommentRecipientPreserved": true,
+    "confirmationHtmlEscaped": true,
+    "unsafeAppUrlOmitted": true,
+    "plainTextPreserved": true,
+    "transport": "streamTransport",
+    "networkUsed": false,
+    "smtpServerUsed": false,
+    "emailSent": false,
+    "passwordChanged": false,
+    "remoteWrites": false,
+    "checkedAt": "2026-11-08T12:31:00.142Z"
+  },
+  "ui": {
+    "scope": "CUA_OWN_LOCAL_DEMO_READ_ONLY",
+    "passed": true,
+    "productionBuild": ".next-goSecurity-1794140328865",
+    "parentCommit": "3ad9a0a709bd7639bc4399772fabcccda559de92",
+    "sourcesUncommitted": true,
+    "existingDemoLoginPassed": true,
+    "observedHeadings": [
+      "CVs & Candidatos",
+      "Pagos & Comprobantes",
+      "Estado de Resultados (P&L)"
+    ],
+    "screenshots": [
+      "ui-security-candidatos.png",
+      "ui-security-pagos.png",
+      "ui-security-resultados.png"
+    ],
+    "financialMutations": false,
+    "passwordChanged": false,
+    "emailSent": false,
+    "remoteWrites": false,
+    "completeFinancialAcceptance": false,
+    "checkedAt": "2026-11-08T12:32:43.479Z"
+  },
+  "parserParity": {
+    "passed": true,
+    "files": [
+      {
+        "file": "apps/web/app/dashboard/rrhh/candidatos/page.tsx",
+        "beforeSource": "5214e1773618db775f108b215a985cb3c98b7ce627bf3a0eefcc6b5a9a46de56",
+        "afterSource": "de41afd9a58624be66cf9f8fd68a5503f9ec6cb0a9342e869e785870d5e0f0f5",
+        "compiledJsIdentical": true,
+        "compiledSha256": "864ef0132f81ec0d4ca8570ac57652ea917a91c9a18ae4061ed9ba4f28470934"
+      },
+      {
+        "file": "apps/web/app/dashboard/rrhh/pagos/page.tsx",
+        "beforeSource": "7af613113c5eaff04ebb207c76d31f0e628d19079775349a6415d01659a771a3",
+        "afterSource": "3b72c57e188e1569c392f5e1105ee443b29bff3281e189d5f9ce3878e7017533",
+        "compiledJsIdentical": true,
+        "compiledSha256": "9dc28d872aa9a33be5509dbd2283f0cf43b5b5952ecf5a8b30bf82c104a91c4d"
+      },
+      {
+        "file": "apps/web/components/contabilidad/EstadoResultados.tsx",
+        "beforeSource": "65aad626e085b55ebd7fa97ac870c3de1195408cad01ddf404e6257ab612e4bb",
+        "afterSource": "3a814bfb6ee39c75f61bbbea3bbc3a67e36720ad3b9beb32ba35be78235a7de9",
+        "compiledJsIdentical": true,
+        "compiledSha256": "06f22e205edc75f2bd305409bfd9d5655cfe79ddfeac65ff821545cdd5cb50c4"
+      }
+    ],
+    "semanticsPreservedByCompiler": true,
+    "remoteWrites": false
+  },
+  "dependencyUpgrades": [
+    {
+      "package": "nodemailer",
+      "version": "10.1.4",
+      "installedCopy": "node_modules/.pnpm/nodemailer@10.1.4/node_modules/nodemailer",
+      "tests": {
+        "normalRecipientPreserved": true,
+        "nestedCommentRecipientPreserved": true,
+        "emailSent": false
+      }
+    },
+    {
+      "package": "fast-uri",
+      "version": "4.2.3",
+      "installedCopy": "node_modules/.pnpm/fast-uri@4.2.3/node_modules/fast-uri",
+      "tests": {
+        "normalUriPreserved": true,
+        "encodedSchemeNotActivated": true,
+        "encodedSchemeNotEqual": true
+      }
+    },
+    {
+      "package": "qs",
+      "version": "6.16.1",
+      "installedCopy": "node_modules/.pnpm/qs@6.16.1/node_modules/qs",
+      "tests": {
+        "normalCommaArrayPreserved": true,
+        "nonCallableToStringHandled": true,
+        "bothEncodingPaths": true
+      }
+    }
+  ],
+  "productionRegistryVulnerabilities": {
+    "info": 0,
+    "low": 0,
+    "moderate": 0,
+    "high": 0,
+    "critical": 0
+  },
+  "allRegistryVulnerabilities": {
+    "info": 0,
+    "low": 1,
+    "moderate": 5,
+    "high": 0,
+    "critical": 0
+  },
+  "remainingRegistryAdvisories": [
+    {
+      "advisory": "GHSA-rj75-hqrm-r3gf",
+      "package": "postcss-selector-parser",
+      "severity": "moderate",
+      "installedVersions": [
+        "6.1.3"
+      ],
+      "patchedVersions": ">=6.1.5"
+    },
+    {
+      "advisory": "GHSA-gcqx-w48m-w2h4",
+      "package": "deepmerge",
+      "severity": "low",
+      "installedVersions": [
+        "4.3.1"
+      ],
+      "patchedVersions": "<0.0.0"
+    },
+    {
+      "advisory": "GHSA-3g3m-2fjr-6pw4",
+      "package": "glob",
+      "severity": "moderate",
+      "installedVersions": [
+        "13.0.6",
+        "10.5.0"
+      ],
+      "patchedVersions": ">=14.0.2"
+    },
+    {
+      "advisory": "GHSA-g3hv-75wg-m249",
+      "package": "minimatch",
+      "severity": "moderate",
+      "installedVersions": [
+        "10.2.5",
+        "9.0.7"
+      ],
+      "patchedVersions": ">=11.0.1"
+    }
+  ],
+  "sast": {
+    "parentCommit": "3ad9a0a709bd7639bc4399772fabcccda559de92",
+    "sourcesUncommittedAtCopy": true,
+    "changes": [
+      {
+        "file": "apps/erp-api/package.json",
+        "sha256": "fb4ad5a7c1c498acca85d6301f63fe8bafd763f08b748bd80d3fdc6a404b0f79"
+      },
+      {
+        "file": "apps/erp-api/src/shared/email/email.service.spec.ts",
+        "sha256": "71eda237d314a8512ac6b76b62e6e0402e276b5ae165e12c062c925b6abfa88a"
+      },
+      {
+        "file": "apps/erp-api/src/shared/email/email.service.ts",
+        "sha256": "cb642bfd90b9419beeed38bf8d236f9dfff0e0efee1347ccba6e80b32c47efeb"
+      },
+      {
+        "file": "apps/web/app/dashboard/rrhh/candidatos/page.tsx",
+        "sha256": "de41afd9a58624be66cf9f8fd68a5503f9ec6cb0a9342e869e785870d5e0f0f5"
+      },
+      {
+        "file": "apps/web/app/dashboard/rrhh/pagos/page.tsx",
+        "sha256": "3b72c57e188e1569c392f5e1105ee443b29bff3281e189d5f9ce3878e7017533"
+      },
+      {
+        "file": "apps/web/components/contabilidad/EstadoResultados.tsx",
+        "sha256": "3a814bfb6ee39c75f61bbbea3bbc3a67e36720ad3b9beb32ba35be78235a7de9"
+      },
+      {
+        "file": "package.json",
+        "sha256": "3768f34eae86d3d80d66bb2bb1992b8769a885941db74a0a721d9b3bb77f4310"
+      },
+      {
+        "file": "pnpm-lock.yaml",
+        "sha256": "51d60decc3cd45630d4015bc036324dbd2a0760879861c220c521b88c61a6590"
+      },
+      {
+        "file": "scripts/ci/audit-dependencies.mjs",
+        "sha256": "32c7b350b66ea038260c59785e777b2d525f5618b9eb7c803672786629256517"
+      },
+      {
+        "file": "scripts/ci/verify-security-upgrades.mjs",
+        "sha256": "e536edd18c084a0ad1a277c99ba8954495d359b88c47865b9509b0b0fb1d0183"
+      }
+    ],
+    "startedAt": "2026-11-08T12:26:45.529Z",
+    "endedAt": "2026-11-08T12:31:45.759Z",
+    "exitCode": 1,
+    "engineVersion": "1.184.0",
+    "image": "semgrep/semgrep@sha256:cc1b68266f267878b39739373ea9985b9a78e5d64497dd875c8de100b22695ed",
+    "sourceFiles": 1549,
+    "ruleFiles": 184,
+    "scannedFiles": 1549,
+    "findings": 211,
+    "errors": 0,
+    "immutableCopyVerified": true,
+    "sourceChangesUnchanged": true,
+    "network": "none",
+    "metrics": "off",
+    "newAccount": false,
+    "paidService": false,
+    "remoteWrites": false,
+    "notEquivalentToCodeql": true,
+    "securityReviewComplete": false,
+    "findingsByRuleAndPathSameAsParent": true,
+    "completeSecurityAcceptance": false
+  },
+  "cliDiagnosticsOutsideJson": [
+    "npm-audit-updated.json",
+    "dependency-regressions-final.json"
+  ],
+  "evidence": [
+    {
+      "file": "api-security-deps.json",
+      "sha256": "48afcf31db5839442f2906dc70c370171dbba33649460f204b14dd57e6536544"
+    },
+    {
+      "file": "web-security-deps-build.json",
+      "sha256": "9178009d0f51f6178b155c29bd0f5d1ef7c030f1a1de85cadf46972066be1701"
+    },
+    {
+      "file": "static-security-deps.json",
+      "sha256": "1fb4afe7ba2cfaed08af02c2e8ba36528d01b90632da75217f6adc4afb61d327"
+    },
+    {
+      "file": "email-html-red.json",
+      "sha256": "7fc8139a743669d3a07e4979ffabb295a260f3178b606767ece7ff09d0790414"
+    },
+    {
+      "file": "email-html-green.json",
+      "sha256": "fe454d2b9997b27890d53259f80d4aba706dcaab6d7b6b7c7afadc45f3594f04"
+    },
+    {
+      "file": "email-stream-security-deps.json",
+      "sha256": "acfdaab1283bc5a6163ed2d2e169e9326f8c1c06cd45d21d696053b23ade59b2"
+    },
+    {
+      "file": "ui-security-deps.json",
+      "sha256": "243cf9a395fb6cec8bc4db6b8e9e789a55b8f8275638d57772f15770ffcd34f4"
+    },
+    {
+      "file": "dependency-red-green.json",
+      "sha256": "5103992cadd82edcc40f9b7e2185151fd43c5462b8040671eea497fc66c2d366"
+    },
+    {
+      "file": "dependency-regressions-final.json",
+      "sha256": "e7e990311b5e4aa4b37bd2f755bd2bb8d8b7812334490ee2ac7419bc4fce75e3"
+    },
+    {
+      "file": "npm-audit-updated.json",
+      "sha256": "2aae2df9f3a67eaee507876aff75ba705a55ff7361c74d3798ee28438f086cca"
+    },
+    {
+      "file": "npm-audit-all-updated.json",
+      "sha256": "270a70a1d11f936ecd77a137d8d27392f21f998cd0d3dc8118c5b8315529cb0e"
+    },
+    {
+      "file": "audit-with-regressions.json",
+      "sha256": "deaabc57576d0aeec8aea71f6eb545f4ffd17798f3ef06f8927e07cec48cc8d5"
+    },
+    {
+      "file": "jsx-parser-parity.json",
+      "sha256": "ae669fe27d0ca26c0a927840c52323c7a9c29d9e74320aa544076bce0f01ef81"
+    },
+    {
+      "file": "sast-security-deps/source.json",
+      "sha256": "a4ab2cf0516aea1785a8fe8a48bcbed53ecbb941066de044e9fa1603150b9ef5"
+    },
+    {
+      "file": "sast-security-deps/results/raw.json",
+      "sha256": "a8b7dcddecfb87505d25fdcaf98e071c0e909d05960463d68f70ca818d4b660e"
+    },
+    {
+      "file": "sast-security-deps/results/run.json",
+      "sha256": "5b1cff45eda18cd606344d56637af966e5ae7ac08ee9d340c9414e64d360ba50"
+    },
+    {
+      "file": "recovery612-verified.json",
+      "sha256": "c7111b8e9183bdf3ab5be50f6888ccf32c3370575c859cb13eade7e7f581ba57"
+    }
+  ],
+  "scopeLimits": [
+    "Local tests do not replace GitHub CI",
+    "CodeQL unavailable remains a gate",
+    "211 SAST matches require complete triage",
+    "A-J and release gates remain open",
+    "No complete first-admin E2E recertification",
+    "No pending-form natural session-expiry acceptance",
+    "No new fiscal, payroll, reversal, or production acceptance"
+  ],
+  "remoteWrites": false,
+  "emailSent": false,
+  "passwordChanged": false,
+  "paidService": false,
+  "securityChecksDisabled": false,
+  "merged": false,
+  "deployed": false
+}

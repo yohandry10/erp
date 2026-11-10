@@ -1,0 +1,213 @@
+{
+  "archiveSha256": "204ab62ba21fb83b4c075da5145f71a6fe66f9486c1a226a5455df1ce83da581",
+  "exito": true,
+  "redDelContenedor": "none",
+  "conexionesRemotas": 0,
+  "desde": 594,
+  "hasta": 617,
+  "limites": [
+    "Sin objetos de Storage ni roles globales reales; el tiempo local no acredita el de PROD."
+  ],
+  "restaurarMs": 9326,
+  "esquemaDelRespaldo": 593,
+  "entornoDelRespaldo": "PROD",
+  "aplicadasAntesDelLote": [],
+  "loteSha256": "0ee1ea396949bf8ecf0b5482025930c6b9dffe33a5fe0656a7731686ec381300",
+  "migraciones": [
+    "594__kardex_initial_stock_tie_order.sql",
+    "595__canonical_demo_sample_consistency.sql",
+    "596__peru_rma_cumulative_credit_rounding.sql",
+    "597__peru_rma_cumulative_currency_rounding.sql",
+    "598__cxc_cumulative_book_currency.sql",
+    "599__treasury_currency_from_country.sql",
+    "600__bank_foreign_currency_full_consumption.sql",
+    "601__cxp_cumulative_book_currency.sql",
+    "602__cash_foreign_currency_full_consumption.sql",
+    "603__customer_credit_cumulative_receivable_book.sql",
+    "604__customer_refund_bank_book_consumption.sql",
+    "605__customer_refund_cash_book_consumption.sql",
+    "606__supplier_credit_cumulative_book.sql",
+    "607__supplier_note_cumulative_book.sql",
+    "608__supplier_refund_bank_carrying_trace.sql",
+    "609__rrhh_automatic_attendance_intent.sql",
+    "610__rrhh_solicitudes_sin_cruce.sql",
+    "611__demo_cpe_type_and_draft.sql",
+    "612__sales_approval_history_backend_read.sql",
+    "613__linked_inventory_business_reversals.sql",
+    "614__purchase_receipt_invoice_serialization.sql",
+    "615__linked_purchase_receipt_business_reversal.sql",
+    "616__purchase_receipt_reversal_recovery.sql",
+    "617__purchase_receipt_frozen_currency_valuation.sql"
+  ],
+  "tablas": 334,
+  "filas": 227816,
+  "rollbackMs": 451,
+  "rollbackSinRastro": true,
+  "aplicarMs": 336,
+  "esquemaFinal": 617,
+  "tablasNuevas": [
+    "app.receipt_accounting_write_615",
+    "app.receipt_source_617",
+    "app.receipt_valuation_617",
+    "app.receipt_write_617",
+    "public.inventario_reversa_resoluciones",
+    "public.inventario_reversas"
+  ],
+  "tablasPerdidas": [],
+  "columnasPerdidas": [],
+  "tablasConDatosCambiados": [],
+  "funcionesPublicasRetiradas": [],
+  "salud": {
+    "ready": true,
+    "esquema": 617,
+    "cola_muerta": 16,
+    "requerido_aplicado": true
+  },
+  "movimientosBancarios": {
+    "nulos": 0,
+    "total": 44,
+    "inactivos": 0
+  },
+  "defaultActivo": "true",
+  "verificadores": [
+    {
+      "version": 594,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 595,
+      "ok": true,
+      "error": null,
+      "identidadLocal": true
+    },
+    {
+      "version": 596,
+      "ok": true,
+      "error": null,
+      "identidadLocal": true
+    },
+    {
+      "version": 597,
+      "ok": true,
+      "error": null,
+      "identidadLocal": true
+    },
+    {
+      "version": 598,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 599,
+      "ok": true,
+      "error": null,
+      "identidadLocal": true
+    },
+    {
+      "version": 600,
+      "ok": true,
+      "error": null,
+      "identidadLocal": true
+    },
+    {
+      "version": 601,
+      "ok": true,
+      "error": null,
+      "identidadLocal": true
+    },
+    {
+      "version": 602,
+      "ok": true,
+      "error": null,
+      "identidadLocal": true
+    },
+    {
+      "version": 603,
+      "ok": true,
+      "error": null,
+      "identidadLocal": true
+    },
+    {
+      "version": 604,
+      "ok": true,
+      "error": null,
+      "identidadLocal": true
+    },
+    {
+      "version": 605,
+      "ok": true,
+      "error": null,
+      "identidadLocal": true
+    },
+    {
+      "version": 606,
+      "ok": true,
+      "error": null,
+      "identidadLocal": true
+    },
+    {
+      "version": 607,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 608,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 609,
+      "ok": true,
+      "error": null,
+      "identidadLocal": true
+    },
+    {
+      "version": 610,
+      "ok": true,
+      "error": null,
+      "identidadLocal": true
+    },
+    {
+      "version": 611,
+      "ok": true,
+      "error": null,
+      "identidadLocal": true
+    },
+    {
+      "version": 612,
+      "ok": true,
+      "error": null
+    },
+    {
+      "version": 613,
+      "ok": true,
+      "error": null,
+      "identidadLocal": true
+    },
+    {
+      "version": 614,
+      "ok": true,
+      "error": null,
+      "identidadLocal": true
+    },
+    {
+      "version": 615,
+      "ok": true,
+      "error": null,
+      "identidadLocal": true
+    },
+    {
+      "version": 616,
+      "ok": true,
+      "error": null,
+      "identidadLocal": true
+    },
+    {
+      "version": 617,
+      "ok": true,
+      "error": null
+    }
+  ],
+  "verificadoresFallidos": 0
+}

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatFiscalDocumentNumber } from '@/lib/fiscal-document-number'
 import { cpeA4Metadata } from '@/lib/cpe-read-contract'
+import { cpePreviewTaxLabel } from '@/lib/cpe-preview-tax-label'
 import { isOfflineCachedResponse } from '@/lib/offline-store'
 import { customAuth } from '@/lib/auth-service'
 import { useAuth } from '@/contexts/AuthContext'
@@ -306,7 +307,7 @@ function CpeA4Sheet({
   const qrUrl = safeCpeImageUrl(
     metadata.fiscal_qr_data_url || metadata.dian_qr_data_url || metadata.sunat_qr_data_url || metadata.qr_data_url,
   )
-  const taxRate = firstFiniteNumber(metadata.tasa_igv, taxable > 0 ? (tax / taxable) * 100 : profile.defaultTaxRate)
+  const taxLabel = cpePreviewTaxLabel(metadata, profile.taxName, profile.defaultTaxRate)
   const storedMetadata = metadata.metadata && typeof metadata.metadata === 'object'
     ? metadata.metadata as Record<string, unknown>
     : {}
@@ -327,7 +328,7 @@ function CpeA4Sheet({
     { label: 'Descuentos', value: firstFiniteNumber(metadata.total_descuentos, metadata.descuentos) },
     { label: otherTaxLabel, value: firstFiniteNumber(metadata.total_isc) },
     { label: 'ICBPER', value: firstFiniteNumber(metadata.total_icbper) },
-    { label: `${profile.taxName} (${Number(taxRate.toFixed(2))}%)`, value: tax },
+    { label: taxLabel, value: tax },
   ].filter((row) => Math.abs(row.value) >= 0.005)
   const noteReference = previewNoteReference(metadata)
   const fiscalPrintInfo = metadata.fiscal_print_info

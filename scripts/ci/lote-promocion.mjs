@@ -22,7 +22,9 @@ export function construirLote(root, desde, hasta) {
   const lote = todas.filter((m) => m.version >= desde && m.version <= hasta);
   assert.equal(lote[0].version, desde);
   const partes = lote.map(({ version, archivo }) => {
-    const cuerpo = fs.readFileSync(path.join(dir, archivo), 'utf8').replace(/^﻿/, '');
+    const cuerpo = fs.readFileSync(path.join(dir, archivo), 'utf8').replace(/^﻿/, '').replace(/\r\n/g, '\n');
+    // Los bytes del lote son los del repositorio (LF), no los del checkout: en Windows
+    // autocrlf entrega CRLF y un ancla multilínea deja de coincidir con la función en la base.
     assert.equal((cuerpo.match(/^BEGIN;\s*$/gm) || []).length, 1, `${archivo}: se esperaba un BEGIN;`);
     assert.equal((cuerpo.match(/^COMMIT;\s*$/gm) || []).length, 1, `${archivo}: se esperaba un COMMIT;`);
     const nombre = archivo.replace(/^\d+__/, '').replace(/\.sql$/, '');

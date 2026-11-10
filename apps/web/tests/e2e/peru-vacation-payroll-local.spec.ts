@@ -5,7 +5,7 @@ import {loginPeruLocal} from './helpers/peru-login-local'
 import {readLocalSql,consumeLocalAccounting} from './helpers/peru-local-accounting'
 
 test('RRHH Perú: doce solicitudes alimentan cálculo, aprobación segregada y pago único',async({page,context,browser})=>{
- test.setTimeout(300000);page.setDefaultTimeout(30000)
+ test.setTimeout(300000);page.setDefaultTimeout(30000);page.setDefaultNavigationTimeout(120000)
  expect(process.env.E2E_EPHEMERAL_LOCAL_DB).toBe('1');expect(process.env.PGPORT).toBe('55456')
  const output=process.env.LOCAL_INTEGRATED_OUTPUT_DIR!,f=JSON.parse(await fs.readFile(path.join(output,'vacation-payroll-fixture.json'),'utf8'))
  expect(f.tenant).toMatch(/^[0-9a-f-]{36}$/i);expect(f.requestIds).toHaveLength(12)

@@ -1,0 +1,39 @@
+{
+  "intent": {
+    "version": 1,
+    "tenantId": "e5a0ba56-22d0-4c72-819d-a1feed26cb7f",
+    "actorId": "0444fd96-4ec8-451f-8f60-60d19e8242bb",
+    "receiptId": "f5f8d4fd-20aa-4042-8951-8dcf39274483",
+    "receiptNumber": "Recepción de prueba 616",
+    "createdAt": "2026-11-08T11:38:10.461133-05:00",
+    "key": "verify616-abandon",
+    "fingerprint": "68a044efdecfe7b822fa792bf1655ac749438f68e7e0588daa933d6bf028606d",
+    "body": {
+      "motivo": "Anulación con recibo original",
+      "fecha_contable": "2026-11-08"
+    }
+  },
+  "response": {
+    "success": true,
+    "data": {
+      "status": "ABANDONED",
+      "resolution": {
+        "id": "a3c79e16-b0d9-44e1-a4d3-c3da9bb20db1",
+        "type": "RECEPCION_REVERSA",
+        "actor_id": "0444fd96-4ec8-451f-8f60-60d19e8242bb",
+        "tenant_id": "e5a0ba56-22d0-4c72-819d-a1feed26cb7f",
+        "confirmed_at": "2026-11-08T11:38:10.461133-05:00",
+        "idempotency_key": "verify616-abandon",
+        "request_payload": {
+          "tipo": "RECEPCION",
+          "motivo": "Anulación con recibo original",
+          "actor_id": "0444fd96-4ec8-451f-8f60-60d19e8242bb",
+          "fuente_id": "f5f8d4fd-20aa-4042-8951-8dcf39274483",
+          "fecha_contable": "2026-11-08"
+        },
+        "request_fingerprint": "68a044efdecfe7b822fa792bf1655ac749438f68e7e0588daa933d6bf028606d",
+        "source_operation_id": "f5f8d4fd-20aa-4042-8951-8dcf39274483"
+      }
+    }
+  }
+}

@@ -11,6 +11,24 @@ const money = (v: unknown): v is number => typeof v === 'number' && Number.isFin
 const civil = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) &&
   Number.isFinite(Date.parse(v)) && new Date(v + 'T00:00:00Z').toISOString().slice(0, 10) === v
 const fail = (): never => { throw new Error('No se pudo recuperar el registro pendiente. Sus datos se conservan y se bloquea otro registro.') }
+export function validateSupplierInvoiceAmounts(payload: Record<string, unknown>): void {
+  const fields = ['subtotal', 'igv', 'total', 'detraccion', 'retencion', 'percepcion'];
+  if (fields.some(key => payload[key] !== undefined &&
+      (!money(payload[key]) || Number(payload[key]) > 999_999_999_999.99)) ||
+      Number(payload.total) - Number(payload.detraccion || 0) - Number(payload.retencion || 0) + Number(payload.percepcion || 0) > 999_999_999_999.99) {
+    throw new Error('Cada importe y el saldo deben admitir como máximo 999.999.999.999,99 y dos decimales. Corrige los importes antes de registrar.');
+  }
+}
+
+/** Sólo un rechazo inequívoco permite desbloquear la edición del mismo intento. */
+export function releaseRejectedSupplierInvoiceIntent(error: any, intent: SupplierInvoiceIntent,
+  storage: Pick<Storage, 'getItem' | 'removeItem'>): boolean {
+  if (error?.status !== 400 || !['SUPPLIER_INVOICE_AMOUNT_OUT_OF_RANGE', 'SUPPLIER_INVOICE_PERIOD_NOT_OPEN'].includes(error?.data?.code)) return false;
+  const key = supplierInvoiceIntentKey(intent);
+  if (storage.getItem(key) !== JSON.stringify(intent)) return false;
+  storage.removeItem(key);
+  return storage.getItem(key) === null;
+}
 export function supplierInvoiceIntentKey(scope: InvoiceRegistrationScope) {
   if (!uuid.test(scope.tenantId) || !uuid.test(scope.actorId)) return fail()
   return `erp.supplier-invoice.pending.v1.${scope.tenantId}:${scope.actorId}`

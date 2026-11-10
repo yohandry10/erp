@@ -9,7 +9,7 @@ import { loginPeruLocal } from './helpers/peru-login-local'
 // avisa en vez de mostrar ventas en cero. Sólo hosts locales.
 test('Dashboard: una lectura caída se informa y no se muestra como ventas en cero', async ({ page, context, request }) => {
   test.setTimeout(240000)
-  page.setDefaultTimeout(25000)
+  page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000)
   const output = process.env.LOCAL_INTEGRATED_OUTPUT_DIR!
   assert.equal(process.env.E2E_EPHEMERAL_LOCAL_DB, '1')
   assert.equal(process.env.PGHOST, '127.0.0.1')

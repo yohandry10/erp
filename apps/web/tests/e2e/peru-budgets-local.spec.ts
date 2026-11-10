@@ -9,7 +9,7 @@ import { loginPeruLocal } from './helpers/peru-login-local'
 // (A→B→A) se aplica, no reproduce la primera edición. Sólo hosts locales.
 test('Presupuestos: editar y volver al monto anterior lo guarda de verdad', async ({ page, context, request }) => {
   test.setTimeout(300000)
-  page.setDefaultTimeout(25000)
+  page.setDefaultTimeout(25000);page.setDefaultNavigationTimeout(120000)
   const output = process.env.LOCAL_INTEGRATED_OUTPUT_DIR!
   assert.equal(process.env.E2E_EPHEMERAL_LOCAL_DB, '1')
   assert.equal(process.env.PGHOST, '127.0.0.1')

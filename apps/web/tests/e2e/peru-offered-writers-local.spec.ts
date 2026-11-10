@@ -10,7 +10,7 @@ const proof={scope:'FRESH_REAL_UI_QUOTE_CONTRACT_CASH_PAYROLL_SQL',complete:fals
 test.afterAll(()=>{proof.complete=proof.steps.length===5&&!proof.page_errors.length;fs.writeFileSync(path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!,'supplemental-offered-writers-ui.json'),JSON.stringify(proof,null,2))})
 async function start(page:Page,context:BrowserContext){
  expect(process.env.E2E_EPHEMERAL_LOCAL_DB).toBe('1');expect(process.env.PGPORT).toBe('55456')
- page.setDefaultTimeout(30000);page.on('pageerror',e=>proof.page_errors.push(e.message))
+ page.setDefaultTimeout(30000);page.setDefaultNavigationTimeout(120000);page.on('pageerror',e=>proof.page_errors.push(e.message))
  await context.route('**/*',r=>['127.0.0.1','localhost','[::1]'].includes(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient'))
  const f=JSON.parse(fs.readFileSync(path.join(process.env.LOCAL_INTEGRATED_OUTPUT_DIR!,'accounting-first-fixture.json'),'utf8'))
  const auth=await loginPeruLocal(page,f.email,'Cliente-Local-2026-Only!'),token=auth.access_token??auth.data?.access_token

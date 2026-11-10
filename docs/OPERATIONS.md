@@ -1,5 +1,52 @@
 # Operación, configuración y base de datos
 
+## Publicación del repositorio
+
+Antes de cambiar la visibilidad, revisar todas las ramas, etiquetas e historial,
+los artefactos y logs de Actions, los respaldos y las credenciales incrustadas.
+Retirar una clave de Git no la revoca: comprobar su revocación o rotación.
+Una reescritura cambia los SHA y exige coordinar los clones anteriores para que
+no reintroduzcan el historial. Las referencias y vistas antiguas de PR pueden
+requerir intervención de GitHub Support; un push forzado no prueba su eliminación.
+Conservar una copia privada y un plan de actualización con leases antes de aplicar.
+
+## Captura de errores con Sentry
+
+Los SDK11.11.0 son opcionales y sólo se activan con un DSN explícito del
+recolectorHTTPS de Sentry. No hay DSN real ni token de administración en Git.
+
+| Variable | Uso |
+| --- | --- |
+| `SENTRY_DSN` | API y servidorNext; configuración inyectada al arrancar |
+| `NEXT_PUBLIC_SENTRY_DSN` | Captura del navegador; se fija al compilar y su clave permite ingestión, no lectura de errores |
+| `SENTRY_ENVIRONMENT` / `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | Etiqueta de entorno; por defecto `production`, pruebas propias `erp-local-verification` |
+| `APP_COMMIT_SHA` / `NEXT_PUBLIC_APP_COMMIT_SHA` | Release de40hex del binario/build concreto; no sustituirlo por otro candidato |
+
+API captura erroresHTTP5xx mediante el filtro global y errores de proceso no
+manejados después de su inicialización; los4xx de negocio no se envían. Next
+captura errores de servidorNode, no manejados del navegador y del ErrorBoundary
+existente. No acredita todos los jobs que capturan internamente sus excepciones,
+ni la aceptación del cliente nativo.
+
+`dataCollection` desactiva usuario, cookies, headers, cuerpos, consultasURL,
+datosSQL/colas/IA y variables/contexto de código. El último filtro conserva tipo
+de excepción y posición de fuente acotada, sustituye su mensaje por uno genérico
+y retira los demás contextos. No se envían breadcrumbs, logs, métricas, tracing
+ni replay. Las copias de políticaAPI/web tienen prueba de igualdad. Un fallo del
+monitor no debe impedir la respuestaHTTP. No copiar cuerpo, sesión ni contexto
+financiero al capturador.
+
+En Sentry activar también la prevención de almacenarIP y reglas sobre los
+campos de usuario/geografía: el servicio puede inferirlos de la conexión aunque
+el SDK no los haya enviado. Comprobar el evento recibido después del cambio;
+una respuesta200 de ingestión no prueba la anonimización. Las reglas sólo
+afectan eventos nuevos. Conservar las pruebas iniciales y su alcance.
+
+El build desactiva uploads de sourcemaps y telemetría. No requiere autorizar una
+integraciónGitHub, crear tokens ni cambiar el plan gratuito. Las pruebas locales
+no habilitan por sí solas el monitoreo de un desplieguePROD ni acreditan una
+alarma operativa o su notificación.
+
 ## Requisitos
 
 - Node.js 24 LTS, con parche vigente; CI y las tres imágenes Docker usan la rama 24.
@@ -44,6 +91,13 @@ SELECT nuevo sin delegación. Sigue sin promoción
 aPROD569. No ejecutar el grant por separado enPROD.
 El arranque operativo requiere primero el preflight PROD indicado más abajo;
 después se ejecuta el paquete compilado mediante `pnpm --filter @erp-suite/erp-api start`.
+
+La612 concede explícitamente SELECT de `pedido_aprobaciones` al backend. Su
+ausencia en una reconstrucción convertía un intento incompatible posterior a
+una decisión en503 al consultar el historial, en lugar del409 esperado. No se
+depende de default privileges del proveedor ni de un GRANT en el fixture E2E.
+No cambia filas, RLS/políticas, owner, permisos de clientes ni DML; la decisión
+conserva la RPC441 y el filtrado de tenant/actor del API. Sin promoción remota.
 
 Servicios principales:
 
@@ -100,6 +154,12 @@ Los esquemas de configuración en código son la fuente exacta. Categorías:
 - Supabase: URL, anon key, service-role key y conexión PostgreSQL.
 - Redis/worker: host, puerto, credenciales y flags de jobs.
 - Auth: secretos JWT, cookies y expiraciones.
+- PII: `PII_ENCRYPTION_KEY` o, en su ausencia, `ENCRYPTION_KEY`; rotación con
+  `PII_ENCRYPTION_KEY_OLD`. Las claves declaradas requieren32caracteres como
+  mínimo. Sin clave no se ejecuta cifradoPII, aunque una configuración sólo
+  de certificados siga siendo válida para otros módulos. La búsqueda requiere
+  `PII_SEARCH_SALT` explícito de al menos32caracteres; nunca se reemplaza por
+  un valor público ni se regeneran hashes existentes automáticamente.
 - SUNAT/OSE: ambiente, SOL, certificado, RUC esperado y GRE REST.
 - ARCA: ambiente, certificado y punto de venta. WSAA/WSFE se derivan del
   ambiente y sólo admiten las URLs oficiales exactas: homologación usa
@@ -282,6 +342,14 @@ Esos artefactos son forenses; pueden estar superados. Deben contrastarse con
 
 ## Ensayo local de recuperación
 
+El corte609 añade sólo `registrar_asistencia_actual_tx`, con EXECUTE para
+`service_role` y el writer/ledger475 intactos. El ensayo local compara definición
+del writer y ACL/RLS de tablas antes/después, retira la función nueva, reaplica
+dos veces y ejecuta el verificador609 con rollback de todos sus fixtures. No hay
+backfill ni recifrado. Un rollback de binario debe preceder a retirar esta
+función: el runtime609 exige ese piso. El registro local de historia no promueve
+la migración remota ni acredita readiness si existen eventos antiguos pendientes.
+
 `node scripts/ci/run-peru-integrated-local.mjs --browser` reconstruye PostgreSQL
 16 efímero, verifica SQL y flujos HTTP y toma un respaldo con snapshot exportado.
 `test-peru-backup-restore-local.mjs` sólo acepta el contenedor efímero del runner:
@@ -359,6 +427,11 @@ Ensayos locales:
 - `pnpm test:storage-backup` levanta dos Storage efímeros en Docker, respalda,
   rechaza un respaldo alterado, restaura una empresa y luego todo, verifica
   cada objeto por SHA-256 y rechaza destinos remotos.
+  Docker asigna los puertos HTTP libres exclusivamente en loopback; PostgreSQL
+  y PostgREST sólo se exponen dentro de la red propia del ensayo.
+  Si el pool local de Docker está agotado, `STORAGE_BACKUP_TEST_SUBNET` permite
+  indicar una subred privada /24 previamente comprobada libre; Docker rechaza
+  solapamientos. No modifica las redes existentes ni la configuración del motor.
   `scripts/datos/restaurar-storage.mjs` sólo escribe en Storage local:
   recuperar PROD sigue el procedimiento de operaciones destructivas.
 - `pnpm test:tenant-export` (base efímera) exporta una empresa y comprueba que
@@ -575,6 +648,13 @@ otro usuario, recepción, factura y pago bancario con sus asientos; contrasta
 el contexto fiscal persistido y los conflictos al reintentar. `--browser`
 añade login, apertura y cobro desde el POS, además de crear, aprobar y recibir
 una compra desde la interfaz.
+La fase de navegador corre en tres tandas, cada una con un proceso Next dev nuevo,
+porque Next dev retiene cada ruta compilada y un solo proceso agotó el heap a
+mitad de la fase. Se conserva el orden alfabético global y una tanda fallida no
+impide las demás; sus logs son `browser.log`, `browser-2.log` y `browser-3.log`.
+El barrido de pantallas (`--survey`) corre igual en tres tramos contiguos
+(`module-survey-1.log` a `module-survey-3.log`); `module-survey/survey.json` combina
+los tramos en el orden global.
 El ejecutor conserva logs/JSON/capturas en `artifacts/peru-integrated-<ejecución>`
 y detiene sólo los recursos que creó. No carga archivos operativos ni cambia
 la lista blanca PROD del runtime; la dependencia Supabase local se inyecta en
