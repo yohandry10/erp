@@ -338,6 +338,9 @@ Reglas:
    preflight, lote transaccional y readiness 590. El ensayo corre sin red, fuerza
    un rollback, compara cada tabla y ejecuta los verificadores sobre esos datos; es
    lo único que emula los privilegios por defecto de Supabase, que CI no tiene.
+   El lote se arma con los bytes del repositorio (LF) aunque el checkout de
+   Windows entregue CRLF: su huella es la misma en cualquier equipo, y un
+   verificador no puede exigir la ausencia de concesiones que da el proveedor.
    Se aplica con `node scripts/promote-lote-prod.mjs --desde 570 --hasta 590 --pr <n>
    --backup <manifiesto> --rehearsal <informe> --apply --env-file <.env.production>
    --pg-bin <PostgreSQL 17/bin>`; sin `--apply` sólo comprueba las compuertas: respaldo

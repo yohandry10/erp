@@ -263,6 +263,9 @@ jobs:
           fi
           psql --version
 
+      - name: Promotion batch bytes do not depend on checkout line endings
+        run: node scripts/ci/test-lote-promocion.mjs
+
       - name: Rebuild and verify the required database contract
         run: node scripts/ci/verify-database-contracts.mjs
 

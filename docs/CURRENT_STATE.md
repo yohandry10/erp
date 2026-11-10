@@ -1,6 +1,6 @@
 # Estado actual del ERP
 
-Actualizado: 2026-11-09. Una página: si algo no cabe aquí, va a su documento de dominio.
+Actualizado: 2026-11-10. Una página: si algo no cabe aquí, va a su documento de dominio.
 
 ## Dónde está
 
@@ -12,8 +12,10 @@ Actualizado: 2026-11-09. Una página: si algo no cabe aquí, va a su documento d
   cada una con un Next dev nuevo, y las navegaciones esperan la compilación en
   frío (120 s). Sobre083d5c55 las tres tandas de navegador pasan71/71 sin
   inestables; el fallo de recuperación de actor y el refresco inestable de
-  estados financieros vistos en f0066851 no se repiten. El barrido en tandas
-  (f81599f7) y D57 esperan su CI; no se acepta verde hasta verlo completo.
+  estados financieros vistos en f0066851 no se repiten. Con el barrido en
+  tandas y D57, la cabeza 4547bc1e pasa sus 17 checks: CI42720616798 con la
+  integración Perú completa, E2E aislado42720616852 y Security42720616958,
+  sin alertas CodeQL abiertas en el PR.
   D58 corregido: ocho regresionesReact reales pasan;
   seis fallan sobre la versión anterior. En build de producción, guardar,
   recargar y eliminar el reparto conserva ambas líneas y el borrador12.34/12.34.
@@ -205,6 +207,23 @@ Próxima libre: `618`. El binario WIP y el candidato publicado exigen617; el sta
 histórico local conservado sigue612, PROD observado593. No arrancar el binario nuevo sobre
 la base conservada sin completar su migración en infraestructura de pruebas propia.
 Comprobar prefijos duplicados antes de añadir una.
+
+**Ensayo de promoción 594–617 (10-nov), sin escribir en PROD:** preflight
+aprobado y respaldo de sólo lectura de 19,9 MB (esquema 593, 334 tablas,
+227.816 filas), restaurado en un contenedor sin red. El lote único aplica en
+0,3 s y deja 617; el rollback forzado no deja rastro; ninguna tabla ni columna
+se pierde, ninguna fila existente cambia, no se retira ninguna función pública
+y la salud queda lista (16 eventos históricos en cola muerta). Los 24
+verificadores pasan. Dos defectos del propio procedimiento, corregidos antes:
+el lote se armaba con los finales de línea del checkout (en Windows, CRLF) y la
+596 no reconocía la función que parchea; y el verificador 612 exigía que la
+tabla de historial no tuviera las concesiones que el proveedor da por defecto
+(lectura de clientes y DML del backend), que la migración no retira. Ahora
+comprueba lo que la protege: clientes sin escritura, RLS forzado, políticas
+ligadas a la empresa y guarda 441 activa. La promoción real sigue pendiente de
+autorización y exige CI verde sobre el commit que incluye estas correcciones y
+un respaldo de menos de 24 horas.
+[Informe](../artifacts/promocion-ensayo-594-617-20261110042949/informe.json).
 
 **D56 corregido en el candidato local617:** nuevas recepcionesUSD exigen valuación
 congelada; la contabilización original y la reversa verifican esa autoridad. Los
