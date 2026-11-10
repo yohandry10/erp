@@ -1,0 +1,64 @@
+{
+  "archiveSha256": "69dc024ab5f198cda25e6db1c60855201ae8814356aaffa180cfe4e3eb5c2ae9",
+  "exito": true,
+  "redDelContenedor": "none",
+  "conexionesRemotas": 0,
+  "desde": 618,
+  "hasta": 618,
+  "limites": [
+    "Sin objetos de Storage ni roles globales reales; el tiempo local no acredita el de PROD."
+  ],
+  "restaurarMs": 8614,
+  "esquemaDelRespaldo": 617,
+  "entornoDelRespaldo": "PROD",
+  "aplicadasAntesDelLote": [],
+  "loteSha256": "78cd05f802ad1893879c06403494776192824ef48aca1a14fc90ef101e01b858",
+  "migraciones": [
+    "618__peru_global_afp_insurable_cap_2026.sql"
+  ],
+  "tablas": 340,
+  "filas": 227816,
+  "rollbackMs": 114,
+  "rollbackSinRastro": true,
+  "aplicarMs": 109,
+  "esquemaFinal": 618,
+  "tablasNuevas": [],
+  "tablasPerdidas": [],
+  "columnasPerdidas": [],
+  "tablasConDatosCambiados": [
+    {
+      "tabla": "public.normativa_peru_periodos",
+      "antes": 12,
+      "despues": 12,
+      "mismasFilas": true,
+      "columnasCambiadas": {
+        "fuente": 12,
+        "updated_at": 12,
+        "afp_remuneracion_max_asegurable": 12
+      },
+      "filasBorradas": 0
+    }
+  ],
+  "funcionesPublicasRetiradas": [],
+  "salud": {
+    "ready": true,
+    "esquema": 618,
+    "cola_muerta": 16,
+    "requerido_aplicado": true
+  },
+  "movimientosBancarios": {
+    "nulos": 0,
+    "total": 44,
+    "inactivos": 0
+  },
+  "defaultActivo": "true",
+  "verificadores": [
+    {
+      "version": 618,
+      "ok": true,
+      "error": null
+    }
+  ],
+  "verificadoresFallidos": 0,
+  "contenedor": "erp-ensayo-promocion-20261110190813-10848"
+}

@@ -207,8 +207,10 @@ Actualizado: 2026-11-10. Una página: si algo no cabe aquí, va a su documento d
 | `616` | WIP local: recibo ligado a actor/tenant/origen y resolución durable; tres carreras más verifican commit/abandono/revocación. UI conserva intención/archivo antes de retirar el pendiente; rechazo por período, recarga, resolución y nueva anulación verificados conSQL y worker.98pruebas del contrato web, colaJS y48Rust pasan. SuiteAPI completa6066/408 enUTC, tipos/buildAPI yweb pasan; lintAPI0errores/97avisos, sin avisos en la UI nueva. Cadena fresca612migraciones/125verificadores+67históricos aprobada.21tablas conservadas intactas. UI de transferencia, matrizFX y ensayo de restore/rollback aún pendientes; NO_GO |
 | `617` | WIP local: cierre congela monedaOC, moneda contable del país, tasa decimal y referencia; worker con claim real valida el origen y registra valores base, sin reinterpretar historiaFX. Bien físico/servicio/sin stockUSD5.17→PEN19.13 y reversa exacta neto0; cero sinGL. Cuatro carreras reales y cierreUI USD5.16→PEN19.09 pasan. SuiteAPI6101/410 con coberturaUTC, tipos/build/lintAPI y buildweb pasan. Cadena nueva613migraciones/126verificadores+67históricos aprobada. Sin promoción; NO_GO |
 
-Próxima libre: `618`. El binario de `main` exige617 y PROD está en617 desde el
-10-nov; el stack histórico local conservado sigue612. No arrancar el binario nuevo sobre
+| `618` | Tope AFP (remuneración máxima asegurable) de la normativa general 2026, con los valores de la SBS por mes de devengue: 12.209,11 (ene–mar), 12.598,91 (abr–jun), 12.672,65 (jul–sep) y 12.732,70 (oct–dic; diciembre por trimestre, aún sin publicar). Sólo completa filas globales sin tope; no toca normativa de empresas ni planillas calculadas, y falla sin confirmar si no puede escribir. Cadena limpia, control en rojo con rol sin BYPASSRLS, reaplicación y ensayo sobre respaldo del 10-nov (sólo cambian esas 12 filas) pasan. Se promueve antes de fusionar: el binario exige618 |
+
+Próxima libre: `619`. El binario de `main` exige618; PROD pasó a617 el 10-nov y a618
+con este cambio. El stack histórico local conservado sigue612. No arrancar el binario nuevo sobre
 la base conservada sin completar su migración en infraestructura de pruebas propia.
 Comprobar prefijos duplicados antes de añadir una.
 
@@ -273,9 +275,14 @@ Expediente de la versión: `artifacts/expediente-590/EXPEDIENTE.md`. Resumen:
 ## Bloquea la entrega a un cliente
 
 - SUNAT, SOL y SIRE reales, con credenciales y PFX de ese contribuyente. Guías por GRE REST.
+  El servidor no necesita nada más: ambiente, usuario SOL, certificado y credenciales GRE se
+  guardan cifrados por empresa y de ahí salen los endpoints. En PROD la clave de cifrado está
+  operativa (hay certificados guardados). Falta la primera emisión real aceptada de un contribuyente.
 - Extracto real: perfilar, mapear, ensayo con cero errores y conciliación; medir su duración,
   que corre en una transacción con `SUPABASE_LONG_FETCH_TIMEOUT_MS` (10 min por defecto).
-- Instalador Windows firmado; impresora física y prueba de carga.
+- Firma de código del instalador Windows; impresora física y prueba de carga. El instalador
+  sin firma ya se genera contra el API público (`OPERATIONS.md`) y el API admite su origen;
+  Windows SmartScreen avisa al ejecutarlo hasta que se firme.
 - RPO, RTO y retención acordados; programar el respaldo de Storage. Restaurar la base lleva unos
   10 s en local con 216.000 filas; falta medir el RTO completo, con proyecto nuevo y secretos.
 - Correo productivo en Render (`SMTP_*` o SendGrid, y `FRONTEND_URL`): sin él, la recuperación de
@@ -309,7 +316,8 @@ Detalle: `docs/RELEASE.md`.
   alcance por requisito: [matriz A–J](../artifacts/uat-new-defects-20261104/COBERTURA.md).
 - **Diez arreglos locales anteriores:** `claude/uat-defectos-20261104` / `8aded64c`, sin
   despliegue acreditado; se excluyen de D-01..D-17. El cruce de ausencias pasa a la base
-  en 610. El máximo AFP 2026-11 ausente sigue bloqueando planilla; no se cambió normativa.
+  en 610. El máximo AFP faltaba en toda la normativa general 2026 y bloqueaba la prima;
+  la618 lo carga con fuente SBS. Para 2027 no hay normativa general todavía.
 - **Pendientes conocidos:** el código del CPE de nuevas muestras se corrige en611;
   siguen como borrador sin evidencia y no son origen elegible para una NC fiscal.
   El rechazo `REFERENCED_NOTE_SOURCE_CPE_INVALID` conserva su guarda y explicación;

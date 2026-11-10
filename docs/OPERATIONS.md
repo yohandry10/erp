@@ -146,6 +146,26 @@ pnpm desktop:dev
 pnpm desktop:build
 ```
 
+### Instalador de Windows
+
+Se genera en Windows con Rust y Node instalados, desde `apps/web`, con las
+variables públicas de producción y sin proxy ni cookies del navegador:
+
+```powershell
+$env:NODE_ENV='production'; $env:TAURI_BUILD='1'
+$env:NEXT_PUBLIC_API_URL='<URL pública del API>'
+$env:NEXT_PUBLIC_API_PROXY='false'; $env:NEXT_PUBLIC_COOKIE_AUTH='0'
+# NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY, las mismas de la web
+node node_modules/@tauri-apps/cli/tauri.js build --bundles nsis
+```
+
+El resultado queda en `src-tauri/target/release/bundle/nsis/*-setup.exe`, fuera
+de Git. La URL del API queda fija dentro del paquete: cambiarla exige otro
+instalador. La CLI reescribe los finales de línea de `Cargo.toml`; restaurarlo
+después. El instalador no lleva firma de código: Windows SmartScreen avisa al
+ejecutarlo hasta que se firme con un certificado del editor. El API debe
+aceptar el origen `http://tauri.localhost` (`ARCHITECTURE.md`).
+
 ## Variables
 
 Los esquemas de configuración en código son la fuente exacta. Categorías:
