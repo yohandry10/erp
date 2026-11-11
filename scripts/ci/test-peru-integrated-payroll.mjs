@@ -13,24 +13,34 @@ export async function testPayroll({ request, sql, uuid, results, tenantId, setTo
 
   const supported = await request('rrhh/planillas', { periodo: '2026-02', idempotency_key: randomUUID() });
   assert.equal(supported.success, true);
-  const missingCap = await request(`rrhh/planillas/${supported.id}/calcular`, {}, 400);
-  assert.match(missingCap.message, /remuneración máxima asegurable AFP de 2026-02/);
-  assert.equal(sql(`SELECT estado FROM planillas WHERE id=${uuid(supported.id)};`), 'borrador');
-  assert.equal(sql(`SELECT count(*) FROM empleado_planilla WHERE planilla_id=${uuid(supported.id)};`), '0');
-  results.push({scenario:'AFP sin máximo asegurable bloquea antes de persistir cálculo',passed:true});
   const globalNormativeHash = () => sql(`SELECT md5(coalesce(string_agg(to_jsonb(n)::text,'' ORDER BY n.id),'')) FROM normativa_peru_periodos n WHERE tenant_id IS NULL;`);
   const globalBefore = globalNormativeHash();
+  // La normativa general de 2026 trae el tope publicado por la SBS (618): una
+  // empresa nueva no tiene que registrar nada para calcular la prima AFP.
   const normative = (await request('rrhh/configuracion-laboral/peru/normativa?periodo=2026-02')).data.normativa;
-  assert.ok(normative && normative.afp_remuneracion_max_asegurable == null);
+  assert.equal(Number(normative?.afp_remuneracion_max_asegurable), 12209.11);
+  results.push({scenario:'Normativa general 2026 trae el máximo asegurable AFP publicado por la SBS',passed:true,periodo:'2026-02',tope:12209.11});
   const fields=['uit','rmv','asignacion_familiar','afp_aporte','afp_prima_seguro','afp_comision_flujo_default',
     'onp_aporte','essalud_aporte','quinta_deduccion_uit','bancarizacion_pen_min','bancarizacion_usd_min','igv_tasa'];
   assert.ok(fields.every(field=>normative[field]!==null&&normative[field]!==undefined&&Number.isFinite(Number(normative[field]))),'Normativa base conocida sin inventar ceros');
-  const ownNormative = {periodo:'2026-02',...Object.fromEntries(fields.map(field=>[field,Number(normative[field])])),
+  const base = {periodo:'2026-02',...Object.fromEntries(fields.map(field=>[field,Number(normative[field])]))};
+  const ownNormative = {...base,
     afp_remuneracion_max_asegurable:99999.99,
     referencia:'PARAMETRO SINTETICO LOCAL: prueba integrada efímera; no es sustento SBS ni normativa productiva'};
   const normativeAdmin = await request('auth/login',{email:'peru-integrated-normative-admin-1@example.test',password:'Local-Peru-2026-Only!'});
   setToken(normativeAdmin.access_token);
   try {
+    // La versión propia prevalece sobre la general y no hereda su tope: sin él,
+    // la prima AFP sigue bloqueada antes de persistir nada.
+    await request('rrhh/configuracion-laboral/peru/normativa',{...base,
+      referencia:'PARAMETRO SINTETICO LOCAL: versión propia sin máximo asegurable para probar el bloqueo'},200,{'idempotency-key':randomUUID()},'PUT');
+    setToken(primaryToken);
+    const missingCap = await request(`rrhh/planillas/${supported.id}/calcular`, {}, 400);
+    assert.match(missingCap.message, /remuneración máxima asegurable AFP de 2026-02/);
+    assert.equal(sql(`SELECT estado FROM planillas WHERE id=${uuid(supported.id)};`), 'borrador');
+    assert.equal(sql(`SELECT count(*) FROM empleado_planilla WHERE planilla_id=${uuid(supported.id)};`), '0');
+    results.push({scenario:'AFP sin máximo asegurable bloquea antes de persistir cálculo',passed:true});
+    setToken(normativeAdmin.access_token);
     await request('rrhh/configuracion-laboral/peru/normativa',ownNormative,200,{'idempotency-key':randomUUID()},'PUT');
   } finally { setToken(primaryToken); }
   assert.equal(globalNormativeHash(),globalBefore,'Configurar la empresa no modifica normas globales');
