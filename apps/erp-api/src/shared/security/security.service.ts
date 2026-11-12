@@ -1,6 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+// El escritorio Windows instalado sirve su interfaz desde este origen fijo
+// (WebView2 de Tauri 2). No es un dominio público ni configurable por
+// despliegue: sin él, la app instalada no puede iniciar sesión contra el API.
+// Se autentica con Bearer guardado en el equipo, no con cookies del navegador.
+export const DESKTOP_APP_ORIGINS = ['http://tauri.localhost'];
+
 @Injectable()
 export class SecurityService {
   constructor(private configService: ConfigService) {}
@@ -78,7 +84,9 @@ export class SecurityService {
           }
           callback(null, false);
         }
-      : allowedOrigins.length > 0 ? allowedOrigins : defaultOrigins;
+      : allowedOrigins.length > 0
+        ? [...new Set([...allowedOrigins, ...DESKTOP_APP_ORIGINS])]
+        : defaultOrigins;
 
     if (process.env.NODE_ENV !== 'production' && allowedOrigins.length === 0) {
       console.log('🌐 [CORS] Modo desarrollo: permitiendo localhost en cualquier puerto');

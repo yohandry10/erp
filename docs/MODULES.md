@@ -3744,6 +3744,10 @@ detalle de planilla aplica la misma comprobación del padre.
   Limita únicamente la prima del seguro; no limita aporte obligatorio ni
   comisión de flujo. Sin ese parámetro, sólo se bloquea un cálculo AFP con prima
   positiva. ONP no lo requiere y nunca se hereda el tope de otro período.
+  La normativa general de 2026 trae el tope publicado por la SBS para cada mes
+  de devengue (618); diciembre usa el del trimestre octubre-diciembre hasta que
+  la SBS lo publique. Una empresa puede registrar su propia versión del período.
+  Para 2027 no hay normativa general: UIT y tope se cargan al publicarse.
 - La quinta categoría proyecta las gratificaciones proporcionales que
   corresponden a la fecha de ingreso, con bonificación de EsSalud o EPS.
   Para septiembre, octubre y noviembre deduce retenciones hasta agosto;

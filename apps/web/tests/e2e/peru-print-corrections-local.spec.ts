@@ -64,8 +64,9 @@ test('Impresión: ranking y flujo financiero PEN/USD usan datos reales y singula
    await page.emulateMedia({media:'print'});await page.pdf({path:path.join(output,'cashflow-current-'+currency+'.pdf'),format:'A4',printBackground:true});await page.emulateMedia({media:'screen'})
    proof.steps.push({name:'real_cashflow_print_'+currency,result:'PASS',currency,pdf:'cashflow-current-'+currency+'.pdf'})
   }
+   // Tras compilar la ruta en frío, la lectura de tesorería puede tardar más que los 5 s por defecto de expect.
   for(const route of ['/dashboard/finanzas/tesoreria/','/dashboard/finanzas/tesoreria/programacion/']){
-   await page.goto(route,{waitUntil:'domcontentloaded',timeout:120000});await expect(page.getByText('Proveedor impresión '+suffix,{exact:false}).first()).toBeVisible();await expect(page.locator('main')).not.toContainText(/\b1 días\b/)
+   await page.goto(route,{waitUntil:'domcontentloaded',timeout:120000});await expect(page.getByText('Proveedor impresión '+suffix,{exact:false}).first()).toBeVisible({timeout:60000});await expect(page.locator('main')).not.toContainText(/\b1 días\b/)
   }
   proof.steps.push({name:'treasury_and_payment_schedule_keep_singular_for_one_day',result:'PASS'})
   expect(proof.scriptErrors).toEqual([]);proof.complete=true

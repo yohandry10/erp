@@ -61,6 +61,9 @@ sin datos de clientes.
   El recorrido principal→empresa2→principal se repitió en el mismo navegador,
   con auditoría y notificaciones aisladas y sin borrar cookies manualmente.
 - Tauri usa Bearer local cifrado; no se persiste en claro.
+- CORS de producción admite los orígenes de `ALLOWED_ORIGINS` más el origen
+  fijo del escritorio Windows instalado, `http://tauri.localhost`. No hay
+  comodines ni otros esquemas; el escritorio no depende de cookies del navegador.
 - Las rutas públicas del paquete estático restauran ese almacén y confirman el
   perfil. No aplican el atajo del middleware web ni borran la identidad compartida
   mientras otra ventana nativa tiene una sesión válida; revocada o ausente sigue
