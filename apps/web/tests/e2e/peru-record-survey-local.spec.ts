@@ -66,7 +66,16 @@ test('Perú: carga las pantallas con identificador usando registros de la empres
       && !pathname.endsWith('/auth/login')) errors.push(`${response.status()} ${pathname}`)
   })
   for (const tenant of [1, 2]) {
-    await page.goto('/login/')
+    // Al borrar la sesión de la primera empresa, la pantalla abierta redirige
+    // sola a /login y esa navegación puede abortar la nuestra (net::ERR_ABORTED).
+    // Ambas van al mismo destino: se reintenta y se comprueba dónde quedó.
+    for (let attempt = 0; ; attempt++) {
+      try { await page.goto('/login/'); break } catch (error) {
+        if (attempt >= 2 || !/ERR_ABORTED/.test(String(error))) throw error
+        await page.waitForLoadState('load').catch(() => {})
+      }
+    }
+    await expect(page).toHaveURL(/\/login\/?(\?|$)/)
     await page.locator('#email').fill(`peru-integrated-${tenant}@example.test`)
     await page.locator('#password').fill('Local-Peru-2026-Only!')
     let token: string | undefined
