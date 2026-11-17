@@ -965,7 +965,12 @@ test('Perú: reembolso RMA recupera catálogos, respuesta perdida y asiento sin 
   expect(replay.movimiento_id).toBe(committed.movimiento_id)
   await expect(dialog).toBeHidden()
   await page.reload()
-  await page.getByRole('button', { name: 'Saldos a favor', exact: true }).click()
+  // Tras recargar, un clic previo a la hidratación de la pestaña se pierde: se
+  // repite hasta ver la fila. No reenvía nada; sólo cambia de pestaña.
+  await expect(async () => {
+    await page.getByRole('button', { name: 'Saldos a favor', exact: true }).click()
+    await expect(row).toBeVisible({ timeout: 3000 })
+  }).toPass({ timeout: 30000 })
   await expect(row).toContainText(/12[.,]60/)
   const saldoAfter = await getReal(`ventas/rma/saldos-favor/${paid.saldo_favor_id}`)
   expect(Number(saldoAfter.monto_disponible)).toBeCloseTo(paid.saldo_disponible - 4, 2)
