@@ -510,7 +510,7 @@ ${lines}
   }
 
   private buildSummaryDocumentLineXml(cpe: any, index: number): string {
-    const moneda = this.escapeXmlText(cpe.moneda || 'PEN');
+    const moneda = this.escapeXmlAttribute(cpe.moneda || 'PEN');
     const gravadas = this.toNumber(cpe.total_gravadas, 0);
     const exoneradas = this.toNumber(cpe.total_exoneradas, 0);
     const inafectas = this.toNumber(cpe.total_inafectas, 0);
@@ -630,6 +630,11 @@ ${billingPayments}
 
   private escapeXmlText(value: any): string {
     return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // En atributos también se escapan las comillas que delimitan el valor.
+  private escapeXmlAttribute(value: any): string {
+    return this.escapeXmlText(value).replace(/"/g, '&quot;').replace(/'/g, '&apos;');
   }
 
   private wrapCdata(value: any): string {

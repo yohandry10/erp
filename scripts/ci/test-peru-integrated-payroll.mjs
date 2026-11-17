@@ -85,4 +85,23 @@ export async function testPayroll({ request, sql, uuid, results, tenantId, setTo
   assert.equal(sql(`SELECT count(*) FROM asientos_contables WHERE source_event_id=${uuid(paymentEvent)}
     AND tenant_id=${uuid(tenantId)} AND estado='CONFIRMADO' AND total_debe=total_haber;`), '1');
   results.push({ scenario: 'pago de planilla, cargo bancario y asiento únicos al reintentar', passed: true });
+
+  // Empresa sin normativa propia para 2026-03: calcula con la general de la 618
+  // y deja constancia del tope SBS que usó. El redondeo del tope está cubierto
+  // en planillas-afp-cap.spec.ts; aquí se acredita el recorrido completo.
+  assert.equal(sql(`SELECT count(*) FROM normativa_peru_periodos WHERE tenant_id=${uuid(tenantId)} AND periodo='2026-03';`), '0');
+  const general = await request('rrhh/planillas', { periodo: '2026-03', idempotency_key: randomUUID() });
+  assert.equal(general.success, true);
+  const generalCalc = await request(`rrhh/planillas/${general.id}/calcular`, {});
+  assert.equal(generalCalc.success, true);
+  assert.ok(generalCalc.totalEmpleados > 0);
+  assert.equal(sql(`SELECT estado FROM planillas WHERE id=${uuid(general.id)} AND tenant_id=${uuid(tenantId)};`), 'calculada');
+  const used = JSON.parse(sql(`SELECT metadata->'normativa_usada' FROM planillas WHERE id=${uuid(general.id)};`));
+  assert.ok(Array.isArray(used) && used.length >= 1);
+  assert.equal(used[0].tenant_id, null);
+  assert.equal(used[0].periodo, '2026-03');
+  assert.equal(Number(used[0].afp_remuneracion_max_asegurable), 12209.11);
+  assert.equal(used[0].fuente?.afp_remuneracion_max_asegurable?.source_migration, '618__peru_global_afp_insurable_cap_2026');
+  results.push({ scenario: 'planilla calculada con la normativa general 2026 y su tope AFP de la SBS, sin normativa propia', passed: true,
+    periodo: '2026-03', tope: 12209.11, totalEmpleados: generalCalc.totalEmpleados });
 }

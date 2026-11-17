@@ -393,7 +393,7 @@ export class XmlSigner {
     } catch (error) {
       console.error('❌ Error generando hash:', error);
       // Fallback hash si hay error
-      return crypto.createHash('md5').update(xmlContent + Date.now()).digest('hex').substring(0, 32).toUpperCase();
+      return crypto.createHash('sha256').update(xmlContent + Date.now()).digest('hex').substring(0, 32).toUpperCase();
     }
   }
 

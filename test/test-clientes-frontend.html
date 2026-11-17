@@ -101,12 +101,16 @@
             const timestamp = new Date().toLocaleTimeString();
             const className = isError ? 'error' : 'success';
             
-            resultsDiv.innerHTML += `
-                <div style="margin-bottom: 20px;">
-                    <h3 class="${className}">${timestamp} - ${title}</h3>
-                    <pre>${JSON.stringify(data, null, 2)}</pre>
-                </div>
-            `;
+            // textContent: un mensaje de error del servidor nunca se interpreta como HTML.
+            const block = document.createElement('div');
+            block.style.marginBottom = '20px';
+            const heading = document.createElement('h3');
+            heading.className = className;
+            heading.textContent = `${timestamp} - ${title}`;
+            const pre = document.createElement('pre');
+            pre.textContent = JSON.stringify(data, null, 2);
+            block.append(heading, pre);
+            resultsDiv.appendChild(block);
             
             resultsDiv.scrollTop = resultsDiv.scrollHeight;
         }

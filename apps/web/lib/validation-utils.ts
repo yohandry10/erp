@@ -23,7 +23,9 @@ export function isValidAmount(amount: number | string | undefined | null): boole
 export function isValidEmail(email: string | undefined | null): boolean {
   if (!email) return false
   
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (email.length > 254) return false
+  // Los tramos del dominio no se solapan: la evaluación es lineal.
+  const emailRegex = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/
   return emailRegex.test(email)
 }
 

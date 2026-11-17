@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { testPurchaseVariants } from './test-peru-integrated-purchase-variants.mjs';
+import { testUsdPurchaseChain } from './test-peru-integrated-usd-purchase.mjs';
 
 // Este módulo se invoca desde el ejecutor que valida API, base y fixture locales.
 // Las mutaciones pasan por HTTP; SQL sólo contrasta la evidencia persistida.
@@ -151,5 +152,7 @@ export async function testPurchases({ request, sql, uuid, results, processAccoun
   await testPurchaseVariants({ request, sql, uuid, results, processAccounting, tenantId,
     setToken, primaryToken, approverToken: approver.access_token, outputDir,
     provider, product, warehouseId, today, paidReceipt: receipt, paidOrder: order, paidInvoice: invoice });
+  await testUsdPurchaseChain({ request, sql, uuid, results, processAccounting, tenantId,
+    setToken, primaryToken, approverToken: approver.access_token });
   return { approverToken: approver.access_token };
 }

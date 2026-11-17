@@ -159,7 +159,7 @@ generateXmlContent(factura: CreateFacturaDto): string {
     const dueDateTag = (factura as any).fecha_vencimiento
       ? `\n  <cbc:DueDate>${this.escapeXmlText(this.resolveDueDate(issueDate, (factura as any).fecha_vencimiento))}</cbc:DueDate>`
       : '';
-    const moneda = this.escapeXmlText(factura.moneda || 'PEN');
+    const moneda = this.escapeXmlAttribute(factura.moneda || 'PEN');
     const tipoOperacion = this.resolveTipoOperacionSunat(factura);
     const formaPagoXml = this.buildPaymentTermsXml(factura, moneda);
     const noteXml = this.buildOptionalNoteXml(factura);
@@ -220,7 +220,7 @@ generateXmlContent(factura: CreateFacturaDto): string {
   <cac:AccountingCustomerParty>
     <cac:Party>
       <cac:PartyIdentification>
-        <cbc:ID schemeID="${this.escapeXmlText(factura.tipo_documento_receptor)}" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${this.escapeXmlText(factura.documento_receptor)}</cbc:ID>
+        <cbc:ID schemeID="${this.escapeXmlAttribute(factura.tipo_documento_receptor)}" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${this.escapeXmlText(factura.documento_receptor)}</cbc:ID>
       </cac:PartyIdentification>
       <cac:PartyLegalEntity>
         <cbc:RegistrationName>${this.wrapCdata(factura.razon_social_receptor)}</cbc:RegistrationName>
@@ -351,7 +351,7 @@ private generateDebitNoteXmlContent(factura: CreateFacturaDto): string {
   ): string {
     const issueDate = this.resolveEmissionDate((factura as any).fecha_emision);
     const issueTime = this.resolveIssueTime((factura as any).hora_emision ?? (factura as any).fecha_emision);
-    const moneda = this.escapeXmlText(factura.moneda || 'PEN');
+    const moneda = this.escapeXmlAttribute(factura.moneda || 'PEN');
     const reference = this.resolveNotaDocumentoReferencia(factura);
     const motivo = this.resolveMotivoNota(factura, config.defaultReason);
     const linesXml = factura.items
@@ -420,7 +420,7 @@ private generateDebitNoteXmlContent(factura: CreateFacturaDto): string {
   <cac:AccountingCustomerParty>
     <cac:Party>
       <cac:PartyIdentification>
-        <cbc:ID schemeID="${this.escapeXmlText(factura.tipo_documento_receptor)}" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${this.escapeXmlText(factura.documento_receptor)}</cbc:ID>
+        <cbc:ID schemeID="${this.escapeXmlAttribute(factura.tipo_documento_receptor)}" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${this.escapeXmlText(factura.documento_receptor)}</cbc:ID>
       </cac:PartyIdentification>
       <cac:PartyLegalEntity>
         <cbc:RegistrationName>${this.wrapCdata(factura.razon_social_receptor)}</cbc:RegistrationName>

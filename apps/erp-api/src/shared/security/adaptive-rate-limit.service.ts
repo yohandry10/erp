@@ -276,10 +276,12 @@ export class AdaptiveRateLimitService implements OnModuleInit {
 
   private matchEndpoint(endpoint: string, pattern: string): boolean {
     // Simple pattern matching
+    // Se escapan los metacaracteres de cada tramo literal antes de traducir los
+    // comodines `*` y los parámetros `:id`.
     const regexPattern = pattern
-      .replace(/\//g, '\\/')
-      .replace(/\*/g, '.*')
-      .replace(/:[\w]+/g, '[^/]+');
+      .split('*')
+      .map(part => part.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&').replace(/:\w+/g, '[^/]+'))
+      .join('.*');
     return new RegExp(`^${regexPattern}$`).test(endpoint);
   }
 

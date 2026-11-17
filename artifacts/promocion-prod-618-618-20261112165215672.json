@@ -1,0 +1,47 @@
+{
+  "commit": "54e9cd11d59cf7c8c923bf7cb2a6a22a047ceeb6",
+  "pr": 155,
+  "proyecto": "wypnbcptofqdmoynlonq",
+  "desde": 618,
+  "hasta": 618,
+  "migraciones": [
+    "618__peru_global_afp_insurable_cap_2026.sql"
+  ],
+  "respaldoSha256": "fd3fb4beeb1fa8e9f805c5012e6480ac83a17cdec8d0704d150871e31139ac58",
+  "loteSha256": "78cd05f802ad1893879c06403494776192824ef48aca1a14fc90ef101e01b858",
+  "exito": true,
+  "escriturasRemotas": true,
+  "antes": {
+    "esquema": 617,
+    "salud": {
+      "ready": true,
+      "esquema": 617,
+      "cola_muerta": 16,
+      "requerido_aplicado": true
+    },
+    "tablas": 342,
+    "filas": 227822
+  },
+  "aplicarMs": 3039,
+  "despues": {
+    "esquema": 618,
+    "salud": {
+      "ready": true,
+      "esquema": 618,
+      "cola_muerta": 16,
+      "requerido_aplicado": true
+    },
+    "tablasPerdidas": [],
+    "columnasPerdidas": [],
+    "tablasConDatosCambiados": [
+      {
+        "tabla": "public.normativa_peru_periodos",
+        "antes": 12,
+        "despues": 12,
+        "mismasFilas": true
+      }
+    ],
+    "cambiosNoVistosEnElEnsayo": []
+  },
+  "terminado": "2026-11-12T16:54:35.203Z"
+}

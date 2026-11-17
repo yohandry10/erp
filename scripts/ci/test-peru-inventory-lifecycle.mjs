@@ -76,6 +76,40 @@ export async function testPeruInventoryLifecycle({ request, sql, uuid, results, 
   assert.deepEqual(foreignKardex.data, []);
   results.push({ scenario: 'inventario: ajuste decimal y transferencia real/replay conservan saldo, ledger y kardex; insuficiencia y clave reutilizada no mutan', passed: true });
 
+  // Anulación enlazada del traslado (613): dos movimientos opuestos, el original intacto,
+  // el reintento con la misma clave devuelve la misma reversa y otra anulación se rechaza.
+  // Se anula un segundo traslado de 1 unidad: los saldos posteriores del ciclo no cambian.
+  const transferReceipt = (await request('inventario/transferencias', intent({ ...transfer, cantidad: 1, motivo: 'Traslado a anular' }))).data;
+  assert.equal(stock(origin.id), 6.75);
+  assert.equal(stock(destination.id), 5.5);
+  const operationId = transferReceipt.operation_identity?.operation_id ?? transferReceipt.operacion_id;
+  const actorId = transferReceipt.operation_identity?.actor_id;
+  uuid(operationId); uuid(actorId);
+  const originalRows = sql(`SELECT md5(string_agg(to_jsonb(m)::text,'' ORDER BY m.id)) FROM movimientos_inventario m WHERE m.referencia_id=${uuid(operationId)}::uuid;`);
+  const preview = (await request(`inventario/transferencias/${operationId}`)).data;
+  assert.equal(preview.reversal_check?.already_reversed, false);
+  const reversal = { expected_scope: { tenant_id: tenantId, actor_id: actorId, source_operation_id: operationId },
+    original: { motivo: 'Anulación local del traslado', idempotency_key: randomUUID() } };
+  const reversed = (await request(`inventario/transferencias/${operationId}/anular`, reversal, 200)).data;
+  assert.equal(reversed.idempotent, false);
+  assert.equal(stock(origin.id), 7.75);
+  assert.equal(stock(destination.id), 4.5);
+  assert.equal(ledgerCount(), countBefore + 7);
+  const replayed = (await request(`inventario/transferencias/${operationId}/anular`, reversal, 200)).data;
+  assert.equal(replayed.idempotent, true);
+  assert.equal(replayed.operation_identity.operation_id, reversed.operation_identity.operation_id);
+  assert.equal(ledgerCount(), countBefore + 7);
+  const recovered = (await request(`inventario/transferencias/${operationId}/anular/recibo`, reversal, 200)).data;
+  assert.equal(recovered.operation_identity.operation_id, reversed.operation_identity.operation_id);
+  await request(`inventario/transferencias/${operationId}/anular`, { ...reversal, original: { ...reversal.original, idempotency_key: randomUUID() } }, 409);
+  assert.equal(ledgerCount(), countBefore + 7);
+  assert.equal(sql(`SELECT md5(string_agg(to_jsonb(m)::text,'' ORDER BY m.id)) FROM movimientos_inventario m WHERE m.referencia_id=${uuid(operationId)}::uuid;`), originalRows);
+  assert.equal((await request(`inventario/transferencias/${operationId}`)).data.reversal_check?.already_reversed, true);
+  const reversedKardex = await request(`inventario/kardex?productoId=${product.id}&almacenId=${destination.id}`);
+  assert.equal(Number(reversedKardex.resumen.saldoCantidad), 4.5);
+  await request(`inventario/transferencias/${operationId}/anular`, reversal, 409, { authorization: `Bearer ${otherTenantToken}` });
+  results.push({ scenario: 'inventario: anular traslado devuelve stock a ambos almacenes, conserva el original, replay único y segunda anulación rechazada', passed: true, operacion_id: operationId });
+
   const deleteHeaders = () => ({ 'idempotency-key': randomUUID() });
   for (const endpoint of [`productos/${product.id}`, `categorias/${category.id}`, `almacenes/${origin.id}`, `almacenes/${destination.id}`]) {
     await request(`inventario/${endpoint}`, undefined, 400, deleteHeaders(), 'DELETE');
@@ -115,7 +149,7 @@ export async function testPeruInventoryLifecycle({ request, sql, uuid, results, 
   await request('inventario/transferencias', intent({ ...transfer, cantidad: 1 }), 400,
     { authorization: `Bearer ${otherTenantToken}` });
   assert.equal(stock(origin.id) + stock(destination.id), 12.25);
-  assert.equal(ledgerCount(), countBefore + 3);
+  assert.equal(ledgerCount(), countBefore + 7);
   results.push({ scenario: 'inventario: rol de lectura no ajusta/transfiere/edita/desactiva; referencias ajenas rechazan sin mutar existencias', passed: true });
   assert.ok(applied.event_id);
   const shortageProduct = await create('productos', { codigo: `FAL-${suffix}`, nombre: `Faltante local ${suffix}`,
