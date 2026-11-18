@@ -43,6 +43,10 @@ export const EVENTOS_SIN_SUSCRIPTOR: ReadonlySet<string> = new Set([
   // cambio; no representa una integración ni una tarea adicional pendiente.
   'configuracion.empresa.actualizada',
 
+  // El RPC 464 crea la empresa, su RBAC y el primer administrador, y audita, en
+  // una transacción.
+  'tenant.creado',
+
   // Los RPC atómicos de RMA (456) dejan escritos en su transacción la RMA, su
   // bitácora `rma_eventos`, el stock devuelto y el saldo a favor. Lo contable
   // viaja aparte en `saldo_favor.*`, que sí tiene suscriptor.

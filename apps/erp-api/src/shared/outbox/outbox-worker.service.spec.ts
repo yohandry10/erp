@@ -85,7 +85,7 @@ describe('OutboxWorker claim contract', () => {
 
   it('cierra las constancias de RMA, pedido, canje, OC y GRE sin despachar', async () => {
     for (const eventType of ['rma.creada', 'rma.decidida', 'rma.recepcionada', 'rma.recepcion.revertida',
-      'pedido.cancelado', 'pos.ticket.canje.reservado', 'orden.compra.aprobada', 'gre.creada']) {
+      'pedido.cancelado', 'pos.ticket.canje.reservado', 'orden.compra.aprobada', 'gre.creada', 'tenant.creado']) {
       const { worker, outboxService, eventBus } = buildWorker([{ ...emailClaim, event_type: eventType }]);
       await expect(worker.processPendingEventsManual()).resolves.toEqual({ processed: 1, failed: 0 });
       expect(eventBus.emitAndAwait).not.toHaveBeenCalled();

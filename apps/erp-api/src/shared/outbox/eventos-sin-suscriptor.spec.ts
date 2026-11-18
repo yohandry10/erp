@@ -24,6 +24,8 @@ describe('eventos de outbox sin suscriptor', () => {
       'venta.procesada',
       'planilla.calculada',
       'email.send',
+      // Defecto abierto: espera reversa contable, no es una constancia.
+      'cxp.anulada',
     ]) {
       expect(esEventoSinSuscriptor(evento)).toBe(false);
     }

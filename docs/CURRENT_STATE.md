@@ -318,6 +318,11 @@ Expediente de la versión: `artifacts/expediente-590/EXPEDIENTE.md`. Resumen:
   10 s en local con 216.000 filas; falta medir el RTO completo, con proyecto nuevo y secretos.
 - Correo productivo en Render (`SMTP_*` o SendGrid, y `FRONTEND_URL`): sin él, la recuperación de
   contraseña responde 503 y las alertas no salen. Por comprobar en Render.
+- **Anulación manual de CxP sin reversa contable.** `gestionar_cxp_tx` (478) anula cualquier CxP
+  sin pagos y emite `cxp.anulada` con `accountingHandledByOutbox`, pero ningún handler la
+  procesa: una CxP nacida de factura deja la 42 abierta. La anulación por devolución sí cuadra
+  (la revierte `devolucion.proveedor.registrada`). En PROD cae a `dead_letter` a la vista; la UAT
+  integrada la lista como defecto conocido. Falta el contraasiento, sin duplicar el de devolución.
 - Power BI: actualización programada real.
 - Piloto con usuarios, aceptación firmada y anexos comerciales.
 - Render `free→starter` (USD 7/mes) para que los workers no se duerman: requiere medio de pago y
