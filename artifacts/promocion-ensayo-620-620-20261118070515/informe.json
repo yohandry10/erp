@@ -1,0 +1,50 @@
+{
+  "archiveSha256": "8355ec28a749ee55fffd62f917e22909ccf357b23946aa96c71cdeafe7ebd514",
+  "exito": true,
+  "redDelContenedor": "none",
+  "conexionesRemotas": 0,
+  "desde": 620,
+  "hasta": 620,
+  "limites": [
+    "Sin objetos de Storage ni roles globales reales; el tiempo local no acredita el de PROD."
+  ],
+  "restaurarMs": 8993,
+  "esquemaDelRespaldo": 619,
+  "entornoDelRespaldo": "PROD",
+  "aplicadasAntesDelLote": [],
+  "loteSha256": "dc83893babcf314636a4e0ccc6734d366673489466673210bdd2c086196faed8",
+  "migraciones": [
+    "620__cxp_cancellation_counter_journal.sql"
+  ],
+  "tablas": 342,
+  "filas": 227830,
+  "rollbackMs": 110,
+  "rollbackSinRastro": true,
+  "aplicarMs": 114,
+  "esquemaFinal": 620,
+  "tablasNuevas": [],
+  "tablasPerdidas": [],
+  "columnasPerdidas": [],
+  "tablasConDatosCambiados": [],
+  "funcionesPublicasRetiradas": [],
+  "salud": {
+    "ready": true,
+    "esquema": 620,
+    "cola_muerta": 0,
+    "requerido_aplicado": true
+  },
+  "movimientosBancarios": {
+    "nulos": 0,
+    "total": 44,
+    "inactivos": 0
+  },
+  "defaultActivo": "true",
+  "verificadores": [
+    {
+      "version": 620,
+      "ok": true,
+      "error": null
+    }
+  ],
+  "verificadoresFallidos": 0
+}
