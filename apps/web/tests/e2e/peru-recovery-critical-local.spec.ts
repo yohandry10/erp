@@ -117,7 +117,8 @@ test('Recuperación crítica: recibos reales, almacenamiento, actor retenido y a
    await page.getByRole('button',{name:'Guardar',exact:true}).click();await expect.poll(()=>!!captured.receipt).toBe(true);const original=await pending();expect(count()).toBe(before+1)
    const second=await context.newPage()
    try{await login(second,other);await expect.poll(()=>second.evaluate(()=>JSON.parse(localStorage.getItem('erp.auth.session.snapshot')||'null')?.user?.id)).toBe(otherActor);release();await page.waitForTimeout(250);expect(await pending()).toBe(original);expect(await second.evaluate(k=>localStorage.getItem(k),key)).toBe(original);expect(count()).toBe(before+1)}finally{release();await second.close();await page.unroute(matcher)}
-   await login(page,fixture);await page.goto(origin+'/dashboard/contabilidad/activos-fijos/',{waitUntil:'domcontentloaded'});await expect(retry).toBeEnabled();await recover(captured,before)
+   // Tras volver a entrar, restaurar el pendiente exige sesión, perfil y lectura de la página: en CI puede superar los 5 s por defecto.
+   await login(page,fixture);await page.goto(origin+'/dashboard/contabilidad/activos-fijos/',{waitUntil:'domcontentloaded'});await expect(retry).toBeEnabled({timeout:30000});await recover(captured,before)
    steps.push({name:'real_actor_and_tenant_switch_while_committed_reply_held_preserves_original_owner',result:'PASS',surface:'CHROMIUM',nativeCoverageClaimed:false})
   }
   const access=await apiLogin()

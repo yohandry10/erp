@@ -1,6 +1,35 @@
 # Estado actual del ERP
 
-Actualizado: 2026-11-10. Una página: si algo no cabe aquí, va a su documento de dominio.
+Actualizado: 2026-11-17. Una página: si algo no cabe aquí, va a su documento de dominio.
+
+## GO_PROD de plataforma (17-nov)
+
+Criterios en `RELEASE.md`. Producción sirve `3443d818` con esquema 618. La UAT
+histórica sigue vigente; lo añadido después tiene UAT dirigida propia en el
+ensayo integrado (709 escenarios HTTP, 0 fallidos), incluidos el circuito
+completo de compra en USD (recepción con tipo de cambio congelado, factura y
+pago con banco y cuenta 42 cuadrados), la planilla calculada con la normativa
+general 2026 y su tope AFP, y la anulación de un traslado contra base real.
+
+| Criterio | Estado |
+| --- | --- |
+| P1 CI de `main` | Cumple: CI, E2E y Security de `3443d818` en verde |
+| P2 Esquema y readiness | Cumple: 618 requerido y aplicado, readiness `ready`, 0 fallidos |
+| P3 Promociones con respaldo y ensayo | Cumple: 594–617 y 618 con evidencia |
+| P4 UAT de lo añadido | Cumple vía API y base real; la anulación de traslados no tiene botón en pantalla, sólo API |
+| P5 Respaldo y restauración | Cumple en el ensayo integrado; RTO de PROD no medido |
+| P6 Seguridad | En corrección: 43 alertas CodeQL antiguas en `main`; las reales se corrigen en este corte y las falsas se descartan con justificación. La clave filtrada del historial es de un proyecto que ya no existe. Aviso alto de `picomatch` (GHSA-fc5q-39xc-vjpf, 17-nov) sin versión corregida: aceptado en el audit sólo porque llega a producción a través del empaquetador de compilación de Sentry; vuelve a bloquear cuando se publique la corrección |
+| P7 Instancia siempre activa | **No cumple**: el API está en el plan gratuito de Render y se duerme; las colas contables se detienen con él |
+| P8 Correo productivo | **No cumple**: el API arranca con «SMTP host not configured» |
+| P9 Desplegar tras los checks | **No cumple**: Render despliega al recibir el commit, no tras CI |
+| P10 Errores capturados | **No cumple**: producción no tiene `SENTRY_DSN` |
+| P11 Normativa vigente | Cumple para 2026; la de 2027 debe cargarse antes del 1-ene |
+| P12 Instalador | Cumple: generado contra PROD; la app inicia y el API responde a su origen |
+
+P7–P10 son configuración del servicio en Render, no código: requieren el plan
+de pago (USD 7/mes), credenciales de un proveedor de correo, el ajuste de
+despliegue y el DSN de Sentry. Con esos cuatro y P6 cerrado, la plataforma es
+GO_PROD. El go-live de cada cliente (PFX, SOL, migración, piloto) es aparte.
 
 ## Dónde está
 

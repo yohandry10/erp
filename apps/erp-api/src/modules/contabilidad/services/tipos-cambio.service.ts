@@ -133,6 +133,11 @@ export class TiposCambioService {
     monedaDestino: string,
     fecha: string
   ): Promise<TipoCambioResponseDto | null> {
+    // Llegan desde la query: un parámetro repetido sería un arreglo, no un texto.
+    if (typeof monedaOrigen !== 'string' || typeof monedaDestino !== 'string'
+      || typeof fecha !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(fecha)) {
+      throw new BadRequestException('Indique monedas y una fecha YYYY-MM-DD válidas para el tipo de cambio');
+    }
     const origen = monedaOrigen.toUpperCase();
     const destino = monedaDestino.toUpperCase();
 

@@ -89,7 +89,7 @@ export class ValidationInterceptor implements NestInterceptor {
       if (typeof value === 'string') {
         // Detectar posibles inyecciones SQL o XSS
         const dangerousPatterns = [
-          /<script[^>]*>.*?<\/script>/gi,
+          /<\s*\/?\s*script\b/gi,
           /javascript:/gi,
           /on\w+\s*=/gi,
           /(union|select|insert|update|delete|drop|create|alter)\s+/gi,

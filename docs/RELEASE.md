@@ -25,6 +25,34 @@ Debe cumplirse:
 
 Estado actual y pendientes: `docs/CURRENT_STATE.md`.
 
+### GO_PROD de plataforma y go-live por cliente
+
+Son dos decisiones distintas. **GO_PROD de plataforma** dice que producción
+está lista para recibir a su primer cliente; no depende de tener uno. Se
+cumple cuando todo esto es cierto y verificable a la vez:
+
+| # | Criterio | Cómo se verifica |
+| --- | --- | --- |
+| P1 | `main` desplegado es un commit con CI, E2E aislado y Security/CodeQL completos en verde | Checks del merge y `/health/version` del API |
+| P2 | Esquema de PROD igual al requerido por el binario; readiness `ready`; outbox sin fallidos ni atascados | `/health/ready` |
+| P3 | Cada promoción con preflight, respaldo de menos de 24 h, ensayo del mismo lote y evidencia | `artifacts/promocion-*` |
+| P4 | Todo cambio posterior a la UAT histórica tiene UAT dirigida propia | Escenarios del ensayo integrado y de navegador |
+| P5 | Respaldo y restauración ensayados; rollback por corrección hacia delante | Ensayo de restauración del integrado |
+| P6 | Seguridad: sin alertas CodeQL abiertas, ninguna credencial vigente expuesta, CORS en lista blanca | GitHub y prueba de CORS |
+| P7 | El API atiende y procesa colas sin dormirse: instancia siempre activa | Plan del servicio en Render |
+| P8 | Correo productivo configurado: recuperación de contraseña y alertas salen | Arranque sin error SMTP y envío de prueba |
+| P9 | Render despliega sólo después de los checks (`checksPass`) | Configuración del servicio en Render |
+| P10 | Errores de producción capturados (Sentry con DSN de producción) | Evento de prueba recibido |
+| P11 | Normativa vigente cargada (UIT, RMV, AFP y su tope del año) | Normativa general del período |
+| P12 | Instalador de Windows generado contra el API de producción y probado | Inicio de la app y respuesta del API desde su origen |
+
+**Go-live por cliente** se decide aparte, para cada empresa, y no bloquea el
+GO_PROD de plataforma: certificado PFX y clave SOL del contribuyente con una
+primera emisión aceptada, migración de sus datos con conciliación,
+parametrización y usuarios, capacitación, piloto y aceptación firmada. La
+firma de código del instalador evita el aviso de SmartScreen; se recomienda
+antes de entregarlo, pero no impide usarlo.
+
 CI y E2E verifican las ramas de trabajo al abrir o actualizar un PR, incluidos
 los borradores. No duplican ese mismo análisis por cada push de la rama;
 `main` y `develop` conservan la validación por push y E2E el despacho manual.

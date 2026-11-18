@@ -1,4 +1,4 @@
-import { test, expect, type BrowserContext, type Dialog, type Page } from '@playwright/test'
+import { test, expect, type BrowserContext, type Dialog, type Download, type Page } from '@playwright/test'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -464,10 +464,15 @@ test('Perú: primer administrador importa, edita y desactiva maestros con recupe
     await expect(dialog).toBeHidden()
     await page.getByRole('textbox', { name: 'Buscar' }).fill(name)
     await expect(page.getByRole('row').filter({ hasText: name })).toBeVisible()
-    const [download] = await Promise.all([
-      page.waitForEvent('download'), page.getByRole('button', { name: 'Exportar página (CSV)' }).click(),
-    ])
-    expect(await fs.readFile(await download.path(), 'utf8')).toContain(name)
+    // Un clic previo a la hidratación no dispara la descarga y la espera sin
+    // plazo agotaba la prueba completa: se repite con plazo por intento.
+    let download: Download | undefined
+    await expect(async () => {
+      ;[download] = await Promise.all([
+        page.waitForEvent('download', { timeout: 15000 }), page.getByRole('button', { name: 'Exportar página (CSV)' }).click(),
+      ])
+    }).toPass({ timeout: 60000 })
+    expect(await fs.readFile(await download!.path(), 'utf8')).toContain(name)
     await page.getByRole('row').filter({ hasText: name }).getByRole('button', { name: 'Editar' }).click()
     await expect(page).toHaveURL(/\/editar\/?$/, { timeout: 20000 })
     const masterId = new URL(page.url()).pathname.split('/').filter(Boolean).at(-2)!
@@ -965,7 +970,12 @@ test('Perú: reembolso RMA recupera catálogos, respuesta perdida y asiento sin 
   expect(replay.movimiento_id).toBe(committed.movimiento_id)
   await expect(dialog).toBeHidden()
   await page.reload()
-  await page.getByRole('button', { name: 'Saldos a favor', exact: true }).click()
+  // Tras recargar, un clic previo a la hidratación de la pestaña se pierde: se
+  // repite hasta ver la fila. No reenvía nada; sólo cambia de pestaña.
+  await expect(async () => {
+    await page.getByRole('button', { name: 'Saldos a favor', exact: true }).click()
+    await expect(row).toBeVisible({ timeout: 3000 })
+  }).toPass({ timeout: 30000 })
   await expect(row).toContainText(/12[.,]60/)
   const saldoAfter = await getReal(`ventas/rma/saldos-favor/${paid.saldo_favor_id}`)
   expect(Number(saldoAfter.monto_disponible)).toBeCloseTo(paid.saldo_disponible - 4, 2)
