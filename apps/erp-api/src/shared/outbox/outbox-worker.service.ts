@@ -166,10 +166,10 @@ export class OutboxWorker implements OnApplicationBootstrap {
             timestamp: new Date(event.created_at),
             module: 'outbox-worker',
           };
-          // Un evento declarado sin suscriptor se da por procesado sin despachar.
-          // El resto sigue fallando cerrado: si le falta el handler, cae a
-          // dead_letter, que es donde debe verse.
-          if (!esEventoSinSuscriptor(event.event_type)) {
+          // Un evento declarado sin suscriptor se da por procesado sin despachar,
+          // salvo que alguien lo escuche ya. El resto sigue fallando cerrado: si
+          // le falta el handler, cae a dead_letter, que es donde debe verse.
+          if (!esEventoSinSuscriptor(event.event_type) || this.eventBus.hasListeners(event.event_type)) {
             await this.eventBus.emitAndAwait(event.event_type, erpEvent.data, 'outbox-worker');
           }
           await this.outboxService.markEventCompleted(event.id, event.claim_token);
