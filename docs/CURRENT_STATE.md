@@ -14,7 +14,7 @@ general 2026 y su tope AFP, y la anulación de un traslado contra base real.
 | Criterio | Estado |
 | --- | --- |
 | P1 CI de `main` | Cumple: CI, E2E y Security de `3443d818` en verde |
-| P2 Esquema y readiness | Cumple: 618 requerido y aplicado, readiness `ready`, 0 fallidos. Los 16 `dead_letter` (respaldo de solo lectura del 17-nov) son todos `OUTBOX_HANDLER_NOT_REGISTERED`: 7 constancias de configuración de agosto y 9 de RMA, cancelación de pedido, canje POS, aprobación de OC y GRE, que nadie escucha. Iban a crecer con cada operación hasta superar el umbral de 100 del readiness. Se declaran como constancias y la UAT integrada ejecuta ahora el worker general; los 16 se cierran reencolándolos tras el despliegue |
+| P2 Esquema y readiness | Cumple: 618 requerido y aplicado, readiness `ready`, 0 fallidos. Los 16 `dead_letter` (respaldo de solo lectura del 17-nov) son todos `OUTBOX_HANDLER_NOT_REGISTERED`: 7 constancias de configuración de agosto y 9 de RMA, cancelación de pedido, canje POS, aprobación de OC y GRE, que nadie escucha. Iban a crecer con cada operación hasta superar el umbral de 100 del readiness. Se declaran como constancias y la UAT integrada ejecuta ahora el worker general; los 16 se cierran con la migración `619` |
 | P3 Promociones con respaldo y ensayo | Cumple: 594–617 y 618 con evidencia |
 | P4 UAT de lo añadido | Cumple vía API y base real; la anulación de traslados no tiene botón en pantalla, sólo API |
 | P5 Respaldo y restauración | Cumple en el ensayo integrado; RTO de PROD no medido |
@@ -238,7 +238,9 @@ GO_PROD. El go-live de cada cliente (PFX, SOL, migración, piloto) es aparte.
 
 | `618` | Tope AFP (remuneración máxima asegurable) de la normativa general 2026, con los valores de la SBS por mes de devengue: 12.209,11 (ene–mar), 12.598,91 (abr–jun), 12.672,65 (jul–sep) y 12.732,70 (oct–dic; diciembre por trimestre, aún sin publicar). Sólo completa filas globales sin tope; no toca normativa de empresas ni planillas calculadas, y falla sin confirmar si no puede escribir. Cadena limpia, control en rojo con rol sin BYPASSRLS, reaplicación y ensayo sobre respaldo del 10-nov (sólo cambian esas 12 filas) pasan. Se promueve antes de fusionar: el binario exige618 |
 
-Próxima libre: `619`. El binario de `main` exige618; PROD pasó a617 el 10-nov y a618
+| `619` | Sólo datos: cierra como completados, igual que el worker, los `dead_letter` cuyo error es `OUTBOX_HANDLER_NOT_REGISTERED` de su propio tipo, sólo en las constancias declaradas en `EVENTOS_SIN_SUSCRIPTOR`; el error original queda en el payload. No los reencola: con su `created_at` antiguo, el readiness (health check de Render) quedaría no listo hasta que pasara el worker, y el ensayo abortó así. No sube el piso del binario |
+
+Próxima libre: `620`. El binario de `main` exige618; PROD pasó a617 el 10-nov y a618
 con este cambio. El stack histórico local conservado sigue612. No arrancar el binario nuevo sobre
 la base conservada sin completar su migración en infraestructura de pruebas propia.
 Comprobar prefijos duplicados antes de añadir una.
