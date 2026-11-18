@@ -1,0 +1,19 @@
+{
+  "completedAt": "2026-11-18T07:05:07.617Z",
+  "project": "wypnbcptofqdmoynlonq",
+  "remoteWrites": false,
+  "archive": "C:\\Users\\PC\\Desktop\\erp\\.claude\\worktrees\\memo\\artifacts\\db-backups\\prod-pre-peru-552-20261118065838276.dump",
+  "schemas": [
+    "public",
+    "app",
+    "auth",
+    "storage",
+    "supabase_migrations"
+  ],
+  "bytes": 20270802,
+  "sha256": "8355ec28a749ee55fffd62f917e22909ccf357b23946aa96c71cdeafe7ebd514",
+  "catalogEntries": 8892,
+  "durationMs": 389392,
+  "restoreVerified": false,
+  "limits": "Respaldo lógico de esquemas de la aplicación. No incluye objetos externos de Storage ni roles globales."
+}

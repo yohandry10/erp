@@ -48,13 +48,13 @@ describe('AppController runtime contract', () => {
       }),
     }));
     expect(rpc).toHaveBeenCalledWith('outbox_runtime_health_492', expect.objectContaining({
-      p_required_schema_version: 619,
+      p_required_schema_version: 620,
     }));
     expect(rpc).not.toHaveBeenCalledWith('pgrst_reload_schema', expect.anything());
     expect(cache.getRuntimeHealth).toHaveBeenCalledTimes(1);
   });
 
-  it.each([{ configured: '558', expected: 619 }, { configured: '576', expected: 619 }, { configured: '582', expected: 619 }, { configured: '589', expected: 619 }, { configured: '594', expected: 619 }, { configured: '609', expected: 619 }, { configured: '610', expected: 619 }, { configured: '611', expected: 619 }, { configured: '612', expected: 619 }, { configured: '613', expected: 619 }, { configured: '614', expected: 619 }, { configured: '615', expected: 619 }, { configured: '616', expected: 619 }, { configured: '617', expected: 619 }, { configured: '618', expected: 619 }, { configured: '619', expected: 619 }, { configured: '620', expected: 620 }])('respeta el piso contractual con despliegue $configured', async ({ configured, expected }) => {
+  it.each([{ configured: '558', expected: 620 }, { configured: '576', expected: 620 }, { configured: '582', expected: 620 }, { configured: '589', expected: 620 }, { configured: '594', expected: 620 }, { configured: '609', expected: 620 }, { configured: '610', expected: 620 }, { configured: '611', expected: 620 }, { configured: '612', expected: 620 }, { configured: '613', expected: 620 }, { configured: '614', expected: 620 }, { configured: '615', expected: 620 }, { configured: '616', expected: 620 }, { configured: '617', expected: 620 }, { configured: '618', expected: 620 }, { configured: '619', expected: 620 }, { configured: '620', expected: 620 }, { configured: '621', expected: 621 }])('respeta el piso contractual con despliegue $configured', async ({ configured, expected }) => {
     const { controller, rpc } = build();
     (controller as any).configService.get.mockImplementation((key: string) => (
       key === 'REQUIRED_DATABASE_SCHEMA_VERSION' ? configured : {

@@ -447,6 +447,9 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
           case 'recepcion.revertida':
             await this.handleRecepcionRevertida(evento);
             break;
+          case 'cxp.anulada':
+            await this.handleCxpAnulada(evento);
+            break;
 
           case 'factura.proveedor.registrada':
           case 'FacturaProveedorRegistrada':
@@ -1862,6 +1865,31 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
       || typeof data.total_debe !== 'string' || !/^\d{1,12}\.\d{2}$/.test(data.total_debe)
       || /^0+\.00$/.test(data.total_debe) || data.total_debe !== data.total_haber) {
       throw new Error('El contraasiento de recepción no tiene identidad e importes completos');
+    }
+  }
+
+  /**
+   * La anulación de una CxP invierte el asiento de su factura en la base, con el
+   * claim del evento; aquí sólo se exige que la prueba devuelta sea completa.
+   */
+  private async handleCxpAnulada(evento: OutboxEvent): Promise<void> {
+    const payload = evento.event_data;
+    const tenantId = this.ensureEventTenant(payload, 'cxp.anulada');
+    const eventId = evento.event_id || payload.eventId;
+    if (!eventId || !evento.claim_token || !payload.cxpId) {
+      throw new Error('Anulación de CxP requiere identidad y claim originales');
+    }
+    const { data, error } = await this.supabaseService.getClient().rpc('contabilizar_anulacion_cxp_620', {
+      p_tenant_id: tenantId, p_event_id: eventId, p_claim_token: evento.claim_token,
+    });
+    if (error) throw new Error(error.message || 'No se pudo contabilizar la anulación de la CxP');
+    const uuid = (value: any) => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+    if (!data || data.success !== true || data.event_id !== eventId || data.cxp_id !== payload.cxpId
+      || !uuid(data.original_event_id) || !uuid(data.asiento_id) || !uuid(data.original_asiento_id)
+      || data.asiento_id === data.original_asiento_id || typeof data.idempotent !== 'boolean'
+      || typeof data.total_debe !== 'string' || !/^\d{1,12}\.\d{2}$/.test(data.total_debe)
+      || /^0+\.00$/.test(data.total_debe) || data.total_debe !== data.total_haber) {
+      throw new Error('El contraasiento de la CxP anulada no tiene identidad e importes completos');
     }
   }
 
