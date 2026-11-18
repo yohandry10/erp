@@ -25,3 +25,20 @@ export function captureUnexpectedError(error: unknown): void {
 }
 
 export const flushErrorMonitoring = Sentry.flush;
+
+class PlatformDiagnosticError extends Error {
+  constructor() {
+    super('Evento de diagnóstico de plataforma');
+    this.name = 'PlatformDiagnosticError';
+  }
+}
+
+/**
+ * Envía un evento identificable para comprobar que el despliegue llega a Sentry.
+ * El filtro de privacidad conserva el tipo, el entorno y el release.
+ */
+export async function sendDiagnosticEvent(): Promise<{ eventId: string; delivered: boolean } | null> {
+  if (!Sentry.isInitialized()) return null;
+  const eventId = Sentry.captureException(new PlatformDiagnosticError());
+  return { eventId, delivered: await Sentry.flush(5000) };
+}

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTenant } from '@/contexts/TenantContext'
 import { useApi } from '@/hooks/use-api'
+import { PlatformDiagnostics } from './platform-diagnostics'
 
 interface DashboardStats {
   period: string
@@ -396,6 +397,8 @@ export default function SecurityDashboard() {
           </div>
         </>
       )}
+
+      <PlatformDiagnostics />
     </div>
   )
 }

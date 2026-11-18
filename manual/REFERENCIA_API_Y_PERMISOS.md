@@ -1,8 +1,8 @@
 # Operaciones del API y permisos
 
-Generado desde los decoradores de los controladores con `node scripts/manual/generar-referencias.mjs`; no se edita a mano. 806 operaciones. Si difiere del código, manda el código.
+Generado desde los decoradores de los controladores con `node scripts/manual/generar-referencias.mjs`; no se edita a mano. 816 operaciones. Si difiere del código, manda el código.
 
-"-" significa que el controlador no declara un permiso con ese decorador: puede ser pública, usar otro guard o validar el permiso dentro de la operación. No debe leerse como acceso libre (62 casos). El permiso declarado no es lo único que se exige: también cuentan la empresa, la sucursal y el estado del registro.
+"-" significa que el controlador no declara un permiso con ese decorador: puede ser pública, usar otro guard o validar el permiso dentro de la operación. No debe leerse como acceso libre (63 casos). El permiso declarado no es lo único que se exige: también cuentan la empresa, la sucursal y el estado del registro.
 
 ## alertas
 
@@ -49,6 +49,7 @@ Generado desde los decoradores de los controladores con `node scripts/manual/gen
 | GET | `/api/auth/config-status` | - |
 | POST | `/api/auth/password-reset/request` | - |
 | POST | `/api/auth/password-reset/validate` | - |
+| POST | `/api/auth/password/change` | - |
 | POST | `/api/auth/password-reset/confirm` | - |
 | POST | `/api/auth/switch-tenant` | `tenants.manage` |
 | POST | `/api/auth/logout` | - |
@@ -121,6 +122,9 @@ Generado desde los decoradores de los controladores con `node scripts/manual/gen
 | GET | `/api/compras/proveedores/:id` | `compras.proveedores.ver` |
 | PUT | `/api/compras/proveedores/:id` | `compras.proveedores.editar` |
 | DELETE | `/api/compras/proveedores/:id` | `compras.proveedores.eliminar` |
+| POST | `/api/compras/recepciones/:id/anular` | `compras.recepciones.cerrar` |
+| POST | `/api/compras/recepciones/:id/anular/recibo` | `compras.recepciones.cerrar` |
+| POST | `/api/compras/recepciones/:id/anular/resolver` | `compras.recepciones.cerrar` |
 | GET | `/api/compras/recepciones` | `compras.recepciones.ver` |
 | GET | `/api/compras/recepciones/:id` | `compras.recepciones.ver` |
 | POST | `/api/compras/recepciones/ordenes/:ordenId` | `compras.recepciones.crear` |
@@ -558,6 +562,10 @@ Generado desde los decoradores de los controladores con `node scripts/manual/gen
 | GET | `/api/inventario/transferencias/recibo` | `inventario.movimientos.create` |
 | POST | `/api/inventario/movimientos` | `inventario.movimientos.create` |
 | POST | `/api/inventario/transferencias` | `inventario.movimientos.create` |
+| GET | `/api/inventario/transferencias/:id` | `inventario.movimientos.read` |
+| POST | `/api/inventario/transferencias/:id/anular` | `inventario.movimientos.create` |
+| POST | `/api/inventario/transferencias/:id/anular/recibo` | `inventario.movimientos.create` |
+| POST | `/api/inventario/transferencias/:id/anular/resolver` | `inventario.movimientos.create` |
 | GET | `/api/inventario/productos/:id` | `inventario.productos.read` |
 | DELETE | `/api/inventario/productos/:id` | `inventario.productos.delete` |
 | PUT | `/api/inventario/productos/:id` | `inventario.productos.update` |
@@ -793,6 +801,8 @@ Generado desde los decoradores de los controladores con `node scripts/manual/gen
 | GET | `/api/security/rls/violations` | `security.audit.read` |
 | GET | `/api/security/dashboard/alerts-unacknowledged` | `security.audit.read` |
 | GET | `/api/security/dashboard/security-report` | `security.audit.read` |
+| POST | `/api/security/diagnostico/correo` | `security.audit.read` |
+| POST | `/api/security/diagnostico/sentry` | `security.audit.read` |
 
 ## sire
 
