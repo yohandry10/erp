@@ -4,7 +4,7 @@ Actualizado: 2026-11-17. Una página: si algo no cabe aquí, va a su documento d
 
 ## GO_PROD de plataforma (17-nov)
 
-Criterios en `RELEASE.md`. Producción sirve `35272a6c` (PR156) con esquema 618. La UAT
+Criterios en `RELEASE.md`. Producción sirve `90a2063e` (PR157) con esquema 619. La UAT
 histórica sigue vigente; lo añadido después tiene UAT dirigida propia en el
 ensayo integrado (709 escenarios HTTP, 0 fallidos), incluidos el circuito
 completo de compra en USD (recepción con tipo de cambio congelado, factura y
@@ -14,7 +14,7 @@ general 2026 y su tope AFP, y la anulación de un traslado contra base real.
 | Criterio | Estado |
 | --- | --- |
 | P1 CI de `main` | Cumple: CI, E2E y Security de `3443d818` en verde |
-| P2 Esquema y readiness | Cumple: 618 requerido y aplicado, readiness `ready`, 0 fallidos. Los 16 `dead_letter` (respaldo de solo lectura del 17-nov) son todos `OUTBOX_HANDLER_NOT_REGISTERED`: 7 constancias de configuración de agosto y 9 de RMA, cancelación de pedido, canje POS, aprobación de OC y GRE, que nadie escucha. Iban a crecer con cada operación hasta superar el umbral de 100 del readiness. Se declaran como constancias y la UAT integrada ejecuta ahora el worker general; los 16 se cierran con la migración `619` |
+| P2 Esquema y readiness | Cumple: 619 requerido y aplicado (18-nov), readiness `ready`, 0 fallidos y 0 `dead_letter`. Los 16 `dead_letter` (respaldo de solo lectura del 17-nov) son todos `OUTBOX_HANDLER_NOT_REGISTERED`: 7 constancias de configuración de agosto y 9 de RMA, cancelación de pedido, canje POS, aprobación de OC y GRE, que nadie escucha. Iban a crecer con cada operación hasta superar el umbral de 100 del readiness. Se declaran como constancias y la UAT integrada ejecuta ahora el worker general; la `619` cerró los 16 en PROD (`artifacts/promocion-prod-619-619-20261118055057026.json`: sólo `outbox_events`, 270 filas, sin cambios fuera del ensayo) |
 | P3 Promociones con respaldo y ensayo | Cumple: 594–617 y 618 con evidencia |
 | P4 UAT de lo añadido | Cumple vía API y base real; la anulación de traslados no tiene botón en pantalla, sólo API |
 | P5 Respaldo y restauración | Cumple en el ensayo integrado; RTO de PROD no medido |
