@@ -4,7 +4,7 @@ Actualizado: 2026-11-17. Una página: si algo no cabe aquí, va a su documento d
 
 ## GO_PROD de plataforma (17-nov)
 
-Criterios en `RELEASE.md`. Producción sirve `a3f57a39` (PR158) con esquema 619. La UAT
+Criterios en `RELEASE.md`. Producción sirve `336c9c7b` (PR160) con esquema 620. La UAT
 histórica sigue vigente; lo añadido después tiene UAT dirigida propia en el
 ensayo integrado (709 escenarios HTTP, 0 fallidos), incluidos el circuito
 completo de compra en USD (recepción con tipo de cambio congelado, factura y
@@ -242,7 +242,7 @@ GO_PROD. El go-live de cada cliente (PFX, SOL, migración, piloto) es aparte.
 | `620` | Anulación de CxP con contraasiento: `cxp.anulada` (478) pasa al worker contable y a las guardas de período; `contabilizar_anulacion_cxp_620` invierte, con el claim del evento, el asiento completo de la factura de la CxP (42, IGV, compras o 4699 y retenciones), enlazado por `reversion_de_asiento_id` y fechado con la anulación. Falla cerrado sin factura contable (apertura), con el original ya revertido o con otros asientos vivos de la CxP; reintenta si la factura aún no se contabiliza. Ensayo sobre respaldo del 18-nov sin cambios de datos; la UAT de finanzas comprueba el espejo y la 42 en cero |
 
 Próxima libre: `621`. El binario de `main` exige620; PROD pasó a617 el 10-nov, a618
-el 12-nov y a619 con el PR157. El stack histórico local conservado sigue612. No arrancar el binario nuevo sobre
+el 12-nov, a619 con el PR157 y a620 con el PR160 (`artifacts/promocion-prod-620-620-20261118191832489.json`: sin tablas ni datos cambiados). El stack histórico local conservado sigue612. No arrancar el binario nuevo sobre
 la base conservada sin completar su migración en infraestructura de pruebas propia.
 Comprobar prefijos duplicados antes de añadir una.
 

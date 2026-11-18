@@ -1,0 +1,40 @@
+{
+  "commit": "6e75781344e91ac9658e0bf5cb7ca22b1a84dd62",
+  "pr": 160,
+  "proyecto": "wypnbcptofqdmoynlonq",
+  "desde": 620,
+  "hasta": 620,
+  "migraciones": [
+    "620__cxp_cancellation_counter_journal.sql"
+  ],
+  "respaldoSha256": "8355ec28a749ee55fffd62f917e22909ccf357b23946aa96c71cdeafe7ebd514",
+  "loteSha256": "dc83893babcf314636a4e0ccc6734d366673489466673210bdd2c086196faed8",
+  "exito": true,
+  "escriturasRemotas": true,
+  "antes": {
+    "esquema": 619,
+    "salud": {
+      "ready": true,
+      "esquema": 619,
+      "cola_muerta": 0,
+      "requerido_aplicado": true
+    },
+    "tablas": 342,
+    "filas": 227830
+  },
+  "aplicarMs": 3763,
+  "despues": {
+    "esquema": 620,
+    "salud": {
+      "ready": true,
+      "esquema": 620,
+      "cola_muerta": 0,
+      "requerido_aplicado": true
+    },
+    "tablasPerdidas": [],
+    "columnasPerdidas": [],
+    "tablasConDatosCambiados": [],
+    "cambiosNoVistosEnElEnsayo": []
+  },
+  "terminado": "2026-11-18T19:21:13.077Z"
+}
