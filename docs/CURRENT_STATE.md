@@ -4,7 +4,7 @@ Actualizado: 2026-11-17. Una página: si algo no cabe aquí, va a su documento d
 
 ## GO_PROD de plataforma (17-nov)
 
-Criterios en `RELEASE.md`. Producción sirve `3443d818` con esquema 618. La UAT
+Criterios en `RELEASE.md`. Producción sirve `35272a6c` (PR156) con esquema 618. La UAT
 histórica sigue vigente; lo añadido después tiene UAT dirigida propia en el
 ensayo integrado (709 escenarios HTTP, 0 fallidos), incluidos el circuito
 completo de compra en USD (recepción con tipo de cambio congelado, factura y
@@ -14,11 +14,11 @@ general 2026 y su tope AFP, y la anulación de un traslado contra base real.
 | Criterio | Estado |
 | --- | --- |
 | P1 CI de `main` | Cumple: CI, E2E y Security de `3443d818` en verde |
-| P2 Esquema y readiness | Cumple: 618 requerido y aplicado, readiness `ready`, 0 fallidos |
+| P2 Esquema y readiness | Cumple: 618 requerido y aplicado, readiness `ready`, 0 fallidos. Los 16 `dead_letter` (respaldo de solo lectura del 17-nov) son todos `OUTBOX_HANDLER_NOT_REGISTERED`: 7 constancias de configuración de agosto y 9 de RMA, cancelación de pedido, canje POS, aprobación de OC y GRE, que nadie escucha. Iban a crecer con cada operación hasta superar el umbral de 100 del readiness. Se declaran como constancias y la UAT integrada ejecuta ahora el worker general; los 16 se cierran con la migración `619` |
 | P3 Promociones con respaldo y ensayo | Cumple: 594–617 y 618 con evidencia |
 | P4 UAT de lo añadido | Cumple vía API y base real; la anulación de traslados no tiene botón en pantalla, sólo API |
 | P5 Respaldo y restauración | Cumple en el ensayo integrado; RTO de PROD no medido |
-| P6 Seguridad | En corrección: 43 alertas CodeQL antiguas en `main`; las reales se corrigen en este corte y las falsas se descartan con justificación. La clave filtrada del historial es de un proyecto que ya no existe. Aviso alto de `picomatch` (GHSA-fc5q-39xc-vjpf, 17-nov) sin versión corregida: aceptado en el audit sólo porque llega a producción a través del empaquetador de compilación de Sentry; vuelve a bloquear cuando se publique la corrección |
+| P6 Seguridad | Cumple: 0 alertas CodeQL abiertas en `main`; PR156 corrigió 40 y se descartaron 3 falsos positivos (scripts SUNAT que no imprimen claves). La clave filtrada del historial es de un proyecto que ya no existe. Aviso alto de `picomatch` (GHSA-fc5q-39xc-vjpf, 17-nov) sin versión corregida: aceptado en el audit sólo porque llega a producción a través del empaquetador de compilación de Sentry; vuelve a bloquear cuando se publique la corrección |
 | P7 Instancia siempre activa | **No cumple**: el API está en el plan gratuito de Render y se duerme; las colas contables se detienen con él |
 | P8 Correo productivo | **No cumple**: el API arranca con «SMTP host not configured» |
 | P9 Desplegar tras los checks | **No cumple**: Render despliega al recibir el commit, no tras CI |
@@ -28,7 +28,7 @@ general 2026 y su tope AFP, y la anulación de un traslado contra base real.
 
 P7–P10 son configuración del servicio en Render, no código: requieren el plan
 de pago (USD 7/mes), credenciales de un proveedor de correo, el ajuste de
-despliegue y el DSN de Sentry. Con esos cuatro y P6 cerrado, la plataforma es
+despliegue y el DSN de Sentry. Con esos cuatro, la plataforma es
 GO_PROD. El go-live de cada cliente (PFX, SOL, migración, piloto) es aparte.
 
 ## Dónde está
@@ -238,8 +238,10 @@ GO_PROD. El go-live de cada cliente (PFX, SOL, migración, piloto) es aparte.
 
 | `618` | Tope AFP (remuneración máxima asegurable) de la normativa general 2026, con los valores de la SBS por mes de devengue: 12.209,11 (ene–mar), 12.598,91 (abr–jun), 12.672,65 (jul–sep) y 12.732,70 (oct–dic; diciembre por trimestre, aún sin publicar). Sólo completa filas globales sin tope; no toca normativa de empresas ni planillas calculadas, y falla sin confirmar si no puede escribir. Cadena limpia, control en rojo con rol sin BYPASSRLS, reaplicación y ensayo sobre respaldo del 10-nov (sólo cambian esas 12 filas) pasan. Se promueve antes de fusionar: el binario exige618 |
 
-Próxima libre: `619`. El binario de `main` exige618; PROD pasó a617 el 10-nov y a618
-con este cambio. El stack histórico local conservado sigue612. No arrancar el binario nuevo sobre
+| `619` | Sólo datos: cierra como completados, igual que el worker, los `dead_letter` cuyo error es `OUTBOX_HANDLER_NOT_REGISTERED` de su propio tipo, sólo en las constancias declaradas en `EVENTOS_SIN_SUSCRIPTOR`; el error original queda en el payload. No los reencola: con su `created_at` antiguo, el readiness (health check de Render) quedaría no listo hasta que pasara el worker, y el ensayo abortó así. El contrato de CI iguala el piso del binario a la última migración: exige619 y se promueve antes de fusionar |
+
+Próxima libre: `620`. El binario de `main` exige619; PROD pasó a617 el 10-nov, a618
+el 12-nov y a619 con el PR157. El stack histórico local conservado sigue612. No arrancar el binario nuevo sobre
 la base conservada sin completar su migración en infraestructura de pruebas propia.
 Comprobar prefijos duplicados antes de añadir una.
 
@@ -316,6 +318,11 @@ Expediente de la versión: `artifacts/expediente-590/EXPEDIENTE.md`. Resumen:
   10 s en local con 216.000 filas; falta medir el RTO completo, con proyecto nuevo y secretos.
 - Correo productivo en Render (`SMTP_*` o SendGrid, y `FRONTEND_URL`): sin él, la recuperación de
   contraseña responde 503 y las alertas no salen. Por comprobar en Render.
+- **Anulación manual de CxP sin reversa contable.** `gestionar_cxp_tx` (478) anula cualquier CxP
+  sin pagos y emite `cxp.anulada` con `accountingHandledByOutbox`, pero ningún handler la
+  procesa: una CxP nacida de factura deja la 42 abierta. La anulación por devolución sí cuadra
+  (la revierte `devolucion.proveedor.registrada`). En PROD cae a `dead_letter` a la vista; la UAT
+  integrada la lista como defecto conocido. Falta el contraasiento, sin duplicar el de devolución.
 - Power BI: actualización programada real.
 - Piloto con usuarios, aceptación firmada y anexos comerciales.
 - Render `free→starter` (USD 7/mes) para que los workers no se duerman: requiere medio de pago y

@@ -1,0 +1,66 @@
+{
+  "archiveSha256": "a223e33167161de732514098ae66052e44a31308e4bd1109fa040eafe38e1572",
+  "exito": true,
+  "redDelContenedor": "none",
+  "conexionesRemotas": 0,
+  "desde": 619,
+  "hasta": 619,
+  "limites": [
+    "Sin objetos de Storage ni roles globales reales; el tiempo local no acredita el de PROD."
+  ],
+  "restaurarMs": 9035,
+  "esquemaDelRespaldo": 618,
+  "entornoDelRespaldo": "PROD",
+  "aplicadasAntesDelLote": [],
+  "loteSha256": "045b0c4dff73b482a083e9e267911f6f6599b0262cdb0396833bfa4c52a50c37",
+  "migraciones": [
+    "619__outbox_close_declared_constancias.sql"
+  ],
+  "tablas": 342,
+  "filas": 227826,
+  "rollbackMs": 106,
+  "rollbackSinRastro": true,
+  "aplicarMs": 107,
+  "esquemaFinal": 619,
+  "tablasNuevas": [],
+  "tablasPerdidas": [],
+  "columnasPerdidas": [],
+  "tablasConDatosCambiados": [
+    {
+      "tabla": "public.outbox_events",
+      "antes": 270,
+      "despues": 270,
+      "mismasFilas": true,
+      "columnasCambiadas": {
+        "status": 16,
+        "payload": 16,
+        "updated_at": 16,
+        "processed_at": 16,
+        "error_message": 16,
+        "last_heartbeat_at": 16
+      },
+      "filasBorradas": 0
+    }
+  ],
+  "funcionesPublicasRetiradas": [],
+  "salud": {
+    "ready": true,
+    "esquema": 619,
+    "cola_muerta": 0,
+    "requerido_aplicado": true
+  },
+  "movimientosBancarios": {
+    "nulos": 0,
+    "total": 44,
+    "inactivos": 0
+  },
+  "defaultActivo": "true",
+  "verificadores": [
+    {
+      "version": 619,
+      "ok": true,
+      "error": null
+    }
+  ],
+  "verificadoresFallidos": 0
+}

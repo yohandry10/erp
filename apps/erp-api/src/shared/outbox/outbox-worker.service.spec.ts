@@ -18,7 +18,10 @@ describe('OutboxWorker claim contract', () => {
       markEventCompleted: jest.fn().mockResolvedValue(undefined),
       markEventFailed: jest.fn().mockResolvedValue('failed'),
     };
-    const eventBus = { emitAndAwait: jest.fn().mockResolvedValue(undefined) };
+    const eventBus = {
+      emitAndAwait: jest.fn().mockResolvedValue(undefined),
+      hasListeners: jest.fn().mockReturnValue(false),
+    };
     const tenantContext = { run: jest.fn(async (_ctx, callback) => callback()) };
     return {
       worker: new OutboxWorker(
@@ -78,6 +81,26 @@ describe('OutboxWorker claim contract', () => {
     expect(eventBus.emitAndAwait).not.toHaveBeenCalled();
     expect(outboxService.markEventCompleted).toHaveBeenCalledWith('row-1', 'claim-1');
     expect(outboxService.markEventFailed).not.toHaveBeenCalled();
+  });
+
+  it('cierra las constancias de RMA, pedido, canje, OC y GRE sin despachar', async () => {
+    for (const eventType of ['rma.creada', 'rma.decidida', 'rma.recepcionada', 'rma.recepcion.revertida',
+      'pedido.cancelado', 'pos.ticket.canje.reservado', 'orden.compra.aprobada', 'gre.creada', 'tenant.creado']) {
+      const { worker, outboxService, eventBus } = buildWorker([{ ...emailClaim, event_type: eventType }]);
+      await expect(worker.processPendingEventsManual()).resolves.toEqual({ processed: 1, failed: 0 });
+      expect(eventBus.emitAndAwait).not.toHaveBeenCalled();
+      expect(outboxService.markEventCompleted).toHaveBeenCalledWith('row-1', 'claim-1');
+    }
+  });
+
+  it('despacha una constancia declarada en cuanto alguien la escucha', async () => {
+    const claim = { ...emailClaim, event_type: 'rma.creada' };
+    const { worker, outboxService, eventBus } = buildWorker([claim]);
+    eventBus.hasListeners.mockReturnValue(true);
+    eventBus.emitAndAwait.mockRejectedValueOnce(new Error('listener falló'));
+    await expect(worker.processPendingEventsManual()).resolves.toEqual({ processed: 0, failed: 1 });
+    expect(eventBus.emitAndAwait).toHaveBeenCalledWith('rma.creada', expect.anything(), 'outbox-worker');
+    expect(outboxService.markEventFailed).toHaveBeenCalledWith('row-1', 'claim-1', 'listener falló');
   });
 
   it('conserva el fallo cerrado de integraciones sin handler', async () => {

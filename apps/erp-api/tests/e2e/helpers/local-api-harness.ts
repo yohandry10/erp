@@ -125,6 +125,26 @@ async function main() {
   // La prueba decide cuándo consumir el outbox y puede observar primero la
   // transacción de venta. El procesador invocado sigue siendo el servicio real.
   if (!process.argv.includes('--automatic-accounting')) accounting.onApplicationBootstrap = () => undefined;
+  if (process.argv.includes('--outbox-drain')) {
+    // El servidor local apaga el cron del worker general; PROD lo tiene activo.
+    // Este modo ejecuta ese mismo servicio hasta vaciar lo reclamable, para que
+    // la UAT vea los eventos que en PROD acabarían en dead_letter.
+    try {
+      const { OutboxWorker } = await import('../../../src/shared/outbox/outbox-worker.service');
+      const worker = moduleRef.get(OutboxWorker);
+      let processed = 0;
+      let failed = 0;
+      for (let batch = 0; batch < 20; batch++) {
+        const result = await worker.processPendingEventsManual(100);
+        processed += result.processed;
+        failed += result.failed;
+        if (result.processed + result.failed === 0) break;
+        if (batch === 19) throw new Error('La cola general local superó veinte lotes reales');
+      }
+      process.stdout.write(`LOCAL_OUTBOX_DRAINED processed=${processed} failed=${failed}\n`);
+    } finally { await moduleRef.close(); }
+    return;
+  }
   if (process.argv.includes('--accounting-once') || process.argv.includes('--accounting-drain')) {
     try {
       if (process.argv.includes('--accounting-drain')) {

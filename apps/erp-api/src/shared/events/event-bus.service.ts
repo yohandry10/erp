@@ -760,6 +760,10 @@ export class EventBusService {
     console.log(`✅ [EventBus] Evento ${eventType} emitido exitosamente`);
   }
 
+  hasListeners(eventType: string): boolean {
+    return this.eventEmitter.listenerCount(eventType) > 0;
+  }
+
   /**
    * Emits an event and awaits all registered listeners to complete.
    * Used by OutboxWorker to ensure handlers finish before marking events completed.

@@ -15,6 +15,14 @@
  * eventos que funcionaban exactamente como debían. Y mientras tanto, quien
  * mirase la cola para detectar un fallo real la encontraba llena de falsos.
  *
+ * El 2026-11-17 PROD acumulaba nueve más del mismo origen (RMA, cancelación de
+ * pedido, canje POS, aprobación de OC y GRE): la UAT integrada nunca los vio
+ * porque apaga el worker general. Ahora lo ejecuta y falla si alguno queda sin
+ * suscriptor.
+ *
+ * Si un evento declarado gana un suscriptor, el worker lo despacha igualmente:
+ * la lista sólo cubre el caso en que nadie escucha.
+ *
  * Declararlos aquí distingue las dos situaciones que antes se veían iguales: un
  * evento sin suscriptor previsto (esto) y un evento cuyo handler falta por error
  * (sigue cayendo a dead_letter). Cualquier alta en esta lista debe explicar por
@@ -34,6 +42,33 @@ export const EVENTOS_SIN_SUSCRIPTOR: ReadonlySet<string> = new Set([
   // auditoría en la misma transacción. Este evento sólo deja constancia del
   // cambio; no representa una integración ni una tarea adicional pendiente.
   'configuracion.empresa.actualizada',
+
+  // El RPC 464 crea la empresa, su RBAC y el primer administrador, y audita, en
+  // una transacción.
+  'tenant.creado',
+
+  // Los RPC atómicos de RMA (456) dejan escritos en su transacción la RMA, su
+  // bitácora `rma_eventos`, el stock devuelto y el saldo a favor. Lo contable
+  // viaja aparte en `saldo_favor.*`, que sí tiene suscriptor.
+  'rma.creada',
+  'rma.decidida',
+  'rma.recepcionada',
+  'rma.recepcion.revertida',
+
+  // El RPC 467 cancela el pedido, libera reservas y audita en una transacción.
+  'pedido.cancelado',
+
+  // El RPC 471 reserva y aplica el canje del ticket POS en su transacción; el
+  // efecto contable sale por `pos.venta.registrada`.
+  'pos.ticket.canje.reservado',
+
+  // El RPC 453 aprueba la orden y registra su historial de aprobación; la
+  // obligación contable nace con la recepción y la factura del proveedor.
+  'orden.compra.aprobada',
+
+  // GreService firma y persiste la guía antes de emitir; ningún módulo
+  // reacciona a su creación.
+  'gre.creada',
 ]);
 
 export function esEventoSinSuscriptor(eventType: string): boolean {

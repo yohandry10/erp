@@ -24,6 +24,8 @@ describe('eventos de outbox sin suscriptor', () => {
       'venta.procesada',
       'planilla.calculada',
       'email.send',
+      // Defecto abierto: espera reversa contable, no es una constancia.
+      'cxp.anulada',
     ]) {
       expect(esEventoSinSuscriptor(evento)).toBe(false);
     }
@@ -55,6 +57,6 @@ describe('eventos de outbox sin suscriptor', () => {
       ['grep', '-n', 'esEventoSinSuscriptor', '--', 'apps/erp-api/src/shared/outbox/outbox-worker.service.ts'],
       { cwd: raiz, encoding: 'utf8' },
     );
-    expect(worker).toContain('esEventoSinSuscriptor(event.event_type)');
+    expect(worker).toContain('esEventoSinSuscriptor(event.event_type) || this.eventBus.hasListeners(event.event_type)');
   });
 });
