@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';import path from 'node:path';import {randomUUID} from 'node:crypto';import {execFileSync} from 'node:child_process';
+import {createRequire} from 'node:module';
 import {fetchWithLocalLoginRetry} from './peru-local-http.mjs';
 // Finanzas no cubiertas por finance-lifecycle: CxP, tesorería, consultas bancarias, conciliación y tableros.
 assert.equal(process.env.E2E_EPHEMERAL_LOCAL_DB,'1');assert.equal(process.env.PGHOST,'127.0.0.1');assert.equal(process.env.PGDATABASE,'erp_e2e');
@@ -73,6 +74,28 @@ try{
   assert.equal((await call('finanzas/cxp/'+c.id)).estado,'ANULADA');
   assert.ok(!JSON.stringify(await call('finanzas/tesoreria/programacion')).includes(c.id),'Anulada sigue programada');
   assert.equal((await raw('finanzas/cxp/'+b.id+'/anular',{motivo:'Ajena'},otherToken)).status,404,'Anulación ajena');
+ });
+ await check('CxP: la anulación invierte el asiento de su factura y la 42 de esa deuda queda en cero',async()=>{
+  // Worker contable real: procesa la factura y luego su anulación.
+  const apiDirectory=path.resolve('apps/erp-api'),require=createRequire(path.join(apiDirectory,'package.json'));
+  const log=execFileSync(process.execPath,[require.resolve('ts-node/dist/bin.js'),'--transpile-only','tests/e2e/helpers/local-api-harness.ts','--accounting-drain'],{cwd:apiDirectory,env:process.env,encoding:'utf8',windowsHide:true,timeout:90000,maxBuffer:10000000});
+  fs.writeFileSync(path.join(output,'finance-ops-cxp-cancel-accounting.log'),log);
+  const proof=JSON.parse(sql(`WITH debt AS (SELECT * FROM cuentas_por_pagar WHERE tenant_id=${q(first.tenant)} AND id=${q(c.id)}),
+   cancel AS (SELECT o.* FROM outbox_events o,debt WHERE o.tenant_id=debt.tenant_id AND o.event_type='cxp.anulada' AND o.aggregate_id=debt.id::text),
+   original AS (SELECT a.* FROM asientos_contables a,debt WHERE a.tenant_id=debt.tenant_id AND a.source_event_id=debt.event_id),
+   counter AS (SELECT a.* FROM asientos_contables a,cancel WHERE a.tenant_id=cancel.tenant_id AND a.source_event_id=cancel.event_id),
+   lines AS (SELECT d.cuenta_id,sum(d.debe-d.haber) neto FROM detalle_asientos d WHERE d.asiento_id IN (SELECT id FROM original UNION ALL SELECT id FROM counter) GROUP BY d.cuenta_id)
+   SELECT jsonb_build_object('events',(SELECT count(*) FROM cancel),'status',(SELECT string_agg(status,',') FROM cancel),
+    'originals',(SELECT count(*) FROM original),'counters',(SELECT count(*) FROM counter),
+    'linked',(SELECT bool_and(counter.reversion_de_asiento_id=original.id AND counter.origen='CXP_ANULACION' AND counter.estado='CONFIRMADO'
+      AND counter.total_debe=original.total_haber AND counter.total_haber=original.total_debe AND counter.total_debe>0) FROM counter,original),
+    'cuentasConSaldo',(SELECT count(*) FROM lines WHERE neto<>0),
+    'neto42',(SELECT coalesce(sum(l.neto),0) FROM lines l JOIN plan_cuentas p ON p.id=l.cuenta_id WHERE p.codigo LIKE '42%'),
+    'movimiento42',(SELECT count(*) FROM detalle_asientos d JOIN plan_cuentas p ON p.id=d.cuenta_id WHERE p.codigo LIKE '42%' AND d.asiento_id IN (SELECT id FROM original)));`));
+  assert.deepEqual({events:proof.events,status:proof.status,originals:proof.originals,counters:proof.counters,linked:proof.linked,cuentasConSaldo:proof.cuentasConSaldo},
+   {events:1,status:'completed',originals:1,counters:1,linked:true,cuentasConSaldo:0},JSON.stringify(proof));
+  assert.ok(proof.movimiento42>0,'La factura no movió la 42: '+JSON.stringify(proof));assert.equal(cents(proof.neto42),0,'La 42 de la CxP anulada no quedó en cero');
+  return {proof};
  });
  await check('Bancos: movimientos por cuenta y período, saldos y aislamiento',async()=>{
   const movs=await call('finanzas/bancos/cuentas/'+bank.id+'/movimientos?fecha_desde='+today+'&fecha_hasta='+today);assert.ok(JSON.stringify(movs).includes('FUND-FIN'),'Movimientos de la cuenta');

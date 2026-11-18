@@ -32,6 +32,7 @@ export const ACCOUNTING_EVENT_TYPES = [
   'recepcion.registrada',
   'RecepcionRegistrada',
   'recepcion.revertida',
+  'cxp.anulada',
   'factura.proveedor.registrada',
   'FacturaProveedorRegistrada',
   'devolucion.proveedor.registrada',
