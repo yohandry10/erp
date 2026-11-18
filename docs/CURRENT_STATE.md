@@ -239,7 +239,9 @@ GO_PROD. El go-live de cada cliente (PFX, SOL, migración, piloto) es aparte.
 
 | `619` | Sólo datos: cierra como completados, igual que el worker, los `dead_letter` cuyo error es `OUTBOX_HANDLER_NOT_REGISTERED` de su propio tipo, sólo en las constancias declaradas en `EVENTOS_SIN_SUSCRIPTOR`; el error original queda en el payload. No los reencola: con su `created_at` antiguo, el readiness (health check de Render) quedaría no listo hasta que pasara el worker, y el ensayo abortó así. El contrato de CI iguala el piso del binario a la última migración: exige619 y se promueve antes de fusionar |
 
-Próxima libre: `620`. El binario de `main` exige619; PROD pasó a617 el 10-nov, a618
+| `620` | Anulación de CxP con contraasiento: `cxp.anulada` (478) pasa al worker contable y a las guardas de período; `contabilizar_anulacion_cxp_620` invierte, con el claim del evento, el asiento completo de la factura de la CxP (42, IGV, compras o 4699 y retenciones), enlazado por `reversion_de_asiento_id` y fechado con la anulación. Falla cerrado sin factura contable (apertura), con el original ya revertido o con otros asientos vivos de la CxP; reintenta si la factura aún no se contabiliza. Ensayo sobre respaldo del 18-nov sin cambios de datos; la UAT de finanzas comprueba el espejo y la 42 en cero |
+
+Próxima libre: `621`. El binario de `main` exige620; PROD pasó a617 el 10-nov, a618
 el 12-nov y a619 con el PR157. El stack histórico local conservado sigue612. No arrancar el binario nuevo sobre
 la base conservada sin completar su migración en infraestructura de pruebas propia.
 Comprobar prefijos duplicados antes de añadir una.
@@ -315,11 +317,6 @@ Expediente de la versión: `artifacts/expediente-590/EXPEDIENTE.md`. Resumen:
   Windows SmartScreen avisa al ejecutarlo hasta que se firme.
 - RPO, RTO y retención acordados; programar el respaldo de Storage. Restaurar la base lleva unos
   10 s en local con 216.000 filas; falta medir el RTO completo, con proyecto nuevo y secretos.
-- **Anulación manual de CxP sin reversa contable.** `gestionar_cxp_tx` (478) anula cualquier CxP
-  sin pagos y emite `cxp.anulada` con `accountingHandledByOutbox`, pero ningún handler la
-  procesa: una CxP nacida de factura deja la 42 abierta. La anulación por devolución sí cuadra
-  (la revierte `devolucion.proveedor.registrada`). En PROD cae a `dead_letter` a la vista; la UAT
-  integrada la lista como defecto conocido. Falta el contraasiento, sin duplicar el de devolución.
 - Power BI: actualización programada real.
 - Piloto con usuarios, aceptación firmada y anexos comerciales.
 - Render `free→starter` (USD 7/mes) para que los workers no se duerman: requiere medio de pago y
