@@ -4,7 +4,7 @@ Actualizado: 2026-11-17. Una página: si algo no cabe aquí, va a su documento d
 
 ## GO_PROD de plataforma (17-nov)
 
-Criterios en `RELEASE.md`. Producción sirve `35272a6c` (PR156) con esquema 618. La UAT
+Criterios en `RELEASE.md`. Producción sirve `a3f57a39` (PR158) con esquema 619. La UAT
 histórica sigue vigente; lo añadido después tiene UAT dirigida propia en el
 ensayo integrado (709 escenarios HTTP, 0 fallidos), incluidos el circuito
 completo de compra en USD (recepción con tipo de cambio congelado, factura y
@@ -14,21 +14,20 @@ general 2026 y su tope AFP, y la anulación de un traslado contra base real.
 | Criterio | Estado |
 | --- | --- |
 | P1 CI de `main` | Cumple: CI, E2E y Security de `3443d818` en verde |
-| P2 Esquema y readiness | Cumple: 618 requerido y aplicado, readiness `ready`, 0 fallidos. Los 16 `dead_letter` (respaldo de solo lectura del 17-nov) son todos `OUTBOX_HANDLER_NOT_REGISTERED`: 7 constancias de configuración de agosto y 9 de RMA, cancelación de pedido, canje POS, aprobación de OC y GRE, que nadie escucha. Iban a crecer con cada operación hasta superar el umbral de 100 del readiness. Se declaran como constancias y la UAT integrada ejecuta ahora el worker general; los 16 se cierran con la migración `619` |
+| P2 Esquema y readiness | Cumple: 619 requerido y aplicado (18-nov), readiness `ready`, 0 fallidos y 0 `dead_letter`. Los 16 `dead_letter` (respaldo de solo lectura del 17-nov) son todos `OUTBOX_HANDLER_NOT_REGISTERED`: 7 constancias de configuración de agosto y 9 de RMA, cancelación de pedido, canje POS, aprobación de OC y GRE, que nadie escucha. Iban a crecer con cada operación hasta superar el umbral de 100 del readiness. Se declaran como constancias y la UAT integrada ejecuta ahora el worker general; la `619` cerró los 16 en PROD (`artifacts/promocion-prod-619-619-20261118055057026.json`: sólo `outbox_events`, 270 filas, sin cambios fuera del ensayo) |
 | P3 Promociones con respaldo y ensayo | Cumple: 594–617 y 618 con evidencia |
 | P4 UAT de lo añadido | Cumple vía API y base real; la anulación de traslados no tiene botón en pantalla, sólo API |
 | P5 Respaldo y restauración | Cumple en el ensayo integrado; RTO de PROD no medido |
 | P6 Seguridad | Cumple: 0 alertas CodeQL abiertas en `main`; PR156 corrigió 40 y se descartaron 3 falsos positivos (scripts SUNAT que no imprimen claves). La clave filtrada del historial es de un proyecto que ya no existe. Aviso alto de `picomatch` (GHSA-fc5q-39xc-vjpf, 17-nov) sin versión corregida: aceptado en el audit sólo porque llega a producción a través del empaquetador de compilación de Sentry; vuelve a bloquear cuando se publique la corrección |
 | P7 Instancia siempre activa | **No cumple**: el API está en el plan gratuito de Render y se duerme; las colas contables se detienen con él |
-| P8 Correo productivo | **No cumple**: el API arranca con «SMTP host not configured» |
+| P8 Correo productivo | Cumple (18-nov): SMTP de Resend con clave sólo de envío para el dominio; el diagnóstico de plataforma envió a la casilla de operaciones, Resend lo marcó Delivered y llegó a la bandeja |
 | P9 Desplegar tras los checks | **No cumple**: Render despliega al recibir el commit, no tras CI |
-| P10 Errores capturados | **No cumple**: producción no tiene `SENTRY_DSN` |
+| P10 Errores capturados | Cumple (18-nov): `SENTRY_DSN` en Render; el diagnóstico de plataforma envió `PlatformDiagnosticError`, recibido con entorno `production` y release `a3f57a39` |
 | P11 Normativa vigente | Cumple para 2026; la de 2027 debe cargarse antes del 1-ene |
 | P12 Instalador | Cumple: generado contra PROD; la app inicia y el API responde a su origen |
 
-P7–P10 son configuración del servicio en Render, no código: requieren el plan
-de pago (USD 7/mes), credenciales de un proveedor de correo, el ajuste de
-despliegue y el DSN de Sentry. Con esos cuatro, la plataforma es
+P7 y P9 son configuración del servicio en Render, no código: requieren el plan
+de pago (USD 7/mes) y el ajuste de despliegue tras los checks. Con esos dos, la plataforma es
 GO_PROD. El go-live de cada cliente (PFX, SOL, migración, piloto) es aparte.
 
 ## Dónde está
@@ -316,8 +315,6 @@ Expediente de la versión: `artifacts/expediente-590/EXPEDIENTE.md`. Resumen:
   Windows SmartScreen avisa al ejecutarlo hasta que se firme.
 - RPO, RTO y retención acordados; programar el respaldo de Storage. Restaurar la base lleva unos
   10 s en local con 216.000 filas; falta medir el RTO completo, con proyecto nuevo y secretos.
-- Correo productivo en Render (`SMTP_*` o SendGrid, y `FRONTEND_URL`): sin él, la recuperación de
-  contraseña responde 503 y las alertas no salen. Por comprobar en Render.
 - **Anulación manual de CxP sin reversa contable.** `gestionar_cxp_tx` (478) anula cualquier CxP
   sin pagos y emite `cxp.anulada` con `accountingHandledByOutbox`, pero ningún handler la
   procesa: una CxP nacida de factura deja la 42 abierta. La anulación por devolución sí cuadra

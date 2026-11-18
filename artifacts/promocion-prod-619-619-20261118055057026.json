@@ -1,0 +1,47 @@
+{
+  "commit": "2ee6ef5cdd7629274d893a5b992e14a800f67488",
+  "pr": 157,
+  "proyecto": "wypnbcptofqdmoynlonq",
+  "desde": 619,
+  "hasta": 619,
+  "migraciones": [
+    "619__outbox_close_declared_constancias.sql"
+  ],
+  "respaldoSha256": "a223e33167161de732514098ae66052e44a31308e4bd1109fa040eafe38e1572",
+  "loteSha256": "045b0c4dff73b482a083e9e267911f6f6599b0262cdb0396833bfa4c52a50c37",
+  "exito": true,
+  "escriturasRemotas": true,
+  "antes": {
+    "esquema": 618,
+    "salud": {
+      "ready": true,
+      "esquema": 618,
+      "cola_muerta": 16,
+      "requerido_aplicado": true
+    },
+    "tablas": 342,
+    "filas": 227828
+  },
+  "aplicarMs": 4894,
+  "despues": {
+    "esquema": 619,
+    "salud": {
+      "ready": true,
+      "esquema": 619,
+      "cola_muerta": 0,
+      "requerido_aplicado": true
+    },
+    "tablasPerdidas": [],
+    "columnasPerdidas": [],
+    "tablasConDatosCambiados": [
+      {
+        "tabla": "public.outbox_events",
+        "antes": 270,
+        "despues": 270,
+        "mismasFilas": true
+      }
+    ],
+    "cambiosNoVistosEnElEnsayo": []
+  },
+  "terminado": "2026-11-18T05:54:08.518Z"
+}
