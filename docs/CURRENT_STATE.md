@@ -238,10 +238,10 @@ GO_PROD. El go-live de cada cliente (PFX, SOL, migración, piloto) es aparte.
 
 | `618` | Tope AFP (remuneración máxima asegurable) de la normativa general 2026, con los valores de la SBS por mes de devengue: 12.209,11 (ene–mar), 12.598,91 (abr–jun), 12.672,65 (jul–sep) y 12.732,70 (oct–dic; diciembre por trimestre, aún sin publicar). Sólo completa filas globales sin tope; no toca normativa de empresas ni planillas calculadas, y falla sin confirmar si no puede escribir. Cadena limpia, control en rojo con rol sin BYPASSRLS, reaplicación y ensayo sobre respaldo del 10-nov (sólo cambian esas 12 filas) pasan. Se promueve antes de fusionar: el binario exige618 |
 
-| `619` | Sólo datos: cierra como completados, igual que el worker, los `dead_letter` cuyo error es `OUTBOX_HANDLER_NOT_REGISTERED` de su propio tipo, sólo en las constancias declaradas en `EVENTOS_SIN_SUSCRIPTOR`; el error original queda en el payload. No los reencola: con su `created_at` antiguo, el readiness (health check de Render) quedaría no listo hasta que pasara el worker, y el ensayo abortó así. No sube el piso del binario |
+| `619` | Sólo datos: cierra como completados, igual que el worker, los `dead_letter` cuyo error es `OUTBOX_HANDLER_NOT_REGISTERED` de su propio tipo, sólo en las constancias declaradas en `EVENTOS_SIN_SUSCRIPTOR`; el error original queda en el payload. No los reencola: con su `created_at` antiguo, el readiness (health check de Render) quedaría no listo hasta que pasara el worker, y el ensayo abortó así. El contrato de CI iguala el piso del binario a la última migración: exige619 y se promueve antes de fusionar |
 
-Próxima libre: `620`. El binario de `main` exige618; PROD pasó a617 el 10-nov y a618
-con este cambio. El stack histórico local conservado sigue612. No arrancar el binario nuevo sobre
+Próxima libre: `620`. El binario de `main` exige619; PROD pasó a617 el 10-nov, a618
+el 12-nov y a619 con el PR157. El stack histórico local conservado sigue612. No arrancar el binario nuevo sobre
 la base conservada sin completar su migración en infraestructura de pruebas propia.
 Comprobar prefijos duplicados antes de añadir una.
 
