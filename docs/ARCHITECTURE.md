@@ -115,7 +115,9 @@ sin datos de clientes.
 Un sistema externo cobra con boleta o factura sin sesión de usuario, siempre
 desde su servidor (nunca desde un navegador o instalador). La administra quien
 tiene `users.manage` en **Configuración → Integraciones externas**
-(`/dashboard/configuracion/integraciones`).
+(`/dashboard/configuracion/integraciones`). Un administrador con
+establecimientos asignados sólo crea y administra credenciales de esas sedes
+(`403 INTEGRATION_BRANCH_OUT_OF_ACTOR_SCOPE`).
 
 - **Identidad.** Cada credencial pertenece a una empresa y una sucursal, y opera
   con una cuenta técnica propia (`usuarios_sistema.es_cuenta_integracion`): sin

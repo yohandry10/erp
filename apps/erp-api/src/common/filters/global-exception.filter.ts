@@ -79,6 +79,7 @@ const MENSAJES_POR_CODIGO: Record<string, string> = {
   INTEGRATION_NO_ROTATION_IN_PROGRESS: 'No hay una rotación en curso.',
   INTEGRATION_EXPIRY_OUT_OF_RANGE: 'El vencimiento debe estar entre una hora y dos años desde ahora.',
   INTEGRATION_BRANCH_INVALID: 'La sucursal no existe o no está activa en esta empresa.',
+  INTEGRATION_BRANCH_OUT_OF_ACTOR_SCOPE: 'Sólo puedes administrar credenciales de los establecimientos que tienes asignados.',
   INTEGRATION_TENANT_PERMISSIONS_MISSING: 'La empresa no tiene configurados los permisos de POS, inventario y comprobantes que la credencial necesita.',
   INTEGRATION_CREDENTIAL_REVOKED: 'La credencial está revocada.',
   INTEGRATION_CREDENTIAL_EXPIRED: 'La credencial está vencida: renueva su vencimiento antes de rotar.',

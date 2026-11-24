@@ -211,6 +211,24 @@ BEGIN
     RAISE EXCEPTION 'VERIFY_621_USE_AUDIT rechazos=%', v_count;
   END IF;
 
+  -- Un administrador limitado a otra sede no crea ni administra esta.
+  INSERT INTO public.usuario_sucursales (tenant_id, usuario_sistema_id, sucursal_id)
+  VALUES (v_tenant, v_admin, v_otra_sucursal);
+  BEGIN
+    PERFORM public.crear_integracion_externa_621(v_tenant, v_admin, v_sucursal, 'Integración 621 C', 'Sistema 621',
+      now() + interval '30 days', 'eeeeeeee0621', repeat('e', 64), 'alta-621-fuera-de-sede');
+    RAISE EXCEPTION 'VERIFY_621_EXPECTED_ACTOR_BRANCH_CREATE';
+  EXCEPTION WHEN insufficient_privilege THEN
+    IF SQLERRM <> 'INTEGRATION_BRANCH_OUT_OF_ACTOR_SCOPE' THEN RAISE; END IF;
+  END;
+  BEGIN
+    PERFORM public.revocar_integracion_externa_621(v_tenant, v_admin, v_cred, 'Fuera de sede');
+    RAISE EXCEPTION 'VERIFY_621_EXPECTED_ACTOR_BRANCH_ADMIN';
+  EXCEPTION WHEN insufficient_privilege THEN
+    IF SQLERRM <> 'INTEGRATION_BRANCH_OUT_OF_ACTOR_SCOPE' THEN RAISE; END IF;
+  END;
+  DELETE FROM public.usuario_sucursales WHERE tenant_id = v_tenant AND usuario_sistema_id = v_admin;
+
   ---------------------------------------------------------------------------
   -- 5. Rotación con período de gracia.
   ---------------------------------------------------------------------------

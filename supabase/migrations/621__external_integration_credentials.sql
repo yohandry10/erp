@@ -348,6 +348,34 @@ BEGIN
 END;
 $function$;
 
+-- Un administrador con alcance por sucursal (usuario_sucursales) sólo
+-- administra credenciales de sus sedes; sin asignaciones, alcance total, igual
+-- que SucursalScopeService.
+CREATE OR REPLACE FUNCTION app.assert_actor_sucursal_621(
+  p_tenant_id uuid,
+  p_actor_id uuid,
+  p_sucursal_id uuid
+)
+RETURNS void
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, public, app, pg_temp
+AS $function$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public.usuario_sucursales us
+     WHERE us.tenant_id = p_tenant_id AND us.usuario_sistema_id = p_actor_id
+  ) AND NOT EXISTS (
+    SELECT 1 FROM public.usuario_sucursales us
+     WHERE us.tenant_id = p_tenant_id AND us.usuario_sistema_id = p_actor_id
+       AND us.sucursal_id = p_sucursal_id
+  ) THEN
+    RAISE EXCEPTION 'INTEGRATION_BRANCH_OUT_OF_ACTOR_SCOPE' USING ERRCODE = '42501';
+  END IF;
+END;
+$function$;
+
 CREATE OR REPLACE FUNCTION app.credencial_integracion_admin_621(
   p_tenant_id uuid,
   p_actor_id uuid,
@@ -369,6 +397,7 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'INTEGRATION_CREDENTIAL_NOT_FOUND' USING ERRCODE = 'P0002';
   END IF;
+  PERFORM app.assert_actor_sucursal_621(p_tenant_id, p_actor_id, v_credencial.sucursal_id);
   RETURN v_credencial;
 END;
 $function$;
@@ -430,6 +459,7 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'INTEGRATION_BRANCH_INVALID' USING ERRCODE = '22023';
   END IF;
+  PERFORM app.assert_actor_sucursal_621(p_tenant_id, p_actor_id, p_sucursal_id);
 
   -- Permisos del tenant que la credencial necesita. Si falta alguno, falla
   -- cerrado: no se crea una credencial que luego responda 403 en cada ruta.
@@ -947,6 +977,7 @@ REVOKE ALL ON FUNCTION app.integracion_eventos_inmutables_621() FROM PUBLIC, ano
 REVOKE ALL ON FUNCTION app.registrar_evento_integracion_621(public.integracion_externa_credenciales, text, text, uuid, uuid, jsonb, jsonb) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION app.assert_secreto_integracion_621(text, text) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION app.credencial_integracion_admin_621(uuid, uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION app.assert_actor_sucursal_621(uuid, uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION app.vincular_integracion_venta_621(uuid, uuid, uuid, jsonb) FROM PUBLIC, anon, authenticated, service_role;
 
 REVOKE ALL ON FUNCTION public.crear_integracion_externa_621(uuid, uuid, uuid, text, text, timestamptz, text, text, text) FROM PUBLIC, anon, authenticated;
