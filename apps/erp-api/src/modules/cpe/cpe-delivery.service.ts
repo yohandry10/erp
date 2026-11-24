@@ -11,7 +11,7 @@ import { DOMParser } from '@xmldom/xmldom';
 import { FacturaDto } from '@erp-suite/dtos';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { FiscalAdapterService } from './fiscal-adapter.service';
-import { PdfGeneratorService } from './pdf-generator.service';
+import { PdfGeneratorService, type CpePdfFormato } from './pdf-generator.service';
 import { CpeCertificateService } from './cpe-certificate.service';
 import { buildSunatQrContent, buildSunatQrDataUrl } from './sunat-qr.util';
 import {
@@ -831,13 +831,13 @@ async getCpeById(id: string, tenantId: string): Promise<any> {
     }
   }
 
-async generatePdf(id: string, tenantId: string): Promise<Buffer> {
+async generatePdf(id: string, tenantId: string, formato: CpePdfFormato = 'a4'): Promise<Buffer> {
     try {
-      this.logger.log(`Generando representación PDF A4 para CPE: ${id}`);
-      
-      // Representación A4 compatible con los requisitos fiscales aplicables.
-      // A4 es una opción de salida del ERP, no un tamaño único impuesto por SUNAT.
-      const pdfBuffer = await this.pdfGenerator.generateSunatCompliantPdf(id, tenantId);
+      this.logger.log(`Generando representación PDF ${formato} para CPE: ${id}`);
+
+      // A4 o ticket térmico (80/58 mm): opciones de salida del ERP, no un
+      // tamaño único impuesto por SUNAT.
+      const pdfBuffer = await this.pdfGenerator.generateSunatCompliantPdf(id, tenantId, formato);
       
       this.logger.log(`✅ PDF generado exitosamente para CPE: ${id}`);
       return pdfBuffer;

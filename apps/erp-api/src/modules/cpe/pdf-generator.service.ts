@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import axios from 'axios';
 import { lookup as dnsLookup } from 'node:dns';
 import { Agent as HttpsAgent } from 'node:https';
@@ -27,6 +27,19 @@ export const CPE_PDF_PRINT_FORMAT = {
 };
 
 export const CPE_PDF_QR_SIZE_MM = 42;
+
+/**
+ * Formatos de salida del PDF del CPE. A4 es el de siempre; los tickets son
+ * rollos térmicos de ancho fijo (área imprimible 72 o 48 mm) y alto según el
+ * contenido.
+ */
+export type CpePdfFormato = 'a4' | 'ticket80' | 'ticket58';
+export const CPE_PDF_FORMATOS: readonly CpePdfFormato[] = ['a4', 'ticket80', 'ticket58'];
+export const CPE_PDF_TICKET_FORMATS = {
+  ticket80: { paperMm: 80, printableMm: 72, qrMm: 32, fontSize: 8 },
+  ticket58: { paperMm: 58, printableMm: 48, qrMm: 28, fontSize: 7 },
+} as const;
+const MM = 72 / 25.4;
 
 export const CPE_PDF_PE_TAX_BOX_MIN_MM = { width: 80, height: 40 } as const;
 
@@ -323,7 +336,10 @@ export class PdfGeneratorService {
    * A4 es el formato físico elegido por el producto; no se presenta como un
    * tamaño de papel impuesto por SUNAT.
    */
-  async generateSunatCompliantPdf(cpeId: string, tenantId: string): Promise<Buffer> {
+  async generateSunatCompliantPdf(cpeId: string, tenantId: string, formato: CpePdfFormato = 'a4'): Promise<Buffer> {
+    if (!CPE_PDF_FORMATOS.includes(formato)) {
+      throw new BadRequestException('CPE_PDF_FORMATO_INVALIDO');
+    }
     try {
       this.logger.log(`📄 Generando PDF para CPE: ${cpeId}`);
 
@@ -334,6 +350,12 @@ export class PdfGeneratorService {
       const currentCountryCode = await this.getCountryCode(tenantId);
       const currentEmpresaConfig = await this.getEmpresaConfig(tenantId, currentCountryCode);
       const countryCode = resolveHistoricalCpeCountry(cpeData, currentCountryCode);
+      // El ticket térmico reproduce la representación impresa peruana; los
+      // datos fiscales de otros países (CUFE, CAE, transparencia) sólo están
+      // maquetados en A4.
+      if (formato !== 'a4' && countryCode !== 'PE') {
+        throw new BadRequestException('CPE_PDF_FORMATO_NO_DISPONIBLE_PAIS');
+      }
       const issuerSnapshot = cpeData.issuer_snapshot && typeof cpeData.issuer_snapshot === 'object'
         ? cpeData.issuer_snapshot
         : {};
@@ -372,8 +394,10 @@ export class PdfGeneratorService {
         qrCode = await this.generateQRCode(printableCpeData, countryCode, allowUnofficialRepresentation);
       }
 
-      // 5. Generar PDF con formato específico del país
-      const pdfBuffer = await this.buildPdfDocument(printableCpeData, empresaConfig, qrCode, countryCode);
+      // 5. Generar PDF con formato específico del país.
+      const pdfBuffer = formato === 'a4'
+        ? await this.buildPdfDocument(printableCpeData, empresaConfig, qrCode, countryCode)
+        : await this.buildTicketPdf(printableCpeData, empresaConfig, qrCode, countryCode, CPE_PDF_TICKET_FORMATS[formato]);
 
       this.logger.log(`✅ PDF generado exitosamente para CPE: ${cpeId} (${fiscalAuthority})`);
       return pdfBuffer;
@@ -1078,12 +1102,12 @@ export class PdfGeneratorService {
   /**
    * Agrega los totales del comprobante
    */
-  private addTotales(doc: any, cpeData: any, countryCode: string): void {
-    const totalValue = Number(cpeData.total_venta ?? cpeData.total ?? 0);
+  /** Filas de totales que se imprimen (A4 y ticket): sólo las que tienen importe. */
+  private getPrintedTotalRows(cpeData: any, countryCode: string): Array<{ label: string; value: unknown }> {
     const otherTaxLabel = countryCode === 'AR'
       ? 'Otros tributos'
       : countryCode === 'CO' ? 'INC' : 'ISC';
-    const conditionalRows = [
+    return [
       { label: 'Op. Gravadas', value: cpeData.total_gravadas },
       { label: 'Op. Exoneradas', value: cpeData.total_exoneradas },
       { label: 'Op. Inafectas', value: cpeData.total_inafectas },
@@ -1093,6 +1117,164 @@ export class PdfGeneratorService {
       { label: 'ICBPER', value: cpeData.total_icbper },
       { label: this.getTaxLabel(cpeData, countryCode), value: cpeData.total_igv },
     ].filter((row) => Number.isFinite(Number(row.value)) && Math.abs(Number(row.value)) >= 0.005);
+  }
+
+  /**
+   * Representación impresa en rollo térmico: ancho fijo y alto según el
+   * contenido. Lleva los mismos datos fiscales que el A4 (emisor, tipo y
+   * número, fecha, cliente, ítems, totales, monto en letras, QR, hash y
+   * leyendas) y la marca de muestra cuando el comprobante no tiene validez.
+   * Se dibuja dos veces: la primera, sobre una hoja muy alta, sólo mide.
+   */
+  private async buildTicketPdf(
+    cpeData: any,
+    empresaConfig: any,
+    qrCode: string | null,
+    countryCode: string,
+    format: { paperMm: number; printableMm: number; qrMm: number; fontSize: number },
+  ): Promise<Buffer> {
+    const PDFDocument = (await import('pdfkit')).default;
+    const width = format.paperMm * MM;
+    const margin = ((format.paperMm - format.printableMm) / 2) * MM;
+    const render = (height: number): Promise<{ buffer: Buffer; contentHeight: number }> =>
+      new Promise((resolve, reject) => {
+        try {
+          const doc = new PDFDocument({
+            size: [width, height],
+            margins: { top: margin, bottom: 0, left: margin, right: margin },
+            autoFirstPage: true,
+          });
+          const chunks: Buffer[] = [];
+          let contentHeight = 0;
+          doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+          doc.on('end', () => resolve({ buffer: Buffer.concat(chunks), contentHeight }));
+          doc.on('error', reject);
+          contentHeight = this.drawTicket(doc, cpeData, empresaConfig, qrCode, countryCode, format, margin);
+          doc.end();
+        } catch (error) {
+          reject(error);
+        }
+      });
+    const medida = await render(20000);
+    return (await render(Math.ceil(medida.contentHeight + margin))).buffer;
+  }
+
+  private drawTicket(
+    doc: any,
+    cpeData: any,
+    empresaConfig: any,
+    qrCode: string | null,
+    countryCode: string,
+    format: { printableMm: number; qrMm: number; fontSize: number },
+    margin: number,
+  ): number {
+    const x = margin;
+    const w = format.printableMm * MM;
+    const fs = format.fontSize;
+    const moneda = cpeData.moneda || 'PEN';
+    let y = margin;
+    const line = (text: string, opts: { size?: number; bold?: boolean; align?: string; gap?: number } = {}) => {
+      const size = opts.size ?? fs;
+      doc.fontSize(size).font(opts.bold ? 'Helvetica-Bold' : 'Helvetica');
+      doc.text(text, x, y, { width: w, align: opts.align ?? 'center' });
+      y += this.measureTextHeight(doc, text, w, size) + (opts.gap ?? 1);
+    };
+    const pair = (label: string, value: string, bold = false, size = fs) => {
+      doc.fontSize(size).font(bold ? 'Helvetica-Bold' : 'Helvetica');
+      const valueWidth = w * 0.45;
+      doc.text(label, x, y, { width: w - valueWidth, align: 'left' });
+      doc.text(value, x + w - valueWidth, y, { width: valueWidth, align: 'right' });
+      y += Math.max(this.measureTextHeight(doc, label, w - valueWidth, size), size + 2) + 1;
+    };
+    const rule = () => {
+      y += 2;
+      doc.save().dash(1.5, { space: 1.5 }).moveTo(x, y).lineTo(x + w, y).lineWidth(0.5).stroke().undash().restore();
+      y += 4;
+    };
+
+    const simulated = cpeData.simulated_origin !== false;
+    const evidenceStatus = String(cpeData.fiscal_authority_evidence?.status || 'LEGACY_UNVERIFIED');
+    const nonFiscalBanner = () => {
+      const top = y;
+      const title = String(evidenceStatus).toUpperCase() === 'SIMULATED' ? 'MUESTRA DEMO' : 'SIN VALIDEZ FISCAL';
+      y += 3;
+      doc.fillColor('#92400e');
+      line(title, { size: fs + 4, bold: true });
+      line(getCpeNonFiscalPdfNotice(countryCode, evidenceStatus), { size: fs - 1, bold: true, gap: 3 });
+      doc.fillColor('black');
+      doc.rect(x, top, w, y - top).lineWidth(1).stroke();
+      y += 4;
+    };
+    if (simulated) nonFiscalBanner();
+
+    const taxIdLabel = countryCode === 'AR' ? 'CUIT' : countryCode === 'CO' ? 'NIT' : 'RUC';
+    line(String(empresaConfig.razon_social || ''), { size: fs + 1, bold: true });
+    line(`${taxIdLabel}: ${empresaConfig.ruc}`);
+    line(String(empresaConfig.direccion_fiscal || empresaConfig.direccion || 'Dirección no especificada'), { size: fs - 1 });
+    if (empresaConfig.telefono) line(`Tel: ${empresaConfig.telefono}`, { size: fs - 1 });
+    rule();
+    const tipoDoc = this.pdfFormatHelper.getHeaderText(
+      countryCode,
+      String(cpeData.tipo_documento_fiscal || cpeData.tipo_documento || ''),
+    );
+    line(tipoDoc.toUpperCase(), { bold: true });
+    line(this.formatPrintedDocumentNumber(cpeData, countryCode), { size: fs + 2, bold: true, gap: 3 });
+    pair('Fecha de emisión:', this.formatDate(cpeData.fecha_emision, countryCode));
+    if (cpeData.fecha_vencimiento) pair('Vencimiento:', this.formatDate(cpeData.fecha_vencimiento, countryCode));
+    pair('Moneda:', moneda);
+    rule();
+    line(`Cliente: ${cpeData.razon_social_receptor || 'Cliente General'}`, { align: 'left' });
+    line(`${this.getTipoDocumentoReceptorText(cpeData.tipo_documento_receptor, countryCode)}: ${cpeData.documento_receptor || 'N/A'}`, { align: 'left' });
+    if (cpeData.direccion_receptor) line(`Dirección: ${cpeData.direccion_receptor}`, { align: 'left', size: fs - 1 });
+    rule();
+
+    const items = Array.isArray(cpeData.items) ? cpeData.items : [];
+    pair('DESCRIPCIÓN', 'TOTAL', true);
+    for (const item of items) {
+      const descripcion = String(item.nombre_producto || item.descripcion || '').trim() || 'Producto';
+      line(descripcion, { align: 'left' });
+      const cantidad = Number(item.cantidad || 1);
+      const unidad = String(item.unidad_medida || item.unidad || 'NIU').trim().toUpperCase();
+      pair(
+        `  ${cantidad} ${unidad} x ${this.formatMoney(resolveCpePrintedUnitPrice(item))}`,
+        this.formatMoney(resolveCpePrintedLineTotal(item)),
+      );
+    }
+    rule();
+
+    for (const row of this.getPrintedTotalRows(cpeData, countryCode)) {
+      pair(`${row.label}:`, `${moneda} ${this.formatMoney(Number(row.value))}`);
+    }
+    const total = Number(cpeData.total_venta ?? cpeData.total ?? 0);
+    pair('TOTAL:', `${moneda} ${this.formatMoney(total)}`, true, fs + 2);
+    y += 2;
+    line(`SON: ${this.numeroALetras(total, moneda)}`, { align: 'left', size: fs - 1, gap: 4 });
+
+    if (qrCode) {
+      const qrSize = Math.min(format.qrMm * MM, w);
+      const base64 = String(qrCode).replace(/^data:image\/png;base64,/, '');
+      doc.image(Buffer.from(base64, 'base64'), x + (w - qrSize) / 2, y, { width: qrSize, height: qrSize });
+      y += qrSize + 4;
+    }
+
+    line(this.getPrintedRepresentationLegend(cpeData.tipo_documento_fiscal || cpeData.tipo_documento, countryCode), { size: fs - 1 });
+    line(`Consulte su comprobante en: ${this.getFiscalConsultUrl(countryCode)}`, { size: fs - 1 });
+    if (cpeData.hash_firma || cpeData.hash) line(`Hash: ${cpeData.hash_firma || cpeData.hash}`, { size: fs - 2 });
+    for (const leyenda of this.getLeyendasEspecificas(cpeData)) line(leyenda, { size: fs - 1, bold: true });
+
+    const pendingAcceptance = countryCode === 'PE' ? getCpePeruPendingAcceptanceNotice(cpeData) : null;
+    if (pendingAcceptance) line(pendingAcceptance, { size: fs - 1, bold: true });
+    const status = simulated
+      ? 'MUESTRA LOCAL · NO TRANSMITIDO'
+      : cpeData.sunat_status || cpeData.estado || 'PENDIENTE';
+    line(`Estado: ${status}`, { size: fs - 2, gap: 3 });
+    if (simulated) nonFiscalBanner();
+    return y;
+  }
+
+  private addTotales(doc: any, cpeData: any, countryCode: string): void {
+    const totalValue = Number(cpeData.total_venta ?? cpeData.total ?? 0);
+    const conditionalRows = this.getPrintedTotalRows(cpeData, countryCode);
     const sectionHeight = conditionalRows.length * 15 + 58 + (countryCode === 'AR' ? 48 : 0);
     this.ensureVerticalSpace(doc, sectionHeight + 10);
     const startY = doc.y + 8;

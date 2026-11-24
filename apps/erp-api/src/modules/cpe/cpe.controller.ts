@@ -15,6 +15,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { CpeService } from './cpe.service';
+import { CPE_PDF_FORMATOS, type CpePdfFormato } from './pdf-generator.service';
 import { CpeHelperService } from './cpe-helper.service';
 import { CreateFacturaDto, FacturaDto, PaginationDto } from '@erp-suite/dtos';
 import type { Response } from 'express';
@@ -315,11 +316,18 @@ export class CpeController {
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentTenant() tenantId: string,
     @Res() res: Response,
+    @Query('formato') formatoQuery?: string,
   ) {
-    const pdfBuffer = await this.cpeService.generatePdf(id, tenantId);
+    // A4 por defecto (compatible con lo anterior); ticket80/ticket58 para
+    // impresoras térmicas. Cualquier otro valor es 400.
+    const formato = (formatoQuery ?? 'a4') as CpePdfFormato;
+    if (!CPE_PDF_FORMATOS.includes(formato)) {
+      throw new BadRequestException('CPE_PDF_FORMATO_INVALIDO');
+    }
+    const pdfBuffer = await this.cpeService.generatePdf(id, tenantId, formato);
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="cpe-${id}.pdf"`,
+      'Content-Disposition': `attachment; filename="cpe-${id}${formato === 'a4' ? '' : `-${formato}`}.pdf"`,
       'Content-Length': pdfBuffer.length,
     });
     return res.send(pdfBuffer);

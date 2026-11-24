@@ -11,7 +11,7 @@ import { ValidationService } from '../validations/validation.service';
 import { Logger } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { CacheInvalidationService } from '../../shared/cache/cache-invalidation.service';
-import { PdfGeneratorService } from './pdf-generator.service';
+import { PdfGeneratorService, type CpePdfFormato } from './pdf-generator.service';
 import { FiscalAdapterService } from './fiscal-adapter.service';
 import { CpeXmlBuilder } from './cpe-xml.builder';
 import { sunatOperation } from '../../shared/utils/sunat-operation.util';
@@ -3077,8 +3077,8 @@ async getCpeById(id: string, tenantId: string): Promise<any> {
     return this.deliveryService.getCpeById(id, tenantId);
   }
 
-async generatePdf(id: string, tenantId: string): Promise<Buffer> {
-    return this.deliveryService.generatePdf(id, tenantId);
+async generatePdf(id: string, tenantId: string, formato: CpePdfFormato = 'a4'): Promise<Buffer> {
+    return this.deliveryService.generatePdf(id, tenantId, formato);
   }
 
 async getSignedXml(id: string, tenantId: string): Promise<string> {
