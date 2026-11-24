@@ -1,0 +1,40 @@
+{
+  "commit": "9e0aa1f684b0a39ce41abd7ab5d5fa7cef996c47",
+  "pr": 162,
+  "proyecto": "wypnbcptofqdmoynlonq",
+  "desde": 621,
+  "hasta": 621,
+  "migraciones": [
+    "621__external_integration_credentials.sql"
+  ],
+  "respaldoSha256": "c72a058e6e7a2e6e483b7a78295411c0da362f52f413bd7989fadf64aa0aa4f5",
+  "loteSha256": "2dff65638b308e41c373479cfa00549efdc25ebb1d35fc299e6205aa8ae04bb0",
+  "exito": true,
+  "escriturasRemotas": true,
+  "antes": {
+    "esquema": 620,
+    "salud": {
+      "ready": true,
+      "esquema": 620,
+      "cola_muerta": 0,
+      "requerido_aplicado": true
+    },
+    "tablas": 342,
+    "filas": 229395
+  },
+  "aplicarMs": 17936,
+  "despues": {
+    "esquema": 621,
+    "salud": {
+      "ready": true,
+      "esquema": 621,
+      "cola_muerta": 0,
+      "requerido_aplicado": true
+    },
+    "tablasPerdidas": [],
+    "columnasPerdidas": [],
+    "tablasConDatosCambiados": [],
+    "cambiosNoVistosEnElEnsayo": []
+  },
+  "terminado": "2026-11-24T06:23:00.250Z"
+}

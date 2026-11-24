@@ -4,7 +4,7 @@ Actualizado: 2026-11-17. Una página: si algo no cabe aquí, va a su documento d
 
 ## GO_PROD de plataforma (17-nov)
 
-Criterios en `RELEASE.md`. Producción sirve `336c9c7b` (PR160) con esquema 620. La UAT
+Criterios en `RELEASE.md`. Producción tiene esquema 621 (PR162, fusionado como `c8d8ec0e`). La UAT
 histórica sigue vigente; lo añadido después tiene UAT dirigida propia en el
 ensayo integrado (709 escenarios HTTP, 0 fallidos), incluidos el circuito
 completo de compra en USD (recepción con tipo de cambio congelado, factura y
@@ -241,10 +241,10 @@ GO_PROD. El go-live de cada cliente (PFX, SOL, migración, piloto) es aparte.
 
 | `620` | Anulación de CxP con contraasiento: `cxp.anulada` (478) pasa al worker contable y a las guardas de período; `contabilizar_anulacion_cxp_620` invierte, con el claim del evento, el asiento completo de la factura de la CxP (42, IGV, compras o 4699 y retenciones), enlazado por `reversion_de_asiento_id` y fechado con la anulación. Falla cerrado sin factura contable (apertura), con el original ya revertido o con otros asientos vivos de la CxP; reintenta si la factura aún no se contabiliza. Ensayo sobre respaldo del 18-nov sin cambios de datos; la UAT de finanzas comprueba el espejo y la 42 en cero |
 
-| `621` | Credencial de integración externa por empresa y sucursal (contrato en `ARCHITECTURE.md`): cuenta técnica sin contraseña con rol `INTEGRACION_EXTERNA` acotado por triggers, secretos sólo como hash con rotación y gracia, vencimiento, revocación, eventos de sólo inserción y `ventas_pos.referencia_externa` con las dos identidades. Cadena limpia y verificador con fixture real (venta, rotación, vencimiento, revocación, alcance) en base efímera. Sin promoción ni UAT contra API real; el binario exige621 y se promueve antes de fusionar |
+| `621` | Credencial de integración externa por empresa y sucursal (contrato en `ARCHITECTURE.md`): cuenta técnica sin contraseña con rol `INTEGRACION_EXTERNA` acotado por triggers, secretos sólo como hash con rotación y gracia, vencimiento, revocación, eventos de sólo inserción y `ventas_pos.referencia_externa` con las dos identidades. Cadena limpia y verificador con fixture real (venta, rotación, vencimiento, revocación, alcance) en base efímera. Promovida el 24-nov antes de fusionar (ensayo sobre respaldo de PROD del mismo día sin cambios en datos existentes). Sin UAT contra el API real |
 
-Próxima libre: `622`. El binario de la rama exige621 (`main` exige620); PROD pasó a617 el 10-nov, a618
-el 12-nov, a619 con el PR157 y a620 con el PR160 (`artifacts/promocion-prod-620-620-20261118191832489.json`: sin tablas ni datos cambiados). El stack histórico local conservado sigue612. No arrancar el binario nuevo sobre
+Próxima libre: `622`. El binario de `main` exige621; PROD pasó a617 el 10-nov, a618
+el 12-nov, a619 con el PR157, a620 con el PR160 (`artifacts/promocion-prod-620-620-20261118191832489.json`: sin tablas ni datos cambiados) y a621 con el PR162 (`artifacts/promocion-prod-621-621-20261124062024456.json`: tres tablas nuevas, sin tablas ni datos existentes cambiados). El stack histórico local conservado sigue612. No arrancar el binario nuevo sobre
 la base conservada sin completar su migración en infraestructura de pruebas propia.
 Comprobar prefijos duplicados antes de añadir una.
 
