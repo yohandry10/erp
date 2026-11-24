@@ -2044,6 +2044,23 @@ export class PosService {
       const tipoEmision = venta.tipo_emision || null;
       const esTicketInterno = tipoEmision === 'TICKET';
 
+      // Si el CPE se creó después de la venta (reintento o worker), el número
+      // no está en atomic_result: se lee del propio comprobante del tenant.
+      let numeroFiscal: string | null = venta.atomic_result?.numero_fiscal || null;
+      if (!numeroFiscal && venta.cpe_id) {
+        const { data: cpe, error: cpeError } = await this.supabase.getClient()
+          .from('cpe')
+          .select('serie, numero, metadata')
+          .eq('id', venta.cpe_id)
+          .eq('tenant_id', user.tenant_id)
+          .maybeSingle();
+        if (cpeError) throw this.toPosException(cpeError, 'La consulta de facturación POS está temporalmente indisponible');
+        numeroFiscal = (cpe as any)?.metadata?.numero_fiscal
+          || ((cpe as any)?.serie && (cpe as any)?.numero
+            ? `${(cpe as any).serie}-${String((cpe as any).numero).padStart(8, '0')}`
+            : null);
+      }
+
       return {
         venta_id: venta.id,
         numero_ticket: venta.numero_ticket,
@@ -2052,7 +2069,7 @@ export class PosService {
         factura_electronica: Boolean(venta.cpe_id),
         tipo_emision: tipoEmision,
         canjeable: esTicketInterno && !venta.cpe_id,
-        numero_fiscal: venta.atomic_result?.numero_fiscal || null,
+        numero_fiscal: numeroFiscal,
         intentos_facturacion: Number(venta.intentos_facturacion || 0),
         error_facturacion: venta.error_facturacion || null,
         ultimo_intento_facturacion: venta.ultimo_intento_facturacion || null,
