@@ -85,6 +85,8 @@ const MENSAJES_POR_CODIGO: Record<string, string> = {
   INTEGRATION_CREDENTIAL_EXPIRED: 'La credencial está vencida: renueva su vencimiento antes de rotar.',
   INTEGRATION_REVOCATION_REASON_REQUIRED: 'Indica el motivo de la revocación.',
   INTEGRATION_GRACE_OUT_OF_RANGE: 'El período de gracia debe estar entre 1 y 720 horas.',
+  CPE_PDF_FORMATO_INVALIDO: 'Formato de PDF no válido: usa a4, ticket80 o ticket58.',
+  CPE_PDF_FORMATO_NO_DISPONIBLE_PAIS: 'El formato de ticket sólo está disponible para comprobantes de Perú; usa a4.',
   BANK_RECONCILIATION_DIFFERENCE_REQUIRES_EXPLICIT_ACCOUNTED_ADJUSTMENT:
     'Los saldos del banco y del sistema no cuadran; registra el ajuste contable antes de cerrar la conciliación.',
 };
