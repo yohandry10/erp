@@ -2024,6 +2024,10 @@ export class PosService {
     tipo_emision: string | null;
     canjeable: boolean;
     numero_fiscal: string | null;
+    /** Estado del comprobante en el ERP (BORRADOR, FIRMADO, ENVIADO, ACEPTADO, RECHAZADO…). */
+    cpe_estado: string | null;
+    /** Estado ante la autoridad fiscal (PENDIENTE, ACEPTADO, RECHAZADO…). */
+    estado_sunat: string | null;
     intentos_facturacion: number;
     error_facturacion: string | null;
     ultimo_intento_facturacion: string | null;
@@ -2044,6 +2048,30 @@ export class PosService {
       const tipoEmision = venta.tipo_emision || null;
       const esTicketInterno = tipoEmision === 'TICKET';
 
+      // Con CPE se lee el propio comprobante del tenant: su estado y el de la
+      // autoridad fiscal, y el número cuando se creó después de la venta
+      // (reintento o worker) y por eso no está en atomic_result.
+      let numeroFiscal: string | null = venta.atomic_result?.numero_fiscal || null;
+      let cpeEstado: string | null = null;
+      let estadoSunat: string | null = null;
+      if (venta.cpe_id) {
+        const { data: cpe, error: cpeError } = await this.supabase.getClient()
+          .from('cpe')
+          .select('serie, numero, metadata, estado, estado_sunat')
+          .eq('id', venta.cpe_id)
+          .eq('tenant_id', user.tenant_id)
+          .maybeSingle();
+        if (cpeError) throw this.toPosException(cpeError, 'La consulta de facturación POS está temporalmente indisponible');
+        const comprobante = cpe as any;
+        numeroFiscal = numeroFiscal
+          || comprobante?.metadata?.numero_fiscal
+          || (comprobante?.serie && comprobante?.numero
+            ? `${comprobante.serie}-${String(comprobante.numero).padStart(8, '0')}`
+            : null);
+        cpeEstado = comprobante?.estado ?? null;
+        estadoSunat = comprobante?.estado_sunat ?? null;
+      }
+
       return {
         venta_id: venta.id,
         numero_ticket: venta.numero_ticket,
@@ -2052,7 +2080,9 @@ export class PosService {
         factura_electronica: Boolean(venta.cpe_id),
         tipo_emision: tipoEmision,
         canjeable: esTicketInterno && !venta.cpe_id,
-        numero_fiscal: venta.atomic_result?.numero_fiscal || null,
+        numero_fiscal: numeroFiscal,
+        cpe_estado: cpeEstado,
+        estado_sunat: estadoSunat,
         intentos_facturacion: Number(venta.intentos_facturacion || 0),
         error_facturacion: venta.error_facturacion || null,
         ultimo_intento_facturacion: venta.ultimo_intento_facturacion || null,

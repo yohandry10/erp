@@ -1745,3 +1745,54 @@ describe('PosService con credencial de integración externa (621)', () => {
       .rejects.toThrow('INTEGRACION_ALCANCE_SUCURSAL');
   });
 });
+
+describe('PosService estado de facturación: número fiscal', () => {
+  const venta = (extra: Record<string, unknown>) => ({
+    id: '3b135288-622d-42dc-8ff7-5cc3e3700e20', numero_ticket: 'T001-00000002', tipo_emision: 'FISCAL_INMEDIATO',
+    cpe_pendiente: false, intentos_facturacion: 0, ...extra,
+  });
+  const conCpe = (ctx: ReturnType<typeof createService>, cpe: any) => {
+    const original = ctx.supabaseClient.from.getMockImplementation();
+    const pedidos: any[] = [];
+    ctx.supabaseClient.from.mockImplementation((table: string) => {
+      if (table !== 'cpe') return original(table);
+      const chain: any = { select: jest.fn(() => chain), eq: jest.fn((c: string, v: any) => { pedidos.push([c, v]); return chain; }),
+        maybeSingle: jest.fn(async () => ({ data: cpe, error: null })) };
+      return chain;
+    });
+    return pedidos;
+  };
+
+  it('lee el número del comprobante cuando el CPE se creó después de la venta', async () => {
+    const ctx = createService({ ventasPosResponse: venta({ cpe_id: 'cpe-1', atomic_result: {} }) });
+    const pedidos = conCpe(ctx, { serie: 'B001', numero: '1', metadata: {}, estado: 'FIRMADO', estado_sunat: 'PENDIENTE' });
+
+    const estado = await ctx.service.obtenerEstadoFacturacionVenta('3b135288-622d-42dc-8ff7-5cc3e3700e20', user);
+
+    expect(estado).toEqual(expect.objectContaining({
+      numero_fiscal: 'B001-00000001', cpe_estado: 'FIRMADO', estado_sunat: 'PENDIENTE',
+    }));
+    expect(pedidos).toEqual(expect.arrayContaining([['id', 'cpe-1'], ['tenant_id', 'tenant-1']]));
+  });
+
+  it('respeta el número de la venta y expone el estado del comprobante', async () => {
+    const ctx = createService({ ventasPosResponse: venta({ cpe_id: 'cpe-1', atomic_result: { numero_fiscal: 'B001-00000009' } }) });
+    conCpe(ctx, { serie: 'B001', numero: '1', estado: 'ACEPTADO', estado_sunat: 'ACEPTADO' });
+
+    const estado = await ctx.service.obtenerEstadoFacturacionVenta('3b135288-622d-42dc-8ff7-5cc3e3700e20', user);
+
+    expect(estado).toEqual(expect.objectContaining({
+      numero_fiscal: 'B001-00000009', cpe_estado: 'ACEPTADO', estado_sunat: 'ACEPTADO',
+    }));
+  });
+
+  it('sin CPE el número sigue vacío', async () => {
+    const ctx = createService({ ventasPosResponse: venta({ cpe_id: null, cpe_pendiente: true, atomic_result: {} }) });
+    const pedidos = conCpe(ctx, null);
+
+    const estado = await ctx.service.obtenerEstadoFacturacionVenta('3b135288-622d-42dc-8ff7-5cc3e3700e20', user);
+
+    expect(estado).toEqual(expect.objectContaining({ numero_fiscal: null, cpe_estado: null, estado_sunat: null }));
+    expect(pedidos).toEqual([]);
+  });
+});
