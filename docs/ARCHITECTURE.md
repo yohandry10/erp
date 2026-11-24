@@ -110,6 +110,79 @@ sin datos de clientes.
   Conserva destinatario, asunto y texto plano. Las regresiones usan transporte
   simulado; la comprobación MIME local usa transporte en memoria y no envía correo.
 
+### Credencial de integración externa (621)
+
+Un sistema externo cobra con boleta o factura sin sesión de usuario, siempre
+desde su servidor (nunca desde un navegador o instalador). La administra quien
+tiene `users.manage` en **Configuración → Integraciones externas**
+(`/dashboard/configuracion/integraciones`). Un administrador con
+establecimientos asignados sólo crea y administra credenciales de esas sedes
+(`403 INTEGRATION_BRANCH_OUT_OF_ACTOR_SCOPE`).
+
+- **Identidad.** Cada credencial pertenece a una empresa y una sucursal, y opera
+  con una cuenta técnica propia (`usuarios_sistema.es_cuenta_integracion`): sin
+  contraseña, sin superadministrador, sólo con el rol `INTEGRACION_EXTERNA`.
+  Triggers de la 621 impiden darle contraseña, otro rol, permisos fuera de la
+  lista o reactivarla tras revocar. Así las RPC del POS (actor activo, RBAC,
+  caja, idempotencia) siguen siendo la frontera sin reescribirlas.
+- **Cabeceras.** `X-Integracion-Credencial: erpint_<prefijo>_<secreto>`. Junto a
+  ella no puede viajar `Authorization` ni la cookie `access_token`
+  (`401 INTEGRACION_CREDENCIAL_AMBIGUA`). La persona que cobra, ya verificada por
+  el sistema externo, va en `X-Actor-Externo-Id` (`[A-Za-z0-9._:@-]`, hasta 120)
+  y `X-Actor-Externo-Nombre` (codificado con `encodeURIComponent`, hasta 160).
+  Es obligatoria al vender, reintentar y abrir o cerrar caja. Con una sesión de
+  usuario esas cabeceras responden `403 INTEGRACION_ACTOR_EXTERNO_NO_PERMITIDO`;
+  no crean usuarios.
+- **Rutas.** Sólo las marcadas con `@PermiteIntegracionExterna` (una prueba fija
+  la lista): `POST /api/pos/venta`, `GET /api/pos/facturacion/:ventaId`,
+  `POST /api/pos/reintentar-facturacion/:ventaId`,
+  `GET /api/cpe/comprobantes/:id/pdf`, `GET /api/pos/sesion-caja`,
+  `POST /api/pos/caja/abrir`, `POST /api/pos/caja/cerrar`,
+  `GET /api/pos/metodos-pago` y `GET /api/inventario/productos/:id`. Cualquier
+  otra: `403 INTEGRACION_RUTA_NO_PERMITIDA`. `PermissionGuard` aplica además el
+  techo `pos.vender`, `pos.read`, `pos.caja.write`, `inventario.productos.read`
+  y `cpe.comprobantes.descargar_pdf` (`403 INTEGRACION_PERMISO_NO_PERMITIDO`).
+- **Alcance.** Empresa y sucursal salen de la credencial. Un `tenant_id`,
+  `tenantId`, `X-Tenant-Id`, `sucursal_id` o `sucursalId` distinto en body o
+  query responde `403 INTEGRACION_ALCANCE_TENANT` o `…_SUCURSAL`. El contexto
+  fija la sucursal de la credencial como alcance de toda consulta (ventas, cajas,
+  sesiones, CPE): una venta o comprobante de otra sede es 404, una caja ajena es
+  `403 INTEGRACION_ALCANCE_SUCURSAL`, y la lectura de producto sólo devuelve
+  precio y stock de esa sucursal.
+- **Autenticación.** `autenticar_integracion_externa_621` decide secreto,
+  revocación, vencimiento, gracia, ruta, alcance y persona, y deja el uso
+  (`USO`) o el rechazo (`RECHAZO` con su código) en
+  `integracion_externa_eventos` en la misma transacción. Si la base no
+  responde: `503 INTEGRACION_AUTENTICACION_NO_DISPONIBLE`; nunca cae a sesión.
+- **Alta.** `POST /api/integraciones-externas` con `nombre`, `sistema`,
+  `sucursal_id`, `expira_en` (entre 1 hora y 2 años) e `idempotency_key`.
+  Devuelve `credencial` una sola vez; la base sólo guarda el SHA-256. Repetir la
+  clave es `409 INTEGRATION_CREDENTIAL_ALREADY_CREATED` y no muestra el secreto.
+- **Rotación sin cortes.** `POST /:id/rotar` con `gracia_horas` (1–720) emite un
+  secreto nuevo, mostrado una vez; el anterior sigue válido hasta el fin de la
+  gracia (nunca más allá del vencimiento). Otra rotación durante la gracia es
+  `409 INTEGRATION_ROTATION_IN_PROGRESS`; `POST /:id/finalizar-rotacion` retira
+  el anterior antes. Un secreto retirado responde
+  `401 INTEGRACION_SECRETO_RETIRADO`.
+- **Vencimiento.** `PUT /:id/vencimiento` con `expira_en`. Vencida:
+  `401 INTEGRACION_CREDENCIAL_VENCIDA`; el primer intento registra `VENCIMIENTO`.
+- **Revocación.** `POST /:id/revocar` con `motivo`: inmediata, retira todos los
+  secretos y desactiva la cuenta técnica. Luego:
+  `401 INTEGRACION_CREDENCIAL_REVOCADA`.
+- **Auditoría.** `GET /:id/eventos`. Alta, rotación, fin de rotación, retiro de
+  secreto, vencimiento, cambio de vencimiento, revocación, cada uso y cada
+  rechazo, con credencial, sucursal, sistema, persona externa, método, ruta e
+  IP. Sólo inserción.
+- **Venta.** `referencia_externa` (`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,79}$`, sin
+  datos clínicos ni personales) y las dos identidades
+  (`integracion_credencial_id`, `actor_externo_id`, `actor_externo_nombre`) se
+  guardan en `ventas_pos` en la misma transacción que la venta
+  (`pos_registrar_venta_integracion_621`). El mismo `idempotency_key` devuelve
+  la misma venta; con otra referencia es `409`. Una sesión normal puede enviar
+  `referencia_externa`, nunca la persona externa.
+- La fecha del comprobante sigue siendo la del proceso: emitir con la fecha real
+  de un cobro sin conexión requiere decisión contable y no está implementado.
+
 ## Fiscal
 
 Los parches de dependencias sin versión publicada viven en `patches/` y se

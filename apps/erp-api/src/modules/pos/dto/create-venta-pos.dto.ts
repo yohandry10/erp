@@ -11,6 +11,7 @@ import {
   Min,
   IsObject,
   IsInt,
+  Matches,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -222,6 +223,15 @@ export class CreateVentaPosDto {
   @IsString()
   @MaxLength(500)
   referencia_pago?: string;
+
+  /**
+   * Referencia de la operación en un sistema externo (p. ej. `EXT-…`), para
+   * reportes y conciliación. Nunca lleva datos clínicos ni personales.
+   */
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,79}$/, { message: 'referencia_externa no es válida' })
+  referencia_externa?: string;
 
   @IsOptional()
   @IsString()

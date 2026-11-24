@@ -6,6 +6,7 @@ import { PERMISSION_KEY, ParsedPermission } from '../decorators/require-permissi
 import { PermissionService } from '../../modules/permissions/permission.service';
 import { ConfigService } from '@nestjs/config';
 import { TenantContextService } from '../../shared/tenant/tenant-context.service';
+import { PERMISOS_INTEGRACION, esIntegracion } from '../../modules/integracion-externa/integracion-externa.contract';
 
 /**
  * HARDENING: Guard centralizado que valida permisos granulares contra la tabla
@@ -59,6 +60,15 @@ export class PermissionGuard implements CanActivate {
       PERMISSION_KEY,
       [context.getHandler(), context.getClass()],
     );
+
+    // Techo de la credencial de integración: aunque su rol técnico ganara un
+    // permiso más, sólo cuentan los de la lista acotada.
+    if (esIntegracion(request.user)) {
+      const codigo = String(requiredPermission?.raw ?? '').trim().toLowerCase();
+      if (!codigo || !PERMISOS_INTEGRACION.includes(codigo)) {
+        throw new ForbiddenException('INTEGRACION_PERMISO_NO_PERMITIDO');
+      }
+    }
 
     if (!requiredPermission) {
       let user = request.user;

@@ -34,6 +34,8 @@ export class SupabaseService {
     'claim_outbox_events_tx',
     'heartbeat_outbox_event_tx',
     'outbox_runtime_health_492',
+    // Antes de conocer el tenant: la credencial es la que lo determina.
+    'autenticar_integracion_externa_621',
   ]);
   private readonly logger = new Logger(SupabaseService.name);
   private readonly serviceRoleKey: string;

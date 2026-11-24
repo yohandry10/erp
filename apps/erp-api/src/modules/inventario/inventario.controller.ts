@@ -33,6 +33,7 @@ import { MAX_PRODUCT_IMAGE_BYTES, ProductImagesService, ProductImageUpload } fro
 import { rangoDelDiaDelTenant } from '../../shared/utils/fecha-tenant.util';
 import { calcularMetricasInventario, obtenerPaisMetricasInventario } from './inventario-metrics.util';
 import { lecturaInventarioFallida } from './inventario-errors';
+import { PermiteIntegracionExterna, esIntegracion } from '../integracion-externa/integracion-externa.contract';
 
 /**
  * ✅ MULTI-TENANT: Controlador de Inventario con soporte multi-tenant
@@ -671,13 +672,15 @@ export class InventarioController {
    * Obtener producto específico por ID
    */
   @Get('productos/:id')
+  @PermiteIntegracionExterna({ actorExterno: 'opcional' })
   @RequirePermission('inventario.productos.read') // HARDENING: lectura individual protegida.
   @ApiOperation({ summary: 'Obtener producto por ID' })
   @ApiResponse({ status: 200, description: 'Producto obtenido exitosamente' })
   async getProducto(
     @CurrentTenant() tenantId: string,
     @Param('id', UuidParamPipe) id: string,
-    @Query() query: any
+    @Query() query: any,
+    @CurrentUser() user?: any,
   ) {
     try {
       this.logger.log(`🔍 [Tenant: ${tenantId}] Obteniendo producto por ID: ${id}`); // HARDENING: evita logs sin contexto tenant.
@@ -702,6 +705,15 @@ export class InventarioController {
       if (includeSucursal && data?.id) {
         if (data.id !== id || data.tenant_id !== tenantId) throw lecturaInventarioFallida(null, 'el alcance del producto');
         const sucursales = await readProductSucursalSources(this.supabase.getClient(), tenantId, [data]);
+        if (esIntegracion(user)) {
+          // La credencial de integración sólo ve el precio y el stock de su sucursal.
+          const propia = (row: any) => row?.sucursal_id === user.integracion?.sucursal_id;
+          const producto = sucursales.data[0];
+          producto.precios_sucursal = producto.precios_sucursal.filter(propia);
+          producto.stock_sucursal = producto.stock_sucursal.filter(propia);
+          sucursales.sources.precios_total = producto.precios_sucursal.length;
+          sucursales.sources.stock_total = producto.stock_sucursal.length;
+        }
         return {
           success: true,
           complete: true, tenant_id: tenantId, include_sucursal: true,

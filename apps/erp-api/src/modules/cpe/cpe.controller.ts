@@ -39,6 +39,7 @@ import { CpeDianEventsService } from './cpe-dian-events.service';
 
 import { CrearComprobanteUiDto } from './dto/crear-comprobante-ui.dto';
 import { VincularCxcCpeDto } from './dto/vincular-cxc-cpe.dto';
+import { PermiteIntegracionExterna } from '../integracion-externa/integracion-externa.contract';
 
 @ApiTags('cpe')
 @Controller('cpe')
@@ -305,6 +306,7 @@ export class CpeController {
   }
 
   @Get('comprobantes/:id/pdf')
+  @PermiteIntegracionExterna({ actorExterno: 'opcional' })
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.descargar_pdf')
   @ApiOperation({ summary: 'Descargar PDF del CPE' })
