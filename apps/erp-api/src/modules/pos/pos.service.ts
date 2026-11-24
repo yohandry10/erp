@@ -20,6 +20,7 @@ import { toPostgresBytea } from '../../shared/utils/certificate.utils';
 import { parseColombiaNit } from '../paises/initial-country';
 import { CanjearTicketPosDto } from './dto/canjear-ticket-pos.dto';
 import { normalizeDianIdentity } from '../fiscal/colombia/dian-document.util';
+import { esIntegracion } from '../integracion-externa/integracion-externa.contract';
 
 @Injectable()
 export class PosService {
@@ -219,6 +220,28 @@ export class PosService {
         return operation();
       },
     );
+  }
+
+  /**
+   * Referencia externa y las dos identidades de una venta. La credencial y la
+   * persona externa salen del principal autenticado, nunca del body; con una
+   * sesión normal sólo cabe la referencia.
+   */
+  static vinculoIntegracion(ventaData: any, user: any): Record<string, string | null> | null {
+    const referencia = typeof ventaData?.referencia_externa === 'string' && ventaData.referencia_externa.trim()
+      ? ventaData.referencia_externa.trim()
+      : null;
+    if (esIntegracion(user)) {
+      return {
+        credencial_id: user.integracion?.credencial_id ?? null,
+        referencia_externa: referencia,
+        actor_externo_id: user.actor_externo?.id ?? null,
+        actor_externo_nombre: user.actor_externo?.nombre ?? null,
+      };
+    }
+    return referencia
+      ? { credencial_id: null, referencia_externa: referencia, actor_externo_id: null, actor_externo_nombre: null }
+      : null;
   }
 
   private buildVentaLockKey(ventaData: any, user: any): string {
@@ -951,6 +974,7 @@ export class PosService {
       // Normalizar idempotency_key para que sea estable (trim) en todos los sub-flujos (CPE/CxC/outbox).
       ventaData.idempotency_key = String(ventaData.idempotency_key).trim();
       const ventaIdempotencyKey = ventaData.idempotency_key;
+      const vinculo = PosService.vinculoIntegracion(ventaData, user);
 
       // Validaciones mínimas de entrada antes de tocar la BD
       if (!items.length) {
@@ -1007,6 +1031,19 @@ export class PosService {
       }
       if (retryData && typeof retryData === 'object' && !Array.isArray(retryData)) {
         const retry = retryData as Record<string, any>;
+        if (vinculo) {
+          // Reintento confirmado: la venta ya existe. Sólo se comprueba (o se
+          // completa) su enlace; otra referencia con la misma clave es otro cobro.
+          const { data: enlace, error: enlaceError } = await this.supabase.getClient()
+            .rpc('pos_vincular_integracion_venta_621', {
+              p_tenant_id: user.tenant_id,
+              p_usuario_id: user.id,
+              p_venta_id: retry.venta_id,
+              p_integracion: vinculo,
+            });
+          if (enlaceError) throw enlaceError;
+          retry.referencia_externa = (enlace as any)?.referencia_externa ?? null;
+        }
         const tipoEmisionRetry = retry.tipo_emision
           || (emitirCpe ? 'FISCAL_INMEDIATO' : 'TICKET');
         return {
@@ -1034,6 +1071,7 @@ export class PosService {
           redondeo_efectivo_legal: retry.redondeo_efectivo_legal === true,
           monto_efectivo_cobrado: retry.monto_efectivo_cobrado ?? null,
           monto_ajuste_redondeo: retry.monto_ajuste_redondeo ?? null,
+          referencia_externa: retry.referencia_externa ?? null,
           message: tipoEmisionRetry === 'TICKET'
             ? 'Ticket interno ya confirmado; reintento validado sin recalcular la lista'
             : 'Venta fiscal ya confirmada; reintento validado sin recalcular la lista',
@@ -1558,21 +1596,25 @@ export class PosService {
         } : null,
       };
 
+      // Con credencial de integración o referencia externa, el writer 621 envuelve
+      // al comercial y enlaza referencia e identidades en la misma transacción.
+      const writer = vinculo ? 'pos_registrar_venta_integracion_621' : 'pos_registrar_venta_comercial_tx';
       const { data: txData, error: txError } = await this.supabase.getClient()
-        .rpc('pos_registrar_venta_comercial_tx', {
+        .rpc(writer, {
           p_tenant_id: user.tenant_id,
           p_usuario_id: user.id,
           p_sesion_caja_id: sesionCajaId,
           p_idempotency_key: ventaIdempotencyKey,
           p_payload: atomicPayload,
+          ...(vinculo ? { p_integracion: vinculo } : {}),
         });
 
       if (
         txError?.code === 'PGRST202' &&
-        String(txError?.details || txError?.message || '').includes('pos_registrar_venta_comercial_tx')
+        String(txError?.details || txError?.message || '').includes(writer)
       ) {
         throw new Error(
-          'POS_ATOMIC_CONTRACT_UNAVAILABLE: falta pos_registrar_venta_comercial_tx; venta bloqueada para evitar saldos divergentes',
+          `POS_ATOMIC_CONTRACT_UNAVAILABLE: falta ${writer}; venta bloqueada para evitar saldos divergentes`,
         );
       }
 
@@ -1604,6 +1646,7 @@ export class PosService {
           impuestos: ventaResult.impuestos,
           total: ventaResult.total,
           idempotency_key: ventaIdempotencyKey,
+          ...(vinculo ? { integracion_externa: vinculo } : {}),
         },
       }));
 
@@ -1640,6 +1683,7 @@ export class PosService {
         redondeo_efectivo_legal: ventaTx.redondeo_efectivo_legal === true,
         monto_efectivo_cobrado: ventaTx.monto_efectivo_cobrado ?? null,
         monto_ajuste_redondeo: ventaTx.monto_ajuste_redondeo ?? null,
+        referencia_externa: ventaTx.referencia_externa ?? null,
         fiscal_simulado: emitirCpe && countryCode === 'CO' && dianIsDemo,
         message: tipoEmision === 'TICKET'
           ? 'Venta confirmada como ticket interno canjeable; sin correlativo fiscal reservado'
@@ -1715,6 +1759,21 @@ export class PosService {
         user.tenant_id,
         typeof data === 'number' ? undefined : data?.caja_id,
       );
+
+      // La credencial de integración sólo abre cajas de su sucursal. El cliente
+      // ya filtra `cajas` por esa sucursal; esto lo hace explícito y con código.
+      if (esIntegracion(user)) {
+        const { data: caja, error: cajaError } = await client
+          .from('cajas')
+          .select('id, sucursal_id')
+          .eq('tenant_id', user.tenant_id)
+          .eq('id', cajaId)
+          .maybeSingle();
+        if (cajaError) throw new ServiceUnavailableException('No se pudo verificar la caja; reintente');
+        if (!caja || (caja as any).sucursal_id !== user.integracion?.sucursal_id) {
+          throw new ForbiddenException('INTEGRACION_ALCANCE_SUCURSAL');
+        }
+      }
 
       const dto: AbrirCajaDto = {
         monto_inicio: montoInicial,

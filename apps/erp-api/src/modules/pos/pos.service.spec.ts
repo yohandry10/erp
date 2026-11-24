@@ -1622,3 +1622,126 @@ describe('PosService atomic transaction contract', () => {
     expect(ctx.cpeService.create).not.toHaveBeenCalled();
   });
 });
+
+describe('PosService con credencial de integración externa (621)', () => {
+  const principal = {
+    id: 'cuenta-tecnica-1',
+    tenant_id: 'tenant-1',
+    is_super_admin: false,
+    auth_type: 'integracion_externa',
+    integracion: { credencial_id: 'cred-1', sucursal_id: 'suc-1', nombre: 'Integración', sistema: 'Externo', secreto_id: 'sec-1' },
+    actor_externo: { id: 'EXT-7', nombre: 'Recepción 7' },
+  };
+  const ventaFeliz = (ctx: ReturnType<typeof createService>, extra: Record<string, unknown> = {}) => {
+    ctx.validationService.validateCertificate.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+    ctx.validationService.validateRucConfiguration.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+    ctx.validationService.validateDocumentBeforeEmission.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+    const original = ctx.rpcMock.getMockImplementation()!;
+    ctx.rpcMock.mockImplementation(async (fn: string, args?: any) => {
+      if (fn === 'pos_registrar_venta_integracion_621') {
+        const base: any = await original('pos_registrar_venta_comercial_tx', args);
+        return { data: { ...base.data, referencia_externa: args.p_integracion.referencia_externa, ...extra }, error: null };
+      }
+      return original(fn, args);
+    });
+  };
+
+  it('registra la venta con el writer 621 y toma credencial y persona del principal, no del body', async () => {
+    const ctx = createService();
+    ventaFeliz(ctx);
+
+    const result: any = await ctx.service.procesarVenta(
+      { ...ventaBase, referencia_externa: 'EXT-0001', credencial_id: 'cred-falsa', actor_externo_id: 'otro' },
+      principal,
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.referencia_externa).toBe('EXT-0001');
+    expect(ctx.rpcMock).toHaveBeenCalledWith('pos_registrar_venta_integracion_621', expect.objectContaining({
+      p_tenant_id: 'tenant-1',
+      p_usuario_id: 'cuenta-tecnica-1',
+      p_idempotency_key: 'lock-123',
+      p_integracion: {
+        credencial_id: 'cred-1',
+        referencia_externa: 'EXT-0001',
+        actor_externo_id: 'EXT-7',
+        actor_externo_nombre: 'Recepción 7',
+      },
+    }));
+    expect(ctx.rpcMock).not.toHaveBeenCalledWith('pos_registrar_venta_comercial_tx', expect.anything());
+  });
+
+  it('una sesión normal sólo aporta la referencia: nunca credencial ni persona externa', async () => {
+    const ctx = createService();
+    ventaFeliz(ctx);
+
+    await ctx.service.procesarVenta({ ...ventaBase, referencia_externa: 'EXT-0002' }, {
+      ...user,
+      actor_externo: { id: 'EXT-7', nombre: 'Inventado' },
+      integracion: { credencial_id: 'cred-1' },
+    });
+
+    expect(ctx.rpcMock).toHaveBeenCalledWith('pos_registrar_venta_integracion_621', expect.objectContaining({
+      p_integracion: { credencial_id: null, referencia_externa: 'EXT-0002', actor_externo_id: null, actor_externo_nombre: null },
+    }));
+  });
+
+  it('sin referencia ni credencial conserva el writer comercial de siempre', async () => {
+    const ctx = createService();
+    ventaFeliz(ctx);
+
+    await ctx.service.procesarVenta(ventaBase, user);
+
+    expect(ctx.rpcMock).toHaveBeenCalledWith('pos_registrar_venta_comercial_tx', expect.not.objectContaining({ p_integracion: expect.anything() }));
+    expect(ctx.rpcMock).not.toHaveBeenCalledWith('pos_registrar_venta_integracion_621', expect.anything());
+  });
+
+  it('el reintento idempotente comprueba el enlace sin registrar otra venta', async () => {
+    const ctx = createService();
+    ctx.rpcMock.mockImplementation(async (fn: string) => {
+      if (fn === 'reintentar_venta_pos_comercial_tx') {
+        return { data: { venta_id: 'venta-1', total: 118, impactos_aplicados: true, idempotent: true }, error: null };
+      }
+      if (fn === 'pos_vincular_integracion_venta_621') {
+        return { data: { referencia_externa: 'EXT-0001' }, error: null };
+      }
+      return { data: null, error: null };
+    });
+
+    const result: any = await ctx.service.procesarVenta({ ...ventaBase, referencia_externa: 'EXT-0001' }, principal);
+
+    expect(result).toEqual(expect.objectContaining({ success: true, venta_id: 'venta-1', idempotent: true, referencia_externa: 'EXT-0001' }));
+    expect(ctx.rpcMock).toHaveBeenCalledWith('pos_vincular_integracion_venta_621', {
+      p_tenant_id: 'tenant-1',
+      p_usuario_id: 'cuenta-tecnica-1',
+      p_venta_id: 'venta-1',
+      p_integracion: expect.objectContaining({ credencial_id: 'cred-1', referencia_externa: 'EXT-0001' }),
+    });
+    expect(ctx.rpcMock).not.toHaveBeenCalledWith('pos_registrar_venta_integracion_621', expect.anything());
+  });
+
+  it('la misma clave con otra referencia es otro cobro: no responde éxito', async () => {
+    const ctx = createService();
+    ctx.rpcMock.mockImplementation(async (fn: string) => {
+      if (fn === 'reintentar_venta_pos_comercial_tx') {
+        return { data: { venta_id: 'venta-1', total: 118, impactos_aplicados: true, idempotent: true }, error: null };
+      }
+      if (fn === 'pos_vincular_integracion_venta_621') {
+        return { data: null, error: { code: '23505', message: 'POS_IDEMPOTENCY_PAYLOAD_MISMATCH' } };
+      }
+      return { data: null, error: null };
+    });
+
+    const result: any = await ctx.service.procesarVenta({ ...ventaBase, referencia_externa: 'EXT-0009' }, principal);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toEqual(expect.objectContaining({ tipo: 'DATABASE_ERROR', codigo: '23505' }));
+  });
+
+  it('no abre una caja de otra sucursal', async () => {
+    const ctx = createService();
+
+    await expect(ctx.service.abrirCaja({ monto_inicial: 0, caja_id: 'caja-ajena' }, principal))
+      .rejects.toThrow('INTEGRACION_ALCANCE_SUCURSAL');
+  });
+});

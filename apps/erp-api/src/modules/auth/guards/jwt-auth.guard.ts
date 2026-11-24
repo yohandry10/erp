@@ -2,14 +2,28 @@ import {
   Injectable,
   ExecutionContext,
   UnauthorizedException,
+  ForbiddenException,
   Logger,
   Inject,
+  Optional,
   forwardRef
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from '../auth.service';
 import { Reflector } from '@nestjs/core';
 import { PUBLIC_METADATA_KEY } from '../../../common/decorators/public.decorator';
+import { IntegracionExternaAuthService } from '../../integracion-externa/integracion-externa-auth.service';
+import {
+  CABECERA_ACTOR_ID,
+  CABECERA_ACTOR_NOMBRE,
+  CABECERA_CREDENCIAL,
+  RUTA_INTEGRACION_KEY,
+  RutaIntegracionOptions,
+} from '../../integracion-externa/integracion-externa.contract';
+
+const tieneCookieDeSesion = (request: any): boolean =>
+  Boolean(request?.cookies?.access_token) ||
+  (typeof request?.headers?.cookie === 'string' && /(?:^|;\s*)access_token=/.test(request.headers.cookie));
 
 /**
  * A3: Guard mejorado que valida sesión en cada request
@@ -28,8 +42,51 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   constructor(
     @Inject(forwardRef(() => AuthService)) private readonly authService?: AuthService,
     private readonly reflector?: Reflector,
+    @Optional() private readonly integracionAuth?: IntegracionExternaAuthService,
   ) {
     super();
+  }
+
+  /**
+   * Credencial de integración externa: identidad propia, nunca combinada con
+   * una sesión de usuario. Sólo la aceptan las rutas marcadas con
+   * `@PermiteIntegracionExterna`; la base decide y audita cada intento.
+   */
+  private async autenticarIntegracion(context: ExecutionContext, request: any): Promise<boolean> {
+    if (request.integracionExterna) {
+      // Ya autenticada por el guard global; el de controlador no repite el uso.
+      return true;
+    }
+    if (request.headers?.authorization !== undefined || tieneCookieDeSesion(request)) {
+      throw new UnauthorizedException('INTEGRACION_CREDENCIAL_AMBIGUA');
+    }
+    if (!this.integracionAuth) {
+      throw new UnauthorizedException('INTEGRACION_CREDENCIAL_INVALIDA');
+    }
+    const ruta = this.reflector?.get<RutaIntegracionOptions>(RUTA_INTEGRACION_KEY, context.getHandler());
+    const principal = await this.integracionAuth.autenticar(request, ruta);
+
+    request.integracionExterna = principal;
+    request.user = {
+      id: principal.cuenta_tecnica_id,
+      email: null,
+      username: principal.nombre,
+      roles: [],
+      tenant_id: principal.tenant_id,
+      is_super_admin: false,
+      auth_type: 'integracion_externa',
+      integracion: {
+        credencial_id: principal.credencial_id,
+        sucursal_id: principal.sucursal_id,
+        nombre: principal.nombre,
+        sistema: principal.sistema,
+        secreto_id: principal.secreto_id,
+      },
+      actor_externo: principal.actor_externo,
+    };
+    request.tenantId = principal.tenant_id;
+    request.tenant_id = principal.tenant_id;
+    return true;
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -46,6 +103,16 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
     if (request.method === 'GET' && request.path === '/api/metrics') {
       return true;
+    }
+
+    if (request.headers?.[CABECERA_CREDENCIAL] !== undefined) {
+      return this.autenticarIntegracion(context, request);
+    }
+
+    // La persona externa sólo existe junto a una credencial de integración:
+    // con una sesión normal sería un nombre que cualquiera puede inventar.
+    if (request.headers?.[CABECERA_ACTOR_ID] !== undefined || request.headers?.[CABECERA_ACTOR_NOMBRE] !== undefined) {
+      throw new ForbiddenException('INTEGRACION_ACTOR_EXTERNO_NO_PERMITIDO');
     }
 
     this.logger.debug(`[JWT] canActivate START - Path: ${request.path}, Has Auth Header: ${!!request.headers?.authorization}`);

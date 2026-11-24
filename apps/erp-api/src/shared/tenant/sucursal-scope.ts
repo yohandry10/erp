@@ -26,6 +26,9 @@ export const TABLAS_CON_SUCURSAL: ReadonlySet<string> = new Set([
   // vistas que exponen la columna
   'cpe_documentos',
   'stock_por_sucursal',
+  // 621: credenciales de integración externa y su auditoría, por sede
+  'integracion_externa_credenciales',
+  'integracion_externa_eventos',
 ]);
 
 /**

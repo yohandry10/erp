@@ -202,6 +202,8 @@ BEGIN
       'ventas_pos', 'sesiones_caja', 'movimientos_inventario', 'cpe', 'documentos',
       'empleados',
       'cpe_documentos', 'stock_por_sucursal',
+      -- 621: credenciales de integración externa y su auditoría, por sede.
+      'integracion_externa_credenciales', 'integracion_externa_eventos',
       -- Estas dos llevan la columna desde la migracion 025 y su NULL significa
       -- "global, sin establecimiento": es la clave de los upsert de inventario.
       'producto_precios_sucursal', 'producto_stock_sucursal'

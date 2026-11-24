@@ -9,6 +9,7 @@ import { Public } from '../../common/decorators/public.decorator';
 import { WorkerAuthGuard } from '../../shared/guards/worker-auth.guard';
 import { CreateVentaPosDto } from './dto/create-venta-pos.dto';
 import { CanjearTicketPosDto } from './dto/canjear-ticket-pos.dto';
+import { PermiteIntegracionExterna } from '../integracion-externa/integracion-externa.contract';
 
 import { AbrirCajaPosDto, CerrarCajaPosDto, ConfigurarCertificadoPosDto } from './dto/caja-pos.dto';
 
@@ -35,6 +36,7 @@ export class PosController {
   }
 
   @Get('metodos-pago')
+  @PermiteIntegracionExterna({ actorExterno: 'opcional' })
   @UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)
   @RequireFeatureFlag('pos')
   @RequirePermission('pos.read') // HARDENING: consulta métodos de pago.
@@ -51,6 +53,7 @@ export class PosController {
   }
 
   @Get('sesion-caja')
+  @PermiteIntegracionExterna({ actorExterno: 'opcional' })
   @UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)
   @RequireFeatureFlag('pos')
   @RequirePermission('pos.read') // HARDENING: consultar sesión de caja.
@@ -67,6 +70,7 @@ export class PosController {
   }
 
   @Post('venta')
+  @PermiteIntegracionExterna({ actorExterno: 'requerido' })
   @UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)
   @RequireFeatureFlag('pos')
   @RequirePermission('pos.vender') // HARDENING: venta rápida requiere permiso.
@@ -90,6 +94,8 @@ export class PosController {
         return HttpStatus.CONFLICT;
       case 'DATABASE_ERROR':
         if (resultado.error.codigo === '23505') return HttpStatus.CONFLICT;
+        // Enlace de integración externa fuera de alcance (621): no es una caída.
+        if (/^POS_(INTEGRATION|EXTERNAL_ACTOR)_/.test(String(resultado.error.mensaje ?? ''))) return HttpStatus.FORBIDDEN;
         // Falta de existencias en el almacén de la caja: regla de negocio, no caída.
         if (String(resultado.error.mensaje ?? '').startsWith('INVENTORY_')) return HttpStatus.CONFLICT;
         if (['22023','22P02','23503','23514','23502'].includes(resultado.error.codigo)) return HttpStatus.BAD_REQUEST;
@@ -114,6 +120,7 @@ export class PosController {
   }
 
   @Post('caja/abrir')
+  @PermiteIntegracionExterna({ actorExterno: 'requerido' })
   @UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)
   @RequireFeatureFlag('pos')
   @RequirePermission('pos.caja.write') // HARDENING: apertura de caja protegida.
@@ -125,6 +132,7 @@ export class PosController {
   }
 
   @Post('caja/cerrar')
+  @PermiteIntegracionExterna({ actorExterno: 'requerido' })
   @UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)
   @RequireFeatureFlag('pos')
   @RequirePermission('pos.caja.write') // HARDENING: cierre de caja protegido.
@@ -173,6 +181,7 @@ export class PosController {
   }
 
   @Get('facturacion/:ventaId')
+  @PermiteIntegracionExterna({ actorExterno: 'opcional' })
   @UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)
   @RequireFeatureFlag('pos')
   @RequirePermission('pos.read') // HARDENING: consultar estado fiscal de una venta POS.
@@ -181,6 +190,7 @@ export class PosController {
   }
 
   @Post('reintentar-facturacion/:ventaId')
+  @PermiteIntegracionExterna({ actorExterno: 'requerido' })
   @UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)
   @RequireFeatureFlag('pos')
   @RequirePermission('pos.vender') // HARDENING: reintentar facturación requiere permiso de venta.

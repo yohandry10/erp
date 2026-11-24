@@ -34,6 +34,7 @@ import { RrhhModule } from './modules/rrhh/rrhh.module';
 import { RetencionesModule } from './modules/retenciones/retenciones.module';
 import { PaisesModule } from './modules/paises/paises.module';
 import { SucursalesModule } from './modules/sucursales/sucursales.module';
+import { IntegracionExternaModule } from './modules/integracion-externa/integracion-externa.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { ValidationModule } from './modules/validations/validation.module';
 import { TenantMiddleware } from './common/middleware/tenant.middleware'; // ✅ MULTI-TENANT
@@ -117,6 +118,7 @@ import { apiEnvFilePath } from './config/env-files';
     RetencionesModule,
     PaisesModule,
     SucursalesModule,
+    IntegracionExternaModule,
     ValidationModule,
     ClientesModule,
     VentasCotizacionesModule,

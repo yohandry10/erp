@@ -87,8 +87,13 @@ export class TenantContextInterceptor implements NestInterceptor {
     // contexto; `SupabaseService.getClient()` lo aplica a toda consulta sobre
     // una tabla con `sucursal_id`. Un superadministrador no se restringe, y una
     // petición sin usuario tampoco: son los caminos de sistema.
+    // Una credencial de integración externa trae su sucursal: no se consulta ni
+    // se amplía por ninguna asignación posterior de su cuenta técnica.
+    const sucursalIntegracion: string | undefined = request.integracionExterna?.sucursal_id;
     const resolverAlcance = (): Promise<string[] | null> =>
-      isSuperAdmin ? Promise.resolve(null) : this.sucursalScope.resolver(tenantId, userId);
+      sucursalIntegracion
+        ? Promise.resolve([sucursalIntegracion])
+        : isSuperAdmin ? Promise.resolve(null) : this.sucursalScope.resolver(tenantId, userId);
 
     // Establecer contexto de tenant para AsyncLocalStorage
     const store = this.tenantContext.getContext();
